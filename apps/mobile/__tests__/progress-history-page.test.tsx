@@ -117,6 +117,7 @@ const buildViewProps = (
   onOpenWeek: jest.fn(),
   onRetry: jest.fn(),
   todayDateKey: '2026-06-05',
+  timeline: { weekSetsTarget: { muscleGroupIds: ['side_delts'] }, onOpenSession: jest.fn() },
   ...overrides,
 });
 
@@ -217,6 +218,7 @@ describe('HistoryView', () => {
 
   it('labels each view option by name, drawing it as an icon', () => {
     expect(HISTORY_VIEW_OPTIONS.map(option => [option.value, option.label, option.icon])).toEqual([
+      ['timeline', 'Timeline', 'timeline-columns'],
       ['daily', 'Grid', 'calendar-grid'],
       ['weekly', 'Weekly', 'weekly-bars'],
     ]);

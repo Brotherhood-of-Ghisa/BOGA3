@@ -143,6 +143,7 @@ export {
   createDrizzleExerciseHistoryStore,
   createExerciseHistoryRepository,
   loadExercisePerformanceHistory,
+  loadExerciseRangeEntries,
   type ExerciseHistoryBest,
   type ExerciseHistoryGymOption,
   type ExerciseHistoryPeriod,

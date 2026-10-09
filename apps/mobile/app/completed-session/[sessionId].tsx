@@ -19,11 +19,10 @@ import {
   formatSessionListCompactDuration,
   loadLocalGymById,
   loadSessionSnapshotById,
-  normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
-import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
+import { loadSessionRecordBaselines, toCompletedSessionDetailExercises } from '@/src/session-recorder/completed-session-cards';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
@@ -203,19 +202,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
         gymName: gymRecord?.name ?? null,
         deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
-        exercises: sessionGraph.exercises.map((exercise) => ({
-          id: exercise.id,
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          name: exercise.name,
-          loadContext: exercise.loadContext,
-          sets: exercise.sets.map((set) => ({
-            id: set.id,
-            weight: set.weightValue,
-            reps: set.repsValue,
-            setType: normalizeSessionSetType(set.setType),
-            performanceStatus: set.performanceStatus,
-          })),
-        })),
+        exercises: toCompletedSessionDetailExercises(sessionGraph.exercises),
       };
     }
 
@@ -224,9 +211,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
   async loadInsights(sessionId) {
     return loadCompletedSessionInsights(sessionId);
   },
-  async loadHistoricalBests(session, exerciseDefinitionIds) {
-    return recordBaselinesOf(await loadEarlierBestsByDefinition(session, exerciseDefinitionIds));
-  },
+  loadHistoricalBests: loadSessionRecordBaselines,
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
   },

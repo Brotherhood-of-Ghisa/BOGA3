@@ -1,8 +1,8 @@
 # BoGa Heatmaps — Progress history integration
 
-Two heatmap views for the exercise and muscle history page Progress pushes
-(`components/stats/history-view.tsx`, route `app/progress-history.tsx`). They
-replace the older month-grid `CalendarHeatmap`.
+Two heatmap views and a Timeline chart for the exercise and muscle history page
+Progress pushes (`components/stats/history-view.tsx`, route
+`app/progress-history.tsx`). They replace the older month-grid `CalendarHeatmap`.
 
 | File | What it is |
 |------|-----------|
@@ -11,6 +11,8 @@ replace the older month-grid `CalendarHeatmap`.
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
+| `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → columns and the month labels that fit. Pure. |
+| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as columns ([[comparison.timeline-history]]): readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection. |
 | `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; a training week opens its sessions. |
 
 ## Data flow
@@ -95,10 +97,11 @@ host passes the openers and routes; a rest day or week stays text.
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
 
-The history page's view selector (`Grid` | `Weekly`, icons) is the sole
-Daily/Weekly choice, and it writes the saved `heatmapView` preference: Settings
-has no such row. Missing or invalid choices use Daily; valid saved Daily or
-Weekly choices survive restart and account switching. Progress history targets
+The history page's view selector (`Timeline` | `Grid` | `Weekly`, icons) is
+the sole view choice, and it writes the saved `heatmapView` preference
+(`timeline`, `daily`, `weekly`): Settings has no such row. Missing or invalid
+choices use Daily; a valid saved choice survives restart and account
+switching. The Timeline's week list is read only while that view shows. Progress history targets
 one muscle ID or one exercise definition, never a family.
 Numeric `weeks` controls the exact query/grid span;
 short windows have no implicit 52-week minimum.

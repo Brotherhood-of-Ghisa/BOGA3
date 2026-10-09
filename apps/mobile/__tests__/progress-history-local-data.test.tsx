@@ -165,6 +165,66 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
+  it('opens the saved Timeline with the selected week\'s sets, whose cards and View sessions navigate', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-heatmap-panel-timeline')).toHaveProp('pointerEvents', 'auto'));
+    expect(screen.getByTestId('stats-exercise-history-view-chip-timeline')).toHaveProp('accessibilityState', { selected: true });
+    // The selection starts on the current week, where the fixture's squat sessions are.
+    const cards = await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/);
+    expect(cards.length).toBeGreaterThan(0);
+    fireEvent.press(cards[0]);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-view-sessions'));
+    // View sessions opens Sessions at the readout's week, as a Weekly row does.
+    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${localDateKey(calendarWeekBounds(1).start)}`);
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
+  });
+
+  it('keeps listing the readout\'s week when the selection is cleared', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    const before = (await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).length;
+
+    // Nothing starts selected, so the readout and list show the newest week. A double tap selects
+    // that announced week, a second clears it; the list stays on the same week throughout.
+    const plot = () => screen.getByTestId('stats-exercise-history-timeline-plot');
+    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
+    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(screen.getByTestId('stats-exercise-history-timeline-selected')).toBeTruthy();
+    expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before);
+    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
+    await waitFor(() => expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before));
+    expect(screen.queryByTestId('stats-exercise-history-week-sets-empty')).toBeNull();
+  });
+
+  it('retries a failed week read in place', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort').mockRejectedValueOnce(new Error('DB busy'));
+    await openHistory({ muscleGroupId: 'quads' });
+
+    expect(await screen.findByTestId('stats-muscle-history-week-sets-error')).toHaveTextContent(/DB busy/);
+    fireEvent.press(screen.getByTestId('stats-muscle-history-week-sets-retry'));
+    expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
+  });
+
+  it('lists a muscle\'s week by the exercises that worked it', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ muscleGroupId: 'quads' });
+
+    const cards = await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/);
+    expect(cards.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Squat/).length).toBeGreaterThan(0);
+  });
+
   it('opens in the saved Weekly view without a banner, and again on the next visit', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 104 }));

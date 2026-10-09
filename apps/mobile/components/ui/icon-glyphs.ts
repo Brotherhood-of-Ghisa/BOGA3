@@ -204,6 +204,8 @@ export const ICON_GLYPHS = {
   ],
   // Lucide `align-left`: the weekly view's horizontal bars.
   'weekly-bars': [path('M21 6H3'), path('M15 12H3'), path('M17 18H3')],
+  // Lucide `chart-column`: the Timeline view's week columns.
+  'timeline-columns': [path('M3 3v16a2 2 0 0 0 2 2h16'), path('M18 17V9'), path('M13 17V5'), path('M8 17v-3')],
 
   // Lucide `palette`: the Appearance row in Settings.
   palette: [

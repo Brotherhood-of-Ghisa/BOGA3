@@ -59,6 +59,37 @@ retaining sampled daily tiles.
 Why: each daily figure and completed weekly total appears once, in its starting week.
 Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/components/heatmaps/DailyHeatmap.tsx`.
 
+### comparison.timeline-history · presentation · accepted
+
+The Timeline history view plots one value per Monday week across
+[[comparison.history-window]], oldest on the left, as columns on a zero-based
+scale. A month is labelled at the first week that starts in it, as in
+[[comparison.daily-history]]; a label that would overlap another is left out,
+January's and the first one kept, and those two carry the year.
+
+| Metric | Week value | Rest week | Unavailable week |
+| --- | --- | --- | --- |
+| Volume, Sets | the week's sum | no column; the readout says `0` | no column; the readout says `Unavailable` |
+| 1RM, Top weight | the week's best | no column; the readout says `No sets` | no column; the readout says `Unavailable` |
+
+The readout above the chart shows the selected week, else the newest: its
+figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions` for any
+week with training, which opens Sessions at that week as a Weekly row does
+([[session.history-open]]). Tapping a
+week selects it and fills its column in `ink`; a second tap clears it. Unlike
+Daily and Weekly ([[copy.blank-history]]), the readout writes a rest week's
+figure.
+
+The readout's week's sets follow the chart as View Session's cards, record
+highlights and bands included, Monday first. An exercise's cards are its
+session blocks with a performed set, titled by day with the gym; a muscle's
+are the exercise blocks whose sets counted for it, titled by exercise with the
+day.
+
+Why: one form reads the same for every metric; a week without training sums
+to zero, and a best has no value without sets.
+Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`; `apps/mobile/components/stats/week-sets.ts`.
+
 ### comparison.weekly-reference · calculation · accepted
 
 Within [[comparison.history-window]], known training weeks form the reference

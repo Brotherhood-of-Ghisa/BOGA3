@@ -13,8 +13,8 @@ import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
+import { weekRangeLabel } from './timeline';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DATE_WIDTH = 96;
 
 interface Props {
@@ -34,13 +34,6 @@ type Reference = { id: string; label: string; value: string; position: number };
 const REFERENCE_PERCENTILES = [['p25', '25th percentile', .25], ['median', 'median', .5], ['p75', '75th percentile', .75]] as const;
 
 const isKnownTraining = (week: WeekCell) => !week.unavailable && (week.hasTraining ?? week.value > 0);
-
-const weekLabel = (week: WeekCell): string => {
-  const start = week.monday;
-  const end = new Date(start.getTime() + 6 * 86400000);
-  const first = `${start.getUTCDate()}${start.getUTCMonth() === end.getUTCMonth() ? '' : ` ${MONTHS[start.getUTCMonth()]}`}`;
-  return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
-};
 
 const weekValue = (week: WeekCell, formatValue: Props['formatValue']) =>
   isKnownTraining(week) ? formatValue(week.value) : '';
@@ -67,7 +60,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, ma
   };
   const content = <>
     <View style={styles.date}>
-      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week)}</Text>
+      <Text allowFontScaling={false} style={styles.dateText}>{weekRangeLabel(week.monday)}</Text>
       {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
       {year !== currentYear || year !== endYear ? <Text allowFontScaling={false} style={styles.year}>{year === endYear ? year : `${year}–${endYear}`}</Text> : null}
     </View>

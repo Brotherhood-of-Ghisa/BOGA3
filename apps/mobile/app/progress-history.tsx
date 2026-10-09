@@ -14,13 +14,13 @@ import { ActionButton, Notice, Screen, StatePanel, uiSpace } from '@/components/
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { historyDayHref, sessionsWeekHref } from '@/src/navigation/routes';
+import { completedSessionHref, historyDayHref, sessionsWeekHref } from '@/src/navigation/routes';
 import type { HeatmapView } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 // One exercise's or one muscle's history, pushed from Progress. The subject is
 // the page's native title, and the view and metric selectors sit in one row
-// above the heatmap. The params carry an id, never a name: the page resolves
+// above the chart. The params carry an id, never a name: the page resolves
 // the name from the exercise catalogue cache, which also decides the
 // unavailable state (`navigation-contract.md`: a bad id renders in route).
 
@@ -80,6 +80,7 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     if (href) router.push(href);
   }, [router]);
   const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
+  const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
 
   if (unavailable) {
     return (
@@ -109,6 +110,10 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     // preference store will retry; the band below says it is not saved yet.
     view: pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
+    timeline: {
+      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
+      onOpenSession: openSession,
+    },
   };
 
   return (

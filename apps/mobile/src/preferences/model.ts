@@ -3,7 +3,7 @@ import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelect
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
-export type HeatmapView = 'daily' | 'weekly';
+export type HeatmapView = 'daily' | 'weekly' | 'timeline';
 // The two Progress filters remembered across launches. The period is not one
 // of them: every visit opens on Settings' Progress period ([[comparison.window]]).
 export type ProgressBreakdown = 'exercise' | 'muscle';
@@ -67,7 +67,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   volumeEfforts: 'Choose valid volume effort labels.',
   targetWindowWeeks: 'Progress period must be a whole number of weeks from 1 to 52.',
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
-  heatmapView: 'Choose Daily or Weekly for heatmaps.',
+  heatmapView: 'Choose Grid, Weekly or Timeline for history.',
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
 };
@@ -86,7 +86,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'volumeEfforts': return isEffortSelection(value);
     case 'targetWindowWeeks': return isPositiveSafeInteger(value) && value <= 52;
     case 'historyLookbackWeeks': return isPositiveSafeInteger(value) && value <= MAX_HISTORY_LOOKBACK_WEEKS;
-    case 'heatmapView': return value === 'daily' || value === 'weekly';
+    case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
   }

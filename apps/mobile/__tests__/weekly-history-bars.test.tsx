@@ -9,6 +9,7 @@ import type { DailyEffortMetrics } from '@/src/data';
 
 const TODAY = '2026-10-05';
 const PREFIX = 'bars';
+const TIMELINE = { weekSetsTarget: { exerciseDefinitionId: 'bench' }, onOpenSession: jest.fn() };
 const day = (dateKey: string, value: number | null): DailyEffortMetrics => ({
   dateKey, workingSetCount: value ?? 2, totalVolume: value,
   estimatedRM1: value, highestWeight: value,
@@ -155,7 +156,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
 
 it('opens rows without a banner and uses one active vertical scroller', () => {
   const open = jest.fn();
-  render(<HistoryView kind="exercise" subject="Bench Press"
+  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
     onOpenWeek={open} todayDateKey={TODAY}
@@ -174,7 +175,7 @@ it('opens rows without a banner and uses one active vertical scroller', () => {
 
 it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers only the relevant action', state => {
   const retry = jest.fn();
-  render(<HistoryView kind="exercise" subject="Bench Press"
+  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={1} isLoading={state === 'loading'}
     errorMessage={state === 'error' ? 'Read failed' : null}
@@ -193,7 +194,7 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
 
 it('formats fractional Top weight references to one decimal without floating-point noise', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistoryView kind="exercise" subject="Bench Press"
+  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} weeklyEffort={[]}
@@ -219,7 +220,7 @@ it('retains coincident reference positions and accessible values without visible
 
 it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s history with no captions', kind => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistoryView kind={kind} subject="Training"
+  render(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="workingSetCount" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} weeklyEffort={[]}
@@ -244,7 +245,7 @@ it('excludes future observations from reference eligibility', () => {
 });
 
 it('draws no view title in either view: the page title and selectors name what is shown', () => {
-  const { unmount } = render(<HistoryView kind="exercise" subject="Bench Press"
+  const { unmount } = render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
     view="daily" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} dailyMetrics={[day(TODAY, 20)]} weeklyEffort={[]} />);

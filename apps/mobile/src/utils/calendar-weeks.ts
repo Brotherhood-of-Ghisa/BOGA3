@@ -14,3 +14,10 @@ export const calendarWeekBounds = (weeks: number, now = new Date()) => {
 
 export const localDateKey = (date: Date): string =>
   `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/** One local Monday–Sunday week from its `YYYY-MM-DD` Monday key; `end` is the next Monday, exclusive. */
+export const localWeekBounds = (weekStartDateKey: string) => {
+  const [year, month, day] = weekStartDateKey.split('-').map(Number);
+  const start = new Date(year, month - 1, day);
+  return { start, end: shiftCalendarWeeks(start, 1) };
+};

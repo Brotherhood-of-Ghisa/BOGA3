@@ -480,4 +480,20 @@ describe('createExerciseHistoryRepository', () => {
     expect(await createExerciseHistoryRepository(buildStore({ loadExerciseDefinition: jest.fn().mockResolvedValue(null) }))
       .loadSessionEntries({ exerciseDefinitionId: 'missing', sessionId: 's1' })).toEqual([]);
   });
+
+  it('loads the exercise\'s blocks completed in a date range', async () => {
+    const loadSessionsForExercise = jest.fn().mockResolvedValue([
+      sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-10-06T08:00:00.000Z') }),
+    ]);
+    const repo = createExerciseHistoryRepository(buildStore({ loadSessionsForExercise }));
+    const start = new Date('2026-10-05T00:00:00.000Z');
+    const end = new Date('2026-10-12T00:00:00.000Z');
+
+    const entries = await repo.loadRangeEntries({ exerciseDefinitionId: 'ex-bench', start, end });
+
+    expect(loadSessionsForExercise).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex-bench', start, end });
+    expect(entries.map((entry) => entry.sessionId)).toEqual(['s1']);
+    await expect(repo.loadRangeEntries({ exerciseDefinitionId: 'ex-bench', start: new Date('nope'), end }))
+      .rejects.toThrow();
+  });
 });
