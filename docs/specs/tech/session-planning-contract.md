@@ -306,7 +306,7 @@ path is defined so the permitted operation can never block sync.
   local violation; the push leg inside its recovery pull).
 - **Mobile training programmes.** `programme-form-model.ts` validates draft
   graphs (>=2 child plans). Authoring (`/programme/new`) edits child sessions via
-  `ProgrammeSessionEditSheet` sub-sheet. Detail (`/programme/[programmeId]`,
+  the `ProgrammeSessionEditSheet` page-sheet editor. Detail (`/programme/[programmeId]`,
   `useProgrammeDetail.ts`) surfaces `nextBlock` (first unresolved block across
   plans in programme then exercise order); Add attaches via
   `addPlanBlockToSession` and Skip advances via `skipPlanBlock`. Reordering

@@ -66,6 +66,7 @@ export function ProgrammeDetailScreen({ programmeId }: ProgrammeDetailScreenProp
         />
 
         <NextProgrammeBlockCard
+          blockCounts={detail.blockCounts}
           nextBlock={detail.nextBlock}
           onAdd={controller.addBlock}
           onSkip={controller.skipBlock}

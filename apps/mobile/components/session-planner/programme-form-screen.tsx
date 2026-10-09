@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   ActionButton,
@@ -8,7 +8,7 @@ import {
   IconButton,
   ListRow,
   Notice,
-  Sheet,
+  PageSheet,
   uiFonts,
   uiGeometry,
   uiRoles,
@@ -150,109 +150,117 @@ function ProgrammeSessionEditSheet({
   };
 
   return (
-    <Sheet
-      dismissLabel="Close session editor"
+    <PageSheet
+      closeLabel="Close session editor"
+      keyboardAvoiding
       onDismiss={onDismiss}
       testID="programme-child-plan-editor-sheet"
       title={`Edit ${plan.title || 'Session'}`}
       visible={visible}>
-      <View style={styles.childEditorBody} testID="programme-child-plan-editor-body">
-        <FormField
-          accessibilityLabel="Session title"
-          error={errors.get(`${prefix}.title`)}
-          label="Session title"
-          onChangeText={(text) => onUpdatePlan(planIndex, { title: text })}
-          placeholder="e.g. Day 1: Squat"
-          testID="programme-child-plan-title-input"
-          value={plan.title}
-        />
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        style={styles.childEditorScroll}
+        testID="programme-child-plan-editor-scroll">
+        <View style={styles.childEditorBody} testID="programme-child-plan-editor-body">
+          <FormField
+            accessibilityLabel="Session title"
+            error={errors.get(`${prefix}.title`)}
+            label="Session title"
+            onChangeText={(text) => onUpdatePlan(planIndex, { title: text })}
+            placeholder="e.g. Day 1: Squat"
+            testID="programme-child-plan-title-input"
+            value={plan.title}
+          />
 
-        <FormField
-          accessibilityLabel="Schedule date and time"
-          error={errors.get(`${prefix}.scheduledFor`)}
-          hint="Leave blank for an unscheduled session."
-          label="Schedule (optional)"
-          onChangeText={(text) => onUpdatePlan(planIndex, { scheduleText: text })}
-          placeholder="YYYY-MM-DD HH:mm"
-          testID="programme-child-plan-schedule-input"
-          value={plan.scheduleText}
-        />
+          <FormField
+            accessibilityLabel="Schedule date and time"
+            error={errors.get(`${prefix}.scheduledFor`)}
+            hint="Leave blank for an unscheduled session."
+            label="Schedule (optional)"
+            onChangeText={(text) => onUpdatePlan(planIndex, { scheduleText: text })}
+            placeholder="YYYY-MM-DD HH:mm"
+            testID="programme-child-plan-schedule-input"
+            value={plan.scheduleText}
+          />
 
-        <View style={styles.fieldBlock}>
-          <Text allowFontScaling={false} style={styles.fieldLabel}>
-            Gym
-          </Text>
-          <Card>
-            <ListRow
-              accessibilityLabel={`Gym: ${selectedGymName}`}
-              density="list"
-              divider={false}
-              label={selectedGymName}
-              onPress={openGymPicker}
-              testID="programme-child-plan-gym-row"
-            />
-          </Card>
-        </View>
-
-        <View style={styles.fieldBlock}>
-          <View style={styles.blocksHeader}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={styles.fieldLabel}>
-              Exercise blocks
+          <View style={styles.fieldBlock}>
+            <Text allowFontScaling={false} style={styles.fieldLabel}>
+              Gym
             </Text>
-            <ActionButton
-              accessibilityLabel="Add exercise block"
-              label="+ Add exercise"
-              onPress={addBlock}
-              testID="programme-child-plan-add-block"
-              variant="outline"
-            />
+            <Card>
+              <ListRow
+                accessibilityLabel={`Gym: ${selectedGymName}`}
+                density="list"
+                divider={false}
+                label={selectedGymName}
+                onPress={openGymPicker}
+                testID="programme-child-plan-gym-row"
+              />
+            </Card>
           </View>
 
-          {plan.blocks.map((block, blockIdx) => (
-            <PlanBlockEditor
-              block={block}
-              count={plan.blocks.length}
-              displayEfforts={trainingPreferences.displayEfforts}
-              errorPrefix={`${prefix}.exercises`}
-              errors={errors}
-              index={blockIdx}
-              key={block.id}
-              onAddSet={addSet}
-              onChangeBlock={updateBlock}
-              onChangeSet={updateSet}
-              onMoveBlock={moveBlock}
-              onPickExercise={(id) => setPickBlockId(id)}
-              onRemoveBlock={removeBlock}
-              onRemoveSet={removeSet}
-            />
-          ))}
+          <View style={styles.fieldBlock}>
+            <View style={styles.blocksHeader}>
+              <Text allowFontScaling={false} accessibilityRole="header" style={styles.fieldLabel}>
+                Exercise blocks
+              </Text>
+              <ActionButton
+                accessibilityLabel="Add exercise block"
+                label="+ Add exercise"
+                onPress={addBlock}
+                testID="programme-child-plan-add-block"
+                variant="outline"
+              />
+            </View>
+
+            {plan.blocks.map((block, blockIdx) => (
+              <PlanBlockEditor
+                block={block}
+                count={plan.blocks.length}
+                displayEfforts={trainingPreferences.displayEfforts}
+                errorPrefix={`${prefix}.exercises`}
+                errors={errors}
+                index={blockIdx}
+                key={block.id}
+                onAddSet={addSet}
+                onChangeBlock={updateBlock}
+                onChangeSet={updateSet}
+                onMoveBlock={moveBlock}
+                onPickExercise={(id) => setPickBlockId(id)}
+                onRemoveBlock={removeBlock}
+                onRemoveSet={removeSet}
+              />
+            ))}
+          </View>
+
+          <ActionButton
+            accessibilityLabel="Done editing session"
+            label="Done"
+            onPress={onDismiss}
+            testID="programme-child-plan-done-button"
+            variant="primary"
+          />
+
+          <PlanGymSheet
+            gyms={gyms}
+            onDismiss={() => setGymSheetVisible(false)}
+            onPick={(gymId) => {
+              onUpdatePlan(planIndex, { gymId });
+              setGymSheetVisible(false);
+            }}
+            visible={gymSheetVisible}
+          />
+
+          <PlanExercisePickSheet
+            onDismiss={() => setPickBlockId(null)}
+            onPick={onPickExercise}
+            request={pickBlockId !== null ? { blockId: pickBlockId } : null}
+          />
         </View>
-
-        <ActionButton
-          accessibilityLabel="Done editing session"
-          label="Done"
-          onPress={onDismiss}
-          testID="programme-child-plan-done-button"
-          variant="primary"
-        />
-
-        <PlanGymSheet
-          gyms={gyms}
-          onDismiss={() => setGymSheetVisible(false)}
-          onPick={(gymId) => {
-            onUpdatePlan(planIndex, { gymId });
-            setGymSheetVisible(false);
-          }}
-          visible={gymSheetVisible}
-        />
-
-        <PlanExercisePickSheet
-          onDismiss={() => setPickBlockId(null)}
-          onPick={onPickExercise}
-          request={pickBlockId !== null ? { blockId: pickBlockId } : null}
-        />
-      </View>
-    </Sheet>
+      </ScrollView>
+    </PageSheet>
   );
 }
 
@@ -589,6 +597,9 @@ const styles = StyleSheet.create({
   },
   saveSection: {
     paddingTop: uiSpace.md,
+  },
+  childEditorScroll: {
+    flex: 1,
   },
   childEditorBody: {
     gap: uiSpace.md,

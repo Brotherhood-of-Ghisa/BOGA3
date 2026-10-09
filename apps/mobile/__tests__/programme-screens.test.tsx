@@ -41,7 +41,7 @@ jest.mock('expo-router', () => {
 import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
-import { planQueries, planRepository } from '@/src/session-planner';
+import { planQueries, planRepository, addPlanBlockToSession } from '@/src/session-planner';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 
@@ -198,6 +198,115 @@ describe('programme screens', () => {
         paddingHorizontal: uiSpace.lg,
       });
     });
+
+    it('gives the child session editor a scrolling body', () => {
+      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+
+      // The editor's body is a ScrollView so a long session scrolls rather than
+      // hiding fields and Done beyond the sheet's fixed height.
+      expect(screen.getByTestId('programme-child-plan-editor-scroll')).toBeTruthy();
+    });
+  });
+
+  describe('programme edit (/programme/new?edit=)', () => {
+    let editProgrammeId: string;
+
+    beforeEach(async () => {
+      const result = await planRepository.createProgramme({
+        name: 'Editable Wave',
+        description: 'Block 1',
+        plans: [
+          {
+            title: 'Lower A',
+            gymId: null,
+            scheduledFor: null,
+            exercises: [
+              { exerciseDefinitionId: 'ex-squat', name: 'Barbell Squat', sets: [{ targetWeightText: '140', targetRepsText: '5', targetSetType: null }] },
+            ],
+          },
+          {
+            title: 'Upper A',
+            gymId: null,
+            scheduledFor: null,
+            exercises: [
+              { exerciseDefinitionId: 'ex-bench', name: 'Bench Press', sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }] },
+            ],
+          },
+          {
+            title: 'Lower B',
+            gymId: null,
+            scheduledFor: null,
+            exercises: [
+              { exerciseDefinitionId: 'ex-squat', name: 'Barbell Squat', sets: [{ targetWeightText: '120', targetRepsText: '8', targetSetType: null }] },
+            ],
+          },
+        ],
+      });
+      if (result.status !== 'saved') {
+        throw new Error(`createProgramme failed in test setup: ${JSON.stringify(result)}`);
+      }
+      editProgrammeId = result.id;
+    });
+
+    const saveProgramme = async () => {
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('programme-form-save'));
+      });
+      await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    };
+
+    it('persists an edited child session title', async () => {
+      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      fireEvent.changeText(screen.getByTestId('programme-child-plan-title-input'), 'Lower A+');
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+
+      await saveProgramme();
+
+      const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
+      expect(detail?.plans.map((plan) => plan.title)).toEqual(['Lower A+', 'Upper A', 'Lower B']);
+    });
+
+    it('persists a duplicated child session', async () => {
+      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-duplicate'));
+      expect(screen.getByTestId('programme-form-plan-4')).toBeTruthy();
+
+      await saveProgramme();
+
+      const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
+      expect(detail?.plans).toHaveLength(4);
+    });
+
+    it('persists removing a child session', async () => {
+      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-remove'));
+
+      await saveProgramme();
+
+      const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
+      expect(detail?.plans.map((plan) => plan.title)).toEqual(['Upper A', 'Lower B']);
+    });
+
+    it('persists a reordered child session list', async () => {
+      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-3-up'));
+
+      await saveProgramme();
+
+      const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
+      expect(detail?.plans.map((plan) => plan.title)).toEqual(['Lower A', 'Lower B', 'Upper A']);
+    });
   });
 
   describe('programme detail (/programme/[programmeId])', () => {
@@ -292,6 +401,42 @@ describe('programme screens', () => {
       // Once Lower A Barbell Squat is skipped, Upper A Bench Press becomes the next block
       await waitFor(() => {
         expect(screen.getByTestId('programme-next-block-name')).toHaveTextContent('Bench Press');
+      });
+    });
+
+    it('shows availability wording, not completion, when every unresolved block is attached', async () => {
+      const detail = await planQueries.loadProgrammeDetail(seededProgrammeId);
+      const blockIds = detail!.plans.flatMap((plan) => plan.blocks.map((block) => block.id));
+      for (const blockId of blockIds) {
+        await addPlanBlockToSession(blockId);
+      }
+
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('programme-next-block-empty')).toBeTruthy();
+      });
+      expect(screen.getByTestId('programme-next-block-empty-text')).toHaveTextContent(
+        'Every remaining block is already attached to a session.'
+      );
+    });
+
+    it('claims completion only once every block is resolved', async () => {
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+
+      await waitFor(() => expect(screen.getByTestId('programme-next-block-skip')).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('programme-next-block-skip'));
+      });
+      await waitFor(() => expect(screen.getByTestId('programme-next-block-skip')).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('programme-next-block-skip'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('programme-next-block-empty-text')).toHaveTextContent(
+          'All blocks in this programme have been completed or skipped.'
+        );
       });
     });
 

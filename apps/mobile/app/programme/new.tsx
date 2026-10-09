@@ -11,12 +11,29 @@ import {
   planRepository,
   programmeFormFromDetail,
   programmeFormToDraft,
+  saveProgrammeEdits,
+  type PlanMutationResult,
   type ProgrammeFormState,
 } from '@/src/session-planner';
 import { ensureExerciseCatalogLoaded, getExerciseCatalogSnapshot, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
+
+const programmeEditErrorMessage = (result: PlanMutationResult): string => {
+  switch (result.status) {
+    case 'validation-failed':
+      return result.errors[0]?.message ?? "Couldn't save changes. Try again.";
+    case 'immutable-block':
+      return 'A block in this programme has already been used, so those changes can’t be saved.';
+    case 'limit-exceeded':
+      return 'This programme has reached its session limit.';
+    case 'invalid-order':
+      return "Couldn't save the new session order. Try again.";
+    default:
+      return "Couldn't save changes. Try again.";
+  }
+};
 
 export type ProgrammeNewScreenProps = {
   /** `from`: a programme to prefill the form from (duplicate); Save still creates. */
@@ -58,30 +75,12 @@ export function ProgrammeNewScreen({ fromProgrammeId, editProgrammeId }: Program
 
   const onSave = async (form: ProgrammeFormState): Promise<SaveOutcome> => {
     if (isEdit && editProgrammeId !== null) {
-      const metaResult = await planRepository.updateProgramme(editProgrammeId, {
-        name: form.name,
-        description: form.description,
-      });
-      if (metaResult.status !== 'updated' && metaResult.status !== 'saved') {
-        return {
-          status: 'failed',
-          message:
-            metaResult.status === 'validation-failed'
-              ? metaResult.errors[0]?.message ?? "Couldn't save changes. Try again."
-              : "Couldn't save changes. Try again.",
-        };
+      const result = await saveProgrammeEdits(editProgrammeId, form);
+      if (result.status === 'saved' || result.status === 'updated') {
+        router.back();
+        return { status: 'saved', planId: editProgrammeId };
       }
-
-      // Check if child plans with sourcePlanId need reordering
-      const existingPlanIds = form.plans
-        .map((p) => p.sourcePlanId)
-        .filter((id): id is string => id !== null);
-      if (existingPlanIds.length > 0) {
-        await planRepository.reorderProgrammePlans(editProgrammeId, existingPlanIds);
-      }
-
-      router.back();
-      return { status: 'saved', planId: editProgrammeId };
+      return { status: 'failed', message: programmeEditErrorMessage(result) };
     }
 
     const prepared = programmeFormToDraft(form);

@@ -5,8 +5,24 @@ import type { PlanBlockView, PlanTargetView } from '@/src/session-planner';
 
 export type NextProgrammeBlockCardProps = {
   nextBlock: PlanBlockView | null;
+  /** The programme's derived block counts, so the empty card can tell an
+   *  all-attached programme from a fully completed one. */
+  blockCounts: { pending: number; attached: number; completed: number; skipped: number };
   onAdd: (block: PlanBlockView) => void;
   onSkip: (block: PlanBlockView) => void;
+};
+
+/** The empty card's message from the programme's block counts — `nextBlock` is
+ *  null both when nothing is left to do and when every unresolved block is
+ *  already attached to a session. */
+const emptyMessage = (counts: NextProgrammeBlockCardProps['blockCounts']): string => {
+  if (counts.attached > 0) {
+    return 'Every remaining block is already attached to a session.';
+  }
+  if (counts.completed + counts.skipped > 0) {
+    return 'All blocks in this programme have been completed or skipped.';
+  }
+  return 'No blocks are available to add right now.';
 };
 
 const formatTargetLine = (targets: PlanTargetView[]): string => {
@@ -20,6 +36,7 @@ const formatTargetLine = (targets: PlanTargetView[]): string => {
 
 export function NextProgrammeBlockCard({
   nextBlock,
+  blockCounts,
   onAdd,
   onSkip,
 }: NextProgrammeBlockCardProps) {
@@ -29,8 +46,8 @@ export function NextProgrammeBlockCard({
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
           Next block
         </Text>
-        <Text allowFontScaling={false} style={styles.emptyText}>
-          All blocks in this programme have been completed or skipped.
+        <Text allowFontScaling={false} style={styles.emptyText} testID="programme-next-block-empty-text">
+          {emptyMessage(blockCounts)}
         </Text>
       </Card>
     );

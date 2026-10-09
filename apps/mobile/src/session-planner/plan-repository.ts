@@ -52,6 +52,8 @@ export type PlanMutationResult =
 
 export type PlanRepository = {
   createPlan(draft: PlanDraft, now?: Date): Promise<PlanMutationResult>;
+  /** Creates one child plan attached to a programme (its order index is assigned by `reorderProgrammePlans`). */
+  createPlanInProgramme(programmeId: string, draft: PlanDraft, now?: Date): Promise<PlanMutationResult>;
   createProgramme(draft: ProgrammeDraft, now?: Date): Promise<PlanMutationResult>;
   updatePlanMeta(
     planId: string,
@@ -174,6 +176,18 @@ export const createPlanRepository = (): PlanRepository => ({
       return { status: 'validation-failed', errors: validation.errors };
     }
     const planId = await planStore.savePlanGraph(toStorePlanInput(validation.value.plan), now);
+    return { status: 'saved', id: planId };
+  },
+
+  async createPlanInProgramme(programmeId, draft, now = new Date()) {
+    const validation = validatePlanDraft(draft);
+    if (!validation.ok) {
+      return { status: 'validation-failed', errors: validation.errors };
+    }
+    const planId = await planStore.savePlanGraph(
+      { ...toStorePlanInput(validation.value.plan), programmeId },
+      now,
+    );
     return { status: 'saved', id: planId };
   },
 

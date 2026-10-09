@@ -238,8 +238,9 @@ Decided with mobile training programmes.
   standalone plans under Unscheduled, ordered by recency. Persistent
   `Plan session` and `New programme` action rows provide direct authoring entry.
 - **Child session editing.** Editing child sessions in the programme form uses
-  a focused sub-sheet (`ProgrammeSessionEditSheet`) rather than an unbounded
-  mega-form, preventing scroll fatigue and preserving field validation focus.
+  a focused page-sheet editor (`ProgrammeSessionEditSheet`) rather than an
+  unbounded mega-form, preventing scroll fatigue and preserving field validation
+  focus.
 - **Next unresolved block.** Programme detail (`/programme/[programmeId]`)
   determines progress and deterministically surfaces the next unresolved block
   in programme order, then exercise order. **Add to session** attaches the block
