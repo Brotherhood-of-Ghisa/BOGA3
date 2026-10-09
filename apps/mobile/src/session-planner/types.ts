@@ -128,8 +128,3 @@ export type ResolvePlanBlockResult =
   | { status: 'completed' | 'skipped'; resolvedAt: Date }
   | { status: 'not-resolvable' }
   | { status: 'block-not-found' };
-
-export type ReorderSessionSetsResult =
-  | { status: 'reordered' }
-  | { status: 'invalid-list' }
-  | { status: 'exercise-not-found' };

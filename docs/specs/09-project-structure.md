@@ -95,9 +95,8 @@ Define the canonical repository structure, path ownership, and placement convent
     programme progress, next block), the plan/programme repository (the
     mutation boundary for planner screens), pure contract-limit validation with
     field-addressable errors, the deterministic materialization IDs,
-    `startSessionPlan` / `addPlanBlockToSession`, performed-set reordering, and
-    explicit block resolution (`docs/specs/tech/session-planning-contract.md`
-    §4.6).
+    `startSessionPlan` / `addPlanBlockToSession`, and explicit block resolution
+    (`docs/specs/tech/session-planning-contract.md` §4.6).
   - imports `src/data`; `src/data` never imports it back. All plan-table and
     performed-graph SQL stays in `src/data`.
 - `apps/mobile/src/session-insights/`
