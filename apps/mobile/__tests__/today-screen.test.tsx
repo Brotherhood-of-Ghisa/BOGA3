@@ -34,6 +34,7 @@ import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
 import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 import { TodayScreen, type TodayScreenProps } from '../app/(tabs)/today';
 
@@ -89,7 +90,7 @@ const logHistory = async () => {
 const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
   await bootLocalApp();
   const view = render(<TodayScreen now={clock} groupState={signedOut} {...props} />);
-  await waitFor(() => expect(screen.queryByTestId('today-progress-loading')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('today-progress-loading'));
   return view;
 };
 

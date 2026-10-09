@@ -58,6 +58,7 @@ import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-scr
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 let alertSpy: jest.SpyInstance;
 
@@ -327,9 +328,7 @@ describe('plan detail', () => {
     fireEvent.press(screen.getByTestId('plan-card-choice-card-1'));
     fireEvent.press(screen.getByTestId('plan-card-choice-confirm'));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('plan-card-choice-sheet')).toBeNull();
-    });
+    await waitForGone(() => screen.queryByTestId('plan-card-choice-sheet'));
     expect(mockPush).toHaveBeenCalledWith('/session/live-session-1');
     // The chosen card carries the block; the other stays unsourced.
     const planDetail = await planQueries.loadPlanDetail(planId);

@@ -6,6 +6,9 @@ const globals = require('globals');
 const NO_DEV_GLOBAL_MESSAGE =
   'Do not use `__DEV__` directly. Use `isDevMode()` from `@/src/utils/isDevMode` instead — it also returns true in the `com.phano.boga3.dev` build (TestFlight dev), where `__DEV__` is false.';
 
+const WAIT_FOR_ABSENCE_MESSAGE =
+  'Wait for an element to leave with `waitForGone(() => screen.queryBy…(…))` from `__tests__/helpers/wait-for-gone.ts`, not `waitFor(() => expect(queryBy…).toBeNull())` (docs/specs/writing-tests.md, "Async waits").';
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -29,6 +32,20 @@ module.exports = defineConfig([
           name: '__DEV__',
           message: NO_DEV_GLOBAL_MESSAGE,
         },
+      ],
+    },
+  },
+  {
+    // A failed absence matcher inside waitFor pretty-prints the element's whole
+    // React fiber on every poll, which on a slow runner outlasts the timeout.
+    files: ['__tests__/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['callee.object.arguments.0.callee.property.name', 'callee.object.arguments.0.callee.name'].map((query) => ({
+          selector: `CallExpression[callee.name='waitFor'] CallExpression[callee.property.name=/^(toBeNull|toBeFalsy|toBeUndefined)$/][callee.object.callee.name='expect'][${query}=/^query/]`,
+          message: WAIT_FOR_ABSENCE_MESSAGE,
+        })),
       ],
     },
   },

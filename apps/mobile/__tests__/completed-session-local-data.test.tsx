@@ -90,6 +90,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const ONE_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId;
 const NO_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId;
@@ -428,7 +429,7 @@ describe('completed-session detail over real data', () => {
       fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
     });
 
-    await waitFor(() => expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('completed-session-detail-deleted-band'));
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
     expect(deletedAt()).toBeNull();
   });

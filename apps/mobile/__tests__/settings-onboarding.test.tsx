@@ -65,6 +65,7 @@ import {
   ensureExerciseListPreferencesLoaded,
 } from '@/src/exercise-catalog/list-preferences';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 // The preferences card reads its store on mount; load it first so the read
 // lands in the test.
@@ -139,10 +140,8 @@ describe('settings onboarding surface', () => {
     mockOpenUrl.mockResolvedValueOnce(true);
     fireEvent.press(screen.getByTestId('settings-connect-agent-row'));
 
-    await waitFor(() => {
-      expect(mockOpenUrl).toHaveBeenCalledTimes(2);
-      expect(screen.queryByTestId('settings-connect-agent-error')).toBeNull();
-    });
+    await waitFor(() => expect(mockOpenUrl).toHaveBeenCalledTimes(2));
+    await waitForGone(() => screen.queryByTestId('settings-connect-agent-error'));
   });
 
   it('keeps signed-in-only management hidden while leaving setup and sync guidance useful', async () => {

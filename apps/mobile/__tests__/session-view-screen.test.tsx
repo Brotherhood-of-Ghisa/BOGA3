@@ -98,6 +98,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
@@ -202,7 +203,7 @@ const addExerciseThroughPicker = async (name: string) => {
   await act(async () => {
     fireEvent.press(addEmptySet);
   });
-  await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('exercise-picker'));
   await replayFocus();
 };
 
@@ -433,7 +434,7 @@ describe('Session view', () => {
     await act(async () => {
       fireEvent.press(screen.getByLabelText(`Repeat last workout for ${squat}`));
     });
-    await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-picker'));
 
     const added = (await readSession(SESSION))!.exercises.at(-1)!;
     expect(added.name).toBe(squat);
@@ -1108,7 +1109,7 @@ describe('Session view: editing a completed session', () => {
       fireEvent(end, 'blur');
     });
 
-    await waitFor(() => expect(screen.queryByTestId('session-view-exercise-done_bench-record')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('session-view-exercise-done_bench-record'));
     expect(sessionRow(DONE)?.completedAt).toEqual(new Date(2026, 2, 10, 10, 45, 0, 0));
     expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
   });

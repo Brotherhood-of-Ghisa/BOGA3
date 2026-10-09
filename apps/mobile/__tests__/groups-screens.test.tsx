@@ -13,6 +13,7 @@ import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+import { waitForGone } from './helpers/wait-for-gone';
 
 let fixture: InMemoryDatabaseFixture;
 const mockCurrentDatabase = () => fixture.database;
@@ -355,7 +356,7 @@ describe('Groups tab', () => {
     expect(screen.getByTestId('groups-stream-filter-group-a').props.accessibilityState).toEqual({ selected: true });
 
     fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
-    await waitFor(() => expect(screen.queryByTestId(cardID('friend-1:s-1'))).toBeNull());
+    await waitForGone(() => screen.queryByTestId(cardID('friend-1:s-1')));
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
   });
@@ -688,7 +689,7 @@ describe("Friend's session view", () => {
     expect(await screen.findByTestId('group-session-records-error')).toBeTruthy();
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
     fireEvent.press(screen.getByTestId('group-session-records-error-retry'));
-    await waitFor(() => expect(screen.queryByTestId('group-session-records-error')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('group-session-records-error'));
   });
 
   it('a refused certify swaps Certify for Refresh, which re-reads the records', async () => {
