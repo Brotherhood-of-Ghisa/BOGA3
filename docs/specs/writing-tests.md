@@ -72,16 +72,22 @@ runner changes the timing.
   the rest of the test. A side effect (a store write, a mock call) can land
   before the render it causes, so waiting on the side effect and then reading
   the screen races. Wait on the rendered outcome, then check the side effects.
-  The Jest key-value store fake in `apps/mobile/jest.setup.ts` holds a value
-  before its write promise settles, which made
-  `apps/mobile/__tests__/theme-colour-screen.test.tsx` flaky this way.
+  The Jest key-value store fake in `apps/mobile/jest.setup.ts` shows an async
+  write only once its promise settles, as the real store does; React still
+  renders the result later, so this rule holds.
 - **Wait for absence with `waitForGone`**
   (`apps/mobile/__tests__/helpers/wait-for-gone.ts`), never
   `waitFor(() => expect(screen.queryBy…(…)).toBeNull())`. Each failed poll of
   that matcher pretty-prints the found element's whole React fiber, and on a
   slow runner that outlasts the timeout. `waitForGone` takes a `queryBy*`, a
-  `queryAllBy*`, or an array of them. A `no-restricted-syntax` rule in
-  `apps/mobile/eslint.config.js` rejects the matcher form inside `waitFor`.
+  `queryAllBy*`, or an array of them; a falsy result counts as gone. On timeout
+  it names each element still found (type, testID, label, text). A
+  `no-restricted-syntax` rule in `apps/mobile/eslint.config.js` rejects the
+  absence matchers inside `waitFor`: `toBeNull`, `toBeFalsy`, `toBeUndefined`,
+  `toBe(null)`, `.not.toBeTruthy()`, and `toHaveLength(0)` or `toEqual([])` on a
+  `queryAllBy*`.
+- **Prove a wait sees the new render.** After a change, wait for something
+  only the new state shows, never a state the previous step already rendered.
 - **Reproduce a timing flake deterministically**, not by rerunning. Delay the
   promise the code awaits in the test (for example `setTimeout(resolve, 5)`),
   keeping its side effect immediate. The race then fails on every run, so the

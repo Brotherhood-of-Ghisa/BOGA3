@@ -69,6 +69,22 @@ describe('the launch theme', () => {
     expect(readLaunchTheme()).toEqual({ preset: getThemePreset('forest'), problem: null });
   });
 
+  // The Jest fake store (jest.setup.ts) shows an async write only once it
+  // settles, as the real one does, so a test cannot read a saved value before
+  // the code awaiting the write has resumed.
+  it('holds a saved choice only once the write settles', async () => {
+    const write = saveThemePresetId('slate');
+    expect(readStoredThemePresetId()).toBeNull();
+    await write;
+    expect(readStoredThemePresetId()).toBe('slate');
+  });
+
+  it('orders an async read after a write still settling', async () => {
+    const write = Storage.setItem(THEME_PRESET_STORAGE_KEY, 'forest');
+    await expect(Storage.getItem(THEME_PRESET_STORAGE_KEY)).resolves.toBe('forest');
+    await write;
+  });
+
   it('falls back to the default and reports why when the store cannot be read', () => {
     jest.spyOn(Storage, 'getItemSync').mockImplementationOnce(() => {
       throw new Error('database is locked');
