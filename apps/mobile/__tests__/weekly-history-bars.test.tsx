@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { FlatList, Modal, ScrollView, StyleSheet } from 'react-native';
+import { FlatList, ScrollView, StyleSheet } from 'react-native';
 
 import { WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { HistorySheet, EXERCISE_HISTORY_METRIC_OPTIONS } from '@/components/stats/history-sheet';
+import { HistoryView, EXERCISE_HISTORY_METRIC_OPTIONS } from '@/components/stats/history-view';
 import { uiGeometry, uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 
@@ -156,19 +156,19 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
 });
 
 it('selects rows without a banner and uses one active vertical scroller', () => {
-  function SelectedSheet() {
+  function SelectedHistory() {
     const [key, setKey] = useState<string | null>(null);
-    return <HistorySheet kind="exercise" eyebrow="Exercise History" title="Bench Press"
+    return <HistoryView kind="exercise" subject="Bench Press"
       metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
-      view="weekly" lookbackWeeks={8} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
+      view="weekly" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
       selectedWeekKey={key} onSelectWeek={setKey} todayDateKey={TODAY}
       dailyMetrics={[day('2026-09-28', null)]}
       weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
   }
-  render(<SelectedSheet />);
+  render(<SelectedHistory />);
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
   expect(screen.queryByText(/Tap a week/)).toBeNull();
-  expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
+  expect(screen.getByLabelText('Select history view')).toBeTruthy();
   expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toHaveProp('pointerEvents', 'none');
   const weekly = screen.UNSAFE_getByType(FlatList);
   expect(weekly.parent?.type).not.toBe(ScrollView);
@@ -181,11 +181,11 @@ it('selects rows without a banner and uses one active vertical scroller', () => 
 
 it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers only the relevant action', state => {
   const retry = jest.fn();
-  const dismiss = jest.fn();
-  render(<HistorySheet kind="exercise" eyebrow="Exercise History" title="Bench Press"
+  render(<HistoryView kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
-    view="weekly" lookbackWeeks={1} isLoading={state === 'loading'} errorMessage={state === 'error' ? 'Read failed' : null}
-    onRetry={retry} onDismiss={dismiss} selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY}
+    view="weekly" onSelectView={jest.fn()} lookbackWeeks={1} isLoading={state === 'loading'}
+    errorMessage={state === 'error' ? 'Read failed' : null}
+    onRetry={retry} selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY}
     dailyMetrics={[]} weeklyEffort={[]} />);
   expect(screen.getByTestId(`stats-exercise-history-${state}`)).toBeTruthy();
   if (state !== 'empty') expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
@@ -194,20 +194,15 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
     fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
     expect(retry).toHaveBeenCalledTimes(1);
   } else expect(screen.queryByTestId('stats-exercise-history-retry')).toBeNull();
-  // An iOS swipe has already taken the page sheet away: the host hears once,
-  // and a late native dismissal of the swiped modal is not a second close.
-  const swiped = screen.UNSAFE_getByType(Modal);
-  fireEvent(swiped, 'requestClose');
-  expect(dismiss).toHaveBeenCalledTimes(1);
-  fireEvent(swiped, 'dismiss');
-  expect(dismiss).toHaveBeenCalledTimes(1);
+  // The page is left by its native Back: nothing here draws a modal or a close.
+  expect(screen.queryByTestId('stats-exercise-history-close')).toBeNull();
 });
 
 it('formats fractional Top weight references to one decimal without floating-point noise', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistorySheet kind="exercise" eyebrow="Exercise History" title="Bench Press"
+  render(<HistoryView kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
-    view="weekly" lookbackWeeks={6} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
+    view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => ({ ...day(date, 1), highestWeight: index >= 4 ? 11 : 10 }))} />);
   expect(screen.getByTestId('stats-exercise-history-heatmap-median')).toHaveProp('accessibilityLabel', '6-week median 10.0');
@@ -231,9 +226,9 @@ it('retains coincident reference positions and accessible values without visible
 
 it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s history with no captions', kind => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistorySheet kind={kind} eyebrow={`${kind} history`} title="Training"
+  render(<HistoryView kind={kind} subject="Training"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="workingSetCount" onSelectMetric={jest.fn()}
-    view="weekly" lookbackWeeks={6} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
+    view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => day(date, index * 2))} />);
   const prefix = `stats-${kind}-history`;
@@ -255,14 +250,14 @@ it('excludes future observations from reference eligibility', () => {
   expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });
 
-it('uses the same title typography for Daily and Weekly', () => {
-  const { unmount } = render(<HistorySheet kind="exercise" eyebrow="Exercise History" title="Bench Press"
+it('draws no view title in either view: the page title and selectors name what is shown', () => {
+  const { unmount } = render(<HistoryView kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
-    view="daily" lookbackWeeks={8} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
+    view="daily" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
     selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} dailyMetrics={[day(TODAY, 20)]} weeklyEffort={[]} />);
-  const daily = StyleSheet.flatten(screen.getByText('Daily training load').props.style);
+  expect(screen.queryByText('Daily training load')).toBeNull();
+  expect(screen.queryByText('Bench Press')).toBeNull();
   unmount();
   render(chart(data([day(TODAY, 20)])));
-  const weekly = StyleSheet.flatten(screen.getByText('Weekly training load').props.style);
-  for (const key of ['fontFamily', 'fontWeight', 'fontSize', 'lineHeight']) expect(weekly[key]).toBe(daily[key]);
+  expect(screen.queryByText('Weekly training load')).toBeNull();
 });

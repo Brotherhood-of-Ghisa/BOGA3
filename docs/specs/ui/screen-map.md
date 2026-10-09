@@ -26,7 +26,7 @@ draws the same fixed bar on every screen that shows tabs.
 | --- | --- | --- |
 | `/today` | Landing page: how this week and month are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
-| `/progress` | One frozen row of filter chips — breakdown, period, and the metric where the table has one to pick — over a frozen exercise search; breakdown and metric are remembered on the device, the period opens on Settings' ([[comparison.window]]), and `breakdown` / `period` override on entry; comparisons with one row contribution accordion; per-muscle / per-exercise history page sheet; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
+| `/progress` | One frozen row of filter chips — breakdown, period, and the metric where the table has one to pick — over a frozen exercise search; breakdown and metric are remembered on the device, the period opens on Settings' ([[comparison.window]]), and `breakdown` / `period` override on entry; comparisons with one row contribution accordion; a muscle or exercise name pushes `/progress-history`; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four: Community, Tools, Library & account | `(tabs)/more.tsx` |
 
 ### Preserved tab roots
@@ -54,6 +54,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/session-plan/[planId]` | One plan: targets, derived progress, provenance; **Start all** (an active-session conflict offers one Resume and creates nothing), per-block **Add to session** (several compatible cards offer a choice sheet that writes nothing until one is picked), **Skip without doing it** on pending blocks, **Duplicate**, and confirmed **Delete** while no block pins the plan. Consumed blocks are read-only and link to their performed session | `session-plan/[planId].tsx` |
 | `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit` and delete/undelete. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
 | `/exercise-history` | One `exercise_definitions` row's history: period and tag filters, all-time bests, one card per session | `exercise-history.tsx` |
+| `/progress-history` | One muscle's or one exercise's effort history, titled by that subject: the view (Grid \| Weekly) and metric selectors in one row, then the saved heatmap, with its own loading / error+Retry / empty states. Native back returns to Progress as it was left | `progress-history.tsx`, `components/stats/history-view.tsx` |
 
 ## Account, library and tools
 
@@ -118,8 +119,8 @@ addressable, each resolving to a canonical owner for tab selection.
 - Detail screens use the native **minimal** back-button display mode (arrow,
   no text label), which also keeps the internal `(tabs)` group name off screen.
 - Screens whose header title is the name of a thing (`exercise-history`,
-  `exercise-link`, `group/[groupId]`, a leaderboard) set that title inside the
-  route file once the entity resolves; session-view, exercise-page, the
+  `exercise-link`, `progress-history`, `group/[groupId]`, a leaderboard) set
+  that title inside the route file once the entity resolves; session-view, exercise-page, the
   exercise picker and every `completed-session` presentation hide the native
   header and draw their own top bar.
 

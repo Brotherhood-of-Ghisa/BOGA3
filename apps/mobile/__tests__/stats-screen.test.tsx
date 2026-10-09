@@ -1,13 +1,11 @@
 /**
  * Stats without a database: the formatting, intensity and sort rules as pure
  * functions, and the screen shell's presentation on hand-built props (deltas,
- * shades, accessibility labels, sort cycling, overlay states). The route over
- * real data — queries, caches, focus reloads, navigation — is
- * `stats-screen-local-data.test.tsx`.
+ * shades, accessibility labels, sort cycling, the history page it opens). The
+ * route over real data — queries, caches, focus reloads, navigation — is
+ * `stats-screen-local-data.test.tsx`; the history page it pushes is
+ * `progress-history-page.test.tsx`.
  */
-
-import { mkdirSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
@@ -19,7 +17,6 @@ import {
   type StatsScreenShellProps,
   type ExerciseListItem,
   type ExerciseSortHeader,
-  type MuscleHistoryTarget,
   describeExerciseSortMode,
   formatCountDelta,
   formatPeriodComparison,
@@ -28,12 +25,11 @@ import {
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
-import * as heatmapData from '@/components/heatmaps/heatmapData';
 import ProgressRoute from '../app/(tabs)/progress';
 import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
 import { resolveLayout } from '@/components/stats/progress-tables';
 import { compareProgressVolume, type ProgressComparison } from '@/src/data/progress-comparisons';
-import type { SelectedMuscleWeeklyEffort, StatsSummary, ProgressComparisons } from '@/src/data';
+import type { StatsSummary, ProgressComparisons } from '@/src/data';
 
 const buildLegacySummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   current: {
@@ -196,38 +192,15 @@ const buildShellProps = (
   period: 'this-week',
   onSelectPeriod: jest.fn(),
   onPressSessionsCard: jest.fn(),
-  onPressMuscleHistory: jest.fn(),
-  onDismissMuscleHistory: jest.fn(),
-  onSelectMuscleHistoryWeek: jest.fn(),
+  onOpenMuscleHistory: jest.fn(),
+  onOpenExerciseHistory: jest.fn(),
   isLoading: false,
   errorMessage: null,
-  selectedMuscle: null,
-  muscleHistoryWeeklyEffort: [],
-  muscleHistoryDailyMetrics: [],
-  isMuscleHistoryLoading: false,
-  muscleHistoryErrorMessage: null,
-  selectedMuscleHistoryWeekKey: null,
-  muscleHistoryMetric: 'totalVolume',
-  muscleHistoryView: 'weekly',
-  onSelectMuscleHistoryMetric: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
   tableMetric: 'workingSetCount',
   onSelectTableMetric: jest.fn(),
   exerciseListItems: [],
-  selectedExercise: null,
-  exerciseHistoryWeeklyEffort: [],
-  exerciseHistoryDailyMetrics: [],
-  isExerciseHistoryLoading: false,
-  exerciseHistoryErrorMessage: null,
-  selectedExerciseHistoryWeekKey: null,
-  exerciseHistoryMetric: 'totalVolume',
-  exerciseHistoryView: 'weekly',
-  onPressExerciseHistory: jest.fn(),
-  onDismissExerciseHistory: jest.fn(),
-  onSelectExerciseHistoryWeek: jest.fn(),
-  onSelectExerciseHistoryMetric: jest.fn(),
-  historyTodayDateKey: '2026-06-05',
   searchQuery: '',
   onSearchQueryChange: jest.fn(),
   ...overrides,
@@ -244,24 +217,6 @@ const sortArrow = (header: ExerciseSortHeader): 'up' | 'down' | null => {
 
 const renderStatsScreenShell = (overrides: Partial<StatsScreenShellProps> = {}) =>
   render(<StatsScreenShell {...buildShellProps(overrides)} />);
-
-const buildWeeklyEffort = (): SelectedMuscleWeeklyEffort => ({
-  weekStartDateKey: '2026-05-11',
-  monthKey: '2026-05',
-  weekOfMonth: 2,
-  totalVolume: 1100,
-  workingSetCount: 2,
-  estimatedRM1: 150,
-  highestWeight: 120,
-});
-
-const captureUiEvidence = (name: string, tree: unknown) => {
-  const evidenceDir = process.env.UI_EVIDENCE_DIR;
-  if (!evidenceDir) return;
-
-  mkdirSync(evidenceDir, { recursive: true });
-  writeFileSync(path.join(evidenceDir, `${name}.json`), JSON.stringify(tree, null, 2));
-};
 
 describe('Progress route parity', () => {
   it('uses the existing Stats / History implementation without an analytics fork', () => {
@@ -437,13 +392,13 @@ describe('sortExerciseListItems', () => {
 
 describe('StatsScreenShell', () => {
   it('separates names, numbers and selected chevrons, keeping families inert', () => {
-    const onPressMuscleHistory = jest.fn();
-    renderStatsScreenShell({ onPressMuscleHistory });
+    const onOpenMuscleHistory = jest.fn();
+    renderStatsScreenShell({ onOpenMuscleHistory });
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
     expect(screen.queryByTestId('stats-card-sets')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-family-header-chest'));
     fireEvent.press(screen.getByTestId('stats-muscle-row-chest-now'));
-    expect(onPressMuscleHistory).not.toHaveBeenCalled();
+    expect(onOpenMuscleHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityLabel', 'Hide Chest contributions');
@@ -451,12 +406,12 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
     expect(screen.queryByTestId('stats-contributions-total')).toBeNull();
     expect(within(screen.getByTestId('stats-contributions')).queryByText('Total')).toBeNull();
-    expect(onPressMuscleHistory).not.toHaveBeenCalled();
+    expect(onOpenMuscleHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: false });
     fireEvent.press(screen.getByTestId('stats-muscle-history-chest'));
-    expect(onPressMuscleHistory).toHaveBeenCalledWith({ muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' });
+    expect(onOpenMuscleHistory).toHaveBeenCalledWith({ muscleGroupId: 'chest' });
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
     expect(screen.getByTestId('stats-muscle-history-chest')).toHaveStyle({ minWidth: 44, minHeight: 44 });
     expect(within(screen.getByTestId('stats-muscle-history-chest')).getByText('Chest'))
@@ -472,271 +427,6 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveStyle({ color: uiRoles.ink });
   });
 
-  it('does not render a sheet handed a legacy multi-muscle target', () => {
-    renderStatsScreenShell({ selectedMuscle: {
-      muscleGroupIds: ['front_delts', 'rear_delts'], displayName: 'Shoulders', familyName: 'Shoulders',
-    } as unknown as MuscleHistoryTarget });
-    expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
-  });
-
-  it('renders muscle-history overlay states: loading, error, empty, populated, and dismiss', () => {
-    const onDismissMuscleHistory = jest.fn();
-    const onRetryMuscleHistory = jest.fn();
-    const onSelectMuscleHistoryWeek = jest.fn();
-    const { rerender, toJSON } = render(
-      <StatsScreenShell
-        {...buildShellProps({
-          selectedMuscle: {
-            muscleGroupIds: ['front_delts'] as [string],
-            displayName: 'Front Delts',
-            familyName: 'Shoulders',
-          },
-          isMuscleHistoryLoading: true,
-          onDismissMuscleHistory,
-          onSelectMuscleHistoryWeek,
-        })}
-      />
-    );
-
-    expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent(
-      /Front Delts/
-    );
-    expect(screen.getByTestId('stats-muscle-history-loading')).toHaveTextContent(/Loading/);
-    expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
-    captureUiEvidence('stats-muscle-history-loading', toJSON());
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          selectedMuscle: {
-            muscleGroupIds: ['front_delts'] as [string],
-            displayName: 'Front Delts',
-            familyName: 'Shoulders',
-          },
-          muscleHistoryErrorMessage: 'Nope',
-          onRetryMuscleHistory,
-          onDismissMuscleHistory,
-          onSelectMuscleHistoryWeek,
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Nope/);
-    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
-    expect(onRetryMuscleHistory).toHaveBeenCalledTimes(1);
-    captureUiEvidence('stats-muscle-history-error', toJSON());
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          selectedMuscle: {
-            muscleGroupIds: ['front_delts'] as [string],
-            displayName: 'Front Delts',
-            familyName: 'Shoulders',
-          },
-          muscleHistoryWeeklyEffort: [],
-          onDismissMuscleHistory,
-          onSelectMuscleHistoryWeek,
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-empty')).toHaveTextContent(/No history yet/);
-    captureUiEvidence('stats-muscle-history-empty', toJSON());
-
-    const effort = [buildWeeklyEffort()];
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          selectedMuscle: {
-            muscleGroupIds: ['front_delts'] as [string],
-            displayName: 'Front Delts',
-            familyName: 'Shoulders',
-          },
-          muscleHistoryWeeklyEffort: effort,
-          selectedMuscleHistoryWeekKey: '2026-05-11',
-          onDismissMuscleHistory,
-          onSelectMuscleHistoryWeek,
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
-    captureUiEvidence('stats-muscle-history-populated', toJSON());
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11'));
-    expect(onSelectMuscleHistoryWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-    expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([['muscle', 'daily'], ['muscle', 'weekly'], ['exercise', 'daily'], ['exercise', 'weekly']] as const)(
-    'uses fixed black and white for the active %s history metric in %s mode', (kind, view) => {
-      const onSelectMetric = jest.fn();
-      const props = buildShellProps({
-        selectedMuscle: kind === 'muscle' ? { muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' } : null,
-        selectedExercise: kind === 'exercise' ? { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' } : null,
-        muscleHistoryView: view,
-        exerciseHistoryView: view,
-        onSelectMuscleHistoryMetric: onSelectMetric,
-        onSelectExerciseHistoryMetric: onSelectMetric,
-      });
-      const { rerender } = render(<StatsScreenShell {...props} />);
-      const prefix = `stats-${kind}-history-metric-chip`;
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.selection });
-      expect(within(screen.getByTestId(`${prefix}-totalVolume`)).getByText('Volume')).toHaveStyle({ color: uiRoles.surface });
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.surface });
-      fireEvent.press(screen.getByTestId(`${prefix}-workingSetCount`));
-      expect(onSelectMetric).toHaveBeenCalledWith('workingSetCount');
-
-      rerender(<StatsScreenShell {...props} muscleHistoryMetric="workingSetCount" exerciseHistoryMetric="workingSetCount" />);
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.selection });
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveProp('accessibilityState', { selected: true });
-      expect(within(screen.getByTestId(`${prefix}-workingSetCount`)).getByText('Sets')).toHaveStyle({ color: uiRoles.surface });
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.surface });
-    });
-
-  it('keeps both heatmap views warm through loading, retry and view changes', () => {
-    const dailyMetrics = [
-      {
-        dateKey: '2026-05-13',
-        totalVolume: 1200,
-        workingSetCount: 2,
-        estimatedRM1: 95,
-        highestWeight: 80,
-      },
-    ];
-    const sharedProps = {
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'] as [string],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
-      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      muscleHistoryDailyMetrics: dailyMetrics,
-    };
-    const { rerender } = render(
-      <StatsScreenShell
-        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
-      />
-    );
-
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
-
-    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
-    expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
-
-    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', muscleHistoryErrorMessage: 'Read failed', onRetryMuscleHistory: jest.fn() })} />);
-    expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Read failed/);
-    expect(screen.queryByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toBeNull();
-    expect(screen.queryByTestId('stats-muscle-history-heatmap-cell-2026-05-13', { includeHiddenElements: true })).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
-    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'weekly' })}
-      />
-    );
-    expect(
-      screen.getByTestId('stats-muscle-history-heatmap-panel-daily', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({ position: 'absolute', opacity: 0 });
-    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveStyle({
-      position: 'relative',
-      opacity: 1,
-    });
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
-  });
-
-  it('shows the active muscle metric directly in read-only daily tiles', () => {
-    const props = {
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'] as [string],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
-      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      muscleHistoryDailyMetrics: [
-        {
-          dateKey: '2026-05-13',
-          totalVolume: 1200,
-          workingSetCount: 2,
-          estimatedRM1: 95,
-          highestWeight: 80,
-        },
-      ],
-      muscleHistoryView: 'daily' as const,
-    };
-    const { rerender } = render(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'totalVolume',
-        })}
-      />
-    );
-
-    // The weekly rollup banner is hidden in daily view.
-    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
-
-    // Values are visible and announced directly, without a selection action.
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13-value')).toHaveTextContent(
-      /1200/
-    );
-    expect(screen.getByText('Volume per day')).toBeTruthy();
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'workingSetCount',
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13-value')).toHaveTextContent(
-      /2/
-    );
-    // Muscle Sets colour grades the weekly target, so the ramp names it (0%…100%).
-    expect(screen.getByText('Weekly target')).toBeTruthy();
-    expect(screen.queryByText('Sets per day')).toBeNull();
-  });
-
-  it.each(['totalVolume', 'workingSetCount'] as const)('omits the selected-week banner for %s and keeps Metric controls', metric => {
-    renderStatsScreenShell({
-      selectedMuscle: { muscleGroupIds: ['front_delts'], displayName: 'Front Delts', familyName: 'Shoulders' },
-      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      selectedMuscleHistoryWeekKey: '2026-05-11',
-      muscleHistoryMetric: metric,
-    });
-    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
-    expect(screen.getByTestId(`stats-muscle-history-metric-chip-${metric}`)).toBeTruthy();
-  });
-
-  it('omits the banner and instruction when no week is selected', () => {
-    renderStatsScreenShell({
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'] as [string],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
-      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      selectedMuscleHistoryWeekKey: null,
-    });
-
-    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
-    expect(screen.queryByText(/Tap a week/)).toBeNull();
-  });
 });
 
 describe('Stats route parameters', () => {
@@ -854,10 +544,10 @@ describe('StatsScreenShell — view mode toggle', () => {
   });
 
   it('reorders rows and updates compact active indicators through every header cycle', () => {
-    const onPressExerciseHistory = jest.fn();
+    const onOpenExerciseHistory = jest.fn();
     renderStatsScreenShell({
       viewMode: 'exercise',
-      onPressExerciseHistory,
+      onOpenExerciseHistory,
       exerciseListItems: [
         buildExerciseListItem('alpha', 'Alpha', {
           workingSetCount: 10,
@@ -913,12 +603,9 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     expect(sortArrow('volume')).toBe('up');
     expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveStyle({ opacity: 0 });
-    expect(onPressExerciseHistory).not.toHaveBeenCalled();
+    expect(onOpenExerciseHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-exercise-row-gamma'));
-    expect(onPressExerciseHistory).toHaveBeenCalledWith({
-      exerciseDefinitionId: 'gamma',
-      displayName: 'Gamma',
-    });
+    expect(onOpenExerciseHistory).toHaveBeenCalledWith({ exerciseDefinitionId: 'gamma' });
   });
 
   it('sorts by 1RM on tap, flips on the second tap, and sinks rows with no estimate', () => {
@@ -1003,43 +690,17 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.queryByTestId('stats-scroll')).toBeNull();
   });
 
-  it('shows loading state in exercise overlay', () => {
-    renderStatsScreenShell({
-      selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Squat' },
-      isExerciseHistoryLoading: true,
-    });
-    expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
-    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
+  it('opens an exercise row’s history page by id, drawing no sheet of its own', () => {
+    const onOpenExerciseHistory = jest.fn();
+    renderStatsScreenShell({ viewMode: 'exercise', onOpenExerciseHistory, exerciseListItems: [
+      buildExerciseListItem('ex1', 'Bench Press'),
+    ] });
+    fireEvent.press(screen.getByTestId('stats-exercise-row-ex1'));
+    expect(onOpenExerciseHistory).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex1' });
+    expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
+    expect(screen.UNSAFE_queryAllByType(Modal)).toHaveLength(0);
   });
 
-  it('shows error state in exercise overlay', () => {
-    renderStatsScreenShell({
-      selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Squat' },
-      exerciseHistoryErrorMessage: 'Load failed',
-      isExerciseHistoryLoading: false,
-    });
-    expect(screen.getByTestId('stats-exercise-history-error')).toHaveTextContent(/Load failed/);
-  });
-
-  it('shows empty state in exercise overlay when no history', () => {
-    renderStatsScreenShell({
-      selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Squat' },
-      exerciseHistoryWeeklyEffort: [],
-      isExerciseHistoryLoading: false,
-      exerciseHistoryErrorMessage: null,
-    });
-    expect(screen.getByTestId('stats-exercise-history-empty')).toBeTruthy();
-  });
-
-  it('opens history as a page sheet closed by its X or a swipe down', () => {
-    renderStatsScreenShell({
-      selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' },
-    });
-    expect(screen.getByTestId('stats-exercise-history')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-modal')).toHaveProp('presentationStyle', 'pageSheet');
-    expect(screen.getByTestId('stats-exercise-history-header')).toHaveTextContent('Exercise HistoryBench Press');
-    expect(screen.getByTestId('stats-exercise-history-close')).toHaveProp('accessibilityLabel', 'Close exercise history');
-  });
 });
 
 describe('StatsScreenShell — search & filtering', () => {
@@ -1315,16 +976,50 @@ it('returns screen-reader focus to the retained exercise row that launched histo
     totalVolume: 100, estimatedOneRepMax: null, lastCompletedAt: null }] });
   const view = render(<StatsScreenShell {...props} />);
   // The native Pressable mock has no host instance; supply its ref callback
-  // so this check exercises the screen's launch/dismiss focus wiring.
+  // so this check exercises the screen's launch/return focus wiring.
   const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
   act(() => row.props.ref(launch));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
-  view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
-  fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
+  // The history page is on top: Progress is unfocused and stays mounted.
+  view.rerender(<StatsScreenShell {...props} isFocused={false} />);
+  await act(async () => {});
   expect(focused).not.toHaveBeenCalled();
-  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  view.rerender(<StatsScreenShell {...props} isFocused />);
   await act(async () => {});
   expect(focused).toHaveBeenLastCalledWith(77);
+  enabled.mockRestore(); focused.mockRestore();
+});
+
+it('leaves the reader where it landed when the return was not from history', async () => {
+  const enabled = jest.spyOn(ReactNative.AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+  const focused = jest.spyOn(ReactNative.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [{ id: 'lift', name: 'Lift', workingSetCount: 1,
+    totalVolume: 100, estimatedOneRepMax: null, lastCompletedAt: null }] });
+  const view = render(<StatsScreenShell {...props} />);
+  const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
+  act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
+  fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
+  // Back from history once: the row is restored and then forgotten.
+  view.rerender(<StatsScreenShell {...props} isFocused={false} />);
+  view.rerender(<StatsScreenShell {...props} isFocused />);
+  await act(async () => {});
+  expect(focused).toHaveBeenCalledTimes(1);
+  // Any later return — a tab, the Sessions link — leaves the reader alone.
+  view.rerender(<StatsScreenShell {...props} isFocused={false} />);
+  view.rerender(<StatsScreenShell {...props} isFocused />);
+  await act(async () => {});
+  expect(focused).toHaveBeenCalledTimes(1);
+  enabled.mockRestore(); focused.mockRestore();
+});
+
+it('leaves focus alone on a first load, with no row to return to', async () => {
+  const enabled = jest.spyOn(ReactNative.AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+  const focused = jest.spyOn(ReactNative.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  const props = buildShellProps({ viewMode: 'exercise' });
+  const view = render(<StatsScreenShell {...props} isFocused={false} />);
+  view.rerender(<StatsScreenShell {...props} isFocused />);
+  await act(async () => {});
+  expect(focused).not.toHaveBeenCalled();
   enabled.mockRestore(); focused.mockRestore();
 });
 
@@ -1361,11 +1056,10 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
   act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
-  view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
-  fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  view.rerender(<StatsScreenShell {...props} isFocused={false} />);
+  view.rerender(<StatsScreenShell {...props} isFocused />);
   if (action === 'unmount') view.unmount();
-  else fireEvent.press(screen.getByTestId('stats-exercise-row-lift', { includeHiddenElements: true }));
+  else fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
   await act(async () => resolve(true));
   expect(focused).not.toHaveBeenCalled();
   enabled.mockRestore(); focused.mockRestore();
@@ -1383,30 +1077,4 @@ it('draws the three filter chips as one equal-width outline row', () => {
     expect(chip).toHaveTextContent(label);
     expect(StyleSheet.flatten(within(chip).getByText(label).props.style).color).toBe(uiRoles.ink);
   }
-});
-
-it('still marks the history sheet metric filter in fixed black and white', () => {
-  renderStatsScreenShell({ selectedExercise: { exerciseDefinitionId: 'lift', displayName: 'Lift' } });
-  const segment = screen.getByTestId('stats-exercise-history-metric-chip-totalVolume');
-  expect(segment).toHaveStyle({ backgroundColor: '#000000' });
-  expect(segment).toHaveProp('accessibilityState', { selected: true });
-  expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
-});
-
-it.each(['muscle', 'exercise'] as const)('opens %s loading/error chrome without computing either chart', kind => {
-  const build = jest.spyOn(heatmapData, 'buildHeatmapData');
-  const target = kind === 'muscle'
-    ? { selectedMuscle: { muscleGroupIds: ['quads'] as [string], displayName: 'Quads', familyName: 'Legs' }, isMuscleHistoryLoading: true }
-    : { selectedExercise: { exerciseDefinitionId: 'squat', displayName: 'Squat' }, isExerciseHistoryLoading: true };
-  const props = buildShellProps(target);
-  const result = render(<StatsScreenShell {...props} />);
-  expect(screen.getByTestId(`stats-${kind}-history-loading`)).toBeTruthy();
-  expect(screen.getByTestId(`stats-${kind}-history-title`)).toBeTruthy();
-  expect(build).not.toHaveBeenCalled();
-  result.rerender(<StatsScreenShell {...props} isMuscleHistoryLoading={false} isExerciseHistoryLoading={false}
-    muscleHistoryErrorMessage={kind === 'muscle' ? 'Failed read' : null}
-    exerciseHistoryErrorMessage={kind === 'exercise' ? 'Failed read' : null} />);
-  expect(screen.getByTestId(`stats-${kind}-history-error`)).toBeTruthy();
-  expect(build).not.toHaveBeenCalled();
-  build.mockRestore();
 });

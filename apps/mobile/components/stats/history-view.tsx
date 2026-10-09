@@ -6,7 +6,6 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import {
-  PageSheet,
   SegmentedControl,
   StatePanel,
   uiSpace,
@@ -17,11 +16,12 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
-// Pending/error bodies mount only their StatePanel; chart work starts after data.
-// The history of one exercise or one muscle on Progress: a sub-page
-// (`PageSheet`) holding the metric control and the saved Daily
-// or Weekly heatmap. One component for the muscle and the exercise
-// sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
+// The body of the history page (`app/progress-history.tsx`): the view and
+// metric selectors in one row, then the chosen Grid or Weekly heatmap. The
+// subject's name is the page's native title, so nothing here repeats it.
+// Pending/error bodies mount only their StatePanel; chart work starts after
+// data. One component for the muscle and the exercise page; `kind` names its
+// testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';
 export type MuscleHistoryMetric = Extract<CalendarHeatmapMetric, 'totalVolume' | 'workingSetCount'>;
@@ -150,16 +150,25 @@ function HistoryHeatmap({
   );
 }
 
-export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
+// The two history views, labelled by their icons: the month calendars (Grid)
+// and the weekly bars. Switching writes the saved `heatmapView` preference, so
+// the choice survives leaving the page. A third, Timeline view is planned.
+export const HISTORY_VIEW_OPTIONS = [
+  { value: 'daily' as HeatmapView, label: 'Grid', icon: 'calendar-grid' as const },
+  { value: 'weekly' as HeatmapView, label: 'Weekly', icon: 'weekly-bars' as const },
+];
+
+export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   kind: HistoryKind;
-  // Above the title: "Exercise History" or "Muscle History".
-  eyebrow: string;
-  // The exercise or muscle name.
-  title: string;
+  // The exercise or muscle name. The page's native title carries it; the body
+  // uses it only inside its loading and empty copy, and leaves it out of both
+  // while the catalogue is still resolving the name.
+  subject: string | null;
   metricOptions: readonly HistoryMetricOption<TMetric>[];
   metric: TMetric;
   onSelectMetric: (metric: TMetric) => void;
   view: HeatmapView;
+  onSelectView: (view: HeatmapView) => void;
   weeklyEffort: SelectedMuscleWeeklyEffort[];
   dailyMetrics: DailyEffortMetrics[];
   isLoading: boolean;
@@ -169,21 +178,18 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
-  // Called once the sheet has gone (X, swipe down, Back or escape), so the host
-  // clears its target and restores focus after the native modal has closed.
-  onDismiss: () => void;
   onRetry?: () => void;
   todayDateKey?: string;
 };
 
-export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
+export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   kind,
-  eyebrow,
-  title,
+  subject,
   metricOptions,
   metric,
   onSelectMetric,
   view,
+  onSelectView,
   weeklyEffort,
   dailyMetrics,
   isLoading,
@@ -192,18 +198,16 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   muscleTargets,
   selectedWeekKey,
   onSelectWeek,
-  onDismiss,
   onRetry,
   todayDateKey,
-}: HistorySheetProps<TMetric>) {
+}: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
-  // The host mounts the sheet open and unmounts it from `onDismiss`.
-  const [visible, setVisible] = useState(true);
+  const named = subject ? `${subject} ` : '';
 
   const status = <>
     {isLoading ? (
-      <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
+      <StatePanel body={`Loading ${named}history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
     ) : null}
 
     {!isLoading && errorMessage ? (
@@ -219,7 +223,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 
     {!isLoading && !errorMessage && weeklyEffort.length === 0 ? (
       <StatePanel
-        body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
+        body={`No ${named}training was found in the selected ${lookbackWeeks}-week history window.`}
         fill={false}
         testID={`${prefix}-empty`}
         title="No history yet"
@@ -229,39 +233,54 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   </>;
 
   return (
-    <PageSheet closeLabel={`Close ${kind} history`} eyebrow={eyebrow} onDismiss={() => setVisible(false)}
-      onDismissed={onDismiss} testID={prefix} title={title} visible={visible}>
-      <View style={styles.body} testID={`${prefix}-overlay`}>
-        <View style={styles.controls}>
-          <SegmentedControl
-            accessibilityLabel="Select effort metric"
-            // Four metrics: `Top weight` outgrows an equal quarter.
-            layout="fit"
-            selectedGround="selection"
-            onChange={onSelectMetric}
-            options={metricOptions}
-            testIDPrefix={`${prefix}-metric-chip`}
-            value={metric}
-          />
-        </View>
-
-        {!!errorMessage || (isLoading && dailyMetrics.length === 0) ? (
-          <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView>
-        ) : <HistoryHeatmap
-          dailyMetrics={dailyMetrics}
-          lookbackWeeks={lookbackWeeks}
-          muscleTargets={muscleTargets}
-          metric={metric}
-          metricLabel={metricLabel}
-          onSelectWeek={onSelectWeek}
-          selectedWeekKey={selectedWeekKey}
-          testIDPrefix={prefix}
-          todayDateKey={todayDateKey}
-          view={view}
-          status={status}
-        />}
+    <View style={styles.body} testID={`${prefix}-overlay`}>
+      {/* Both selectors in one row: the view as icons, so the metric names —
+          up to four, `Top weight` the widest — keep the rest of the row. */}
+      <View style={styles.controls}>
+        <SegmentedControl
+          accessibilityLabel="Select history view"
+          density="compact"
+          // Icon segments are 32pt wide: hit slop keeps the 44pt target
+          // (`design-language.md`, "Tap targets").
+          hitSlop={uiSpace.md}
+          layout="inline"
+          onChange={onSelectView}
+          options={HISTORY_VIEW_OPTIONS}
+          selectedGround="selection"
+          testIDPrefix={`${prefix}-view-chip`}
+          value={view}
+        />
+        <SegmentedControl
+          accessibilityLabel="Select effort metric"
+          density="compact"
+          hitSlop={uiSpace.sm}
+          // Four metrics: `Top weight` outgrows an equal quarter.
+          layout="fit"
+          onChange={onSelectMetric}
+          options={metricOptions}
+          selectedGround="selection"
+          style={styles.metricControl}
+          testIDPrefix={`${prefix}-metric-chip`}
+          value={metric}
+        />
       </View>
-    </PageSheet>
+
+      {!!errorMessage || (isLoading && dailyMetrics.length === 0) ? (
+        <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView>
+      ) : <HistoryHeatmap
+        dailyMetrics={dailyMetrics}
+        lookbackWeeks={lookbackWeeks}
+        muscleTargets={muscleTargets}
+        metric={metric}
+        metricLabel={metricLabel}
+        onSelectWeek={onSelectWeek}
+        selectedWeekKey={selectedWeekKey}
+        testIDPrefix={prefix}
+        todayDateKey={todayDateKey}
+        view={view}
+        status={status}
+      />}
+    </View>
   );
 }
 
@@ -269,9 +288,17 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
+  // The view and metric selectors share one row and one height.
   controls: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
+  },
+  metricControl: {
+    flex: 1,
+    minWidth: 0,
   },
   scroll: {
     flex: 1,
