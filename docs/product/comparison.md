@@ -60,21 +60,24 @@ Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/componen
 ### comparison.timeline-history · presentation · accepted
 
 The Timeline history view plots one value per Monday week across
-[[comparison.history-window]], oldest on the left. A month is labelled at the
-first week that starts in it, as in [[comparison.daily-history]].
+[[comparison.history-window]], oldest on the left, as columns on a zero-based
+scale. A month is labelled at the first week that starts in it, as in
+[[comparison.daily-history]].
 
-| Metric | Week value | Drawn as | Rest week | Unavailable week |
-| --- | --- | --- | --- | --- |
-| Volume, Sets | the week's sum | a column on a zero-based scale | zero: no column | a gap |
-| 1RM, Top weight | the week's best | a line on a scale fitted to the plotted weeks | a gap: the line breaks | a gap |
+| Metric | Week value | Rest week | Unavailable week |
+| --- | --- | --- | --- |
+| Volume, Sets | the week's sum | no column; the readout says `0` | no column; the readout says `Unavailable` |
+| 1RM, Top weight | the week's best | no column; the readout says `No sets` | no column; the readout says `Unavailable` |
 
-Tapping a week does what tapping a Weekly row does. The readout above the
-chart shows the selected week, else the newest; it follows
-[[copy.blank-history]].
+The readout above the chart shows the selected week, else the newest: its
+figure and unit (`volume`, `sets`, `kg`), and `View sessions` for a trained
+week. Tapping a week selects it and fills its column in `ink`; a second tap
+clears it. The selected week's sets follow the chart. Unlike Daily and Weekly
+([[copy.blank-history]]), the readout writes a rest week's figure.
 
-Why: a sum is a quantity a lifter piles up, so a week without one is zero; a
-best is a level, and a rest week has none to draw.
-Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`.
+Why: one form reads the same for every metric; a week without training sums
+to zero, and a best has no value without sets.
+Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`; `apps/mobile/components/stats/week-sets.ts`.
 
 ### comparison.weekly-reference · calculation · accepted
 

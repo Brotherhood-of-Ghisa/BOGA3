@@ -2,7 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { Circle, Path } from 'react-native-svg';
+import { Text } from 'react-native';
+import { Path } from 'react-native-svg';
 
 import { uiRoles } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
@@ -20,60 +21,93 @@ const DAYS = [
 
 // The readout and tick labels are hidden from VoiceOver: the plot's adjustable value speaks for them.
 const hidden = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
-const svgProps = (type: 'path' | 'circle', id: string) => {
-  const marks = type === 'path' ? screen.UNSAFE_getAllByType(Path) : screen.UNSAFE_getAllByType(Circle);
-  return marks.find(mark => mark.props.testID === id)?.props;
-};
+const barFill = (id: string) => screen.UNSAFE_getAllByType(Path).find(mark => mark.props.testID === id)?.props.fill;
 
-const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), days = DAYS }: {
+const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), onViewSessions, days = DAYS, children }: {
   metric?: CalendarHeatmapMetric; weeks?: number; selectedWeekKey?: string | null;
-  onSelectWeek?: (key: string | null) => void; days?: DailyEffortMetrics[];
+  onSelectWeek?: (key: string | null) => void; onViewSessions?: (key: string) => void; days?: DailyEffortMetrics[];
+  children?: React.ReactNode;
 } = {}) => <TimelineHeatmap data={buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks })} metric={metric}
-  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" formatValue={String}
-  metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={metric === 'totalVolume' ? 'kg·reps' : 'kg'} />;
+  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} onViewSessions={onViewSessions} testIDPrefix="history"
+  formatValue={metric === 'totalVolume' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={metric === 'totalVolume' ? 'volume' : 'kg'}>
+  {children}
+</TimelineHeatmap>;
 
-it('draws a zero-based column per trained week with its unit and y scale', () => {
+it('draws a zero-based column per trained week on a y scale with no unit label over it', () => {
   render(chart());
   expect(screen.getByTestId(`${ID}-bar-2026-09-14`)).toBeTruthy();
   expect(screen.getByTestId(`${ID}-bar-2026-09-28`)).toBeTruthy();
   expect(screen.queryByTestId(`${ID}-bar-2026-09-21`)).toBeNull();
-  expect(svgProps('path', `${ID}-bar-2026-10-05`)?.fill).toBe(uiRoles.viz4);
-  expect(screen.getByTestId(`${ID}-unit`)).toHaveTextContent('kg·reps');
+  expect(barFill(`${ID}-bar-2026-10-05`)).toBe(uiRoles.viz4);
   expect(hidden(`${ID}-tick-0`)).toHaveTextContent('0');
   expect(hidden(`${ID}-tick-400`)).toHaveTextContent('400');
-  expect(screen.queryByTestId(`${ID}-line-0`)).toBeNull();
+  expect(screen.queryByTestId(`${ID}-unit`, { includeHiddenElements: true })).toBeNull();
 });
 
-it('draws 1RM as a line broken at the rest week', () => {
-  render(chart({ metric: 'estimatedRM1' }));
-  expect(screen.getAllByTestId(/history-timeline-line-/)).toHaveLength(1);
-  expect(screen.getByTestId(`${ID}-dot`)).toBeTruthy();
-  expect(screen.queryByTestId(/history-timeline-bar-/)).toBeNull();
-  expect(hidden(`${ID}-tick-80`)).toBeTruthy();
+it('draws 1RM as columns too, its whole ticks without a decimal', () => {
+  const { rerender } = render(chart({ metric: 'estimatedRM1', days: [day('2026-10-05', { estimatedRM1: 9 })] }));
+  expect(hidden(`${ID}-tick-2.5`)).toHaveTextContent('2.5');
+  expect(hidden(`${ID}-tick-5`)).toHaveTextContent('5');
+  rerender(chart({ metric: 'estimatedRM1' }));
+  expect(screen.getAllByTestId(/history-timeline-bar-/)).toHaveLength(3);
+  expect(hidden(`${ID}-tick-100`)).toHaveTextContent('100');
+});
+
+it('fills the selected column in ink, so a full column still shows it', () => {
+  render(chart({ selectedWeekKey: '2026-09-14' }));
+  expect(barFill(`${ID}-bar-2026-09-14`)).toBe(uiRoles.ink);
+  expect(barFill(`${ID}-bar-2026-09-28`)).toBe(uiRoles.viz4);
 });
 
 it('reads out the newest week until one is selected, then the selected week', () => {
   const { rerender } = render(chart());
   expect(hidden(`${ID}-readout-week`)).toHaveTextContent('5 – 11 Oct');
-  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 kg·reps');
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 volume');
   expect(screen.getByText('Current week', { includeHiddenElements: true })).toBeTruthy();
   expect(screen.queryByTestId(`${ID}-selected`)).toBeNull();
 
   rerender(chart({ selectedWeekKey: '2026-09-14' }));
   expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14 – 20 Sep');
-  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('400 kg·reps');
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('400 volume');
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 0);
 });
 
-it('leaves a rest week blank in the readout and says so to VoiceOver', () => {
-  render(chart({ selectedWeekKey: '2026-09-21' }));
-  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('');
-  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21 – 27 Sep 2026, Rest week' });
+it('reads a rest week as zero for a sum and as no sets for a best', () => {
+  const { rerender } = render(chart({ selectedWeekKey: '2026-09-21' }));
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('0 volume');
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21 – 27 Sep 2026, Volume 0' });
+
+  rerender(chart({ metric: 'estimatedRM1', selectedWeekKey: '2026-09-21' }));
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('No sets');
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21 – 27 Sep 2026, 1RM No sets' });
 });
 
-it('marks the selected point of a line', () => {
-  render(chart({ metric: 'estimatedRM1', selectedWeekKey: '2026-09-28' }));
-  expect(svgProps('circle', `${ID}-selected-dot`)?.fill).toBe(uiRoles.ink);
+it('speaks a unit that differs from the metric', () => {
+  render(chart({ metric: 'estimatedRM1' }));
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 5 – 11 Oct 2026, 1RM 80.0 kg, Current week' });
+});
+
+it('reads an unavailable week as unavailable', () => {
+  render(chart({ days: [day('2026-10-05', { totalVolume: null })] }));
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('Unavailable');
+});
+
+it('offers View sessions for a trained week only', () => {
+  const onViewSessions = jest.fn();
+  const { rerender } = render(chart({ onViewSessions, selectedWeekKey: '2026-09-14' }));
+  fireEvent.press(screen.getByTestId(`${ID}-view-sessions`));
+  expect(onViewSessions).toHaveBeenCalledWith('2026-09-14');
+  expect(screen.getByTestId(`${ID}-view-sessions`)).toHaveProp('accessibilityLabel', 'View sessions, week of 14 – 20 Sep');
+
+  rerender(chart({ onViewSessions, selectedWeekKey: '2026-09-21' }));
+  expect(screen.queryByTestId(`${ID}-view-sessions`)).toBeNull();
+  rerender(chart({ selectedWeekKey: '2026-09-14' }));
+  expect(screen.queryByTestId(`${ID}-view-sessions`)).toBeNull();
+});
+
+it('shows the week detail below the chart', () => {
+  render(chart({ children: <Text testID="week-detail">sets</Text> }));
+  expect(screen.getByTestId('week-detail')).toBeTruthy();
 });
 
 it('selects the tapped week and clears it on a second tap', () => {

@@ -20,7 +20,6 @@ export {
 export {
   buildTimelineSeries,
   timelineGeometry,
-  type TimelineMark,
   type TimelineSeries,
   type TimelineWeek,
 } from './timeline';

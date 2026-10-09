@@ -20,3 +20,10 @@ export const keepHistorySelection = (key: string | null, weeks: number, now = ne
   const currentWeek = localDateKey(calendarWeekBounds(1, now).start);
   return key && key >= localDateKey(start) && key <= currentWeek ? key : currentWeek;
 };
+
+/** One local Monday–Sunday week from its `YYYY-MM-DD` Monday key; `end` is the next Monday, exclusive. */
+export const localWeekBounds = (weekStartDateKey: string) => {
+  const [year, month, day] = weekStartDateKey.split('-').map(Number);
+  const start = new Date(year, month - 1, day);
+  return { start, end: shiftCalendarWeeks(start, 1) };
+};

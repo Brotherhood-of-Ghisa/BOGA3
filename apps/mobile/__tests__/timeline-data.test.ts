@@ -35,13 +35,12 @@ describe('buildTimelineSeries', () => {
   });
 
   it.each([
-    ['totalVolume', 'bar', [350, 0, 40, 10]],
-    ['workingSetCount', 'bar', [7, 0, 1, 1]],
-    ['estimatedRM1', 'line', [70, null, 55, 30]],
-    ['highestWeight', 'line', [50, null, 52.5, 30]],
-  ] as const)('%s sums or takes the weekly best, as a %s; a rest week is zero for sums and a gap for bests', (metric, mark, expected) => {
+    ['totalVolume', [350, 0, 40, 10]],
+    ['workingSetCount', [7, 0, 1, 1]],
+    ['estimatedRM1', [70, 0, 55, 30]],
+    ['highestWeight', [50, 0, 52.5, 30]],
+  ] as const)('%s sums or takes the weekly best; a rest week is zero', (metric, expected) => {
     const built = series(days, metric);
-    expect(built.mark).toBe(mark);
     expect(values(built)).toEqual(expected);
     expect(built.weeks.map(week => week.state)).toEqual(['training', 'rest', 'training', 'training']);
   });
@@ -49,7 +48,7 @@ describe('buildTimelineSeries', () => {
   it('leaves an unavailable week as a gap for every metric', () => {
     const unknown = [day('2026-09-28', { totalVolume: null, estimatedRM1: null, highestWeight: null }), day('2026-10-05')];
     expect(values(series(unknown, 'totalVolume'))).toEqual([0, 0, null, 100]);
-    expect(values(series(unknown, 'estimatedRM1'))).toEqual([null, null, null, 50]);
+    expect(values(series(unknown, 'estimatedRM1'))).toEqual([0, 0, null, 50]);
     expect(series(unknown, 'estimatedRM1').weeks[2].state).toBe('unavailable');
   });
 
@@ -73,28 +72,25 @@ describe('buildTimelineSeries', () => {
     expect(turn.months).toEqual([{ index: 2, label: 'Jan', year: 2026 }]);
   });
 
-  it('draws only the zero baseline for an empty window, and no scale for an empty line', () => {
+  it('draws only the zero baseline for an empty window', () => {
     expect(series([], 'totalVolume').ticks).toEqual([0]);
-    expect(series([], 'estimatedRM1').ticks).toEqual([]);
+    expect(series([], 'estimatedRM1').ticks).toEqual([0]);
   });
 });
 
 describe('timelineTicks', () => {
-  it('starts columns at zero on a nice step', () => {
-    expect(timelineTicks([350, 0, 40], 'bar', false)).toEqual([0, 100, 200, 300, 400]);
-    expect(timelineTicks([0, 0], 'bar', false)).toEqual([0]);
+  it('starts at zero and ends on the first nice step at or above the largest value', () => {
+    expect(timelineTicks([350, 0, 40], false)).toEqual([0, 100, 200, 300, 400]);
+    expect(timelineTicks([131.2, 92.5], false)).toEqual([0, 50, 100, 150]);
+    expect(timelineTicks([0.4], false)).toEqual([0, 0.1, 0.2, 0.3, 0.4]);
+    expect(timelineTicks([0, 0], false)).toEqual([0]);
+    expect(timelineTicks([], false)).toEqual([0]);
   });
 
   it('uses whole steps for set counts', () => {
-    expect(timelineTicks([7, 1], 'bar', true)).toEqual([0, 2, 4, 6, 8]);
-    expect(timelineTicks([1], 'bar', true)).toEqual([0, 1]);
+    expect(timelineTicks([7, 1], true)).toEqual([0, 2, 4, 6, 8]);
+    expect(timelineTicks([1], true)).toEqual([0, 1]);
     expect(niceStep(3, true)).toBe(1);
-  });
-
-  it('fits a line to its values, pads a flat line and never drops below zero', () => {
-    expect(timelineTicks([102.5, 110, 97.5], 'line', false)).toEqual([95, 100, 105, 110]);
-    expect(timelineTicks([100, 100], 'line', false)).toEqual([95, 97.5, 100, 102.5, 105]);
-    expect(timelineTicks([0.4], 'line', false)).toEqual([0, 0.5, 1, 1.5]);
   });
 });
 
@@ -110,9 +106,9 @@ describe('timelineGeometry', () => {
     expect(geometry.columnWidth).toBe(100);
     expect(geometry.width).toBe(400);
     expect(geometry.bars).toEqual([
-      { weekStartDateKey: '2026-09-14', x: 38, y: 0, width: 24, height: 100 },
-      { weekStartDateKey: '2026-09-28', x: 238, y: 50, width: 24, height: 50 },
-      { weekStartDateKey: '2026-10-05', x: 338, y: 75, width: 24, height: 25 },
+      { weekStartDateKey: '2026-09-14', index: 0, x: 38, y: 0, width: 24, height: 100 },
+      { weekStartDateKey: '2026-09-28', index: 2, x: 238, y: 50, width: 24, height: 50 },
+      { weekStartDateKey: '2026-10-05', index: 3, x: 338, y: 75, width: 24, height: 25 },
     ]);
     expect(geometry.ticks.map(tick => tick.y)).toEqual([100, 75, 50, 25, 0]);
   });
@@ -127,17 +123,15 @@ describe('timelineGeometry', () => {
     expect(timelineWeekIndexAt(13, geometry.columnWidth, 104)).toBe(2);
   });
 
-  it('breaks a line at a gap and dots a point with no neighbour', () => {
-    const line = series([
+  it('draws a best-of metric as zero-based columns too, leaving an unavailable week empty', () => {
+    const best = series([
       day('2026-09-14', { estimatedRM1: 100 }),
-      day('2026-09-28', { estimatedRM1: 90 }),
+      day('2026-09-28', { estimatedRM1: null }),
       day('2026-10-05', { estimatedRM1: 80 }),
     ], 'estimatedRM1');
-    const geometry = timelineGeometry(line, 400, 100);
-    expect(geometry.bars).toEqual([]);
-    expect(geometry.isolated).toEqual([{ x: 50, y: 0 }]);
-    expect(geometry.segments).toEqual([[{ x: 250, y: 50 }, { x: 350, y: 100 }]]);
-    expect(geometry.points[1]).toBeNull();
+    expect(best.ticks).toEqual([0, 25, 50, 75, 100]);
+    expect(timelineGeometry(best, 400, 100).bars.map(bar => [bar.weekStartDateKey, bar.height]))
+      .toEqual([['2026-09-14', 100], ['2026-10-05', 80]]);
   });
 
   it('keeps month labels apart, preferring the ones carrying a year', () => {
@@ -154,7 +148,7 @@ describe('timelineGeometry', () => {
   });
 
   it('draws a column with a rounded top and a square baseline', () => {
-    expect(barPath({ weekStartDateKey: 'w', x: 2, y: 10, width: 8, height: 30 }))
+    expect(barPath({ weekStartDateKey: 'w', index: 0, x: 2, y: 10, width: 8, height: 30 }))
       .toBe('M 2,40V14Q2,10 6,10H6Q10,10 10,14V40Z');
   });
 });

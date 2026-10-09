@@ -1,11 +1,12 @@
 // Timeline: the selected metric week by week across the history window, oldest
-// on the left. Volume and Sets draw zero-based columns; 1RM and Top weight draw
-// a line that breaks on rest weeks ([[comparison.timeline-history]]). A month is
-// labelled at the first week that starts in it. The window fits the width down
-// to `MIN_TIMELINE_COLUMN_WIDTH` per week, then scrolls sideways, opening on the
-// newest week. Tapping a week selects it, a second tap clears it, as a Weekly
-// row does; the readout above shows the selected week, else the newest.
-// VoiceOver reads the plot as one adjustable element stepping through weeks.
+// on the left, as zero-based columns ([[comparison.timeline-history]]). A month
+// is labelled at the first week that starts in it. The window fits the width
+// down to `MIN_TIMELINE_COLUMN_WIDTH` per week, then scrolls sideways, opening
+// on the newest week. Tapping a week selects it, a second tap clears it, as a
+// Weekly row does: its column fills `ink` on a `ruleSoft` band. The readout
+// above shows the selected week, else the newest, with `View sessions` for a
+// trained week; `children` (the week's sets) follow the chart. VoiceOver reads
+// the plot as one adjustable element stepping through weeks.
 import React, { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
@@ -18,9 +19,9 @@ import {
   type LayoutChangeEvent,
   type ScrollViewInstance,
 } from 'react-native';
-import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
+import Svg, { Line, Path, Rect } from 'react-native-svg';
 
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import { heatmapStyles } from './heatmap-style';
@@ -39,12 +40,15 @@ interface Props {
   metric: CalendarHeatmapMetric;
   selectedWeekKey: string | null;
   onSelectWeek: (weekStartDateKey: string | null) => void;
+  /** Opens the sessions of a trained week; without it the readout has no button. */
+  onViewSessions?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
   formatValue: (value: number) => string;
   metricLabel: string;
-  /** The y axis unit, e.g. `kg`. */
+  /** The readout's unit word, e.g. `kg`, `sets`, `volume`. */
   unitLabel: string;
   header?: ReactNode;
+  children?: ReactNode;
 }
 
 const PLOT_HEIGHT = 160;
@@ -53,36 +57,49 @@ const PLOT_HEIGHT = 160;
 const FALLBACK_PLOT_WIDTH = 300;
 // Plex Mono advances 0.6em per character.
 const TICK_CHAR_WIDTH = uiTypography.size.xxs * 0.6;
-const DOT_RADIUS = 4;
 
-const readoutValue = (week: TimelineWeek, formatValue: Props['formatValue']) =>
-  week.state === 'training' && week.value !== null ? formatValue(week.value) : '';
+const isSum = (metric: CalendarHeatmapMetric) => metric === 'totalVolume' || metric === 'workingSetCount';
 
-const weekDescription = (week: TimelineWeek, metricLabel: string, formatValue: Props['formatValue']) => {
-  const figure = week.state === 'unavailable' ? `${metricLabel} unavailable`
-    : week.state === 'rest' ? 'Rest week' : `${metricLabel} ${readoutValue(week, formatValue)}`;
-  return `Week of ${weekRangeLabel(week.monday)} ${week.monday.getUTCFullYear()}, ${figure}${week.isCurrentWeek ? ', Current week' : ''}`;
+type Figure = { value: string; unit: boolean };
+
+// A rest week reads as a zero for a sum; a best has nothing to show.
+const weekFigure = (week: TimelineWeek, metric: CalendarHeatmapMetric, formatValue: Props['formatValue']): Figure => {
+  if (week.state === 'unavailable' || week.value === null) return { value: 'Unavailable', unit: false };
+  if (week.state === 'rest' && !isSum(metric)) return { value: 'No sets', unit: false };
+  return { value: formatValue(week.value), unit: true };
 };
 
-function Readout({ week, formatValue, unitLabel, currentYear, testID }: {
-  week: TimelineWeek; formatValue: Props['formatValue']; unitLabel: string; currentYear: number; testID: string;
+// `Volume 100`, `Sets 6`, `1RM 112.5 kg`: a unit that repeats the metric is not spoken twice.
+const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string, unitLabel: string) => {
+  const unit = figure.unit && unitLabel.toLowerCase() !== metricLabel.toLowerCase() ? ` ${unitLabel}` : '';
+  return `Week of ${weekRangeLabel(week.monday)} ${week.monday.getUTCFullYear()}, ${metricLabel} ${figure.value}${unit}${week.isCurrentWeek ? ', Current week' : ''}`;
+};
+
+function Readout({ week, figure, unitLabel, currentYear, onViewSessions, testID }: {
+  week: TimelineWeek; figure: Figure; unitLabel: string; currentYear: number;
+  onViewSessions?: Props['onViewSessions']; testID: string;
 }) {
   const year = week.monday.getUTCFullYear();
-  const value = readoutValue(week, formatValue);
-  return <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={styles.readout}>
-    <View>
-      <Text allowFontScaling={false} style={styles.readoutWeek} testID={`${testID}-readout-week`}>
-        {weekRangeLabel(week.monday)}{year === currentYear ? '' : ` ${year}`}
-      </Text>
-      {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
+  const label = `${weekRangeLabel(week.monday)}${year === currentYear ? '' : ` ${year}`}`;
+  return <View style={styles.readout}>
+    <View style={styles.readoutWeekColumn}>
+      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <Text allowFontScaling={false} style={styles.readoutWeek} testID={`${testID}-readout-week`}>{label}</Text>
+        {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
+      </View>
+      {onViewSessions && week.state === 'training' ? <ActionButton size="compact" variant="outline" label="View sessions"
+        accessibilityLabel={`View sessions, week of ${label}`} onPress={() => onViewSessions(week.weekStartDateKey)}
+        testID={`${testID}-view-sessions`} /> : null}
     </View>
-    <Text allowFontScaling={false} style={styles.readoutValue} testID={`${testID}-readout-value`}>
-      {value}{value ? <Text allowFontScaling={false} style={heatmapStyles.legendText}> {unitLabel}</Text> : null}
+    <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
+      style={styles.readoutValue} testID={`${testID}-readout-value`}>
+      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={heatmapStyles.legendText}> {unitLabel}</Text> : null}
     </Text>
   </View>;
 }
 
-export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue, metricLabel, unitLabel, header }: Props) {
+export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, onViewSessions, testIDPrefix, formatValue,
+  metricLabel, unitLabel, header, children }: Props) {
   const testID = `${testIDPrefix}-timeline`;
   const series = useMemo(() => buildTimelineSeries(data.weekly, metric), [data.weekly, metric]);
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
@@ -92,32 +109,30 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
   const selectedIndex = weeks.findIndex(week => week.weekStartDateKey === selectedWeekKey);
   const shownIndex = selectedIndex >= 0 ? selectedIndex : weeks.length - 1;
   const shown = weeks[shownIndex];
+  const figure = shown ? weekFigure(shown, metric, formatValue) : null;
   const overflows = geometry.width > plotWidth + 0.5;
-  const tickLabels = geometry.ticks.map(tick => formatValue(tick.value));
+  // A whole tick drops the metric's decimal: `150`, not `150.0`.
+  const tickLabels = geometry.ticks.map(tick => Number.isInteger(tick.value) ? String(tick.value) : formatValue(tick.value));
   const axisWidth = Math.ceil(Math.max(uiSpace.lg, ...tickLabels.map(label => label.length * TICK_CHAR_WIDTH)) + uiSpace.xs);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const measured = Math.round(event.nativeEvent.layout.width);
     if (measured > 0 && measured !== plotWidth) setPlotWidth(measured);
   };
-  const toggle = (index: number) => {
-    const key = weeks[index].weekStartDateKey;
+  const onPress = (event: GestureResponderEvent) => {
+    if (weeks.length === 0) return;
+    const key = weeks[timelineWeekIndexAt(event.nativeEvent.locationX, geometry.columnWidth, weeks.length)].weekStartDateKey;
     onSelectWeek(key === selectedWeekKey ? null : key);
   };
-  const onPress = (event: GestureResponderEvent) => {
-    if (weeks.length > 0) toggle(timelineWeekIndexAt(event.nativeEvent.locationX, geometry.columnWidth, weeks.length));
-  };
   const onAccessibilityAction = (event: AccessibilityActionEvent) => {
-    const step = event.nativeEvent.actionName === 'increment' ? 1 : -1;
-    const next = weeks[shownIndex + step];
+    const next = weeks[shownIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1)];
     if (next) onSelectWeek(next.weekStartDateKey);
   };
 
   return <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID={testID}>
     {header}
-    {shown ? <Readout week={shown} formatValue={formatValue} unitLabel={unitLabel}
+    {shown && figure ? <Readout week={shown} figure={figure} unitLabel={unitLabel} onViewSessions={onViewSessions}
       currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} /> : null}
-    <Text allowFontScaling={false} style={heatmapStyles.legendText} testID={`${testID}-unit`}>{unitLabel}</Text>
     <View style={styles.chartRow}>
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[styles.axis, { width: axisWidth }]}>
         {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
@@ -130,7 +145,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
           testID={`${testID}-scroll`}>
           <Pressable accessible accessibilityRole="adjustable"
             accessibilityLabel={`${metricLabel} by week, ${weeks.length} weeks`}
-            accessibilityValue={shown ? { text: weekDescription(shown, metricLabel, formatValue) } : undefined}
+            accessibilityValue={shown && figure ? { text: weekDescription(shown, figure, metricLabel, unitLabel) } : undefined}
             accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
             onAccessibilityAction={onAccessibilityAction}
             onPress={onPress} testID={`${testID}-plot`} style={{ width: geometry.width }}>
@@ -145,6 +160,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
         </ScrollView>
       </View>
     </View>
+    {children}
   </ScrollView>;
 }
 
@@ -152,29 +168,23 @@ function TimelinePlot({ geometry, selectedIndex, testID }: {
   geometry: ReturnType<typeof timelineGeometry>; selectedIndex: number; testID: string;
 }) {
   const { width, height, columnWidth } = geometry;
-  const selectedPoint = geometry.points[selectedIndex];
   return <View pointerEvents="none">
     <Svg height={height} width={width}>
       {selectedIndex >= 0 ? <Rect fill={uiRoles.ruleSoft} height={height} testID={`${testID}-selected`}
         width={columnWidth} x={selectedIndex * columnWidth} y={0} /> : null}
       {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? uiRoles.rule : uiRoles.ruleSoft}
         strokeWidth={1} x1={0} x2={width} y1={tick.y} y2={tick.y} />)}
-      {geometry.bars.map(bar => <Path key={bar.weekStartDateKey} d={barPath(bar)} fill={uiRoles.viz4}
-        testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
-      {geometry.segments.map((run, index) => <Polyline key={index} fill="none" points={run.map(point => `${point.x},${point.y}`).join(' ')}
-        stroke={uiRoles.viz4} strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} testID={`${testID}-line-${index}`} />)}
-      {geometry.isolated.map(point => <Circle key={point.x} cx={point.x} cy={point.y} fill={uiRoles.viz4} r={DOT_RADIUS}
-        stroke={uiRoles.surface} strokeWidth={2} testID={`${testID}-dot`} />)}
-      {selectedPoint ? <Circle cx={selectedPoint.x} cy={selectedPoint.y} fill={uiRoles.ink} r={DOT_RADIUS + 0.5}
-        stroke={uiRoles.surface} strokeWidth={2} testID={`${testID}-selected-dot`} /> : null}
+      {geometry.bars.map(bar => <Path key={bar.weekStartDateKey} d={barPath(bar)}
+        fill={bar.index === selectedIndex ? uiRoles.ink : uiRoles.viz4} testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
     </Svg>
   </View>;
 }
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  content: { gap: uiSpace.sm, padding: uiSpace.lg },
-  readout: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: uiSpace.sm, marginBottom: uiSpace.sm },
+  content: { gap: uiSpace.md, padding: uiSpace.lg },
+  readout: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: uiSpace.sm },
+  readoutWeekColumn: { alignItems: 'flex-start', gap: uiSpace.sm },
   readoutWeek: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
   note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
   readoutValue: { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },

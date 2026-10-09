@@ -1,14 +1,12 @@
 // timeline.ts — the Timeline history view's data and geometry: one value per
-// week of the adapter's weekly series (`heatmapData.ts`), its y scale, month
-// labels and the plotted marks. Pure, no React / react-native imports.
-// Rest-week display follows [[comparison.timeline-history]].
+// week of the adapter's weekly series (`heatmapData.ts`), its zero-based y
+// scale, month labels and the columns. Pure, no React / react-native imports.
+// Week values and rest weeks follow [[comparison.timeline-history]].
 
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import type { WeekCell } from './heatmapData';
 
-/** Summed metrics draw zero-based columns; best-of metrics draw a line. */
-export type TimelineMark = 'bar' | 'line';
 export type TimelineWeekState = 'training' | 'rest' | 'unavailable';
 
 export interface TimelineWeek {
@@ -16,7 +14,7 @@ export interface TimelineWeek {
   monday: Date;
   isCurrentWeek: boolean;
   state: TimelineWeekState;
-  /** `null` is a gap: an unavailable figure, or a rest week of a best-of metric. */
+  /** Zero for a rest week; `null` (a gap) when the figure is unavailable. */
   value: number | null;
 }
 
@@ -29,9 +27,8 @@ export interface TimelineMonth {
 }
 
 export interface TimelineSeries {
-  mark: TimelineMark;
   weeks: TimelineWeek[];
-  /** Ascending; the first and last are the y domain. Empty when nothing is plotted. */
+  /** Ascending from zero; the last is the top of the scale. */
   ticks: number[];
   months: TimelineMonth[];
 }
@@ -39,33 +36,22 @@ export interface TimelineSeries {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const TARGET_TICK_INTERVALS = 4;
 
-export const timelineMark = (metric: CalendarHeatmapMetric): TimelineMark =>
-  metric === 'totalVolume' || metric === 'workingSetCount' ? 'bar' : 'line';
-
 const weekState = (week: WeekCell): TimelineWeekState => {
   if (week.unavailable) return 'unavailable';
   return week.hasTraining ?? week.value > 0 ? 'training' : 'rest';
 };
 
-const weekValue = (state: TimelineWeekState, value: number, mark: TimelineMark): number | null => {
-  if (state === 'unavailable') return null;
-  if (state === 'rest') return mark === 'bar' ? 0 : null;
-  return value;
-};
-
-const toTimelineWeek = (week: WeekCell, mark: TimelineMark): TimelineWeek => {
+const toTimelineWeek = (week: WeekCell): TimelineWeek => {
   const state = weekState(week);
   return {
     weekStartDateKey: week.weekStartDateKey,
     monday: week.monday,
     isCurrentWeek: week.isCurrentWeek,
     state,
-    value: weekValue(state, week.value, mark),
+    value: state === 'unavailable' ? null : state === 'rest' ? 0 : week.value,
   };
 };
 
-// The first week starting in a month carries its label: its Monday is one of
-// the month's first seven days.
 /** A Monday–Sunday week as `29 Sep – 5 Oct`, or `6 – 12 Oct` within one month. */
 export const weekRangeLabel = (monday: Date): string => {
   const end = new Date(monday.getTime() + 6 * 86400000);
@@ -73,6 +59,8 @@ export const weekRangeLabel = (monday: Date): string => {
   return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
 };
 
+// The first week starting in a month carries its label: its Monday is one of
+// the month's first seven days.
 const timelineMonths = (weeks: TimelineWeek[]): TimelineMonth[] => {
   const months: TimelineMonth[] = [];
   weeks.forEach((week, index) => {
@@ -95,31 +83,20 @@ export const niceStep = (span: number, integer: boolean): number => {
   return integer ? Math.max(1, Math.round(step)) : step;
 };
 
-const ticksBetween = (low: number, high: number, integer: boolean): number[] => {
-  const step = niceStep(high - low, integer);
-  const first = Math.floor(low / step) * step;
-  const last = Math.ceil(high / step) * step;
-  const count = Math.round((last - first) / step);
-  return Array.from({ length: count + 1 }, (_, index) => Number((first + index * step).toPrecision(12)));
-};
-
-// Columns share a zero origin. A line spans the plotted values, padded when
-// they are all equal and never below zero.
-export const timelineTicks = (values: number[], mark: TimelineMark, integer: boolean): number[] => {
-  if (values.length === 0) return [];
-  const max = Math.max(...values);
-  if (mark === 'bar') return max > 0 ? ticksBetween(0, max, integer) : [0];
-  const min = Math.min(...values);
-  const pad = min === max ? Math.max(1, Math.abs(max) * 0.05) : 0;
-  return ticksBetween(Math.max(0, min - pad), max + pad, integer);
+/** Zero up to the first nice step at or above the largest value. */
+export const timelineTicks = (values: number[], integer: boolean): number[] => {
+  const max = Math.max(0, ...values);
+  if (max === 0) return [0];
+  const step = niceStep(max, integer);
+  const count = Math.ceil(max / step);
+  return Array.from({ length: count + 1 }, (_, index) => Number((index * step).toPrecision(12)));
 };
 
 /** The weekly series (sums for Volume/Sets, best-of for 1RM/Top weight) as the timeline plots it. */
 export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapMetric): TimelineSeries {
-  const mark = timelineMark(metric);
-  const weeks = weekly.map(week => toTimelineWeek(week, mark));
+  const weeks = weekly.map(toTimelineWeek);
   const values = weeks.flatMap(week => week.value === null ? [] : [week.value]);
-  return { mark, weeks, ticks: timelineTicks(values, mark, metric === 'workingSetCount'), months: timelineMonths(weeks) };
+  return { weeks, ticks: timelineTicks(values, metric === 'workingSetCount'), months: timelineMonths(weeks) };
 }
 
 // ── Geometry ────────────────────────────────────────────────────────────────
@@ -130,9 +107,10 @@ const MAX_BAR_WIDTH = 24;
 const BAR_GAP = 2;
 /** The data end of a column is rounded; its baseline end stays square. */
 export const BAR_RADIUS = 4;
+/** Room a month label needs (`SEP`, `2026`) before the next one starts. */
+export const MONTH_LABEL_WIDTH = 30;
 
-export type TimelinePoint = { x: number; y: number };
-export type TimelineBar = { weekStartDateKey: string; x: number; y: number; width: number; height: number };
+export type TimelineBar = { weekStartDateKey: string; index: number; x: number; y: number; width: number; height: number };
 
 export interface TimelineGeometry {
   columnWidth: number;
@@ -140,19 +118,10 @@ export interface TimelineGeometry {
   width: number;
   height: number;
   bars: TimelineBar[];
-  /** A line's point per week, `null` at a gap; empty for columns. */
-  points: (TimelinePoint | null)[];
-  /** Runs of consecutive plotted weeks; a gap ends a run. */
-  segments: TimelinePoint[][];
-  /** Points with no plotted neighbour, drawn as dots so they stay visible. */
-  isolated: TimelinePoint[];
   ticks: { value: number; y: number }[];
   /** The month labels that fit: none overlaps another or runs off the end. */
   months: (TimelineMonth & { x: number })[];
 }
-
-/** Room a month label needs (`SEP`, `2026`) before the next one starts. */
-export const MONTH_LABEL_WIDTH = 30;
 
 // January and the first label carry the year, so they win a collision; the
 // rest fill in oldest first wherever they still fit.
@@ -166,50 +135,26 @@ const fittingMonths = (months: (TimelineMonth & { x: number })[], width: number)
   return kept.sort((a, b) => a.index - b.index);
 };
 
-const scaleY = (ticks: number[], height: number) => {
-  const low = ticks[0] ?? 0;
-  const span = (ticks[ticks.length - 1] ?? 0) - low || 1;
-  return (value: number) => height - ((value - low) / span) * height;
-};
-
-const lineRuns = (points: (TimelinePoint | null)[]): TimelinePoint[][] => {
-  const runs: TimelinePoint[][] = [];
-  let run: TimelinePoint[] = [];
-  for (const point of points) {
-    if (point) run.push(point);
-    else if (run.length > 0) { runs.push(run); run = []; }
-  }
-  if (run.length > 0) runs.push(run);
-  return runs;
-};
-
-const columnBars = (series: TimelineSeries, columnWidth: number, y: (value: number) => number, height: number): TimelineBar[] => {
+const columnBars = (series: TimelineSeries, columnWidth: number, height: number): TimelineBar[] => {
+  const top = series.ticks[series.ticks.length - 1] || 1;
   const width = Math.max(1, Math.min(MAX_BAR_WIDTH, columnWidth - BAR_GAP));
   return series.weeks.flatMap((week, index) => {
     if (week.value === null || week.value <= 0) return [];
-    const top = y(week.value);
-    return [{ weekStartDateKey: week.weekStartDateKey, x: index * columnWidth + (columnWidth - width) / 2, y: top, width, height: height - top }];
+    const barHeight = (week.value / top) * height;
+    return [{ weekStartDateKey: week.weekStartDateKey, index, x: index * columnWidth + (columnWidth - width) / 2, y: height - barHeight, width, height: barHeight }];
   });
 };
 
 export function timelineGeometry(series: TimelineSeries, plotWidth: number, height: number): TimelineGeometry {
   const count = Math.max(1, series.weeks.length);
   const columnWidth = Math.max(MIN_TIMELINE_COLUMN_WIDTH, plotWidth / count);
-  const y = scaleY(series.ticks, height);
-  const centre = (index: number) => index * columnWidth + columnWidth / 2;
-  const points = series.mark === 'line'
-    ? series.weeks.map((week, index) => week.value === null ? null : { x: centre(index), y: y(week.value) })
-    : [];
-  const segments = lineRuns(points);
+  const top = series.ticks[series.ticks.length - 1] || 1;
   return {
     columnWidth,
     width: columnWidth * count,
     height,
-    bars: series.mark === 'bar' ? columnBars(series, columnWidth, y, height) : [],
-    points,
-    segments: segments.filter(run => run.length > 1),
-    isolated: segments.filter(run => run.length === 1).map(([point]) => point),
-    ticks: series.ticks.map(value => ({ value, y: y(value) })),
+    bars: columnBars(series, columnWidth, height),
+    ticks: series.ticks.map(value => ({ value, y: height - (value / top) * height })),
     months: fittingMonths(series.months.map(month => ({ ...month, x: month.index * columnWidth })), columnWidth * count),
   };
 }
