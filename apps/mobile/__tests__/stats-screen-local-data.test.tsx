@@ -15,8 +15,9 @@
  * reaches it.
  */
 
+import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as mockReact from 'react';
-import { Modal } from 'react-native';
+import { FlatList, Modal } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Icon, uiBorder, uiGeometry, uiRoles } from '@/components/ui';
 
@@ -68,6 +69,12 @@ const SQUAT = EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId;
 const BENCH = EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId;
 const PULLDOWN = EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseId;
 const SQUAT_ROW = `stats-exercise-row-${SQUAT}`;
+const renderedDailySample = () => {
+  const list = screen.UNSAFE_getAllByType(FlatList).find(node => node.props.testID === 'stats-exercise-history-scroll');
+  const months: CalendarMonth[] = list!.props.data;
+  return months.flatMap(month => month.weeks.flatMap(week => week.days)).filter(day => day.day);
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const renderStats = async () => {
@@ -158,24 +165,35 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent(days === 7 ? 'This week' : '4 weeks');
   });
 
+  it('reads exercise history once and preserves both standalone projections over real data', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const read = jest.spyOn(localDataClient(), 'prepare');
+    const options = { ...calendarWeekBounds(52), exerciseDefinitionId: SQUAT };
+    const history = await exerciseAnalytics.computeSelectedExerciseHistoryEffort(options);
+    expect(read.mock.calls.filter(([sql]) => sql.includes('from "exercise_sets"'))).toHaveLength(1);
+    expect(history.daily).toEqual(await exerciseAnalytics.computeSelectedExerciseDailyEffort(options));
+    expect(history.weekly).toEqual(await exerciseAnalytics.computeSelectedExerciseWeeklyEffort(options));
+    expect(history.daily.length).toBeGreaterThan(0);
+  });
+
   it('shows no empty-history panel while the initial read or look-back reload is pending', async () => {
     await renderSeededStats();
-    const initial = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
-    const reload = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
-    jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
+    const initial = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseHistoryEffort>>>();
+    const reload = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseHistoryEffort>>>();
+    jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort')
       .mockReturnValueOnce(initial.promise).mockReturnValueOnce(reload.promise);
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    await act(async () => initial.resolve([]));
+    await act(async () => initial.resolve({ weekly: [], daily: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
     act(() => updatePreferences({ historyLookbackWeeks: 4 }));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    expect(screen.getAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(2);
-    await act(async () => reload.resolve([]));
+    expect(screen.queryAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(0);
+    await act(async () => reload.resolve({ weekly: [], daily: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
   });
 
@@ -196,36 +214,33 @@ describe('Stats over real data', () => {
     await logPulldown(450);
     await logPulldown(.05);
     updatePreferences({ historyLookbackWeeks: weeks, heatmapView: 'daily' });
-    const read = jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseDailyEffort');
+    const read = jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort');
     await renderStats();
     fireEvent.press(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
     const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
-    expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength((weeks - 1) * 7 + 6);
+    expect(renderedDailySample()).toHaveLength((weeks - 1) * 7 + 6);
     const olderKey = localDateKey(new Date(Date.now() - 450 * DAY_MS));
     if (weeks === 104) {
-      expect(panel.getByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`).props.accessibilityLabel).toContain('Volume 600');
+      expect(renderedDailySample().find(day => day.dateKey === olderKey)?.day?.value).toBe(600);
     } else expect(panel.queryByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`)).toBeNull();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
-  // The 104-week heatmap re-render trips the default ceiling when jest
-  // workers run alongside the fast aggregate's other lanes; this test alone
-  // needs ~18 s worst-case and the lane's load has cost it 40-90 s.
   it('updates read-only daily tiles when the saved history window is shortened', async () => {
     await renderSeededStats();
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     const dateKey = localDateKey(new Date(Date.now() - 40 * DAY_MS));
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
+    expect(renderedDailySample().some(day => day.dateKey === dateKey)).toBe(true);
     act(() => updatePreferences({ historyLookbackWeeks: 52 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
+    expect(renderedDailySample().some(day => day.dateKey === dateKey)).toBe(true);
     act(() => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
@@ -233,7 +248,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  }, 120_000);
+  });
 
   it('shows the empty state on an empty database', async () => {
     await renderStats();
@@ -352,7 +367,7 @@ describe('Stats over real data', () => {
 
   it('retries a failed exercise history read for the same definition without closing the sheet', async () => {
     jest
-      .spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
+      .spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort')
       .mockRejectedValueOnce(new Error('DB error'));
     await renderSeededStats();
 
@@ -483,7 +498,7 @@ describe('Stats over real data', () => {
 
   it('retries a failed muscle history read and dismisses it back to the same breakdown', async () => {
     jest
-      .spyOn(statsRepository, 'computeSelectedMuscleWeeklyEffort')
+      .spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort')
       .mockRejectedValueOnce(new Error('Weekly boom'));
     await renderSeededStats();
 
@@ -758,7 +773,7 @@ describe('Stats over real data', () => {
     chooseFilter('metric', 'Volume');
     fireEvent.press(screen.getByTestId('stats-muscle-history-quads'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
-    const read = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffortMetrics');
+    const read = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
     localDataClient().prepare("UPDATE exercise_sets SET weight_value = '0' WHERE session_exercise_id LIKE '%squat%'").run();
     await replayFocus();
     await waitFor(() => expect(read).toHaveBeenCalled());

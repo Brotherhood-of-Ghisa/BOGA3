@@ -80,23 +80,13 @@ Daily tiles are read-only; Weekly bars select a row:
 />
 ```
 
-- **Daily** follows [[comparison.daily-history]]: months and week rows run newest first; the month's first
-  day is in the bottom row, its last observed week in the top row. Each month
-  shows only its own day tiles; adjoining-month positions are empty spacers.
-  A Week tile appears beside that month's Sunday once Sunday has arrived,
-  provided all seven Monday–Sunday dates are present in the full data sample,
-  including rest days and preceding-month days. A partial first sample week or
-  missing date omits its Week tile while keeping the sampled daily tiles.
-  The complete adapter value/colour spans month boundaries.
-  The current Week tile appears only on Sunday; rows whose Sunday is in the
-  next month have no Week tile. Tiles are read-only, without selection or black
-  outlines. Figure visibility follows [[copy.blank-history]].
-  Future day positions are empty spacers with no tile or accessible day value.
-  No visible Rest wording or question mark is displayed.
-  No future week rows extend the saved history window.
-  A vertical `rule` centres in a wider Sun/Week gap through each header and row;
-  all eight read-only columns can shrink on narrow screens.
-  Monday dates are small, top-left figures. Full dates, today/current week and rest are announced accessibly.
+- **Daily** follows [[comparison.daily-history]]. `daily-calendar.ts` builds
+  the month/row framing without changing adapter values or colours. Tiles are
+  read-only, without selection or black outlines. Figure visibility follows
+  [[copy.blank-history]]. Missing/future positions are empty spacers without
+  accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
+  the eight tile columns shrink independently of the outside date gutter.
+  Full dates, today/current week and rest are announced accessibly.
 - **Weekly** lifts selection to the host; a second tap clears the selected
   row. No selected-week banner is displayed; figure visibility follows [[copy.blank-history]].
   Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
@@ -121,12 +111,12 @@ the current week when excluded and survives look-back edits while in range.
   Weekly selection retains its accessible state and filled `ink` caret.
   Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
-- **Warm switching:** the history sheet keeps both views mounted. Its inactive
+- **Warm switching:** the history sheet mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
   a chart rebuild when the saved view changes while preserving Weekly selection
   and body scroll state.
 - **One active vertical scroller.** The weekly `FlatList` owns the sheet body;
-  Daily has one outer `ScrollView` containing vertical month calendars. Inline loading/error/empty
+  Daily owns a virtualized `FlatList` of month calendars. Inline loading/error/empty
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
