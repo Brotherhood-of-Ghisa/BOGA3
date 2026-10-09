@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
@@ -15,6 +15,9 @@ type Props = {
   formatValue: (value: number) => string;
   targetAveraged?: boolean;
   testID: string;
+  /** Opens what the tile counts; a tile without it reads as text. */
+  onPress?: () => void;
+  accessibilityHint?: string;
 };
 
 export function calendarValue(cell: DayCell | WeekCell | undefined, future: boolean, formatValue: Props['formatValue']): string {
@@ -30,19 +33,24 @@ function description({ cell, future, metricLabel, formatValue }: Props) {
 }
 
 export function CalendarTile(props: Props) {
-  const { cell, dateLabel, mondayDate, future, weekly, current, formatValue, targetAveraged, testID } = props;
+  const { cell, dateLabel, mondayDate, future, weekly, current, formatValue, targetAveraged, testID, onPress, accessibilityHint } = props;
   const value = calendarValue(cell, future, formatValue);
   const target = cell?.targetAttainment;
-  return <View accessible accessibilityRole="text"
-    accessibilityLabel={`${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
-    testID={testID}
-    style={[styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
-      cell?.unavailable ? styles.unavailable : null]}>
+  const content = <>
     {mondayDate === undefined ? null : <Text allowFontScaling={false} style={styles.date} testID={`${testID}-date`}>{mondayDate}</Text>}
     <Text allowFontScaling={false} style={styles.value} numberOfLines={1} testID={`${testID}-value`}>
       {value}
     </Text>
-  </View>;
+  </>;
+  const shared = {
+    accessibilityLabel: `${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
+    testID,
+    style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
+      cell?.unavailable ? styles.unavailable : null],
+  };
+  return onPress
+    ? <Pressable accessibilityRole="button" accessibilityHint={accessibilityHint} onPress={onPress} {...shared}>{content}</Pressable>
+    : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

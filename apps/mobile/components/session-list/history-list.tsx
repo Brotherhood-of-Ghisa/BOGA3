@@ -35,6 +35,11 @@ export type HistoryListProps = {
   nowMs: number;
   /** The blocks above the history (active session, planning). */
   header: ReactElement;
+  /**
+   * Week headings and the empty-week lines; off when the page lists one week
+   * or day, which its title already names.
+   */
+  weekHeadings?: boolean;
 };
 
 const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
@@ -60,6 +65,7 @@ export function HistoryList({
   onOpenCompletedSession,
   nowMs,
   header,
+  weekHeadings = true,
 }: HistoryListProps) {
   const now = new Date(nowMs);
   // A reload (focus, the deleted toggle) keeps the rows on screen, and with
@@ -88,7 +94,7 @@ export function HistoryList({
           session={item}
         />
       )}
-      renderSectionHeader={({ section }) => <WeekHeading now={now} section={section} />}
+      renderSectionHeader={weekHeadings ? ({ section }) => <WeekHeading now={now} section={section} /> : undefined}
       sections={sections}
       stickySectionHeadersEnabled={false}
       style={styles.list}

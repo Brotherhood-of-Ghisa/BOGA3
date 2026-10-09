@@ -33,7 +33,7 @@ const dateKey = (date: Date): string =>
 
 // A completed session sits in the week of its completion, as on Progress and
 // Today; a row without one falls back to its start.
-const sessionInstant = (session: SessionListItem): Date =>
+export const sessionInstant = (session: SessionListItem): Date =>
   new Date(session.completedAt ?? session.startedAt);
 
 /**

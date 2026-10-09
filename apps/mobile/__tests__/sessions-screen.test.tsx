@@ -24,6 +24,7 @@ jest.mock('@/src/data/bootstrap', () =>
 const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 let mockIsFocused = true;
+let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
   const mockReact = jest.requireActual('react');
@@ -33,9 +34,15 @@ jest.mock('expo-router', () => {
       push: mockPush,
     }),
     useIsFocused: () => mockIsFocused,
-    // The header's ⋮ renders in place, so a test can press it.
+    useLocalSearchParams: () => mockParams,
+    // The header's ⋮ and any title render in place, so a test can press and read them.
     Stack: {
-      Screen: ({ options }: { options?: { headerRight?: () => unknown } }) => options?.headerRight?.() ?? null,
+      Screen: ({ options }: { options?: { title?: string; headerRight?: () => unknown } }) => {
+        const { Text } = jest.requireActual('react-native');
+        return mockReact.createElement(mockReact.Fragment, null,
+          options?.title ? mockReact.createElement(Text, { testID: 'header-title' }, options.title) : null,
+          options?.headerRight?.() ?? null);
+      },
     },
     useFocusEffect: (callback: () => void | (() => void)) => {
       mockReact.useEffect(() => callback(), [callback]);
@@ -46,6 +53,7 @@ jest.mock('expo-router', () => {
 import SessionsRoute, { SessionsScreen } from '../app/sessions';
 import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
+  parseHistoryFilter,
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
@@ -93,6 +101,7 @@ beforeEach(() => {
   mockDismissTo.mockClear();
   mockPush.mockClear();
   mockIsFocused = true;
+  mockParams = {};
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -307,6 +316,96 @@ describe('Sessions over real data', () => {
 });
 
 // Races real data cannot stage: the loads are held open by an injected client.
+const localDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+describe('Sessions opened on one week or day of a history grid', () => {
+  const OLDEST = 'maestro_exercise_block_history_squat_6_outside_limit';
+
+  it('lists only the week from `?week=`, under its range, without the planning hub or week headings', async () => {
+    // The fixture's oldest session completed 26 days ago, 8 days before the next: alone in its week.
+    mockParams = { week: localDateKey(new Date(Date.now() - 26 * 24 * 60 * 60 * 1000)) };
+    await loadMaestroFixture('session-view');
+    await bootLocalApp();
+    render(<SessionsRoute />);
+
+    await screen.findByTestId(`completed-session-row-${OLDEST}`);
+    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(1);
+    expect(screen.getByTestId('header-title')).toHaveTextContent(/^Mon \d+( \w{3})? – Sun \d+ \w{3}( \d{4})?$/);
+    expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull();
+    expect(screen.queryByTestId('sessions-plan-session-action')).toBeNull();
+    expect(screen.queryByTestId(/^completed-history-week-/)).toBeNull();
+    expect(screen.queryByTestId(/^completed-history-gap-/)).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`completed-session-open-button-${OLDEST}`));
+    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${OLDEST}`);
+  });
+
+  it('opens the whole list, with its hub, when the filter param is malformed', async () => {
+    mockParams = { week: '2026-02-30' };
+    await openSessions();
+
+    expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
+    expect(screen.queryByTestId('header-title')).toBeNull();
+    expect(screen.getAllByTestId(/^completed-session-row-/).length).toBeGreaterThan(1);
+  });
+
+  const completedAt = (id: string, at: Date): SessionListItem => ({
+    id,
+    startedAt: new Date(at.getTime() - 3_600_000).toISOString(),
+    status: 'completed',
+    completedAt: at.toISOString(),
+    durationSec: 3_600,
+    durationDisplay: '1h',
+    gymName: null,
+    exerciseCount: 1,
+    setCount: 3,
+    totalWeight: 0,
+    deletedAt: null,
+    records: [],
+  });
+
+  const clientWith = (sessions: SessionListItem[]): SessionListDataClient => ({
+    loadSessions: jest.fn(async () => sessions),
+    startSession: jest.fn(),
+    completeActiveSession: jest.fn(),
+    discardActiveSession: jest.fn(),
+  });
+
+  // Local wall-clock times around the week of Mon 5 – Sun 11 Oct 2026.
+  const sessions = [
+    completedAt('next-monday-midnight', new Date(2026, 9, 12, 0, 0)),
+    completedAt('sunday-late', new Date(2026, 9, 11, 23, 59)),
+    completedAt('wednesday-evening', new Date(2026, 9, 7, 19, 0)),
+    completedAt('wednesday-morning', new Date(2026, 9, 7, 7, 0)),
+    completedAt('monday-midnight', new Date(2026, 9, 5, 0, 0)),
+    completedAt('previous-sunday-late', new Date(2026, 9, 4, 23, 59)),
+  ];
+  const listed = () => screen.getAllByTestId(/^completed-session-row-/).map((node) => String(node.props.testID).replace('completed-session-row-', ''));
+
+  it('keeps a week from Monday 00:00 to the next Monday, local, by completion', async () => {
+    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ week: '2026-10-07' })} isFocused />);
+
+    await screen.findByTestId('completed-session-row-sunday-late');
+    expect(listed()).toEqual(['sunday-late', 'wednesday-evening', 'wednesday-morning', 'monday-midnight']);
+    expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+  });
+
+  it('keeps one local day', async () => {
+    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ day: '2026-10-07' })} isFocused />);
+
+    await screen.findByTestId('completed-session-row-wednesday-evening');
+    expect(listed()).toEqual(['wednesday-evening', 'wednesday-morning']);
+  });
+
+  it('says the window holds no sessions when they have gone since', async () => {
+    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ day: '2026-10-06' })} isFocused />);
+
+    expect(await screen.findByText('No completed sessions')).toBeTruthy();
+    expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+  });
+});
+
 describe('Sessions list load races', () => {
   const session = (id: string, completedAt: string): SessionListItem => ({
     id,

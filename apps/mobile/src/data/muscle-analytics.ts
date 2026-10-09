@@ -344,6 +344,8 @@ export type DailyEffortMetrics = {
   dateKey: string;
   /** Per-muscle counts for target grading; the existing displayed metrics are unchanged. */
   workingSetCountsByMuscle?: Record<string, number>;
+  /** The completed sessions whose sets make up the day, each once: a day tile opens them. */
+  sessionIds?: string[];
   totalVolume: number | null;
   workingSetCount: number;
   estimatedRM1: number | null;
@@ -484,6 +486,7 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
       return {
         dateKey: day.dateKey,
         workingSetCountsByMuscle: Object.fromEntries([...identitiesByMuscle].map(([id, identities]) => [id, identities.size])),
+        sessionIds: [...new Set(day.contributions.map((contribution) => contribution.sessionId))],
         totalVolume: acc.totalVolume,
         workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,

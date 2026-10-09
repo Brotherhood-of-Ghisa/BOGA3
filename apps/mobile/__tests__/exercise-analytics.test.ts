@@ -257,6 +257,22 @@ describe('aggregateExerciseDailyEffort', () => {
     expect(day.estimatedRM1).toBeCloseTo(Math.max(estimateOneRepMax(100, 5) as number, estimateOneRepMax(120, 3) as number));
   });
 
+  it('names each session behind a day once, leaving out one that added nothing', () => {
+    const sessions = [
+      { ...makeSession('2026-05-18T08:00:00Z', [{ setType: 'rir_1', weight: 100, reps: 5 }]), id: 'morning' },
+      // The same exercise twice in one session.
+      { ...makeSession('2026-05-18T08:00:00Z', [{ setType: 'rir_1', weight: 90, reps: 5 }]), id: 'morning' },
+      { ...makeSession('2026-05-18T18:00:00Z', [{ setType: null, weight: 80, reps: 5 }]), id: 'evening' },
+      { ...makeSession('2026-05-18T20:00:00Z', [{ setType: 'warm_up', weight: 60, reps: 10 }]), id: 'warm-up-only' },
+      { ...makeSession('2026-05-19T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]), id: 'tuesday' },
+    ];
+
+    expect(aggregateExerciseDailyEffort(sessions, TZ).map((day) => day.sessionIds)).toEqual([
+      ['morning', 'evening'],
+      ['tuesday'],
+    ]);
+  });
+
   it('makes no cell for a warm-up-only day', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [{ setType: 'warm_up', weight: 60, reps: 10 }]),
