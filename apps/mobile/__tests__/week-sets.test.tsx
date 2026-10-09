@@ -7,6 +7,7 @@ import type { CompletedSessionDetailCard } from '@/src/session-recorder/complete
 import type { ExerciseHistorySessionEntry, MuscleSetContribution } from '@/src/data';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
 import { localWeekBounds } from '@/src/utils/calendar-weeks';
+import * as sessionFacts from '@/src/data/exercise-session-facts';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 
@@ -15,7 +16,10 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule());
 
 beforeEach(() => resetLocalData());
-afterEach(() => closeLocalData());
+afterEach(() => {
+  jest.restoreAllMocks();
+  closeLocalData();
+});
 
 const local = (day: number, hour = 8) => new Date(2026, 9, day, hour);
 
@@ -95,6 +99,15 @@ describe('useWeekSets over local data', () => {
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: null });
     expect(result.current).toEqual({ groups: [], loading: false, error: null });
+  });
+
+  it('still lists the cards, without records, when the records read fails', async () => {
+    await seed();
+    jest.spyOn(sessionFacts, 'loadEarlierBestsByDefinition').mockRejectedValue(new Error('facts unavailable'));
+    const { result } = renderHook(() => useWeekSets({ exerciseDefinitionId: 'seed_barbell_bench_press' }, '2026-10-05'));
+    await waitFor(() => expect(result.current.groups).toHaveLength(3));
+    expect(result.current.error).toBeNull();
+    expect(result.current.groups.flatMap(group => group.record)).toEqual([]);
   });
 });
 

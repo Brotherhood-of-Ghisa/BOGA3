@@ -62,7 +62,8 @@ Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/componen
 The Timeline history view plots one value per Monday week across
 [[comparison.history-window]], oldest on the left, as columns on a zero-based
 scale. A month is labelled at the first week that starts in it, as in
-[[comparison.daily-history]].
+[[comparison.daily-history]]; a label that would overlap another is left out,
+January's and the first one kept, and those two carry the year.
 
 | Metric | Week value | Rest week | Unavailable week |
 | --- | --- | --- | --- |
@@ -70,15 +71,22 @@ scale. A month is labelled at the first week that starts in it, as in
 | 1RM, Top weight | the week's best | no column; the readout says `No sets` | no column; the readout says `Unavailable` |
 
 The readout above the chart shows the selected week, else the newest: its
-figure and unit (`volume`, `sets`, `kg`), and `View sessions` for a trained
-week. Tapping a week selects it and fills its column in `ink`; a second tap
-clears it. The selected week's sets follow the chart as View Session's
-cards, record highlights and bands included. Unlike Daily and Weekly
-([[copy.blank-history]]), the readout writes a rest week's figure.
+figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions`, which
+opens Sessions filtered to that week, for any week with training. Tapping a
+week selects it and fills its column in `ink`; a second tap clears it. Unlike
+Daily and Weekly ([[copy.blank-history]]), the readout writes a rest week's
+figure.
+
+The readout's week's sets follow the chart as View Session's cards, record
+highlights and bands included, Monday first. An exercise's cards are its
+session blocks with a performed set, titled by day with the gym; a muscle's
+are the exercise blocks whose sets counted for it, titled by exercise with the
+day.
 
 Why: one form reads the same for every metric; a week without training sums
 to zero, and a best has no value without sets.
 Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`; `apps/mobile/components/stats/week-sets.ts`.
+Pending: Sessions cannot filter to a week yet, so `View sessions` opens the whole list.
 
 ### comparison.weekly-reference · calculation · accepted
 

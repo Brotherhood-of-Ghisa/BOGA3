@@ -183,6 +183,30 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
   });
 
+  it('keeps listing the readout\'s week when the selection is cleared', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    const before = (await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).length;
+
+    // A double tap on the selected (current) week clears it; the readout falls back to the newest week, the same one.
+    fireEvent(screen.getByTestId('stats-exercise-history-timeline-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
+    await waitFor(() => expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before));
+    expect(screen.queryByTestId('stats-exercise-history-week-sets-empty')).toBeNull();
+  });
+
+  it('retries a failed week read in place', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort').mockRejectedValueOnce(new Error('DB busy'));
+    await openHistory({ muscleGroupId: 'quads' });
+
+    expect(await screen.findByTestId('stats-muscle-history-week-sets-error')).toHaveTextContent(/DB busy/);
+    fireEvent.press(screen.getByTestId('stats-muscle-history-week-sets-retry'));
+    expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
+  });
+
   it('lists a muscle\'s week by the exercises that worked it', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));

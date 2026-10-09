@@ -1,6 +1,5 @@
-// The Timeline's week list: the selected week's sets under the chart, one
-// `ExerciseSetsCard` per block with View Session's rows and record band
-// (`week-sets.ts`). A card opens its session.
+// The Timeline's week list ([[comparison.timeline-history]]): one
+// `ExerciseSetsCard` per block from `week-sets.ts`. A card opens its session.
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';

@@ -21,6 +21,9 @@ const DAYS = [
 
 // The readout and tick labels are hidden from VoiceOver: the plot's adjustable value speaks for them.
 const hidden = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
+const UNITS: Record<CalendarHeatmapMetric, (value: number) => string> = {
+  totalVolume: () => 'volume', workingSetCount: value => value === 1 ? 'set' : 'sets', estimatedRM1: () => 'kg', highestWeight: () => 'kg',
+};
 const barFill = (id: string) => screen.UNSAFE_getAllByType(Path).find(mark => mark.props.testID === id)?.props.fill;
 
 const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), onViewSessions, days = DAYS, children }: {
@@ -29,7 +32,7 @@ const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSe
   children?: React.ReactNode;
 } = {}) => <TimelineHeatmap data={buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks })} metric={metric}
   selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} onViewSessions={onViewSessions} testIDPrefix="history"
-  formatValue={metric === 'totalVolume' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={metric === 'totalVolume' ? 'volume' : 'kg'}>
+  formatValue={metric === 'totalVolume' || metric === 'workingSetCount' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={UNITS[metric]}>
   {children}
 </TimelineHeatmap>;
 
@@ -87,9 +90,27 @@ it('speaks a unit that differs from the metric', () => {
   expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 5 – 11 Oct 2026, 1RM 80.0 kg, Current week' });
 });
 
-it('reads an unavailable week as unavailable', () => {
-  render(chart({ days: [day('2026-10-05', { totalVolume: null })] }));
+it('reads an unavailable week as unavailable, still offering its sessions', () => {
+  render(chart({ days: [day('2026-10-05', { totalVolume: null })], onViewSessions: jest.fn() }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('Unavailable');
+  expect(screen.getByTestId(`${ID}-view-sessions`)).toBeTruthy();
+});
+
+it('names one set in the singular', () => {
+  render(chart({ metric: 'workingSetCount', days: [day('2026-10-05', { workingSetCount: 1 })] }));
+  expect(hidden(`${ID}-readout-value`)).toHaveTextContent('1 set');
+  expect(hidden(`${ID}-readout-value`)).not.toHaveTextContent('1 sets');
+});
+
+it('toggles the announced week on a VoiceOver double tap, not the week under the centre', () => {
+  const onSelectWeek = jest.fn();
+  const { rerender } = render(chart({ onSelectWeek, selectedWeekKey: '2026-09-14' }));
+  expect(screen.getByTestId(`${ID}-plot`).props.accessibilityActions).toContainEqual({ name: 'activate' });
+  fireEvent(screen.getByTestId(`${ID}-plot`), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+  expect(onSelectWeek).toHaveBeenLastCalledWith(null);
+  rerender(chart({ onSelectWeek }));
+  fireEvent(screen.getByTestId(`${ID}-plot`), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+  expect(onSelectWeek).toHaveBeenLastCalledWith('2026-10-05');
 });
 
 it('offers View sessions for a trained week only', () => {

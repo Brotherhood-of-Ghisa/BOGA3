@@ -4,6 +4,7 @@ import {
   type SessionDraftExerciseSnapshot,
 } from '@/src/data';
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 
 import {
   buildCompletedSessionDetailModel,
@@ -33,18 +34,20 @@ export const loadSessionRecordBaselines = async (
 ) => recordBaselinesOf(await loadEarlierBestsByDefinition(session, exerciseDefinitionIds));
 
 /**
- * One completed session's exercise cards exactly as View Session draws them:
- * performed rows, their record highlights and each card's record band
- * (`training-metrics-contract.md` §3). Empty for a session that is not completed.
+ * One completed session's exercise cards exactly as View Session draws them
+ * ([[set.row-figures]], `training-metrics-contract.md` §3). Empty for a
+ * session that is not completed.
  */
 export const loadCompletedSessionCards = async (sessionId: string): Promise<CompletedSessionDetailCard[]> => {
   const graph = await loadSessionSnapshotById(sessionId);
   if (!graph || graph.status !== 'completed') return [];
   const exercises = toCompletedSessionDetailExercises(graph.exercises);
   const definitionIds = [...new Set(exercises.flatMap((exercise) => exercise.exerciseDefinitionId ? [exercise.exerciseDefinitionId] : []))];
+  // Records are optional enrichment, as on View Session: a failed read shows
+  // the cards without them rather than no cards.
   const baselines = await loadSessionRecordBaselines(
     { sessionId, completedAt: graph.completedAt ?? graph.startedAt },
     definitionIds
-  );
+  ).catch(() => new Map<string, RecordBaseline>());
   return buildCompletedSessionDetailModel(exercises, baselines).cards;
 };

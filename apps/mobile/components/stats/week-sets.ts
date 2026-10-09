@@ -1,8 +1,6 @@
-// The sets of one history week, as cards for the Timeline's week list: an
-// exercise's history lists each session block of the exercise, a muscle's each
-// exercise block that worked the muscle, days Monday first. A card is View
-// Session's card for that block (`loadCompletedSessionCards`): the same rows,
-// record highlights and record band as every finished session.
+// The sets of one history week for the Timeline's week list
+// ([[comparison.timeline-history]]): the blocks to list, each drawn with View
+// Session's card for it (`loadCompletedSessionCards`).
 import { useEffect, useState } from 'react';
 
 import {
