@@ -14,7 +14,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, SectionList, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -53,11 +53,12 @@ jest.mock('expo-router', () => {
 import SessionsRoute, { SessionsScreen } from '../app/sessions';
 import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
-  parseHistoryFilter,
+  parseHistoryJump,
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
 import * as exerciseSessionFacts from '@/src/data/exercise-session-facts';
+import * as logEventModule from '@/src/logging/logEvent';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
@@ -319,35 +320,35 @@ describe('Sessions over real data', () => {
 const localDateKey = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-describe('Sessions opened on one week or day of a history grid', () => {
-  const OLDEST = 'maestro_exercise_block_history_squat_6_outside_limit';
+const mondayKey = (date: Date): string =>
+  localDateKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() - ((date.getDay() + 6) % 7)));
 
-  it('lists only the week from `?week=`, under its range, without the planning hub or week headings', async () => {
-    // The fixture's oldest session completed 26 days ago, 8 days before the next: alone in its week.
-    mockParams = { week: localDateKey(new Date(Date.now() - 26 * 24 * 60 * 60 * 1000)) };
-    await loadMaestroFixture('session-view');
-    await bootLocalApp();
-    render(<SessionsRoute />);
-
-    await screen.findByTestId(`completed-session-row-${OLDEST}`);
-    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(1);
-    expect(screen.getByTestId('header-title')).toHaveTextContent(/^Mon \d+( \w{3})? – Sun \d+ \w{3}( \d{4})?$/);
-    expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull();
-    expect(screen.queryByTestId('sessions-plan-session-action')).toBeNull();
-    expect(screen.queryByTestId(/^completed-history-week-/)).toBeNull();
-    expect(screen.queryByTestId(/^completed-history-gap-/)).toBeNull();
-
-    fireEvent.press(screen.getByTestId(`completed-session-open-button-${OLDEST}`));
-    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${OLDEST}`);
+describe('Sessions opened at a week or day of a history grid', () => {
+  let scrollToLocation: jest.SpyInstance;
+  beforeEach(() => {
+    scrollToLocation = jest.spyOn(SectionList.prototype, 'scrollToLocation').mockImplementation(() => {});
   });
 
-  it('opens the whole list, with its hub, when the filter param is malformed', async () => {
-    mockParams = { week: '2026-02-30' };
+  it('opens the whole list at the week from `?week=`, its hub and every row still there', async () => {
+    const weekDay = new Date(Date.now() - 26 * 24 * 60 * 60 * 1000);
+    mockParams = { week: localDateKey(weekDay) };
     await openSessions();
 
     expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
-    expect(screen.queryByTestId('header-title')).toBeNull();
+    expect(screen.getByTestId('sessions-plan-session-action')).toBeTruthy();
     expect(screen.getAllByTestId(/^completed-session-row-/).length).toBeGreaterThan(1);
+    const weeks = screen.getAllByTestId(/^completed-history-week-/).map((node) => String(node.props.testID));
+    const sectionIndex = weeks.indexOf(`completed-history-week-${mondayKey(weekDay)}`);
+    expect(sectionIndex).toBeGreaterThan(0);
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
+    expect(scrollToLocation).toHaveBeenCalledWith({ sectionIndex, itemIndex: 0, viewPosition: 0, animated: false });
+  });
+
+  it('opens at the top when the param is malformed', async () => {
+    mockParams = { week: '2026-02-30' };
+    await openSessions();
+
+    expect(scrollToLocation).not.toHaveBeenCalled();
   });
 
   const completedAt = (id: string, at: Date): SessionListItem => ({
@@ -372,37 +373,66 @@ describe('Sessions opened on one week or day of a history grid', () => {
     discardActiveSession: jest.fn(),
   });
 
-  // Local wall-clock times around the week of Mon 5 – Sun 11 Oct 2026.
+  const at = (day: Date, offsetDays: number, hour: number) =>
+    new Date(day.getFullYear(), day.getMonth(), day.getDate() + offsetDays, hour);
+  // The target week is three weeks back: its Wednesday holds two sessions, its Friday one.
+  const today = new Date();
+  const wednesday = at(today, -((today.getDay() + 6) % 7) - 21 + 2, 12);
   const sessions = [
-    completedAt('next-monday-midnight', new Date(2026, 9, 12, 0, 0)),
-    completedAt('sunday-late', new Date(2026, 9, 11, 23, 59)),
-    completedAt('wednesday-evening', new Date(2026, 9, 7, 19, 0)),
-    completedAt('wednesday-morning', new Date(2026, 9, 7, 7, 0)),
-    completedAt('monday-midnight', new Date(2026, 9, 5, 0, 0)),
-    completedAt('previous-sunday-late', new Date(2026, 9, 4, 23, 59)),
+    completedAt('today', at(today, 0, 0)),
+    completedAt('friday', at(wednesday, 2, 18)),
+    completedAt('wednesday-evening', at(wednesday, 0, 19)),
+    completedAt('wednesday-morning', at(wednesday, 0, 7)),
   ];
-  const listed = () => screen.getAllByTestId(/^completed-session-row-/).map((node) => String(node.props.testID).replace('completed-session-row-', ''));
 
-  it('keeps a week from Monday 00:00 to the next Monday, local, by completion', async () => {
-    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ week: '2026-10-07' })} isFocused />);
+  it('lands a day jump on its newest row, and a day without one on its week heading', async () => {
+    const view = render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    // Section 1 is the target week; row 1 is Friday, row 2 Wednesday's newest.
+    expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 2, viewPosition: 0, animated: false });
+    view.unmount();
 
-    await screen.findByTestId('completed-session-row-sunday-late');
-    expect(listed()).toEqual(['sunday-late', 'wednesday-evening', 'wednesday-morning', 'monday-midnight']);
-    expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(at(wednesday, 1, 12)) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 0, viewPosition: 0, animated: false });
   });
 
-  it('keeps one local day', async () => {
-    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ day: '2026-10-07' })} isFocused />);
+  it('jumps once: a focus reload keeps the reader where they scrolled', async () => {
+    const client = clientWith(sessions);
+    const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
+    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-friday');
 
-    await screen.findByTestId('completed-session-row-wednesday-evening');
-    expect(listed()).toEqual(['wednesday-evening', 'wednesday-morning']);
+    view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
+    view.rerender(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await waitFor(() => expect(client.loadSessions).toHaveBeenCalledTimes(2));
+
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
   });
 
-  it('says the window holds no sessions when they have gone since', async () => {
-    render(<SessionsScreen dataClient={clientWith(sessions)} filter={parseHistoryFilter({ day: '2026-10-06' })} isFocused />);
+  it('aims again once rows not yet laid out are measured, and logs a jump it cannot make', async () => {
+    const warn = jest.spyOn(logEventModule, 'logEvent').mockResolvedValue();
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    const list = screen.UNSAFE_getByType(SectionList);
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
+    jest.useFakeTimers();
+    try {
 
-    expect(await screen.findByText('No completed sessions')).toBeTruthy();
-    expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+      act(() => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 }));
+      expect(scrollToLocation).toHaveBeenCalledTimes(1);
+      act(() => jest.advanceTimersByTime(50));
+      expect(scrollToLocation).toHaveBeenCalledTimes(2);
+
+      for (let attempt = 2; attempt <= 11; attempt += 1) {
+        act(() => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 }));
+        act(() => jest.advanceTimersByTime(50));
+      }
+      expect(scrollToLocation).toHaveBeenCalledTimes(11);
+      expect(warn).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn', event: 'sessions.history_jump_failed' }));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

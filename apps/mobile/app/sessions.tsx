@@ -7,11 +7,9 @@ import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
   DEFAULT_SESSION_LIST_ITEMS,
   HistoryList,
-  historyFilterTitle,
-  parseHistoryFilter,
-  sessionsInHistoryFilter,
+  parseHistoryJump,
   useSessionListData,
-  type HistoryFilter,
+  type HistoryJump,
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
@@ -29,24 +27,20 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
-import { completedSessionHref } from '@/src/navigation/routes';
 
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
   initialSessions?: SessionListItem[];
   isFocused?: boolean;
-  /**
-   * One week or day of the completed history, from a history grid: the page
-   * lists only its sessions, under its title, without the planning hub.
-   */
-  filter?: HistoryFilter | null;
+  /** A week or day of the history to open at (`?week=` / `?day=`). */
+  jumpTo?: HistoryJump | null;
 };
 
 export function SessionsScreen({
   dataClient,
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
   isFocused = true,
-  filter = null,
+  jumpTo = null,
 }: SessionsScreenProps) {
   const router = useRouter();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
@@ -65,7 +59,7 @@ export function SessionsScreen({
   const activeSession = sessions.find(
     (session) => session.status === 'active' && session.deletedAt === null
   );
-  const completedSessions = (filter ? sessionsInHistoryFilter(sessions, filter) : sessions)
+  const completedSessions = sessions
     .filter((session) => session.status === 'completed')
     .filter((session) => showDeletedSessions || session.deletedAt === null)
     .sort((left, right) => {
@@ -81,7 +75,6 @@ export function SessionsScreen({
     planSections.unscheduled.length === 0;
 
   const showGlobalEmptyState =
-    !filter &&
     !isLoadingSessions &&
     !loadErrorMessage &&
     !activeSession &&
@@ -129,7 +122,7 @@ export function SessionsScreen({
   };
 
   const openCompletedSessionSummary = (sessionId: string) => {
-    router.push(completedSessionHref(sessionId));
+    router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
 
   const hub = (
@@ -182,7 +175,6 @@ export function SessionsScreen({
       {/* The list's view options sit behind the header's options button, as on the exercise catalog. */}
       <Stack.Screen
         options={{
-          ...(filter ? { title: historyFilterTitle(filter, new Date(loadedAtMs)) } : null),
           headerRight: () => (
             <IconButton
               accessibilityLabel="Session list options"
@@ -194,8 +186,9 @@ export function SessionsScreen({
         }}
       />
       <HistoryList
-        header={filter ? <></> : hub}
+        header={hub}
         isLoading={isLoadingSessions}
+        jumpTo={jumpTo}
         loadErrorMessage={loadErrorMessage}
         nowMs={loadedAtMs}
         onOpenCompletedSession={openCompletedSessionSummary}
@@ -204,7 +197,6 @@ export function SessionsScreen({
         }}
         sessions={completedSessions}
         showGlobalEmptyState={showGlobalEmptyState}
-        weekHeadings={!filter}
       />
       <Sheet
         dismissLabel="Close session list options"
@@ -228,13 +220,13 @@ export function SessionsScreen({
 export default function SessionsRoute() {
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ week?: string | string[]; day?: string | string[] }>();
-  // An opening selection, read once: the page never rewrites it.
-  const [filter] = useState(() => parseHistoryFilter(params));
+  // An opening position, read once: the page never rewrites it.
+  const [jumpTo] = useState(() => parseHistoryJump(params));
   return (
     <SessionsScreen
       dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-      filter={filter}
       isFocused={isFocused}
+      jumpTo={jumpTo}
     />
   );
 }

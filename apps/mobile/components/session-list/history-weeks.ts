@@ -28,7 +28,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const weeksBetween = (later: Date, earlier: Date): number =>
   Math.round((later.getTime() - earlier.getTime()) / (7 * DAY_MS));
 
-const dateKey = (date: Date): string =>
+/** A local date's `YYYY-MM-DD`. */
+export const localDateKey = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 // A completed session sits in the week of its completion, as on Progress and
@@ -45,7 +46,7 @@ export const groupSessionsByWeek = (sessions: SessionListItem[], now: Date): His
   const sections: HistoryWeekSection[] = [];
   for (const session of sessions) {
     const window = localWeekWindow(sessionInstant(session));
-    const key = dateKey(window.start);
+    const key = localDateKey(window.start);
     let section = sections.at(-1);
     if (section?.key !== key) {
       const weeksAgo = weeksBetween(thisWeek.start, window.start);

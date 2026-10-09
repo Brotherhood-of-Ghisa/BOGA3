@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useCallback, useEffect, useRef, type ReactElement, type RefObject } from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -11,7 +11,10 @@ import {
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
 import { todayText } from '@/components/today/text-styles';
 import { Card, StatePanel, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { logEvent } from '@/src/logging';
 import { formatMonthDayTime } from '@/src/utils/local-time';
+
+import { historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
 
 import {
   formatEmptyWeeks,
@@ -36,10 +39,10 @@ export type HistoryListProps = {
   /** The blocks above the history (active session, planning). */
   header: ReactElement;
   /**
-   * Week headings and the empty-week lines; off when the page lists one week
-   * or day, which its title already names.
+   * A week or day to open at, once its rows first load: a history grid's
+   * week or day leads here. The list stays whole.
    */
-  weekHeadings?: boolean;
+  jumpTo?: HistoryJump | null;
 };
 
 const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
@@ -65,7 +68,7 @@ export function HistoryList({
   onOpenCompletedSession,
   nowMs,
   header,
-  weekHeadings = true,
+  jumpTo = null,
 }: HistoryListProps) {
   const now = new Date(nowMs);
   // A reload (focus, the deleted toggle) keeps the rows on screen, and with
@@ -73,9 +76,13 @@ export function HistoryList({
   // before the first rows.
   const showRows = !loadErrorMessage && (!isLoading || sessions.length > 0);
   const sections = showRows ? groupSessionsByWeek(sessions, now) : [];
+  const listRef = useRef<SectionList<SessionListItem, HistoryWeekSection>>(null);
+  const onScrollToIndexFailed = useJumpOnce(listRef, jumpTo ? historyJumpLocation(sections, jumpTo) : null);
 
   return (
     <SectionList
+      onScrollToIndexFailed={onScrollToIndexFailed}
+      ref={listRef}
       contentContainerStyle={styles.content}
       // A screenful of rows and week headings and more; the rest render as they near the screen.
       initialNumToRender={24}
@@ -94,13 +101,66 @@ export function HistoryList({
           session={item}
         />
       )}
-      renderSectionHeader={weekHeadings ? ({ section }) => <WeekHeading now={now} section={section} /> : undefined}
+      renderSectionHeader={({ section }) => <WeekHeading now={now} section={section} />}
       sections={sections}
       stickySectionHeadersEnabled={false}
       style={styles.list}
       testID="completed-history-scroll"
     />
   );
+}
+
+// A jump into rows not yet laid out: bring that part of the list in from an
+// estimated offset, then aim again once it has been measured.
+const JUMP_RETRY_MS = 50;
+const JUMP_ATTEMPTS = 10;
+
+type ScrollToIndexFailure = { index: number; averageItemLength: number };
+
+/**
+ * Scrolls once to `location` the first time it exists (the first load holding
+ * the target), never again on a reload. Returns the list's
+ * `onScrollToIndexFailed`.
+ */
+function useJumpOnce(
+  listRef: RefObject<SectionList<SessionListItem, HistoryWeekSection> | null>,
+  location: HistoryJumpLocation | null,
+) {
+  const jumpedRef = useRef(false);
+  const attemptsRef = useRef(0);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionIndex = location?.sectionIndex;
+  const itemIndex = location?.itemIndex;
+
+  const scrollToTarget = useCallback(() => {
+    if (sectionIndex === undefined || itemIndex === undefined) return;
+    listRef.current?.scrollToLocation({ sectionIndex, itemIndex, viewPosition: 0, animated: false });
+  }, [listRef, sectionIndex, itemIndex]);
+
+  useEffect(() => {
+    if (jumpedRef.current || sectionIndex === undefined) return;
+    jumpedRef.current = true;
+    scrollToTarget();
+  }, [scrollToTarget, sectionIndex]);
+
+  useEffect(() => () => {
+    if (retryRef.current) clearTimeout(retryRef.current);
+  }, []);
+
+  return useCallback((failure: ScrollToIndexFailure) => {
+    attemptsRef.current += 1;
+    if (attemptsRef.current > JUMP_ATTEMPTS) {
+      void logEvent({
+        level: 'warn',
+        source: 'app',
+        event: 'sessions.history_jump_failed',
+        message: `Could not reach list index ${failure.index} after ${JUMP_ATTEMPTS} attempts`,
+      });
+      return;
+    }
+    listRef.current?.getScrollResponder()?.scrollTo({ y: failure.averageItemLength * failure.index, animated: false });
+    retryRef.current = setTimeout(scrollToTarget, JUMP_RETRY_MS);
+  }, [listRef, scrollToTarget]);
 }
 
 function WeekHeading({ section, now }: { section: HistoryWeekSection; now: Date }) {

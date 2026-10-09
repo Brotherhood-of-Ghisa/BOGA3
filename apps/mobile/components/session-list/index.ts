@@ -1,10 +1,10 @@
 export { ActiveSessionRow, type ActiveSessionRowProps } from './active-session-row';
 export {
-  historyFilterTitle,
-  parseHistoryFilter,
-  sessionsInHistoryFilter,
-  type HistoryFilter,
-} from './history-filter';
+  historyJumpLocation,
+  parseHistoryJump,
+  type HistoryJump,
+  type HistoryJumpLocation,
+} from './history-jump';
 export { HistoryList, type HistoryListProps } from './history-list';
 export {
   formatEmptyWeeks,
