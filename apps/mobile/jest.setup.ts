@@ -18,6 +18,36 @@ afterEach(() => {
   cleanup();
 });
 
+// Make React's uncaught render/effect errors fail the test that caused them.
+//
+// React 19 reports an error no boundary caught through `reportGlobalError`,
+// which does `window.dispatchEvent(new window.ErrorEvent('error', { error }))`.
+// jest-expo's environment installs a PARTIAL `window`: it has `ErrorEvent` but
+// no `dispatchEvent`, so the reporter itself throws
+// `TypeError: window.dispatchEvent is not a function` — the original error is
+// destroyed, and that TypeError escapes into whichever test the event loop is
+// running by then, blaming an innocent test.
+//
+// This hook exists to SURFACE those errors, never to swallow them: it records
+// the real error, and the `afterEach` below rethrows it so the test that threw
+// fails with the real message and stack. Returning `false` (the DOM meaning of
+// "preventDefault was called") stops React from `console.error`-ing it as well,
+// so there is exactly one report — the failure. Never make this hook drop an
+// error: a React error with nowhere to go is a bug, not noise.
+const uncaughtReactErrors: unknown[] = [];
+const partialWindow = (globalThis as { window?: { dispatchEvent?: unknown } }).window;
+if (partialWindow && typeof partialWindow.dispatchEvent !== 'function') {
+  partialWindow.dispatchEvent = (event: { error?: unknown }) => {
+    uncaughtReactErrors.push(event?.error ?? event);
+    return false;
+  };
+}
+
+afterEach(() => {
+  if (uncaughtReactErrors.length === 0) return;
+  throw uncaughtReactErrors.splice(0, uncaughtReactErrors.length)[0];
+});
+
 // Worklets installs its native runtime on import; Jest has none, so any suite
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
