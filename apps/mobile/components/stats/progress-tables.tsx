@@ -1,9 +1,13 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Icon, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { formatCountDelta, formatVolumeDelta } from './comparison-format';
+import {
+  StatsTable, StatsTableFigures, StatsTableHeader, StatsTableHeaderLabel,
+  statsTableColumnWidth, statsTableStyles,
+} from './stats-table';
 
 export type ProgressTableMetric = 'workingSetCount' | 'totalVolume';
 const figures = (row: ProgressComparison, metric: ProgressTableMetric) => metric === 'workingSetCount'
@@ -13,6 +17,14 @@ const hasMetric = (row: ProgressComparison, metric: ProgressTableMetric) => metr
   ? row.current.workingSetCount > 0 || row.previous.workingSetCount > 0
   : row.current.volumeSetCount > 0 || row.previous.volumeSetCount > 0;
 
+// The columns, drawn and spoken. `Prev` is abbreviated like the exercise
+// table's `Vol` so three figure columns and the name fit one line on a small
+// phone; the unit belongs to the spoken label, never the header.
+const COLUMN_LABELS = ['Now', 'Prev', 'Change'] as const;
+const COLUMN_NAMES = ['Now', 'Previous', 'Change'] as const;
+const COLUMN_KEYS = ['now', 'previous', 'change'] as const;
+const unit = (metric: ProgressTableMetric) => metric === 'totalVolume' ? 'kg·reps' : 'working sets';
+
 type Props = {
   muscles: ProgressMuscleComparison[]; metric: ProgressTableMetric; selectedId: string | null;
   onSelect: (id: string) => void;
@@ -20,154 +32,156 @@ type Props = {
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
 };
 
-// Progress's muscle comparison table. A muscle's name opens its history and a
-// separate trailing chevron discloses one contribution block directly under
-// the row: sibling targets of at least 44pt, never one pressable row.
-// Contributors reconcile with their muscle row in both periods, but no Total
-// row is drawn. Figures never shrink or abbreviate: when they do not fit they
-// move to a full-width second line, then to labelled Now/Previous/Change
-// lines. Neutral rows keep the selected muscle’s ink rule.
+type Layout = { columns: number[]; stacked: boolean };
+
+// Progress's muscle breakdown, in the table style both breakdowns share
+// (`stats-table.tsx`): no title, and no unit in the headers. A muscle's name
+// opens its history and a separate trailing chevron discloses one contribution
+// block directly under the row: sibling targets of at least 44pt, never one
+// pressable row. Contributors reconcile with their muscle row in both periods,
+// but no Total row is drawn. A family is an inert band above its muscles, never
+// a figure of its own: a set mapped to two muscles of one family counts in
+// both rows, so a family sum would overstate the work ([[muscle.set-count]]).
+// Figures never shrink: when they do not fit beside the name they move to a
+// full-width second line, and one too wide for its column wraps inside it.
 export function ProgressTables(props: Props) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasMetric(row, metric)) ?? [];
-  // Plex Mono has a fixed advance. Reserve the widest full figure in each
-  // column before assigning the name; narrow screens put figures below it.
-  const allRows = [...muscles, ...exercises];
-  const columns = [0, 1, 2].map(index => Math.max(uiGeometry.tapTarget,
-    ...allRows.map(row => figures(row, metric)[index].length * uiTypography.size.md * .61 + uiSpace.sm)));
-  const numericWidth = columns.reduce((sum, value) => sum + value, 0) + uiSpace.sm * 2;
-  const vertical = numericWidth > width - uiSpace.lg * 2 - uiSpace.sm;
-  const stacked = width - uiSpace.lg * 2 < numericWidth + uiGeometry.tapTarget + uiSpace.xxl * 2 + uiSpace.sm * 3;
-  return <>
-    <View testID="stats-muscle-table" style={styles.table}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>Work by muscle</Text>
-      <Headers name="Muscle" columns={columns} stacked={stacked} vertical={vertical} metric={metric} action />
-      {muscles.map((row, index) => <Fragment key={row.muscleGroupId}>
-        {index === 0 || muscles[index - 1].familyName !== row.familyName ? <Text
-          allowFontScaling={false} accessibilityRole="header" style={styles.family}
-          testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`}>{row.familyName}</Text> : null}
-        <MuscleRow row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical}
-          selected={row.muscleGroupId === selectedId}
+  const layout = resolveLayout(width, [...muscles, ...exercises], metric);
+  return <StatsTable testID="stats-muscle-table">
+    <Headers name="Muscle" layout={layout} metric={metric} testID="stats-muscle-table-header" />
+    {muscles.map((row, index) => <Fragment key={row.muscleGroupId}>
+      {index === 0 || muscles[index - 1].familyName !== row.familyName ? <Text
+        allowFontScaling={false} accessibilityRole="header" style={styles.family}
+        testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`}>{row.familyName}</Text> : null}
+      <View style={row.muscleGroupId === selectedId ? styles.selected : undefined}
+        testID={`stats-muscle-block-${row.muscleGroupId}`}>
+        <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
           onSelect={onSelect} onHistory={onMuscleHistory} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
-          <Headers name="Exercise" columns={columns} stacked={stacked} vertical={vertical} metric={metric} action />
+          <Headers name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
           {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
-            body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map((row, index) =>
-            <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} columns={columns}
-              stacked={stacked} vertical={vertical} last={index === exercises.length - 1} onHistory={onExerciseHistory} />)}
+            body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map(row =>
+            <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout}
+              onHistory={onExerciseHistory} />)}
         </View> : null}
-      </Fragment>)}
-    </View>
-  </>;
-}
-
-function Headers({ name, columns, stacked, vertical, metric, action = false }: { name: string; columns: number[]; stacked: boolean; vertical: boolean; metric: ProgressTableMetric; action?: boolean }) {
-  return <View style={[styles.row, styles.headers, stacked && styles.stacked]}>
-    <Text allowFontScaling={false} style={[styles.label, styles.nameCell]}>{name}</Text>
-    {!vertical ? <View style={[styles.values, stacked && styles.fullWidth]}>
-      {['Now', 'Previous', 'Change'].map((label, index) => <Text key={label} allowFontScaling={false}
-        style={[styles.label, styles.numeric, { width: columns[index] }, stacked && styles.grow]}>{label}{metric === 'totalVolume' && index < 2 ? '\nkg·reps' : ''}</Text>)}
-    </View> : null}
-    {action && !stacked ? <View style={styles.actionCell} /> : null}
-  </View>;
-}
-
-function Values({ row, metric, columns, stacked, vertical, prefix }: { row: ProgressComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; prefix: string }) {
-  return <View testID={`${prefix}-values`} style={[styles.values, stacked && styles.fullWidth, vertical && styles.verticalValues]}>
-    {figures(row, metric).map((value, index) => <View key={index}
-      style={[!vertical && { width: columns[index] }, stacked && !vertical && styles.grow, vertical && styles.valueLine]}>
-      {vertical ? <Text allowFontScaling={false} style={[styles.label, styles.nameCell]}>{['Now', 'Previous', 'Change'][index]}{metric === 'totalVolume' && index < 2 ? ' (kg·reps)' : ''}</Text> : null}
-      <View style={vertical ? { width: columns[index] } : undefined}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.figure, styles.numeric]} testID={`${prefix}-${['now', 'previous', 'change'][index]}`}>{value}</Text>
       </View>
+    </Fragment>)}
+  </StatsTable>;
+}
+
+/**
+ * The figure columns, and whether they still fit beside the name. A column is
+ * as wide as its widest full figure, capped so three of them plus the
+ * chevron's axis never outgrow the row; the name keeps a tap target and a step
+ * of its own, or the figures take their own line under it.
+ */
+export const resolveLayout = (
+  width: number, rows: ProgressComparison[], metric: ProgressTableMetric,
+): Layout => {
+  const rowContent = width - uiSpace.lg * 2 - uiBorder.width * 2 - uiSpace.md * 2;
+  const gaps = uiSpace.sm * (COLUMN_LABELS.length - 1);
+  const cap = (rowContent - uiGeometry.tapTarget - uiSpace.md - gaps) / COLUMN_LABELS.length;
+  const columns = COLUMN_LABELS.map((label, index) => Math.min(cap,
+    statsTableColumnWidth(label, rows.map(row => figures(row, metric)[index]))));
+  const nameRoom = rowContent - uiGeometry.tapTarget - uiSpace.md * 2
+    - columns.reduce((sum, value) => sum + value, 0) - gaps;
+  return { columns, stacked: nameRoom < uiGeometry.tapTarget + uiSpace.xl };
+};
+
+// The header row mirrors a data row: the name cell, the figure columns, and the
+// chevron's empty axis, stacking with the rows so a label stays over its column.
+function Headers({ name, layout, metric, testID }: {
+  name: string; layout: Layout; metric: ProgressTableMetric; testID: string;
+}) {
+  const columns = <StatsTableFigures style={layout.stacked && styles.stackedFigures}>
+    {COLUMN_LABELS.map((label, index) => <View key={label} accessible accessibilityRole="header"
+      accessibilityLabel={`${COLUMN_NAMES[index]}, ${unit(metric)}`}
+      style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width: layout.columns[index] }]}>
+      <StatsTableHeaderLabel label={label} />
     </View>)}
+  </StatsTableFigures>;
+  return <StatsTableHeader testID={testID}>
+    <View style={[statsTableStyles.headerCell, statsTableStyles.nameCell, layout.stacked && styles.stackedName]}>
+      <StatsTableHeaderLabel label={name} />
+      {layout.stacked ? columns : null}
+    </View>
+    {layout.stacked ? null : columns}
+    <View style={styles.axis} />
+  </StatsTableHeader>;
+}
+
+function Values({ row, metric, layout, prefix }: {
+  row: ProgressComparison; metric: ProgressTableMetric; layout: Layout; prefix: string;
+}) {
+  return <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${unit(metric)}.`}
+    style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
+    <StatsTableFigures testID={`${prefix}-values`}>
+      {figures(row, metric).map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
+        style={[statsTableStyles.figure, { width: layout.columns[index] }]}
+        testID={`${prefix}-${COLUMN_KEYS[index]}`}>{value}</Text>)}
+    </StatsTableFigures>
   </View>;
 }
 
-function MuscleRow({ row, metric, columns, stacked, vertical, selected, onSelect, onHistory }: {
-  row: ProgressMuscleComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; selected: boolean;
+function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
+  row: ProgressMuscleComparison; metric: ProgressTableMetric; layout: Layout; selected: boolean;
   onSelect: Props['onSelect']; onHistory: Props['onMuscleHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
-  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, selected && styles.selected]}
-    testID={prefix}>
-    <View style={[styles.nameActions, !stacked && styles.nameCell, stacked && styles.stackedName]}>
-      <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-        onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
-        <Text allowFontScaling={false} style={styles.name}>{row.displayName}</Text>
-      </Pressable>
-    </View>
-    <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side.' : 'Working sets.'}`}
-      style={stacked ? styles.fullWidth : undefined}>
-      <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={prefix} />
-    </View>
-    <Selection row={row} selected={selected} stacked={stacked} onSelect={onSelect} />
-  </View>;
+  const values = <Values row={row} metric={metric} layout={layout} prefix={prefix} />;
+  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values}
+    trailing={<Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
+      accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
+      testID={`stats-muscle-select-${row.muscleGroupId}`}>
+      <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
+    </Pressable>}>
+    <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
+      onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
+      <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
+    </Pressable>
+    {layout.stacked ? values : null}
+  </ListRow>;
 }
 
-function Selection({ row, selected, stacked, onSelect }: { row: ProgressMuscleComparison; selected: boolean; stacked: boolean; onSelect: Props['onSelect'] }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
-    accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={[styles.chevron, stacked && styles.stackedChevron]}
-    testID={`stats-muscle-select-${row.muscleGroupId}`}>
-    <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
-  </Pressable>;
-}
-
-function ExerciseRow({ row, metric, columns, stacked, vertical, last, onHistory }: {
-  row: ProgressExerciseComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; last: boolean; onHistory: Props['onExerciseHistory'];
+function ExerciseRow({ row, metric, layout, onHistory }: {
+  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: Layout; onHistory: Props['onExerciseHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
-  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, last && styles.lastContribution]} testID={`stats-contribution-${row.exerciseDefinitionId}`}>
+  const prefix = `stats-contribution-${row.exerciseDefinitionId}`;
+  const values = <Values row={row} metric={metric} layout={layout} prefix={prefix} />;
+  // No control of its own, and the chevron's axis still kept clear, so a
+  // contributor's figures stay under its muscle's.
+  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={null}>
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-      onPress={() => onHistory(row, name.current)} style={[styles.nameLink, styles.nameCell]}>
-      <Text allowFontScaling={false} style={styles.name}>{row.displayName}</Text>
+      onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
+      <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
       <Text allowFontScaling={false} style={styles.role}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>
     </Pressable>
-    <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={`stats-contribution-${row.exerciseDefinitionId}`} />
-    {!stacked ? <View style={styles.actionCell} /> : null}
-  </View>;
+    {layout.stacked ? values : null}
+  </ListRow>;
 }
 
 const styles = StyleSheet.create({
-  table: { gap: 0 },
   contributions: { backgroundColor: uiRoles.ruleSoft, borderTopWidth: uiBorder.width,
     borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
-  lastContribution: { borderBottomWidth: 0 },
-  title: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink, paddingVertical: uiSpace.sm },
+  // The family band: the table's micro-label on a section rule, with no
+  // figures and nothing to press.
   family: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
     lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase', color: uiRoles.inkMuted, paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.xs, borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
-  row: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, borderBottomWidth: uiBorder.width,
-    borderColor: uiRoles.rule, paddingHorizontal: uiSpace.xs },
-  dataRow: { flexWrap: 'wrap' },
-  stacked: { flexDirection: 'column', alignItems: 'stretch', paddingBottom: uiSpace.sm },
-  selected: { borderLeftWidth: uiBorder.width * 3, borderLeftColor: uiRoles.ink, borderBottomWidth: 0 },
-  headers: { borderBottomWidth: uiBorder.width, paddingVertical: uiSpace.sm },
-  label: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
-  nameCell: { flex: 1, minWidth: uiGeometry.tapTarget },
-  nameActions: { flexDirection: 'row', alignItems: 'center' },
-  stackedName: { paddingRight: uiGeometry.tapTarget },
-  stackedChevron: { position: 'absolute', top: 0, right: uiSpace.xs },
-  nameLink: { flex: 1, minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center', paddingVertical: uiSpace.sm },
-  name: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
-  actionCell: { width: uiGeometry.tapTarget },
+    textTransform: 'uppercase', color: uiRoles.inkMuted, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
+    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
+  // The selected muscle keeps its ink rule, and its contributions hang off it.
+  selected: { borderLeftWidth: uiBorder.width * 3, borderLeftColor: uiRoles.ink },
+  nameLink: { minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center' },
   chevron: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
-  values: { flexDirection: 'row', gap: uiSpace.sm, alignItems: 'flex-start', paddingVertical: uiSpace.sm },
-  fullWidth: { alignSelf: 'stretch', width: '100%' },
-  grow: { flexGrow: 1 },
-  verticalValues: { flexDirection: 'column' },
-  valueLine: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: uiSpace.sm },
-  numeric: { textAlign: 'right' },
-  figure: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md, color: uiRoles.ink },
+  axis: { width: uiGeometry.tapTarget },
+  stackedName: { alignItems: 'stretch' },
+  stackedFigures: { alignSelf: 'stretch', width: '100%', justifyContent: 'flex-end', paddingBottom: uiSpace.xs },
   role: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
     lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
 });

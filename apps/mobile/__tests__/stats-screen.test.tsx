@@ -30,7 +30,8 @@ import {
 } from '../app/(tabs)/stats-history';
 import ProgressRoute from '../app/(tabs)/progress';
 import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
-import { compareProgressVolume } from '@/src/data/progress-comparisons';
+import { resolveLayout } from '@/components/stats/progress-tables';
+import { compareProgressVolume, type ProgressComparison } from '@/src/data/progress-comparisons';
 import type { SelectedMuscleWeeklyEffort, StatsSummary, ProgressComparisons } from '@/src/data';
 
 const buildLegacySummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
@@ -1117,6 +1118,104 @@ it('shows Volume with no coverage note and uses ordinary strength copy for bodyw
 });
 
 
+it('drops the muscle table title and the header unit, keeping the unit spoken', () => {
+  renderStatsScreenShell();
+  expect(screen.queryByText('Work by muscle')).toBeNull();
+  const header = () => within(screen.getByTestId('stats-muscle-table-header'));
+  expect(header().getByText('Muscle')).toBeTruthy();
+  expect(header().queryByText(/kg·reps/)).toBeNull();
+  expect(screen.getByLabelText('Now, working sets')).toBeTruthy();
+
+  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  expect(header().queryByText(/kg·reps/)).toBeNull();
+  expect(header().getByText('Now')).toBeTruthy();
+  expect(header().getByText('Prev')).toBeTruthy();
+  for (const column of ['Now', 'Previous', 'Change']) {
+    expect(screen.getByLabelText(`${column}, kg·reps`)).toBeTruthy();
+  }
+  expect(screen.getByTestId('stats-muscle-row-chest-figures').props.accessibilityLabel)
+    .toBe('Now 1800, previous 1500, change +20%. kg·reps.');
+});
+
+it('draws both breakdowns in one table style', () => {
+  const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
+  const labelStyle = (testID: string, label: string) =>
+    StyleSheet.flatten(within(screen.getByTestId(testID)).getByText(label).props.style);
+
+  const muscleView = renderStatsScreenShell();
+  const muscleTable = flat('stats-muscle-table');
+  const muscleHeader = flat('stats-muscle-table-header');
+  const muscleLabel = labelStyle('stats-muscle-table-header', 'Muscle');
+  const muscleName = labelStyle('stats-muscle-row-chest', 'Chest');
+  const { width: _muscleColumn, ...muscleFigure } = flat('stats-muscle-row-chest-now') as { width: number };
+  muscleView.unmount();
+
+  renderStatsScreenShell({ viewMode: 'exercise', exerciseListItems: [{
+    id: 'ex1', name: 'Bench Press', workingSetCount: 2, totalVolume: 2500,
+    estimatedOneRepMax: 110, lastCompletedAt: null,
+  }] });
+  const { width: _exerciseColumn, ...exerciseFigure } = flat('stats-exercise-sets-ex1') as { width: number };
+  // One card, one header row, one micro-label, one name and one figure style;
+  // only the column widths belong to each table (issue #636).
+  expect(muscleTable).toEqual(flat('stats-exercise-list'));
+  expect(muscleHeader).toEqual(flat('stats-exercise-table-header'));
+  expect(muscleLabel).toEqual(labelStyle('stats-exercise-table-header', 'Exercise'));
+  expect(muscleName).toEqual(labelStyle('stats-exercise-row-ex1', 'Bench Press'));
+  expect(muscleFigure).toEqual(exerciseFigure);
+});
+
+it('bands a muscle family without giving it a figure of its own', () => {
+  renderStatsScreenShell();
+  const band = screen.getByTestId('stats-family-header-shoulders');
+  expect(band).toHaveTextContent('Shoulders');
+  expect(band.props.accessibilityRole).toBe('header');
+  expect(band.props.onPress).toBeUndefined();
+  // Only its muscles carry figures: a set mapped to two muscles of one family
+  // counts in both rows, so a family sum would overstate the work.
+  expect(within(band).queryByText(/\d/)).toBeNull();
+  expect(screen.queryByTestId('stats-family-header-shoulders-figures')).toBeNull();
+  expect(screen.getByTestId('stats-muscle-row-front_delts-figures')).toBeTruthy();
+  expect(screen.getByTestId('stats-muscle-row-rear_delts-figures')).toBeTruthy();
+});
+
+describe('resolveLayout', () => {
+  const row = (current: number, previous: number): ProgressComparison => ({
+    current: { workingSetCount: current, totalVolume: current, volumeSetCount: 1 },
+    previous: { workingSetCount: previous, totalVolume: previous, volumeSetCount: 1 },
+    workingSetChange: current - previous,
+    volumeChange: compareProgressVolume(current, previous),
+  });
+
+  it('keeps the figures beside the name on a current phone, in either metric', () => {
+    expect(resolveLayout(375, [row(120, 100)], 'workingSetCount').stacked).toBe(false);
+    expect(resolveLayout(390, [row(123456, 100000)], 'totalVolume').stacked).toBe(false);
+  });
+
+  it('moves the figures to their own line when the name loses its floor', () => {
+    // 320pt: three labelled columns and the chevron leave the name too little,
+    // whichever metric is shown.
+    expect(resolveLayout(320, [row(120, 100)], 'workingSetCount').stacked).toBe(true);
+    expect(resolveLayout(320, [row(123456, 100000)], 'totalVolume').stacked).toBe(true);
+  });
+
+  it('caps a column so three of them and the chevron never outgrow the row', () => {
+    const layout = resolveLayout(390, [row(188271603422374, 1)], 'totalVolume');
+    const figures = layout.columns.reduce((sum, value) => sum + value, 0);
+    expect(figures).toBeLessThanOrEqual(390 - 44);
+    expect(Math.max(...layout.columns)).toBeLessThan(String(188271603422374).length * 13 * 0.61);
+  });
+
+  it('gives a column at least its own header label', () => {
+    const [now, previous, change] = resolveLayout(430, [row(1, 1)], 'workingSetCount').columns;
+    expect(now).toBeLessThan(previous);
+    expect(previous).toBeLessThan(change);
+  });
+});
+
+/** A figure cell's reserved column width, as drawn. */
+const columnWidth = (testID: string): number =>
+  (StyleSheet.flatten(screen.getByTestId(testID).props.style) as { width: number }).width;
+
 it.each([320, 430])('keeps full figures at %ipt, using another line only when needed', width => {
   const dimensions = ReactNative.Dimensions.get('window');
   act(() => ReactNative.Dimensions.set({ window: { width, height: 900, scale: 1, fontScale: 1 } }));
@@ -1126,13 +1225,17 @@ it.each([320, 430])('keeps full figures at %ipt, using another line only when ne
   summary.muscles[0].previous.totalVolume = 987654321;
   renderStatsScreenShell({ summary });
   fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: width === 320 ? 'column' : 'row' });
+  // Nine digits beside a long name do not fit a small phone's row, so the
+  // figures take their own full-width line under it; neither is abbreviated.
+  const stackedFigures = { width: '100%' };
+  if (width === 320) expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle(stackedFigures);
+  else expect(screen.getByTestId('stats-muscle-row-chest-figures')).not.toHaveStyle(stackedFigures);
   expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('123456789');
   expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveTextContent('987654321');
   expect(screen.getByTestId('stats-muscle-history-chest')).toHaveStyle({ minWidth: 44, minHeight: 44 });
   expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
   expect(screen.getByText('A very long individual muscle name').props.numberOfLines).toBeUndefined();
-  expect(screen.getByTestId('stats-muscle-row-chest-now').props.numberOfLines).toBe(1);
+  expect(screen.getByTestId('stats-muscle-row-chest-now').props.numberOfLines).toBeUndefined();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 
@@ -1149,13 +1252,17 @@ it.each([375, 430])('uses the full row width for parent and contribution figures
   renderStatsScreenShell({ summary });
   fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
   fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'column' });
-  const parentValues = screen.getByTestId('stats-muscle-row-chest-values');
-  expect(screen.getByLabelText(/^Now 188271603422374, previous 6172839456170,/)).toHaveStyle({ width: '100%' });
-  expect(parentValues).toHaveStyle({ width: '100%' });
-  expect(screen.getByTestId('stats-contribution-bench-values')).toHaveStyle({ width: '100%' });
+  expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
+  expect(screen.getByTestId('stats-contribution-bench-figures')).toHaveStyle({ width: '100%' });
+  expect(screen.getByTestId('stats-muscle-row-chest-figures').props.accessibilityLabel)
+    .toMatch(/^Now 188271603422374, previous 6172839456170, change .*\. kg·reps\.$/);
   expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
   expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
+  // A contributor's figures stay on its muscle's columns, whatever the width.
+  for (const key of ['now', 'previous', 'change']) {
+    expect(columnWidth(`stats-contribution-bench-${key}`))
+      .toBe(columnWidth(`stats-muscle-row-chest-${key}`));
+  }
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 
@@ -1167,10 +1274,15 @@ it('keeps a twelve-digit Volume baseline and long percent readable on a small ph
   summary.muscles[0].previous.totalVolume = 1;
   renderStatsScreenShell({ summary });
   fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-  expect(screen.getByTestId('stats-muscle-row-chest-values')).toHaveStyle({ flexDirection: 'column' });
+  // Every digit is kept: the figures take their own line, and one too wide for
+  // its capped column wraps inside it rather than shrinking or abbreviating.
+  expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('100000000000');
   expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+9999999999900%');
-  expect(within(screen.getByTestId('stats-muscle-row-chest')).getByText('Change')).toBeTruthy();
+  expect(columnWidth('stats-muscle-row-chest-change')).toBeLessThan(320);
+  // The columns are named once, in the table's header.
+  expect(within(screen.getByTestId('stats-muscle-table-header')).getByText('Change')).toBeTruthy();
+  expect(within(screen.getByTestId('stats-muscle-row-chest')).queryByText('Change')).toBeNull();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 
@@ -1205,13 +1317,14 @@ it('retains the disclosure control when a wide contributor changes the row layou
     current: { ...muscle.current, workingSetCount: 1234567890123456 } }];
   renderStatsScreenShell({ summary });
   const disclosure = screen.getByTestId('stats-muscle-select-chest');
-  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'row' });
+  const figures = () => screen.getByTestId('stats-muscle-row-chest-figures');
+  expect(figures()).not.toHaveStyle({ width: '100%' });
   fireEvent.press(disclosure);
-  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'column' });
+  expect(figures()).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-muscle-select-chest')).toBe(disclosure);
   fireEvent.press(disclosure);
   expect(screen.getByTestId('stats-muscle-select-chest')).toBe(disclosure);
-  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'row' });
+  expect(figures()).not.toHaveStyle({ width: '100%' });
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 

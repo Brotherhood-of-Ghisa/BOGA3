@@ -18,7 +18,7 @@
 import * as mockReact from 'react';
 import { Modal } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Icon, uiBorder, uiRoles } from '@/components/ui';
+import { Icon, uiBorder, uiGeometry, uiRoles } from '@/components/ui';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -415,7 +415,8 @@ describe('Stats over real data', () => {
       expect(screen.queryAllByLabelText(/Colour:/)).toEqual([]);
     }
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
-    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ borderLeftColor: uiRoles.ink });
+    // The selected muscle's ink rule runs down its row and its contributions.
+    expect(screen.getByTestId('stats-muscle-block-chest')).toHaveStyle({ borderLeftColor: uiRoles.ink });
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
   });
 
@@ -546,7 +547,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     expect(within(screen.getByTestId('stats-muscle-select-quads')).UNSAFE_getByType(Icon).props.name)
       .toBe('chevron-down');
-    expect(screen.getByTestId('stats-muscle-table')).toHaveStyle({ gap: 0 });
+    expect(screen.getByTestId('stats-muscle-table')).toHaveStyle({ backgroundColor: uiRoles.surface,
+      borderRadius: uiGeometry.radius.card, borderWidth: uiBorder.width, borderColor: uiRoles.rule });
     expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: uiRoles.ruleSoft,
       borderTopWidth: uiBorder.width, borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule });
     select('chest');
