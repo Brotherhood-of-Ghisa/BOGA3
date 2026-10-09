@@ -57,6 +57,25 @@ retaining sampled daily tiles.
 Why: each daily figure and completed weekly total appears once, in its starting week.
 Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/components/heatmaps/DailyHeatmap.tsx`.
 
+### comparison.timeline-history · presentation · accepted
+
+The Timeline history view plots one value per Monday week across
+[[comparison.history-window]], oldest on the left. A month is labelled at the
+first week that starts in it, as in [[comparison.daily-history]].
+
+| Metric | Week value | Drawn as | Rest week | Unavailable week |
+| --- | --- | --- | --- | --- |
+| Volume, Sets | the week's sum | a column on a zero-based scale | zero: no column | a gap |
+| 1RM, Top weight | the week's best | a line on a scale fitted to the plotted weeks | a gap: the line breaks | a gap |
+
+Tapping a week does what tapping a Weekly row does. The readout above the
+chart shows the selected week, else the newest; it follows
+[[copy.blank-history]].
+
+Why: a sum is a quantity a lifter piles up, so a week without one is zero; a
+best is a level, and a rest week has none to draw.
+Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`.
+
 ### comparison.weekly-reference · calculation · accepted
 
 Within [[comparison.history-window]], known training weeks form the reference

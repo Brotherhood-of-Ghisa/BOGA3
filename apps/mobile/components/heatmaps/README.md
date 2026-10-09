@@ -1,6 +1,6 @@
 # BoGa Heatmaps — Progress history integration
 
-Two heatmap views for the exercise and muscle history sheets on Progress
+Two heatmap views and a Timeline chart for the exercise and muscle history sheets on Progress
 (`components/stats/history-sheet.tsx`). They replace the older month-grid
 `CalendarHeatmap`.
 
@@ -11,6 +11,8 @@ Two heatmap views for the exercise and muscle history sheets on Progress
 | `heatmap-style.ts`  | Shared title, micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
+| `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, y ticks and month labels; `timelineGeometry` → columns, line runs and fitting labels. Pure. |
+| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week ([[comparison.timeline-history]]): readout, y axis with unit, columns or line, month axis; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`. |
 | `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; selection lifted to the host. |
 
 ## Data flow
