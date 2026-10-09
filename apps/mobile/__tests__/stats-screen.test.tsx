@@ -231,11 +231,12 @@ describe('formatPeriodComparison', () => {
   });
 });
 
-it.each([['this-week' as const, 'This week', 'week', '4 weeks'], ['window' as const, '4 weeks', '4 weeks', 'This week']])(
-  'announces the %s comparison and its alternative without a visible subtitle', (period, shown, wording, alternative) => {
+it.each([['this-week' as const, 'This week', 'week', '4 weeks', 'week'],
+  ['window' as const, '4 weeks', '4 weeks', 'This week', 'weeks']])(
+  'announces the %s comparison and its alternative without a visible subtitle', (period, shown, wording, alternative, unit) => {
     renderStatsScreenShell({ period, targetWindowWeeks: 4 });
     expect(screen.getByTestId('stats-period-chip')).toHaveProp('accessibilityLabel',
-      `Stats period: ${shown}, vs previous ${wording}, same elapsed calendar span. Activate to show ${alternative}.`);
+      `Stats period: ${shown}, vs previous ${wording}, full previous calendar ${unit}. Activate to show ${alternative}.`);
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent(shown);
     expect(screen.queryByText(`vs previous ${wording}`)).toBeNull();
     expect(screen.queryByTestId('stats-comparison-label')).toBeNull();

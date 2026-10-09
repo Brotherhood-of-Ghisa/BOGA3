@@ -23,13 +23,13 @@ time.
 
 | Screen | Current period | Compared with |
 | --- | --- | --- |
-| Progress, N > 1 | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the immediately preceding N full calendar weeks, ending at the current period's start |
-| Progress, This week (N = 1) | this calendar week until now; the alternative to the configured period, and the only choice when N is 1 | the same span one week earlier, cut at the same elapsed time |
+| Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the immediately preceding N full calendar weeks, ending at the current period's start |
+| Progress, This week (N = 1) | this calendar week until now; the alternative to the configured period, and the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
 | Today, month pace | this month through today | the previous month through the same day (its last day when it is shorter) |
 
-Why: Progress's multiweek totals compare with the whole preceding block;
-This week compares week-to-date spans. Today's week bar shows progress toward
+Why: every weekly comparison includes the unfinished current week and uses the
+whole preceding block as its baseline. Today's week bar shows progress toward
 last week's whole total.
 Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and month windows in `apps/mobile/src/progress-summary/calculations.ts`.
 

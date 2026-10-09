@@ -191,11 +191,12 @@ it('caps constituent muscle attainment before averaging, including untrained mus
   expect(groupedTargetAttainment([], {}, 8)).toBe(0);
 });
 
-it('aligns to local Monday and keeps the same elapsed previous span', () => {
+it('aligns current calendar-week windows to local Monday and now', () => {
   const now = new Date(2026, 9, 3, 15, 20);
   expect(calendarWeekBounds(1, now).start).toEqual(new Date(2026, 8, 28));
   const bounds = calendarWeekBounds(4, now);
   expect(bounds.start).toEqual(new Date(2026, 8, 7));
+  expect(bounds.end).toEqual(now);
   expect(shiftCalendarWeeks(now, -4)).toEqual(new Date(2026, 8, 5, 15, 20));
 });
 

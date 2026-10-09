@@ -100,14 +100,15 @@ const METRIC_OPTIONS = [
   { value: 'totalVolume' as ProgressMetric, label: 'Volume' },
 ] as const;
 
+// Period choices and accessibility wording follow [[comparison.window]].
 // `This week` is the only choice when Settings' Progress period is one week,
 // which leaves the chip inert rather than offering the same span twice.
 const periodOptions = (targetWindowWeeks: number) => {
   const thisWeek = { value: 'this-week' as ProgressPeriod, label: 'This week',
-    accessibilityLabel: `This week, ${formatPeriodComparison(7)}, same elapsed calendar span` };
+    accessibilityLabel: `This week, ${formatPeriodComparison(7)}, full previous calendar week` };
   if (targetWindowWeeks === 1) return [thisWeek];
   return [{ value: 'window' as ProgressPeriod, label: `${targetWindowWeeks} weeks`,
-    accessibilityLabel: `${targetWindowWeeks} weeks, ${formatPeriodComparison(targetWindowWeeks * 7)}, same elapsed calendar span` },
+    accessibilityLabel: `${targetWindowWeeks} weeks, ${formatPeriodComparison(targetWindowWeeks * 7)}, full previous calendar weeks` },
     thisWeek];
 };
 
