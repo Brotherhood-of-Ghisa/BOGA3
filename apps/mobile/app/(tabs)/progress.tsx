@@ -1,7 +1,7 @@
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -16,12 +16,6 @@ import {
 } from 'react-native';
 
 import {
-  EXERCISE_HISTORY_METRIC_OPTIONS,
-  HistorySheet,
-  MUSCLE_HISTORY_METRIC_OPTIONS,
-  type MuscleHistoryMetric,
-} from '@/components/stats/history-sheet';
-import {
   Card,
   Icon,
   ListRow,
@@ -33,16 +27,10 @@ import {
   uiRoles,
   uiSpace,
 } from '@/components/ui';
-import {
-  type CalendarHeatmapMetric,
-  type DailyEffortMetrics,
-  type SelectedExerciseWeeklyEffort,
-  type SelectedMuscleWeeklyEffort,
-  type ProgressComparisons,
-} from '@/src/data';
+import { type ProgressComparisons } from '@/src/data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
+import type { ProgressMetric } from '@/src/preferences/model';
 import { ProgressTables } from '@/components/stats/progress-tables';
 import {
   StatsTable,
@@ -51,22 +39,14 @@ import {
   StatsTableHeaderLabel,
   statsTableStyles,
 } from '@/components/stats/stats-table';
-import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
 import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
+import { progressHistoryHref } from '@/src/navigation/routes';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
-export type MuscleHistoryTarget = {
-  muscleGroupIds: [string];
-  displayName: string;
-  familyName: string;
-};
-
-export type ExerciseHeatmapTarget = {
-  exerciseDefinitionId: string;
-  displayName: string;
-};
+export type MuscleHistoryTarget = { muscleGroupId: string };
+export type ExerciseHeatmapTarget = { exerciseDefinitionId: string };
 
 export type ExerciseListItem = {
   id: string;
@@ -238,45 +218,21 @@ export type StatsScreenShellProps = {
   onRetry?: () => void;
   period: ProgressPeriod;
   targetWindowWeeks?: number;
-  historyLookbackWeeks?: number;
-  weeklyWorkingSetTarget?: number;
   onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
-  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
-  onDismissMuscleHistory: () => void;
-  onRetryMuscleHistory?: () => void;
-  onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
+  // A muscle or exercise name opens its history page; Progress keeps its own
+  // state and scroll behind it.
+  onOpenMuscleHistory: (muscle: MuscleHistoryTarget) => void;
+  onOpenExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   isLoading: boolean;
   errorMessage: string | null;
-  selectedMuscle: MuscleHistoryTarget | null;
-  muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
-  muscleHistoryDailyMetrics: DailyEffortMetrics[];
-  isMuscleHistoryLoading: boolean;
-  muscleHistoryErrorMessage: string | null;
-  selectedMuscleHistoryWeekKey: string | null;
-  muscleHistoryMetric: MuscleHistoryMetric;
-  muscleHistoryView: HeatmapView;
-  onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
   tableMetric: ProgressMetric;
   onSelectTableMetric: (metric: ProgressMetric) => void;
   exerciseListItems: ExerciseListItem[];
-  selectedExercise: ExerciseHeatmapTarget | null;
-  exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
-  exerciseHistoryDailyMetrics: DailyEffortMetrics[];
-  isExerciseHistoryLoading: boolean;
-  exerciseHistoryErrorMessage: string | null;
-  selectedExerciseHistoryWeekKey: string | null;
-  exerciseHistoryMetric: CalendarHeatmapMetric;
-  exerciseHistoryView: HeatmapView;
-  onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
-  onDismissExerciseHistory: () => void;
-  onRetryExerciseHistory?: () => void;
-  onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
-  onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
-  /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
-  historyTodayDateKey?: string;
+  // False while the history page is on top: returning restores reader focus.
+  isFocused?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
 };
@@ -286,44 +242,18 @@ export function StatsScreenShell({
   onRetry,
   period,
   targetWindowWeeks = 4,
-  historyLookbackWeeks = 52,
-  weeklyWorkingSetTarget = 8,
   onSelectPeriod,
   onPressSessionsCard,
-  onPressMuscleHistory,
-  onDismissMuscleHistory,
-  onRetryMuscleHistory,
-  onSelectMuscleHistoryWeek,
+  onOpenMuscleHistory,
+  onOpenExerciseHistory,
   isLoading,
   errorMessage,
-  selectedMuscle,
-  muscleHistoryWeeklyEffort,
-  muscleHistoryDailyMetrics,
-  isMuscleHistoryLoading,
-  muscleHistoryErrorMessage,
-  selectedMuscleHistoryWeekKey,
-  muscleHistoryMetric,
-  muscleHistoryView,
-  onSelectMuscleHistoryMetric,
   viewMode,
   onSelectViewMode,
   tableMetric,
   onSelectTableMetric,
   exerciseListItems,
-  selectedExercise,
-  exerciseHistoryWeeklyEffort,
-  exerciseHistoryDailyMetrics,
-  isExerciseHistoryLoading,
-  exerciseHistoryErrorMessage,
-  selectedExerciseHistoryWeekKey,
-  exerciseHistoryMetric,
-  exerciseHistoryView,
-  onPressExerciseHistory,
-  onDismissExerciseHistory,
-  onRetryExerciseHistory,
-  onSelectExerciseHistoryWeek,
-  onSelectExerciseHistoryMetric,
-  historyTodayDateKey,
+  isFocused = true,
   searchQuery,
   onSearchQueryChange,
 }: StatsScreenShellProps) {
@@ -331,22 +261,43 @@ export function StatsScreenShell({
     DEFAULT_EXERCISE_SORT_MODE
   );
   const [contributionId, setContributionId] = useState<string | null>(null);
+  // The row whose history was opened, held only until the return it is for:
+  // any other way back to Progress (a tab, the Sessions link) leaves the
+  // reader where it landed.
   const launchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const focusRequest = useRef(0);
   useEffect(() => () => { focusRequest.current += 1; }, []);
-  const focus = (target: ComponentRef<typeof View> | null) => {
+  const focus = useCallback((target: ComponentRef<typeof View> | null) => {
     const request = ++focusRequest.current;
     void AccessibilityInfo.isScreenReaderEnabled().then(enabled => {
       if (request !== focusRequest.current) return;
       const handle = target && findNodeHandle(target);
       if (enabled && handle) AccessibilityInfo.setAccessibilityFocus(handle);
     });
-  };
+  }, []);
+  const wasFocused = useRef(isFocused);
+  useEffect(() => {
+    const returned = isFocused && !wasFocused.current;
+    wasFocused.current = isFocused;
+    if (!returned) return;
+    const row = launchTarget.current;
+    launchTarget.current = null;
+    if (row) focus(row);
+  }, [focus, isFocused]);
   const showContributions = (id: string) => {
     setContributionId(current => current === id ? null : id);
   };
-  const dismissMuscle = () => { onDismissMuscleHistory(); focus(launchTarget.current); };
-  const dismissExercise = () => { onDismissExerciseHistory(); focus(launchTarget.current); };
+  // The press that opens history: the keyboard goes, the row is remembered for
+  // the return, and any pending focus request for an earlier row is dropped.
+  const openHistory = useCallback(
+    <T,>(open: (target: T) => void, target: T, row: ComponentRef<typeof View> | null) => {
+      focusRequest.current += 1;
+      Keyboard.dismiss();
+      launchTarget.current = row;
+      open(target);
+    },
+    []
+  );
 
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -386,62 +337,17 @@ export function StatsScreenShell({
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
         {viewMode === 'exercise' ? (
-          <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
+          <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
         ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
           onSelect={showContributions}
-          onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
-          onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
+          onMuscleHistory={(row, target) => openHistory(onOpenMuscleHistory, { muscleGroupId: row.muscleGroupId }, target)}
+          onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
           meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={statsTableStyles.name}>Sessions</Text></ListRow>
       </ScreenScroll>
 
-      {selectedMuscle && isIndividualMuscleHistoryTarget(selectedMuscle) ? (
-        <HistorySheet
-          key={`muscle-${selectedMuscle.muscleGroupIds[0]}`}
-          dailyMetrics={muscleHistoryDailyMetrics}
-          errorMessage={muscleHistoryErrorMessage}
-          eyebrow="Muscle History"
-          isLoading={isMuscleHistoryLoading}
-          kind="muscle"
-          metric={muscleHistoryMetric}
-          metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissMuscle}
-          onRetry={onRetryMuscleHistory}
-          onSelectMetric={onSelectMuscleHistoryMetric}
-          onSelectWeek={onSelectMuscleHistoryWeek}
-          selectedWeekKey={selectedMuscleHistoryWeekKey}
-          title={selectedMuscle.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={muscleHistoryView}
-          weeklyEffort={muscleHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTarget: weeklyWorkingSetTarget }}
-        />
-      ) : null}
-      {selectedExercise ? (
-        <HistorySheet
-          key={`exercise-${selectedExercise.exerciseDefinitionId}`}
-          dailyMetrics={exerciseHistoryDailyMetrics}
-          errorMessage={exerciseHistoryErrorMessage}
-          eyebrow="Exercise History"
-          isLoading={isExerciseHistoryLoading}
-          kind="exercise"
-          metric={exerciseHistoryMetric}
-          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissExercise}
-          onRetry={onRetryExerciseHistory}
-          onSelectMetric={onSelectExerciseHistoryMetric}
-          onSelectWeek={onSelectExerciseHistoryWeek}
-          selectedWeekKey={selectedExerciseHistoryWeekKey}
-          title={selectedExercise.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={exerciseHistoryView}
-          weeklyEffort={exerciseHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-        />
-      ) : null}
     </Screen>
   );
 }
@@ -543,7 +449,7 @@ function ExerciseListView({
               </Text>
             </StatsTableFigures>
           }
-          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name }, links.current.get(item.id) ?? null)}
+          onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
           testID={`stats-exercise-row-${item.id}`}>
           <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
@@ -639,6 +545,7 @@ export default function StatsRoute() {
 
 function StatsContent() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
   const { values } = useAccountLocalPreferenceState();
   const filters = useProgressFilters(params);
@@ -648,11 +555,6 @@ function StatsContent() {
   const { stats, reload } = useExerciseCatalogStats(catalogPeriod);
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, revision, reload);
-  const historyRevision = revision + summary.refreshRevision;
-  const muscle = useHistory<MuscleHistoryTarget>(values.historyLookbackWeeks, historyRevision);
-  const exercise = useHistory<ExerciseHeatmapTarget>(values.historyLookbackWeeks, historyRevision);
-  const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
-  const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
   const [searchQuery, setSearchQuery] = useState('');
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
     .filter(item => stats.aggregatesById.has(item.id))
@@ -663,19 +565,12 @@ function StatsContent() {
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
   return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
-    historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
-    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onRetryMuscleHistory={muscle.retry} onSelectMuscleHistoryWeek={muscle.selectWeek}
-    selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
-    isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
-    muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
-    viewMode={filters.breakdown} onSelectViewMode={mode => { filters.selectBreakdown(mode); exercise.dismiss(); muscle.dismiss(); }}
-    tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
-    exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
-    exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
-    selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
-    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onRetryExerciseHistory={exercise.retry} onSelectExerciseHistoryWeek={exercise.selectWeek}
-    onSelectExerciseHistoryMetric={setExerciseMetric} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
+    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle))}
+    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise))}
+    viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
+    tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric} isFocused={isFocused}
+    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
 }
 
 // The width the Exercise header reserves for its `Recent` + arrow indicator,

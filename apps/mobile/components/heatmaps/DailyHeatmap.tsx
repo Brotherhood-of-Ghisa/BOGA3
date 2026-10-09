@@ -68,6 +68,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
   const testID = `${testIDPrefix}-heatmap`;
+  // No view title: the page's selectors say which view and metric this is.
   return <View style={styles.wrap} onLayout={event => setWidth(event.nativeEvent.layout.width)} testID={testID}>
     <FlatList
       data={months}
@@ -80,7 +81,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       testID={`${testIDPrefix}-scroll`}
-      ListHeaderComponent={<View style={styles.header}>{header}<Text allowFontScaling={false} style={heatmapStyles.title}>Daily training load</Text></View>}
+      ListHeaderComponent={<View style={styles.header}>{header}</View>}
       ListFooterComponent={<HeatmapLegend label={legendLabel} target={!!data.targetGrading} />}
     />
   </View>;

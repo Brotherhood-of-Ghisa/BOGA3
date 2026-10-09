@@ -31,33 +31,20 @@ const editNumber = (id: string, value: string) => {
 beforeEach(() => resetLocalData());
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
-it('saves both window settings and the view, and retains invalid numeric drafts in the centralized error flow', async () => {
+it('saves both window settings, and retains invalid numeric drafts in the centralized error flow', async () => {
   await openSettings();
-  expect(screen.getByTestId('settings-heatmap-view-daily')).toHaveProp('accessibilityState', { selected: true });
+  // The heatmap view is chosen on the history page itself, not here.
+  expect(screen.queryByTestId('settings-heatmap-view-daily')).toBeNull();
+  expect(screen.queryByText('Heatmap view')).toBeNull();
   editNumber('settings-target-window', '1');
   editNumber('settings-history-lookback', '104');
-  fireEvent.press(screen.getByTestId('settings-heatmap-view-weekly'));
-  expect(values()).toMatchObject({ targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'weekly' });
+  expect(values()).toMatchObject({ targetWindowWeeks: 1, historyLookbackWeeks: 104 });
   editNumber('settings-target-window', '1.5');
   expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '1.5');
   expect(values().targetWindowWeeks).toBe(1);
   expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error')).toHaveTextContent(/from 1 to 52/);
   expect(within(screen.getByTestId('settings-section-progress')).queryByText(/from 1 to 52/)).toBeNull();
   editNumber('settings-target-window', '4');
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
-});
-
-it('retains saved Weekly when a Daily save fails, then persists the draft through Refresh', async () => {
-  await openSettings();
-  act(() => updatePreferences({ heatmapView: 'weekly' }));
-  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
-  fireEvent.press(screen.getByTestId('settings-heatmap-view-daily'));
-  expect(values().heatmapView).toBe('weekly');
-  expect(screen.getByTestId('settings-heatmap-view-daily')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
-  write.mockRestore();
-  fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
-  await waitFor(() => expect(values().heatmapView).toBe('daily'));
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
@@ -83,7 +70,6 @@ it('edits one shared weekly target inline and retains invalid drafts in the cent
   const id = 'settings-weekly-working-set-target';
   expect(screen.getByLabelText('Weekly working sets per muscle')).toHaveProp('value', '8');
   expect(screen.getByLabelText('Progress period (weeks)')).toHaveProp('value', '4');
-  expect(screen.getByLabelText('Heatmap view')).toBeTruthy();
   expect(screen.queryByText('Weekly muscle targets')).toBeNull();
   editNumber(id, '12');
   expect(values().weeklyWorkingSetTarget).toBe(12);

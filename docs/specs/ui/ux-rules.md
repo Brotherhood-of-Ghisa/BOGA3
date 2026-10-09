@@ -53,9 +53,11 @@ the names of its Jest tests are the specification of that component.
    kinds. A **picker or menu** (row actions, management options, a choice of
    one value, a short form) opens a design-language `Sheet` over the current
    screen, sized to its content. A **sub-page** (a browser, an editor, a
-   preview: Swap exercise, the exercise editor, Share session, Progress
-   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
-   uses. Do not document opening either as a route transition.
+   preview: Swap exercise, the exercise editor, Share session) opens a
+   `PageSheet`, the native iOS page sheet the exercise picker uses. Do not
+   document opening either as a route transition. A sub-page whose subject
+   belongs in a native title and whose chart wants the whole screen is a route
+   instead (Progress history, `navigation-contract.md`).
 2. **Dragging down closes every sheet, and dismissal writes nothing.** A
    `Sheet` follows a drag from its handle and title row, closes on a
    deliberate release and springs back otherwise; its body scrolls and taps

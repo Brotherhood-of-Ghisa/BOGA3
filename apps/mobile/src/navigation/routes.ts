@@ -11,3 +11,12 @@ export const BODY_WEIGHT_ROUTE = '/body-weight';
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
 export const THEME_COLOUR_ROUTE = '/theme-colour';
+
+/** One muscle's or one exercise's effort history, pushed from Progress. */
+export const PROGRESS_HISTORY_ROUTE = '/progress-history';
+export const progressHistoryHref = (
+  subject: { muscleGroupId: string } | { exerciseDefinitionId: string }
+): Href =>
+  ('muscleGroupId' in subject
+    ? `${PROGRESS_HISTORY_ROUTE}?muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
+    : `${PROGRESS_HISTORY_ROUTE}?exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`) as Href;

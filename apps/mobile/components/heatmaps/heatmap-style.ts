@@ -1,5 +1,6 @@
 // heatmap-style.ts — the look shared by the Daily and Weekly heatmaps, in the
-// design language: the title, legends, axes and Week-column spacing.
+// design language: legends, axes and Week-column spacing. Neither view draws a
+// title: the history page's selectors name what is shown.
 
 import { StyleSheet } from 'react-native';
 
@@ -15,13 +16,6 @@ const microLabel = {
 } as const;
 
 export const heatmapStyles = StyleSheet.create({
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
   // Weekday gutter, month axis and legend: legends, so `ink-faint`
   // (`design-language.md` §2, G11).
   legendText: { ...microLabel, color: uiRoles.inkFaint },
