@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
@@ -18,13 +17,6 @@ type SetRowProps = {
   divider: boolean;
   onOpen: (setId: string) => void;
   onToggle: (setId: string) => void;
-  // The reorder grab handle (absent with fewer than two sets) — the playlist
-  // drag's only persistent chrome; rendered before the row's toggle.
-  dragHandle?: ReactNode;
-  // The non-drag reorder path: VoiceOver, switch control and keyboard users
-  // move a row through these custom actions (absent at a boundary).
-  onMoveEarlier?: () => void;
-  onMoveLater?: () => void;
 };
 
 const DASH = '—';
@@ -42,7 +34,7 @@ const describeValues = (row: SetRowView) =>
  * The row body opens the row in the logger; the glyph performs or un-performs it.
  * Swipes and their accessibility actions belong to the open row (`SetLogger`).
  */
-export function SetRow({ row, divider, onOpen, onToggle, dragHandle, onMoveEarlier, onMoveLater }: SetRowProps) {
+export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
@@ -82,33 +74,22 @@ export function SetRow({ row, divider, onOpen, onToggle, dragHandle, onMoveEarli
       }
       testID={`exercise-set-${row.number}`}
       trailing={
-        <View style={styles.trailing}>
-          {dragHandle}
-          <Pressable
-            accessibilityLabel={
-              performed ? `Mark set ${row.number} not performed` : `Mark set ${row.number} performed`
-            }
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: performed }}
-            onPress={() => onToggle(row.id)}
-            style={styles.glyph}
-            testID={`exercise-set-${row.number}-toggle`}>
-            <Icon name={glyph} />
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityLabel={
+            performed ? `Mark set ${row.number} not performed` : `Mark set ${row.number} performed`
+          }
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: performed }}
+          onPress={() => onToggle(row.id)}
+          style={styles.glyph}
+          testID={`exercise-set-${row.number}-toggle`}>
+          <Icon name={glyph} />
+        </Pressable>
       }>
       <Pressable
-        accessibilityActions={[
-          ...(onMoveEarlier ? [{ name: 'move-earlier', label: `Move set ${row.number} earlier` }] : []),
-          ...(onMoveLater ? [{ name: 'move-later', label: `Move set ${row.number} later` }] : []),
-        ]}
         accessibilityHint="Opens the set for editing"
         accessibilityLabel={`Set ${row.number}, ${effort}, ${meaning}, ${values}, ${performed ? 'performed' : 'not performed'}`}
         accessibilityRole="button"
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === 'move-earlier') onMoveEarlier?.();
-          if (event.nativeEvent.actionName === 'move-later') onMoveLater?.();
-        }}
         onPress={() => onOpen(row.id)}
         style={styles.body}
         testID={`exercise-set-${row.number}-open`}>
@@ -152,11 +133,5 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // The handle and the toggle share the trailing control column; the handle
-  // comes first, quiet, with the same 44pt target.
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
 });

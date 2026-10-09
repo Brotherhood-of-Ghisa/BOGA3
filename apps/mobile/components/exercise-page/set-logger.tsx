@@ -40,9 +40,6 @@ type SetLoggerProps = {
   // The swipe-left equivalent, as the logger's `discard` accessibility action.
   // Absent when dropping would change nothing.
   onDrop?: () => void;
-  // The reorder moves (`Move set N earlier/later`), absent at a boundary.
-  onMoveEarlier?: () => void;
-  onMoveLater?: () => void;
 };
 
 // Up to 5 digits and a point; the logger rejects anything else as it is typed.
@@ -60,12 +57,14 @@ const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined 
 /**
  * The open set, expanded in place into the logger (spec 08,
  * "In-place row logger pattern"):
- * Weight · Reps · Effort · the commit tick, all fields one height.
- * The tick is the screen's one `accent` primary; it is disabled until the
+ * Effort · Weight · Reps · the commit tick, all fields one height.
+ * The Effort control leads the row, aligned to the set viewer's effort column;
+ * it is followed by the narrower weight input, reps, and the commit tick. The
+ * tick is the screen's one `accent` primary; it is disabled until the
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, onMoveEarlier, onMoveLater, loadContext },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
   weightInputRef
 ) {
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
@@ -80,8 +79,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
     <View style={styles.logger} testID="exercise-set-logger">
       <View
         accessibilityActions={[
-          ...(onMoveEarlier ? [{ name: 'move-earlier', label: `Move set ${number} earlier` }] : []),
-          ...(onMoveLater ? [{ name: 'move-later', label: `Move set ${number} later` }] : []),
           ...(onConfirm ? [{ name: 'confirm', label: `Confirm set ${number}` }] : []),
           ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}` }] : []),
         ]}
@@ -89,8 +86,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         accessibilityLabel={`Set ${number}, in progress`}
         accessible
         onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === 'move-earlier') onMoveEarlier?.();
-          if (event.nativeEvent.actionName === 'move-later') onMoveLater?.();
           if (event.nativeEvent.actionName === 'confirm') onConfirm?.();
           if (event.nativeEvent.actionName === 'discard') onDrop?.();
         }}
@@ -102,6 +97,22 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         </Text>
       </View>
       <View style={styles.fields}>
+        <Pressable
+          accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
+          accessibilityRole="button"
+          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
+          onPress={onCycleEffort}
+          onLongPress={onOpenEffort}
+          style={[styles.field, styles.effortField]}
+          testID="exercise-set-logger-effort">
+          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
+          <View style={styles.effortValue}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
+              {effortText}
+            </Text>
+            <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
+          </View>
+        </Pressable>
         <View style={[styles.field, styles.weightField]}>
           <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
           <TextInput
@@ -133,22 +144,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
             value={repsValue}
           />
         </View>
-        <Pressable
-          accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
-          accessibilityRole="button"
-          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
-          onPress={onCycleEffort}
-          onLongPress={onOpenEffort}
-          style={[styles.field, styles.effortField]}
-          testID="exercise-set-logger-effort">
-          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
-          <View style={styles.effortValue}>
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
-              {effortText}
-            </Text>
-            <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
-          </View>
-        </Pressable>
         <View style={styles.control}>
           <Pressable
             accessibilityLabel={`Log set ${number} as performed`}
@@ -206,15 +201,20 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
   },
+  // The leading column, aligned to the set viewer's effort column: two tap
+  // targets hold the compact label and its caret.
+  effortField: {
+    width: uiGeometry.tapTarget * 2,
+  },
+  // Narrowed to leave the effort control its room; still wide enough for a
+  // five-digit weight. Shrinks below the cap on small viewports.
   weightField: {
     flex: 1,
+    maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl,
   },
   // Two digits of reps; `W-Up` and its caret.
   repsField: {
     width: uiGeometry.fieldHeight,
-  },
-  effortField: {
-    width: uiGeometry.tapTarget * 2,
   },
   input: {
     flex: 1,
@@ -238,8 +238,10 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
+  // Pinned to the trailing edge so the tick keeps the list's control axis.
   control: {
     width: uiGeometry.tapTarget,
+    marginLeft: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
   },

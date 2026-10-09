@@ -13,13 +13,11 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 
 import { SetLogger } from './set-logger';
 import { SetRow } from './set-row';
-import type { RowReorderProps } from './set-reorder-list';
 import { SwipeSetRow } from './swipe-set-row';
 
 export type ExerciseSetRowItemProps = {
   row: SetRowView;
   index: number;
-  reorder: RowReorderProps;
   /** The set the logger sits on, or null when the cursor follows. */
   openSetId: string | null;
   /** The open row's logger values, when its row is on this item. */
@@ -41,15 +39,14 @@ export type ExerciseSetRowItemProps = {
 };
 
 /**
- * One row of the exercise page's reorderable set list: the open row as the
- * swipeable logger (its sides offered only when they would change the row),
- * every other row as a `SetRow` with its grab handle and Move actions.
+ * One row of the exercise page's set list: the open row as the swipeable
+ * logger (its sides offered only when they would change the row), every other
+ * row as a `SetRow` and its toggle.
  * Pure composition — the writes are the screen's callbacks.
  */
 export function ExerciseSetRowItem({
   row,
   index,
-  reorder,
   openSetId,
   loggerValues,
   loadContext,
@@ -69,7 +66,8 @@ export function ExerciseSetRowItem({
   // The hairline hides directly under the open row's logger.
   const followsLogger = index > 0 && allSets[index - 1]?.id === openSetId;
   const divider = index > 0 && !followsLogger;
-  if (open && loggerValues) {    // Only the open row carries the swipes, and each side only when its move
+  if (open && loggerValues) {
+    // Only the open row carries the swipes, and each side only when its move
     // would change the row; the accessibility actions are the non-gesture
     // path for the same two moves.
     const onConfirm = canConfirmSet(allSets, row.id) ? () => onSwipeRight(row.id) : undefined;
@@ -85,8 +83,6 @@ export function ExerciseSetRowItem({
           onConfirm={onConfirm}
           onCycleEffort={() => onCycleEffort(nextSessionSetType(loggerValues.setType))}
           onDrop={onDrop}
-          onMoveEarlier={reorder.onMoveEarlier}
-          onMoveLater={reorder.onMoveLater}
           onOpenEffort={onOpenEffort}
           ref={weightInputRef}
           repsValue={loggerValues.repsValue}
@@ -99,10 +95,7 @@ export function ExerciseSetRowItem({
   return (
     <SetRow
       divider={divider}
-      dragHandle={reorder.dragHandle}
       key={row.id}
-      onMoveEarlier={reorder.onMoveEarlier}
-      onMoveLater={reorder.onMoveLater}
       onOpen={onOpenRow}
       onToggle={onToggleRow}
       row={row}

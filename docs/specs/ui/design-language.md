@@ -132,9 +132,10 @@ micro-labels Archivo 700, sheet titles Archivo 800.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
   value is for. **A screen derives its measures from these** instead of
-  adding values (the logger's Reps field is one field height wide, Effort two
-  tap targets), and spacing a design draws off-scale snaps to the scale
-  (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
+  adding values (the logger's Effort field leads at two tap targets, its
+  Weight field caps at the same two tap targets plus one XL step, and its Reps
+  field is one field height wide), and spacing a design draws off-scale snaps to
+  the scale (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
 - The primitives implementing all of this live in
   `apps/mobile/components/ui/` (`components-catalog.md`).
 

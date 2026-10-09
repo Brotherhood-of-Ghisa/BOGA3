@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   type TextInputInstance,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,7 +22,7 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
-import { completePlanBlock, loadPlanBlockProgressStatus, reorderSessionExerciseSets } from '@/src/session-planner';
+import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
@@ -55,13 +56,7 @@ import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
-import { SetReorderList } from './set-reorder-list';
-import { useSetReorder } from './use-set-reorder';
 import { pageText } from './text-styles';
-
-/** The permutation a drag produced is a no-op when it matches the persisted order. */
-const isSameOrder = (order: string[], other: string[]): boolean =>
-  order.length === other.length && order.every((id, index) => id === other[index]);
 
 type ExercisePageScreenProps = {
   sessionId: string;
@@ -160,9 +155,6 @@ export function ExercisePageScreen({
   // The sourced card's block state: Complete block is offered while the
   // block is still pending, never after it is resolved.
   const [blockStatus, setBlockStatus] = useState<'pending' | 'resolved' | null>(null);
-  const reorderWriteRef = useRef(false);
-  const inFlightReorderRef = useRef<Promise<void> | null>(null);
-  const draftQueueRef = useRef<Promise<void>>(Promise.resolve());
   const weightInputRef = useRef<TextInputInstance>(null);
 
   // The sourced card's block state decides whether Complete block is
@@ -189,8 +181,6 @@ export function ExercisePageScreen({
   }, [router]);
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
-  const setOrderIds = useMemo(() => sets.map((set) => set.id), [sets]);
-  const reorder = useSetReorder(setOrderIds);
   const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
   const loadContext = personalCalculationContext(
     bodyweightCalculationsEnabled,
@@ -204,47 +194,30 @@ export function ExercisePageScreen({
     ? recordBaselineOf(records.summary.records) : null;
   const recordSession = exercise && draft.state.status === 'ready'
     ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
-  // While a drag is live the rows render in the drag's order; otherwise the
-  // persisted order — a failed write just clears the overlay, restoring it.
-  const orderedSets = reorder.dragOrder
-    ? reorder.dragOrder
-        .map((id) => sets.find((set) => set.id === id))
-        .filter((set) => set !== undefined)
-    : sets;
-  const rows = buildSetRows(orderedSets, baseline, loadContext, recordSession);
+  const rows = buildSetRows(sets, baseline, loadContext, recordSession);
   const recordLines = recordBandFor(sets, baseline, loadContext, recordSession);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
   const loggerValues = openSet ? loggerValuesFor(openSet) : null;
 
-  const queueDraftUpdate = useCallback(
+  const applyDraftUpdate = useCallback(
     (
       recipe: (exercise: SessionDraftExerciseSnapshot) => SessionDraftExerciseSnapshot,
       kind: SessionExerciseMutationKind,
     ) => {
-      const apply = () => {
-        draft.update(recipe, kind);
-      };
-      if (inFlightReorderRef.current) {
-        draftQueueRef.current = draftQueueRef.current
-          .then(() => inFlightReorderRef.current)
-          .catch(() => {})
-          .then(apply);
-        return;
-      }
-      apply();
+      draft.update(recipe, kind);
     },
     [draft]
   );
 
   const updateSets = useCallback(
     (recipe: (current: typeof sets) => typeof sets, kind: SessionExerciseMutationKind) =>
-      queueDraftUpdate((current) => {
+      applyDraftUpdate((current) => {
         const nextSets = recipe(current.sets);
         return nextSets === current.sets ? current : { ...current, sets: nextSets };
       }, kind),
-    [queueDraftUpdate]
+    [applyDraftUpdate]
   );
 
   const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
@@ -322,65 +295,9 @@ export function ExercisePageScreen({
     if (!next.some((set) => set.id === setId)) setOpenSetId(null);
   };
 
-
-  /**
-   * A committed drag drop or Move earlier/later, persisted through the
-   * reorder operation — never the draft graph, so the two writers cannot
-   * race. Pending edits flush first; the overlay (a drag's live order)
-   * settles onto the write's result: reload on success, clear on failure,
-   * which restores the prior order exactly. One write at a time: overlapping
-   * moves queue nowhere — a second is dropped while the first is in flight.
-   */
-  const persistSetReorder = async (orderedIds: string[], announcement?: string) => {
-    if (reorderWriteRef.current) {
-      return;
-    }
-    reorderWriteRef.current = true;
-    let resolveInFlight: () => void;
-    inFlightReorderRef.current = new Promise<void>((resolve) => {
-      resolveInFlight = resolve;
-    });
-    try {
-      if (isSameOrder(orderedIds, setOrderIds)) {
-        reorder.clearDrag();
-        return;
-      }
-      if (announcement) reorder.announce(announcement);
-      await draftQueueRef.current;
-      if (!(await draft.flush())) {
-        reorder.clearDrag();
-        reorder.announce('Not saved. The previous order stays.');
-        return;
-      }
-      const result = await reorderSessionExerciseSets(sessionExerciseId, orderedIds);
-      if (result.status !== 'reordered') {
-        reorder.clearDrag();
-        reorder.announce("Couldn't save the new order. The previous order stays.");
-        return;
-      }
-      // The reload is the only thing that moves the rows: a failed reload
-      // keeps the local order as it was and says so, rather than leaving the
-      // page reading something the store does not.
-      if (!(await draft.reload())) {
-        reorder.clearDrag();
-        reorder.announce("Couldn't save the new order. The previous order stays.");
-        return;
-      }
-      reorder.clearDrag();
-    } catch {
-      reorder.clearDrag();
-      reorder.announce("Couldn't save the new order. The previous order stays.");
-    } finally {
-      reorderWriteRef.current = false;
-      resolveInFlight!();
-      inFlightReorderRef.current = null;
-    }
-  };
-
   const finishComplete = async (nextSets: typeof sets) => {
     setIsCompleting(true);
     updateSets(() => nextSets, 'structural');
-    await draftQueueRef.current;
     const saved = await draft.flush();
     setIsCompleting(false);
     if (saved) goBack();
@@ -491,23 +408,12 @@ export function ExercisePageScreen({
               <Notice live message={blockNotice} testID="exercise-block-notice" tone="neutral" />
             ) : null}
             <RecordBand lines={recordLines} placement="header" testID="exercise-record-band" />
-            {reorder.announcement ? (
-              <Text
-                allowFontScaling={false}
-                accessibilityLiveRegion="polite"
-                style={styles.reorderAnnouncement}
-                testID="exercise-set-reorder-announcement">
-                {reorder.announcement}
-              </Text>
-            ) : null}
-            <SetReorderList
-              controller={reorder}
-              items={rows}
-              onReorder={(orderedIds, announcement) => void persistSetReorder(orderedIds, announcement)}
-              renderRow={(row, index, reorderProps) => (
+            <View testID="exercise-set-list-rows">
+              {rows.map((row, index) => (
                 <ExerciseSetRowItem
                   allSets={sets}
                   index={index}
+                  key={row.id}
                   loadContext={loadContext}
                   loggerValues={loggerValues}
                   nextSessionSetType={(setType) => nextSessionSetType(setType, trainingPreferences.displayEfforts)}
@@ -520,13 +426,11 @@ export function ExercisePageScreen({
                   onSwipeRight={onSwipeRight}
                   onToggleRow={onToggle}
                   openSetId={openSet?.id ?? null}
-                  reorder={reorderProps}
                   row={row}
                   weightInputRef={weightInputRef}
                 />
-              )}
-              testID="exercise-set-list-rows"
-            />
+              ))}
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={onAddSet}
@@ -598,7 +502,7 @@ export function ExercisePageScreen({
         onDismiss={() => setOpenSheet('none')}
         onSelect={(picked) => {
           setOpenSheet('none');
-          queueDraftUpdate(
+          applyDraftUpdate(
             (current) => ({
               ...current,
               exerciseDefinitionId: picked.id,
@@ -652,13 +556,6 @@ const styles = StyleSheet.create({
   },
   saveError: {
     color: uiRoles.danger,
-  },
-  // The VoiceOver result of a Move earlier/later, read aloud only.
-  reorderAnnouncement: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).
