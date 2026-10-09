@@ -395,6 +395,45 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
   });
 
+  it('re-enters a mounted Progress on a deep link that changes a param, field by field', async () => {
+    mockSearchParams = {};
+    await loadMaestroFixture('exercise-block-history');
+    await renderStats();
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    chooseFilter('view-mode', 'Exercise');
+    chooseFilter('period', 'This week');
+
+    // Done replaced to a bare /progress; a later boga3://progress?breakdown=muscle
+    // lands on the same screen. The breakdown re-enters, the period choice stays.
+    mockSearchParams = { breakdown: 'muscle' };
+    screen.rerender(<StatsRoute />);
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    expect(chipValue('view-mode')).toBe('Muscle');
+    expect(chipValue('period')).toBe('This week');
+
+    // The same params again are not a new entry: the choice made since stands.
+    chooseFilter('view-mode', 'Exercise');
+    mockSearchParams = { breakdown: 'muscle' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Exercise');
+
+    mockSearchParams = { breakdown: 'muscle', period: '30' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('period')).toBe('4 weeks');
+    expect(chipValue('view-mode')).toBe('Exercise');
+
+    // A param going away re-enters too, on the stored breakdown (the chip's
+    // last tap) rather than the link's.
+    chooseFilter('view-mode', 'Muscle');
+    mockSearchParams = { breakdown: 'exercise' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Exercise');
+    mockSearchParams = {};
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Muscle');
+    expect(chipValue('period')).toBe('4 weeks');
+  });
+
   it('discloses one block directly under its muscle and collapses on a repeated chevron', async () => {
     await renderMuscles();
     const order = () => within(screen.getByTestId('stats-muscle-table'))

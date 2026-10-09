@@ -147,21 +147,11 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# 5. The pinned switch opens exercise browsing without leaving Progress. Start
-# on Muscle, whatever an earlier run of this lane left stored: Done has already
-# mounted Progress on the stored breakdown, and a deep link to a mounted screen
-# does not re-read its params, so switch back here when it opened on Exercise.
-- extendedWaitUntil:
-    visible:
-      id: "stats-view-mode-chip"
-    timeout: 15000
-- runFlow:
-    when:
-      visible:
-        id: "stats-exercise-list"
-    commands:
-      - tapOn:
-          id: "stats-view-mode-chip"
+# 5. The pinned switch opens exercise browsing without leaving Progress. Enter
+# on the breakdown this step starts from rather than on whatever the last run
+# of this lane left stored: Done has already mounted Progress, and a deep link
+# that changes its breakdown re-enters it, overriding the remembered filter.
+- openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:
     visible:
       id: "stats-muscle-table"

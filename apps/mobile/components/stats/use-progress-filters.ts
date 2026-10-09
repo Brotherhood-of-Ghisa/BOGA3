@@ -41,15 +41,26 @@ export const periodParam = (value: string | string[] | undefined): ProgressPerio
 // A choice is held here as well as written to the store, so a chip still
 // answers its tap where no preference profile is writable (signed out of a
 // configured build).
+// A tab stays mounted, so a deep link can reach it with new params: a param
+// whose value changed is a new entry for its field, dropping this visit's
+// choice there. A link repeating the params the route already holds is not.
 export function useProgressFilters(params: ProgressFilterParams): ProgressFilters {
   const { values } = useAccountLocalPreferenceState();
-  const [entry] = useState(() => ({
-    breakdown: breakdownParam(params.breakdown), period: periodParam(params.period),
-  }));
+  const link = { breakdown: firstParam(params.breakdown), period: firstParam(params.period) };
+  const [entered, setEntered] = useState(link);
   const [chosen, setChosen] = useState<{
     breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
   }>({});
   const choose = (patch: typeof chosen) => setChosen(current => ({ ...current, ...patch }));
+  if (link.breakdown !== entered.breakdown || link.period !== entered.period) {
+    setEntered(link);
+    setChosen(({ breakdown, period, ...current }) => ({
+      ...current,
+      ...(link.breakdown === entered.breakdown ? { breakdown } : {}),
+      ...(link.period === entered.period ? { period } : {}),
+    }));
+  }
+  const entry = { breakdown: breakdownParam(entered.breakdown), period: periodParam(entered.period) };
 
   return {
     breakdown: chosen.breakdown ?? entry.breakdown ?? values.progressBreakdown,
