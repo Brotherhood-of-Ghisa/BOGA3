@@ -37,7 +37,6 @@ import {
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 import {
-  deriveSessionExerciseVolumeComparisons,
   loadCompletedSessionInsights,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
@@ -425,34 +424,6 @@ export function CompletedSessionDetailScreenShell({
     });
   }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, session]);
 
-  const fallbackExerciseVolumeComparisons = useMemo(() => {
-    if (!session) return [];
-    return deriveSessionExerciseVolumeComparisons({
-      targetSession: {
-        sessionId: session.id,
-        status: 'completed',
-        completedAt: new Date(session.completedAt),
-        deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
-        exercises: session.exercises.map((exercise, exerciseIndex) => ({
-          id: exercise.id,
-          orderIndex: exerciseIndex,
-          exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
-          exerciseName: exercise.name,
-        loadContext: exercise.loadContext,
-          sets: exercise.sets.map((set, setIndex) => ({
-            id: set.id,
-            orderIndex: setIndex,
-            weightValue: set.weight,
-            repsValue: set.reps,
-            setType: set.setType,
-            performanceStatus: set.performanceStatus,
-          })),
-        })),
-      },
-      historicalSessions: [],
-    });
-  }, [session]);
-
   const handleCompletionExit = useCallback(() => {
     router.replace('/progress');
   }, [router]);
@@ -580,11 +551,6 @@ export function CompletedSessionDetailScreenShell({
       : exerciseCatalog.status === 'ready' ? 'ready' : 'loading';
 
   if (presentation === 'completion') {
-    const personalRecords = completedInsights?.personalRecords ?? [];
-    const exerciseVolumeComparisons =
-      completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
-        ? completedInsights.exerciseVolumeComparisons
-        : fallbackExerciseVolumeComparisons;
     return (
       <>
         <Stack.Screen options={stackOptions} />
@@ -592,13 +558,14 @@ export function CompletedSessionDetailScreenShell({
           completedAt={session.completedAt}
           durationDisplay={session.durationDisplay}
           exerciseCount={performedExercises.length}
-          exerciseVolumeComparisons={exerciseVolumeComparisons}
+          exerciseVolumeComparisons={completedInsights?.exerciseVolumeComparisons ?? []}
           gymName={session.gymName}
+          historyState={insightState}
           muscleCatalogState={muscleCatalogState}
           muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
           muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
           onDone={handleCompletionExit}
-          personalRecords={personalRecords}
+          personalRecords={completedInsights?.personalRecords ?? []}
           shouldFailNextShare={shouldFailNextMaestroShare}
           workingSetCount={workingSetCount}
         />

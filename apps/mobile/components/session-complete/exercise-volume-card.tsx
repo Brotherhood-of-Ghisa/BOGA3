@@ -63,7 +63,7 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
  * delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
  * Equal quartiles collapse to a rule. A comparison without a distribution
- * gets no card: its host pools it by name (`BuildingHistoryCard`).
+ * gets no card: its host pools it by name (`ComparisonUnavailableCard`).
  * Labels and values center on their rules, above and below the bar. Crowded
  * annotations reduce to the median; sets sit beside the name in every state.
  * Shared by the session summary, live comparison and captured share image.

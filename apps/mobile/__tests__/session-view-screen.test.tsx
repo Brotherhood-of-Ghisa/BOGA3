@@ -1155,12 +1155,12 @@ describe('Session vs history', () => {
     await seed();
     render(<SessionCompareScreen sessionId={SESSION} />);
 
-    expect(await screen.findByTestId('session-insight-building-history-exercise')).toHaveTextContent(
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-exercise')).toHaveTextContent(
       /Barbell Bench Press/
     );
     expect(screen.queryByTestId(`session-insight-exercise-${BENCH}`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(await screen.findByTestId('session-insight-building-history-muscle')).toHaveTextContent(/Chest/);
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Chest/);
   });
 
   it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
@@ -1171,9 +1171,9 @@ describe('Session vs history', () => {
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByLabelText(/Quads, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
     act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
-    expect(await screen.findByTestId('session-insight-building-history-muscle')).toHaveTextContent(/Quads/);
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Quads/);
     fireEvent.press(screen.getByTestId('session-insight-mode-exercise'));
-    expect(await screen.findByTestId('session-insight-building-history-exercise')).toHaveTextContent(
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-exercise')).toHaveTextContent(
       /Barbell Back Squat/
     );
   });

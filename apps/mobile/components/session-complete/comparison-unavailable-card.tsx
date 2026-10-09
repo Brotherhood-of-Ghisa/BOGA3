@@ -4,10 +4,11 @@ import { Card } from '@/components/ui/card';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
-// The cutoff in words, so the card states the rule instead of a bare count.
-const RULE = `A volume comparison needs ${MIN_HISTORY_OBSERVATIONS} prior comparable sessions.`;
+// One statement: what is missing, and what it takes. The cutoff is the shared
+// constant, never a literal.
+const STATEMENT = `Comparison unavailable — needs at least ${MIN_HISTORY_OBSERVATIONS} sessions`;
 
-type BuildingHistoryCardProps = {
+type ComparisonUnavailableCardProps = {
   /** Exercise or muscle names, in the order the session lists them. */
   names: string[];
   testID?: string;
@@ -20,13 +21,12 @@ type BuildingHistoryCardProps = {
  * card is the only place a distribution is drawn, so nothing here suggests a
  * plot is missing. One accessible node: a shortfall is read as one statement.
  */
-export function BuildingHistoryCard({ names, testID }: BuildingHistoryCardProps) {
+export function ComparisonUnavailableCard({ names, testID }: ComparisonUnavailableCardProps) {
   if (names.length === 0) return null;
   return (
     <Card testID={testID}>
-      <View accessibilityLabel={`Building history. ${RULE} ${names.join(', ')}.`} accessible style={styles.body}>
-        <Text allowFontScaling={false} style={styles.title}>Building history</Text>
-        <Text allowFontScaling={false} style={styles.rule}>{RULE}</Text>
+      <View accessibilityLabel={`${STATEMENT}. ${names.join(', ')}.`} accessible style={styles.body}>
+        <Text allowFontScaling={false} style={styles.statement}>{STATEMENT}</Text>
         <View style={styles.names}>
           {names.map((name, index) => (
             <Text allowFontScaling={false} key={`${index}-${name}`} style={styles.name}>{name}</Text>
@@ -43,20 +43,13 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
   },
-  // A card's own title, a step below the section heading (`design-language.md` §3).
-  title: {
+  // The card's own line, a step below the section heading (`design-language.md` §3).
+  statement: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
-  },
-  rule: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   names: {
     paddingTop: uiSpace.xs,

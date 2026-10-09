@@ -23,6 +23,9 @@ type SessionCompletionScreenProps = {
   muscleVolumeComparisons?: ExerciseVolumeComparison[];
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: MuscleCatalogState;
+  // The insights read: pending and failed states say so rather than reading as
+  // a session with no history ([[session.volume-comparison]]).
+  historyState?: 'loading' | 'ready' | 'error';
   shouldFailNextShare?: boolean;
   onDone: () => void;
 };
@@ -30,7 +33,8 @@ type SessionCompletionScreenProps = {
 /**
  * The completion screen after Finish, in the design language: `Session
  * complete` · Done (where Finish sat), the summary card with sets by muscle, every record set (1RM, else Weight), each exercise's volume against its history,
- * and `Share session`. Stored context only; history is optional enrichment.
+ * and `Share session`. Stored context carries the screen; the comparisons wait
+ * on the history read and say when it is pending or failed.
  */
 export function SessionCompletionScreen({
   completedAt,
@@ -43,6 +47,7 @@ export function SessionCompletionScreen({
   muscleVolumeComparisons = [],
   muscleSummary,
   muscleCatalogState,
+  historyState = 'ready',
   shouldFailNextShare = false,
   onDone,
 }: SessionCompletionScreenProps) {
@@ -82,6 +87,8 @@ export function SessionCompletionScreen({
           personalRecords={personalRecords}
           exerciseVolumeComparisons={exerciseVolumeComparisons}
           muscleVolumeComparisons={muscleVolumeComparisons}
+          historyState={historyState}
+          muscleCatalogState={muscleCatalogState}
           shouldFailNextShare={shouldFailNextShare}
         />
       </ScrollView>

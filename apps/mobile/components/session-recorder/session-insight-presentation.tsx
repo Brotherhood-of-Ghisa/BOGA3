@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BuildingHistoryCard } from '@/components/session-complete/building-history-card';
+import { ComparisonUnavailableCard } from '@/components/session-complete/comparison-unavailable-card';
 import { ExerciseVolumeCard } from '@/components/session-complete/exercise-volume-card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SectionHeader } from '@/components/ui/page-header';
@@ -38,7 +38,7 @@ export function SessionInsightPresentation({
   const state = historyState !== 'ready' ? historyState : mode === 'muscle' ? muscleCatalogState : 'ready';
   // A comparison with no distribution gets no card: it is pooled by name
   // ([[session.volume-comparison]]), so no card ever draws an empty plot.
-  const { comparable, buildingHistory } = partitionVolumeComparisons(comparisons);
+  const { comparable, unavailable } = partitionVolumeComparisons(comparisons);
   return (
     <View style={styles.section} testID="session-insight-presentation">
       <SectionHeader title="Volume" />
@@ -59,7 +59,7 @@ export function SessionInsightPresentation({
                 testID={`${testIdPrefix}-${mode === 'muscle' ? 'muscle-comparison' : 'exercise'}-${comparison.sessionExerciseIds[0]}`}
               />
             ))}
-            <BuildingHistoryCard names={buildingHistory} testID={`${testIdPrefix}-building-history-${mode}`} />
+            <ComparisonUnavailableCard names={unavailable} testID={`${testIdPrefix}-comparison-unavailable-${mode}`} />
           </>
         ) : (
           <Text allowFontScaling={false} style={styles.muted} testID="session-insight-empty">

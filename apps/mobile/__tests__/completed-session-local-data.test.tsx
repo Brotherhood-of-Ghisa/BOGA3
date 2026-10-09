@@ -324,7 +324,7 @@ describe('completion presentation over real data', () => {
     act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
     // The window leaves too few observations: no card at all, the name pooled.
     await waitFor(() =>
-      expect(screen.getByTestId('session-completion-building-history-exercise')).toHaveTextContent(/Barbell Back Squat/)
+      expect(screen.getByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(/Barbell Back Squat/)
     );
     expect(screen.queryByTestId(card)).toBeNull();
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
@@ -431,8 +431,8 @@ describe('completed-session detail over real data', () => {
 
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toBeNull();
-    const pooled = screen.getByTestId('session-completion-building-history-exercise');
-    expect(pooled).toHaveTextContent(/^Building historyA volume comparison needs 6 prior comparable sessions\./);
+    const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
+    expect(pooled).toHaveTextContent(/^Comparison unavailable — needs at least 6 sessions/);
     expect(within(pooled).queryByText(/No comparison history yet|Vol|500/)).toBeNull();
     expect(label('completed-session-detail-volume')).toBe('Volume 500');
 
@@ -528,7 +528,7 @@ describe('a session written through the app', () => {
     expect(label('completed-session-detail-sets')).toBe('Sets 4');
     expect(label('completed-session-detail-volume')).toBe('Volume 4955');
     // Neither exercise can be compared yet, so both are pooled by name.
-    expect(await screen.findByTestId('session-completion-building-history-exercise')).toHaveTextContent(
+    expect(await screen.findByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(
       /Barbell Bench PressLat Pulldown/
     );
     expect(screen.queryByTestId(`session-completion-exercise-${DESIGN.bench}`)).toBeNull();
@@ -648,7 +648,7 @@ describe('a session written through the app', () => {
     expect(screen.getByRole('header', { name: 'Sets by muscle' })).toBeTruthy();
     expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();
     // No comparison card is drawn: both names sit in one secondary card.
-    expect(screen.getByTestId('session-completion-building-history-exercise')).toHaveTextContent(
+    expect(screen.getByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(
       /Barbell Bench PressLat Pulldown/
     );
     expect(screen.queryByText(/· \d+ working/)).toBeNull();
@@ -712,15 +712,15 @@ describe('a session written through the app', () => {
     expect(screen.getByTestId(`session-completion-exercise-${DESIGN.bench}-distribution`)).toBeTruthy();
 
     // The pulldown has no history: one secondary card, its name only.
-    const pooled = screen.getByTestId('session-completion-building-history-exercise');
-    expect(pooled).toHaveTextContent(/needs 6 prior comparable sessions\.Lat Pulldown$/);
+    const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
+    expect(pooled).toHaveTextContent(/needs at least 6 sessionsLat Pulldown$/);
     expect(within(pooled).queryByText(/Vol|120|1 set/)).toBeNull();
     expect(screen.queryByTestId(`session-completion-exercise-${DESIGN.pulldown}`)).toBeNull();
 
     // The muscle tab pools its own shortfalls: chest is comparable, triceps too.
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-completion-muscle-comparison-chest')).toBeTruthy();
-    expect(screen.queryByTestId('session-completion-building-history-exercise')).toBeNull();
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
 
     // The image carries the drawn card only, never the shortfall card.
     fireEvent.press(screen.getByTestId('session-completion-share-session'));

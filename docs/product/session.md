@@ -77,22 +77,28 @@ overlap or extend beyond the bar, keep only Median and its value; the marks
 and current dot remain. Equal quartiles collapse to one mark.
 
 A card is drawn only for an exercise or muscle that has the observations.
-The rest get no card: one secondary `Building history` card closes the
-section, stating the cutoff and listing their names in session order, names
-only. An unavailable Volume is listed there too. A session with nothing to
-compare shows that card alone; the share image carries the drawn cards only
-and omits its volume section when there are none. There is no prior-session
-subtitle or comparison footnote.
+The rest get no card: one secondary card closes the section, stating
+`Comparison unavailable — needs at least 6 sessions` and listing their names
+in session order, names only. An unavailable Volume is listed there too. A
+session with nothing to compare shows that card alone; the share image
+carries the drawn cards only and omits its volume section when there are
+none. There is no prior-session subtitle or comparison footnote.
+
+A pending or failed history read is never drawn as a session without
+history: the section says `Loading comparisons…` or
+`Comparisons unavailable. Return to this session to retry.`, on the
+completion screen as on Session Summary. The facts, sets by muscle, records
+and the share image do not wait on that read.
 
 Why: an empty distribution plot reads as a broken card, so the section shows
 a comparison or says plainly that it has none.
 Code: `ExerciseVolumeCard` in
 `apps/mobile/components/session-complete/exercise-volume-card.tsx`;
-`BuildingHistoryCard` in
-`apps/mobile/components/session-complete/building-history-card.tsx`;
+`ComparisonUnavailableCard` in
+`apps/mobile/components/session-complete/comparison-unavailable-card.tsx`;
 `partitionVolumeComparisons` in
 `apps/mobile/src/session-insights/volume-reference.ts`;
 `apps/mobile/src/session-insights/calculations.ts`;
 `apps/mobile/src/utils/history-reference.ts` shares the cutoff with the
 weekly heatmap.
-Signature: `Building history`
+Signature: `Comparison unavailable`
