@@ -39,9 +39,12 @@ export type ExerciseSetRowItemProps = {
 };
 
 /**
- * One row of the exercise page's set list: the open row as the swipeable
- * logger (its sides offered only when they would change the row), every other
- * row as a `SetRow` and its toggle.
+ * One row of the exercise page's set list: the open row as the logger, every
+ * other row as a `SetRow` and its toggle. Every row carries the swipe shell,
+ * each side offered only when it would change the row, so swipe-left reaches a
+ * confirmed row too and the gesture never goes dead on a finished list; only
+ * the open row offers the confirming swipe-right, which the other rows carry
+ * as their toggle.
  * Pure composition — the writes are the screen's callbacks.
  */
 export function ExerciseSetRowItem({
@@ -66,12 +69,11 @@ export function ExerciseSetRowItem({
   // The hairline hides directly under the open row's logger.
   const followsLogger = index > 0 && allSets[index - 1]?.id === openSetId;
   const divider = index > 0 && !followsLogger;
+  // A side is offered only when its move would change the row; the
+  // accessibility actions are the non-gesture path for the same moves.
+  const onDrop = canDropSet(allSets, row.id) ? () => onSwipeLeft(row.id) : undefined;
   if (open && loggerValues) {
-    // Only the open row carries the swipes, and each side only when its move
-    // would change the row; the accessibility actions are the non-gesture
-    // path for the same two moves.
     const onConfirm = canConfirmSet(allSets, row.id) ? () => onSwipeRight(row.id) : undefined;
-    const onDrop = canDropSet(allSets, row.id) ? () => onSwipeLeft(row.id) : undefined;
     return (
       <SwipeSetRow onSwipeLeft={onDrop} onSwipeRight={onConfirm} testID={`exercise-set-swipe-${row.number}`}>
         <SetLogger
@@ -93,12 +95,8 @@ export function ExerciseSetRowItem({
     );
   }
   return (
-    <SetRow
-      divider={divider}
-      key={row.id}
-      onOpen={onOpenRow}
-      onToggle={onToggleRow}
-      row={row}
-    />
+    <SwipeSetRow onSwipeLeft={onDrop} testID={`exercise-set-swipe-${row.number}`}>
+      <SetRow divider={divider} onDrop={onDrop} onOpen={onOpenRow} onToggle={onToggleRow} row={row} />
+    </SwipeSetRow>
   );
 }

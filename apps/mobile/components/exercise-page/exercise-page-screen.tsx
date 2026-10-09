@@ -282,10 +282,10 @@ export function ExercisePageScreen({
   };
 
   /**
-   * Swipe left on the open set (`ux-rules.md` "Swipes on the exercise page"):
-   * drop it (`dropSet`) — an ad-hoc row is removed and the logger falls back
-   * to the cursor; a touched planned row reads as its plan again and stays
-   * open. Never navigates.
+   * Swipe left on any set (`ux-rules.md` "Swipes on the exercise page"):
+   * drop it (`dropSet`) — an ad-hoc row is removed, confirmed or not, and the
+   * logger falls back to the cursor; a planned row reads as its plan again and
+   * keeps its place. Never navigates.
    */
   const onSwipeLeft = (setId: string) => {
     Keyboard.dismiss();
