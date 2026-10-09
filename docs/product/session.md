@@ -65,7 +65,11 @@ Session Summary, live comparison and the share image use the same volume
 card. The name and set count share a row.
 After six known prior comparable sessions, show P25, Median and P75 as
 vertical marks, current Volume as a black dot and its median delta. Genuine zero history
-counts. Earlier history scope and set eligibility stay unchanged.
+counts. Prior sessions use Settings' History look-back and
+[[comparison.history-window]], anchored to the completed session's End or now
+while active. The start is inclusive; the target and later sessions are excluded,
+with earlier IDs breaking equal-End ties. Set eligibility is unchanged; record
+baselines remain all-time.
 
 The linear scale centers the median and includes the current reading.
 Each reference label sits above its mark, its value below. If annotations

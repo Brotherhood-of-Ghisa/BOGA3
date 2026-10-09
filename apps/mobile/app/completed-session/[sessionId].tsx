@@ -27,6 +27,8 @@ import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { completedSessionTitle } from '@/src/session-recorder/session-view-model';
 import {
@@ -77,7 +79,7 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
-  loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
+  loadInsights?(sessionId: string, historyLookbackWeeks: number): Promise<CompletedSessionInsights | null>;
   // Each exercise's records in the sessions before this one, for the
   // detail's record band. Optional: without it, no record shows.
   loadHistoricalBests?(
@@ -208,8 +210,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
-  async loadInsights(sessionId) {
-    return loadCompletedSessionInsights(sessionId);
+  async loadInsights(sessionId, historyLookbackWeeks) {
+    return loadCompletedSessionInsights(sessionId, historyLookbackWeeks);
   },
   loadHistoricalBests: loadSessionRecordBaselines,
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
@@ -230,6 +232,7 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const datedWeightRevision = useBodyWeightContextRevision();
+  const { values: { historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -326,6 +329,7 @@ export function CompletedSessionDetailScreenShell({
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      const isCurrent = () => !cancelled && accountRevision === getAccountLocalPreferenceAccountRevision();
       setCompletedInsights(null);
       setInsightState(dataClient.loadInsights ? 'loading' : 'error');
       if (!sessionId || isDeleted) {
@@ -336,15 +340,15 @@ export function CompletedSessionDetailScreenShell({
         setInsightState(maestroInsights);
       } else if (dataClient.loadInsights) {
         void dataClient
-          .loadInsights(sessionId)
+          .loadInsights(sessionId, historyLookbackWeeks)
           .then((loadedInsights) => {
-            if (!cancelled) {
+            if (isCurrent()) {
               setCompletedInsights(loadedInsights);
               setInsightState(loadedInsights ? 'ready' : 'error');
             }
           })
           .catch(() => {
-            if (!cancelled) {
+            if (isCurrent()) {
               setCompletedInsights(null);
               setInsightState('error');
             }
@@ -354,7 +358,7 @@ export function CompletedSessionDetailScreenShell({
       return () => { cancelled = true; };
     // Weight corrections invalidate the derived comparisons too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision])
+    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision, historyLookbackWeeks, accountRevision])
   );
 
   const formattedStartedAt = useMemo(

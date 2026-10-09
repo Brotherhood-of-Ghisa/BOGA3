@@ -3,7 +3,7 @@ import {
   computeSelectedExerciseHistoryEffort, computeSelectedMuscleHistoryEffort,
   type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
-import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 /** What one history page is about: one exercise definition or one muscle group. */
 export type HistorySubject =
@@ -16,7 +16,7 @@ const historySubjectId = (subject: HistorySubject | null): string | null => {
 };
 
 const loadHistory = async (kind: HistorySubject['kind'], id: string, weeks: number) => {
-  const bounds = calendarWeekBounds(weeks);
+  const bounds = historyWeekBounds(weeks);
   return kind === 'muscle'
     ? computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id] })
     : computeSelectedExerciseHistoryEffort({ ...bounds, exerciseDefinitionId: id });
@@ -28,10 +28,10 @@ const loadHistory = async (kind: HistorySubject['kind'], id: string, weeks: numb
  * (subject, window, revision) it was read for, and the page shows nothing until
  * the current one has landed.
  */
-export function useHistory(subject: HistorySubject | null, weeks: number, revision: number) {
+export function useHistory(subject: HistorySubject | null, weeks: number, revision: number, accountRevision: number) {
   const kind = subject?.kind ?? null;
   const id = historySubjectId(subject);
-  const context = `${kind ?? ''}:${id ?? ''}:${weeks}:${revision}`;
+  const context = `${kind ?? ''}:${id ?? ''}:${weeks}:${revision}:${accountRevision}`;
   const [loading, setLoading] = useState(id !== null);
   const [loaded, setLoaded] = useState<{ context: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[] } | null>(null);
   const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
@@ -62,7 +62,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
       if (timer !== undefined) clearTimeout(timer);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read.
-  }, [kind, id, weeks, revision, retryRevision]);
+  }, [kind, id, weeks, revision, accountRevision, retryRevision]);
   const current = loaded?.context === context ? loaded : null;
   const error = failure?.context === context ? failure.message : null;
   return {

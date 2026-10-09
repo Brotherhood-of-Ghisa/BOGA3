@@ -82,6 +82,7 @@ import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/se
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
+import { setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -289,6 +290,18 @@ afterEach(() => {
 });
 
 describe('completion presentation over real data', () => {
+  it.each(['completion', 'summary'])('refreshes the %s and share comparison when the saved window changes', async presentation => {
+    await openSession({ sessionId: ONE_PR, presentation });
+    const card = `session-completion-exercise-${ONE_PR_SQUAT}`;
+    expect(await screen.findByTestId(`${card}-distribution`)).toBeTruthy();
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    await waitFor(() => expect(screen.getByTestId(card)).toHaveTextContent(/Building history/));
+    expect(screen.queryByTestId(`${card}-distribution`)).toBeNull();
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    expect(screen.getByTestId(`session-share-exercise-${ONE_PR_SQUAT}`)).toHaveTextContent(/Building history/);
+    expect(screen.queryByTestId(`session-share-exercise-${ONE_PR_SQUAT}-distribution`)).toBeNull();
+  });
+
   it('shows the one-PR session: its record, sets and muscle row, with no pager', async () => {
     await openSession({ sessionId: ONE_PR, presentation: 'completion' });
 

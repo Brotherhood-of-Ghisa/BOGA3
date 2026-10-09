@@ -35,12 +35,15 @@ Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calen
 
 ### comparison.history-window · definition · accepted
 
-Exercise and muscle history use Settings' History look-back (weeks): the Monday
-N − 1 weeks before the current week through today. Both displayed weeks and
+Exercise and muscle history use Settings' History look-back (weeks), N complete
+Monday–Sunday weeks through today. On Monday–Saturday, start on the Monday N
+weeks before this week's Monday; on Sunday, start N − 1 weeks before it. The
+current partial week follows the complete weeks. Both displayed weeks and
 Weekly reference calculations use this entire window.
 
 Why: a history setting must select the same sample for the chart and its baseline.
-Code: `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
+Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
+`HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
 
 ### comparison.daily-history · presentation · accepted
 

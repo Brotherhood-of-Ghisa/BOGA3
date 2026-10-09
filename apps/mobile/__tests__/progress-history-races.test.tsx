@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as stats from '@/src/data/stats';
 import type { SelectedMuscleWeeklyEffort } from '@/src/data';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
-import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 // Delayed reads are injected at the real repository boundary to prove races.
 const weekly = (count: number): SelectedMuscleWeeklyEffort[] => [{
@@ -20,8 +20,8 @@ const deferred = () => {
 // The page's own props: its subject, the saved window and the policy revision.
 const renderHistory = (subject: HistorySubject | null, weeks = 52, revision = 0) =>
   renderHook(
-    (props: { subject: HistorySubject | null; weeks: number; revision: number }) =>
-      useHistory(props.subject, props.weeks, props.revision),
+    (props: { subject: HistorySubject | null; weeks: number; revision: number; accountRevision?: number }) =>
+      useHistory(props.subject, props.weeks, props.revision, props.accountRevision ?? 0),
     { initialProps: { subject, weeks, revision } }
   );
 // The read is deferred past the first frame, so each race syncs on its start.
@@ -50,7 +50,7 @@ it('retries the same subject after a policy change without retaining old values'
   expect(result.current.error).toBeNull();
   expect(read).toHaveBeenCalledTimes(3);
   for (const [options] of read.mock.calls) {
-    expect(options).toMatchObject({ muscleGroupIds: ['quads'], start: calendarWeekBounds(52).start });
+    expect(options).toMatchObject({ muscleGroupIds: ['quads'], start: historyWeekBounds(52).start });
   }
 });
 
@@ -92,6 +92,17 @@ it('cannot publish an old account’s history into the next mounted account', as
   await waitFor(() => expect(accountB.result.current.weekly).toEqual(weekly(4)));
   await act(async () => old.resolve(weekly(100)));
   expect(accountB.result.current.weekly).toEqual(weekly(4));
+});
+
+it('rejects an old account read when the same subject and look-back stay mounted', async () => {
+  const old = deferred();
+  jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort').mockReturnValueOnce(old.promise).mockResolvedValue(history(4));
+  const { result, rerender } = renderHistory(muscle('quads'));
+  await started(1);
+  rerender({ subject: muscle('quads'), weeks: 52, revision: 0, accountRevision: 1 });
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
+  await act(async () => old.resolve(weekly(100)));
+  expect(result.current.weekly).toEqual(weekly(4));
 });
 
 it('publishes its loading state before starting the read, cancelling the read a left page scheduled', async () => {

@@ -72,7 +72,7 @@ it('reads out the newest week until one is selected, then the selected week', ()
   rerender(chart({ selectedWeekKey: '2026-09-14' }));
   expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14 – 20 Sep');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('400 volume');
-  expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 0);
+  expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 60);
 });
 
 it('reads a rest week as zero for a sum and as no sets for a best', () => {
@@ -133,13 +133,13 @@ it('shows the week detail below the chart', () => {
 
 it('selects the tapped week and clears it on a second tap', () => {
   const onSelectWeek = jest.fn();
-  // Four weeks over the 300pt fallback plot: 75pt columns.
+  // Five rows over the 300pt fallback plot: 60pt columns.
   const { rerender } = render(chart({ onSelectWeek }));
-  fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 160 } });
+  fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 190 } });
   expect(onSelectWeek).toHaveBeenLastCalledWith('2026-09-28');
 
   rerender(chart({ onSelectWeek, selectedWeekKey: '2026-09-28' }));
-  fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 160 } });
+  fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 190 } });
   expect(onSelectWeek).toHaveBeenLastCalledWith(null);
 });
 
@@ -164,13 +164,13 @@ it('scrolls sideways only when the window outgrows the plot', () => {
   expect(screen.getByTestId(`${ID}-scroll`)).toHaveProp('scrollEnabled', false);
   rerender(chart({ weeks: 104 }));
   expect(screen.getByTestId(`${ID}-scroll`)).toHaveProp('scrollEnabled', true);
-  expect(screen.getByTestId(`${ID}-plot`)).toHaveStyle({ width: 624 });
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveStyle({ width: 630 });
 });
 
 it('labels months at the first week starting in each, dropping one that would run off the end', () => {
   render(chart({ weeks: 16 }));
-  expect(screen.getByTestId(`${ID}-month-2`)).toHaveTextContent('Jul');
+  expect(screen.getByTestId(`${ID}-month-3`)).toHaveTextContent('Jul');
   expect(screen.getByText('2026')).toBeTruthy();
-  expect(screen.getByTestId(`${ID}-month-11`)).toHaveTextContent('Sep');
-  expect(screen.queryByTestId(`${ID}-month-15`)).toBeNull(); // Oct starts in the last 18.75pt column
+  expect(screen.getByTestId(`${ID}-month-12`)).toHaveTextContent('Sep');
+  expect(screen.queryByTestId(`${ID}-month-16`)).toBeNull(); // Oct starts in the last 17.65pt column
 });

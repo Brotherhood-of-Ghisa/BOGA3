@@ -42,15 +42,15 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
     day('2026-09-21', null), day('2026-09-28', 100), day(TODAY, 200),
   ];
   const { rerender } = render(chart(data(days, weeks)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks);
-  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks}-week median 30`);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks + 1);
+  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks + 1}-week median 30`);
   expect(style('bars-heatmap-median').left).toBe('3%');
   expect(Number.parseFloat(style('bars-heatmap-p25').left)).toBeCloseTo(1.5);
   expect(Number.parseFloat(style('bars-heatmap-p75').left)).toBeCloseTo(15);
 
   rerender(chart(data(days, 12)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(12);
-  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '12-week median 25');
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(13);
+  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '13-week median 25');
   expect(style('bars-heatmap-median').left).toBe('12.5%');
   expect(style('bars-heatmap-p25').left).toBe('6.25%');
   expect(style('bars-heatmap-p75').left).toBe('41.25%');
@@ -60,7 +60,7 @@ it('counts eligible older training weeks across the saved window and omits refer
   const dates = ['2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-06'];
   const days = dates.map((date, index) => day(date, index * 20));
   const { rerender } = render(chart(data(days, 52)));
-  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '52-week median 50');
+  expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '53-week median 50');
   expect(style('bars-heatmap-median').left).toBe('50%');
   rerender(chart(data(days, 12)));
   for (const id of ['median', 'p25', 'p75']) expect(screen.queryByTestId(`bars-heatmap-${id}`)).toBeNull();
@@ -132,7 +132,7 @@ it('retains target colour independently of length and bounds long formatted valu
 it('retains the complete 520-week window while initially rendering a small recent subset', () => {
   const loaded = data([day(TODAY, 12)], 520);
   render(chart(loaded));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(520);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(521);
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).length).toBeLessThan(30);
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/)[0]).toHaveProp('testID', 'bars-heatmap-cell-2026-10-05');
 });
@@ -150,7 +150,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
   expect(screen.queryByText(/week average:/)).toBeNull();
   expect(screen.getByText('Current week')).toBeTruthy();
   expect(screen.getByText('Intensity (per week)')).toBeTruthy();
-  if (count >= 6) expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '8-week median 20');
+  if (count >= 6) expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '9-week median 20');
   else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });
 
@@ -199,9 +199,9 @@ it('formats fractional Top weight references to one decimal without floating-poi
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => ({ ...day(date, 1), highestWeight: index >= 4 ? 11 : 10 }))} />);
-  expect(screen.getByTestId('stats-exercise-history-heatmap-median')).toHaveProp('accessibilityLabel', '6-week median 10.0');
-  expect(screen.getByTestId('stats-exercise-history-heatmap-p25')).toHaveProp('accessibilityLabel', '6-week 25th percentile 10.0');
-  expect(screen.getByTestId('stats-exercise-history-heatmap-p75')).toHaveProp('accessibilityLabel', '6-week 75th percentile 10.8');
+  expect(screen.getByTestId('stats-exercise-history-heatmap-median')).toHaveProp('accessibilityLabel', '7-week median 10.0');
+  expect(screen.getByTestId('stats-exercise-history-heatmap-p25')).toHaveProp('accessibilityLabel', '7-week 25th percentile 10.0');
+  expect(screen.getByTestId('stats-exercise-history-heatmap-p75')).toHaveProp('accessibilityLabel', '7-week 75th percentile 10.8');
   expect(screen.getByTestId(`stats-exercise-history-heatmap-value-${TODAY}`)).toHaveTextContent('11.0');
 });
 
@@ -209,7 +209,7 @@ it('retains coincident reference positions and accessible values without visible
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
   render(chart(data(dates.map(date => day(date, 20)))));
   for (const [id, description] of [['p25', '25th percentile'], ['median', 'median'], ['p75', '75th percentile']]) {
-    expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `8-week ${description} 20`);
+    expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `9-week ${description} 20`);
     expect(style(`bars-heatmap-${id}`).left).toBe('100%');
     expect(style(`bars-heatmap-reference-${id}-${TODAY}`).left).toBe('100%');
   }
@@ -226,7 +226,7 @@ it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s hist
     todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => day(date, index * 2))} />);
   const prefix = `stats-${kind}-history`;
-  expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '6-week median 5.0');
+  expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '7-week median 5.0');
   expect(style(`${prefix}-heatmap-median`).left).toBe('50%');
   expect(screen.queryByTestId(`${prefix}-heatmap-p25`)).toBeNull();
   expect(screen.queryByTestId(`${prefix}-heatmap-p75`)).toBeNull();

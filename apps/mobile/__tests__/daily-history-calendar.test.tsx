@@ -197,7 +197,7 @@ it('updates the displayed history when its metric or look-back window changes', 
   const short = buildHeatmapData(samples, 'totalVolume', { todayDateKey: today, weeks: 1 });
   rerender(<DailyHeatmap data={short} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
   expect(screen.getByTestId(`calendar-heatmap-cell-${today}-value`)).toHaveTextContent('840');
-  expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-28')).toBeNull();
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-21')).toBeNull();
 });
 
 it.each([320, 375, 402, 448])('centres the Sun/Week separator in a wider gap at %ipt', width => {
@@ -235,7 +235,7 @@ it.each(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '
   'shows daily tiles only through today and a Week tile once Sunday arrives (%s)', date => {
     const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: date, weeks: 1 });
     render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
-    expect(screen.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID))
+    expect(screen.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID).sort())
       .toEqual(data.daily.map(day => `calendar-heatmap-cell-${day.dateKey}`));
     expect(screen.queryAllByLabelText(/Future/)).toEqual([]);
     expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05') !== null).toBe(date === '2026-10-11');

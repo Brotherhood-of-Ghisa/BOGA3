@@ -1,3 +1,4 @@
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import {
   calculateLinearPercentile,
   captureSessionShareImage,
@@ -1280,7 +1281,7 @@ describe("createCompletedSessionInsightsRepository", () => {
     const store = buildStore();
     const repository = createCompletedSessionInsightsRepository(store);
 
-    await expect(repository.loadInsights("missing")).resolves.toBeNull();
+    await expect(repository.loadInsights("missing", 52)).resolves.toBeNull();
     expect(store.loadEarlierCompletedSessions).not.toHaveBeenCalled();
     expect(store.loadSessionExercises).not.toHaveBeenCalled();
   });
@@ -1328,10 +1329,11 @@ describe("createCompletedSessionInsightsRepository", () => {
     });
     const repository = createCompletedSessionInsightsRepository(store);
 
-    const insights = await repository.loadInsights("target");
+    const insights = await repository.loadInsights("target", 52);
 
     expect(store.loadEarlierCompletedSessions).toHaveBeenCalledWith({
       completedAt: AT,
+      start: historyWeekBounds(52, AT).start,
       targetSessionId: "target",
     });
     expect(store.loadEarlierRecordBaselines).toHaveBeenCalledWith({

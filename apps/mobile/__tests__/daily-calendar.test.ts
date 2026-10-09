@@ -33,7 +33,7 @@ it('orders each month newest first and represents every sampled day exactly once
 
 it('frames the current week with unobserved future positions and no Week tile', () => {
   const months = buildCalendarMonths(buildHeatmapData(samples, 'totalVolume', { todayDateKey: '2026-10-06', weeks: 1 }));
-  expect(months.map(month => month.key)).toEqual(['2026-10']);
+  expect(months.map(month => month.key)).toEqual(['2026-10', '2026-09']);
   expect(months[0].weeks.map(week => week.weekStartDateKey)).toEqual(['2026-10-05']);
   expect(months[0].weeks[0].week).toBeUndefined();
   expect(months[0].weeks[0].days[1].day?.isToday).toBe(true);

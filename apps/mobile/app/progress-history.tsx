@@ -56,7 +56,7 @@ export type ProgressHistoryScreenProps = {
 };
 
 export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistoryScreenProps) {
-  const { values, pending, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
+  const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
   const router = useRouter();
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
@@ -73,7 +73,7 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
   }, [catalog, subject]);
   const unavailable = !subject || (catalog.status === 'ready' && name === null);
   // A subject that no longer exists is never read for.
-  const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision);
+  const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
   // [[session.history-open]]. Stable, so the charts' memoised trees survive a re-render.
   const openDay = useCallback((day: DayCell) => {
     const href = historyDayHref(day.dateKey, day.sessionIds);
