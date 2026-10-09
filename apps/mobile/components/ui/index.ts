@@ -56,6 +56,11 @@ export {
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
 export {
+  ToggleChip,
+  type ToggleChipOption,
+  type ToggleChipProps,
+} from '@/components/ui/toggle-chip';
+export {
   uiBorder,
   uiFonts,
   uiGeometry,
