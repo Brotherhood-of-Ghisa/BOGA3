@@ -20,7 +20,7 @@ type WaitForOptions = Parameters<typeof waitFor>[1];
 export function waitForGone(query: () => unknown, options?: WaitForOptions): Promise<void> {
   return waitFor(() => {
     const found = stillFound(query());
-    if (found.length > 0) throw new Error(`Still on screen: ${found.map(describe).join(', ')}`);
+    if (found.length > 0) throw new Error(`Still on screen: ${found.map(describeElement).join(', ')}`);
   }, options);
 }
 
@@ -29,7 +29,7 @@ const stillFound = (found: unknown): unknown[] => (Array.isArray(found) ? found.
 const MAX_TEXT = 40;
 
 /** Type, testID, accessibility label and (truncated) text of one element. */
-function describe(found: unknown): string {
+function describeElement(found: unknown): string {
   if (!isElement(found)) return String(found);
   const type = typeof found.type === 'string' ? found.type : 'Composite';
   const { testID, accessibilityLabel } = found.props as { testID?: unknown; accessibilityLabel?: unknown };
@@ -38,12 +38,20 @@ function describe(found: unknown): string {
     typeof testID === 'string' ? ` testID="${testID}"` : '',
     typeof label === 'string' ? ` label="${label}"` : '',
   ].join('');
-  const text = textOf(found);
+  const text = textOf(found).replace(/\s+/g, ' ').trim();
   return `<${type}${attributes}>${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text}</${type}>`;
 }
 
 const isElement = (found: unknown): found is ReactTestInstance =>
   typeof found === 'object' && found !== null && 'type' in found && 'props' in found && 'children' in found;
 
-const textOf = (element: ReactTestInstance): string =>
-  element.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('');
+// Text nodes, space-separated; stops once past MAX_TEXT so a large subtree is
+// not walked on every poll.
+function textOf(element: ReactTestInstance): string {
+  let text = '';
+  for (const child of element.children) {
+    if (text.length > MAX_TEXT) break;
+    text += ` ${typeof child === 'string' ? child : textOf(child)}`;
+  }
+  return text;
+}

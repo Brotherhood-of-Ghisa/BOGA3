@@ -12,15 +12,16 @@ const WAIT_FOR_ABSENCE_MESSAGE =
 // Absence assertions on a query result: a failed one pretty-prints the found
 // elements. `expect` is the path from the matcher call to `expect(query)`.
 const QUERY_ABSENCE_MATCHERS = [
-  { expect: 'callee.object', query: '^query', matcher: "[callee.property.name=/^(toBeNull|toBeFalsy|toBeUndefined)$/]" },
-  { expect: 'callee.object', query: '^query', matcher: "[callee.property.name=/^(toBe|toEqual|toStrictEqual)$/][arguments.0.raw='null']" },
-  { expect: 'callee.object', query: '^query', matcher: "[callee.property.name=/^(toBe|toEqual|toStrictEqual)$/][arguments.0.type='Identifier'][arguments.0.name='undefined']" },
-  { expect: 'callee.object.object', query: '^query', matcher: "[callee.object.property.name='not'][callee.property.name='toBeTruthy']" },
-  { expect: 'callee.object', query: '^queryAll', matcher: "[callee.property.name='toHaveLength'][arguments.0.value=0]" },
-  { expect: 'callee.object', query: '^queryAll', matcher: "[callee.property.name=/^(toEqual|toStrictEqual)$/][arguments.0.type='ArrayExpression'][arguments.0.elements.length=0]" },
+  { expect: 'callee.object', query: '^(UNSAFE_)?query', matcher: "[callee.property.name=/^(toBeNull|toBeFalsy|toBeUndefined)$/]" },
+  { expect: 'callee.object', query: '^(UNSAFE_)?query', matcher: "[callee.property.name=/^(toBe|toEqual|toStrictEqual)$/][arguments.0.raw='null']" },
+  { expect: 'callee.object', query: '^(UNSAFE_)?query', matcher: "[callee.property.name=/^(toBe|toEqual|toStrictEqual)$/][arguments.0.type='Identifier'][arguments.0.name='undefined']" },
+  { expect: 'callee.object.object', query: '^(UNSAFE_)?query', matcher: "[callee.object.property.name='not'][callee.property.name='toBeTruthy']" },
+  { expect: 'callee.object', query: '^(UNSAFE_)?queryAll', matcher: "[callee.property.name='toHaveLength'][arguments.0.value=0]" },
+  { expect: 'callee.object', query: '^(UNSAFE_)?queryAll', matcher: "[callee.property.name=/^(toEqual|toStrictEqual)$/][arguments.0.type='ArrayExpression'][arguments.0.elements.length=0]" },
 ];
 
-// `screen.queryBy…(…)` and a bare `queryBy…(…)` (destructured from render).
+// `screen.queryBy…(…)` and a bare `queryBy…(…)` (destructured from render);
+// RNTL's `UNSAFE_queryBy…` print the same way.
 const waitForAbsenceSelectors = () =>
   QUERY_ABSENCE_MATCHERS.flatMap(({ expect, query, matcher }) =>
     ['callee.property.name', 'callee.name'].map(

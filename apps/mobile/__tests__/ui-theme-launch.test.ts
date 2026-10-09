@@ -79,6 +79,12 @@ describe('the launch theme', () => {
     expect(readStoredThemePresetId()).toBe('slate');
   });
 
+  it('orders an async read after a write still settling', async () => {
+    const write = Storage.setItem(THEME_PRESET_STORAGE_KEY, 'forest');
+    await expect(Storage.getItem(THEME_PRESET_STORAGE_KEY)).resolves.toBe('forest');
+    await write;
+  });
+
   it('falls back to the default and reports why when the store cannot be read', () => {
     jest.spyOn(Storage, 'getItemSync').mockImplementationOnce(() => {
       throw new Error('database is locked');
