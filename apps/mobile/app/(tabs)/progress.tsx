@@ -28,8 +28,8 @@ import {
   Screen,
   ScreenScroll,
   SearchField,
-  SegmentedControl,
   StatePanel,
+  ToggleChip,
   uiRoles,
   uiSpace,
 } from '@/components/ui';
@@ -42,8 +42,8 @@ import {
 } from '@/src/data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { HeatmapView } from '@/src/preferences/model';
-import { ProgressTables, type ProgressTableMetric } from '@/components/stats/progress-tables';
+import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
+import { ProgressTables } from '@/components/stats/progress-tables';
 import {
   StatsTable,
   StatsTableFigures,
@@ -52,6 +52,7 @@ import {
   statsTableStyles,
 } from '@/components/stats/stats-table';
 import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
+import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
@@ -108,17 +109,27 @@ const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader>
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+// The filter row holds three chips at phone width, so each carries one word.
+// `Sets` unqualified is the working-set count ([[set.count-display]]).
 const VIEW_MODE_OPTIONS = [
-  { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
-  { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
+  { value: 'exercise' as StatsViewMode, label: 'Exercise' },
+  { value: 'muscle' as StatsViewMode, label: 'Muscle' },
+] as const;
+const METRIC_OPTIONS = [
+  { value: 'workingSetCount' as ProgressMetric, label: 'Sets' },
+  { value: 'totalVolume' as ProgressMetric, label: 'Volume' },
 ] as const;
 
-const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
-
-export const resolveStatsInitialBreakdown = (
-  value: string | string[] | undefined
-): StatsViewMode => (firstRouteParam(value) === 'exercise' ? 'exercise' : 'muscle');
+// `This week` is the only choice when Settings' Progress period is one week,
+// which leaves the chip inert rather than offering the same span twice.
+const periodOptions = (targetWindowWeeks: number) => {
+  const thisWeek = { value: 'this-week' as ProgressPeriod, label: 'This week',
+    accessibilityLabel: `This week, ${formatPeriodComparison(7)}, same elapsed calendar span` };
+  if (targetWindowWeeks === 1) return [thisWeek];
+  return [{ value: 'window' as ProgressPeriod, label: `${targetWindowWeeks} weeks`,
+    accessibilityLabel: `${targetWindowWeeks} weeks, ${formatPeriodComparison(targetWindowWeeks * 7)}, same elapsed calendar span` },
+    thisWeek];
+};
 
 export { formatCountDelta, formatVolumeDelta } from '@/components/stats/comparison-format';
 export const formatPeriodComparison = (periodDays: number): string =>
@@ -225,11 +236,11 @@ export const sortExerciseListItems = (
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
   onRetry?: () => void;
-  periodDays: number;
+  period: ProgressPeriod;
   targetWindowWeeks?: number;
   historyLookbackWeeks?: number;
   weeklyWorkingSetTarget?: number;
-  onSelectPeriod: (period: number) => void;
+  onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
   onDismissMuscleHistory: () => void;
@@ -248,6 +259,8 @@ export type StatsScreenShellProps = {
   onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
+  tableMetric: ProgressMetric;
+  onSelectTableMetric: (metric: ProgressMetric) => void;
   exerciseListItems: ExerciseListItem[];
   selectedExercise: ExerciseHeatmapTarget | null;
   exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
@@ -271,7 +284,7 @@ export type StatsScreenShellProps = {
 export function StatsScreenShell({
   summary,
   onRetry,
-  periodDays,
+  period,
   targetWindowWeeks = 4,
   historyLookbackWeeks = 52,
   weeklyWorkingSetTarget = 8,
@@ -294,6 +307,8 @@ export function StatsScreenShell({
   onSelectMuscleHistoryMetric,
   viewMode,
   onSelectViewMode,
+  tableMetric,
+  onSelectTableMetric,
   exerciseListItems,
   selectedExercise,
   exerciseHistoryWeeklyEffort,
@@ -315,7 +330,6 @@ export function StatsScreenShell({
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
-  const [tableMetric, setTableMetric] = useState<ProgressTableMetric>('workingSetCount');
   const [contributionId, setContributionId] = useState<string | null>(null);
   const launchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const focusRequest = useRef(0);
@@ -351,25 +365,20 @@ export function StatsScreenShell({
   return (
     <Screen testID="stats-history-screen">
       <View style={styles.controls} testID="stats-controls">
-        <View testID="stats-view-switch">
-          <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-            value={viewMode} onChange={onSelectViewMode} selectedGround="selection" testIDPrefix="stats-view-mode-chip" />
+        <View style={styles.filters} testID="stats-view-switch">
+          <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
+            value={viewMode} onChange={onSelectViewMode} testID="stats-view-mode-chip" />
+          <ToggleChip accessibilityLabel="Stats period" options={periodOptions(targetWindowWeeks)}
+            value={targetWindowWeeks === 1 ? 'this-week' : period} onChange={onSelectPeriod} testID="stats-period-chip" />
+          {viewMode === 'muscle' ? (
+            <ToggleChip accessibilityLabel="Progress metric" options={METRIC_OPTIONS}
+              value={tableMetric} onChange={onSelectTableMetric} testID="stats-metric-chip" />
+          ) : null}
         </View>
-        <SegmentedControl
-          accessibilityLabel="Select stats time range"
-          options={(targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
-            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
-            .map(option => ({ ...option, accessibilityLabel:
-              `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
-          value={periodDays} onChange={onSelectPeriod} selectedGround="selection" testIDPrefix="stats-period-chip" />
-        {viewMode === 'muscle' ? (
-          <SegmentedControl accessibilityLabel="Select progress metric"
-            options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} selectedGround="selection" testIDPrefix="stats-metric-chip" />
-        ) : (
+        {viewMode === 'exercise' ? (
           <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
             onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
-        )}
+        ) : null}
       </View>
       <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
@@ -632,9 +641,8 @@ function StatsContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
   const { values } = useAccountLocalPreferenceState();
-  const [thisWeek, setThisWeek] = useState(firstRouteParam(params.period) === '7');
-  const weeks = thisWeek ? 1 : values.targetWindowWeeks;
-  const periodDays = weeks * 7;
+  const filters = useProgressFilters(params);
+  const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalogPeriod = useMemo(() => ({ weeks }), [weeks]);
   const catalog = useExerciseCatalog();
   const { stats, reload } = useExerciseCatalogStats(catalogPeriod);
@@ -645,7 +653,6 @@ function StatsContent() {
   const exercise = useHistory<ExerciseHeatmapTarget>(values.historyLookbackWeeks, historyRevision);
   const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
-  const [viewMode, setViewMode] = useState<StatsViewMode>(() => resolveStatsInitialBreakdown(params.breakdown));
   const [searchQuery, setSearchQuery] = useState('');
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
     .filter(item => stats.aggregatesById.has(item.id))
@@ -655,14 +662,15 @@ function StatsContent() {
         totalVolume: aggregate.totalVolume,
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
-  return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
+  return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
-    onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
+    onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
     onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onRetryMuscleHistory={muscle.retry} onSelectMuscleHistoryWeek={muscle.selectWeek}
     selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
     isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
     muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
-    viewMode={viewMode} onSelectViewMode={mode => { setViewMode(mode); exercise.dismiss(); muscle.dismiss(); }}
+    viewMode={filters.breakdown} onSelectViewMode={mode => { filters.selectBreakdown(mode); exercise.dismiss(); muscle.dismiss(); }}
+    tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
     exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
     selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
@@ -677,6 +685,7 @@ const RECENCY_INDICATOR_WIDTH = 64;
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
+  filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   headerCellPressed: {
     backgroundColor: uiRoles.paper,
   },

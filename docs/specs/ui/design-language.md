@@ -70,10 +70,12 @@ and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline,
-being only 1.18:1 against `surface`. Progress/history filters use fixed black
-`selection` with white `surface` text in every theme
-(`SegmentedControl`'s `selectedGround`); heatmap tiles/bars have no black
-current/selected outlines. Weekly selection uses a caret and accessible state.
+being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
+force in fixed black `selection` with white `surface` text in every theme
+(`SegmentedControl`'s `selectedGround`): the history metrics. A `ToggleChip`
+shows one value and has no unselected peer, so it carries `ink` on `surface`
+(Progress's filter row). Heatmap tiles/bars have no black current/selected
+outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
 

@@ -3,13 +3,15 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
+import type { ProgressMetric } from '@/src/preferences/model';
 import { formatCountDelta, formatVolumeDelta } from './comparison-format';
 import {
   StatsTable, StatsTableFigures, StatsTableHeader, StatsTableHeaderLabel,
   statsTableColumnWidth, statsTableStyles,
 } from './stats-table';
 
-export type ProgressTableMetric = 'workingSetCount' | 'totalVolume';
+// The figure the table shows, and the filter Progress remembers for it.
+export type ProgressTableMetric = ProgressMetric;
 const figures = (row: ProgressComparison, metric: ProgressTableMetric) => metric === 'workingSetCount'
   ? [String(row.current.workingSetCount), String(row.previous.workingSetCount), formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount).text]
   : [formatVolumeFigure(row.current.totalVolume), formatVolumeFigure(row.previous.totalVolume), formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume).text];

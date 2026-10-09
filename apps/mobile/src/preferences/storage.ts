@@ -3,9 +3,9 @@ import { DEFAULT_DISPLAY_EFFORTS } from '../exercise-calculations/effort-policy'
 import {
   type AccountLocalPreferences,
   DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
-  browsingPreferenceFields,
   isPreferenceValue,
   preferenceFields,
+  textPreferenceFields,
 } from './model';
 
 // Distinct namespaces prevent even an account named "local" sharing the local profile.
@@ -19,8 +19,7 @@ export function readScopedPreferences(profile: PreferenceProfile) {
     const raw = Storage.getItemSync(preferenceKey(profile, field));
     const value = field === 'showNeverDone'
       ? raw === 'true' ? true : raw === 'false' ? false : null
-      : browsingPreferenceFields.includes(field as typeof browsingPreferenceFields[number]) || field === 'heatmapView'
-        ? raw : parseJsonPreference(raw);
+      : textPreferenceFields.includes(field) ? raw : parseJsonPreference(raw);
     if (isPreferenceValue(field, value)) Object.assign(valid, { [field]: value });
   }
   // The former picker allowed arbitrary RIR grades. Keep its choices for fixed

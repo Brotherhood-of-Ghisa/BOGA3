@@ -12,9 +12,10 @@ appId: com.dinoderek.mobile
 #      so Stats counts it), and it commits `135.0 × 8`;
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
-#   5. Progress → By Exercise reads back the session just written: the only
+#   5. Progress → Exercise reads back the session just written: the only
 #      on-device check of the Stats queries (their values over the harness
-#      fixtures are stats-screen-local-data.test.tsx).
+#      fixtures are stats-screen-local-data.test.tsx). Its filter row is
+#      remembered on the device, so reopening Progress returns to Exercise.
 #   6. history's page sheet snaps back after a short drag of its header, leaves
 #      chart scrolling independent, and closes on a deliberate downward swipe.
 # Why device:
@@ -140,9 +141,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# 5. The pinned switch opens exercise browsing without leaving Progress.
+# 5. The pinned switch opens exercise browsing without leaving Progress. Enter
+# on the breakdown this step starts from rather than on whatever the last run
+# of this lane left stored: the deep link overrides the remembered filter.
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-table"
+    timeout: 15000
 - tapOn:
-    id: "stats-view-mode-chip-exercise"
+    id: "stats-view-mode-chip"
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
@@ -168,8 +176,12 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "settings-heatmap-view-daily"
 - openLink: "boga3://progress"
-- tapOn:
-    id: "stats-view-mode-chip-exercise"
+# Progress reopens on the breakdown chosen above: the filter row is remembered,
+# so this returns to the exercise list without touching the switch again.
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-list"
+    timeout: 15000
 - tapOn:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - extendedWaitUntil:

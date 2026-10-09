@@ -15,6 +15,7 @@ import {
   ActionButton,
   Card,
   ChipGroup,
+  Icon,
   FormField,
   IconButton,
   ListRow,
@@ -29,6 +30,7 @@ import {
   StatePanel,
   SwitchRow,
   Tag,
+  ToggleChip,
   uiGeometry,
   uiRoles,
   uiSpace,
@@ -732,6 +734,66 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('ToggleChip', () => {
+  const OPTIONS = [
+    { value: 'workingSetCount', label: 'Sets' },
+    { value: 'totalVolume', label: 'Volume', accessibilityLabel: 'Volume, kg·reps' },
+  ] as const;
+
+  it('shows the value in force and swaps it for the other on one press', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value="workingSetCount" />);
+
+    expect(screen.getByTestId('metric')).toHaveTextContent('Sets');
+    expect(screen.queryByText('Volume')).toBeNull();
+    expect(screen.getByTestId('metric').props.accessibilityRole).toBe('button');
+    expect(screen.getByTestId('metric').props.accessibilityLabel)
+      .toBe('Progress metric: Sets. Activate to show Volume.');
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenCalledWith('totalVolume');
+
+    rerender(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value="totalVolume" />);
+    // An option's own label is what assistive tech reads for the value in force.
+    expect(screen.getByTestId('metric').props.accessibilityLabel)
+      .toBe('Progress metric: Volume, kg·reps. Activate to show Sets.');
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenLastCalledWith('workingSetCount');
+  });
+
+  it('is an equal-width outline control that keeps a 44pt target at 28pt drawn', () => {
+    render(<ToggleChip accessibilityLabel="Progress metric" onChange={jest.fn()}
+      options={OPTIONS} testID="metric" value="workingSetCount" />);
+    const chip = screen.getByTestId('metric');
+    expect(flatStyle(chip)).toMatchObject({
+      flex: 1, minHeight: uiGeometry.compactControlHeight,
+      backgroundColor: uiRoles.surface, borderColor: uiRoles.rule,
+    });
+    expect(chip.props.hitSlop).toBe((uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2);
+    expect(flatStyle(within(chip).getByText('Sets')).color).toBe(uiRoles.ink);
+    expect(within(chip).getByText('Sets').props.allowFontScaling).toBe(false);
+    // The swap glyph says a tap replaces the value rather than opening a menu.
+    expect(within(chip).UNSAFE_getByType(Icon).props.name).toBe('swap');
+  });
+
+  it('is inert and unglyphed with a single option, and recovers from an unknown value', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<ToggleChip accessibilityLabel="Stats period" onChange={onChange}
+      options={[{ value: 'this-week', label: 'This week' }]} testID="period" value="this-week" />);
+
+    expect(screen.getByTestId('period')).toHaveProp('accessibilityState', { disabled: true });
+    expect(screen.getByTestId('period').props.accessibilityLabel).toBe('Stats period: This week.');
+    expect(within(screen.getByTestId('period')).UNSAFE_queryByType(Icon)).toBeNull();
+    fireEvent.press(screen.getByTestId('period'));
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value={'gone' as 'workingSetCount'} />);
+    expect(screen.getByTestId('metric')).toHaveTextContent('Sets');
   });
 });
 

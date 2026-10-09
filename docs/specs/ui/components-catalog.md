@@ -42,6 +42,7 @@ Two standing rules:
 | A labelled text or figure input | `FormField` (`form-field.tsx`) |
 | A search input | `SearchField` (`search-field.tsx`) |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
+| One filter of two values where a row of them cannot afford both labels | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap swaps it |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
 | One view option on or off, in a sheet (`Show deleted sessions`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |

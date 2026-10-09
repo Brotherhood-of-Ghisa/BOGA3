@@ -4,7 +4,7 @@ import {
   __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState, retryAccountLocalPreferences, setAccountLocalPreferenceAccount, setAccountLocalPreferences,
 } from '@/src/preferences/account-local';
-import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from '@/src/preferences/model';
+import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue, preferenceValidationMessages } from '@/src/preferences/model';
 import { preferenceKey } from '@/src/preferences/storage';
 import { getSessionSetTypeCycle, nextSessionSetType, defaultSessionSetType } from '@/src/data/set-types';
 import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
@@ -75,6 +75,41 @@ it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects inval
   expect(values().weeklyWorkingSetTarget).toBe(8);
   expect(write).not.toHaveBeenCalled();
 });
+
+// Progress's remembered filters. The period is deliberately not one of them:
+// every visit opens on Settings' Progress period ([[comparison.window]]).
+it('restores the remembered Progress filters after relaunch, per account, as plain text', async () => {
+  await account();
+  expect(values().progressBreakdown).toBe('muscle');
+  expect(values().progressMetric).toBe('workingSetCount');
+  expect(Object.keys(values())).not.toContain('progressPeriod');
+
+  setAccountLocalPreferences({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
+  // Each is its own scoped key, written as its own text: a JSON-quoted value
+  // is what the shared `heatmapView` branch avoids, and would read back null.
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressBreakdown'))).toBe('exercise');
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressMetric'))).toBe('totalVolume');
+
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
+
+  await account('B');
+  expect(values()).toMatchObject({ progressBreakdown: 'muscle', progressMetric: 'workingSetCount' });
+  await account('A');
+  expect(values().progressMetric).toBe('totalVolume');
+});
+
+it.each(['progressBreakdown', 'progressMetric'] as const)(
+  'keeps the stored %s when an unreadable value is offered, and reports why', async field => {
+    Storage.setItemSync(preferenceKey('account:A', field), '"muscle"');
+    await account();
+    expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+
+    setAccountLocalPreferences({ [field]: 'sideways' });
+    expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+    expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages[field]);
+  });
 
 it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('targetWindowWeeks', 52)).toBe(true);

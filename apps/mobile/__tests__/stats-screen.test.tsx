@@ -26,8 +26,8 @@ import {
   formatVolumeDelta,
   nextExerciseSortMode,
   sortExerciseListItems,
-  resolveStatsInitialBreakdown,
 } from '../app/(tabs)/stats-history';
+import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
 import ProgressRoute from '../app/(tabs)/progress';
 import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
 import { resolveLayout } from '@/components/stats/progress-tables';
@@ -192,7 +192,7 @@ const buildShellProps = (
   overrides: Partial<StatsScreenShellProps> = {}
 ): StatsScreenShellProps => ({
   summary: buildSummary(),
-  periodDays: 7,
+  period: 'this-week',
   onSelectPeriod: jest.fn(),
   onPressSessionsCard: jest.fn(),
   onPressMuscleHistory: jest.fn(),
@@ -211,6 +211,8 @@ const buildShellProps = (
   onSelectMuscleHistoryMetric: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
+  tableMetric: 'workingSetCount',
+  onSelectTableMetric: jest.fn(),
   exerciseListItems: [],
   selectedExercise: null,
   exerciseHistoryWeeklyEffort: [],
@@ -273,12 +275,22 @@ describe('formatPeriodComparison', () => {
   });
 });
 
-it.each([[7, 'week'], [28, '4 weeks']])('announces the %i-day comparison without a visible subtitle', (periodDays, wording) => {
-  renderStatsScreenShell({ periodDays });
-  const label = `${periodDays === 7 ? 'This week' : '4 weeks'}, vs previous ${wording}, same elapsed calendar span`;
-  expect(screen.getByRole('tab', { name: label })).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.queryByText(`vs previous ${wording}`)).toBeNull();
-  expect(screen.queryByTestId('stats-comparison-label')).toBeNull();
+it.each([['this-week' as const, 'This week', 'week', '4 weeks'], ['window' as const, '4 weeks', '4 weeks', 'This week']])(
+  'announces the %s comparison and its alternative without a visible subtitle', (period, shown, wording, alternative) => {
+    renderStatsScreenShell({ period, targetWindowWeeks: 4 });
+    expect(screen.getByTestId('stats-period-chip')).toHaveProp('accessibilityLabel',
+      `Stats period: ${shown}, vs previous ${wording}, same elapsed calendar span. Activate to show ${alternative}.`);
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent(shown);
+    expect(screen.queryByText(`vs previous ${wording}`)).toBeNull();
+    expect(screen.queryByTestId('stats-comparison-label')).toBeNull();
+  });
+
+it('leaves the period chip inert when the Progress period is one week', () => {
+  renderStatsScreenShell({ period: 'window', targetWindowWeeks: 1 });
+  const chip = screen.getByTestId('stats-period-chip');
+  expect(chip).toHaveTextContent('This week');
+  expect(chip).toHaveProp('accessibilityState', { disabled: true });
+  expect(chip.props.accessibilityLabel).not.toContain('Activate');
 });
 
 describe('formatCountDelta', () => {
@@ -451,9 +463,9 @@ describe('StatsScreenShell', () => {
   });
 
   it('keeps muscle rows neutral in either metric', () => {
-    renderStatsScreenShell();
+    const view = renderStatsScreenShell();
     expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    view.rerender(<StatsScreenShell {...buildShellProps({ tableMetric: 'totalVolume' })} />);
     expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+20%');
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveStyle({ color: uiRoles.ink });
@@ -727,11 +739,19 @@ describe('StatsScreenShell', () => {
 });
 
 describe('Stats route parameters', () => {
-  it('validates initial breakdown query values', () => {
-    expect(resolveStatsInitialBreakdown('muscle')).toBe('muscle');
-    expect(resolveStatsInitialBreakdown(['exercise'])).toBe('exercise');
-    expect(resolveStatsInitialBreakdown('unknown')).toBe('muscle');
-    expect(resolveStatsInitialBreakdown(undefined)).toBe('muscle');
+  it('reads an entry breakdown, and tells no breakdown from an unknown one', () => {
+    expect(breakdownParam('muscle')).toBe('muscle');
+    expect(breakdownParam(['exercise'])).toBe('exercise');
+    expect(breakdownParam('unknown')).toBe('muscle');
+    // No param at all is the only case that defers to the remembered filter.
+    expect(breakdownParam(undefined)).toBeNull();
+  });
+
+  it('reads an entry period, keeping ?period=7 as This week', () => {
+    expect(periodParam('7')).toBe('this-week');
+    expect(periodParam(['7'])).toBe('this-week');
+    expect(periodParam('30')).toBe('window');
+    expect(periodParam(undefined)).toBeNull();
   });
 });
 
@@ -755,10 +775,13 @@ describe('StatsScreenShell — view mode toggle', () => {
       .getAllByTestId(/^stats-exercise-name-/)
       .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''));
 
-  it('retains period and explicit browse controls with minimal copy', () => {
+  it('retains period and explicit browse controls with minimal copy, hiding the metric', () => {
     renderStatsScreenShell({ viewMode: 'exercise' });
-    expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('This week');
-    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
+    // The exercise table shows Sets, Vol and 1RM at once, so no metric to pick.
+    expect(screen.queryByTestId('stats-metric-chip')).toBeNull();
+    expect(screen.getByTestId('stats-search-input')).toBeTruthy();
     expect(screen.queryByText('Time range')).toBeNull();
     expect(screen.queryByText('Breakdown')).toBeNull();
     expect(screen.getByTestId('stats-sessions-link')).toBeTruthy();
@@ -946,7 +969,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       <StatsScreenShell
         {...buildShellProps({
           viewMode: 'muscle',
-          periodDays: 30,
+          period: 'window',
           exerciseListItems: [
             buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
             buildExerciseListItem('beta', 'Beta', { totalVolume: 50 }),
@@ -958,7 +981,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       <StatsScreenShell
         {...buildShellProps({
           viewMode: 'exercise',
-          periodDays: 30,
+          period: 'window',
           searchQuery: 'a',
           exerciseListItems: [
             buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
@@ -1119,14 +1142,14 @@ it('shows Volume with no coverage note and uses ordinary strength copy for bodyw
 
 
 it('drops the muscle table title and the header unit, keeping the unit spoken', () => {
-  renderStatsScreenShell();
+  const view = renderStatsScreenShell();
   expect(screen.queryByText('Work by muscle')).toBeNull();
   const header = () => within(screen.getByTestId('stats-muscle-table-header'));
   expect(header().getByText('Muscle')).toBeTruthy();
   expect(header().queryByText(/kg·reps/)).toBeNull();
   expect(screen.getByLabelText('Now, working sets')).toBeTruthy();
 
-  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  view.rerender(<StatsScreenShell {...buildShellProps({ tableMetric: 'totalVolume' })} />);
   expect(header().queryByText(/kg·reps/)).toBeNull();
   expect(header().getByText('Now')).toBeTruthy();
   expect(header().getByText('Prev')).toBeTruthy();
@@ -1223,8 +1246,7 @@ it.each([320, 430])('keeps full figures at %ipt, using another line only when ne
   summary.muscles[0].displayName = 'A very long individual muscle name';
   summary.muscles[0].current.totalVolume = 123456789;
   summary.muscles[0].previous.totalVolume = 987654321;
-  renderStatsScreenShell({ summary });
-  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  renderStatsScreenShell({ summary, tableMetric: 'totalVolume' });
   // Nine digits beside a long name do not fit a small phone's row, so the
   // figures take their own full-width line under it; neither is abbreviated.
   const stackedFigures = { width: '100%' };
@@ -1249,9 +1271,8 @@ it.each([375, 430])('uses the full row width for parent and contribution figures
   muscle.previous.totalVolume = 6172839456170;
   muscle.exercises = [{ exerciseDefinitionId: 'bench', displayName: 'Long exercise name', role: 'primary',
     current: muscle.current, previous: muscle.previous, workingSetChange: muscle.workingSetChange, volumeChange: muscle.volumeChange }];
-  renderStatsScreenShell({ summary });
+  renderStatsScreenShell({ summary, tableMetric: 'totalVolume' });
   fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
-  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
   expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-contribution-bench-figures')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-muscle-row-chest-figures').props.accessibilityLabel)
@@ -1272,8 +1293,7 @@ it('keeps a twelve-digit Volume baseline and long percent readable on a small ph
   const summary = buildSummary();
   summary.muscles[0].current.totalVolume = 100000000000;
   summary.muscles[0].previous.totalVolume = 1;
-  renderStatsScreenShell({ summary });
-  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  renderStatsScreenShell({ summary, tableMetric: 'totalVolume' });
   // Every digit is kept: the figures take their own line, and one too wide for
   // its capped column wraps inside it rather than shrinking or abbreviating.
   expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
@@ -1350,12 +1370,24 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   enabled.mockRestore(); focused.mockRestore();
 });
 
-it('uses fixed black and white for active Progress filters', () => {
-  renderStatsScreenShell({ periodDays: 28 });
-  for (const id of ['stats-view-mode-chip-muscle', 'stats-period-chip-28', 'stats-metric-chip-workingSetCount']) {
-    const segment = screen.getByTestId(id);
-    expect(segment).toHaveStyle({ backgroundColor: '#000000' });
-    expect(segment).toHaveProp('accessibilityState', { selected: true });
-    expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
+it('draws the three filter chips as one equal-width outline row', () => {
+  renderStatsScreenShell({ period: 'window', targetWindowWeeks: 4 });
+  const row = screen.getByTestId('stats-view-switch');
+  expect(row).toHaveStyle({ flexDirection: 'row' });
+  for (const [id, label] of [['stats-view-mode-chip', 'Muscle'], ['stats-period-chip', '4 weeks'],
+    ['stats-metric-chip', 'Sets']] as const) {
+    const chip = screen.getByTestId(id);
+    expect(within(row).getByTestId(id)).toBeTruthy();
+    expect(chip).toHaveStyle({ flex: 1, backgroundColor: uiRoles.surface, borderColor: uiRoles.rule });
+    expect(chip).toHaveTextContent(label);
+    expect(StyleSheet.flatten(within(chip).getByText(label).props.style).color).toBe(uiRoles.ink);
   }
+});
+
+it('still marks the history sheet metric filter in fixed black and white', () => {
+  renderStatsScreenShell({ selectedExercise: { exerciseDefinitionId: 'lift', displayName: 'Lift' } });
+  const segment = screen.getByTestId('stats-exercise-history-metric-chip-totalVolume');
+  expect(segment).toHaveStyle({ backgroundColor: '#000000' });
+  expect(segment).toHaveProp('accessibilityState', { selected: true });
+  expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
 });
