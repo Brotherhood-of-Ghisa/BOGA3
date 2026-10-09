@@ -8,7 +8,7 @@ import { buildCalendarMonths, type CalendarMonth, type CalendarWeek } from './da
 import { CalendarTile } from './calendar-tile';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
-import type { HeatmapData } from './heatmapData';
+import type { DayCell, HeatmapData } from './heatmapData';
 
 const ROW_LABEL_WIDTH = uiSpace.xl;
 const ROW_LABEL_GUTTER = ROW_LABEL_WIDTH + uiSpace.xs;
@@ -20,12 +20,24 @@ interface Props {
   formatValue: (value: number) => string;
   legendLabel?: string;
   header?: ReactNode;
+  /** Opens a day's sessions ([[session.history-open]]). */
+  onOpenDay?: (day: DayCell) => void;
+  /** Opens a Week tile's sessions ([[session.history-open]]). */
+  onOpenWeek?: (weekStartDateKey: string) => void;
 }
 
-function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, gap }: {
+type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek'>;
+
+const dayHint = (day: DayCell) => day.sessionIds.length === 1 ? 'Opens the session' : "Opens the day's sessions";
+// [[session.history-open]]: a day opens by its sessions.
+const dayOpener = (day: DayCell, onOpenDay: Props['onOpenDay']) =>
+  onOpenDay && day.sessionIds.length > 0 ? () => onOpenDay(day) : undefined;
+
+function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, gap, onOpenDay, onOpenWeek }: {
   row: CalendarWeek; monthKey: string;
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
-}) {
+} & Openers) {
+  const week = row.week;
   return <View style={styles.row} testID={`${testID}-row-${row.weekStartDateKey}`}>
     <Text allowFontScaling={false} accessibilityLabel={`Week of ${row.weekStartDateKey}`} style={styles.rowLabel}
       testID={`${testID}-row-label-${row.weekStartDateKey}`}>{row.startDay}</Text>
@@ -34,11 +46,15 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
         future={day.future}
         current={!!day.day?.isToday}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
+        onPress={dayOpener(day.day, onOpenDay)}
+        accessibilityHint={dayHint(day.day)}
         testID={`${testID}-cell-${day.dateKey}`} />
         : <View key={day.dateKey} style={styles.blankTile} testID={`${testID}-empty-${monthKey}-${day.dateKey}`} />)}
-      {row.week ? <CalendarTile weekly cell={row.week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
-        current={!!row.week.isCurrentWeek}
+      {week ? <CalendarTile weekly cell={week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
+        current={!!week.isCurrentWeek}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
+        onPress={onOpenWeek && week.hasTraining ? () => onOpenWeek(row.weekStartDateKey) : undefined}
+        accessibilityHint="Opens the week's sessions"
         testID={`${testID}-week-${monthKey}-${row.weekStartDateKey}`} />
         : <View style={[styles.blankTile, heatmapStyles.weekColumn]} testID={`${testID}-empty-week-${monthKey}-${row.weekStartDateKey}`} />}
     </View>
@@ -63,7 +79,7 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
   </View>;
 }
 
-export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day', header }: Props) {
+export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day', header, onOpenDay, onOpenWeek }: Props) {
   const [width, setWidth] = useState(0);
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
@@ -74,7 +90,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
       data={months}
       keyExtractor={month => month.key}
       renderItem={({ item }) => <Month month={item} data={data}
-        metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />}
+        metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} onOpenDay={onOpenDay} onOpenWeek={onOpenWeek} />}
       initialNumToRender={2}
       maxToRenderPerBatch={2}
       windowSize={3}

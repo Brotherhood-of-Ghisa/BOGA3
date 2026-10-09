@@ -1,4 +1,4 @@
-import { Stack, useIsFocused, useRouter, type Href } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -7,7 +7,9 @@ import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
   DEFAULT_SESSION_LIST_ITEMS,
   HistoryList,
+  parseHistoryJump,
   useSessionListData,
+  type HistoryJump,
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
@@ -30,12 +32,15 @@ export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
   initialSessions?: SessionListItem[];
   isFocused?: boolean;
+  /** A week or day of the history to open at (`?week=` / `?day=`). */
+  jumpTo?: HistoryJump | null;
 };
 
 export function SessionsScreen({
   dataClient,
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
   isFocused = true,
+  jumpTo = null,
 }: SessionsScreenProps) {
   const router = useRouter();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
@@ -183,6 +188,9 @@ export function SessionsScreen({
       <HistoryList
         header={hub}
         isLoading={isLoadingSessions}
+        // The plans above the history load on their own: jump once they have,
+        // so they cannot push the target down after it lands.
+        jumpTo={planSections.isLoading ? null : jumpTo}
         loadErrorMessage={loadErrorMessage}
         nowMs={loadedAtMs}
         onOpenCompletedSession={openCompletedSessionSummary}
@@ -213,10 +221,14 @@ export function SessionsScreen({
 
 export default function SessionsRoute() {
   const isFocused = useIsFocused();
+  const params = useLocalSearchParams<{ week?: string | string[]; day?: string | string[] }>();
+  // An opening position, read once: the page never rewrites it.
+  const [jumpTo] = useState(() => parseHistoryJump(params));
   return (
     <SessionsScreen
       dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
       isFocused={isFocused}
+      jumpTo={jumpTo}
     />
   );
 }

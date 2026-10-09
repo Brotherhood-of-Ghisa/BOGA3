@@ -22,4 +22,6 @@ export const heatmapStyles = StyleSheet.create({
   weekColumn: { marginLeft: uiSpace.sm },
   // An empty (`viz0`) cell needs a hairline to read against `surface`.
   restCell: { borderColor: uiRoles.rule },
+  // A tile or row that opens its sessions, while held (as ActionButton's press).
+  pressed: { opacity: 0.7 },
 });

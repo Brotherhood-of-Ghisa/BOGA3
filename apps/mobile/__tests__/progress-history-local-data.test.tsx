@@ -24,8 +24,8 @@ jest.mock('@/src/data/bootstrap', () =>
 
 let mockScreenOptions: { title?: string } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
+const mockPush = jest.fn();
 
-const mockRouter = { push: jest.fn() };
 jest.mock('expo-router', () => ({
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
@@ -34,7 +34,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => mockRouter,
+  useRouter: () => ({ push: mockPush }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -105,6 +105,7 @@ beforeEach(async () => {
   resetLocalData();
   mockScreenOptions = {};
   mockSearchParams = {};
+  mockPush.mockClear();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
   jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
@@ -175,9 +176,10 @@ describe('The history page over real data', () => {
     const cards = await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/);
     expect(cards.length).toBeGreaterThan(0);
     fireEvent.press(cards[0]);
-    expect(mockRouter.push).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
     fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-view-sessions'));
-    expect(mockRouter.push).toHaveBeenLastCalledWith('/sessions');
+    // View sessions opens Sessions at the readout's week, as a Weekly row does.
+    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${localDateKey(calendarWeekBounds(1).start)}`);
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
@@ -189,8 +191,14 @@ describe('The history page over real data', () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
     const before = (await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).length;
 
-    // A double tap on the selected (current) week clears it; the readout falls back to the newest week, the same one.
-    fireEvent(screen.getByTestId('stats-exercise-history-timeline-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    // Nothing starts selected, so the readout and list show the newest week. A double tap selects
+    // that announced week, a second clears it; the list stays on the same week throughout.
+    const plot = () => screen.getByTestId('stats-exercise-history-timeline-plot');
+    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
+    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(screen.getByTestId('stats-exercise-history-timeline-selected')).toBeTruthy();
+    expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before);
+    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
     await waitFor(() => expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before));
     expect(screen.queryByTestId('stats-exercise-history-week-sets-empty')).toBeNull();
@@ -236,24 +244,29 @@ describe('The history page over real data', () => {
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
   });
 
-  it('selects and clears a weekly row over real data, and follows a shortened window', async () => {
+  it('opens a Grid day\'s session and a Weekly row\'s week over real data, and follows a shortened window', async () => {
     await loadMaestroFixture('exercise-block-history');
-    act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 8 }));
+    act(() => updatePreferences({ heatmapView: 'daily', historyLookbackWeeks: 8 }));
     await openHistory({ exerciseDefinitionId: SQUAT });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
+    // [[session.history-open]]: the sessions behind each day come from the same read.
+    const days = await exerciseAnalytics.computeSelectedExerciseDailyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT });
+    const single = days.find(day => day.sessionIds?.length === 1)!;
+    expect(single.sessionIds).toHaveLength(1);
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${single.dateKey}`));
+    expect(mockPush).toHaveBeenLastCalledWith(`/completed-session/${single.sessionIds![0]}`);
+    const several = days.find(day => (day.sessionIds?.length ?? 0) > 1)!;
+    expect(several.sessionIds!.length).toBeGreaterThan(1);
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${several.dateKey}`));
+    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${several.dateKey}`);
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-weekly')); });
     const current = localDateKey(calendarWeekBounds(1).start);
     const row = screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`);
-    // The existing successful-load selection starts on the current week.
     fireEvent.press(row);
-    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
-    fireEvent.press(row);
-    const expected = (await exerciseAnalytics.computeSelectedExerciseWeeklyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT }))
-      .find(week => week.weekStartDateKey === current)!;
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`)).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-value-${current}`)).toHaveTextContent(String(expected.workingSetCount));
-    fireEvent.press(row);
+    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${current}`);
+    expect(row.props.accessibilityState?.selected).toBeFalsy();
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.queryByText(/Tap a week/)).toBeNull();
 
@@ -307,7 +320,7 @@ describe('The history page over real data', () => {
   // The 104-week heatmap re-render trips the default ceiling when jest
   // workers run alongside the fast aggregate's other lanes; this test alone
   // needs ~18 s worst-case and the lane's load has cost it 40-90 s.
-  it('updates read-only daily tiles when the saved history window is shortened', async () => {
+  it('updates daily tiles when the saved history window is shortened: rest days read, training days open', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
     await openHistory({ exerciseDefinitionId: SQUAT });
@@ -319,8 +332,9 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
     act(() => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
+    // Today holds a Squat session, so it opens it ([[session.history-open]]).
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
-      .toHaveProp('accessibilityRole', 'text');
+      .toHaveProp('accessibilityRole', 'button');
     expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
   }, 120_000);
 

@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import type { DayCell } from '@/components/heatmaps';
 import {
   EXERCISE_HISTORY_METRIC_OPTIONS,
   HistoryView,
@@ -13,6 +14,7 @@ import { ActionButton, Notice, Screen, StatePanel, uiSpace } from '@/components/
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { completedSessionHref, historyDayHref, sessionsWeekHref } from '@/src/navigation/routes';
 import type { HeatmapView } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -55,14 +57,11 @@ export type ProgressHistoryScreenProps = {
 
 export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistoryScreenProps) {
   const { values, pending, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
+  const router = useRouter();
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
   const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
-  const router = useRouter();
-  // The session list cannot filter to one week yet, so View sessions opens all of it.
-  const onViewSessions = useCallback(() => router.push('/sessions'), [router]);
-  const onOpenSession = useCallback((sessionId: string) => router.push(`/completed-session/${encodeURIComponent(sessionId)}`), [router]);
 
   // The catalogue is the one name source for both kinds, and it is already
   // loaded by boot. Until it is, the page keeps its declared title; once it is
@@ -75,6 +74,13 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
   const unavailable = !subject || (catalog.status === 'ready' && name === null);
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision);
+  // [[session.history-open]]. Stable, so the charts' memoised trees survive a re-render.
+  const openDay = useCallback((day: DayCell) => {
+    const href = historyDayHref(day.dateKey, day.sessionIds);
+    if (href) router.push(href);
+  }, [router]);
+  const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
+  const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
 
   if (unavailable) {
     return (
@@ -96,8 +102,8 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     lookbackWeeks: values.historyLookbackWeeks,
     onRetry: history.retry,
     onSelectView: (view: HeatmapView) => updatePreferences({ heatmapView: view }),
-    onSelectWeek: history.selectWeek,
-    selectedWeekKey: history.weekKey,
+    onOpenDay: openDay,
+    onOpenWeek: openWeek,
     subject: name,
     todayDateKey,
     // A view whose save failed stays the chosen one here, as a draft the
@@ -106,8 +112,7 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     weeklyEffort: history.weekly,
     timeline: {
       weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
-      onViewSessions,
-      onOpenSession,
+      onOpenSession: openSession,
     },
   };
 

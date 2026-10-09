@@ -69,6 +69,41 @@ it('exposes read-only day and week values without selection or black outlines', 
   expect(screen.queryByTestId('calendar-heatmap-day-detail')).toBeNull();
 });
 
+it('opens a day with sessions and a Week tile with training, and offers no rest day or rest week', () => {
+  const onOpenDay = jest.fn();
+  const onOpenWeek = jest.fn();
+  const input = samples.map((day, index) => ({ ...day, sessionIds: index === 1 ? ['a', 'b'] : [`s-${index}`] }));
+  const data = buildHeatmapData(input, 'totalVolume', { todayDateKey: today, weeks: 5 });
+  render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume}
+    onOpenDay={onOpenDay} onOpenWeek={onOpenWeek} />);
+
+  const one = screen.getByTestId('calendar-heatmap-cell-2026-10-05');
+  expect(one).toHaveProp('accessibilityRole', 'button');
+  expect(one).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
+  expect(one).toHaveProp('accessibilityHint', 'Opens the session');
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-09-30')).toHaveProp('accessibilityHint', "Opens the day's sessions");
+  // Held, it dims like a button; released, it does not.
+  // Pressable's style takes its pressed state; read it from the composite element.
+  const [pressable] = screen.UNSAFE_root.findAll(node =>
+    node.props.testID === 'calendar-heatmap-cell-2026-10-05' && typeof node.props.style === 'function');
+  expect(StyleSheet.flatten(pressable.props.style({ pressed: true })).opacity).toBe(0.7);
+  expect(StyleSheet.flatten(pressable.props.style({ pressed: false })).opacity).toBeUndefined();
+  fireEvent.press(one);
+  expect(onOpenDay).toHaveBeenCalledWith(expect.objectContaining({ dateKey: '2026-10-05', sessionIds: ['s-4'] }));
+
+  const week = screen.getByTestId('calendar-heatmap-week-2026-09-2026-09-28');
+  expect(week).toHaveProp('accessibilityRole', 'button');
+  expect(week).toHaveProp('accessibilityHint', "Opens the week's sessions");
+  fireEvent.press(week);
+  expect(onOpenWeek).toHaveBeenCalledWith('2026-09-28');
+
+  // A rest day, and a whole rest week's tile, read as text.
+  for (const id of ['calendar-heatmap-cell-2026-10-01', 'calendar-heatmap-week-2026-09-2026-09-07']) {
+    expect(screen.getByTestId(id)).toHaveProp('accessibilityRole', 'text');
+    expect(screen.getByTestId(id).props.onPress).toBeUndefined();
+  }
+});
+
 it('leaves rest and unavailable figures blank, retains numeric zero and clips future weeks', () => {
   draw('totalVolume', [sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });

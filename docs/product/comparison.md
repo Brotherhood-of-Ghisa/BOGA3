@@ -71,8 +71,9 @@ January's and the first one kept, and those two carry the year.
 | 1RM, Top weight | the week's best | no column; the readout says `No sets` | no column; the readout says `Unavailable` |
 
 The readout above the chart shows the selected week, else the newest: its
-figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions`, which
-opens Sessions filtered to that week, for any week with training. Tapping a
+figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions` for any
+week with training, which opens Sessions at that week as a Weekly row does
+([[session.history-open]]). Tapping a
 week selects it and fills its column in `ink`; a second tap clears it. Unlike
 Daily and Weekly ([[copy.blank-history]]), the readout writes a rest week's
 figure.
@@ -86,7 +87,6 @@ day.
 Why: one form reads the same for every metric; a week without training sums
 to zero, and a best has no value without sets.
 Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/heatmaps/TimelineHeatmap.tsx`; `apps/mobile/components/stats/week-sets.ts`.
-Pending: Sessions cannot filter to a week yet, so `View sessions` opens the whole list.
 
 ### comparison.weekly-reference · calculation · accepted
 

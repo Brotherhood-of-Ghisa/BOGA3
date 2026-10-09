@@ -2,6 +2,7 @@
 // over [[comparison.window]]'s week, Monday 00:00 local.
 
 import { formatWeekRange, weekDayLabel } from '@/components/today/progress-format';
+import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import type { SessionListItem } from './types';
@@ -28,12 +29,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const weeksBetween = (later: Date, earlier: Date): number =>
   Math.round((later.getTime() - earlier.getTime()) / (7 * DAY_MS));
 
-const dateKey = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
 // A completed session sits in the week of its completion, as on Progress and
 // Today; a row without one falls back to its start.
-const sessionInstant = (session: SessionListItem): Date =>
+export const sessionInstant = (session: SessionListItem): Date =>
   new Date(session.completedAt ?? session.startedAt);
 
 /**
@@ -45,7 +43,7 @@ export const groupSessionsByWeek = (sessions: SessionListItem[], now: Date): His
   const sections: HistoryWeekSection[] = [];
   for (const session of sessions) {
     const window = localWeekWindow(sessionInstant(session));
-    const key = dateKey(window.start);
+    const key = localDateKey(window.start);
     let section = sections.at(-1);
     if (section?.key !== key) {
       const weeksAgo = weeksBetween(thisWeek.start, window.start);

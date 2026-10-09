@@ -71,6 +71,14 @@ describe('buildHeatmapData', () => {
     expect(data.daily.every(day => day.dateKey <= TODAY)).toBe(true);
   });
 
+  it('carries the sessions behind each day, and none on a rest day', () => {
+    const data = buildHeatmapData([{ ...source({ workingSetCount: 3 }), dateKey: '2026-06-03', sessionIds: ['a', 'b'] }],
+      'workingSetCount', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.daily.map(day => [day.dateKey, day.sessionIds])).toEqual([
+      ['2026-06-01', []], ['2026-06-02', []], ['2026-06-03', ['a', 'b']], ['2026-06-04', []], ['2026-06-05', []],
+    ]);
+  });
+
   it('grades two four-set days against eight weekly sets, and includes zero muscles in the group average', () => {
     const days = ['2026-06-03', '2026-06-04'].map(dateKey => ({ dateKey, totalVolume: 100,
       workingSetCount: 4, workingSetCountsByMuscle: { quads: 4 }, estimatedRM1: 50, highestWeight: 40 }));

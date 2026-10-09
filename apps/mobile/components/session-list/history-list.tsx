@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useCallback, useEffect, useRef, type ReactElement, type RefObject } from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -11,7 +11,10 @@ import {
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
 import { todayText } from '@/components/today/text-styles';
 import { Card, StatePanel, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { logEvent } from '@/src/logging';
 import { formatMonthDayTime } from '@/src/utils/local-time';
+
+import { historyJumpListIndex, historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
 
 import {
   formatEmptyWeeks,
@@ -35,6 +38,12 @@ export type HistoryListProps = {
   nowMs: number;
   /** The blocks above the history (active session, planning). */
   header: ReactElement;
+  /**
+   * Where to open, applied once on the first settled load
+   * ([[session.history-open]]). The host passes it only once everything above
+   * the history has loaded, so the target is not pushed down after it lands.
+   */
+  jumpTo?: HistoryJump | null;
 };
 
 const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
@@ -60,6 +69,7 @@ export function HistoryList({
   onOpenCompletedSession,
   nowMs,
   header,
+  jumpTo = null,
 }: HistoryListProps) {
   const now = new Date(nowMs);
   // A reload (focus, the deleted toggle) keeps the rows on screen, and with
@@ -67,12 +77,22 @@ export function HistoryList({
   // before the first rows.
   const showRows = !loadErrorMessage && (!isLoading || sessions.length > 0);
   const sections = showRows ? groupSessionsByWeek(sessions, now) : [];
+  const listRef = useRef<SectionList<SessionListItem, HistoryWeekSection>>(null);
+  const jumpLocation = jumpTo ? historyJumpLocation(sections, jumpTo) : null;
+  // The first settled load consumes the jump, landing or not: a later reload
+  // (focus, Show deleted) never moves a list the reader has scrolled.
+  const jumpReady = jumpTo !== null && !isLoading && !loadErrorMessage;
+  const onScrollToIndexFailed = useJumpOnce(listRef, jumpLocation, jumpReady);
 
   return (
     <SectionList
+      onScrollToIndexFailed={onScrollToIndexFailed}
+      ref={listRef}
       contentContainerStyle={styles.content}
-      // A screenful of rows and week headings and more; the rest render as they near the screen.
-      initialNumToRender={24}
+      // A screenful of rows and week headings and more; the rest render as they
+      // near the screen. A jump renders every row down to its target, so the
+      // target's offset is measured rather than estimated (rows differ in height).
+      initialNumToRender={24 + (jumpLocation ? historyJumpListIndex(sections, jumpLocation) : 0)}
       keyboardShouldPersistTaps="handled"
       keyExtractor={(session) => session.id}
       ListEmptyComponent={
@@ -95,6 +115,59 @@ export function HistoryList({
       testID="completed-history-scroll"
     />
   );
+}
+
+// The jump's rows are rendered but may not be measured yet: aim again shortly,
+// for up to two seconds.
+const JUMP_RETRY_MS = 50;
+const JUMP_ATTEMPTS = 40;
+
+type ScrollToIndexFailure = { index: number };
+
+/**
+ * Scrolls to `location` once, when the list is first `ready`; a target the
+ * first load lacks is dropped, never jumped to later. Returns the list's
+ * `onScrollToIndexFailed`.
+ */
+function useJumpOnce(
+  listRef: RefObject<SectionList<SessionListItem, HistoryWeekSection> | null>,
+  location: HistoryJumpLocation | null,
+  ready: boolean,
+) {
+  const jumpedRef = useRef(false);
+  const attemptsRef = useRef(0);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionIndex = location?.sectionIndex;
+  const itemIndex = location?.itemIndex;
+
+  const scrollToTarget = useCallback(() => {
+    if (sectionIndex === undefined || itemIndex === undefined) return;
+    listRef.current?.scrollToLocation({ sectionIndex, itemIndex, viewPosition: 0, animated: false });
+  }, [listRef, sectionIndex, itemIndex]);
+
+  useEffect(() => {
+    if (jumpedRef.current || !ready) return;
+    jumpedRef.current = true;
+    scrollToTarget();
+  }, [scrollToTarget, ready]);
+
+  useEffect(() => () => {
+    if (retryRef.current) clearTimeout(retryRef.current);
+  }, []);
+
+  return useCallback((failure: ScrollToIndexFailure) => {
+    attemptsRef.current += 1;
+    if (attemptsRef.current > JUMP_ATTEMPTS) {
+      void logEvent({
+        level: 'warn',
+        source: 'app',
+        event: 'sessions.history_jump_failed',
+        message: `Could not reach list index ${failure.index} after ${JUMP_ATTEMPTS} attempts`,
+      });
+      return;
+    }
+    retryRef.current = setTimeout(scrollToTarget, JUMP_RETRY_MS);
+  }, [scrollToTarget]);
 }
 
 function WeekHeading({ section, now }: { section: HistoryWeekSection; now: Date }) {

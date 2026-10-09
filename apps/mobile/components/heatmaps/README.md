@@ -10,10 +10,10 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
-| `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
+| `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → columns and the month labels that fit. Pure. |
-| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as columns ([[comparison.timeline-history]]): readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. |
-| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; selection lifted to the host. |
+| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as columns ([[comparison.timeline-history]]): readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection. |
+| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; a training week opens its sessions. |
 
 ## Data flow
 
@@ -58,9 +58,10 @@ unknown load never gets a filled length. Figure visibility follows
 plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
 Daily retains a neutral dashed rule.
 
-## Props & selection
+## Props & opening
 
-Daily tiles are read-only; Weekly bars select a row:
+A day or week with training opens its sessions ([[session.history-open]]): the
+host passes the openers and routes; a rest day or week stays text.
 
 ```tsx
 <DailyHeatmap
@@ -69,12 +70,13 @@ Daily tiles are read-only; Weekly bars select a row:
   metricLabel="Volume"                  // tile accessibility
   formatValue={(v) => String(v)}
   legendLabel="Volume per day"
+  onOpenDay={onOpenDay}                 // (day: DayCell) => void; day.sessionIds names its sessions
+  onOpenWeek={onOpenWeek}               // (weekStartDateKey) => void; the Week tiles
 />
 
 <WeeklyHeatmap
   data={data}
-  selectedWeekKey={selectedWeekKey}     // string | null
-  onSelectWeek={onSelectWeek}           // (weekStartDateKey | null) => void
+  onOpenWeek={onOpenWeek}               // (weekStartDateKey) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
   formatValue={formatValue}             // rows, axis and accessible values
   formatReferenceValue={formatReferenceValue} // optional; defaults to formatValue
@@ -83,15 +85,14 @@ Daily tiles are read-only; Weekly bars select a row:
 ```
 
 - **Daily** follows [[comparison.daily-history]]. `daily-calendar.ts` builds
-  the month/row framing without changing adapter values or colours. Tiles are
-  read-only, without selection or black outlines. Figure visibility follows
+  the month/row framing without changing adapter values or colours. Tiles have no
+  selection or black outlines. Figure visibility follows
   [[copy.blank-history]]. Missing/future positions are empty spacers without
   accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
-- **Weekly** lifts selection to the host; a second tap clears the selected
-  row. No selected-week banner is displayed; figure visibility follows [[copy.blank-history]].
-  Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
+- **Weekly** rows hold no selection and draw no banner; figure visibility
+  follows [[copy.blank-history]]. Rest/current semantics remain accessible.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -103,22 +104,20 @@ choices use Daily; a valid saved choice survives restart and account
 switching. The Timeline's week list is read only while that view shows. Progress history targets
 one muscle ID or one exercise definition, never a family.
 Numeric `weeks` controls the exact query/grid span;
-short windows have no implicit 52-week minimum. Weekly selection returns to
-the current week when excluded and survives look-back edits while in range.
+short windows have no implicit 52-week minimum.
 
 ## Look
 
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
-- **No black outlines:** current and selected tiles/bars have no black border.
-  Weekly selection retains its accessible state and filled `ink` caret.
+- **No black outlines:** current tiles/bars have no black border.
   Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history page mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
-  a chart rebuild when the chosen view changes while preserving Weekly selection
-  and body scroll state.
+  a chart rebuild when the chosen view changes while preserving each view's
+  scroll state.
 - **One active vertical scroller.** The weekly `FlatList` owns the page body;
   Daily owns a virtualized `FlatList` of month calendars. Inline loading/error/empty
   states share the active body. Row targets are at least 44pt; old-year labels
