@@ -8,7 +8,6 @@ export * from './deterministic-ids';
 export * from './plan-repository';
 export * from './plan-queries';
 export * from './materialization';
-export * from './set-reorder';
 export * from './block-resolution';
 export * from './available-blocks';
 export * from './plan-form-model';

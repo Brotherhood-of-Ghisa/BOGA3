@@ -2,7 +2,7 @@
 
 Load when you are building or changing authored plans and programmes: their
 schema, the Sync v2 16-entity expansion, materialization onto performed rows,
-block lifecycle, set reordering, or the agent plan-write API and MCP tools.
+block lifecycle, or the agent plan-write API and MCP tools.
 
 ## 1. Architectural Decisions and Principles
 
@@ -24,15 +24,12 @@ block lifecycle, set reordering, or the agent plan-write API and MCP tools.
    at most one live performed session per whole-plan start, one live card per plan
    block, and one live set per plan target set — so retries, multi-device sync and
    concurrent attachments converge deterministically (§4.5).
-5. **Set reordering invariant.** Performed sets reorder freely inside a card by
-   mutating only `exercise_sets.order_index`; reordering never alters source-plan
-   target order, row identities, or `source_plan_set_id`.
-6. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
+5. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
    stays strictly read-only. Coaching agents read upcoming plans and create new
    plans/programmes only under explicit per-client permission in
    `public.agent_plan_permissions`; they can never edit or delete plans, start
    workouts, or mutate performed history.
-7. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
+6. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
    via stable keyset cursors to exhaustion. Silent row caps and unpaginated
    truncation are prohibited.
 
@@ -255,20 +252,6 @@ Appends one planned block to an active session, or starts one if none exists.
    default. Each set sets `source_plan_set_id` and
    `performance_status = 'planned'`.
 
-### 4.4 Set Reordering (`reorderSessionExerciseSets`)
-
-```ts
-reorderSessionExerciseSets(sessionExerciseId: string, orderedSetIds: string[]): Promise<void>
-```
-
-- `orderedSetIds` must be an exact permutation of all non-deleted set IDs
-  currently on `sessionExerciseId`; missing, duplicate and cross-card IDs are
-  rejected atomically.
-- Updates `exercise_sets.order_index` to the array index (0, 1, 2, …) and leaves
-  `id`, `source_plan_set_id`, `planned_*`, actual values and performance state
-  untouched.
-- Source plan order in `session_plan_sets` is immutable.
-
 ### 4.5 Provenance Arbitration for Concurrent Attachments
 
 Two offline devices can attach the same block to two different unsourced cards
@@ -301,12 +284,12 @@ path is defined so the permitted operation can never block sync.
   `apps/mobile/src/session-planner/` owns the screen-facing API: types,
   pure validation (§7.1 limits, field-addressable errors), deterministic IDs,
   the plan/programme repository, read models, `startSessionPlan`,
-  `addPlanBlockToSession`, `reorderSessionExerciseSets`, and
-  `completePlanBlock` / `skipPlanBlock`. Screens never write plan tables.
+  `addPlanBlockToSession`, and `completePlanBlock` / `skipPlanBlock`. Screens
+  never write plan tables.
   As-built UI: `/sessions`' planning sections, the two `/session-plan/…`
   routes (create/edit/duplicate via `plan-edit-sync`), the picker's
-  **Repeat last**/**From planner** entries, and the recorder's handle-drag
-  set reorder with **Complete block** on sourced cards.
+  **Repeat last**/**From planner** entries, and **Complete block** on sourced
+  cards.
 - **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` as §4.2; a
   signed-out device uses the `local` owner (nothing syncs, keys only need
   local stability).
@@ -321,8 +304,6 @@ path is defined so the permitted operation can never block sync.
   the winning id — the repair needs no id: pull, clear every live local
   claimant of exactly the pulled claims, re-push (the pull leg repairs on the
   local violation; the push leg inside its recovery pull).
-- **Reorder.** Two-phase: lift above every parent row (tombstones included),
-  then dense `0..n-1`; provenance, targets, and state untouched.
 - **Mobile training programmes.** `programme-form-model.ts` validates draft
   graphs (>=2 child plans). Authoring (`/programme/new`) edits child sessions via
   `ProgrammeSessionEditSheet` sub-sheet. Detail (`/programme/[programmeId]`,
@@ -334,7 +315,6 @@ path is defined so the permitted operation can never block sync.
   (`programme_id = null`) as standalone plans, preserving performed history.
   `listAvailablePlanBlocks` includes unconsumed programme blocks for picker
   selection.
-
 
 ## 5. UI and UX Contracts
 
@@ -351,13 +331,6 @@ path is defined so the permitted operation can never block sync.
 - **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
   last**, and a new **From planner** entry selects available authored blocks.
-
-### 5.2 Set Reordering UX
-
-Recorder sets reorder playlist-style: a quiet trailing grab handle starts the
-drag — no separate "Edit" mode; VoiceOver custom actions **Move earlier** /
-**Move later**; reduced motion drops only the lift. Full rules:
-`docs/specs/ui/ux-rules.md`, "Reordering sets in the recorder".
 
 ## 6. Agent API and MCP Tools
 
