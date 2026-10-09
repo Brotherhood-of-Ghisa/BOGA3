@@ -95,8 +95,9 @@ BOGA_SWEEP_DIR="$BOGA_RELEASE_SWEEP_DIR" ./boga sweep --ref "$BOGA_RELEASE_SHA"
 Record the green summary path and check its commit matches the release SHA.
 The fresh sibling sweep worktree receives its own slot lease and keeps the
 selected SHA even if `main` advances. On a failed sweep, inspect the summary;
-if repeating it requires a fresh sweep checkout, preserve its evidence and
-release only that run's sweep worktree before recreating it.
+if repeating it requires a fresh sweep checkout, preserve its evidence outside
+it and run `./boga worktree release --force` from that run's sweep root before
+recreating it.
 Resolve failures before building. If a release needs an extra contract lane
 outside the sweep, agree and run it too. For native changes, follow that spec's
 dev-client rebuild rule. Record measured durations only via `./boga timings`.
@@ -224,8 +225,11 @@ push failure, verify the existing local tag before retrying the push. Recheck
 remote migration history before resuming migrations; never reset or repair
 history as an automatic recovery step.
 
-Preserve the IPA and record outside the release worktree before removing it.
-Stop its stack with `./boga db down`, then release only the worktree this run
-created with `./boga worktree release`. Release this run's sibling sweep
-worktree from its own root too; leave other runs' checkouts alone. An incomplete
+Preserve the IPA, release record and sweep evidence outside both worktrees
+before removing them. From the release worktree's root, stop its stack with
+`./boga db down`, then run `./boga worktree release --force`. From this run's
+sibling sweep worktree's root, run `./boga worktree release --force` too.
+Both worktrees are detached, so there is no branch PR for `release` to check.
+This procedure authorizes `--force` only for the release and sibling sweep
+worktrees created by this run; leave other runs' checkouts alone. An incomplete
 release retains its artifacts and outstanding-stage record for resumption.
