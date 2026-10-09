@@ -1,7 +1,7 @@
-// Calendar layout follows [[comparison.daily-history]]. The host owns scrolling;
-// figure visibility follows [[copy.blank-history]].
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+// The virtualized month list owns scrolling. Calendar layout follows
+// [[comparison.daily-history]]; figure visibility follows [[copy.blank-history]].
+import React, { useMemo, useState, type ReactNode } from 'react';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { buildCalendarMonths, type CalendarMonth, type CalendarWeek } from './daily-calendar';
@@ -17,6 +17,7 @@ interface Props {
   metricLabel: string;
   formatValue: (value: number) => string;
   legendLabel?: string;
+  header?: ReactNode;
 }
 
 function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, gap }: {
@@ -51,21 +52,33 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
   </View>;
 }
 
-export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day' }: Props) {
+export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day', header }: Props) {
   const [width, setWidth] = useState(0);
-  const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
+  const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
   const testID = `${testIDPrefix}-heatmap`;
   return <View style={styles.wrap} onLayout={event => setWidth(event.nativeEvent.layout.width)} testID={testID}>
-    <Text allowFontScaling={false} style={heatmapStyles.title}>Daily training load</Text>
-    {months.map(month => <Month key={month.key} month={month} data={data}
-      metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />)}
-    <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
+    <FlatList
+      data={months}
+      keyExtractor={month => month.key}
+      renderItem={({ item }) => <Month month={item} data={data}
+        metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />}
+      initialNumToRender={2}
+      maxToRenderPerBatch={2}
+      windowSize={3}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      testID={`${testIDPrefix}-scroll`}
+      ListHeaderComponent={<View style={styles.header}>{header}<Text allowFontScaling={false} style={heatmapStyles.title}>Daily training load</Text></View>}
+      ListFooterComponent={<HeatmapLegend label={legendLabel} target={!!data.targetGrading} />}
+    />
   </View>;
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm, gap: uiSpace.lg },
+  wrap: { flex: 1 },
+  content: { paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm, gap: uiSpace.lg },
+  header: { gap: uiSpace.lg, paddingTop: uiSpace.xs },
   month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: uiRoles.rule },
   monthTitle: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xl,
     lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },

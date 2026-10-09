@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import { ScrollView, StyleSheet } from 'react-native';
+import { FlatList, ScrollView, StyleSheet } from 'react-native';
 import { DailyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
@@ -30,7 +30,8 @@ it('orders months and their own-day rows newest first, with eight headers and Mo
   expect(october.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID)).toEqual(
     [5, 6, 1, 2, 3, 4].map(day => `calendar-heatmap-cell-2026-10-${String(day).padStart(2, '0')}`));
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
-  expect(screen.UNSAFE_queryAllByType(ScrollView)).toEqual([]);
+  expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(1);
+  expect(screen.UNSAFE_getByType(FlatList).props).toMatchObject({ initialNumToRender: 2, maxToRenderPerBatch: 2, windowSize: 3 });
   expect(style('calendar-heatmap-cell-2026-10-05').minHeight).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
   expect(style('calendar-heatmap-cell-2026-10-05').minWidth).toBe(0);
   expect(style('calendar-heatmap-week-separator-2026-10')).toMatchObject({ right: '12.5%', width: 1, backgroundColor: uiRoles.rule, top: 0, bottom: 0 });
@@ -164,7 +165,7 @@ it('updates the displayed history when its metric or look-back window changes', 
 
 it.each([320, 375, 402])('centres the Sun/Week separator in a wider gap at %ipt', width => {
   draw();
-  fireEvent(screen.getByTestId('calendar-heatmap'), 'layout', { nativeEvent: { layout: { width } } });
+  fireEvent(screen.getByTestId('calendar-heatmap'), 'layout', { nativeEvent: { layout: { width: width + uiSpace.sm * 2 } } });
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm - 8 * uiGeometry.tapTarget) / 7));
   const column = (width - 7 * gap - uiSpace.sm) / 8;
   const sunRight = 7 * column + 6 * gap;
@@ -203,3 +204,15 @@ it.each(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '
       expect(empty.props.accessibilityLabel).toBeUndefined();
     }
   });
+
+
+it('keeps the full window in the month list while mounting only the initial months', () => {
+  const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: today, weeks: 104 });
+  render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  const list = screen.UNSAFE_getByType(FlatList);
+  expect(list.props.data).toHaveLength(25);
+  expect(screen.getAllByTestId(/^calendar-heatmap-month-title-/)).toHaveLength(2);
+  const older = list.props.data.at(-1);
+  const oldMonth = render(list.props.renderItem({ item: older, index: 24 }));
+  expect(oldMonth.getByTestId(`calendar-heatmap-month-title-${older.key}`)).toBeTruthy();
+});

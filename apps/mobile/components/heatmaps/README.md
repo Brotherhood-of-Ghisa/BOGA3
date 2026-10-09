@@ -121,12 +121,12 @@ the current week when excluded and survives look-back edits while in range.
   Weekly selection retains its accessible state and filled `ink` caret.
   Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
-- **Warm switching:** the history sheet keeps both views mounted. Its inactive
+- **Warm switching:** the history sheet mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
   a chart rebuild when the saved view changes while preserving Weekly selection
   and body scroll state.
 - **One active vertical scroller.** The weekly `FlatList` owns the sheet body;
-  Daily has one outer `ScrollView` containing vertical month calendars. Inline loading/error/empty
+  Daily owns a virtualized `FlatList` of month calendars. Inline loading/error/empty
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.

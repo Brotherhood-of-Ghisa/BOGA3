@@ -28,6 +28,7 @@ import {
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
+import * as heatmapData from '@/components/heatmaps/heatmapData';
 import ProgressRoute from '../app/(tabs)/progress';
 import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
 import { resolveLayout } from '@/components/stats/progress-tables';
@@ -629,7 +630,7 @@ describe('StatsScreenShell', () => {
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', muscleHistoryErrorMessage: 'Read failed', onRetryMuscleHistory: jest.fn() })} />);
     expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Read failed/);
     expect(screen.queryByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13', { includeHiddenElements: true })).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
+    expect(screen.queryByTestId('stats-muscle-history-heatmap-cell-2026-05-13', { includeHiddenElements: true })).toBeNull();
     fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
@@ -1390,4 +1391,22 @@ it('still marks the history sheet metric filter in fixed black and white', () =>
   expect(segment).toHaveStyle({ backgroundColor: '#000000' });
   expect(segment).toHaveProp('accessibilityState', { selected: true });
   expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
+});
+
+it.each(['muscle', 'exercise'] as const)('opens %s loading/error chrome without computing either chart', kind => {
+  const build = jest.spyOn(heatmapData, 'buildHeatmapData');
+  const target = kind === 'muscle'
+    ? { selectedMuscle: { muscleGroupIds: ['quads'] as [string], displayName: 'Quads', familyName: 'Legs' }, isMuscleHistoryLoading: true }
+    : { selectedExercise: { exerciseDefinitionId: 'squat', displayName: 'Squat' }, isExerciseHistoryLoading: true };
+  const props = buildShellProps(target);
+  const result = render(<StatsScreenShell {...props} />);
+  expect(screen.getByTestId(`stats-${kind}-history-loading`)).toBeTruthy();
+  expect(screen.getByTestId(`stats-${kind}-history-title`)).toBeTruthy();
+  expect(build).not.toHaveBeenCalled();
+  result.rerender(<StatsScreenShell {...props} isMuscleHistoryLoading={false} isExerciseHistoryLoading={false}
+    muscleHistoryErrorMessage={kind === 'muscle' ? 'Failed read' : null}
+    exerciseHistoryErrorMessage={kind === 'exercise' ? 'Failed read' : null} />);
+  expect(screen.getByTestId(`stats-${kind}-history-error`)).toBeTruthy();
+  expect(build).not.toHaveBeenCalled();
+  build.mockRestore();
 });

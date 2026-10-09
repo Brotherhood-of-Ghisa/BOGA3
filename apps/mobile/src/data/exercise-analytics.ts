@@ -119,7 +119,10 @@ export const aggregateExerciseWeeklyEffort = (
   rawSessions: ExerciseRawSession[],
   timeZone?: string
 ): SelectedExerciseWeeklyEffort[] => {
-  const dailyEffort = aggregateExerciseDailyEffort(rawSessions, timeZone);
+  return aggregateExerciseWeeksFromDaily(aggregateExerciseDailyEffort(rawSessions, timeZone));
+};
+
+const aggregateExerciseWeeksFromDaily = (dailyEffort: DailyEffortMetrics[]): SelectedExerciseWeeklyEffort[] => {
   const weekMap = new Map<string, WeekAccumulator>();
 
   for (const day of dailyEffort) {
@@ -306,4 +309,11 @@ export const computeSelectedExerciseDailyEffort = async (
 ): Promise<DailyEffortMetrics[]> => {
   const rawSessions = await loadExerciseRawSessions(options);
   return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
+};
+
+/** Both chart views share one graph read and one daily aggregation. */
+export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
+  const rawSessions = await loadExerciseRawSessions(options);
+  const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone);
+  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily) };
 };

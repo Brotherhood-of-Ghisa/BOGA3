@@ -17,6 +17,7 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
+// Pending/error bodies mount only their StatePanel; chart work starts after data.
 // The history of one exercise or one muscle on Progress: a sub-page
 // (`PageSheet`) holding the metric control and the saved Daily
 // or Weekly heatmap. One component for the muscle and the exercise
@@ -73,7 +74,6 @@ function HistoryHeatmap({
   lookbackWeeks,
   muscleTargets,
   status,
-  chartHidden,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -86,7 +86,6 @@ function HistoryHeatmap({
   lookbackWeeks: number;
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   status: ReactNode;
-  chartHidden: boolean;
 }) {
   // Both views span the saved window and scroll vertically.
   const data = useMemo(
@@ -102,9 +101,10 @@ function HistoryHeatmap({
         metricLabel={metricLabel}
         formatValue={formatDailyValue}
         legendLabel={`${metricLabel} per day`}
+        header={status}
       />
     ),
-    [data, formatDailyValue, metricLabel, testIDPrefix]
+    [data, formatDailyValue, metricLabel, testIDPrefix, status]
   );
   const weeklyHeatmap = useMemo(
     () => (
@@ -116,14 +116,16 @@ function HistoryHeatmap({
         formatValue={formatDailyValue}
         metricLabel={metricLabel}
         formatReferenceValue={metric === 'totalVolume' ? formatVolume : formatOneRepMax}
-        header={chartHidden ? null : status}
+        header={status}
       />
     ),
-    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix, metric, metricLabel, status, chartHidden]
+    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix, metric, metricLabel, status]
   );
+  const [visited, setVisited] = useState({ daily: view === 'daily', weekly: view === 'weekly' });
+  if (!visited[view]) setVisited(previous => ({ ...previous, [view]: true }));
   const dailyVisible = view === 'daily';
 
-  // Both trees stay mounted so a switch reuses the laid-out chart and keeps its
+  // Visited trees stay mounted so a switch reuses the laid-out chart and keeps its
   // selection and scroll; the inactive one is transparent, inert and hidden
   // from assistive tech.
   return (
@@ -134,14 +136,7 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'auto' : 'none'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
         testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        <ScrollView contentContainerStyle={styles.dailyContent} showsVerticalScrollIndicator={false}
-          style={styles.scroll} testID={`${testIDPrefix}-scroll`}>
-          {status}
-          <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
-            pointerEvents={chartHidden ? 'none' : 'auto'} style={chartHidden ? styles.hiddenChart : undefined}>
-            {dailyHeatmap}
-          </View>
-        </ScrollView>
+        {visited.daily ? dailyHeatmap : null}
       </View>
       <View
         accessibilityElementsHidden={dailyVisible}
@@ -149,11 +144,7 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'none' : 'auto'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive]}
         testID={`${testIDPrefix}-heatmap-panel-weekly`}>
-        {chartHidden ? <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView> : null}
-        <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
-          pointerEvents={chartHidden ? 'none' : 'auto'} style={chartHidden ? styles.hiddenWeeklyChart : styles.weeklyChart}>
-          {weeklyHeatmap}
-        </View>
+        {visited.weekly ? weeklyHeatmap : null}
       </View>
     </View>
   );
@@ -210,6 +201,33 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   // The host mounts the sheet open and unmounts it from `onDismiss`.
   const [visible, setVisible] = useState(true);
 
+  const status = <>
+    {isLoading ? (
+      <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
+    ) : null}
+
+    {!isLoading && errorMessage ? (
+      <StatePanel
+        action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${prefix}-retry` } : undefined}
+        body={errorMessage}
+        fill={false}
+        kind="error"
+        testID={`${prefix}-error`}
+        title={`Could not load ${kind} history`}
+      />
+    ) : null}
+
+    {!isLoading && !errorMessage && weeklyEffort.length === 0 ? (
+      <StatePanel
+        body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
+        fill={false}
+        testID={`${prefix}-empty`}
+        title="No history yet"
+      />
+    ) : null}
+
+  </>;
+
   return (
     <PageSheet closeLabel={`Close ${kind} history`} eyebrow={eyebrow} onDismiss={() => setVisible(false)}
       onDismissed={onDismiss} testID={prefix} title={title} visible={visible}>
@@ -227,7 +245,9 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           />
         </View>
 
-        <HistoryHeatmap
+        {!!errorMessage || (isLoading && dailyMetrics.length === 0) ? (
+          <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView>
+        ) : <HistoryHeatmap
           dailyMetrics={dailyMetrics}
           lookbackWeeks={lookbackWeeks}
           muscleTargets={muscleTargets}
@@ -238,34 +258,8 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           testIDPrefix={prefix}
           todayDateKey={todayDateKey}
           view={view}
-          chartHidden={!!errorMessage || (isLoading && dailyMetrics.length === 0)}
-          status={<>
-          {isLoading ? (
-            <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
-          ) : null}
-
-          {!isLoading && errorMessage ? (
-            <StatePanel
-              action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${prefix}-retry` } : undefined}
-              body={errorMessage}
-              fill={false}
-              kind="error"
-              testID={`${prefix}-error`}
-              title={`Could not load ${kind} history`}
-            />
-          ) : null}
-
-          {!isLoading && !errorMessage && weeklyEffort.length === 0 ? (
-            <StatePanel
-              body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
-              fill={false}
-              testID={`${prefix}-empty`}
-              title="No history yet"
-            />
-          ) : null}
-
-          </>}
-        />
+          status={status}
+        />}
       </View>
     </PageSheet>
   );
@@ -286,10 +280,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     padding: uiSpace.lg,
   },
-  dailyContent: { gap: uiSpace.lg, paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm },
-  hiddenChart: { height: 0, opacity: 0, overflow: 'hidden' },
-  weeklyChart: { flex: 1 },
-  hiddenWeeklyChart: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },
   heatmapLayers: {
     flex: 1,
     position: 'relative',
