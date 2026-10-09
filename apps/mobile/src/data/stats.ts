@@ -120,7 +120,7 @@ const comparisonPeriods = (options: ComputeStatsSummaryOptions) => {
     : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
   const previous = options.periodWeeks === undefined ? computePreviousPeriodBounds(current)
     : { days: current.days, start: shiftCalendarWeeks(current.start, -options.periodWeeks),
-      end: shiftCalendarWeeks(current.end, -options.periodWeeks) };
+      end: options.periodWeeks > 1 ? current.start : shiftCalendarWeeks(current.end, -options.periodWeeks) };
   return { current, previous };
 };
 
