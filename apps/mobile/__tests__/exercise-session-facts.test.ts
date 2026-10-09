@@ -487,13 +487,13 @@ describe('exercise session facts — PR flags and completed-session PRs equal de
     expect(flagged.length).toBeGreaterThan(3);
 
     // Every completed graph once; the replay itself skips sessions not before its target.
-    const graphs = await loadSessionInsightHistory({ completedAt: day(365), targetSessionId: '' });
+    const graphs = await loadSessionInsightHistory({ completedAt: day(365), targetSessionId: '', historyLookbackWeeks: 520 });
     for (const sessionId of sessionIds) {
       const replayed = deriveSessionPersonalRecords({
         targetSession: graphs.find((graph) => graph.sessionId === sessionId)!,
         historicalSessions: graphs,
       });
-      const insights = await loadCompletedSessionInsights(sessionId);
+      const insights = await loadCompletedSessionInsights(sessionId, 520);
       // The facts-backed list is the replay's list: same sets, order and values.
       expect({ sessionId, records: insights!.personalRecords }).toEqual({ sessionId, records: replayed });
       // Every flag is a record: `pr_e1rm` on the best set, `pr_weight` on the

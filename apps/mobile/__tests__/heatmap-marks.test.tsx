@@ -115,7 +115,7 @@ describe('Bodyweight heatmap coverage', () => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
     render(<WeeklyHeatmap data={coverage} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
-    expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `52-week median ~${median}`);
+    expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `53-week median ~${median}`);
     expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p25`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p75`).left).toBe('37.5%');

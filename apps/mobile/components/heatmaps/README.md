@@ -103,7 +103,7 @@ the sole view choice, and it writes the saved `heatmapView` preference
 choices use Daily; a valid saved choice survives restart and account
 switching. The Timeline's week list is read only while that view shows. Progress history targets
 one muscle ID or one exercise definition, never a family.
-Numeric `weeks` controls the exact query/grid span;
+Numeric `weeks` controls query/grid coverage under [[comparison.history-window]];
 short windows have no implicit 52-week minimum.
 
 ## Look

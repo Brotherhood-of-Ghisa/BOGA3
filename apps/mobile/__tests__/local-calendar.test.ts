@@ -10,6 +10,7 @@ import {
   localWeekWindow,
   startOfLocalDay,
 } from '@/src/utils/local-calendar';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
@@ -93,5 +94,29 @@ describe('day helpers', () => {
     expect(() => localMonthWindow(invalid)).toThrow('valid Date');
     expect(() => startOfLocalDay(invalid)).toThrow('valid Date');
     expect(() => daysInLocalMonth(invalid)).toThrow('valid Date');
+  });
+});
+
+describe('complete-week history bounds', () => {
+  it.each([5, 6, 7, 8, 9, 10, 11])('includes four complete weeks on October %i', day => {
+    const now = local(2026, 10, day, 12);
+    expect(historyWeekBounds(4, now)).toEqual({
+      start: local(2026, 9, day === 11 ? 14 : 7), end: now,
+    });
+  });
+
+  it.each([
+    [1, 2026, 9, 28], [52, 2025, 10, 6], [520, 2016, 10, 17],
+  ])('covers %i complete weeks before Friday', (weeks, year, month, day) => {
+    expect(historyWeekBounds(weeks, local(2026, 10, 9)).start).toEqual(local(year, month, day));
+  });
+
+  it('keeps Monday midnight across a year, leap February and both DST transitions', () => {
+    expect(historyWeekBounds(1, local(2027, 1, 1)).start).toEqual(local(2026, 12, 21));
+    expect(historyWeekBounds(1, local(2028, 2, 29)).start).toEqual(local(2028, 2, 21));
+    expect(historyWeekBounds(1, local(2026, 3, 30, 12)).start).toEqual(local(2026, 3, 23));
+    expect(historyWeekBounds(1, local(2026, 10, 26, 12)).start).toEqual(local(2026, 10, 19));
+    expect(historyWeekBounds(1, local(2026, 3, 29, 12)).start).toEqual(local(2026, 3, 23));
+    expect(historyWeekBounds(1, local(2026, 10, 25, 12)).start).toEqual(local(2026, 10, 19));
   });
 });

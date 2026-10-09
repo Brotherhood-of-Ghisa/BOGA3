@@ -44,6 +44,7 @@ export function initializeAccountLocalPreferences(isConfigured: boolean): void {
 const currentProfile = () => profile ?? null;
 
 export const getAccountLocalPreferenceState = () => state;
+export const getAccountLocalPreferenceAccountRevision = () => generation;
 export const subscribeToAccountLocalPreferences = (listener: () => void) => {
   listeners.add(listener);
   return () => { listeners.delete(listener); };

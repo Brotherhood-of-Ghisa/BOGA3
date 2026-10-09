@@ -91,6 +91,7 @@ import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 import * as insightsRepository from '@/src/session-insights/repository';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
+import { setAccountLocalPreferences } from '@/src/preferences/account-local';
 import {
   bootLocalApp,
   closeLocalData,
@@ -1135,6 +1136,21 @@ describe('Session view: editing a completed session', () => {
 });
 
 describe('Session vs history', () => {
+  it('rejects a delayed comparison when the saved look-back changes on the mounted session', async () => {
+    await seed();
+    let resolveOld!: (history: Awaited<ReturnType<typeof insightsRepository.loadSessionInsightHistory>>) => void;
+    const read = jest.spyOn(insightsRepository, 'loadSessionInsightHistory')
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error('new window failed'));
+    render(<SessionCompareScreen sessionId={SESSION} />);
+    await screen.findByText('Loading comparisons…');
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ historyLookbackWeeks: 1 }));
+    await act(async () => resolveOld([]));
+    expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
+  });
+
   it('shows the open session volume while its exercise and muscle history builds', async () => {
     await seed();
     render(<SessionCompareScreen sessionId={SESSION} />);
@@ -1152,6 +1168,10 @@ describe('Session vs history', () => {
     expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByLabelText(/Quads, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    expect(await screen.findByLabelText(/Quads, 1 set\. .*Building history/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-exercise'));
+    expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*Building history/)).toBeTruthy();
   });
 
   it('says the comparisons are unavailable when the history read fails', async () => {

@@ -47,7 +47,7 @@ import * as statsRepository from '@/src/data/stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
-import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -119,6 +119,22 @@ afterEach(() => {
 });
 
 describe('The history page over real data', () => {
+  it.each([9, 11])('includes the complete-week start and excludes the preceding instant on October %i', async day => {
+    jest.setSystemTime(new Date(2026, 9, day, 12));
+    await loadMaestroFixture('exercise-block-history');
+    const start = historyWeekBounds(1).start;
+    const daysAgo = (Date.now() - start.getTime()) / DAY_MS;
+    await logPulldown(daysAgo);
+    await logPulldown(daysAgo + 1 / DAY_MS);
+    act(() => updatePreferences({ historyLookbackWeeks: 1, heatmapView: 'daily' }));
+    await openHistory({ exerciseDefinitionId: PULLDOWN });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    const sampled = renderedDailySample();
+    expect(sampled.filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
+      .toEqual([[localDateKey(start), 600]]);
+    expect(sampled.map(tile => tile.dateKey).sort()[0]).toBe(localDateKey(start));
+  });
+
   it('reads exercise history once and preserves both standalone projections over real data', async () => {
     await loadMaestroFixture('exercise-block-history');
     const read = jest.spyOn(localDataClient(), 'prepare');
@@ -272,7 +288,7 @@ describe('The history page over real data', () => {
 
     await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
-    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength(2);
   });
 
   it('shows no empty-history panel while the initial read or look-back reload is pending', async () => {
@@ -308,9 +324,9 @@ describe('The history page over real data', () => {
 
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
-    expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining(historyWeekBounds(weeks)));
     const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
-    expect(renderedDailySample()).toHaveLength((weeks - 1) * 7 + 6);
+    expect(renderedDailySample()).toHaveLength(weeks * 7 + 6);
     const olderKey = localDateKey(new Date(Date.now() - 450 * DAY_MS));
     if (weeks === 104) {
       expect(renderedDailySample().find(day => day.dateKey === olderKey)?.day?.value).toBe(600);

@@ -48,7 +48,7 @@ const read = async () => {
     loadRecentExerciseBlocks({ exerciseDefinitionId: 'pull', now: end }),
     computeSelectedExerciseDailyEffort({ exerciseDefinitionId: 'pull', start, end, timeZone: 'UTC' }),
     computeSelectedMuscleDailyEffort({ muscleGroupIds: ['back'], start, end, timeZone: 'UTC' }),
-    loadCompletedSessionInsights('new'), loadSessionSnapshotById('new'),
+    loadCompletedSessionInsights('new', 52), loadSessionSnapshotById('new'),
   ]);
   if (!history || !insights || !graph) throw new Error('Expected persisted workout graph');
   return { history, blocks, daily, muscle, insights, view: buildSessionViewModel(mapDraftSnapshotToSession(graph), new Map()) };

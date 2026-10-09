@@ -12,6 +12,10 @@ export const calendarWeekBounds = (weeks: number, now = new Date()) => {
   return { start: shiftCalendarWeeks(monday, 1 - weeks), end: new Date(now) };
 };
 
+/** History sample coverage follows [[comparison.history-window]]. */
+export const historyWeekBounds = (weeks: number, now = new Date()) =>
+  calendarWeekBounds(weeks + (now.getDay() === 0 ? 0 : 1), now);
+
 export const localDateKey = (date: Date): string =>
   `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 

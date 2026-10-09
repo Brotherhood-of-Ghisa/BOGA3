@@ -7,6 +7,7 @@
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
+import { historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 
 import {
   getCalendarHeatmapBucket,
@@ -56,7 +57,7 @@ export interface BuildHeatmapDataOptions {
   /** Defaults to the local "today". Pass a `YYYY-MM-DD` key to make tests deterministic. */
   todayDateKey?: string;
   /**
-   * History window in weeks (Monday-aligned span ending today). Default 52.
+   * Minimum complete weeks through today ([[comparison.history-window]]). Default 52.
    * Pass `'all'` to span from the earliest day present in `dailyMetrics` (falling back
    * to the 52-week default when there is less data), so the grid grows with the data.
    */
@@ -96,9 +97,10 @@ const bestOf = (left: number | null, right: number | null | undefined): number =
 
 const DEFAULT_WEEKS = 52;
 
-/** Monday of the week `weeks - 1` weeks before today's week. */
-const windowStart = (today: Date, weeks: number): Date =>
-  addUtcDays(startOfMondayWeek(today), -(weeks - 1) * 7);
+const windowStart = (today: Date, weeks: number): Date => {
+  const localToday = new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return dateKeyToUtcDate(localDateKey(historyWeekBounds(weeks, localToday).start));
+};
 
 const earliestDay = (dailyMetrics: DailyEffortMetrics[]): Date | null => {
   let earliest: Date | null = null;
