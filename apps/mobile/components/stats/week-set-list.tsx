@@ -1,5 +1,6 @@
 // The Timeline's week list: the selected week's sets under the chart, one
-// `ExerciseSetsCard` per block (`week-sets.ts`). A card opens its session.
+// `ExerciseSetsCard` per block with View Session's rows and record band
+// (`week-sets.ts`). A card opens its session.
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
@@ -26,7 +27,7 @@ export function WeekSetList({ groups, loading, error, onOpenSession, onRetry, te
     {groups.map((group) => <ExerciseSetsCard key={group.key}
       accessibilityLabel={`Open session from ${group.detail === group.title ? group.title : `${group.title}, ${group.detail}`}`}
       count={`${group.workingSetCount} ${group.workingSetCount === 1 ? 'set' : 'sets'}`}
-      name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows}
+      name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}
       summary={<View style={styles.summary}>
         <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>{group.detail}</Text>
       </View>}

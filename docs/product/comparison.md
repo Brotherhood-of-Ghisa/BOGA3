@@ -72,7 +72,8 @@ scale. A month is labelled at the first week that starts in it, as in
 The readout above the chart shows the selected week, else the newest: its
 figure and unit (`volume`, `sets`, `kg`), and `View sessions` for a trained
 week. Tapping a week selects it and fills its column in `ink`; a second tap
-clears it. The selected week's sets follow the chart. Unlike Daily and Weekly
+clears it. The selected week's sets follow the chart as View Session's
+cards, record highlights and bands included. Unlike Daily and Weekly
 ([[copy.blank-history]]), the readout writes a rest week's figure.
 
 Why: one form reads the same for every metric; a week without training sums

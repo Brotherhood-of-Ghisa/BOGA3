@@ -1,7 +1,8 @@
 // The sets of one history week, as cards for the Timeline's week list: an
-// exercise's history draws one card per session block, a muscle's one card per
-// exercise block that worked the muscle. Days run Monday first. Pure builders
-// plus the hook that reads a week.
+// exercise's history lists each session block of the exercise, a muscle's each
+// exercise block that worked the muscle, days Monday first. A card is View
+// Session's card for that block (`loadCompletedSessionCards`): the same rows,
+// record highlights and record band as every finished session.
 import { useEffect, useState } from 'react';
 
 import {
@@ -10,9 +11,10 @@ import {
   type ExerciseHistorySessionEntry,
   type MuscleSetContribution,
 } from '@/src/data';
-import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
-import { formatSetRow, type SessionViewSetRow } from '@/src/session-recorder/session-view-model';
+import type { RecordLine } from '@/src/session-insights/record-band';
+import { loadCompletedSessionCards } from '@/src/session-recorder/completed-session-cards';
+import type { CompletedSessionDetailCard } from '@/src/session-recorder/completed-session-detail-model';
+import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 import { localWeekBounds } from '@/src/utils/calendar-weeks';
 
 export type WeekSetGroup = {
@@ -22,7 +24,11 @@ export type WeekSetGroup = {
   detail: string;
   workingSetCount: number;
   rows: SessionViewSetRow[];
+  record: RecordLine[];
 };
+
+/** One session block to list: its card's title, or the card's exercise name when absent. */
+export type WeekBlock = { sessionId: string; sessionExerciseId: string; completedAt: Date; title?: string; detail: string };
 
 export type WeekSetsTarget = { exerciseDefinitionId: string } | { muscleGroupIds: string[] };
 
@@ -33,69 +39,65 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const formatWeekDay = (date: Date): string =>
   `${DAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
 
-const setRow = (input: { id: string; weightValue: string; repsValue: string; setType: string | null }, loadContext?: ExerciseHistorySessionEntry['loadContext']) =>
-  formatSetRow({
-    id: input.id,
-    weight: parseSetWeight(canonicalizeWeightForReps(input.weightValue, input.repsValue)),
-    reps: parseSetReps(input.repsValue),
-    setType: input.setType,
-    done: true,
-    loadContext,
-  });
+/** An exercise's blocks, titled by their day, with their gym. */
+export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[]): WeekBlock[] =>
+  entries.map((entry) => ({
+    sessionId: entry.sessionId,
+    sessionExerciseId: entry.sessionExerciseId,
+    completedAt: entry.completedAt,
+    title: formatWeekDay(entry.completedAt),
+    detail: entry.gymName?.trim() ? entry.gymName : 'No gym',
+  }));
 
-/** One card per session block of the exercise, titled by its day. */
-export const exerciseWeekGroups = (entries: ExerciseHistorySessionEntry[]): WeekSetGroup[] =>
-  [...entries]
-    .sort((left, right) => left.completedAt.getTime() - right.completedAt.getTime())
-    .map((entry) => ({
-      key: entry.sessionExerciseId,
-      sessionId: entry.sessionId,
-      title: formatWeekDay(entry.completedAt),
-      detail: entry.gymName?.trim() ? entry.gymName : 'No gym',
-      workingSetCount: entry.workingSetCount,
-      rows: entry.sets.map((set) => setRow({ ...set, id: set.setId }, entry.loadContext)),
-    }));
-
-type MuscleBlock = WeekSetGroup & { completedAt: number; sets: MuscleSetContribution[] };
-
-/** One card per exercise block that worked the muscle, titled by the exercise. */
-export const muscleWeekGroups = (contributions: MuscleSetContribution[]): WeekSetGroup[] => {
-  const blocks = new Map<string, MuscleBlock>();
-  const seen = new Set<string>();
+/** The blocks that worked a muscle, titled by their exercise, with their day. */
+export const muscleWeekBlocks = (contributions: MuscleSetContribution[]): WeekBlock[] => {
+  const blocks = new Map<string, WeekBlock>();
   for (const contribution of contributions) {
-    if (seen.has(contribution.setIdentity)) continue;
-    seen.add(contribution.setIdentity);
-    const block = blocks.get(contribution.sessionExerciseId) ?? {
-      key: contribution.sessionExerciseId,
+    if (blocks.has(contribution.sessionExerciseId)) continue;
+    blocks.set(contribution.sessionExerciseId, {
       sessionId: contribution.sessionId,
-      title: contribution.exerciseName ?? 'Exercise',
+      sessionExerciseId: contribution.sessionExerciseId,
+      completedAt: contribution.sessionCompletedAt,
       detail: formatWeekDay(contribution.sessionCompletedAt),
-      workingSetCount: 0,
-      rows: [],
-      completedAt: contribution.sessionCompletedAt.getTime(),
-      sets: [],
-    };
-    block.sets.push(contribution);
-    if (contribution.working) block.workingSetCount += 1;
-    blocks.set(contribution.sessionExerciseId, block);
+    });
   }
-  return [...blocks.values()]
-    .sort((left, right) => left.completedAt - right.completedAt)
-    .map(({ completedAt: _completedAt, sets, ...group }) => ({
-      ...group,
-      rows: [...sets]
-        .sort((left, right) => (left.setOrderIndex ?? 0) - (right.setOrderIndex ?? 0))
-        .map((set) => setRow({ ...set, id: set.setId ?? set.setIdentity })),
-    }));
+  return [...blocks.values()];
+};
+
+/** The listed blocks' cards, oldest first; a block without a card (no performed set) is left out. */
+export const weekSetGroups = (
+  blocks: WeekBlock[],
+  cardsBySessionId: ReadonlyMap<string, CompletedSessionDetailCard[]>
+): WeekSetGroup[] =>
+  [...blocks]
+    .sort((left, right) => left.completedAt.getTime() - right.completedAt.getTime())
+    .flatMap((block) => {
+      const card = cardsBySessionId.get(block.sessionId)?.find((candidate) => candidate.id === block.sessionExerciseId);
+      return card ? [{
+        key: block.sessionExerciseId,
+        sessionId: block.sessionId,
+        title: block.title ?? card.name,
+        detail: block.detail,
+        workingSetCount: card.setCount,
+        rows: card.rows,
+        record: card.record,
+      }] : [];
+    });
+
+const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string): Promise<WeekBlock[]> => {
+  const bounds = localWeekBounds(weekKey);
+  if ('exerciseDefinitionId' in target) {
+    return exerciseWeekBlocks(await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId }));
+  }
+  const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds });
+  return muscleWeekBlocks(days.flatMap((day) => day.contributions));
 };
 
 const loadWeekGroups = async (target: WeekSetsTarget, weekKey: string): Promise<WeekSetGroup[]> => {
-  const bounds = localWeekBounds(weekKey);
-  if ('exerciseDefinitionId' in target) {
-    return exerciseWeekGroups(await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId }));
-  }
-  const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds });
-  return muscleWeekGroups(days.flatMap((day) => day.contributions));
+  const blocks = await loadWeekBlocks(target, weekKey);
+  const sessionIds = [...new Set(blocks.map((block) => block.sessionId))];
+  const cards = await Promise.all(sessionIds.map(loadCompletedSessionCards));
+  return weekSetGroups(blocks, new Map(sessionIds.map((sessionId, index) => [sessionId, cards[index]])));
 };
 
 export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: string | null };
