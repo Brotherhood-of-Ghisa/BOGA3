@@ -1,3 +1,4 @@
+export { BuildingHistoryCard } from './building-history-card';
 export { ExerciseVolumeCard } from './exercise-volume-card';
 export { PersonalRecordCard } from './personal-record-card';
 export { SessionCompletionScreen, type MuscleCatalogState } from './session-completion-screen';

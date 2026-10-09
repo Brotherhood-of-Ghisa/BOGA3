@@ -8,6 +8,7 @@ import { PageSheet } from '@/components/ui/page-sheet';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   captureSessionShareImage,
+  hasVolumeReference,
   releaseSessionShareImage,
   shareSessionImage,
   type ExercisePersonalRecord,
@@ -93,11 +94,14 @@ function ShareRecordRow({ record, set }: ShareRecord) {
 }
 
 /**
- * The shared image: session totals, every PR and every exercise comparison, in
- * the design language. It never shows the gym or any location.
+ * The shared image: session totals, every PR and every exercise the session
+ * can compare, in the design language. It never shows the gym or any location.
  */
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
   const shareRecords = shareRecordsOf(snapshot.personalRecords);
+  // The image carries comparisons, not shortfalls: an exercise the session
+  // cannot compare yet is left out rather than pooled ([[session.volume-comparison]]).
+  const comparisons = snapshot.exerciseVolumeComparisons.filter(hasVolumeReference);
   return (
     <View style={styles.shareCard} testID="session-share-card">
       <View style={styles.brandRow}>
@@ -129,17 +133,19 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
         </View>
       ) : null}
 
-      <View style={styles.exercises} testID="session-share-card-exercises">
-        <Text allowFontScaling={false} style={styles.sectionTitle}>Exercise volume</Text>
-        {snapshot.exerciseVolumeComparisons.map((comparison) => (
-          <ExerciseVolumeCard
-            key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
-            comparison={comparison}
-            testID={`session-share-exercise-${comparison.sessionExerciseIds[0]}`}
-            variant="share"
-          />
-        ))}
-      </View>
+      {comparisons.length > 0 ? (
+        <View style={styles.exercises} testID="session-share-card-exercises">
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Exercise volume</Text>
+          {comparisons.map((comparison) => (
+            <ExerciseVolumeCard
+              key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
+              comparison={comparison}
+              testID={`session-share-exercise-${comparison.sessionExerciseIds[0]}`}
+              variant="share"
+            />
+          ))}
+        </View>
+      ) : null}
       <Text allowFontScaling={false} style={styles.madeWith}>Made with BOGA</Text>
     </View>
   );

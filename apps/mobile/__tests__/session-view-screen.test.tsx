@@ -1151,14 +1151,16 @@ describe('Session vs history', () => {
     expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
   });
 
-  it('shows the open session volume while its exercise and muscle history builds', async () => {
+  it('pools the open session by name, in both groupings, while its history builds', async () => {
     await seed();
     render(<SessionCompareScreen sessionId={SESSION} />);
 
-    expect(await screen.findByLabelText(/Barbell Bench Press, 2 sets\. .*Building history/)).toBeTruthy();
-    expect(screen.queryByTestId(`session-insight-exercise-${BENCH}-distribution`)).toBeNull();
+    expect(await screen.findByTestId('session-insight-building-history-exercise')).toHaveTextContent(
+      /Barbell Bench Press/
+    );
+    expect(screen.queryByTestId(`session-insight-exercise-${BENCH}`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(await screen.findByLabelText(/Chest, \d+ sets?\. .*Building history/)).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-building-history-muscle')).toHaveTextContent(/Chest/);
   });
 
   it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
@@ -1169,9 +1171,11 @@ describe('Session vs history', () => {
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByLabelText(/Quads, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
     act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
-    expect(await screen.findByLabelText(/Quads, 1 set\. .*Building history/)).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-building-history-muscle')).toHaveTextContent(/Quads/);
     fireEvent.press(screen.getByTestId('session-insight-mode-exercise'));
-    expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*Building history/)).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-building-history-exercise')).toHaveTextContent(
+      /Barbell Back Squat/
+    );
   });
 
   it('says the comparisons are unavailable when the history read fails', async () => {

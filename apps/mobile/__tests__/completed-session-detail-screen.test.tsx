@@ -283,9 +283,13 @@ describe('CompletedSessionDetailScreenShell', () => {
     });
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
+    // The completion presentation keeps the screen usable without history: its
+    // zero-history fallback pools every exercise by name, drawing no card.
+    expect(screen.getByTestId('session-completion-building-history-exercise')).toHaveTextContent(
+      /Bench PressLat Pulldown/
+    );
     expect(screen.queryByText('No comparison history yet')).toBeNull();
-    expect(screen.queryByTestId('session-completion-exercise-exercise-1-distribution')).toBeNull();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 

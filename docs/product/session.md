@@ -76,13 +76,22 @@ Each reference label sits above its mark, its value below. If annotations
 overlap or extend beyond the bar, keep only Median and its value; the marks
 and current dot remain. Equal quartiles collapse to one mark.
 
-With fewer observations, show Volume and `Building history`, without a
-comparison. An unavailable Volume is `—` with no history label. There is no
-prior-session subtitle or comparison footnote.
+A card is drawn only for an exercise or muscle that has the observations.
+The rest get no card: one secondary `Building history` card closes the
+section, stating the cutoff and listing their names in session order, names
+only. An unavailable Volume is listed there too. A session with nothing to
+compare shows that card alone; the share image carries the drawn cards only
+and omits its volume section when there are none. There is no prior-session
+subtitle or comparison footnote.
 
-Why: a readable typical range and a consistent low-history card.
+Why: an empty distribution plot reads as a broken card, so the section shows
+a comparison or says plainly that it has none.
 Code: `ExerciseVolumeCard` in
 `apps/mobile/components/session-complete/exercise-volume-card.tsx`;
+`BuildingHistoryCard` in
+`apps/mobile/components/session-complete/building-history-card.tsx`;
+`partitionVolumeComparisons` in
+`apps/mobile/src/session-insights/volume-reference.ts`;
 `apps/mobile/src/session-insights/calculations.ts`;
 `apps/mobile/src/utils/history-reference.ts` shares the cutoff with the
 weekly heatmap.

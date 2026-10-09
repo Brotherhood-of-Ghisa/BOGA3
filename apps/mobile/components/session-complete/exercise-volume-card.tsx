@@ -4,8 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { ExerciseVolumeComparison } from '@/src/session-insights';
-import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
+import { hasVolumeReference, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 type ExerciseVolumeCardProps = {
   comparison: ExerciseVolumeComparison;
@@ -34,16 +33,9 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
   return `${percentage}% ${delta > 0 ? 'above' : 'below'} median`;
 };
 
-const hasVolumeReference = (comparison: ExerciseVolumeComparison): boolean =>
-  comparison.currentVolume !== null &&
-  comparison.historicalSessionCount >= MIN_HISTORY_OBSERVATIONS &&
-  comparison.medianVolume !== null && comparison.percentile25Volume !== null && comparison.percentile75Volume !== null;
-
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
   const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.`;
-  if (!hasVolumeReference(comparison)) {
-    return comparison.currentVolume === null ? base : `${base} Building history.`;
-  }
+  if (!hasVolumeReference(comparison)) return base;
 
   return `${base} ${formatExerciseVolumeComparison(comparison)}. Historical median ${formatSpokenVolume(
     comparison.medianVolume
@@ -70,7 +62,8 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
  * current value and sets, then P25/median/P75 and
  * delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
- * Equal quartiles collapse to a rule; low history shows "Building history".
+ * Equal quartiles collapse to a rule. A comparison without a distribution
+ * gets no card: its host pools it by name (`BuildingHistoryCard`).
  * Labels and values center on their rules, above and below the bar. Crowded
  * annotations reduce to the median; sets sit beside the name in every state.
  * Shared by the session summary, live comparison and captured share image.
@@ -108,8 +101,6 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
           </View>
           {hasDistribution ? <Text allowFontScaling={false} style={styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
-          </Text> : comparison.currentVolume !== null ? <Text allowFontScaling={false} style={styles.historyStatus}>
-            Building history
           </Text> : null}
         </View>
 
@@ -227,14 +218,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
-  },
-  historyStatus: {
-    flexShrink: 1, textAlign: 'right',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   distribution: {
     height: uiTypography.lineHeight.xxs + uiSpace.xs * 2 + uiSpace.lg + uiTypography.lineHeight.xs,
