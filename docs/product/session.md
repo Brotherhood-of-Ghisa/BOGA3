@@ -78,8 +78,9 @@ and current dot remain. Equal quartiles collapse to one mark.
 
 A card is drawn only for an exercise or muscle that has the observations.
 The rest get no card: one secondary card closes the section, stating
-`Comparison unavailable — needs at least 6 sessions` and listing their names
-in session order, names only. An unavailable Volume is listed there too. A
+`Comparison unavailable — needs at least 7 sessions` — the six prior
+comparable sessions plus this one — and listing their names in session
+order, names only. An unavailable Volume is listed there too. A
 session with nothing to compare shows that card alone; the share image
 carries the drawn cards only and omits its volume section when there are
 none. There is no prior-session subtitle or comparison footnote.

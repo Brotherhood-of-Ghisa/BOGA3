@@ -432,7 +432,7 @@ describe('completed-session detail over real data', () => {
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toBeNull();
     const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
-    expect(pooled).toHaveTextContent(/^Comparison unavailable — needs at least 6 sessions/);
+    expect(pooled).toHaveTextContent(/^Comparison unavailable — needs at least 7 sessions/);
     expect(within(pooled).queryByText(/No comparison history yet|Vol|500/)).toBeNull();
     expect(label('completed-session-detail-volume')).toBe('Volume 500');
 
@@ -713,7 +713,7 @@ describe('a session written through the app', () => {
 
     // The pulldown has no history: one secondary card, its name only.
     const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
-    expect(pooled).toHaveTextContent(/needs at least 6 sessionsLat Pulldown$/);
+    expect(pooled).toHaveTextContent(/needs at least 7 sessionsLat Pulldown$/);
     expect(within(pooled).queryByText(/Vol|120|1 set/)).toBeNull();
     expect(screen.queryByTestId(`session-completion-exercise-${DESIGN.pulldown}`)).toBeNull();
 

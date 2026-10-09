@@ -4,9 +4,10 @@ import { Card } from '@/components/ui/card';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
-// One statement: what is missing, and what it takes. The cutoff is the shared
-// constant, never a literal.
-const STATEMENT = `Comparison unavailable — needs at least ${MIN_HISTORY_OBSERVATIONS} sessions`;
+// One statement: what is missing, and what it takes. The cutoff counts the
+// sessions *before* this one, so the card's count includes it — the session
+// just finished is the lifter's nth, and the comparison lands on the next.
+const STATEMENT = `Comparison unavailable — needs at least ${MIN_HISTORY_OBSERVATIONS + 1} sessions`;
 
 type ComparisonUnavailableCardProps = {
   /** Exercise or muscle names, in the order the session lists them. */

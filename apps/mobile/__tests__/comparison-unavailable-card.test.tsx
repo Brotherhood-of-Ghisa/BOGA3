@@ -5,14 +5,14 @@ import { ComparisonUnavailableCard } from '@/components/session-complete/compari
 it('states the cutoff once and lists the names in order, with no figures', () => {
   render(<ComparisonUnavailableCard names={['Barbell Bench Press', 'Pull-Up']} testID="pooled" />);
 
-  expect(screen.getByText('Comparison unavailable — needs at least 6 sessions')).toBeTruthy();
+  expect(screen.getByText('Comparison unavailable — needs at least 7 sessions')).toBeTruthy();
   expect(screen.getByTestId('pooled')).toHaveTextContent(
-    /^Comparison unavailable — needs at least 6 sessionsBarbell Bench PressPull-Up$/
+    /^Comparison unavailable — needs at least 7 sessionsBarbell Bench PressPull-Up$/
   );
   // Names only: no set count, no Volume, no empty plot ([[session.volume-comparison]]).
   expect(screen.queryByText(/Vol|sets?$|P25|Median|P75/)).toBeNull();
   expect(screen.getByLabelText(
-    'Comparison unavailable — needs at least 6 sessions. Barbell Bench Press, Pull-Up.'
+    'Comparison unavailable — needs at least 7 sessions. Barbell Bench Press, Pull-Up.'
   )).toBeTruthy();
 });
 
