@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# groups-fixtures.sh — shared helpers for the group backend lanes
-# (groups-contract.sh, groups-leaderboards.sh). Source it; it runs nothing.
+# groups-fixtures.sh — shared helpers for the group backend bodies
+# (supabase/tests/groups-*.sh). Source it; it runs nothing.
 #
 # The sourcing lane sets, before calling the helpers:
 #   LANE_LABEL            log prefix, e.g. "groups-contract"
@@ -115,12 +115,17 @@ http_call() {
   while [[ "${BODY}" == *$'\n' ]]; do BODY="${BODY%$'\n'}"; done
 }
 
+# Every group call speaks the current group contract (protocol 4), as the app
+# does: a group RPC without it is UPDATE_REQUIRED.
+GROUP_CONTRACT_HEADER="x-boga-group-contract: 4"
+
 # rpc <bearer> <function> <json-body>
 rpc() {
   local bearer="$1" name="$2" body="$3"
   http_call -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
+    -H "${GROUP_CONTRACT_HEADER}" \
     -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
     --data "${body}" \
@@ -144,7 +149,7 @@ rest() {
 
 # eval_drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
 eval_drain() {
-  http_call -X POST \
+  http_call -X POST -H "${GROUP_CONTRACT_HEADER}" \
     -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${1-${EVAL_SECRET}}" \
     --data '{}' "${API_URL}/functions/v1/group-eval"
@@ -174,7 +179,8 @@ check() {
 sign_in() {
   local email="$1"
   http_call -X POST \
-    -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "apikey: ${ANON_KEY}" -H "${GROUP_CONTRACT_HEADER}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     --data "$(jq -nc --arg e "${email}" --arg p "${PASSWORD}" '{email: $e, password: $p}')" \
     "${API_URL}/auth/v1/token?grant_type=password"
   [[ "${STATUS}" == "200" ]] || fail "password sign-in for ${email}"

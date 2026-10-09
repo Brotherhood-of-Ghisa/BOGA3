@@ -9,6 +9,7 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
+import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
 
 import CompletedSessionDetailRoute, {
   CompletedSessionDetailScreenShell,
@@ -243,6 +244,25 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
   });
 
+  it.each(['look-back', 'account'])('rejects obsolete comparisons after changing the %s', async change => {
+    setAccountLocalPreferenceAccount('A', true);
+    let resolveOld!: (value: unknown) => void;
+    const loadInsights = jest.fn()
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error('new context failed'));
+    render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
+    await screen.findByText('Loading comparisons…');
+    expect(loadInsights).toHaveBeenLastCalledWith('completed-under-test', 52);
+    act(() => {
+      if (change === 'look-back') setAccountLocalPreferences({ historyLookbackWeeks: 1 });
+      else setAccountLocalPreferenceAccount('B', true);
+    });
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    expect(loadInsights).toHaveBeenLastCalledWith('completed-under-test', change === 'look-back' ? 1 : 52);
+    await act(async () => resolveOld({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] }));
+    expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
+  });
+
   it('keeps completion and current exercise rows available when optional insight history fails', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
@@ -264,7 +284,8 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    expect(screen.getAllByText('No comparison history yet')).toHaveLength(2);
+    expect(screen.queryByText('No comparison history yet')).toBeNull();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1-distribution')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 

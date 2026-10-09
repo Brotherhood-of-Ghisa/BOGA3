@@ -12,23 +12,30 @@ appId: com.dinoderek.mobile
 #      so Stats counts it), and it commits `135.0 × 8`;
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
-#   5. Progress → By Exercise reads back the session just written: the only
+#   5. Progress → Exercise reads back the session just written: the only
 #      on-device check of the Stats queries (their values over the harness
-#      fixtures are stats-screen-local-data.test.tsx).
-#   6. history's page sheet snaps back after a short drag of its header, leaves
-#      chart scrolling independent, and closes on a deliberate downward swipe.
+#      fixtures are stats-screen-local-data.test.tsx). Its filter row is
+#      remembered on the device, so reopening Progress returns to Exercise.
+#   6. an exercise row pushes its history page; its chart scrolls inside the
+#      page, and native back returns to Progress;
+#   7. the history grid opens its sessions ([[session.history-open]]): today's
+#      Grid tile opens the session just logged, and this week's Weekly row
+#      opens Sessions at its week; Back returns to the page in the view left.
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
 #   4. the root-stack replace after Finish.
-#   6. the UIKit page-sheet swipe and the chart's own scroll inside it.
+#   6. the chart's own scroll inside a pushed page, and UIKit's back;
+#   7. native-stack pushes from the page and back to it, and the Sessions list
+#      positioned at the week (Jest mocks scrolling).
 # Jest counterpart: __tests__/exercise-picker.test.tsx,
 #   __tests__/exercise-page-screen.test.tsx (logger),
 #   __tests__/set-effort-defaults.test.ts (first-set warm-up),
 #   __tests__/session-view-model.test.ts (Finish prompts),
 #   __tests__/completed-session-local-data.test.tsx (Done → Stats),
 #   __tests__/stats-screen-local-data.test.tsx, __tests__/sessions-screen.test.tsx.
-#   __tests__/ui-page-sheet.test.tsx (swipe, X and re-presentation decisions).
+#   __tests__/progress-history-local-data.test.tsx (the openers' hrefs),
+#   __tests__/history-navigation.test.ts (jump positions).
 #
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
@@ -140,9 +147,17 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# 5. The pinned switch opens exercise browsing without leaving Progress.
+# 5. The pinned switch opens exercise browsing without leaving Progress. Enter
+# on the breakdown this step starts from rather than on whatever the last run
+# of this lane left stored: Done has already mounted Progress, and a deep link
+# that changes its breakdown re-enters it, overriding the remembered filter.
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-table"
+    timeout: 15000
 - tapOn:
-    id: "stats-view-mode-chip-exercise"
+    id: "stats-view-mode-chip"
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
@@ -153,7 +168,7 @@ appId: com.dinoderek.mobile
     id: "stats-exercise-list-empty"
 - takeScreenshot: "05-data-runtime-smoke-exercise-list"
 # One native gesture scenario; disclosure and browsing state remain Jest.
-# Establish its Daily/window preconditions: data reset preserves saved preferences.
+# Establish its window precondition: data reset preserves saved preferences.
 # This is setup for scrolling, not a new Settings claim (settings-progress.test.tsx).
 - openLink: "boga3://settings"
 - scrollUntilVisible:
@@ -165,31 +180,70 @@ appId: com.dinoderek.mobile
 - eraseText
 - inputText: "52"
 - hideKeyboard
-- tapOn:
-    id: "settings-heatmap-view-daily"
 - openLink: "boga3://progress"
-- tapOn:
-    id: "stats-view-mode-chip-exercise"
+# Progress reopens on the breakdown chosen above: the filter row is remembered,
+# so this returns to the exercise list without touching the switch again.
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-list"
+    timeout: 15000
+# 6. An exercise row pushes its own history page, titled by the exercise, with
+# the view and metric selectors in one row above the chart.
 - tapOn:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - extendedWaitUntil:
     visible:
-      id: "stats-exercise-history-header"
+      id: "stats-exercise-history-view-chip-row"
     timeout: 15000
+- assertVisible: "Barbell Back Squat"
+- tapOn:
+    id: "stats-exercise-history-view-chip-daily"
 - tapOn:
     id: "stats-exercise-history-metric-chip-workingSetCount"
-- swipe:
-    start: "50%,10%"
-    end: "50%,14%"
-    duration: 600
-- waitForAnimationToEnd:
-    timeout: 4000
+- takeScreenshot: "06-history-page-grid"
+# 7. Today's tile holds the one Squat session this flow logged: it opens it,
+# and Back returns to the page, still on Grid.
+- evalScript: ${output.today = (function() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); })()}
+- evalScript: ${output.monday = (function() { var d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); })()}
+- tapOn:
+    id: "stats-exercise-history-heatmap-cell-${output.today}"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 15000
+- takeScreenshot: "06a-history-day-opens-session"
+# View Session draws its own header: its back control, not UIKit's.
+- tapOn:
+    id: "completed-session-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-history-heatmap-cell-${output.today}"
+    timeout: 10000
+# This week's Weekly row opens Sessions at that week; Back returns to Weekly.
+- tapOn:
+    id: "stats-exercise-history-view-chip-weekly"
+- tapOn:
+    id: "stats-exercise-history-heatmap-cell-${output.monday}"
+- extendedWaitUntil:
+    visible:
+      id: "completed-history-week-${output.monday}"
+    timeout: 15000
 - assertVisible:
-    id: "stats-exercise-history-header"
-- takeScreenshot: "06-history-short-drag-restored"
-# The month calendar scrolls vertically inside the native sheet. A month three
-# months earlier starts below the viewport; centring it proves body scrolling
-# without dismissing the sheet. Read-only tiles and calendar arithmetic remain Jest.
+    id: "sessions-screen"
+- takeScreenshot: "06b-history-week-opens-sessions"
+- tapOn:
+    id: "BackButton"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-history-heatmap-panel-weekly"
+    timeout: 10000
+- assertVisible:
+    id: "stats-exercise-history-heatmap-cell-${output.monday}"
+- tapOn:
+    id: "stats-exercise-history-view-chip-daily"
+# The month calendar scrolls vertically inside the page. A month three months
+# earlier starts below the viewport; centring it proves body scrolling without
+# leaving the page. Calendar arithmetic remains Jest.
 - evalScript: ${output.historyOlderMonthKey = (function() { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); })()}
 - scrollUntilVisible:
     element:
@@ -199,17 +253,16 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
 - assertVisible:
-    id: "stats-exercise-history-header"
+    id: "stats-exercise-history-view-chip-row"
 - takeScreenshot: "07-history-chart-scrolled"
-- swipe:
-    from:
-      id: "stats-exercise-history-header"
-    direction: DOWN
-    duration: 600
+# Native back returns to Progress with the exercise list as it was left. The
+# chevron's hidden label varies by iOS runtime, so tap UIKit's own id.
+- tapOn:
+    id: "BackButton"
 - extendedWaitUntil:
     notVisible:
-      id: "stats-exercise-history-header"
+      id: "stats-exercise-history-view-chip-row"
     timeout: 10000
 - assertVisible:
     id: "stats-exercise-row-seed_barbell_back_squat"
-- takeScreenshot: "08-history-swipe-dismissed"
+- takeScreenshot: "08-history-back-to-progress"

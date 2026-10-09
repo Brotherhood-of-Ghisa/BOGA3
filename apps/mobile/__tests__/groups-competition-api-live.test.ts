@@ -1,7 +1,8 @@
 /* eslint-disable import/first */
-/** Actual protocol-4 client RPCs and guards against the leased local endpoint.
- * The groups-api-live lane activates locally for this phase and restores pending
- * state on exit. Server arithmetic/privacy vectors remain in backend fixtures. */
+/** Actual protocol-4 client RPCs and guards against this worktree's leased local
+ * stack (supabase/tests/groups-competition-live.sh, lane groups-api-live), whose
+ * baseline runs protocol 4. Server arithmetic/privacy vectors remain in
+ * backend fixtures. */
 import { readGroupsLiveEnv, signInLiveClient, type LiveClient } from './helpers/groups-live-endpoint';
 let mockActiveClient: LiveClient['client'] | null = null;
 jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () => {
@@ -9,8 +10,8 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   return mockActiveClient;
 } }));
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
-  getCompetitionBoard,getCompetitionCertification,getCompetitionContract,getCompetitionHistory,getCompetitionPodiums,
-  getCompetitionRevisions,getCompetitionSession,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
+  getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
+  getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup } from '@/src/groups/api';
 
 const env=readGroupsLiveEnv();
@@ -61,7 +62,6 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const { group_id: groupId }=await as(owner,() => createGroup({ name: 'Live competition',description: null }));
   const { code }=await as(owner,() => getGroupInviteCode(groupId));
   await as(member,() => joinGroup(code));
-  expect(await as(member,() => getCompetitionContract(groupId))).toMatchObject({ activation_state: 'active',cache_version: 5 });
   await as(owner,() => updateGroup(groupId,{ name: 'Live competition',description: null,bodyweightCalculationsEnabled: true }));
   expect((await as(member,() => getGroup(groupId))).group.bodyweight_calculations_enabled).toBe(true);
   expect((await as(member,() => listMyGroups())).groups.some(group => group.group_id===groupId)).toBe(true);
@@ -80,6 +80,11 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const detail=await as(owner,() => getCompetitionSession(groupId,member.userId,sessionId));
   expect(detail.session.exercises[0].visibility).toBe('normalized');
   expect(detail.session.exercises[0].sets[0]).not.toHaveProperty('weight_value');
+  const { records }=await as(owner,() => getCompetitionSessionRecords(groupId,member.userId,sessionId));
+  expect(records).toHaveLength(1);
+  expect(records[0].event).toMatchObject({ kind: 'record',set_id: setId,visibility: 'normalized' });
+  expect(records[0].boards.map(b => [b.metric,b.leads,b.leader?.user_id])).toEqual([['e1rm',true,member.userId],['volume',true,member.userId]]);
+  expect(records[0].event.values.every(value => value.unit==='percent_bw' || value.unit==='percent_bw_reps')).toBe(true);
   const stream=await as(owner,() => getCompetitionStream(groupId));
   expect(stream.items.some(item => item.kind==='session' && item.session.session_id===sessionId)).toBe(true);
   expect(await as(owner,() => getCompetitionWeek(groupId,joined.sort_at_ms-1,joined.sort_at_ms+120_000))).toMatchObject({ contract_version: 4,group_id: groupId });

@@ -69,17 +69,13 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md`).
   - group screens under `app/**` consume it through `@/src/groups`; group code never runs inside the sync cycle and must not modify `src/sync/**` beyond the `group_cache` delete in the account wipe.
   - `set-facts.ts` is the one implementation of the group set rules, shared with the `group-eval` Edge Function, which loads it by relative path: it may import only by relative `.ts` specifier (never `@/`), and only modules that follow the same rule.
-  - `metric-contract.ts`, `performance-score.ts` and `metric-evaluation.ts`
-    own group Weight/1RM rules and the strict optional-bodyweight graph scorer
-    shared with that worker.
-    Their entire import graph follows the same relative `.ts` rule, including
-    type-only imports. `metric-wire.ts` / `metric-wire-guards.ts` own versioned
-    comparison rules and their privacy validation; `competition-session-view-model.ts`
-    owns the public shared-session projection and never a private reading context.
-    `competition-score.ts` / `competition-evaluation.ts` own activated
-    protocol-4 scoring/worker dispatch; competition wire guards own its exact
-    safe reader shapes at the same API boundary. They follow the same `.ts`
-    relative-import rule where shared with the Edge worker.
+  - `link-compatibility.ts` owns the source-to-target load-mode factor;
+    `competition-score.ts` / `competition-evaluation.ts` own protocol-4
+    scoring and the worker's evaluation, shared with that worker. Their entire
+    import graph follows the same relative `.ts` rule, including type-only
+    imports. Competition wire guards own its exact safe reader shapes at the
+    API boundary; `competition-session-view-model.ts` owns the public
+    shared-session projection and never a private reading context.
 - `apps/mobile/src/exercise-core/`
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
@@ -134,7 +130,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `supabase/functions/group-eval/`
   - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md`). It has no client-facing API.
 - `supabase/tests/lib/`
-  - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by `groups-contract` and `groups-leaderboards`); files here are never lane bodies themselves.
+  - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by the `groups-*` lane bodies); files here are never lane bodies themselves.
 - `docs/procedures/`
   - owns step-by-step procedures that any agent harness follows when `AGENTS.md` routes to them (for example `worktree-cleanup.md`). A procedure states when to run it, its rules, and exact commands; the contracts it applies stay in `docs/specs/**`.
 - `apps/mobile/artifacts/maestro/`

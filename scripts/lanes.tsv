@@ -22,9 +22,10 @@ agent-auth-web	fast-repo	none	yes	.	./scripts/test-agent-auth-web.sh
 mcp-unit	fast-repo	none	yes	.	./scripts/test-boga-mcp.sh
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
+groups-leaderboards	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-boards.sh groups-certification.sh groups-bodyweight.sh groups-leaderboards.sh groups-week-summary.sh
 groups-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-contract.sh
-groups-leaderboards	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-leaderboards.sh groups-boards.sh groups-certification.sh groups-bodyweight.sh groups-week-summary.sh
-groups-api-live	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-api-live.sh
+groups-competitions	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-competitions.sh
+groups-api-live	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-api-live.sh groups-competition-live.sh
 agent-api	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh agent-api-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh
 sync-push-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-push-contract.sh
@@ -41,7 +42,6 @@ ios-session-view	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh 
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
 ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
 ios-groups-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh groups-e2e
-groups-protocol4	extra	supabase	no	.	./supabase/scripts/run-suite.sh groups-competition-live.sh groups-competitions.sh
 handles	extra	none	no	apps/mobile	npm run test:handles
 ios-gates	extra	ios	no	apps/mobile	./scripts/maestro-ios-gates.sh
 jest-sync	extra	none	no	apps/mobile	npm run test:sync

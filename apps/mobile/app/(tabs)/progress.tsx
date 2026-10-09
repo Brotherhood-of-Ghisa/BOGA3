@@ -1,7 +1,7 @@
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -16,52 +16,37 @@ import {
 } from 'react-native';
 
 import {
-  EXERCISE_HISTORY_METRIC_OPTIONS,
-  HistorySheet,
-  MUSCLE_HISTORY_METRIC_OPTIONS,
-  type MuscleHistoryMetric,
-} from '@/components/stats/history-sheet';
-import {
   Card,
   Icon,
   ListRow,
   Screen,
   ScreenScroll,
   SearchField,
-  SegmentedControl,
   StatePanel,
-  uiFonts,
-  uiGeometry,
+  ToggleChip,
   uiRoles,
   uiSpace,
-  uiTypography,
 } from '@/components/ui';
-import {
-  type CalendarHeatmapMetric,
-  type DailyEffortMetrics,
-  type SelectedExerciseWeeklyEffort,
-  type SelectedMuscleWeeklyEffort,
-  type ProgressComparisons,
-} from '@/src/data';
+import { type ProgressComparisons } from '@/src/data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { HeatmapView } from '@/src/preferences/model';
-import { ProgressTables, type ProgressTableMetric } from '@/components/stats/progress-tables';
-import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
+import type { ProgressMetric } from '@/src/preferences/model';
+import { ProgressTables } from '@/components/stats/progress-tables';
+import {
+  StatsTable,
+  StatsTableFigures,
+  StatsTableHeader,
+  StatsTableHeaderLabel,
+  statsTableStyles,
+} from '@/components/stats/stats-table';
+import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
+import { progressHistoryHref } from '@/src/navigation/routes';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
-export type MuscleHistoryTarget = {
-  muscleGroupIds: [string];
-  displayName: string;
-  familyName: string;
-};
-
-export type ExerciseHeatmapTarget = {
-  exerciseDefinitionId: string;
-  displayName: string;
-};
+export type MuscleHistoryTarget = { muscleGroupId: string };
+export type ExerciseHeatmapTarget = { exerciseDefinitionId: string };
 
 export type ExerciseListItem = {
   id: string;
@@ -72,14 +57,16 @@ export type ExerciseListItem = {
   lastCompletedAt: Date | null;
 };
 
-export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume';
+export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume' | 'oneRepMax';
 export type ExerciseSortMode =
   | 'recency-desc'
   | 'recency-asc'
   | 'sets-desc'
   | 'sets-asc'
   | 'volume-desc'
-  | 'volume-asc';
+  | 'volume-asc'
+  | 'oneRepMax-desc'
+  | 'oneRepMax-asc';
 
 export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
 
@@ -87,6 +74,7 @@ const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
   exercise: ['recency-desc', 'recency-asc'],
   sets: ['sets-desc', 'sets-asc'],
   volume: ['volume-desc', 'volume-asc'],
+  oneRepMax: ['oneRepMax-desc', 'oneRepMax-asc'],
 };
 
 const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader> = {
@@ -96,20 +84,33 @@ const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader>
   'sets-asc': 'sets',
   'volume-desc': 'volume',
   'volume-asc': 'volume',
+  'oneRepMax-desc': 'oneRepMax',
+  'oneRepMax-asc': 'oneRepMax',
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+// The filter row holds three chips at phone width, so each carries one word.
+// `Sets` unqualified is the working-set count ([[set.count-display]]).
 const VIEW_MODE_OPTIONS = [
-  { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
-  { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
+  { value: 'exercise' as StatsViewMode, label: 'Exercise' },
+  { value: 'muscle' as StatsViewMode, label: 'Muscle' },
+] as const;
+const METRIC_OPTIONS = [
+  { value: 'workingSetCount' as ProgressMetric, label: 'Sets' },
+  { value: 'totalVolume' as ProgressMetric, label: 'Volume' },
 ] as const;
 
-const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
-
-export const resolveStatsInitialBreakdown = (
-  value: string | string[] | undefined
-): StatsViewMode => (firstRouteParam(value) === 'exercise' ? 'exercise' : 'muscle');
+// Period choices and accessibility wording follow [[comparison.window]].
+// `This week` is the only choice when Settings' Progress period is one week,
+// which leaves the chip inert rather than offering the same span twice.
+const periodOptions = (targetWindowWeeks: number) => {
+  const thisWeek = { value: 'this-week' as ProgressPeriod, label: 'This week',
+    accessibilityLabel: `This week, ${formatPeriodComparison(7)}, full previous calendar week` };
+  if (targetWindowWeeks === 1) return [thisWeek];
+  return [{ value: 'window' as ProgressPeriod, label: `${targetWindowWeeks} weeks`,
+    accessibilityLabel: `${targetWindowWeeks} weeks, ${formatPeriodComparison(targetWindowWeeks * 7)}, full previous calendar weeks` },
+    thisWeek];
+};
 
 export { formatCountDelta, formatVolumeDelta } from '@/components/stats/comparison-format';
 export const formatPeriodComparison = (periodDays: number): string =>
@@ -140,6 +141,10 @@ export const describeExerciseSortMode = (mode: ExerciseSortMode): string => {
       return 'Volume — high to low';
     case 'volume-asc':
       return 'Volume — low to high';
+    case 'oneRepMax-desc':
+      return '1RM — high to low';
+    case 'oneRepMax-asc':
+      return '1RM — low to high';
   }
 };
 
@@ -197,6 +202,14 @@ export const sortExerciseListItems = (
       case 'volume-asc':
         comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, false);
         break;
+      // Rows with no estimate sort last in both directions
+      // (`compareOptionalNumbers`), so the column never leads with blanks.
+      case 'oneRepMax-desc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, true);
+        break;
+      case 'oneRepMax-asc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, false);
+        break;
     }
     return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
   });
@@ -204,45 +217,23 @@ export const sortExerciseListItems = (
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
   onRetry?: () => void;
-  periodDays: number;
+  period: ProgressPeriod;
   targetWindowWeeks?: number;
-  historyLookbackWeeks?: number;
-  weeklyWorkingSetTarget?: number;
-  onSelectPeriod: (period: number) => void;
+  onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
-  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
-  onDismissMuscleHistory: () => void;
-  onRetryMuscleHistory?: () => void;
-  onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
+  // A muscle or exercise name opens its history page; Progress keeps its own
+  // state and scroll behind it.
+  onOpenMuscleHistory: (muscle: MuscleHistoryTarget) => void;
+  onOpenExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   isLoading: boolean;
   errorMessage: string | null;
-  selectedMuscle: MuscleHistoryTarget | null;
-  muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
-  muscleHistoryDailyMetrics: DailyEffortMetrics[];
-  isMuscleHistoryLoading: boolean;
-  muscleHistoryErrorMessage: string | null;
-  selectedMuscleHistoryWeekKey: string | null;
-  muscleHistoryMetric: MuscleHistoryMetric;
-  muscleHistoryView: HeatmapView;
-  onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
+  tableMetric: ProgressMetric;
+  onSelectTableMetric: (metric: ProgressMetric) => void;
   exerciseListItems: ExerciseListItem[];
-  selectedExercise: ExerciseHeatmapTarget | null;
-  exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
-  exerciseHistoryDailyMetrics: DailyEffortMetrics[];
-  isExerciseHistoryLoading: boolean;
-  exerciseHistoryErrorMessage: string | null;
-  selectedExerciseHistoryWeekKey: string | null;
-  exerciseHistoryMetric: CalendarHeatmapMetric;
-  exerciseHistoryView: HeatmapView;
-  onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
-  onDismissExerciseHistory: () => void;
-  onRetryExerciseHistory?: () => void;
-  onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
-  onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
-  /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
-  historyTodayDateKey?: string;
+  // False while the history page is on top: returning restores reader focus.
+  isFocused?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
 };
@@ -250,68 +241,64 @@ export type StatsScreenShellProps = {
 export function StatsScreenShell({
   summary,
   onRetry,
-  periodDays,
+  period,
   targetWindowWeeks = 4,
-  historyLookbackWeeks = 52,
-  weeklyWorkingSetTarget = 8,
   onSelectPeriod,
   onPressSessionsCard,
-  onPressMuscleHistory,
-  onDismissMuscleHistory,
-  onRetryMuscleHistory,
-  onSelectMuscleHistoryWeek,
+  onOpenMuscleHistory,
+  onOpenExerciseHistory,
   isLoading,
   errorMessage,
-  selectedMuscle,
-  muscleHistoryWeeklyEffort,
-  muscleHistoryDailyMetrics,
-  isMuscleHistoryLoading,
-  muscleHistoryErrorMessage,
-  selectedMuscleHistoryWeekKey,
-  muscleHistoryMetric,
-  muscleHistoryView,
-  onSelectMuscleHistoryMetric,
   viewMode,
   onSelectViewMode,
+  tableMetric,
+  onSelectTableMetric,
   exerciseListItems,
-  selectedExercise,
-  exerciseHistoryWeeklyEffort,
-  exerciseHistoryDailyMetrics,
-  isExerciseHistoryLoading,
-  exerciseHistoryErrorMessage,
-  selectedExerciseHistoryWeekKey,
-  exerciseHistoryMetric,
-  exerciseHistoryView,
-  onPressExerciseHistory,
-  onDismissExerciseHistory,
-  onRetryExerciseHistory,
-  onSelectExerciseHistoryWeek,
-  onSelectExerciseHistoryMetric,
-  historyTodayDateKey,
+  isFocused = true,
   searchQuery,
   onSearchQueryChange,
 }: StatsScreenShellProps) {
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
-  const [tableMetric, setTableMetric] = useState<ProgressTableMetric>('workingSetCount');
   const [contributionId, setContributionId] = useState<string | null>(null);
+  // The row whose history was opened, held only until the return it is for:
+  // any other way back to Progress (a tab, the Sessions link) leaves the
+  // reader where it landed.
   const launchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const focusRequest = useRef(0);
   useEffect(() => () => { focusRequest.current += 1; }, []);
-  const focus = (target: ComponentRef<typeof View> | null) => {
+  const focus = useCallback((target: ComponentRef<typeof View> | null) => {
     const request = ++focusRequest.current;
     void AccessibilityInfo.isScreenReaderEnabled().then(enabled => {
       if (request !== focusRequest.current) return;
       const handle = target && findNodeHandle(target);
       if (enabled && handle) AccessibilityInfo.setAccessibilityFocus(handle);
     });
-  };
+  }, []);
+  const wasFocused = useRef(isFocused);
+  useEffect(() => {
+    const returned = isFocused && !wasFocused.current;
+    wasFocused.current = isFocused;
+    if (!returned) return;
+    const row = launchTarget.current;
+    launchTarget.current = null;
+    if (row) focus(row);
+  }, [focus, isFocused]);
   const showContributions = (id: string) => {
     setContributionId(current => current === id ? null : id);
   };
-  const dismissMuscle = () => { onDismissMuscleHistory(); focus(launchTarget.current); };
-  const dismissExercise = () => { onDismissExerciseHistory(); focus(launchTarget.current); };
+  // The press that opens history: the keyboard goes, the row is remembered for
+  // the return, and any pending focus request for an earlier row is dropped.
+  const openHistory = useCallback(
+    <T,>(open: (target: T) => void, target: T, row: ComponentRef<typeof View> | null) => {
+      focusRequest.current += 1;
+      Keyboard.dismiss();
+      launchTarget.current = row;
+      open(target);
+    },
+    []
+  );
 
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -330,25 +317,20 @@ export function StatsScreenShell({
   return (
     <Screen testID="stats-history-screen">
       <View style={styles.controls} testID="stats-controls">
-        <View testID="stats-view-switch">
-          <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-            value={viewMode} onChange={onSelectViewMode} selectedGround="viz" testIDPrefix="stats-view-mode-chip" />
+        <View style={styles.filters} testID="stats-view-switch">
+          <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
+            value={viewMode} onChange={onSelectViewMode} testID="stats-view-mode-chip" />
+          <ToggleChip accessibilityLabel="Stats period" options={periodOptions(targetWindowWeeks)}
+            value={targetWindowWeeks === 1 ? 'this-week' : period} onChange={onSelectPeriod} testID="stats-period-chip" />
+          {viewMode === 'muscle' ? (
+            <ToggleChip accessibilityLabel="Progress metric" options={METRIC_OPTIONS}
+              value={tableMetric} onChange={onSelectTableMetric} testID="stats-metric-chip" />
+          ) : null}
         </View>
-        <SegmentedControl
-          accessibilityLabel="Select stats time range"
-          options={(targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
-            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
-            .map(option => ({ ...option, accessibilityLabel:
-              `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
-          value={periodDays} onChange={onSelectPeriod} selectedGround="viz" testIDPrefix="stats-period-chip" />
-        {viewMode === 'muscle' ? (
-          <SegmentedControl accessibilityLabel="Select progress metric"
-            options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} selectedGround="viz" testIDPrefix="stats-metric-chip" />
-        ) : (
+        {viewMode === 'exercise' ? (
           <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
             onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
-        )}
+        ) : null}
       </View>
       <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
@@ -356,62 +338,17 @@ export function StatsScreenShell({
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
         {viewMode === 'exercise' ? (
-          <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
+          <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
         ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
-          weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
-          onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
-          onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
+          onSelect={showContributions}
+          onMuscleHistory={(row, target) => openHistory(onOpenMuscleHistory, { muscleGroupId: row.muscleGroupId }, target)}
+          onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
-          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={styles.exerciseName}>Sessions</Text></ListRow>
+          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={statsTableStyles.name}>Sessions</Text></ListRow>
       </ScreenScroll>
 
-      {selectedMuscle && isIndividualMuscleHistoryTarget(selectedMuscle) ? (
-        <HistorySheet
-          key={`muscle-${selectedMuscle.muscleGroupIds[0]}`}
-          dailyMetrics={muscleHistoryDailyMetrics}
-          errorMessage={muscleHistoryErrorMessage}
-          eyebrow="Muscle History"
-          isLoading={isMuscleHistoryLoading}
-          kind="muscle"
-          metric={muscleHistoryMetric}
-          metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissMuscle}
-          onRetry={onRetryMuscleHistory}
-          onSelectMetric={onSelectMuscleHistoryMetric}
-          onSelectWeek={onSelectMuscleHistoryWeek}
-          selectedWeekKey={selectedMuscleHistoryWeekKey}
-          title={selectedMuscle.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={muscleHistoryView}
-          weeklyEffort={muscleHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTarget: weeklyWorkingSetTarget }}
-        />
-      ) : null}
-      {selectedExercise ? (
-        <HistorySheet
-          key={`exercise-${selectedExercise.exerciseDefinitionId}`}
-          dailyMetrics={exerciseHistoryDailyMetrics}
-          errorMessage={exerciseHistoryErrorMessage}
-          eyebrow="Exercise History"
-          isLoading={isExerciseHistoryLoading}
-          kind="exercise"
-          metric={exerciseHistoryMetric}
-          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissExercise}
-          onRetry={onRetryExerciseHistory}
-          onSelectMetric={onSelectExerciseHistoryMetric}
-          onSelectWeek={onSelectExerciseHistoryWeek}
-          selectedWeekKey={selectedExerciseHistoryWeekKey}
-          title={selectedExercise.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={exerciseHistoryView}
-          weeklyEffort={exerciseHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-        />
-      ) : null}
     </Screen>
   );
 }
@@ -443,16 +380,16 @@ function ExerciseListView({
   }
 
   return (
-    <Card testID="stats-exercise-list">
-      <View style={styles.tableHeader} testID="stats-exercise-table-header">
+    <StatsTable testID="stats-exercise-list">
+      <StatsTableHeader testID="stats-exercise-table-header">
         <ExerciseSortHeaderCell
           header="exercise"
           label="Exercise"
           sortMode={sortMode}
           onPress={onPressSortHeader}
-          style={styles.nameColumn}
+          style={[statsTableStyles.nameCell, styles.nameColumn]}
         />
-        <View style={styles.tableColumns}>
+        <StatsTableFigures>
           <ExerciseSortHeaderCell
             header="sets"
             label="Sets"
@@ -469,16 +406,16 @@ function ExerciseListView({
             style={styles.volumeColumn}
             numeric
           />
-          <View
-            accessibilityRole="header"
-            style={[styles.headerCell, styles.headerCellNumeric, styles.oneRepMaxColumn]}
-            testID="stats-exercise-header-oneRepMax">
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.headerLabel}>
-              1RM
-            </Text>
-          </View>
-        </View>
-      </View>
+          <ExerciseSortHeaderCell
+            header="oneRepMax"
+            label="1RM"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.oneRepMaxColumn}
+            numeric
+          />
+        </StatsTableFigures>
+      </StatsTableHeader>
       {items.map((item) => (
         <ListRow
           key={item.id}
@@ -492,35 +429,35 @@ function ExerciseListView({
           }`}
           density="list"
           meta={
-            <View style={styles.tableColumns}>
+            <StatsTableFigures>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.setsColumn]}
+                style={[statsTableStyles.figure, styles.setsColumn]}
                 testID={`stats-exercise-sets-${item.id}`}>
                 {String(item.workingSetCount)}
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.volumeColumn]}
+                style={[statsTableStyles.figure, styles.volumeColumn]}
                 testID={`stats-exercise-volume-${item.id}`}>
                 {formatVolumeFigure(item.totalVolume)}
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.oneRepMaxColumn]}
+                style={[statsTableStyles.figure, styles.oneRepMaxColumn]}
                 testID={`stats-exercise-1rm-${item.id}`}>
                 {item.estimatedOneRepMax === null ? '—' : formatOneRepMax(item.estimatedOneRepMax)}
               </Text>
-            </View>
+            </StatsTableFigures>
           }
-          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name }, links.current.get(item.id) ?? null)}
+          onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
           testID={`stats-exercise-row-${item.id}`}>
-          <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
+          <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
         </ListRow>
       ))}
-    </Card>
+    </StatsTable>
   );
 }
 
@@ -535,6 +472,8 @@ const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
       return 'Sets';
     case 'volume':
       return 'Volume';
+    case 'oneRepMax':
+      return '1RM';
   }
 };
 
@@ -571,18 +510,13 @@ function ExerciseSortHeaderCell({
       accessibilityState={{ selected: isActive }}
       onPress={() => onPress(header)}
       style={({ pressed }) => [
-        styles.headerCell,
+        statsTableStyles.headerCell,
         style,
-        numeric && styles.headerCellNumeric,
+        numeric && statsTableStyles.headerCellNumeric,
         pressed && styles.headerCellPressed,
       ]}
       testID={`stats-exercise-sort-${header}`}>
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.headerLabel, isActive && styles.headerLabelActive]}>
-        {label}
-      </Text>
+      <StatsTableHeaderLabel active={isActive} label={label} />
       <View
         accessible={false}
         style={[
@@ -592,9 +526,7 @@ function ExerciseSortHeaderCell({
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
         {header === 'exercise' ? (
-          <Text allowFontScaling={false} accessible={false} style={styles.headerLabel}>
-            Recent
-          </Text>
+          <StatsTableHeaderLabel label="Recent" />
         ) : null}
         <Icon
           color={uiRoles.ink}
@@ -614,22 +546,16 @@ export default function StatsRoute() {
 
 function StatsContent() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
   const { values } = useAccountLocalPreferenceState();
-  const [thisWeek, setThisWeek] = useState(firstRouteParam(params.period) === '7');
-  const weeks = thisWeek ? 1 : values.targetWindowWeeks;
-  const periodDays = weeks * 7;
+  const filters = useProgressFilters(params);
+  const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalogPeriod = useMemo(() => ({ weeks }), [weeks]);
   const catalog = useExerciseCatalog();
   const { stats, reload } = useExerciseCatalogStats(catalogPeriod);
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, revision, reload);
-  const historyRevision = revision + summary.refreshRevision;
-  const muscle = useHistory<MuscleHistoryTarget>(values.historyLookbackWeeks, historyRevision);
-  const exercise = useHistory<ExerciseHeatmapTarget>(values.historyLookbackWeeks, historyRevision);
-  const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
-  const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
-  const [viewMode, setViewMode] = useState<StatsViewMode>(() => resolveStatsInitialBreakdown(params.breakdown));
   const [searchQuery, setSearchQuery] = useState('');
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
     .filter(item => stats.aggregatesById.has(item.id))
@@ -639,64 +565,25 @@ function StatsContent() {
         totalVolume: aggregate.totalVolume,
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
-  return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
-    historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
-    onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
-    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onRetryMuscleHistory={muscle.retry} onSelectMuscleHistoryWeek={muscle.selectWeek}
-    selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
-    isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
-    muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
-    viewMode={viewMode} onSelectViewMode={mode => { setViewMode(mode); exercise.dismiss(); muscle.dismiss(); }}
-    exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
-    exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
-    selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
-    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onRetryExerciseHistory={exercise.retry} onSelectExerciseHistoryWeek={exercise.selectWeek}
-    onSelectExerciseHistoryMetric={setExerciseMetric} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
+  return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
+    onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
+    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle))}
+    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise))}
+    viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
+    tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric} isFocused={isFocused}
+    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
 }
 
 // The width the Exercise header reserves for its `Recent` + arrow indicator,
 // visible or not, so the label never moves when the sort changes.
 const RECENCY_INDICATOR_WIDTH = 64;
 
-const microLabel = {
-  fontFamily: uiFonts.display.family,
-  fontWeight: '700',
-  fontSize: uiTypography.size.xxs,
-  lineHeight: uiTypography.lineHeight.xxs,
-  letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  textTransform: 'uppercase',
-  color: uiRoles.inkMuted,
-} as const;
-
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-  },
-  tableColumns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  headerCell: {
-    minHeight: uiGeometry.tapTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  headerCellNumeric: {
-    justifyContent: 'flex-end',
-  },
+  filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   headerCellPressed: {
     backgroundColor: uiRoles.paper,
-  },
-  headerLabel: microLabel,
-  headerLabelActive: {
-    color: uiRoles.ink,
   },
   headerIndicator: {
     flexDirection: 'row',
@@ -711,10 +598,10 @@ const styles = StyleSheet.create({
   },
   // The table's columns: the name takes the rest; the figures sit in fixed,
   // right-aligned columns so digits align down the list. `Vol` fits a
-  // six-digit volume (`123456`) in Plex Mono.
+  // six-digit volume (`123456`) in Plex Mono, and `1RM` a six-character
+  // estimate (`1234.5`) — 46.8pt — which also clears the 41pt its header label
+  // plus sort arrow need now that the column sorts.
   nameColumn: {
-    flex: 1,
-    minWidth: 0,
     // Let Recent wrap below the label when both cannot fit beside Sets.
     flexWrap: 'wrap',
     alignContent: 'center',
@@ -726,22 +613,6 @@ const styles = StyleSheet.create({
     width: 52,
   },
   oneRepMaxColumn: {
-    width: 40,
-  },
-  exerciseName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-    paddingVertical: uiSpace.xs,
-  },
-  tableFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-    textAlign: 'right',
+    width: 48,
   },
 });

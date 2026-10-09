@@ -1,6 +1,7 @@
 export {
   ActionButton,
   type ActionButtonProps,
+  type ActionButtonSize,
   type ActionButtonTone,
   type ActionButtonVariant,
 } from '@/components/ui/action-button';
@@ -36,6 +37,7 @@ export {
   type SegmentedControlProps,
 } from '@/components/ui/segmented-control';
 export { Sheet, type SheetProps } from '@/components/ui/sheet';
+export { SwitchRow, type SwitchRowProps } from '@/components/ui/switch-row';
 export {
   Stat,
   type StatEmphasis,
@@ -53,6 +55,11 @@ export {
   type StatePanelProps,
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
+export {
+  ToggleChip,
+  type ToggleChipOption,
+  type ToggleChipProps,
+} from '@/components/ui/toggle-chip';
 export {
   uiBorder,
   uiFonts,

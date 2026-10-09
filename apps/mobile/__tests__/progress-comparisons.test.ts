@@ -5,7 +5,7 @@ import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 
 const periods = {
   current: { start: new Date('2026-05-18T00:00:00Z'), end: new Date('2026-05-21T12:00:00Z') },
-  previous: { start: new Date('2026-05-11T00:00:00Z'), end: new Date('2026-05-14T12:00:00Z') },
+  previous: { start: new Date('2026-05-11T00:00:00Z'), end: new Date('2026-05-18T00:00:00Z') },
 };
 const input = (): StatsAggregationInput => ({
   effortPolicy: DEFAULT_PERSONAL_EFFORT_POLICY,
@@ -171,17 +171,18 @@ it.each([
   expect(compareProgressVolume(current as number | null, previous as number | null)).toEqual(expected);
 });
 
-it('loads both periods once and excludes the unelapsed calendar gap', async () => {
+it('loads both periods once, including the previous weekend', async () => {
   const source = input();
-  source.sessions.push({ id: 'gap', completedAt: new Date('2026-05-16T10:00:00Z') });
-  source.sessionExercises.push({ id: 'gap-block', sessionId: 'gap', exerciseDefinitionId: 'lift' });
-  source.exerciseSets.push({ id: 'gap-set', sessionExerciseId: 'gap-block', setType: null, weightValue: '999', repsValue: '5' });
+  source.sessions.push({ id: 'weekend', completedAt: new Date('2026-05-16T10:00:00Z') });
+  source.sessionExercises.push({ id: 'weekend-block', sessionId: 'weekend', exerciseDefinitionId: 'lift' });
+  source.exerciseSets.push({ id: 'weekend-set', sessionExerciseId: 'weekend-block', setType: null, weightValue: '999', repsValue: '5' });
   const store: jest.Mocked<StatsStore> = { loadAggregationInput: jest.fn().mockResolvedValue(source), loadMuscleGroupTaxonomy: jest.fn() };
   const result = await createStatsRepository(store).computeProgressComparisons({ periodWeeks: 1, now: periods.current.end });
   expect(store.loadAggregationInput).toHaveBeenCalledTimes(1);
   // London calendar Mondays are at 23:00 UTC during British Summer Time.
   expect(store.loadAggregationInput).toHaveBeenCalledWith({ start: new Date('2026-05-10T23:00:00Z'), end: periods.current.end });
   expect(result.current.totals.workingSetCount).toBe(2);
-  expect(result.previous.totals.workingSetCount).toBe(1);
+  expect(result.previous.totals.workingSetCount).toBe(2);
+  expect(result.muscles[0].previous).toMatchObject({ workingSetCount: 2, totalVolume: 1398.75 });
   expect(result.muscles[0].current.totalVolume).toBe(125);
 });

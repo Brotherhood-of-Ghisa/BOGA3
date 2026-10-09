@@ -34,15 +34,18 @@ Two standing rules:
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
-| The screen's one primary action, or an outline / text button | `ActionButton` (`action-button.tsx`) |
+| The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`) |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
+| One choice from a few: a filter, a breakdown, a view | `SegmentedControl` (`segmented-control.tsx`) — `fill` / `fit` / `inline`, `density="compact"` and icon segments for two controls sharing a row |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled text or figure input | `FormField` (`form-field.tsx`) |
 | A search input | `SearchField` (`search-field.tsx`) |
-| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, theme-accent or palette-grade selection |
+| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
+| One filter of two values where a row of them cannot afford both labels | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap swaps it |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
+| One view option on or off, in a sheet (`Show deleted sessions`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
@@ -93,13 +96,13 @@ folder rather than re-implementing its row, card or sheet.
 | `session-detail/` | the read-only session cards — `SetSummaryRow`, `ExerciseSetsCard`, `SessionFactsCard` — shared by the session view, View Session, exercise history and the group session view. Row and card models: `src/session-recorder/session-view-model.ts`, `completed-session-detail-model.ts` |
 | `session-complete/` | the post-submit presentation: `SessionCompletionScreen`, `SessionMuscleBreakdown` / `SessionSummaryContent` (shared with historical review), `PersonalRecordCard`, `ExerciseVolumeCard`, and `SessionShareSheet` / `SessionShareCard`. The share image is privacy-limited: all PRs and exercise comparisons, never gym or location data |
 | `view-session/` | View Session's composition, top bar and sheets (route `app/completed-session/[sessionId].tsx`) |
-| `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList`, and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`) so any screen reusing the session buckets shares one repository mapping. Extracted from the retired session-list screen; now also consumed by Progress history |
-| `today/` | the Today cards: `TodayProgressCard` with `WeekFigures`, `ShareBar` and `MonthPace`; the group card; and `SessionSummaryRow` + `TrainingNowMark`, the session row both cards share. Reads: `apps/mobile/src/progress-summary/` |
+| `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList` (Sessions' one virtualized `SectionList`, the hub blocks as its header: [[session.history-weeks]]), the week grouping (`history-weeks.ts`), and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`, which attaches each session's PRs) |
+| `today/` | the Today cards: `TodayProgressCard` with `WeekFigures`, `ShareBar` and `MonthPace`; the group card; and `SessionSummaryRow` + `TrainingNowMark`, the session row both cards and Sessions' history share. Reads: `apps/mobile/src/progress-summary/` |
 | `train/` | `StartDisc`, Train's one action |
 | `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |
-| `stats/` | Progress’s `HistorySheet`, a `PageSheet` for one exercise definition or muscle; Progress restores focus once it has gone. Comparison tables have one inline contribution accordion |
+| `stats/` | `HistoryView`, the body of the history page (`app/progress-history.tsx`) for one exercise definition or muscle: its view and metric selectors and the chosen view; the Timeline's week list (`week-set-list.tsx`, [[comparison.timeline-history]]) draws its cards with `ExerciseSetsCard`. Progress pushes it and restores focus to the launching row on return. `StatsTable` (`stats-table.tsx`) is the one table style both breakdowns are drawn with — a card, a micro-label header row over right-aligned figure columns, `ListRow` rows, no title. Comparison tables have one inline contribution accordion, and band a muscle family without a figure of its own |
 | `gyms/` | `GymsScreen` and `GymEditor`; the gym directory and writes are `src/session-recorder/gym-options.ts`, location reads `src/location/gym-location-reads.ts` |
-| `groups/` | every group surface, behind the barrel `apps/mobile/components/groups/index.ts`: stream session and membership items, `GroupStreamList`, boards (`GroupBoardRow`, `GroupMetricBoard`, `GroupMetricHistory`, `GroupPodiumCard`, `GroupLeaderboardsPage`), the record and action sheets, member and exercise rows, the group / comparison / details forms, `StandardExercisePicker`, `UsernameGate`, `GroupCertificationStatus`, `GroupOfflineBanner`, `GroupWriteNotice`, the feature state panels (thin `StatePanel` wrappers), `usePullToRefresh` and the `groupScreenStyles` page shell. Data comes from `apps/mobile/src/groups` |
+| `groups/` | every group surface, behind the barrel `apps/mobile/components/groups/index.ts`: stream session and membership items, `GroupStreamList`, boards (`GroupBoardRow`, `GroupMetricBoard`, `GroupMetricHistory` and its tap-to-cycle filter pill `GroupCycleButton`, `GroupPodiumCard`, `GroupLeaderboardsPage`), the record and action sheets, member and exercise rows, the group / comparison / details forms, `StandardExercisePicker`, `UsernameGate`, `GroupCertificationStatus`, `GroupSetCertification` (a record set's one status and action), `GroupOfflineBanner`, `GroupWriteNotice`, the feature state panels (thin `StatePanel` wrappers), `usePullToRefresh` and the `groupScreenStyles` page shell. Data comes from `apps/mobile/src/groups` |
 | `bodyweight/` | `WeightEntrySheet`, `BodyWeightSettingsRow`, `BodyWeightScreen` — the only bodyweight entry surfaces. No session, logger or analytics component shows or edits a reading (`docs/specs/tech/bodyweight-load-contract.md`) |
 | `sync-status/` | `SyncStatusPanel`, Settings' one Data & Sync card |
 | `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview |

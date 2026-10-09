@@ -12,13 +12,16 @@
  *
  * `stats-screen.test.tsx` covers the formatting and sorting rules and the
  * screen shell's presentation on hand-built props; this suite proves the data
- * reaches it.
+ * reaches it. The history page Progress pushes has its own suites
+ * (`progress-history-local-data.test.tsx`, `progress-history-page.test.tsx`);
+ * here, a row press is proved by the push it makes.
  */
 
+import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as mockReact from 'react';
-import { Modal } from 'react-native';
+import { FlatList } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Icon, uiBorder, uiRoles } from '@/components/ui';
+import { Icon, uiBorder, uiGeometry, uiRoles } from '@/components/ui';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -26,12 +29,15 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
+let mockIsFocused = true;
 let mockSearchParams: Record<string, string | string[]> = {};
 // Every mounted focus callback, so a test can play "the tab came back".
 const mockFocusCallbacks = new Map<() => void | (() => void), void | (() => void)>();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+  // False while the pushed history page is on top.
+  useIsFocused: () => mockIsFocused,
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
@@ -48,7 +54,11 @@ jest.mock('expo-router', () => ({
 let mockUserId: string | null = null;
 jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: mockUserId ? { id: mockUserId } : null }) }));
 
-import { setAccountLocalPreferenceAccount, ensureAccountLocalPreferencesLoaded } from '@/src/preferences/account-local';
+import {
+  __resetAccountLocalPreferencesForTests,
+  ensureAccountLocalPreferencesLoaded,
+  setAccountLocalPreferenceAccount,
+} from '@/src/preferences/account-local';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
@@ -58,11 +68,18 @@ import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/se
 import * as statsRepository from '@/src/data/stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { closeLocalData, loadMaestroFixture, resetLocalData, localDataClient } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const SQUAT = EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId;
 const BENCH = EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId;
 const PULLDOWN = EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseId;
 const SQUAT_ROW = `stats-exercise-row-${SQUAT}`;
+const renderedDailySample = () => {
+  const list = screen.UNSAFE_getAllByType(FlatList).find(node => node.props.testID === 'stats-exercise-history-scroll');
+  const months: CalendarMonth[] = list!.props.data;
+  return months.flatMap(month => month.weeks.flatMap(week => week.days)).filter(day => day.day);
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const renderStats = async () => {
@@ -89,6 +106,15 @@ const deferred = <T,>() => {
   let reject!: (error: Error) => void;
   const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
   return { promise, resolve, reject };
+};
+
+// Each filter is one chip showing the value in force; a tap swaps it for the
+// other. These say which value the test wants, and tap only when it is not on.
+const chipValue = (filter: 'view-mode' | 'period' | 'metric'): string =>
+  within(screen.getByTestId(`stats-${filter}-chip`)).getByText(/.+/).props.children as string;
+const chooseFilter = (filter: 'view-mode' | 'period' | 'metric', label: string) => {
+  if (chipValue(filter) !== label) fireEvent.press(screen.getByTestId(`stats-${filter}-chip`));
+  expect(chipValue(filter)).toBe(label);
 };
 
 const exerciseOrder = () =>
@@ -124,6 +150,7 @@ beforeEach(() => {
   resetLocalData();
   mockUserId = null;
   mockPush.mockClear();
+  mockIsFocused = true;
   mockSearchParams = { period: '7', breakdown: 'exercise' };
   jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
   jest.setSystemTime(new Date('2026-10-03T12:00:00Z'));
@@ -141,85 +168,20 @@ describe('Stats over real data', () => {
   ('opens the requested %s period using the saved window for legacy values', async (period, days) => {
     mockSearchParams = { period: typeof period === 'string' ? period : [...period], breakdown: 'exercise' };
     await renderSeededStats();
-    expect(screen.getByTestId(`stats-period-chip-${days}`)).toHaveProp('accessibilityState', { selected: true });
-  });
-
-  it('shows no empty-history panel while the initial read or look-back reload is pending', async () => {
-    await renderSeededStats();
-    const initial = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
-    const reload = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
-    jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
-      .mockReturnValueOnce(initial.promise).mockReturnValueOnce(reload.promise);
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
-    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
-    expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    await act(async () => initial.resolve([]));
-    expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
-    act(() => updatePreferences({ historyLookbackWeeks: 4 }));
-    expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
-    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
-    expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    expect(screen.getAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(2);
-    await act(async () => reload.resolve([]));
-    expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent(days === 7 ? 'This week' : '4 weeks');
   });
 
   it('defaults to the configured window, collapses a one-week choice, and refreshes it while mounted', async () => {
     mockSearchParams = { breakdown: 'exercise' };
     await renderSeededStats();
-    expect(screen.getByTestId('stats-period-chip-28')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
     act(() => updatePreferences({ targetWindowWeeks: 1 }));
-    expect(screen.queryByTestId('stats-period-chip-28')).toBeNull();
-    expect(screen.getByTestId('stats-period-chip-7')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    expect(screen.getByTestId('stats-period-chip')).toHaveProp('accessibilityState', { disabled: true });
     act(() => updatePreferences({ targetWindowWeeks: 4 }));
-    expect(screen.getByTestId('stats-period-chip-28')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
     await waitFor(() => expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent('11'));
   });
-
-  it.each([1, 4, 52, 104])('queries and displays the same %i-week history, showing older records at 104', async weeks => {
-    await loadMaestroFixture('exercise-block-history');
-    await logPulldown(450);
-    await logPulldown(.05);
-    updatePreferences({ historyLookbackWeeks: weeks, heatmapView: 'daily' });
-    const read = jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseDailyEffort');
-    await renderStats();
-    fireEvent.press(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent(`Daily · ${weeks} ${weeks === 1 ? 'week' : 'weeks'}`);
-    expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
-    const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
-    expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength((weeks - 1) * 7 + 6);
-    const olderKey = localDateKey(new Date(Date.now() - 450 * DAY_MS));
-    if (weeks === 104) {
-      expect(panel.getByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`).props.accessibilityLabel).toContain('Volume 600');
-    } else expect(panel.queryByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`)).toBeNull();
-    expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  });
-
-  // The 104-week heatmap re-render trips the default ceiling when jest
-  // workers run alongside the fast aggregate's other lanes; this test alone
-  // needs ~18 s worst-case and the lane's load has cost it 40-90 s.
-  it('updates read-only daily tiles when the saved history window is shortened', async () => {
-    await renderSeededStats();
-    act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    const dateKey = localDateKey(new Date(Date.now() - 40 * DAY_MS));
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
-    act(() => updatePreferences({ historyLookbackWeeks: 52 }));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
-    act(() => updatePreferences({ historyLookbackWeeks: 1 }));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
-      .toHaveProp('accessibilityRole', 'text');
-    expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  }, 120_000);
 
   it('shows the empty state on an empty database', async () => {
     await renderStats();
@@ -252,7 +214,7 @@ describe('Stats over real data', () => {
 
     expect(screen.queryByTestId(`stats-exercise-row-${PULLDOWN}`)).toBeNull();
 
-    fireEvent.press(screen.getByTestId('stats-period-chip-28'));
+    chooseFilter('period', '4 weeks');
     expect(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`)).toBeTruthy();
   });
 
@@ -260,7 +222,8 @@ describe('Stats over real data', () => {
     await loadMaestroFixture('exercise-block-history');
     await logPulldown(20);
     await renderStats();
-    fireEvent.press(await screen.findByTestId('stats-period-chip-28'));
+    await screen.findByTestId('stats-period-chip');
+    chooseFilter('period', '4 weeks');
     await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`);
 
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
@@ -299,172 +262,60 @@ describe('Stats over real data', () => {
     await renderStats();
 
     // The summary feeds the muscle breakdown.
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    chooseFilter('view-mode', 'Muscle');
     const error = await screen.findByTestId('stats-error-state');
     expect(error).toHaveTextContent(/Could not load progress/);
     expect(error).not.toHaveTextContent(/Summary boom/);
     expect(screen.getByTestId('stats-retry')).toBeTruthy();
   });
 
-  it("opens a seeded exercise's history with all four metrics and both views, and dismisses it", async () => {
+  it('keeps populated and empty muscle rows neutral while preserving contribution selection', async () => {
     await renderSeededStats();
-
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-
-    const title = await screen.findByTestId('stats-exercise-history-title');
-    expect(title).toHaveTextContent(/Squat/);
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
-    expect(screen.queryByText('Weekly training load')).toBeNull();
-    for (const metric of ['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight']) {
-      expect(screen.getByTestId(`stats-exercise-history-metric-chip-${metric}`)).toBeTruthy();
+    chooseFilter('view-mode', 'Muscle');
+    for (const metric of ['workingSetCount', 'totalVolume']) {
+      chooseFilter('metric', metric === 'workingSetCount' ? 'Sets' : 'Volume');
+      for (const row of screen.getAllByTestId(/^stats-muscle-row-[^-]+$/)) {
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz4 });
+      }
+      expect(screen.queryAllByLabelText(/Colour:/)).toEqual([]);
     }
-
-    await act(async () => {
-      updatePreferences({ heatmapView: 'weekly' });
-    });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 52 weeks');
-    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByText('Weekly training load')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-    expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
-  });
-
-  it('retries a failed exercise history read for the same definition without closing the sheet', async () => {
-    jest
-      .spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
-      .mockRejectedValueOnce(new Error('DB error'));
-    await renderSeededStats();
-
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-
-    expect(await screen.findByTestId('stats-exercise-history-error')).toHaveTextContent(/DB error/);
-    fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-error')).toBeNull());
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent(/Squat/);
-    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
-  });
-
-  it('opens a saved Weekly choice with its banner and retains it on reopening', async () => {
-    await loadMaestroFixture('exercise-block-history');
-    act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 104 }));
-    await renderStats();
-    await screen.findByTestId(SQUAT_ROW);
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    expect(await screen.findByText('Weekly training load')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
-    expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    expect(await screen.findByText('Weekly training load')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
-  });
-
-  it('selects and clears a weekly row over real data and returns to the same search/sort', async () => {
-    await loadMaestroFixture('exercise-block-history');
-    act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 8 }));
-    await renderStats();
-    await screen.findByTestId(SQUAT_ROW);
-    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
-    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
-    fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
-    const current = localDateKey(calendarWeekBounds(1).start);
-    const row = screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`);
-    // The existing successful-load selection starts on the current week.
-    fireEvent.press(row);
-    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
-    fireEvent.press(row);
-    const expected = (await exerciseAnalytics.computeSelectedExerciseWeeklyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT }))
-      .find(week => week.weekStartDateKey === current)!;
-    expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent(`Sets: ${expected.workingSetCount}`);
-    fireEvent.press(row);
-    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
-    expect(screen.queryByText(/Tap a week/)).toBeNull();
-    await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength(1);
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-    expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
-    expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+    // The selected muscle's ink rule runs down its row and its contributions.
+    expect(screen.getByTestId('stats-muscle-block-chest')).toHaveStyle({ borderLeftColor: uiRoles.ink });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
   });
 
   it('keeps seeded families inert and opens only an individual muscle', async () => {
     await renderSeededStats();
 
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    chooseFilter('view-mode', 'Muscle');
     fireEvent.press(await screen.findByTestId('stats-family-header-legs'));
     fireEvent.press(screen.getByTestId('stats-family-header-chest'));
-    expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+
     fireEvent.press(screen.getByTestId('stats-muscle-history-quads'));
-
-    const title = await screen.findByTestId('stats-muscle-history-title');
-    expect(title).toHaveTextContent('Quads');
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
-    expect(
-      within(screen.getByTestId('stats-muscle-history-overlay')).queryByTestId(
-        'stats-muscle-history-metric-chip-highestWeight'
-      )
-    ).toBeNull();
-  });
-
-  it("opens one muscle's history from its row, switching metric and view", async () => {
-    await renderSeededStats();
-
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    fireEvent.press(await screen.findByTestId('stats-muscle-history-quads'));
-
-    expect(await screen.findByTestId('stats-muscle-history-title')).toHaveTextContent(/Quads/);
-    expect(await screen.findByTestId('stats-muscle-history-heatmap')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toHaveProp('accessibilityState', {
-      selected: true,
-    });
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', {
-      selected: true,
-    });
-
-    await act(async () => {
-      updatePreferences({ heatmapView: 'weekly' });
-    });
-    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-  });
-
-  it('retries a failed muscle history read and dismisses it back to the same breakdown', async () => {
-    jest
-      .spyOn(statsRepository, 'computeSelectedMuscleWeeklyEffort')
-      .mockRejectedValueOnce(new Error('Weekly boom'));
-    await renderSeededStats();
-
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    fireEvent.press(await screen.findByTestId('stats-muscle-history-chest'));
-
-    expect(await screen.findByTestId('stats-muscle-history-error')).toHaveTextContent(/Weekly boom/);
-    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
-    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-error')).toBeNull());
-    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
-    expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent('Chest');
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+    expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=quads');
+    // The page draws the history: Progress never does.
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
-    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
+  });
+
+  it('pushes an exercise row’s history page and keeps its own search and sort behind it', async () => {
+    await renderSeededStats();
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(mockPush).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}`);
+    expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
+
+    // Away while the page is on top, then back: the same screen, as left.
+    mockIsFocused = false;
+    screen.rerender(<StatsRoute />);
+    mockIsFocused = true;
+    screen.rerender(<StatsRoute />);
+    expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
+    expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
   });
 
   const renderMuscles = async () => {
@@ -482,16 +333,18 @@ describe('Stats over real data', () => {
     const assertPinned = (scrollId: string) => {
       const controls = within(screen.getByTestId('stats-controls'));
       const scroll = within(screen.getByTestId(scrollId));
-      expect(within(screen.getByTestId('stats-view-switch')).getAllByRole('tab')).toHaveLength(2);
-      const ids = ['stats-view-mode-chip-row', 'stats-period-chip-row',
-        scrollId === 'stats-scroll' ? 'stats-metric-chip-row' : 'stats-search-input'];
+      const muscle = scrollId === 'stats-scroll';
+      // One row: breakdown and period always, the metric only where a table
+      // has one figure to pick; exercise search is its own pinned row.
+      expect(within(screen.getByTestId('stats-view-switch')).getAllByRole('button'))
+        .toHaveLength(muscle ? 3 : 2);
+      const ids = ['stats-view-mode-chip', 'stats-period-chip',
+        muscle ? 'stats-metric-chip' : 'stats-search-input'];
       for (const id of ids) {
         expect(controls.getByTestId(id)).toBeTruthy();
         expect(scroll.queryByTestId(id)).toBeNull();
       }
-      for (const tab of controls.getAllByRole('tab')) {
-        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.viz4 : uiRoles.surface });
-      }
+      expect(controls.queryByTestId(muscle ? 'stats-search-input' : 'stats-metric-chip')).toBeNull();
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(
         /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
@@ -499,13 +352,86 @@ describe('Stats over real data', () => {
       expect(content.at(-1)).toHaveProp('testID', 'stats-sessions-link');
     };
     assertPinned('stats-scroll');
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    chooseFilter('view-mode', 'Exercise');
     assertPinned('stats-exercise-list-scroll');
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'no matching exercise');
     expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
     assertPinned('stats-exercise-list-scroll');
     fireEvent.press(screen.getByTestId('stats-sessions-link'));
     expect(mockPush).toHaveBeenCalledWith('/sessions');
+  });
+
+  it('reopens on the last visit\u2019s breakdown and metric, on the configured period, and lets a deep link override', async () => {
+    mockSearchParams = {};
+    await loadMaestroFixture('exercise-block-history');
+    await renderStats();
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    chooseFilter('metric', 'Volume');
+    chooseFilter('period', 'This week');
+    chooseFilter('view-mode', 'Exercise');
+
+    // Relaunch: a cold store, re-read from the device's key-value storage.
+    screen.unmount();
+    __resetAccountLocalPreferencesForTests();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
+    // The period is not remembered: every visit opens on Settings' Progress
+    // period, so the week chosen above is gone.
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
+
+    // The deep link wins on entry only: the next choice is the user's again.
+    screen.unmount();
+    __resetAccountLocalPreferencesForTests();
+    mockSearchParams = { breakdown: 'exercise', period: '7' };
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    chooseFilter('view-mode', 'Muscle');
+    chooseFilter('period', '4 weeks');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
+  });
+
+  it('re-enters a mounted Progress on a deep link that changes a param, field by field', async () => {
+    mockSearchParams = {};
+    await loadMaestroFixture('exercise-block-history');
+    await renderStats();
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    chooseFilter('view-mode', 'Exercise');
+    chooseFilter('period', 'This week');
+
+    // Done replaced to a bare /progress; a later boga3://progress?breakdown=muscle
+    // lands on the same screen. The breakdown re-enters, the period choice stays.
+    mockSearchParams = { breakdown: 'muscle' };
+    screen.rerender(<StatsRoute />);
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    expect(chipValue('view-mode')).toBe('Muscle');
+    expect(chipValue('period')).toBe('This week');
+
+    // The same params again are not a new entry: the choice made since stands.
+    chooseFilter('view-mode', 'Exercise');
+    mockSearchParams = { breakdown: 'muscle' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Exercise');
+
+    mockSearchParams = { breakdown: 'muscle', period: '30' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('period')).toBe('4 weeks');
+    expect(chipValue('view-mode')).toBe('Exercise');
+
+    // A param going away re-enters too, on the stored breakdown (the chip's
+    // last tap) rather than the link's.
+    chooseFilter('view-mode', 'Muscle');
+    mockSearchParams = { breakdown: 'exercise' };
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Exercise');
+    mockSearchParams = {};
+    screen.rerender(<StatsRoute />);
+    expect(chipValue('view-mode')).toBe('Muscle');
+    expect(chipValue('period')).toBe('4 weeks');
   });
 
   it('discloses one block directly under its muscle and collapses on a repeated chevron', async () => {
@@ -526,7 +452,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     expect(within(screen.getByTestId('stats-muscle-select-quads')).UNSAFE_getByType(Icon).props.name)
       .toBe('chevron-down');
-    expect(screen.getByTestId('stats-muscle-table')).toHaveStyle({ gap: 0 });
+    expect(screen.getByTestId('stats-muscle-table')).toHaveStyle({ backgroundColor: uiRoles.surface,
+      borderRadius: uiGeometry.radius.card, borderWidth: uiBorder.width, borderColor: uiRoles.rule });
     expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: uiRoles.ruleSoft,
       borderTopWidth: uiBorder.width, borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule });
     select('chest');
@@ -551,7 +478,7 @@ describe('Stats over real data', () => {
     await renderStats();
     await screen.findByTestId('stats-muscle-row-quads-now');
     select('quads');
-    fireEvent.press(screen.getByTestId(`stats-metric-chip-${metric}`));
+    chooseFilter('metric', metric === 'workingSetCount' ? 'Sets' : 'Volume');
     const block = screen.getByTestId('stats-contributions');
     expect(within(block).getAllByRole('link')).toHaveLength(2);
     for (const column of ['now', 'previous']) {
@@ -565,7 +492,7 @@ describe('Stats over real data', () => {
 
   it('defaults to the complete taxonomy table and reconciles repeated blocks in both periods', async () => {
     await renderMuscles();
-    expect(screen.getByTestId('stats-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
     expect(value('quads', 'now')).toHaveTextContent(/^7$/);
     expect(value('quads', 'previous')).toHaveTextContent(/^2$/);
@@ -577,7 +504,7 @@ describe('Stats over real data', () => {
     }
     expect(screen.queryByTestId('stats-contributions-total')).toBeNull();
     expect(within(screen.getByTestId('stats-contributions')).queryByText('Total')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    chooseFilter('metric', 'Volume');
     expect(value('quads', 'now')).toHaveTextContent('3550');
     expect(contribution('now')).toHaveTextContent('3550');
     for (const column of ['now', 'previous', 'change']) {
@@ -589,19 +516,15 @@ describe('Stats over real data', () => {
       expect(link).toHaveStyle({ minWidth: 44, minHeight: 44 });
       expect(within(link).getByText(name)).not.toHaveStyle({ textDecorationLine: 'underline' });
     }
+    // Both links push their own page by id, leaving the open block as it is.
     fireEvent.press(muscleLink);
-    await screen.findByTestId('stats-muscle-history-title');
-    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads');
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
-    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent('Barbell Back Squat');
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}`);
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
-    expect(screen.getByTestId('stats-metric-chip-totalVolume')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
   });
 
   it('keeps a previous-only contributor and an empty muscle with working history links', async () => {
@@ -618,10 +541,11 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId('stats-contributions-empty')).toBeNull();
     select('calves');
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No working sets for Calves in either period');
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    chooseFilter('metric', 'Volume');
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No volume-included sets for Calves in either period');
     fireEvent.press(screen.getByTestId('stats-muscle-history-calves'));
-    expect(await screen.findByTestId('stats-muscle-history-empty')).toBeTruthy();
+    // An empty muscle still opens its page; its empty state is that page's.
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=calves');
   });
 
   it('uses independent saved eligibility and retains zero-load Volume contributors', async () => {
@@ -630,7 +554,7 @@ describe('Stats over real data', () => {
     await act(async () => updatePreferences({ workingSetEfforts: [], volumeEfforts: ['warm_up'] }));
     await waitFor(() => expect(value('quads', 'now')).toHaveTextContent(/^0$/));
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent(/No working sets/);
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    chooseFilter('metric', 'Volume');
     expect(contribution('now')).toHaveTextContent('225');
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent('225');
     localDataClient().prepare("UPDATE exercise_sets SET weight_value = '0' WHERE set_type = 'warm_up'").run();
@@ -654,7 +578,7 @@ describe('Stats over real data', () => {
     jest.spyOn(statsRepository, 'computeProgressComparisons').mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(nextRead.promise);
     await replayFocus();
     expect(contribution('now')).toHaveTextContent('7');
-    fireEvent.press(screen.getByTestId('stats-period-chip-28'));
+    chooseFilter('period', '4 weeks');
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
     expect(screen.queryByTestId('stats-contributions-empty')).toBeNull();
     expect(screen.getByTestId('stats-loading-state')).toBeTruthy();
@@ -675,23 +599,16 @@ describe('Stats over real data', () => {
     expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
     expect(contribution('now')).toHaveTextContent('7');
     fireEvent.press(screen.getByTestId('stats-retry'));
-    await waitFor(() => expect(screen.queryByTestId('stats-error-state')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('stats-error-state'));
     expect(contribution('now')).toHaveTextContent('7');
   });
 
-  it('refreshes table, contributions and open history together after a data edit/refocus', async () => {
+  it('refreshes the table and its contributions together after a data edit/refocus', async () => {
     await renderMuscles();
     select('quads');
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-    fireEvent.press(screen.getByTestId('stats-muscle-history-quads'));
-    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
-    const read = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffortMetrics');
+    chooseFilter('metric', 'Volume');
     localDataClient().prepare("UPDATE exercise_sets SET weight_value = '0' WHERE session_exercise_id LIKE '%squat%'").run();
     await replayFocus();
-    await waitFor(() => expect(read).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
-    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
-    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     await waitFor(() => expect(contribution('now')).toHaveTextContent(/^0$/));
     expect(value('quads', 'now')).toHaveTextContent(/^0$/);
   });
@@ -717,8 +634,8 @@ describe('Stats over real data', () => {
     await renderSeededStats();
     fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    chooseFilter('view-mode', 'Muscle');
+    chooseFilter('view-mode', 'Exercise');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
   });
@@ -730,7 +647,7 @@ describe('Stats over real data', () => {
     db.prepare('UPDATE exercise_definitions SET bodyweight_contribution = 2 WHERE id = ?').run(SQUAT);
     await replayFocus();
     select('quads');
-    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    chooseFilter('metric', 'Volume');
     // Squat, the only quads lift, is left out in both periods ([[copy.no-inline-explanation]]):
     // a Volume of 0 against 0, never a note or an invented percentage.
     await waitFor(() => expect(contribution('now')).toHaveTextContent('0'));

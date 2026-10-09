@@ -1,4 +1,5 @@
 export { DailyHeatmap } from './DailyHeatmap';
+export { TimelineHeatmap } from './TimelineHeatmap';
 export { WeeklyHeatmap } from './WeeklyHeatmap';
 export {
   buildHeatmapData,
@@ -16,3 +17,9 @@ export {
   type CalendarHeatmapMetric,
   type HeatmapMetricSource,
 } from './heatmap-metric';
+export {
+  buildTimelineSeries,
+  timelineGeometry,
+  type TimelineSeries,
+  type TimelineWeek,
+} from './timeline';

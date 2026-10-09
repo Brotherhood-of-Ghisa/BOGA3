@@ -1,18 +1,10 @@
 #!/usr/bin/env bash
-# The app's groups client against a live protocol-4 server (lane
-# groups-protocol4). Provisions its own owner and member, activates competitions
-# on this worktree's slot-local stack, runs apps/mobile's
-# groups-competition-api-live Jest suite against it, then deletes the users and
-# everything they made. Activation is one-way, so the wrapper marks the stack for
-# the next baseline preflight to reset — which is why this body lives outside
-# the default backend gate.
-# The ordinary (pre-competition) client wire is groups-api-live.sh's job.
-#
-# ORDER: this body runs BEFORE groups-competitions.sh in the lane. That body
-# unsets the evaluator kick URL for direct-drain mode, leaving no configured
-# baseline behind; this body needs a live evaluator to publish a board, so it
-# must see the preflight's baseline. Reversing them leaves the board empty and
-# this suite times out.
+# The app's protocol-4 groups client against the live server (lane
+# groups-api-live, its second body). Provisions its own owner and member, runs
+# apps/mobile's groups-competition-api-live Jest suite against this worktree's
+# local stack, then deletes the users and everything they
+# made. The suite needs the live evaluator (the baseline's kick URL) to publish
+# a board. The membership and settings wire is groups-api-live.sh's job.
 # Execute only through its Boga lane.
 set -euo pipefail
 
@@ -22,8 +14,8 @@ REPO_ROOT="$(cd "${SUPABASE_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${SUPABASE_DIR}/scripts/_common.sh"
 
-LANE_LABEL="groups-protocol4"
-FIXTURE_EMAIL_PREFIX="groups-protocol4"
+LANE_LABEL="groups-api-live"
+FIXTURE_EMAIL_PREFIX="groups-competition-live"
 # shellcheck disable=SC1091
 source "${SUPABASE_DIR}/tests/lib/groups-fixtures.sh"
 
@@ -36,7 +28,7 @@ load_supabase_status_env
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 
 RUN_TAG="$(printf '%s' "$(date +%s)-$$-${RANDOM}" | tr -c 'a-z0-9-' '-')"
-PASSWORD="GroupsProtocol4!${RUN_TAG}"
+PASSWORD="GroupsCompetitionLive!${RUN_TAG}"
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 RUN_USER_IDS=()
 
@@ -83,7 +75,7 @@ echo "[${LANE_LABEL}] running the protocol-4 client suite against ${API_URL}"
   export GROUPS_LIVE_MEMBER_EMAIL="${FIXTURE_EMAIL_PREFIX}-member-${RUN_TAG}@example.test"
   export GROUPS_LIVE_PASSWORD="${PASSWORD}"
   export GROUPS_LIVE_RUN_TAG="${RUN_TAG}"
-  "${SUPABASE_DIR}/scripts/with-local-group-competitions.sh" npm run --silent test:groups:competition-live
+  npm run --silent test:groups:competition-live
 )
 COMPLETED=1
 pass "the groups client's calls match a live protocol-4 server (run ${RUN_TAG})"

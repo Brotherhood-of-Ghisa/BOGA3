@@ -2,7 +2,7 @@
 
 /**
  * The Sessions list over real data: the production route and its default data
- * client (session-list buckets, discard, delete) over the migrated in-memory
+ * client (session-list buckets, records, discard) over the migrated in-memory
  * SQLite database, seeded through the Maestro harness with the `session-view`
  * fixture: one active session over the block-history fixture's completed ones
  * (helpers/local-data.ts). Writes are read back from the database. Only the
@@ -13,8 +13,8 @@
  * after unmount), driven through an injected client.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, type AlertButton } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert, SectionList, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -24,6 +24,7 @@ jest.mock('@/src/data/bootstrap', () =>
 const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 let mockIsFocused = true;
+let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
   const mockReact = jest.requireActual('react');
@@ -33,6 +34,16 @@ jest.mock('expo-router', () => {
       push: mockPush,
     }),
     useIsFocused: () => mockIsFocused,
+    useLocalSearchParams: () => mockParams,
+    // The header's ⋮ and any title render in place, so a test can press and read them.
+    Stack: {
+      Screen: ({ options }: { options?: { title?: string; headerRight?: () => unknown } }) => {
+        const { Text } = jest.requireActual('react-native');
+        return mockReact.createElement(mockReact.Fragment, null,
+          options?.title ? mockReact.createElement(Text, { testID: 'header-title' }, options.title) : null,
+          options?.headerRight?.() ?? null);
+      },
+    },
     useFocusEffect: (callback: () => void | (() => void)) => {
       mockReact.useEffect(() => callback(), [callback]);
     },
@@ -42,15 +53,19 @@ jest.mock('expo-router', () => {
 import SessionsRoute, { SessionsScreen } from '../app/sessions';
 import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
+  parseHistoryJump,
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
+import * as exerciseSessionFacts from '@/src/data/exercise-session-facts';
+import * as logEventModule from '@/src/logging/logEvent';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
-import { planRepository } from '@/src/session-planner';
+import { planQueries, planRepository } from '@/src/session-planner';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
 const NEWEST_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId;
@@ -63,6 +78,11 @@ const openSessions = async (prepare?: () => Promise<unknown>) => {
   const view = render(<SessionsRoute />);
   await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`);
   return view;
+};
+
+const showDeletedSessions = () => {
+  fireEvent.press(screen.getByTestId('sessions-options-button'));
+  fireEvent.press(screen.getByTestId('toggle-deleted-sessions'));
 };
 
 const loadSpy = () => jest.spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions');
@@ -82,6 +102,7 @@ beforeEach(() => {
   mockDismissTo.mockClear();
   mockPush.mockClear();
   mockIsFocused = true;
+  mockParams = {};
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -114,7 +135,9 @@ describe('Sessions over real data', () => {
     ]);
     // A row's `sets` are its working sets: this session's warm-up is no set,
     // nor is the active session's bench warm-up.
-    expect(screen.getByTestId('session-summary-maestro_exercise_block_history_squat_1-sets')).toHaveTextContent('3 sets');
+    expect(screen.getByTestId('completed-session-open-button-maestro_exercise_block_history_squat_1-figures')).toHaveTextContent(
+      /^3 sets · /
+    );
     expect(screen.getByTestId(`session-summary-${ACTIVE}-sets`)).toHaveTextContent(
       `${SESSION_VIEW_FIXTURE.workingSetCount} sets`
     );
@@ -168,22 +191,26 @@ describe('Sessions over real data', () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it('hides deleted sessions until shown, then marks them, loading once per filter change', async () => {
+  it('hides deleted sessions until shown from the header menu, then marks them, loading once per filter change', async () => {
     const load = loadSpy();
     await openSessions(() => setSessionDeletedState(OLDER_COMPLETED, true));
 
-    const toggle = screen.getByTestId('toggle-deleted-sessions-button');
-    expect(toggle).toHaveProp('accessibilityState', { disabled: false, checked: false });
     expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
+    fireEvent.press(screen.getByTestId('sessions-options-button'));
+    const toggle = screen.getByTestId('toggle-deleted-sessions');
+    expect(toggle).toHaveProp('accessibilityRole', 'switch');
+    expect(toggle).toHaveProp('accessibilityState', { checked: false });
+    expect(toggle).toHaveProp('accessibilityLabel', 'Show deleted sessions');
 
     fireEvent.press(toggle);
 
     expect(await screen.findByTestId(`completed-session-deleted-tag-${OLDER_COMPLETED}`)).toHaveTextContent('Deleted');
-    expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveProp('accessibilityState', {
-      disabled: false,
-      checked: true,
-    });
-    expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveTextContent('Hide deleted');
+    expect(screen.getByTestId(`completed-session-open-button-${OLDER_COMPLETED}`)).toHaveProp(
+      'accessibilityLabel',
+      expect.stringMatching(/^Deleted\. Completed session on /)
+    );
+    expect(screen.getByTestId('toggle-deleted-sessions')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('toggle-deleted-sessions-switch', { includeHiddenElements: true })).toHaveProp('value', true);
     expect(load.mock.calls).toEqual([[{ showDeletedSessions: false }], [{ showDeletedSessions: true }]]);
   });
 
@@ -211,7 +238,7 @@ describe('Sessions over real data', () => {
     });
 
     expect((await loadSessionSnapshotById(ACTIVE))?.deletedAt).toBeInstanceOf(Date);
-    await waitFor(() => expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull());
+    await waitForGone(() => screen.queryByTestId(`active-session-row-${ACTIVE}`));
     expect(load).toHaveBeenCalledTimes(2);
   });
 
@@ -232,18 +259,34 @@ describe('Sessions over real data', () => {
     expect(screen.queryByTestId('session-list-load-error')).toBeNull();
   });
 
-  it('opens a completed row menu as a sheet the backdrop dismisses', async () => {
+  it('shows each row\'s PRs, and gives a row no actions: the whole row opens the session', async () => {
     await openSessions();
 
-    fireEvent.press(screen.getByTestId(`completed-session-menu-button-${NEWEST_COMPLETED}`));
-    expect(screen.getByTestId('completed-session-edit-menu-action-button')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-modal-action-button')).toHaveTextContent('Delete');
-
-    fireEvent.press(screen.getByTestId('completed-session-menu-backdrop', { includeHiddenElements: true }));
-    expect(screen.queryByTestId('completed-session-edit-menu-action-button')).toBeNull();
+    expect(
+      screen.getByTestId(`completed-session-open-button-${EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId}-record`)
+    ).toHaveTextContent(/^2 PRs$/);
+    expect(screen.queryByTestId(`completed-session-open-button-${OLDER_COMPLETED}-record`)).toBeNull();
+    expect(screen.queryByTestId(/^completed-session-menu-button-/)).toBeNull();
+    expect(screen.getByTestId(`completed-session-open-button-${NEWEST_COMPLETED}`)).toHaveProp(
+      'accessibilityHint',
+      'Opens the completed session'
+    );
   });
 
-  it('stamps a row and its menu with the local start time, not the stored UTC clock', async () => {
+  it('lists the history without PR lines when the records read fails (optional enrichment)', async () => {
+    const recordsRead = jest
+      .spyOn(exerciseSessionFacts, 'loadFlaggedExerciseSessionFacts')
+      .mockRejectedValueOnce(new Error('facts unavailable'));
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await openSessions();
+
+    expect(recordsRead).toHaveBeenCalled();
+    expect(screen.getAllByTestId(/^completed-session-row-/).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(/-record$/)).toBeNull();
+    expect(screen.queryByTestId('session-list-load-error')).toBeNull();
+  });
+
+  it('stamps a row with the local start time, not the stored UTC clock', async () => {
     // 23:45 local on 7/24: the stored ISO instant falls on another hour (and,
     // west of UTC, another day) in every zone but UTC.
     const lateId = 'sessions_local_time_late';
@@ -269,14 +312,177 @@ describe('Sessions over real data', () => {
       await completeSessionDraft(lateId, { completedAt, now: completedAt });
     });
 
-    expect(screen.getByTestId(`session-summary-${lateId}-start`)).toHaveTextContent('7/24 23:45');
-
-    fireEvent.press(screen.getByTestId(`completed-session-menu-button-${lateId}`));
-    expect(within(screen.getByTestId('completed-session-menu')).getByText('7/24 23:45')).toBeTruthy();
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('7/24 23:45');
   });
 });
 
 // Races real data cannot stage: the loads are held open by an injected client.
+const localDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const mondayKey = (date: Date): string =>
+  localDateKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() - ((date.getDay() + 6) % 7)));
+
+describe('Sessions opened at a week or day of a history grid', () => {
+  let scrollToLocation: jest.SpyInstance;
+  beforeEach(() => {
+    scrollToLocation = jest.spyOn(SectionList.prototype, 'scrollToLocation').mockImplementation(() => {});
+  });
+
+  it('opens the whole list at the week from `?week=`, its hub and every row still there', async () => {
+    const weekDay = new Date(Date.now() - 26 * 24 * 60 * 60 * 1000);
+    mockParams = { week: localDateKey(weekDay) };
+    await openSessions();
+
+    expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
+    expect(screen.getByTestId('sessions-plan-session-action')).toBeTruthy();
+    expect(screen.getAllByTestId(/^completed-session-row-/).length).toBeGreaterThan(1);
+    const weeks = screen.getAllByTestId(/^completed-history-week-/).map((node) => String(node.props.testID));
+    const sectionIndex = weeks.indexOf(`completed-history-week-${mondayKey(weekDay)}`);
+    expect(sectionIndex).toBeGreaterThan(0);
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
+    expect(scrollToLocation).toHaveBeenCalledWith({ sectionIndex, itemIndex: 0, viewPosition: 0, animated: false });
+  });
+
+  it('opens at the top when the param is malformed', async () => {
+    mockParams = { week: '2026-02-30' };
+    await openSessions();
+
+    expect(scrollToLocation).not.toHaveBeenCalled();
+  });
+
+  const completedAt = (id: string, at: Date): SessionListItem => ({
+    id,
+    startedAt: new Date(at.getTime() - 3_600_000).toISOString(),
+    status: 'completed',
+    completedAt: at.toISOString(),
+    durationSec: 3_600,
+    durationDisplay: '1h',
+    gymName: null,
+    exerciseCount: 1,
+    setCount: 3,
+    totalWeight: 0,
+    deletedAt: null,
+    records: [],
+  });
+
+  const clientWith = (sessions: SessionListItem[]): SessionListDataClient => ({
+    loadSessions: jest.fn(async () => sessions),
+    startSession: jest.fn(),
+    completeActiveSession: jest.fn(),
+    discardActiveSession: jest.fn(),
+  });
+
+  const at = (day: Date, offsetDays: number, hour: number) =>
+    new Date(day.getFullYear(), day.getMonth(), day.getDate() + offsetDays, hour);
+  // The target week is three weeks back: its Wednesday holds two sessions, its Friday one.
+  const today = new Date();
+  const wednesday = at(today, -((today.getDay() + 6) % 7) - 21 + 2, 12);
+  const sessions = [
+    completedAt('today', at(today, 0, 0)),
+    completedAt('friday', at(wednesday, 2, 18)),
+    completedAt('wednesday-evening', at(wednesday, 0, 19)),
+    completedAt('wednesday-morning', at(wednesday, 0, 7)),
+  ];
+
+  it('lands a day jump on its newest row, and a day without one on its week heading', async () => {
+    const view = render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    // Section 1 is the target week; row 1 is Friday, row 2 Wednesday's newest.
+    expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 2, viewPosition: 0, animated: false });
+    view.unmount();
+
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(at(wednesday, 1, 12)) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 0, viewPosition: 0, animated: false });
+  });
+
+  it('jumps once: a focus reload keeps the reader where they scrolled', async () => {
+    const client = clientWith(sessions);
+    const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
+    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-friday');
+
+    view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
+    view.rerender(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await waitFor(() => expect(client.loadSessions).toHaveBeenCalledTimes(2));
+
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a target the first load lacks, rather than jumping to it on a later load', async () => {
+    // The target week's sessions are not there yet on the first read (deleted
+    // since, then shown by a later reload).
+    const loadSessions = jest.fn()
+      .mockResolvedValueOnce(sessions.slice(0, 1))
+      .mockResolvedValue(sessions);
+    const client = { ...clientWith(sessions), loadSessions };
+    const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
+    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-today');
+
+    view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
+    view.rerender(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-friday');
+
+    expect(scrollToLocation).not.toHaveBeenCalled();
+  });
+
+  it('jumps only once the plans above the history have loaded, so they cannot push the target down', async () => {
+    let releasePlans!: () => void;
+    const plansLoaded = new Promise<void>((resolve) => { releasePlans = resolve; });
+    const upcoming = jest.spyOn(planQueries, 'listUpcomingPlans').mockImplementation(async () => {
+      await plansLoaded;
+      return [];
+    });
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    expect(upcoming).toHaveBeenCalled();
+    expect(scrollToLocation).not.toHaveBeenCalled();
+
+    await act(async () => releasePlans());
+
+    await waitFor(() => expect(scrollToLocation).toHaveBeenCalledTimes(1));
+    expect(scrollToLocation).toHaveBeenCalledWith({ sectionIndex: 1, itemIndex: 0, viewPosition: 0, animated: false });
+  });
+
+  it('renders every row down to the target up front, so its offset is measured, not estimated', async () => {
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+
+    // Week 0: heading, row, footer; then the target week's heading, Friday and Wednesday's newest.
+    expect(screen.UNSAFE_getByType(SectionList).props.initialNumToRender).toBe(24 + 5);
+  });
+
+  it('aims again until the rows are measured, and logs a jump it cannot make', async () => {
+    const warn = jest.spyOn(logEventModule, 'logEvent').mockResolvedValue();
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    const list = screen.UNSAFE_getByType(SectionList);
+    expect(scrollToLocation).toHaveBeenCalledTimes(1);
+    jest.useFakeTimers();
+    try {
+
+      const fail = () => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 });
+      act(fail);
+      expect(scrollToLocation).toHaveBeenCalledTimes(1);
+      act(() => jest.advanceTimersByTime(50));
+      expect(scrollToLocation).toHaveBeenCalledTimes(2);
+      expect(warn).not.toHaveBeenCalled();
+
+      // Forty attempts (two seconds), then it says so instead of trying forever.
+      for (let attempt = 2; attempt <= 41; attempt += 1) {
+        act(fail);
+        act(() => jest.advanceTimersByTime(50));
+      }
+      expect(scrollToLocation).toHaveBeenCalledTimes(41);
+      expect(warn).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn', event: 'sessions.history_jump_failed' }));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('Sessions list load races', () => {
   const session = (id: string, completedAt: string): SessionListItem => ({
     id,
@@ -290,6 +496,7 @@ describe('Sessions list load races', () => {
     setCount: 3,
     totalWeight: 0,
     deletedAt: null,
+    records: [],
   });
 
   const createDeferred = <T,>() => {
@@ -308,8 +515,6 @@ describe('Sessions list load races', () => {
       startSession: jest.fn(),
       completeActiveSession: jest.fn(),
       discardActiveSession: jest.fn(),
-      setCompletedSessionDeletedState: jest.fn(),
-      appendCompletedSessionAsPlanned: jest.fn(),
     };
   };
 
@@ -322,7 +527,7 @@ describe('Sessions list load races', () => {
     render(<SessionsScreen dataClient={dataClient} isFocused />);
 
     await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(1));
-    fireEvent.press(screen.getByTestId('toggle-deleted-sessions-button'));
+    showDeletedSessions();
     await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(2));
 
     await act(async () => {
@@ -339,6 +544,26 @@ describe('Sessions list load races', () => {
     expect(screen.queryByTestId(`completed-session-row-${older.id}`)).toBeNull();
   });
 
+  it('keeps the rows on screen while a focus reload is in flight', async () => {
+    const shown = session('completed-session-1', '2026-07-25T10:00:00.000Z');
+    const reload = createDeferred<SessionListItem[]>();
+    const dataClient = heldClient(Promise.resolve([shown]), reload.promise);
+    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
+    expect(await screen.findByTestId(`completed-session-row-${shown.id}`)).toBeTruthy();
+
+    view.rerender(<SessionsScreen dataClient={dataClient} isFocused={false} />);
+    view.rerender(<SessionsScreen dataClient={dataClient} isFocused />);
+    await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByTestId(`completed-session-row-${shown.id}`)).toBeTruthy();
+    expect(screen.queryByTestId('session-list-loading-state')).toBeNull();
+    await act(async () => {
+      reload.resolve([]);
+      await reload.promise;
+    });
+    expect(screen.queryByTestId(`completed-session-row-${shown.id}`)).toBeNull();
+  });
+
   it('invalidates an in-flight request when the consumer unmounts (a race)', async () => {
     const lateLoad = createDeferred<SessionListItem[]>();
     const dataClient = heldClient(lateLoad.promise);
@@ -352,6 +577,70 @@ describe('Sessions list load races', () => {
       await lateLoad.promise;
     });
     expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The weeks are read against the clock, so these sessions are dated from it.
+describe('Sessions history weeks', () => {
+  const daysAgo = (days: number): string => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, now.getHours(), now.getMinutes()).toISOString();
+  };
+
+  const completed = (id: string, completedAt: string): SessionListItem => ({
+    id,
+    startedAt: completedAt,
+    status: 'completed',
+    completedAt,
+    durationSec: 3_600,
+    durationDisplay: '1h',
+    gymName: null,
+    exerciseCount: 2,
+    setCount: 6,
+    totalWeight: 0,
+    deletedAt: null,
+    records: [],
+  });
+
+  const clientWith = (sessions: SessionListItem[]): SessionListDataClient => ({
+    loadSessions: jest.fn(async () => sessions),
+    startSession: jest.fn(),
+    completeActiveSession: jest.fn(),
+    discardActiveSession: jest.fn(),
+  });
+
+  it('heads each week holding sessions, and folds the empty weeks between into one line', async () => {
+    render(
+      <SessionsScreen
+        dataClient={clientWith([
+          completed('this-week', daysAgo(0)),
+          completed('last-week', daysAgo(7)),
+          completed('five-weeks-ago', daysAgo(35)),
+        ])}
+        isFocused
+      />
+    );
+
+    await screen.findByTestId('completed-session-row-five-weeks-ago');
+    const headings = screen.getAllByTestId(/^completed-history-week-/);
+    expect(headings).toHaveLength(3);
+    expect(headings[0]).toHaveTextContent(/^This week.* · 1 session$/);
+    expect(headings[1]).toHaveTextContent(/^Last week.* · 1 session$/);
+    // Weeks 2, 3 and 4 back held nothing: one line, before the week that ends the gap.
+    const gaps = screen.getAllByTestId(/^completed-history-gap-/);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toHaveTextContent('No sessions · 3 weeks');
+    expect(headings[2]).toHaveTextContent(/No sessions · 3 weeks.*1 session$/);
+  });
+
+  it('renders a long history a screenful at a time, not every row up front', async () => {
+    const history = Array.from({ length: 200 }, (_, index) => completed(`history-${index}`, daysAgo(index)));
+    render(<SessionsScreen dataClient={clientWith(history)} isFocused />);
+
+    await screen.findByTestId('completed-session-row-history-0');
+    const rendered = screen.getAllByTestId(/^completed-session-row-/).length;
+    expect(rendered).toBeGreaterThan(5);
+    expect(rendered).toBeLessThan(history.length);
   });
 });
 

@@ -69,10 +69,13 @@ are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
-labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`. Progress's selectors
-also use the strongest grade, `viz4` with `ink` text, for selection
-(`SegmentedControl`'s `selectedGround`).
+labels still say how much. An empty `viz0` cell takes a `rule` hairline,
+being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
+force in fixed black `selection` with white `surface` text in every theme
+(`SegmentedControl`'s `selectedGround`): the history metrics. A `ToggleChip`
+shows one value and has no unselected peer, so it carries `ink` on `surface`
+(Progress's filter row). Heatmap tiles/bars have no black current/selected
+outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
 
@@ -123,7 +126,8 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   and a `rule` handle. **Tapping outside or dragging the handle down
   dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
   page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
-- Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
+- Tap targets ≥44; a compact control draws 28 (`compactControlHeight`) and
+  keeps 44 by hit slop. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
@@ -138,6 +142,9 @@ micro-labels Archivo 700, sheet titles Archivo 800.
 
 **One primary action per screen**, in `accent`. Everything else is an outline or
 a plain text button. Two saturated buttons on one screen is a bug.
+A row-level action inside a list row (a group record's Certify / Withdraw) is a
+compact outline (`compactControlHeight` 28), its tap target kept at 44 by hit
+slop.
 
 **One superlative: `record`.** A figure that beats the lifter's all-time best is
 bold `record`, and earns a band on the containing card where the screen has one

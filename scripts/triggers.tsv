@@ -76,16 +76,15 @@ supabase/migrations/*group*	groups-api-live,ios-groups-e2e	group schema / RPCs (
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
 supabase/scripts/sync-e2e-fixture-reset.sh	ios-sync-e2e	sync e2e fixture reset
 supabase/functions/**	backend	edge functions
-supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
+supabase/functions/group-eval/**	groups-leaderboards,groups-competitions	group evaluator function
 supabase/tests/**	backend	backend test bodies
-supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-api-live	shared group lane fixtures
+supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-competitions,groups-api-live	shared group lane fixtures
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
-supabase/migrations/*competition*	groups-protocol4	protocol-4 representation / cutover (one-way activation ⇒ its own lane)
-supabase/scripts/with-local-group-competitions.sh	groups-protocol4	the protocol-4 activation wrapper
-supabase/tests/groups-competitions.sh	groups-protocol4	the protocol-4 populated-upgrade lane body
-supabase/tests/groups-competition-live.sh	groups-protocol4	the protocol-4 client live lane body
-apps/mobile/src/groups/competition-*.ts	groups-protocol4	protocol-4 scoring / wire / reader guards
-apps/mobile/__tests__/groups-competition-api-live.test.ts	groups-protocol4	the protocol-4 client live suite
+supabase/migrations/*competition*	groups-competitions	protocol-4 representation
+supabase/tests/groups-competitions.sh	groups-competitions	the protocol-4 competition lane body
+supabase/tests/groups-competition-live.sh	groups-api-live	the protocol-4 client live lane body
+apps/mobile/src/groups/competition-*.ts	groups-api-live,groups-competitions	protocol-4 scoring / wire / reader guards
+apps/mobile/__tests__/groups-competition-api-live.test.ts	groups-api-live	the protocol-4 client live suite
 apps/mobile/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
 apps/mobile/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
 supabase/scripts/**	backend	backend wrappers / runtime scripts

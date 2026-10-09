@@ -1,10 +1,10 @@
 // Exact schemas are a privacy boundary, including every nested history/session.
 import { isCompetitionMetric } from './competition-contract.ts';
-import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
+import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
-  CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire.ts';
+  CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire.ts';
 
 const exact = (v: unknown, fields: readonly string[]): v is Record<string, unknown> => v !== null && typeof v === 'object' &&
   !Array.isArray(v) && Object.keys(v).length === fields.length && fields.every(f => Object.prototype.hasOwnProperty.call(v,f));
@@ -116,9 +116,45 @@ export function isCompetitionSessionWire(v: unknown): v is CompetitionSessionWir
 export function isCompetitionSessionDetailWire(v: unknown): v is CompetitionSessionDetailWire {
   return exact(v,['contract_version','group_id','session']) && v.contract_version === 4 && id(v.group_id) && isCompetitionSessionWire(v.session);
 }
+// A board's leader comes only from a current Volume/1RM board; `leads` means that leader's set is this record's.
+function sessionRecordBoard(v: unknown, memberId: string): boolean {
+  if (!exact(v,['metric','leader','leads']) || !historicalMetric(v.metric) || typeof v.leads !== 'boolean') return false;
+  if (v.leader === null) return !v.leads;
+  return member(v.leader) && isCompetitionMetric(v.metric) && (!v.leads || (v.leader as { user_id: string }).user_id === memberId);
+}
+function sessionRecord(v: unknown, memberId: string, sessionId: string): boolean {
+  if (!exact(v,['event','boards']) || !isCompetitionEventWire(v.event) || !Array.isArray(v.boards) || v.boards.length === 0 ||
+    !v.boards.every(board => sessionRecordBoard(board,memberId))) return false;
+  const event = v.event, metrics = v.boards.map(board => (board as { metric: string }).metric);
+  const recordMetrics = event.values.filter(value => value.role === 'record').map(value => value.metric);
+  return event.kind === 'record' && !event.voided && event.member?.user_id === memberId && event.session_id === sessionId && event.set_id !== null &&
+    new Set(metrics).size === metrics.length && recordMetrics.every(metric => metrics.includes(metric));
+}
+export function isCompetitionSessionRecordsWire(v: unknown): v is CompetitionSessionRecordsWire {
+  return exact(v,['contract_version','group_id','member_user_id','session_id','records']) && v.contract_version === 4 &&
+    id(v.group_id) && id(v.member_user_id) && id(v.session_id) &&
+    arrayOf(v.records,r => sessionRecord(r,v.member_user_id as string,v.session_id as string) &&
+      (r as { event: CompetitionEventWire }).event.group.group_id === v.group_id);
+}
+const performedSet = (v: unknown) => v === null ||
+  (typeof v === 'object' && isCompetitionPerformanceWire(v,(v as { visibility?: unknown }).visibility === 'normalized'));
+// A record's set follows the record's own visibility. A previous holder's may
+// be stricter, never looser: a normalized record discloses no holder's kg.
+function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
+  const normalized = event.visibility === 'normalized';
+  const visibility = (set: unknown) => (set as { visibility: string }).visibility;
+  return exact(v,['performance','previous']) && event.kind === 'record' && performedSet(v.performance) &&
+    (v.performance === null || visibility(v.performance) === event.visibility) &&
+    arrayOf(v.previous,p => exact(p,['value','performance']) && performedSet(p.performance) &&
+      (p.value as { role?: unknown }).role === 'previous' &&
+      historyValue(p.value,normalized || (p.performance !== null && visibility(p.performance) === 'normalized')) &&
+      (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
+}
 function streamItem(v: unknown): boolean {
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key;
+  if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
   if (exact(v,['kind','key','sort_at_ms','groups','session']) && v.kind === 'session') return id(v.key) && integer(v.sort_at_ms) &&
     Array.isArray(v.groups) && v.groups.length > 0 && v.groups.every(group) && isCompetitionSessionWire(v.session);
   return exact(v,['kind','key','sort_at_ms','event','group','member']) && v.kind === 'membership' && id(v.key) && integer(v.sort_at_ms) &&

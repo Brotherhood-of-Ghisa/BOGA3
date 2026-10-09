@@ -53,9 +53,11 @@ the names of its Jest tests are the specification of that component.
    kinds. A **picker or menu** (row actions, management options, a choice of
    one value, a short form) opens a design-language `Sheet` over the current
    screen, sized to its content. A **sub-page** (a browser, an editor, a
-   preview: Swap exercise, the exercise editor, Share session, Progress
-   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
-   uses. Do not document opening either as a route transition.
+   preview: Swap exercise, the exercise editor, Share session) opens a
+   `PageSheet`, the native iOS page sheet the exercise picker uses. Do not
+   document opening either as a route transition. A sub-page whose subject
+   belongs in a native title and whose chart wants the whole screen is a route
+   instead (Progress history, `navigation-contract.md`).
 2. **Dragging down closes every sheet, and dismissal writes nothing.** A
    `Sheet` follows a drag from its handle and title row, closes on a
    deliberate release and springs back otherwise; its body scrolls and taps
@@ -87,7 +89,8 @@ the names of its Jest tests are the specification of that component.
    the ⋮ opens a sheet titled with the item's name.
 2. **Deleted and archived items stay in their list behind a toggle** (`Show
    deleted`, `Show archived`), never a separate route: faded, marked with a
-   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet.
+   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet,
+   or on the destination when the row is a link ([[session.history-weeks]]).
 3. **A summary card that opens a destination is one link** with no controls
    inside it and an accessibility label that states its summary (spec 08,
    "Read-only link card pattern"). Editing and removal live on the destination.

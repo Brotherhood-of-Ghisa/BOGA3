@@ -178,10 +178,9 @@ appId: com.dinoderek.mobile
     visible:
       id: "groups-stream-list"
     timeout: 15000
-- assertVisible:
-    id: "groups-stream-filter-${output.groupsGroupId}"
+# One group: no group picker.
 - assertNotVisible:
-    id: "groups-stream-filter-all"
+    id: "groups-stream-filter-row"
 # Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
 - openLink: "boga3://group/mine"
 - extendedWaitUntil:
@@ -253,7 +252,7 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Sled Push, Per side, Rules 1.*per-side load, Not linked"
+      text: "Sled Push, Per side, Not linked"
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"
@@ -314,7 +313,7 @@ appId: com.dinoderek.mobile
           id: "^group-stream-session-card-${output.groupsCardKey}$"
       - extendedWaitUntil:
           visible:
-            id: "group-session-header"
+            id: "group-session-summary"
           timeout: 15000
       - tapOn: "Back"
       - extendedWaitUntil:
@@ -325,14 +324,16 @@ appId: com.dinoderek.mobile
     id: "^group-stream-session-card-${output.groupsCardKey}$"
 - extendedWaitUntil:
     visible:
-      id: "group-session-header"
+      id: "group-session-summary"
     timeout: 15000
+# The header title names whose session and which day; its eyebrow, the group.
 - assertVisible:
-    id: "group-session-member"
-    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+    id: "group-session-title-text"
+    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} · .*"
+# View Session's card: Start and Duration (no status line once completed).
 - assertVisible:
-    id: "group-session-status"
-    text: "Completed · 45m"
+    id: "group-session-times-duration"
+    text: "Duration 45m"
 # Each exercise is a session-detail card (the View Session restyle, PR C):
 # its name, set count and performed sets.
 - assertVisible: "Bench Press"

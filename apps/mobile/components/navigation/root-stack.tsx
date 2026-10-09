@@ -55,6 +55,8 @@ export function RootStack() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
         <Stack.Screen name="exercise-history" />
+        {/* The subject's name replaces this title once it resolves. */}
+        <Stack.Screen name="progress-history" options={{ title: 'History' }} />
         {/* Draws its own top bar (`Stack.Screen` options in the screen). */}
         <Stack.Screen name="completed-session/[sessionId]" />
         <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />

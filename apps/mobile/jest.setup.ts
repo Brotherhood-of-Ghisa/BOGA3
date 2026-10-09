@@ -1,4 +1,6 @@
 import { cleanup, configure } from '@testing-library/react-native';
+
+import { createUncaughtErrorSink } from '@/__tests__/helpers/uncaught-react-errors';
 import {
   __resetAccountLocalPreferencesForTests,
 } from '@/src/preferences/account-local';
@@ -16,6 +18,32 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+});
+
+// Make React's uncaught render/effect errors fail the test that caused them.
+//
+// React 19 reports an error no boundary caught through `reportGlobalError`,
+// which does `window.dispatchEvent(new window.ErrorEvent('error', { error }))`.
+// jest-expo's environment installs a PARTIAL `window`: it has `ErrorEvent` but
+// no `dispatchEvent`, so the reporter itself throws
+// `TypeError: window.dispatchEvent is not a function` — the original error is
+// destroyed, and that TypeError escapes into whichever test the event loop is
+// running by then, blaming an innocent test.
+//
+// This hook exists to SURFACE those errors, never to swallow them: the sink
+// records the real error and the `afterEach` below rethrows it, so the test
+// that threw fails with the real message and stack. Two errors in one test
+// come back as an `AggregateError` naming both rather than one of them
+// silently winning (`__tests__/helpers/uncaught-react-errors.ts`).
+const uncaughtReactErrors = createUncaughtErrorSink();
+const partialWindow = (globalThis as { window?: { dispatchEvent?: unknown } }).window;
+if (partialWindow && typeof partialWindow.dispatchEvent !== 'function') {
+  partialWindow.dispatchEvent = uncaughtReactErrors.record;
+}
+
+afterEach(() => {
+  const failure = uncaughtReactErrors.drain();
+  if (failure !== null) throw failure;
 });
 
 // Worklets installs its native runtime on import; Jest has none, so any suite
@@ -101,16 +129,22 @@ jest.mock('react-native-reanimated', () => {
 // not have. An in-memory store per test file: the chosen theme preset
 // (`components/ui/theme-launch.ts`) is read from it when `tokens.ts` loads, so
 // every suite starts in the default theme unless it sets the key before
-// importing tokens.
+// importing tokens. As in the real store, an async read or write runs when its
+// promise settles, in call order, not when it is called
+// (`ui-theme-launch.test.ts` pins this).
 jest.mock('expo-sqlite/kv-store', () => {
   const items = new Map<string, string>();
   const Storage = {
     getItemSync: (key: string) => items.get(key) ?? null,
-    getItem: async (key: string) => items.get(key) ?? null,
+    getItem: async (key: string) => {
+      await Promise.resolve();
+      return items.get(key) ?? null;
+    },
     setItemSync: (key: string, value: string) => {
       items.set(key, value);
     },
     setItem: async (key: string, value: string) => {
+      await Promise.resolve();
       items.set(key, value);
     },
     removeItemSync: (key: string) => items.delete(key),

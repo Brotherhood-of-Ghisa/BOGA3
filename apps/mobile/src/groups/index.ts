@@ -76,8 +76,8 @@ export {
 } from './use-group-online-pages';
 export {
   archiveCompetitionExercise, certifyCompetition, createCompetitionExercise, endCompetitionCertification,
-  getCompetitionBoard, getCompetitionCertification, getCompetitionContract, getCompetitionHistory,
-  getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionStream,
+  getCompetitionBoard, getCompetitionCertification, getCompetitionHistory,
+  getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionSessionRecords, getCompetitionStream,
   getCompetitionWeek, listCompetitionExercises, updateCompetitionExercise,
 } from './api';
 export type * from './competition-wire';

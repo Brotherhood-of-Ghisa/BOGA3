@@ -3,12 +3,14 @@
 ### set.performed · definition · accepted
 
 A set counts for any figure only when it is **confirmed performed**: valid
-reps (a positive integer), valid Weight (digits with an optional decimal
-point; blank Weight with valid reps is `0`), and no performance status.
+reps (a positive integer, at most 999), valid Weight (digits with an optional
+decimal point; blank Weight with valid reps is `0`), and no performance status.
 Planned, unperformed and skipped rows never count for any figure.
 
-Why: one validity rule means a value is valid everywhere or nowhere.
-Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser in `apps/mobile/src/exercise-calculations/parse.ts`.
+Why: one validity rule means a value is valid everywhere or nowhere. The reps
+cap keeps every count exact on every device and server; no real set comes
+near it.
+Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser and `MAX_SET_REPS` in `apps/mobile/src/exercise-calculations/parse.ts`.
 
 ### set.eligibility · definition · accepted
 
@@ -60,8 +62,10 @@ row only. A set feeds records only as [[set.eligibility]] allows: a working
 set can make a 1RM or Weight record, a volume-included set a Volume record,
 and a set that is neither is never a record, PR or best. The only highlights
 on a set list are the exercise's record sets: the set that took the 1RM record
-and the set that took the Weight record (one set may take both).
+and the set that took the Weight record (one set may take both). The group
+session view highlights instead the set that took #1 on a group 1RM board:
+one `#1 in group` band per set (decided 2026-10-08).
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
-Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; record band words in `apps/mobile/src/session-insights/record-band.ts`.
+Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; record band words in `apps/mobile/src/session-insights/record-band.ts`; the group band in `buildSessionRecordBands`, `apps/mobile/src/groups/competition-session-records-view-model.ts`.

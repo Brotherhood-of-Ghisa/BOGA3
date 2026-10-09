@@ -8,14 +8,12 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 
 export default function GroupBoardHistoryRoute() {
   const { isConfigured,user }=useAuth();
-  const params=useLocalSearchParams<{ groupId?: string | string[];exerciseId?: string | string[];metric?: string | string[];scope?: string | string[];revision?: string | string[] }>();
+  const params=useLocalSearchParams<{ groupId?: string | string[];exerciseId?: string | string[];metric?: string | string[];scope?: string | string[] }>();
   const groupId=first(params.groupId),exerciseId=first(params.exerciseId);
   if (!isConfigured || !user) return <GroupsSignInRequired isConfigured={isConfigured} />;
   if (!groupId || !exerciseId) return null;
-  const revision=Number(first(params.revision));
   return <GroupComparisonBoundary userId={user.id} groupId={groupId} exerciseId={exerciseId} history>
     {exercise => <GroupMetricHistory userId={user.id} groupId={groupId} exercise={exercise}
-      initialMetric={first(params.metric)} initialScope={parseBoardScopeParam(params.scope)}
-      initialRevision={Number.isSafeInteger(revision) && revision > 0 ? revision : null} />}
+      initialMetric={first(params.metric)} initialScope={parseBoardScopeParam(params.scope)} />}
   </GroupComparisonBoundary>;
 }

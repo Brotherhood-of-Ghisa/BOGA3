@@ -9,9 +9,7 @@
 #     present and its inputs + state hashes still match;
 #   - a missing stamp (db reset), another gate's stamp, changed state, a new
 #     migration, an unreadable stamp or a down runtime → the full path again;
-#   - a failing full path exits non-zero and leaves no stamp;
-#   - a stack a one-way body marked, or with protocol 4 active, is reset first
-#     (and says why); a failed reset fails the preflight and keeps the mark.
+#   - a failing full path exits non-zero and leaves no stamp.
 # And `boga` exports one fresh BOGA_GATE_RUN_ID per gate run, never one for a
 # lane run by name.
 #
@@ -53,16 +51,14 @@ case "$1 ${2:-}" in
 esac
 EOF
 printf '#!/usr/bin/env bash\n[[ ! -e "$DB/down" ]]\n' >"$STUB_BIN/curl"
-# docker ps names this slot's db container; `docker exec … psql` is the
-# protocol-4 activation query (prints $DB/active, default f), the stamp query
-# (prints "<stamp>|<state>") or, given -v details=, the stamp write.
+# docker ps names this slot's db container; `docker exec … psql` is the stamp
+# query (prints "<stamp>|<state>") or, given -v details=, the stamp write.
 cat >"$STUB_BIN/docker" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
   ps) echo "supabase_db_BOGA-wt-wt7" ;;
   exec)
     [[ -e "$DB/psql-broken" ]] && { echo "psql: connection refused" >&2; exit 2; }
-    [[ "$(cat)" == *group_competition_active* ]] && { cat "$DB/active" 2>/dev/null || echo f; exit 0; }
     for arg in "$@"; do
       [[ "$arg" == emails=* ]] && printf '%s' "${arg#emails=}" >"$DB/emails"
       [[ "$arg" == details=* ]] && { printf '%s' "${arg#details=}" >"$DB/stamp"; exit 0; }
@@ -81,15 +77,8 @@ done
 for f in local-runtime-up.sh reset-local.sh group-eval-configure.sh smoke-seed.sh auth-provision-local-fixtures.sh; do
   printf '#!/usr/bin/env bash\necho %s >>"$CALLS"\n' "${f%.sh}" >"$ROOT/supabase/scripts/$f"
 done
-# reset-local does what the real one does to the state the preflight reads: it
-# truncates the stamp, deactivates protocol 4 and clears the mark; it fails
-# (leaving all three) while $DB/reset-broken exists.
-cat >"$ROOT/supabase/scripts/reset-local.sh" <<'EOF2'
-#!/usr/bin/env bash
-echo reset-local >>"$CALLS"
-[[ ! -e "$DB/reset-broken" ]] || exit 1
-rm -f "$DB/stamp" "$DB/active" "$(dirname "$0")/../.temp/stack-needs-reset"
-EOF2
+# reset-local truncates the stamp, as the real one's seed.sql does.
+printf '#!/usr/bin/env bash\necho reset-local >>"$CALLS"\nrm -f "$DB/stamp"\n' >"$ROOT/supabase/scripts/reset-local.sh"
 # smoke-seed fails while $DB/seed-broken exists (a baseline the repairs cannot fix).
 printf '#!/usr/bin/env bash\necho smoke-seed >>"$CALLS"\n[[ ! -e "$DB/seed-broken" ]]\n' >"$ROOT/supabase/scripts/smoke-seed.sh"
 chmod +x "$ROOT/supabase/scripts/"*.sh
@@ -195,37 +184,6 @@ preflight G2
 echo "# edited" >>"$ROOT/supabase/scripts/group-eval-configure.sh"
 preflight G2
 expect_full "repair script edited" "baseline changed since this gate stamped it"
-
-echo "== a stack a one-way body marked is reset before the repairs, and says why"
-MARK="$ROOT/supabase/.temp/stack-needs-reset"
-preflight G4
-mkdir -p "$(dirname "$MARK")"
-printf 'body-a activated protocol 4\nbody-b reset to an old migration\n' >"$MARK"
-preflight G4 && pass "exit 0" || fail "exit non-zero"
-[[ "$(repairs)" == "reset-local $FULL" ]] && pass "reset, then the full path" || fail "repairs were '$(repairs)'"
-grep -Fq "(body-a activated protocol 4;body-b reset to an old migration); resetting" "$OUT" \
-  && pass "names every marking body" || { fail "no reset reason"; sed 's/^/      | /' "$OUT" >&2; }
-[[ ! -e "$MARK" ]] && pass "the reset cleared the mark" || fail "mark survived the reset"
-preflight G4
-expect_fast "after the reset, re-stamped"
-
-echo "== protocol 4 active without a mark is reset too"
-echo t >"$DB/active"
-preflight G4
-[[ "$(repairs)" == "reset-local $FULL" ]] && pass "reset, then the full path" || fail "repairs were '$(repairs)'"
-grep -Fq "protocol 4 is active); resetting" "$OUT" && pass "says why" || fail "no activation reason"
-
-echo "== a failed reset fails the preflight and keeps the mark"
-echo "body-c" >"$MARK"
-touch "$DB/reset-broken"
-if preflight G4; then fail "exit 0 after a failed reset"; else pass "exit non-zero"; fi
-[[ "$(repairs)" == "reset-local" ]] && pass "no repairs after the failed reset" || fail "repairs were '$(repairs)'"
-[[ -s "$MARK" ]] && pass "mark kept for the next preflight" || fail "mark lost"
-rm -f "$DB/reset-broken"
-preflight G4
-[[ "$(repairs)" == "reset-local $FULL" && ! -e "$MARK" ]] && pass "next preflight resets and clears it" || fail "repairs were '$(repairs)'"
-grep -Fq "clear_stack_reset_marker" "$SRC_ROOT/supabase/scripts/reset-local.sh" \
-  && pass "the real reset-local.sh clears the mark" || fail "reset-local.sh no longer clears the mark"
 
 echo "== a down runtime cold-starts and resets, then stamps"
 touch "$DB/down"

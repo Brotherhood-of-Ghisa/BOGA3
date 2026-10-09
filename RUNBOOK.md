@@ -132,8 +132,7 @@ its baseline on every start.
 
 The baseline points the group-eval kick at the stack, seeds `a@` (near-blank),
 `b@` and `history@` (rich imported history), seeds the `Dev crew` group
-(`npm run seed:dev-groups` — `history@` owns, `b@` joins, both backdated), and
-activates group competitions once (one-way until `dev-reset`). On real schema
+(`npm run seed:dev-groups` — `history@` owns, `b@` joins, both backdated). On real schema
 drift it **fails loud** rather than wiping; rebuild explicitly with `dev-reset`.
 
 `BOGA-dev` is main-checkout-only: a linked worktree runs the same baseline

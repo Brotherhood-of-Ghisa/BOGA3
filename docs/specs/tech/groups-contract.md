@@ -9,8 +9,8 @@
 | If you need… | Source |
 | --- | --- |
 | Tables, constraints, grants, function bodies | the group migrations in `supabase/migrations/` |
-| Wire shapes | `apps/mobile/src/groups/types.ts`, `metric-wire.ts`, `competition-wire.ts` |
-| Protocol-4 units, disclosure, activation (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
+| Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
+| Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
 | Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
@@ -125,11 +125,11 @@ retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
   its `started_at`; a record sorts at its session's start, just above the card.
   The All stream (`p_group_id` null) is server-only; the app reads one group.
 
-Three RPC generations coexist: legacy `group_*` (kg Weight/1RM) and protocol 3
-(`group_metric_*`, `*_v2`) are this doc's; protocol 4 (`group_competition_*`)
-is the competition contract's. Once it is active, unsafe older RPCs return
-`UPDATE_REQUIRED`. The app calls only protocol 4 and the shared membership and
-settings RPCs.
+One RPC generation: the membership and settings RPCs, and protocol 4
+(`group_competition_*`, owned by the competition contract) for everything
+competitive. Every group RPC requires the `x-boga-group-contract: 4` header
+(`UPDATE_REQUIRED` otherwise). The legacy kg and protocol-3 RPCs are gone; their
+stored rows remain history.
 
 **Week summary.** The client sends its local week (≤ 8 days): the server never
 guesses a time zone. It reads completed, untombstoned sessions shared to the
@@ -141,6 +141,18 @@ included, on `(working_sets desc, group_records desc)`. Training now is an
 active session written within 2 h (max `server_received_at` over session,
 exercises, sets); latest completed is any time.
 
+**Record stream** (`group_competition_stream_v2`) adds each record's
+`record`: its set, and per board taken the previous #1 (holder and set, or
+the lifter's own prior value).
+
+**Session records** (`group_competition_session_records`) sit beside the
+session detail, not in it: exact readers reject a new key. One shared session's
+non-voided records that took #1 in the group, as stream events whose `record`
+values are those boards, each with the All board's current leader (`leads`
+while its own set holds #1; no leader for an earlier revision). The app shows
+them once the session completes (a provisional record can still move), and
+no Volume board: groups are dropping that metric.
+
 ## Device-computed card metrics
 
 Session cards and the friend view count on the viewing device
@@ -148,8 +160,10 @@ Session cards and the friend view count on the viewing device
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
 screens' TS. Counts come only from permitted set context: `Sets` as
 [[set.count-display]], `exercises` those holding a working set. A normalized exercise
-shows reps and effort, never a load figure, and no session total is
-reconstructed. Nothing is mirrored in SQL: SQL mirrors once duplicated set
+shows reps and effort, never a load figure. The friend view's `Volume` sums
+only ordinary exercises' volume-included sets ([[set.eligibility]],
+[[copy.no-inline-explanation]]): hidden kg never enters it, so nothing is
+recovered by subtraction; `—` with none. Nothing is mirrored in SQL: SQL mirrors once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted
 live set. Ordinary rows use ordinary kg and never read a personal preference,
 contribution or reading.
@@ -157,7 +171,7 @@ contribution or reading.
 ## Evaluator
 
 **Queues.** `group_eval_queue` holds session jobs (re-normalize, then re-apply
-targets) and target jobs (re-apply one member × group exercise);
+targets) and target jobs (enqueue one comparison evaluation);
 `group_metric_eval_queue` holds comparisons. Jobs coalesce on their natural
 key: a re-enqueue merges `causes`, bumps `generation`, and is available now.
 Completion writes only if `generation` is unchanged since the claim. Failures
@@ -198,25 +212,24 @@ unarchived group exercise. Any other board is frozen.
 
 ## Boards
 
-`group_board_entries` holds each member's best counting set per group exercise
-× metric (`weight`, `e1rm`) × scope (All, Certified).
+`group_metric_board_entries` holds each member's best counting set per group
+exercise × rules revision × metric (`volume`, `e1rm`) × scope (All,
+Certified). Legacy `group_board_entries` rows are frozen history.
 
 - **Counting set:** performed, working, live, its set row present, in a session
   shared into the group, under an exercise with a live link to the target.
   Zero never ranks.
-- **Conversion (D6):** 1RM scales by the member exercise's current mode vs the
-  target's (same 1, per side → total 2, total → per side 0.5); Weight stays raw
-  kg. `apps/mobile/src/groups/load-factor-vectors.json` holds TS and SQL equal.
-- **Best:** highest value, then earlier achieved, exercise order, set order,
-  set id. **Rank:** value desc, achieved asc, member id. Values are stored at 6
-  decimals so comparisons and cursors are exact. Former members stay ranked,
-  marked, frozen.
+- **Scores, best and rank** (units, load-mode conversion, full-precision
+  values, tie order): the competition contract §1. Former members stay
+  ranked, marked, frozen.
 - **Rules apply forward only.** Stored entries, records and certifications are
   never re-evaluated because a rule changed; at its next apply a target's best
   that no longer counts falls silently (`rules`), and a stored record stands
   while its value does.
 
-**The apply** (`group_eval_apply`), per target under a per-group advisory lock:
+**The apply** (`group_metric_apply_member`, once per member when
+`group_metric_eval_publish` publishes a comparison, under the publisher's
+group, advisory and queue locks):
 
 1. Snapshot old entries, #1s and links; recompute.
 2. **Provisional records** (session `active`): one that still counts and
@@ -248,10 +261,11 @@ converges.
 
 ## Certification
 
-Attests the raw synced values of a record set (a current All entry or a
-non-voided record), by a current member other than the lifter, on an
-unarchived exercise. It pins the live fingerprint; a mismatch is `CONFLICT`.
-One active per target × set; a repeat returns it (`created: false`). Only the
+Implements [[groups.certification]]: attests the raw synced values of a
+record set (a current All entry or a non-voided record) on an unarchived
+exercise, stored as a row per current score under one public id. Certify takes
+any score's token and checks every score's live fingerprint (`CONFLICT`); a
+repeat returns it (`created: false`). Ending any row ends them all. Only the
 certifier withdraws; owners and admins cancel; both are idempotent. Ended rows
 never reopen, and undelete revives nothing. Writers: the RPCs and the apply,
 never a Sync v2 trigger.
@@ -273,8 +287,7 @@ never a Sync v2 trigger.
 - Rule-only changes keep a witness; set edits and deletes void it; a
   private-reading correction ends only the dependent projection.
 - `competition-wire-guards.ts` rejects private fields, mixed revisions and
-  wrong units before the cache; `metric-wire-guards.ts` rejects private fields
-  in a comparison's rules.
+  wrong units before the cache.
 
 ## Mobile client
 
@@ -319,11 +332,11 @@ Code and tests cite these.
 | P2, P4, D17 | Sets count only through a link (one per exercise per group); links are retroactive, offline, inactive while away |
 | P3, D9, D13 | Group exercises only in picker search, the Link screen and the group page |
 | P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's Stream · Leaderboards |
-| P6–P9, D11, D12 | Weight/1RM × Certified/All boards; one row per member; podiums on Certified · 1RM; history is lead changes |
+| P6–P9, D11, D12 | Volume/1RM × Certified/All boards; one row per member; podiums on Certified · 1RM; history is lead changes |
 | P10–P13, D3–D5 | Another current member certifies a record set; one suffices; certifier withdraws, admin cancels; edits void it |
 | P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |
 | P18 | Certify and admin actions need a connection |
-| D6 | 1RM converts across load modes; Weight stays raw |
+| D6 | Scores convert across load modes (competition contract §1) |
 | E0–E0.4 | Linking: picker search, pick sheet, Link screen, group-page link/unlink |
 | E1–E1.3 | Podiums, full board with toggles, history |
 | E2, E3 | Row detail sheet; stream record card (`GroupMetricStreamCard`) |

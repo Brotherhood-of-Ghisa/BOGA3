@@ -4,11 +4,11 @@ import {
   __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState, retryAccountLocalPreferences, setAccountLocalPreferenceAccount, setAccountLocalPreferences,
 } from '@/src/preferences/account-local';
-import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from '@/src/preferences/model';
+import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue, preferenceValidationMessages } from '@/src/preferences/model';
 import { preferenceKey } from '@/src/preferences/storage';
 import { getSessionSetTypeCycle, nextSessionSetType, defaultSessionSetType } from '@/src/data/set-types';
 import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
-import { calendarWeekBounds, keepHistorySelection, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
 const account = async (id: string | null = 'A', configured = true) => {
   setAccountLocalPreferenceAccount(id, configured);
@@ -75,6 +75,41 @@ it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects inval
   expect(values().weeklyWorkingSetTarget).toBe(8);
   expect(write).not.toHaveBeenCalled();
 });
+
+// Progress's remembered filters. The period is deliberately not one of them:
+// every visit opens on Settings' Progress period ([[comparison.window]]).
+it('restores the remembered Progress filters after relaunch, per account, as plain text', async () => {
+  await account();
+  expect(values().progressBreakdown).toBe('muscle');
+  expect(values().progressMetric).toBe('workingSetCount');
+  expect(Object.keys(values())).not.toContain('progressPeriod');
+
+  setAccountLocalPreferences({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
+  // Each is its own scoped key, written as its own text: a JSON-quoted value
+  // is what the shared `heatmapView` branch avoids, and would read back null.
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressBreakdown'))).toBe('exercise');
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressMetric'))).toBe('totalVolume');
+
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
+
+  await account('B');
+  expect(values()).toMatchObject({ progressBreakdown: 'muscle', progressMetric: 'workingSetCount' });
+  await account('A');
+  expect(values().progressMetric).toBe('totalVolume');
+});
+
+it.each(['progressBreakdown', 'progressMetric'] as const)(
+  'keeps the stored %s when an unreadable value is offered, and reports why', async field => {
+    Storage.setItemSync(preferenceKey('account:A', field), '"muscle"');
+    await account();
+    expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+
+    setAccountLocalPreferences({ [field]: 'sideways' });
+    expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+    expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages[field]);
+  });
 
 it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('targetWindowWeeks', 52)).toBe(true);
@@ -156,14 +191,13 @@ it('caps constituent muscle attainment before averaging, including untrained mus
   expect(groupedTargetAttainment([], {}, 8)).toBe(0);
 });
 
-it('aligns to local Monday, keeps the same elapsed previous span, and recovers week selection', () => {
+it('aligns current calendar-week windows to local Monday and now', () => {
   const now = new Date(2026, 9, 3, 15, 20);
   expect(calendarWeekBounds(1, now).start).toEqual(new Date(2026, 8, 28));
   const bounds = calendarWeekBounds(4, now);
   expect(bounds.start).toEqual(new Date(2026, 8, 7));
+  expect(bounds.end).toEqual(now);
   expect(shiftCalendarWeeks(now, -4)).toEqual(new Date(2026, 8, 5, 15, 20));
-  expect(keepHistorySelection('2026-09-14', 4, now)).toBe('2026-09-14');
-  expect(keepHistorySelection('2025-01-06', 4, now)).toBe('2026-09-28');
 });
 
 it.each([[2, 8, 167, '2026-03-02T05:00:00.000Z'], [10, 1, 169, '2026-10-26T04:00:00.000Z']])

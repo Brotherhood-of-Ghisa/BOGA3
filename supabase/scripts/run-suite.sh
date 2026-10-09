@@ -22,10 +22,9 @@ SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TESTS_DIR="${SUPABASE_DIR}/tests"
 
 ensure_baseline=1
-if [[ "${1:-}" == "--no-baseline" ]]; then
-  ensure_baseline=0
-  shift
-fi
+case "${1:-}" in
+  --no-baseline) ensure_baseline=0; shift ;;
+esac
 
 [[ $# -ge 1 ]] || { echo "usage: $0 [--no-baseline] <body.sh> [<body.sh>...]" >&2; exit 2; }
 

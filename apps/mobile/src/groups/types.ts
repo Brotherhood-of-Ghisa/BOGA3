@@ -116,21 +116,6 @@ export type GroupExercise = {
   archived_at_ms: number | null;
 };
 
-// ---- Boards (contract) -----------------------------------------
-
-export type GroupBoardMetric = 'weight' | 'e1rm';
-
-// ---- Week summary (contract) ---------------------------------------------
-
-/** One current member's week: working sets and group records from completed shared sessions in the window. */
-export type GroupWeekBoardRow = {
-  /** Competition rank: equal (working sets, group records) share a rank. */
-  rank: number;
-  member: GroupMemberRef;
-  working_sets: number;
-  group_records: number;
-};
-
 // ---- Errors -----------------------------------------------------------------
 
 /** Tokens the server raises as `'<TOKEN>: <message>'` (contract). */

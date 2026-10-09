@@ -86,20 +86,20 @@ access level, and `useRootRouteAccess`
 
 ## Param rules
 
-- **A param is an opening selection, not state.** A screen reads its params on
-  mount and does not rewrite the query as the user changes things; period, tag,
-  section, grouping, search and sort changes are in-route state. The one
-  exception is a leaderboard board, which writes its metric/scope selection back
-  to the query because Expo may reuse the screen.
+- **A param is an opening selection, not state.** A screen applies it on entry
+  and never rewrites the query (except a leaderboard board, which writes its
+  metric/scope back because Expo may reuse the screen); period, tag, section,
+  grouping, search and sort changes are in-route state. A link changing a
+  mounted tab's param re-enters it; one repeating its value does not.
 - **A missing, unknown, deleted or unauthorised target renders an in-route
   unavailable state.** No route crashes on a bad param and none redirects away:
   an out-of-reach `groupId` shows the lost-access state, a dead session or group
   exercise "no longer available", a bad `exerciseDefinitionId` an error state.
 - **Params carry ids and small enum values, nothing else.** Never a token,
-  session, credential, serialized object, or private reading context: the one
-  external transition (the first-party `/connect` page) carries no OAuth state,
-  session, callback, user identifier or token, and a record sheet never routes
-  private context out. Pass an id and let the destination read it.
+  session, credential, serialized object, or private reading context, nor OAuth
+  state, a callback or a user identifier on the one external transition (the
+  first-party `/connect` page); a record sheet never routes private context
+  out. Pass an id and let the destination read it.
 - Dev/test-only params exist (`completed-session`'s `maestroShare`,
   `maestroCatalog`, `maestroInsights`) and are each gated by `isDevMode()`.
 
@@ -107,6 +107,8 @@ access level, and `useRootRouteAccess`
 | --- | --- | --- |
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
+| `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one, required; both, neither or a blank id renders the unavailable state, as does an id the exercise catalogue no longer holds. The page reads the subject's name from that cache — never from a param |
+| `/sessions` | `week`, `day` | where the list opens ([[session.history-open]]); malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `7` / `30` / `all`; absent or invalid is `30` |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
@@ -125,7 +127,6 @@ access level, and `useRootRouteAccess`
 | | `from` | prefills a duplicate; Save creates a new programme |
 | `/programme/[programmeId]` | `programmeId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
-| `…/history` | `revision` | the positive rules revision the board carried; recorded units are kept, and a retired revision's scores are unavailable |
 
 `source=more` is a navigation marker, not screen state:
 `apps/mobile/components/navigation/more-hub-back-button.tsx` renders the
@@ -160,9 +161,11 @@ Nothing outside this table navigates. A route not listed as a source
 | `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
 | `/session/<id>/exercise/<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the records panel's `History` (`push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
-| `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History. Progress's own muscle and exercise names open in-route history sheets, not this route |
+| `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's own names |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row, and its overflow `Edit` (`push`). `/sessions` never completes an active session directly |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week (`historyDayHref`, `sessionsWeekHref`, `push`) |
+| `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
 | `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
@@ -194,15 +197,19 @@ Nothing outside this table navigates. A route not listed as a source
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | `View groups`, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
-Progress controls change content in-route; Sessions is the final scrolling
-link in both views. Muscle chevrons toggle inline contributions; names open the
-history page sheet, preserving scroll and restoring accessible focus on close.
+Progress’s frozen controls change content in-route;
+Sessions is the final scrolling link in both views. A muscle chevron toggles
+its contribution block directly below that row. `/progress-history` is a
+route, not a sheet.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
-is in-route state (picker editors, exercise page sheets, card menus, Progress
-history sheets, record set detail sheets). A back gesture is disabled where
-leaving would be wrong: the session view of a workout in progress and the
-completion summary both set `gestureEnabled: false`.
+is in-route state. That includes the picker's `Add new` editor, group-pick sheet
+and `Add as new` editor, the exercise page's effort / options / swap sheets and
+its shared exercise editor, the Sessions row and active-session menus, and the
+record set row detail sheet on the Stream and the full board. A back *gesture* is disabled rather than handled where leaving
+would be wrong: the session view of a workout in progress and the completion
+summary both set `gestureEnabled: false`, so they are left only by the actions
+above.
 
 ## Header titles
 

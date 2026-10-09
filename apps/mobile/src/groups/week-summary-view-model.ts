@@ -1,4 +1,4 @@
-// Today's group card, from one `group_week_summary` read (contract):
+// Today's group card, from one `group_competition_week_summary` read (contract):
 // the week's top three by working sets, the caller's own line when outside
 // them, and the latest activity row. Pure; the card only draws it.
 
@@ -13,10 +13,7 @@ import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
 import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
-import type {
-  GroupMemberRef,
-  GroupWeekBoardRow,
-} from './types';
+import type { GroupMemberRef } from './types';
 
 import type {
   CompetitionEventWire,
@@ -26,6 +23,8 @@ import type {
 import { formatCompetitionHistoricalValue } from './competition-view-model';
 type GroupWeekLatestSession = NonNullable<GroupWeekSummaryResult['latest_completed']>;
 type GroupWeekTrainingSession = GroupWeekSummaryResult['training_now'][number];
+/** One current member's week: competition rank (equal working sets and group records share a rank). */
+export type GroupWeekBoardRow = GroupWeekSummaryResult['members'][number];
 
 export const WEEK_BOARD_SIZE = 3;
 

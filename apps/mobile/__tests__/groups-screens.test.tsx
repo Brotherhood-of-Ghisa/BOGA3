@@ -9,9 +9,11 @@
  */
 
 import * as mockReact from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+import { waitForGone } from './helpers/wait-for-gone';
 
 let fixture: InMemoryDatabaseFixture;
 const mockCurrentDatabase = () => fixture.database;
@@ -35,7 +37,10 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
-  Stack: { Screen: () => null },
+  // The header's custom title and right action render inline, so a test can read them.
+  Stack: { Screen: ({ options }: { options?: { headerTitle?: unknown; headerRight?: unknown } }) => mockReact.createElement(mockReact.Fragment, null,
+    typeof options?.headerTitle === 'function' ? options.headerTitle({ children: '' }) : null,
+    typeof options?.headerRight === 'function' ? options.headerRight({}) : null) },
 }));
 
 const mockUseAuth = jest.fn();
@@ -49,6 +54,10 @@ jest.mock('@/src/groups/api', () => {
   getGroup: jest.fn(),
   getCompetitionStream: streamRead,
   getCompetitionSession: jest.fn(),
+  getCompetitionSessionRecords: jest.fn(),
+  certifyCompetition: jest.fn(),
+  getCompetitionCertification: jest.fn(),
+  endCompetitionCertification: jest.fn(),
   listCompetitionExercises: jest.fn(),
   getCompetitionPodiums: jest.fn(),
   };
@@ -67,7 +76,7 @@ import {
   type GroupSummary,
   type StreamSessionItem,
 } from '@/src/groups';
-import type { CompetitionStreamWire as GroupStreamResult,CompetitionStreamItemWire as StreamItem,CompetitionSessionDetailWire as GroupSessionDetailResult } from '@/src/groups/competition-wire';
+import type { CompetitionCertificationWire,CompetitionSessionRecordsWire,CompetitionStreamWire as GroupStreamResult,CompetitionStreamItemWire as StreamItem,CompetitionSessionDetailWire as GroupSessionDetailResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
@@ -188,6 +197,29 @@ const sessionDetail = (overrides: Partial<GroupSessionDetailResult['session']> =
   },
 });
 
+const BENCH = { group_exercise_id: 'ge-bench', name: 'Bench', source_exercise_id: null, archived_at_ms: null,
+  rules: { load_input_mode: 'total_load' as const, bodyweight_calculations_enabled: false, bodyweight_contribution: 0, default_metric: 'e1rm' as const, rules_revision: 1 },
+  published_revision: 1, rebuilding: false };
+const certificationBy = (user_id: string, username: string): CompetitionCertificationWire => ({ certification_id: 'cert-1', metric: 'e1rm',
+  certified_by: { user_id, username }, certified_at_ms: T0, observed_rules_revision: 1, ended_at_ms: null, end_reason: null });
+/** alex's 102.5 × 5 took #1 on 1RM (since passed by sam) and on Volume, a board the view no longer shows. */
+const sessionRecords = ({ member = { user_id: 'friend-1', username: 'alex' }, certification = null as CompetitionCertificationWire | null,
+  provisional = false } = {}): CompetitionSessionRecordsWire => ({
+  contract_version: 4, group_id: 'group-a', member_user_id: member.user_id, session_id: 's-1',
+  records: [{
+    event: { event_id: 'ev-1', sequence: 7, kind: 'record', group: { group_id: 'group-a', name: 'Garage Gym' },
+      group_exercise: { group_exercise_id: 'ge-bench', name: 'Bench' }, rules_revision: 1, representation_version: 4,
+      visibility: 'ordinary', sort_at_ms: T0, member, metric: null, certified: null, reason: null, related_event_id: null,
+      session_id: 's-1', set_id: 'set-2', reps: 5, provisional, voided: false,
+      values: [{ role: 'record', metric: 'e1rm', unit: 'kg', value: 119.6, unavailable: false, member },
+        { role: 'record', metric: 'volume', unit: 'kg_reps', value: 512.5, unavailable: false, member }],
+      record_context: { exercise: BENCH, former: false, metrics: [
+        { metric: 'e1rm', write_token: 'tok-1rm', eligible: true, certification },
+        { metric: 'volume', write_token: 'tok-vol', eligible: true, certification: null }] } },
+    boards: [{ metric: 'e1rm', leader: { user_id: 'friend-2', username: 'sam' }, leads: false }, { metric: 'volume', leader: member, leads: true }],
+  }],
+});
+
 const seed = (cacheKey: string, payload: unknown) =>
   writeGroupCache(fixture.database, { cacheKey, userId: USER_ID, payload, fetchedAtMs: T0 });
 
@@ -222,6 +254,7 @@ beforeEach(() => {
   api.getCompetitionStream.mockResolvedValue(page([]));
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
   api.getCompetitionSession.mockResolvedValue(sessionDetail());
+  api.getCompetitionSessionRecords.mockResolvedValue({ ...sessionRecords(), records: [] });
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listCompetitionExercises>>);
   api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
 });
@@ -261,6 +294,15 @@ describe('Groups tab', () => {
     expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
     // No group selected: the stream reads nothing (there is no all-groups stream).
     expect(api.getCompetitionStream).not.toHaveBeenCalled();
+  });
+
+  it('shows no group picker with a single group, and its stream and leaderboards still open', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
+    render(<GroupsTabRoute />);
+    expect(await screen.findByTestId('groups-segment-stream')).toBeTruthy();
+    await waitFor(() => expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a'));
+    expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
+    expect(screen.queryByTestId('groups-stream-filter-group-a')).toBeNull();
   });
 
   it("renders the first group's cached stream at once, then newest-first cards", async () => {
@@ -314,7 +356,7 @@ describe('Groups tab', () => {
     expect(screen.getByTestId('groups-stream-filter-group-a').props.accessibilityState).toEqual({ selected: true });
 
     fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
-    await waitFor(() => expect(screen.queryByTestId(cardID('friend-1:s-1'))).toBeNull());
+    await waitForGone(() => screen.queryByTestId(cardID('friend-1:s-1')));
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
   });
@@ -434,7 +476,7 @@ describe('Groups tab', () => {
   it('shows the error inline, above cached cards, when data is already on screen', async () => {
     seed(groupCacheKeys.mine,{ groups: [GROUP_A,GROUP_B] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
-    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_stream returned an unexpected payload.'));
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_competition_stream returned an unexpected competition payload.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
@@ -565,15 +607,23 @@ describe("Friend's session view", () => {
     const working = within(screen.getByTestId('group-session-set-row-set-2'));
     expect(working.getByText(/^102\.5 × \d+$/)).toBeTruthy();
     expect(working.getByText('RIR 1')).toBeTruthy();
-    // No record band: the friend's history is not on this device.
+    // No personal record band: the friend's history is not on this device.
     expect(screen.queryByText(/New 1RM record/)).toBeNull();
+    // The header: whose session, which day, seen as which group.
+    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('alex · Fri 11 Sep');
+    expect(screen.getByTestId('group-session-eyebrow')).toHaveTextContent('Garage Gym · group view');
+    expect(screen.queryByTestId('group-session-full-view')).toBeNull();
+    // Volume sums the ordinary volume-included sets: the warm-up is left out.
+    expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume 513');
     // The server sends the planned set too; the device shows performed sets only.
     expect(screen.queryByTestId('group-session-set-row-set-3')).toBeNull();
     // `Sets` counts working sets: the warm-up keeps its row but is no set.
     expect(screen.getByTestId('group-session-sets').props.accessibilityLabel).toBe('Sets 1');
     expect(screen.getByText('Bench Press')).toBeTruthy();
-    expect(screen.getByText('alex')).toBeTruthy();
-    expect(screen.getByText('Completed · 1h 5m')).toBeTruthy();
+    // View Session's card: Start and Duration, no status line once completed.
+    expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 1h 5m');
+    expect(screen.queryByTestId('group-session-status')).toBeNull();
+    expect(screen.queryByTestId('group-session-records')).toBeNull();
     expect(screen.getByText('2026-09-11 09:05')).toBeTruthy();
     expect(api.getCompetitionSession).toHaveBeenCalledWith('group-a','friend-1','s-1');
 
@@ -585,7 +635,7 @@ describe("Friend's session view", () => {
     }
   });
 
-  it('normalized sessions show reps and effort without kg, 1RM, Volume or absolute totals',async()=>{
+  it('normalized sessions show reps and effort without kg, 1RM or Volume, and no Volume total',async()=>{
     const safe=sessionDetail();
     api.getCompetitionSession.mockResolvedValue({ ...safe,session: { ...safe.session,exercises: safe.session.exercises.map(exercise=>({
       ...exercise,visibility: 'normalized',sets: exercise.sets.map(set=>({ set_id: set.set_id,order_index: set.order_index,reps_value: set.reps_value,set_type: set.set_type,performance_status: set.performance_status })) })) } });
@@ -593,19 +643,129 @@ describe("Friend's session view", () => {
     expect(await screen.findByTestId('group-session-set-row-set-2')).toHaveTextContent(/5 reps/);
     expect(screen.getByTestId('group-session-set-row-set-2')).toHaveTextContent(/RIR 1/);
     expect(screen.queryByText(/102.5|110.0|kg|1RM|Vol /)).toBeNull();
-    expect(screen.queryByTestId('group-session-volume')).toBeNull();
+    expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
   });
 
-  it('shows "In progress" for an active session, and pull-to-refresh updates it', async () => {
+  it('lists the #1 records, frozen, with who passed them since, a board link, and one-tap Certify', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    api.certifyCompetition.mockResolvedValue({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') });
+    // A landed certify re-reads it from the server (`src/groups/use-metric-certification.ts`),
+    // so this read is part of the one-tap Certify path, not optional setup.
+    api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: certificationBy(USER_ID, 'me') });
+    render(<GroupSessionRoute />);
+    const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
+    // Groups no longer rank Volume: its board shows neither a row nor in the band.
+    expect(screen.getByTestId('group-session-records-count')).toHaveTextContent('1');
+    expect(screen.queryByTestId('group-session-record-ev-1:volume')).toBeNull();
+    expect(screen.queryByText(/kg·reps/)).toBeNull();
+    expect(rm.getByText('Bench · 1RM')).toBeTruthy();
+    expect(rm.getByText('119.6 kg')).toBeTruthy();
+    expect(rm.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
+    expect(rm.getByText('Not certified')).toBeTruthy();
+    expect(screen.getByText('#1 in group · 1RM')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-link'));
+    expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=e1rm&scope=all');
+
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
+    await waitFor(() => expect(api.certifyCompetition).toHaveBeenCalledWith({ groupId: 'group-a', exerciseId: 'ge-bench',
+      metric: 'e1rm', memberId: 'friend-1', setId: 'set-2', revision: 1, token: 'tok-1rm' }));
+    expect(await rm.findByText('Certified by you · 11 Sep')).toBeTruthy();
+    expect(api.getCompetitionSessionRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('a disabled Certify never opens the board, and a failed records read says so with Retry', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: certificationBy(USER_ID, 'me') });
+    let finish!: (value: Awaited<ReturnType<typeof api.certifyCompetition>>) => void;
+    api.certifyCompetition.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    render(<GroupSessionRoute />);
+    fireEvent.press(await screen.findByTestId('group-session-record-ev-1:e1rm-certify'));
+    // Pending: the button is disabled, and a second tap lands nowhere.
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
+    await act(async () => { finish({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') }); });
+
+    api.getCompetitionSessionRecords.mockRejectedValue(new GroupApiError('INTERNAL', 'boom'));
+    await pullToRefresh('group-session-screen');
+    expect(await screen.findByTestId('group-session-records-error')).toBeTruthy();
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    fireEvent.press(screen.getByTestId('group-session-records-error-retry'));
+    await waitForGone(() => screen.queryByTestId('group-session-records-error'));
+  });
+
+  it('a refused certify swaps Certify for Refresh, which re-reads the records', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    api.certifyCompetition.mockRejectedValue(new GroupApiError('CONFLICT', 'Performance changed. Refresh and review.'));
+    render(<GroupSessionRoute />);
+    fireEvent.press(await screen.findByTestId('group-session-record-ev-1:e1rm-certify'));
+    expect(await screen.findByTestId('group-session-record-ev-1:e1rm-notice')).toHaveTextContent(/The score changed/);
+    expect(screen.queryByTestId('group-session-record-ev-1:e1rm-certify')).toBeNull();
+    const reads = api.getCompetitionSessionRecords.mock.calls.length;
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-refresh'));
+    await waitFor(() => expect(api.getCompetitionSessionRecords.mock.calls.length).toBeGreaterThan(reads));
+  });
+
+  it('withdraws my certification after the confirmation, with the same button', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords({ certification: certificationBy(USER_ID, 'me') }));
+    api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: certificationBy(USER_ID, 'me') });
+    const ended = { ...certificationBy(USER_ID, 'me'), ended_at_ms: T0 + 1, end_reason: 'withdrawn' as const };
+    api.endCompetitionCertification.mockImplementation(async () => {
+      // From here the server reads the certification as ended and the record as uncertified.
+      api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: ended });
+      api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+      return { contract_version: 4, certification: ended };
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    render(<GroupSessionRoute />);
+    const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
+    expect(await rm.findByText('Certified by you · 11 Sep')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-withdraw'));
+    const buttons = alert.mock.calls[0][2] ?? [];
+    await act(async () => { buttons.find(button => button.text === 'Withdraw')?.onPress?.(); });
+    expect(api.endCompetitionCertification).toHaveBeenCalledWith('group-a', 'cert-1', 'e1rm', 'withdraw');
+    expect(await rm.findByText('Not certified')).toBeTruthy();
+    alert.mockRestore();
+  });
+
+  it('on my own session: You in the title, a full-session action, and no Certify for my own record', async () => {
+    const me = { user_id: USER_ID, username: 'me' };
+    mockParams = { groupId: 'group-a', memberId: USER_ID, sessionId: 's-1' };
+    api.getCompetitionSession.mockResolvedValue(sessionDetail({ member: me }));
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords({ member: me }));
+    render(<GroupSessionRoute />);
+    const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
+    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('You · Fri 11 Sep');
+    expect(rm.getByText('Not certified')).toBeTruthy();
+    expect(screen.queryByTestId('group-session-record-ev-1:e1rm-certify')).toBeNull();
+    fireEvent.press(screen.getByTestId('group-session-full-view'));
+    expect(mockPush).toHaveBeenCalledWith('/completed-session/s-1');
+  });
+
+  it('opens my live session while it runs, and shows no records until it is completed', async () => {
+    const me = { user_id: USER_ID, username: 'me' };
+    mockParams = { groupId: 'group-a', memberId: USER_ID, sessionId: 's-1' };
+    api.getCompetitionSession.mockResolvedValue(sessionDetail({ member: me, status: 'active', completed_at_ms: null, duration_sec: null }));
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords({ member: me, provisional: true }));
+    render(<GroupSessionRoute />);
+    fireEvent.press(await screen.findByTestId('group-session-full-view'));
+    expect(mockPush).toHaveBeenCalledWith('/session/s-1');
+    await waitFor(() => expect(api.getCompetitionSessionRecords).toHaveBeenCalled());
+    expect(screen.queryByTestId('group-session-records')).toBeNull();
+    expect(screen.queryByText(/#1 in group/)).toBeNull();
+  });
+
+  it('marks an active session In progress with its elapsed Duration, and pull-to-refresh updates it', async () => {
     api.getCompetitionSession
-      .mockResolvedValueOnce(sessionDetail({ status: 'active', completed_at_ms: null, duration_sec: null }))
+      .mockResolvedValueOnce(sessionDetail({ status: 'active', started_at_ms: Date.now() - 32 * 60_000, completed_at_ms: null, duration_sec: null }))
       .mockResolvedValue(sessionDetail());
     render(<GroupSessionRoute />);
     expect(await screen.findByText('In progress')).toBeTruthy();
-    expect(screen.getByTestId('group-session-times-end').props.accessibilityLabel).toBe('End —');
+    expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 32m');
 
     await pullToRefresh('group-session-screen');
-    expect(await screen.findByText('Completed · 1h 5m')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 1h 5m'));
     expect(screen.queryByText('In progress')).toBeNull();
   });
 

@@ -21,6 +21,7 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim'> = {
   inkGhost: '#BAB2A7',
   paper: '#F6F4EF',
   surface: '#FFFFFF',
+  selection: '#000000',
   rule: '#E2DCD0',
   ruleSoft: '#EFEAE0',
   accent: '#C2410C',
@@ -102,13 +103,14 @@ describe('theme generator', () => {
     expect(drift).toEqual([]);
   });
 
-  it('uses the accent and record seeds as given, and never themes `danger` or `surface`', () => {
+  it('uses the accent and record seeds as given, and never themes danger, surface or filter selection', () => {
     for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
       const roles = generateRoles(seeds);
       expect(roles.accent).toBe(seeds.accent);
       expect(roles.record).toBe(seeds.record);
       expect(roles.danger).toBe('#A4262C');
       expect(roles.surface).toBe('#FFFFFF');
+      expect(roles.selection).toBe('#000000');
       expect(roles.scrim).toBe(withAlpha(roles.ink, 0.42));
     }
   });

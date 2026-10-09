@@ -3,8 +3,8 @@
  * soft-deleted exercises are never offered, one link per group shows as
  * unavailable, archived group exercises are not offered but existing links to
  * them render, the suggestion order and exclusions, inactive links for groups
- * I've left, placeholders for missing cache entries, the load-mode note in
- * both directions, and the default picker list staying free of group rows.
+ * I've left, placeholders for missing cache entries, the group's shared
+ * standard note, and the default picker list staying free of group rows.
  */
 
 import {
@@ -16,9 +16,6 @@ import {
   buildPickSheetModel,
   buildPickerGroupSections,
   describeLinkRetroactivity,
-  describeLoadModeNote,
-  describeGroupLinkIncompatibility,
-  describeGroupLinkLoadNote,
   describeUnlinkConfirm,
   describeUnlinkSuccess,
   filterPickSheetChoices,
@@ -30,8 +27,9 @@ import {
   type LinkRef,
   type LinkableExercise,
 } from '@/src/groups/link-view-model';
-import { buildAddAsNewPrefill, requireAddAsNewCompatibility } from '@/src/groups/add-as-new';
-import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
+import { competitionLinkExercise } from '@/src/groups/competition-view-model';
+import type { CompetitionExerciseWire } from '@/src/groups/competition-wire';
 import type { GroupExercise } from '@/src/groups/types';
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
@@ -42,7 +40,6 @@ const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, '
 });
 
 const exercise = (overrides: Partial<LinkableExercise> & Pick<LinkableExercise, 'id' | 'name'>): LinkableExercise => ({
-  loadInputMode: 'total_load',
   deletedAt: null,
   ...overrides,
 });
@@ -61,7 +58,7 @@ const TUESDAY: GroupExerciseCatalog = { groupId: 'g-tue', groupName: 'Tuesday Cr
 
 const SEED_BENCH = exercise({ id: 'seed_barbell_bench_press', name: 'Barbell Bench Press' });
 const COMP_BENCH = exercise({ id: 'ex-comp', name: 'Bench (comp grip)' });
-const HOTEL_BENCH = exercise({ id: 'ex-hotel', name: 'Bench (hotel gym)', loadInputMode: 'per_side_load' });
+const HOTEL_BENCH = exercise({ id: 'ex-hotel', name: 'Bench (hotel gym)' });
 const DELETED_BENCH = exercise({ id: 'ex-deleted', name: 'Bench', deletedAt: new Date(1) });
 const SQUAT = exercise({ id: 'ex-squat', name: 'Squat' });
 
@@ -84,19 +81,6 @@ describe('groupExercisesLoaded', () => {
 });
 
 describe('notes', () => {
-  it('load-mode note in both directions, none when the modes match', () => {
-    expect(describeLoadModeNote('per_side_load', 'total_load')).toBe(
-      'Weight stays as logged. 1RM is compared in total-load terms.',
-    );
-    expect(describeLoadModeNote('total_load', 'per_side_load')).toBe(
-      'Weight stays as logged. 1RM is compared in per-side terms.',
-    );
-    expect(describeLoadModeNote(undefined, 'per_side_load')).toBe(
-      'Weight stays as logged. 1RM is compared in per-side terms.',
-    );
-    expect(describeLoadModeNote('per_side_load', 'per_side_load')).toBeNull();
-  });
-
   it('retroactivity and unlink wording (E0.2, E0.3)', () => {
     expect(describeLinkRetroactivity('Bench (comp grip)', 'Tuesday Crew')).toBe(
       'Your past Bench (comp grip) sets shared with Tuesday Crew will count.',
@@ -271,7 +255,7 @@ describe('Link screen (E0.3)', () => {
     ]);
     // Tuesday's Bench is a name match (comp grip contains "bench") → Suggested, not repeated below.
     expect(model.suggested.map((row) => row.key)).toEqual(['g-tue:gx-bench-tue']);
-    expect(model.suggested[0].loadModeNote).toBe('Weight stays as logged. 1RM is compared in per-side terms.');
+    expect(model.suggested[0]).not.toHaveProperty('loadModeNote');
     // Iron: the linked target is gone from the list, archived is never offered, Deadlift is unavailable.
     expect(model.groups).toEqual([
       {
@@ -377,32 +361,22 @@ describe('unlink preservation and frozen targets', () => {
 });
 
 
-describe('versioned comparison linking', () => {
-  const target: GroupMetricExerciseWire = { group_exercise_id: 'gx-pull', name: 'Pull-up',
-    source_exercise_id: 'seed_pull_up', archived_at_ms: null, legacy: false,
-    load_input_mode: 'per_side_load', bodyweight_calculations_enabled: true,
-    bodyweight_contribution: 1, default_metric: 'e1rm', rules_revision: 2,
-    published_revision: 2, rebuilding: false };
-  const compatible = exercise({ id: 'mine', name: 'Pull-up' });
+describe('competition exercise linking', () => {
+  const wire: CompetitionExerciseWire = { group_exercise_id: 'gx-pull', name: 'Pull-up',
+    source_exercise_id: 'seed_pull_up', archived_at_ms: null, published_revision: 2, rebuilding: false,
+    rules: { load_input_mode: 'per_side_load', bodyweight_calculations_enabled: true,
+      bodyweight_contribution: 1, default_metric: 'e1rm', rules_revision: 2 } };
+  const target = competitionLinkExercise(wire);
+  const mine = exercise({ id: 'mine', name: 'Pull-up' });
 
-  it('keeps compatible choices available without retired metadata matching', () => {
+  it('offers my exercise whatever the group\'s rules', () => {
     const model = buildPickSheetModel({ groupId: 'g', groupName: 'Crew', groupExercise: target,
-      exercises: [compatible], links: [] });
-    expect(model.suggestion).toBe(compatible);
+      exercises: [mine], links: [] });
+    expect(model.suggestion).toBe(mine);
     expect(model.choices.find(row => row.exercise.id === 'mine')?.unavailableReason).toBeNull();
   });
 
-  it('keeps personal exercise settings independent from the group calculation', () => {
-    const personal = { ...compatible };
-    expect(describeGroupLinkIncompatibility(personal, target)).toBeNull();
-    expect(describeGroupLinkLoadNote(personal, target)).toMatch(/100% bodyweight contribution/);
-    expect(describeGroupLinkLoadNote(personal, target)).toMatch(/settings stay unchanged/);
-  });
-
-  it('prefills the shared exercise core and rechecks edited input before a linked creation', () => {
-    const prefill = buildAddAsNewPrefill(target);
-    expect(prefill).toMatchObject({ name: 'Pull-up', loadInputMode: 'per_side_load' });
-    expect(() => requireAddAsNewCompatibility(prefill, target)).not.toThrow();
-    expect(() => requireAddAsNewCompatibility({ ...prefill, loadInputMode: 'total_load' }, target)).not.toThrow();
+  it('prefills the shared exercise core for a linked creation', () => {
+    expect(buildAddAsNewPrefill(target)).toMatchObject({ name: 'Pull-up', loadInputMode: 'per_side_load' });
   });
 });

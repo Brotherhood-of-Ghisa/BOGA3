@@ -1,3 +1,4 @@
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import {
   calculateLinearPercentile,
   captureSessionShareImage,
@@ -476,11 +477,13 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 });
 
 describe("deriveSessionExerciseVolumeComparisons", () => {
-  it("uses linear interpolation for odd, even, and tail percentiles", () => {
+  it("uses linear interpolation for odd, even, and quartile percentiles", () => {
     expect(calculateLinearPercentile([100, 200, 300], 0.5)).toBe(200);
     expect(calculateLinearPercentile([100, 200, 300, 400], 0.5)).toBe(250);
     expect(calculateLinearPercentile([100, 200], 0.05)).toBe(105);
     expect(calculateLinearPercentile([100, 200], 0.95)).toBe(195);
+    expect(calculateLinearPercentile([100, 200, 300, 400, 500, 600], 0.25)).toBe(225);
+    expect(calculateLinearPercentile([100, 200, 300, 400, 500, 600], 0.75)).toBe(475);
   });
 
   it("combines repeated target blocks, leaves warm-ups out of volume, and excludes invalid work", () => {
@@ -563,8 +566,8 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         currentVolume: 600,
         historicalSessionCount: 3,
         medianVolume: 700,
-        percentile5Volume: 520,
-        percentile95Volume: 880,
+        percentile25Volume: 600,
+        percentile75Volume: 800,
         state: "distribution",
       },
     ]);
@@ -1278,7 +1281,7 @@ describe("createCompletedSessionInsightsRepository", () => {
     const store = buildStore();
     const repository = createCompletedSessionInsightsRepository(store);
 
-    await expect(repository.loadInsights("missing")).resolves.toBeNull();
+    await expect(repository.loadInsights("missing", 52)).resolves.toBeNull();
     expect(store.loadEarlierCompletedSessions).not.toHaveBeenCalled();
     expect(store.loadSessionExercises).not.toHaveBeenCalled();
   });
@@ -1326,10 +1329,11 @@ describe("createCompletedSessionInsightsRepository", () => {
     });
     const repository = createCompletedSessionInsightsRepository(store);
 
-    const insights = await repository.loadInsights("target");
+    const insights = await repository.loadInsights("target", 52);
 
     expect(store.loadEarlierCompletedSessions).toHaveBeenCalledWith({
       completedAt: AT,
+      start: historyWeekBounds(52, AT).start,
       targetSessionId: "target",
     });
     expect(store.loadEarlierRecordBaselines).toHaveBeenCalledWith({

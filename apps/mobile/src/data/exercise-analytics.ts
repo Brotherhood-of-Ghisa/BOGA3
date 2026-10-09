@@ -23,6 +23,8 @@ type ExerciseRawSet = {
 };
 
 export type ExerciseRawSession = {
+  /** The session's id; a day of history lists the sessions that made it. */
+  id?: string;
   completedAt: Date;
   loadContext?: LoadContext;
   sets: ExerciseRawSet[];
@@ -63,6 +65,7 @@ const startOfMondayWeek = (date: Date): Date => {
 };
 
 type DayAccumulator = {
+  sessionIds: string[];
   totalVolume: number | null;
   workingSetCount: number;
   bestRM1: number | null;
@@ -87,6 +90,7 @@ export const aggregateExerciseDailyEffort = (
   for (const session of rawSessions) {
     const dateKey = formatLocalDateKey(session.completedAt, timeZone);
     const day: DayAccumulator = dayMap.get(dateKey) ?? {
+      sessionIds: [],
       totalVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
@@ -101,12 +105,14 @@ export const aggregateExerciseDailyEffort = (
     day.workingSetCount += working.length;
     if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
     if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
+    if (session.id !== undefined && !day.sessionIds.includes(session.id)) day.sessionIds.push(session.id);
     dayMap.set(dateKey, day);
   }
 
   return Array.from(dayMap.entries())
     .map(([dateKey, day]) => ({
       dateKey,
+      sessionIds: day.sessionIds,
       totalVolume: day.totalVolume,
       workingSetCount: day.workingSetCount,
       estimatedRM1: day.bestRM1,
@@ -119,7 +125,10 @@ export const aggregateExerciseWeeklyEffort = (
   rawSessions: ExerciseRawSession[],
   timeZone?: string
 ): SelectedExerciseWeeklyEffort[] => {
-  const dailyEffort = aggregateExerciseDailyEffort(rawSessions, timeZone);
+  return aggregateExerciseWeeksFromDaily(aggregateExerciseDailyEffort(rawSessions, timeZone));
+};
+
+const aggregateExerciseWeeksFromDaily = (dailyEffort: DailyEffortMetrics[]): SelectedExerciseWeeklyEffort[] => {
   const weekMap = new Map<string, WeekAccumulator>();
 
   for (const day of dailyEffort) {
@@ -285,6 +294,7 @@ const loadExerciseRawSessions = async (
     const session = sessionById.get(sessionId);
     if (!session) continue;
     rawSessions.push({
+      id: session.id,
       completedAt: session.completedAt,
       loadContext: personalCalculationContext(bodyweightCalculationsEnabled, definition, session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
@@ -306,4 +316,11 @@ export const computeSelectedExerciseDailyEffort = async (
 ): Promise<DailyEffortMetrics[]> => {
   const rawSessions = await loadExerciseRawSessions(options);
   return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
+};
+
+/** Both chart views share one graph read and one daily aggregation. */
+export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
+  const rawSessions = await loadExerciseRawSessions(options);
+  const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone);
+  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily) };
 };

@@ -82,6 +82,7 @@ import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/se
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
+import { setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -90,6 +91,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const ONE_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId;
 const NO_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId;
@@ -288,6 +290,18 @@ afterEach(() => {
 });
 
 describe('completion presentation over real data', () => {
+  it.each(['completion', 'summary'])('refreshes the %s and share comparison when the saved window changes', async presentation => {
+    await openSession({ sessionId: ONE_PR, presentation });
+    const card = `session-completion-exercise-${ONE_PR_SQUAT}`;
+    expect(await screen.findByTestId(`${card}-distribution`)).toBeTruthy();
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    await waitFor(() => expect(screen.getByTestId(card)).toHaveTextContent(/Building history/));
+    expect(screen.queryByTestId(`${card}-distribution`)).toBeNull();
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    expect(screen.getByTestId(`session-share-exercise-${ONE_PR_SQUAT}`)).toHaveTextContent(/Building history/);
+    expect(screen.queryByTestId(`session-share-exercise-${ONE_PR_SQUAT}-distribution`)).toBeNull();
+  });
+
   it('shows the one-PR session: its record, sets and muscle row, with no pager', async () => {
     await openSession({ sessionId: ONE_PR, presentation: 'completion' });
 
@@ -310,10 +324,13 @@ describe('completion presentation over real data', () => {
     // One fixed heading above the grouping; no subtitle.
     expect(screen.getByText('Volume')).toBeTruthy();
     expect(screen.queryByText('Session vs history')).toBeNull();
-    // The squat has completed history in the fixture, so it is compared, not "no history".
+    // Squat has at least six prior observations; the bench history is shorter.
     expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat')).toHaveTextContent(
-      /\d+% (above|below) median|At median/
+      /Vol1500/
     );
+    expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat-distribution')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_two_prs_bench-distribution')).toBeNull();
+    expect(screen.queryByText(/prior sessions/)).toBeNull();
     // Neither set has an effort; untagged sets are working sets.
     expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set: 1 primary, 0 secondary');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
@@ -379,14 +396,15 @@ describe('completed-session detail over real data', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows no-history and unmapped copy for a session without mapped history', async () => {
+  it('shows current volume and the unmapped state without a history subtitle', async () => {
     await openSession({ sessionId: UNMAPPED });
 
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
     expect(
       within(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise'))
-        .getByText(/No comparison history yet/)
-    ).toBeTruthy();
+        .queryByText(/No comparison history yet/)
+    ).toBeNull();
+    expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toHaveTextContent(/Vol500Building history/);
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-insight-empty')).toHaveTextContent('No mapped working sets for this session.');
@@ -424,7 +442,7 @@ describe('completed-session detail over real data', () => {
       fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
     });
 
-    await waitFor(() => expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('completed-session-detail-deleted-band'));
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
     expect(deletedAt()).toBeNull();
   });

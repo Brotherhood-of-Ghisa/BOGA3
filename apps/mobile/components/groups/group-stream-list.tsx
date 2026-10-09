@@ -28,9 +28,8 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
   const renderItem = ({ item }: { item: CompetitionStreamModel }) => {
     if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
     if (item.kind === 'membership') return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;
-    return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames}
-      onPress={item.event.kind === 'record' ? () => setSelectedKey(item.key) : undefined}
-      pressHint={item.event.kind === 'record' ? 'View record and certification' : undefined} />;
+    return <GroupMetricStreamCard item={item.event} record={item.record} userId={userId} showGroupName={showGroupNames}
+      onPress={item.event.kind === 'record' ? () => setSelectedKey(item.key) : undefined} />;
   };
   const footer = stream.loadingMore ? <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />
     : stream.loadMoreError ? <StatePanel fill={false} kind="error" body="Could not load older items."
@@ -43,7 +42,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       style={groupScreenStyles.screen} testID={testID} />
     {live?.kind === 'competition' && live.event.kind === 'record' ?
-      <GroupMetricStreamRecordSheet key={`${userId}:${live.key}`} record={live.event} userId={userId}
+      <GroupMetricStreamRecordSheet key={`${userId}:${live.key}`} record={live.event} detail={live.record} userId={userId}
         myRole={roleForGroup(live.event.group.group_id)} onClose={() => setSelectedKey(null)} onChanged={refresh} /> : null}
   </>;
 }

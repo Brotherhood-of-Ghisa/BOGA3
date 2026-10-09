@@ -19,6 +19,8 @@ import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effo
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { isVolumeSet, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
 import { normalizeGroupSetFacts } from '@/src/groups/set-facts';
+import { formatEmptyWeeks, groupSessionsByWeek, historyWeekHeading } from '@/components/session-list/history-weeks';
+import type { SessionListItem } from '@/components/session-list/types';
 
 const PRODUCT_DIR = path.resolve(__dirname, '..', '..', '..', 'docs', 'product');
 
@@ -51,10 +53,11 @@ const readFactTable = (file: string, id: string): FactTable => {
 const PENDING: Record<string, readonly string[]> = {
   'set.eligibility': [],
   '1rm.formula': [],
+  'session.history-weeks': [],
 };
 
 /** The facts whose tables this file runs; every fact-table marker must be one. */
-const HANDLED = ['set.eligibility', '1rm.formula'];
+const HANDLED = ['set.eligibility', '1rm.formula', 'session.history-weeks'];
 
 const ranCells = new Set<string>();
 
@@ -171,6 +174,54 @@ describe('1rm.formula', () => {
   }
 });
 
+describe('session.history-weeks', () => {
+  const table = readFactTable('session.md', 'session.history-weeks');
+  const NOW = new Date(2026, 9, 8, 12);
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /** `Wed 7 Oct`, `Mon 5 Oct 00:00`, `Wed 31 Dec 2025`, `Mon 5 Oct deleted`, `… no working set`: one completed session. */
+  const session = (entry: string, index: number): SessionListItem => {
+    const match = /^\w{3} (\d{1,2}) (\w{3})(?: (\d{4}))?(?: (\d{2}):(\d{2}))?( deleted)?( no working set)?$/.exec(entry);
+    if (!match) throw new Error(`unreadable session '${entry}'`);
+    const [, day, month, year, hours, minutes, deleted, noWorkingSet] = match;
+    const completedAt = new Date(Number(year ?? 2026), MONTHS.indexOf(month), Number(day), Number(hours ?? 18), Number(minutes ?? 0));
+    if (!entry.startsWith(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][completedAt.getDay()])) {
+      throw new Error(`'${entry}' names the wrong weekday`);
+    }
+    return {
+      id: `session-${index}`,
+      startedAt: completedAt.toISOString(),
+      status: 'completed',
+      completedAt: completedAt.toISOString(),
+      durationSec: 3_600,
+      durationDisplay: '1h',
+      gymName: null,
+      exerciseCount: 1,
+      setCount: noWorkingSet ? 0 : 3,
+      totalWeight: 0,
+      deletedAt: deleted ? completedAt.toISOString() : null,
+      records: [],
+    };
+  };
+
+  it('has the sessions and shown columns, and rows', () => {
+    expect(table.columns).toEqual(['Sessions completed', 'Shown']);
+    expect(table.rows.length).toBeGreaterThan(0);
+  });
+
+  for (const row of table.rows) {
+    runCell('session.history-weeks', row['Sessions completed'], 'Shown', () => {
+      const sessions = row['Sessions completed'].split(', ').map(session);
+      const lines = groupSessionsByWeek(sessions, NOW).flatMap((section) => {
+        const heading = historyWeekHeading(section, NOW);
+        const gap = section.emptyWeeksBefore > 0 ? [formatEmptyWeeks(section.emptyWeeksBefore)] : [];
+        return [...gap, `${heading.title} · ${heading.detail}`];
+      });
+      return { actual: lines.join(' / '), want: row.Shown };
+    });
+  }
+});
+
 describe('Pending: lines', () => {
   it('lists only cells the tables still have', () => {
     const listed = Object.entries(PENDING).flatMap(([id, cells]) => cells.map((cell) => `${id}|${cell}`));
@@ -180,6 +231,7 @@ describe('Pending: lines', () => {
   it.each([
     ['set.md', HANDLED[0]],
     ['1rm.md', HANDLED[1]],
+    ['session.md', HANDLED[2]],
   ])('%s keeps a Pending: line for %s exactly while it has pending cells', (file, id) => {
     expect(readFactTable(file, id).pending).toBe(PENDING[id].length > 0);
   });

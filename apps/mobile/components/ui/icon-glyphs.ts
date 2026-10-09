@@ -194,6 +194,19 @@ export const ICON_GLYPHS = {
     ),
     circle(12, 12, 3),
   ],
+  // --- History views ---
+  // Lucide `calendar`: the history grid (month calendars) view.
+  'calendar-grid': [
+    path('M8 2v4'),
+    path('M16 2v4'),
+    path('M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),
+    path('M3 10h18'),
+  ],
+  // Lucide `align-left`: the weekly view's horizontal bars.
+  'weekly-bars': [path('M21 6H3'), path('M15 12H3'), path('M17 18H3')],
+  // Lucide `chart-column`: the Timeline view's week columns.
+  'timeline-columns': [path('M3 3v16a2 2 0 0 0 2 2h16'), path('M18 17V9'), path('M13 17V5'), path('M8 17v-3')],
+
   // Lucide `palette`: the Appearance row in Settings.
   palette: [
     path('M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z'),

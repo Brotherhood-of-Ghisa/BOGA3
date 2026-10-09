@@ -10,6 +10,9 @@ that describes it.
   count, `3 sets · 1RM 102.5`), it is data and stays.
 - **Bad:** a line like "Your training at a glance" under `Today`.
 - **Good:** `Mon 6 Oct · 52 min` under a session title.
+- **Kept:** `<group> · group view` above a group session's title: it says
+  whose view of the session this is, which the screen cannot show otherwise
+  (decided 2026-10-08).
 - **Cases** (removed after the fact, decided 2026-10-07):
   - `Sign in to load your data and keep it in sync.` under Sign in,
     `Agents can read training data only. …` under Connected agents, and
@@ -18,6 +21,9 @@ that describes it.
   - The sentence under each Settings and More row (`Review access and
     revoke existing connections.`, `Sign in and manage your account.`, …);
     the signed-in email under Account is data and stays.
+  - History heatmaps omit the window/Metric captions and percentile label
+    stack. Metric controls and chart figures remain; reference identities,
+    values and the history window are accessible.
 
 Why: the screen's content already says what the screen is; a describing line
 costs space and is read once.
@@ -59,6 +65,9 @@ formula notes, hints under fields, or "how this works" lines.
     information.` beside a Volume figure: a set whose load cannot be
     calculated is left out and the Volume of the rest is shown, with no note
     (decided 2026-10-07).
+  - A group session's Volume leaves out the sets whose kg the group cannot
+    see (normalized exercises) and is shown as `Volume`, with no note
+    (decided 2026-10-08).
   - The preview under a group's scoring-rules form (`Apply rules revision N:
     … The whole board will rebuild together. …` and the certification note):
     removed, with nothing in its place (decided 2026-10-07).
@@ -72,6 +81,25 @@ formula notes, hints under fields, or "how this works" lines.
   - `Coaches get read-only training access …` under AI coaching and
     `Configure how dates and other details are displayed …` in Settings'
     Preferences (decided 2026-10-07).
+  - Every rules line on group screens (decided 2026-10-08): `Rules N · …%
+    contribution · Bodyweight scoring … · … load` on the board, its row
+    sheet, the exercise rows and actions and the link notes (with `Your
+    personal exercise settings stay unchanged.`); `· Rules N` on podium
+    cards and stream cards; the history's rules line, revision chips and
+    `History keeps each value's original unit. …`; `Scores use the group's
+    … rules …`, `Certification attests …` and `Observed under rules N; …`
+    on the record sheets; `View rules history`. `As logged: …` is gone: the
+    set has its own line.
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
+
+### copy.blank-history · presentation · accepted
+
+Daily and Weekly history leave rest and unavailable figures visibly blank,
+including Daily's Week column: no `Rest`, `?`, substitute dash or zero. Known
+zero training stays numeric. Accessibility preserves the difference between
+rest, unavailable and known zero values.
+
+Why: an absent training figure should not look like a measurement or an error marker.
+Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.

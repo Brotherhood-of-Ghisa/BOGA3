@@ -85,6 +85,9 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
+Session volume comparison presentation is [[session.volume-comparison]];
+its history and quartiles derive in `apps/mobile/src/session-insights/calculations.ts`.
+
 **Counted-session statistics.**
 
 | Figure | Scope |
@@ -308,8 +311,8 @@ adds ` kg` itself.
 | Volume | whole kg·reps | `2560` |
 
 The agent API, the group evaluator and the SQL group functions call this
-kernel rather than copying it; the SQL load factor matches
-`metric-contract.ts` (`groups-bodyweight.sh` vector).
+kernel rather than copying it; the group load-mode factor is
+`link-compatibility.ts` alone.
 
 ## 5. Versioned group competition representation
 
@@ -318,8 +321,5 @@ kernel rather than copying it; the SQL load factor matches
 records in §3. It uses this kernel's effective total-load Volume/estimated 1RM
 and the same private dated B for public percentages; ordinary group scores
 convert source entered units to the declared group target. Display rounding does
-not determine competitive rank. Versioned worker/publication and safe readers
-are implemented and remain pending after installation until service-only
-activation. Compatible UI and authorized hosted release remain separate.
-Personal/coaching calculations,
+not determine competitive rank. Personal/coaching calculations,
 raw kg storage and existing records retain their current semantics.

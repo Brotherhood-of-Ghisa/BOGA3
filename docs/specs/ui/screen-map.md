@@ -26,7 +26,7 @@ draws the same fixed bar on every screen that shows tabs.
 | --- | --- | --- |
 | `/today` | Landing page: how this week and month are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
-| `/progress` | Frozen breakdown, period and metric/search controls; comparisons with one row contribution accordion; per-muscle / per-exercise history page sheet; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
+| `/progress` | One frozen row of filter chips — breakdown, period, and the metric where the table has one to pick — over a frozen exercise search; breakdown and metric are remembered on the device, the period opens on Settings' ([[comparison.window]]), and `breakdown` / `period` override on entry, including a link that changes them on a mounted Progress; comparisons with one row contribution accordion; a muscle or exercise name pushes `/progress-history`; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four: Community, Tools, Library & account | `(tabs)/more.tsx` |
 
 ### Preserved tab roots
@@ -38,7 +38,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
-| `/groups` | One group at a time (chips, no `All`): a newest-first `Stream` of sessions, records and membership events, or `Leaderboards` podiums | `(tabs)/groups.tsx`, `components/groups/` |
+| `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
 | `/settings` | Account, AI coaching, preferences, sync status, About, and dev-only tools in one support surface | `(tabs)/settings.tsx` |
 
 ## Sessions
@@ -49,13 +49,14 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/session/[sessionId]/exercise/[sessionExerciseId]` | One exercise of that session: records panel, ordered set list with the in-place logger, `Complete exercise` | `session/[sessionId]/exercise/[sessionExerciseId].tsx`, `components/exercise-page/`, `apps/mobile/src/session-recorder/` |
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |
-| `/sessions` | The planning hub: **Active** (the live session's row), **Upcoming** (scheduled one-off plans, soonest first), **Unscheduled** (standalone plans and multi-session training programmes, most recently updated first) and **Completed** history, each with its own states; the quiet `Plan session` and `New programme` actions are the hub's persistent entries and the empty planning sections' inline action. Plans never affect the completed history's count, filters or row actions | `sessions.tsx`, `components/session-planner/plan-sections.tsx` |
+| `/sessions` | The planning hub: **Active** (the live session's row), **Upcoming** (scheduled one-off plans, soonest first), **Unscheduled** (standalone plans and multi-session training programmes, most recently updated first) and the **Completed** history in weeks ([[session.history-weeks]]), each with its own states, in one virtualized list; `?week=` / `?day=` open it at that week or day ([[session.history-open]]); the header ⋮ holds `Show deleted sessions`; the quiet `Plan session` and `New programme` actions are the hub's persistent entries and the empty planning sections' inline action. Plans never affect the completed history's count, filters or row actions | `sessions.tsx`, `components/session-planner/plan-sections.tsx` |
 | `/session-plan/new` | The shared plan editor: title, optional schedule (`YYYY-MM-DD HH:mm`, blank = unscheduled) and gym, ordered exercise blocks with ordered target sets, inline field-addressable validation. `?edit=<planId>` edits that plan in place (its guarded sync refuses to touch a consumed block, writing nothing); `?from=<planId>` prefills a duplicate and Save creates a new plan | `session-plan/new.tsx`, `components/session-planner/plan-form-screen.tsx` |
 | `/session-plan/[planId]` | One plan: targets, derived progress, provenance; **Start all** (an active-session conflict offers one Resume and creates nothing), per-block **Add to session** (several compatible cards offer a choice sheet that writes nothing until one is picked), **Skip without doing it** on pending blocks, **Duplicate**, and confirmed **Delete** while no block pins the plan. Consumed blocks are read-only and link to their performed session | `session-plan/[planId].tsx` |
 | `/programme/new` | Multi-session training programme editor: name, description, ordered child sessions list with reorder/duplicate/remove controls, focused sub-sheet for editing child sessions, atomic transactional save. `?edit=<programmeId>` edits the programme in place; `?from=<programmeId>` prefills a duplicate | `programme/new.tsx`, `components/session-planner/programme-form-screen.tsx` |
 | `/programme/[programmeId]` | Training programme detail: programme metadata, status badge, next unresolved block card (in programme then exercise order) with "Add to session" and "Skip", ordered list of child plans linking to `/session-plan/[planId]` with accessible reordering, duplicate, and contract-defined delete (detaches child plans as standalone plans without deleting workouts) | `programme/[programmeId].tsx`, `components/session-planner/use-programme-detail.ts` |
 | `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit` and delete/undelete. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
 | `/exercise-history` | One `exercise_definitions` row's history: period and tag filters, all-time bests, one card per session | `exercise-history.tsx` |
+| `/progress-history` | One muscle's or one exercise's effort history, titled by that subject: the view (Timeline \| Grid \| Weekly) and metric selectors in one row, then the saved view (the Timeline follows [[comparison.timeline-history]]), with its own loading / error+Retry / empty states; a Grid or Weekly training day or week opens its sessions ([[session.history-open]]). Native back returns to Progress as it was left | `progress-history.tsx`, `components/stats/history-view.tsx` |
 
 ## Account, library and tools
 
@@ -82,8 +83,8 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/group/[groupId]/exercises/new` | Owner/admin add a group exercise, `From catalogue` or `Custom` | `group/[groupId]/exercises/new.tsx` |
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
 | `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: `Volume` \| `1RM` × `Certified` \| `All`, ranked rows, row detail sheet with certification actions | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes, newest first | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
-| `/group-session/[memberId]/[sessionId]` | A friend's session, read-only, drawn with View Session's cards | `group-session/[memberId]/[sessionId].tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes under the current rules, newest first, below one row of tap-to-cycle filters: metric, `Certified` \| `All`, `History` \| `Scores` | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
+| `/group-session/[memberId]/[sessionId]` | A member's shared session as the group sees it, drawn with View Session's cards, View Session's facts card (an `In progress` mark while it runs), its #1 group 1RM records (row → leaderboard); my own adds a full-session action | `group-session/[memberId]/[sessionId].tsx` |
 
 ## Dev-only routes
 
@@ -120,8 +121,8 @@ addressable, each resolving to a canonical owner for tab selection.
 - Detail screens use the native **minimal** back-button display mode (arrow,
   no text label), which also keeps the internal `(tabs)` group name off screen.
 - Screens whose header title is the name of a thing (`exercise-history`,
-  `exercise-link`, `group/[groupId]`, a leaderboard) set that title inside the
-  route file once the entity resolves; session-view, exercise-page, the
+  `exercise-link`, `progress-history`, `group/[groupId]`, a leaderboard) set
+  that title inside the route file once the entity resolves; session-view, exercise-page, the
   exercise picker and every `completed-session` presentation hide the native
   header and draw their own top bar.
 

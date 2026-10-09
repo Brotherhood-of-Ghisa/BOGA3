@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl } from 'react-native';
 
@@ -7,27 +7,45 @@ import {
   GroupInlineError,
   GroupMissingDataState,
   GroupOfflineBanner,
+  GroupSessionHeaderTitle,
   GroupStateView,
   GroupsSignInRequired,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
+import { IconButton } from '@/components/ui/icon-button';
 import { ScreenScroll } from '@/components/ui/screen';
 import { useAuth } from '@/src/auth';
-import type { CompetitionSessionDetailWire } from '@/src/groups/competition-wire';
+import { groupSessionEyebrow, groupSessionTitle } from '@/src/groups/competition-session-records-view-model';
+import type { CompetitionSessionDetailWire, CompetitionSessionRecordWire, CompetitionSessionRecordsWire,
+  CompetitionSessionWire } from '@/src/groups/competition-wire';
 import {
   getCompetitionSession,
+  getCompetitionSessionRecords,
+  getGroup,
   groupCacheKeys,
+  useGroupOnlinePages,
   useGroupResource,
+  useNetworkOnline,
+  type GroupGetResult,
 } from '@/src/groups';
+import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
 const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
+// The records read is one online page: nothing is cached (like a full board).
+const selectRecords = (page: CompetitionSessionRecordsWire) => page.records;
+const noCursor = () => null;
+const noMore = () => false;
+const recordKey = (record: CompetitionSessionRecordWire) => record.event.event_id;
+
 /**
- * The friend's session view (groups contract): read-only, cache
- * first. `completed-session/[sessionId].tsx` is deliberately not reused; both
- * draw their exercises with `components/session-detail/`.
+ * The group session view (groups contract): a member's shared session as the
+ * group sees it, read-only, cache first. The header names the group, the
+ * member and the day; on my own session its one action opens the full
+ * session. `completed-session/[sessionId].tsx` is deliberately not reused;
+ * both draw their exercises with `components/session-detail/`.
  */
 export default function GroupSessionRoute() {
   const params = useLocalSearchParams<{ memberId?: string | string[]; sessionId?: string | string[]; groupId?: string | string[] }>();
@@ -54,7 +72,36 @@ function UnavailableState() {
   );
 }
 
+/** My own session's full view: the live session while it runs, else View Session. */
+const fullSessionHref = (session: CompetitionSessionWire): Href =>
+  session.status === 'completed' ? `/completed-session/${encodeURIComponent(session.session_id)}` as Href : sessionViewHref(session.session_id);
+
+/** The native header: which group's view, whose session and when; on my own session, the full-session action. */
+function GroupSessionHeader({ session, groupName, userId }: { session: CompetitionSessionWire | null; groupName: string | null; userId: string }) {
+  const router = useRouter();
+  return (
+    <Stack.Screen
+      options={{
+        headerTitle: session
+          ? () => <GroupSessionHeaderTitle eyebrow={groupSessionEyebrow(groupName)} title={groupSessionTitle(session, userId)} />
+          : 'Session',
+        headerRight: session?.member.user_id === userId
+          ? () => (
+            <IconButton
+              accessibilityLabel="View full session"
+              name="arrow-up-right"
+              onPress={() => router.push(fullSessionHref(session))}
+              testID="group-session-full-view"
+            />
+          )
+          : undefined,
+      }}
+    />
+  );
+}
+
 function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId: string; groupId: string; memberId: string; sessionId: string }) {
+  const online = useNetworkOnline();
   const fetcher = useCallback(() => getCompetitionSession(groupId,memberId,sessionId), [groupId,memberId,sessionId]);
   // NOT_FOUND deletes this entry from the cache (the hook evicts its own key).
   const detail = useGroupResource<CompetitionSessionDetailWire>({
@@ -63,15 +110,25 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const { pulling, onRefresh } = usePullToRefresh(detail.refresh);
+  const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
+  const group = useGroupResource<GroupGetResult>({ userId, cacheKey: groupCacheKeys.group(groupId), fetcher: groupFetcher, evictGroupIdOnNotFound: groupId });
+  const fetchRecords = useCallback(() => getCompetitionSessionRecords(groupId,memberId,sessionId), [groupId,memberId,sessionId]);
+  const records = useGroupOnlinePages<CompetitionSessionRecordsWire, CompetitionSessionRecordWire, null>({ userId, groupId,
+    viewKey: `${memberId}|${sessionId}`, fetchPage: fetchRecords, selectItems: selectRecords, selectCursor: noCursor,
+    selectHasMore: noMore, itemKey: recordKey });
+  const refreshAll = useCallback(async () => { await Promise.all([detail.refresh(), records.refresh()]); }, [detail, records]);
+  const { pulling, onRefresh } = usePullToRefresh(refreshAll);
   const session = detail.data?.session ?? null;
   const inlineError = pickInlineError(detail.error);
+  // A failed records read says so; it never passes for a session without records.
+  const recordsError = session && !inlineError ? pickInlineError(records.error) : null;
 
   return (
     <ScreenScroll
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       testID="group-session-screen">
-      {detail.lostAccess ? (
+      <GroupSessionHeader groupName={group.data?.group.name ?? null} session={session} userId={userId} />
+      {detail.lostAccess || records.lostAccess ? (
         <UnavailableState />
       ) : (
         <>
@@ -79,8 +136,19 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
           {session && inlineError ? (
             <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-session-inline-error" />
           ) : null}
+          {recordsError ? (
+            <GroupInlineError error={recordsError} onRetry={() => void records.refresh()} testID="group-session-records-error" />
+          ) : null}
           {session ? (
-            <FriendSessionContent session={session} />
+            <FriendSessionContent
+              groupId={groupId}
+              myRole={group.data?.group.my_role ?? null}
+              onRecordsChanged={records.refresh}
+              online={online}
+              records={records.items}
+              session={session}
+              userId={userId}
+            />
           ) : (
             <GroupMissingDataState error={inlineError} offline={detail.offline} onRetry={onRefresh} testIDPrefix="group-session" />
           )}
