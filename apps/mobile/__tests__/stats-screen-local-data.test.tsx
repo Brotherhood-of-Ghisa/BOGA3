@@ -295,7 +295,8 @@ describe('Stats over real data', () => {
     expect(mockPush).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-quads'));
-    expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=quads');
+    // The link carries the filter row's metric, so the page opens on it.
+    expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=quads&metric=sets');
     // The page draws the history: Progress never does.
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
   });
@@ -306,7 +307,7 @@ describe('Stats over real data', () => {
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
 
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
-    expect(mockPush).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}`);
+    expect(mockPush).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets`);
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
 
     // Away while the page is on top, then back: the same screen, as left.
@@ -536,11 +537,12 @@ describe('Stats over real data', () => {
       expect(within(link).getByText(name)).not.toHaveStyle({ textDecorationLine: 'underline' });
     }
     // Both links push their own page by id, leaving the open block as it is.
+    // Volume is the chosen metric here, and both links carry it over.
     fireEvent.press(muscleLink);
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume');
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
-    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}`);
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=volume`);
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
     expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
@@ -564,7 +566,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No volume-included sets for Calves in either period');
     fireEvent.press(screen.getByTestId('stats-muscle-history-calves'));
     // An empty muscle still opens its page; its empty state is that page's.
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=calves');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=calves&metric=volume');
   });
 
   it('uses independent saved eligibility and retains zero-load Volume contributors', async () => {

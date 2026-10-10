@@ -1,5 +1,6 @@
 import {
   barPath,
+  MIN_TIMELINE_COLUMN_WIDTH,
   MONTH_LABEL_WIDTH,
   buildTimelineSeries,
   niceStep,
@@ -113,14 +114,14 @@ describe('timelineGeometry', () => {
     expect(geometry.ticks.map(tick => tick.y)).toEqual([100, 75, 50, 25, 0]);
   });
 
-  it('keeps a minimum column width and grows wider than the plot to scroll', () => {
+  it('keeps every column tappable and grows wider than the plot to scroll', () => {
     const long = series([], 'totalVolume', 104);
     const geometry = timelineGeometry(long, 300, 100);
-    expect(geometry.columnWidth).toBe(6);
-    expect(geometry.width).toBe(630);
-    expect(timelineWeekIndexAt(629, geometry.columnWidth, 105)).toBe(104);
+    expect(geometry.columnWidth).toBe(MIN_TIMELINE_COLUMN_WIDTH);
+    expect(geometry.width).toBe(105 * MIN_TIMELINE_COLUMN_WIDTH);
+    expect(timelineWeekIndexAt(geometry.width - 1, geometry.columnWidth, 105)).toBe(104);
     expect(timelineWeekIndexAt(-4, geometry.columnWidth, 104)).toBe(0);
-    expect(timelineWeekIndexAt(13, geometry.columnWidth, 104)).toBe(2);
+    expect(timelineWeekIndexAt(70, geometry.columnWidth, 104)).toBe(2);
   });
 
   it('draws a best-of metric as zero-based columns too, leaving an unavailable week empty', () => {
@@ -134,17 +135,18 @@ describe('timelineGeometry', () => {
       .toEqual([['2026-09-14', 100], ['2026-10-05', 80]]);
   });
 
-  it('keeps month labels apart, preferring the ones carrying a year', () => {
-    // 52 weeks over 260pt: 5pt columns become 6pt, so a month is ~26pt wide.
+  it('labels every month in the window, the column floor keeping the labels apart', () => {
+    // A year at the 32pt floor: a month starts every four or five columns, so
+    // no label collides with the next and none runs off the drawn width.
     const year = buildTimelineSeries(buildHeatmapData([], 'totalVolume', { todayDateKey: '2026-03-04', weeks: 52 }).weekly, 'totalVolume');
     const geometry = timelineGeometry(year, 260, 100);
     const kept = geometry.months.map(month => `${month.label}${month.year ?? ''}`);
     expect(kept).toContain('Jan2026');
     expect(kept[0]).toMatch(/2025$/);
+    expect(geometry.months).toHaveLength(year.months.length);
     geometry.months.slice(1).forEach((month, index) =>
       expect(month.x - geometry.months[index].x).toBeGreaterThanOrEqual(MONTH_LABEL_WIDTH));
     expect(Math.max(...geometry.months.map(month => month.x)) + MONTH_LABEL_WIDTH).toBeLessThanOrEqual(geometry.width);
-    expect(geometry.months.length).toBeLessThan(year.months.length);
   });
 
   it('draws a column with a rounded top and a square baseline', () => {

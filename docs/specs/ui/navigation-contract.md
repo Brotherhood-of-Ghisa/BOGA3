@@ -16,12 +16,10 @@ load `docs/specs/ui/screen-map.md` instead.
   stack and every root screen declaration
   `apps/mobile/components/navigation/root-stack.tsx`.
 - Navigation is string-path based; there is no typed route layer. The few
-  constants and href builders live in `apps/mobile/src/navigation/routes.ts`
-  (`SIGN_IN_ROUTE`, `GYMS_ROUTE`, `BODY_WEIGHT_ROUTE`, `THEME_COLOUR_ROUTE`,
-  `exerciseLinkHref`) and `apps/mobile/src/navigation/active-session-entry.ts`
-  (`sessionViewHref`, `sessionExerciseHref`, `sessionAddExerciseHref`,
-  `sessionCompareHref`). Build a parameterised href with its builder rather than
-  by interpolation: the builders `encodeURIComponent` their ids.
+  constants and href builders live in `apps/mobile/src/navigation/routes.ts` and
+  `apps/mobile/src/navigation/active-session-entry.ts`. Build a parameterised
+  href with its builder rather than by interpolation: the builders
+  `encodeURIComponent` their ids.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
@@ -30,13 +28,12 @@ load `docs/specs/ui/screen-map.md` instead.
   (`apps/mobile/components/navigation/main-tab-bar.tsx`), the same bar on every
   screen that shows tabs. Only those four are visible destinations; the
   preserved roots `/stats-history`, `/exercise-catalog`, `/groups` and
-  `/settings` stay directly addressable and each maps to a canonical owner
-  (`resolveMainTab`), so every recognised root keeps exactly one tab selected.
-  An unrecognised route selects none rather than a misleading default.
-  `apps/mobile/app/(tabs)/_layout.tsx` therefore registers eight `Tabs.Screen`
-  entries: the four visible destinations and those four preserved roots. A tab
-  root added there must appear in `main-tabs.ts` as a destination or as a
-  preserved root with an owner, or it renders with no tab selected.
+  `/settings` stay addressable and each maps to a canonical owner
+  (`resolveMainTab`), so every recognised root keeps exactly one tab selected
+  and an unrecognised one selects none. A tab root registered in
+  `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
+  destination or as a preserved root with an owner, or it renders with no tab
+  selected.
 - Train is the only tab whose destination is computed: with a workout in
   progress it opens that session directly (`mainTabDestination`,
   `useOpenMainTab`), and a failed lookup opens `/train` rather than assuming
@@ -62,17 +59,17 @@ access level, and `useRootRouteAccess`
 
 - Anything short of a set bootstrap flag keeps the `sync-setup` block, so an
   unexpected gate state fails closed instead of opening data routes. The block's
-  only ways out are the two transitions below; a retryable cycle error offers a
-  single Retry that fires exactly one cycle, and `UPDATE_REQUIRED` explains the
-  required app update with no Retry at all.
+  only ways out are the two transitions below; a retryable cycle error offers one
+  Retry firing exactly one cycle, and `UPDATE_REQUIRED` explains the required app
+  update with no Retry.
 - When the level changes, the old level's routes leave the stack and the router
   lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index`
   (which redirects to `/today`). A deep link to another level's route lands the
   same way. Group order in the root stack therefore matters.
 - **Never unmount or swap out the navigator to gate access.** On expo-router 57
-  unmounting it reverts the route, so a gate that renders a `<Redirect>` or a
-  block in its place loops ("Maximum update depth exceeded"). The sole exception
-  is the restore guard's neutral loading view
+  unmounting it reverts the route, so a gate rendered in its place loops
+  ("Maximum update depth exceeded"). The sole exception is the restore guard's
+  neutral loading view
   (`apps/mobile/components/navigation/auth-route-guard.tsx`), rendered only
   before the navigator first mounts — until session restore resolves and, for a
   signed-in user, the persisted first-sync flag has been read — so a cold launch
@@ -108,6 +105,7 @@ access level, and `useRootRouteAccess`
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
 | `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one, required; both, neither or a blank id renders the unavailable state, as does an id the exercise catalogue no longer holds. The page reads the subject's name from that cache — never from a param |
+| | `metric=volume\|sets` | Progress's choice, carried over; absent or invalid opens on Volume |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `7` / `30` / `all`; absent or invalid is `30` |
@@ -162,15 +160,15 @@ Nothing outside this table navigates. A route not listed as a source
 | `/session/<id>/exercise/<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the records panel's `History` (`push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's own names |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise, each carrying the filter row's `metric` (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week (`historyDayHref`, `sessionsWeekHref`, `push`) |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week, and the header ⋮'s `View sessions` for the Timeline's focused week (`historyDayHref`, `sessionsWeekHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
 | `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
 | `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |
-| `/programme/<id>` | `/session/<sessionId>` | **Add to session** on next unresolved block routes into recorder through `sessionViewHref` (`push`) — conflict offers Resume, ambiguous card choice is a sheet, not a route |
+| `/programme/<id>` | `/session/<sessionId>` | **Add to session** on the next unresolved block, exactly as the plan row above |
 | `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
 | `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
 | `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
@@ -178,18 +176,18 @@ Nothing outside this table navigates. A route not listed as a source
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
-| `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` links included |
+| `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/groups`, `/connected-agents`, `/dev-logs`, `/gyms?source=more`, `/exercise-catalog?source=more`, `/settings?source=more` | hub rows; connected agents requires a current user and developer logs `isDevMode()` |
 | `/more`, `/settings` | the first-party `/connect` page, system browser | `Connect an AI coach`; launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings` | `/profile`, `/connected-agents`, `/body-weight`, `/theme-colour` | destination rows (`push`); Connected agents is absent while signed out, and `Body weight log` is always shown, independent of the `Bodyweight calculations` preference. No workout route reaches bodyweight entry or history |
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |
 | `/groups`, `/exercise-link` (signed out, auth configured) | `/sign-in` | the sign-in-required card's `Sign in` |
-| `/groups` | `/group/mine` | the `My groups` header action — the only route to group management; nothing else on `/groups` opens the group page |
+| `/groups` | `/group/mine` | the `My groups` header action — the only route to group management; nothing else there opens the group page |
 | `/group/mine` | `/group/<groupId>` | a row tap — the only way to the group page (stream membership items do not navigate) |
 | `/groups`, `/group/mine` | `/group/new`, `/group/join` | `Join group` / `Create group` and the empty-state actions (`push`) |
 | `/group/new`, `/group/join` | `/group/<groupId>` | after create, join, or `Open group` when already a member (`replace`, so Back returns to where the flow started) |
-| `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` header actions, the header's member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
+| `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` actions, the member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the tab's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards segment (`push`, no query) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
@@ -218,6 +216,9 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
 
 - A static title is declared in the root stack. Dynamic titles are set in the
   route's `Stack.Screen`, falling back to the placeholder until resolved.
+  `progress-history` renders a two-line title (subject over the Timeline's
+  focused week), so it names its own face: `headerTitleStyle` does not reach a
+  rendered title.
 - `headerShown: false` for `(tabs)` routes (visible shell is `MainTabBar`) and
   screens drawing their own top bar or needing none (`session/[sessionId]/index`,
   the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,

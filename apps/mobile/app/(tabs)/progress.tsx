@@ -567,8 +567,8 @@ function StatsContent() {
     }), [catalog.exercises, stats]);
   return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
-    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle))}
-    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise))}
+    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle, filters.metric))}
+    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise, filters.metric))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric} isFocused={isFocused}
     exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;

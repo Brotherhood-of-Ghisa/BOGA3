@@ -21,15 +21,22 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
-let mockScreenOptions: { title?: string } = {};
+let mockScreenOptions: {
+  title?: string;
+  headerTitle?: (props: { children: string }) => mockReact.ReactNode;
+  headerRight?: () => mockReact.ReactNode;
+} = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
+  // The native header, as the route declares it: its rendered title and items
+  // are mounted in place, so the page's week and its ⋮ are reachable.
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
       mockScreenOptions = options;
-      return null;
+      return mockReact.createElement(mockReact.Fragment, null,
+        options.headerTitle?.({ children: options.title ?? '' }), options.headerRight?.());
     },
   },
   useLocalSearchParams: () => mockSearchParams,
@@ -60,6 +67,7 @@ import {
   default as ProgressHistoryRoute,
   PROGRESS_HISTORY_TITLE,
   ProgressHistoryScreen,
+  resolveHistoryMetric,
   resolveHistorySubject,
 } from '../app/progress-history';
 import {
@@ -152,6 +160,18 @@ describe('resolveHistorySubject', () => {
     expect(resolveHistorySubject({ exerciseDefinitionId: 'ex1', muscleGroupId: 'front_delts' })).toBeNull();
     expect(resolveHistorySubject({})).toBeNull();
     expect(resolveHistorySubject({ muscleGroupId: ' ' })).toBeNull();
+  });
+});
+
+describe('resolveHistoryMetric', () => {
+  it('reads back the metric its own href carries, and nothing from a link without one', () => {
+    const carried = String(progressHistoryHref({ muscleGroupId: 'front_delts' }, 'workingSetCount'));
+    expect(resolveHistoryMetric(new URLSearchParams(carried.split('?')[1]).get('metric')!)).toBe('workingSetCount');
+    expect(resolveHistoryMetric('volume')).toBe('totalVolume');
+    // Progress's link is the only producer: anything else opens on Volume.
+    expect(resolveHistoryMetric(undefined)).toBeNull();
+    expect(resolveHistoryMetric('1rm')).toBeNull();
+    expect(String(progressHistoryHref({ muscleGroupId: 'front_delts' }))).not.toMatch(/metric=/);
   });
 });
 
@@ -348,6 +368,98 @@ describe('ProgressHistoryScreen', () => {
     expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
   });
 
+  it('opens on the metric Progress carried over, and on Volume without one', async () => {
+    mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
+    render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'))
+      .toHaveProp('accessibilityState', { selected: true }));
+
+    screen.unmount();
+    mockSearchParams = { exerciseDefinitionId: 'ex1' };
+    render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
+      .toHaveProp('accessibilityState', { selected: true }));
+  });
+
+  it('opens a link that lands on the mounted route as a new page, on its own metric', async () => {
+    mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
+    const { rerender } = render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'))
+      .toHaveProp('accessibilityState', { selected: true }));
+
+    mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume' };
+    rerender(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(mockScreenOptions.title).toBe('Bench Press');
+  });
+
+  it('puts the Timeline\'s focused week in the title, and its sessions behind the header ⋮', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
+    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    // The newest week in the window is focused, and it is the week trained.
+    await waitFor(() => expect(screen.getByTestId('progress-history-title-week')).toHaveTextContent('1 – 7 Jun'));
+    expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('progress-history-options-button'));
+    // The sheet is titled with the week it acts on.
+    expect(screen.getByTestId('progress-history-options-sheet')).toHaveTextContent(/^1 – 7 Jun/);
+    fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
+    expect(mockPush).toHaveBeenLastCalledWith('/sessions?week=2026-06-01');
+    // Closed by the choice it answered.
+    expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
+  });
+
+  it('steps the title back a week, and offers no ⋮ on a rest week that has nothing to open', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
+    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    await waitFor(() => expect(screen.getByTestId('progress-history-title-week')).toHaveTextContent('1 – 7 Jun'));
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-timeline-previous-week')); });
+    // The week is still named; only the sessions it does not have are gone.
+    expect(screen.getByTestId('progress-history-title-week')).toHaveTextContent('25 – 31 May');
+    expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-timeline-next-week')); });
+    expect(screen.getByTestId('progress-history-options-button')).toBeTruthy();
+  });
+
+  it('reads the subject and its week as one header element, capped so a long name truncates', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
+    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    await waitFor(() => expect(screen.getByTestId('progress-history-title'))
+      .toHaveProp('accessibilityLabel', 'Side delts, week of 1 – 7 Jun'));
+    const title = screen.getByTestId('progress-history-title');
+    expect(title).toHaveProp('accessibilityRole', 'header');
+    // A rendered title sizes to its content, so the cap is what truncates it.
+    expect(title).toHaveStyle({ maxWidth: 260 });
+  });
+
+  it('leaves the week out of the title while a view that selects none shows', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'weekly' }); });
+    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-weekly'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.queryByTestId('progress-history-title-week')).toBeNull();
+    expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
+    // Options are merged across renders, so the key must be named to clear it.
+    expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
+  });
+
+  it('drops the week and the ⋮ when the Timeline is left for another view', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
+    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
+    expect(screen.queryByTestId('progress-history-title-week')).toBeNull();
+    expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-timeline')); });
+    expect(screen.getByTestId('progress-history-title-week')).toHaveTextContent('1 – 7 Jun');
+    expect(screen.getByTestId('progress-history-options-button')).toBeTruthy();
+  });
+
   it('keeps its declared title until the catalogue resolves the name', async () => {
     mockCatalog.status = 'loading';
     mockSearchParams = { exerciseDefinitionId: 'unknown-yet' };
@@ -365,6 +477,11 @@ describe('ProgressHistoryScreen', () => {
     render(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('progress-history-unavailable')).toBeTruthy());
     expect(mockScreenOptions.title).toBe(PROGRESS_HISTORY_TITLE);
+    // The chrome of the subject that vanished goes with it, rather than being
+    // merged through: no stale name, week, or live options button.
+    expect(mockScreenOptions).toHaveProperty('headerTitle', undefined);
+    expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
+    expect(screen.queryByTestId('progress-history-title')).toBeNull();
     expect(stats.computeSelectedMuscleHistoryEffort).not.toHaveBeenCalled();
   });
 

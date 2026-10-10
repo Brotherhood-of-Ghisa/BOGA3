@@ -1,10 +1,11 @@
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
-  DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData, type BuildHeatmapDataOptions, type DayCell,
+  DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData, weekLabel,
+  type BuildHeatmapDataOptions, type DayCell, type FocusedTimelineWeek,
 } from '@/components/heatmaps';
 import { WeekSetList } from '@/components/stats/week-set-list';
 import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
@@ -74,13 +75,18 @@ const UNIT_LABELS: Record<CalendarHeatmapMetric, (value: number) => string> = {
 };
 
 // What the Timeline needs beyond the heatmaps: the subject whose week it
-// lists, and where its cards go. `View sessions` is the page's `onOpenWeek`.
+// lists, and where its cards go. The page's ⋮ opens the focused week's
+// sessions, through the `onOpenWeek` the other views share.
 export type TimelineLinks = {
   weekSetsTarget: WeekSetsTarget;
   onOpenSession: (sessionId: string) => void;
 };
 
 const VIEWS: readonly HeatmapView[] = ['timeline', 'daily', 'weekly'];
+
+const sameFocusedWeek = (left: FocusedTimelineWeek | null, right: FocusedTimelineWeek | null): boolean =>
+  left === right || (left !== null && right !== null && left.weekStartDateKey === right.weekStartDateKey
+    && left.label === right.label && left.hasTraining === right.hasTraining);
 
 function HistoryHeatmap({
   dailyMetrics,
@@ -95,6 +101,7 @@ function HistoryHeatmap({
   muscleTargets,
   status,
   timeline,
+  onFocusWeek,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -108,6 +115,7 @@ function HistoryHeatmap({
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   status: ReactNode;
   timeline: TimelineLinks;
+  onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
 }) {
   // Every view spans the saved window and scrolls vertically.
   const data = useMemo(
@@ -116,15 +124,38 @@ function HistoryHeatmap({
   );
   const formatDailyValue = useCallback((value: number) => formatDayValue(value, metric), [metric]);
   // Only the Timeline selects a week; one a shortened window drops is no
-  // selection. The list follows the readout's week: the selected one, else the
-  // newest. It is read only while the Timeline shows it.
+  // selection. Exactly one week is focused there — the selected one, else the
+  // newest — and the chart's marks, the week list and the page's title and ⋮
+  // all follow it. It is read only while the Timeline shows.
   const [selection, setSelection] = useState<string | null>(null);
   const selectedWeekKey = data.weekly.some(week => week.weekStartDateKey === selection) ? selection : null;
-  const listedWeekKey = selectedWeekKey ?? data.weekly[data.weekly.length - 1]?.weekStartDateKey ?? null;
+  const focusedWeekKey = selectedWeekKey ?? data.weekly[data.weekly.length - 1]?.weekStartDateKey ?? null;
   const [weekSetsRevision, setWeekSetsRevision] = useState(0);
   const retryWeekSets = useCallback(() => setWeekSetsRevision(revision => revision + 1), []);
-  const weekSets = useWeekSets(view === 'timeline' ? timeline.weekSetsTarget : null, listedWeekKey, weekSetsRevision);
+  const weekSets = useWeekSets(view === 'timeline' ? timeline.weekSetsTarget : null, focusedWeekKey, weekSetsRevision);
   const { onOpenSession } = timeline;
+  // The page draws the focused week in its title and offers its sessions, so
+  // it is told which week that is — and told it is gone when the chart is.
+  const focusedWeek = useMemo<FocusedTimelineWeek | null>(() => {
+    const week = view === 'timeline' ? data.weekly.find(candidate => candidate.weekStartDateKey === focusedWeekKey) : undefined;
+    return week ? {
+      weekStartDateKey: week.weekStartDateKey,
+      label: weekLabel(week.monday, Number(data.todayDateKey.slice(0, 4))),
+      hasTraining: week.hasTraining ?? week.value > 0,
+    } : null;
+  }, [data, focusedWeekKey, view]);
+  // Reported by value, not by identity: the window is rebuilt on every render,
+  // so an equal week must not re-render the page around the chart.
+  const reported = useRef<FocusedTimelineWeek | null>(null);
+  const report = useRef(onFocusWeek);
+  useEffect(() => { report.current = onFocusWeek; }, [onFocusWeek]);
+  useEffect(() => {
+    if (sameFocusedWeek(reported.current, focusedWeek)) return;
+    reported.current = focusedWeek;
+    onFocusWeek?.(focusedWeek);
+  }, [focusedWeek, onFocusWeek]);
+  // A failed read drops the chart entirely, and the page's week goes with it.
+  useEffect(() => () => report.current?.(null), []);
   const timelineChart = useMemo(
     () => (
       <TimelineHeatmap
@@ -132,7 +163,6 @@ function HistoryHeatmap({
         metric={metric}
         selectedWeekKey={selectedWeekKey}
         onSelectWeek={setSelection}
-        onViewSessions={onOpenWeek}
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}
         metricLabel={metricLabel}
@@ -141,7 +171,7 @@ function HistoryHeatmap({
         <WeekSetList {...weekSets} onOpenSession={onOpenSession} onRetry={retryWeekSets} testID={`${testIDPrefix}-week-sets`} />
       </TimelineHeatmap>
     ),
-    [data, metric, selectedWeekKey, onOpenWeek, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession, retryWeekSets]
+    [data, metric, selectedWeekKey, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession, retryWeekSets]
   );
   const dailyHeatmap = useMemo(
     () => (
@@ -232,6 +262,9 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   onRetry?: () => void;
   todayDateKey?: string;
   timeline: TimelineLinks;
+  // The Timeline's focused week, for the page's title and its ⋮; `null` while
+  // another view shows, or when no chart does.
+  onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
 };
 
 export function HistoryView<TMetric extends CalendarHeatmapMetric>({
@@ -253,6 +286,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   onRetry,
   todayDateKey,
   timeline,
+  onFocusWeek,
 }: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
@@ -333,6 +367,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
         view={view}
         status={status}
         timeline={timeline}
+        onFocusWeek={onFocusWeek}
       />}
     </View>
   );
@@ -342,12 +377,14 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
-  // The view and metric selectors share one row and one height.
+  // The view and metric selectors share one row and one height, clear of the
+  // native header above them.
   controls: {
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
+    paddingTop: uiSpace.md,
     paddingBottom: uiSpace.md,
   },
   metricControl: {
