@@ -11,7 +11,9 @@ import {
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
 import { todayText } from '@/components/today/text-styles';
 import { Card, StatePanel, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
 import { historyJumpListIndex, historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
@@ -44,6 +46,7 @@ export type HistoryListProps = {
    * the history has loaded, so the target is not pushed down after it lands.
    */
   jumpTo?: HistoryJump | null;
+  dateFormat?: ExerciseDateFormat;
 };
 
 const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
@@ -70,7 +73,10 @@ export function HistoryList({
   nowMs,
   header,
   jumpTo = null,
+  dateFormat,
 }: HistoryListProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const now = new Date(nowMs);
   // A reload (focus, the deleted toggle) keeps the rows on screen, and with
   // them the scroll position, until the new read lands; loading shows only
@@ -102,6 +108,7 @@ export function HistoryList({
       ListHeaderComponent={<View style={styles.header}>{header}</View>}
       renderItem={({ item, index, section }) => (
         <HistoryRow
+          dateFormat={resolvedDateFormat}
           first={index === 0}
           last={index === section.data.length - 1}
           onOpen={onOpenCompletedSession}
@@ -199,16 +206,18 @@ function HistoryRow({
   session,
   first,
   last,
+  dateFormat,
   onOpen,
 }: {
   session: SessionListItem;
   first: boolean;
   last: boolean;
+  dateFormat?: ExerciseDateFormat;
   onOpen: (sessionId: string) => void;
 }) {
   const deleted = session.deletedAt !== null;
   const figures = toSummaryFigures(session);
-  const label = sessionSummaryAccessibilityLabel(figures);
+  const label = sessionSummaryAccessibilityLabel(figures, dateFormat);
   return (
     <View
       style={[styles.cell, first ? styles.cellFirst : styles.cellDivider, last ? styles.cellLast : null]}
@@ -222,7 +231,7 @@ function HistoryRow({
         gym={session.gymName}
         onPress={() => onOpen(session.id)}
         record={sessionSummaryRecordLine(figures)}
-        stamp={formatMonthDayTime(figures.startedAt.getTime())}
+        stamp={formatMonthDayTime(figures.startedAt.getTime(), dateFormat)}
         style={[styles.row, deleted ? styles.deletedRow : null]}
         testID={`completed-session-open-button-${session.id}`}>
         {/* Deleted is said in words, not only by the fade (`08` baseline 5). */}

@@ -6,6 +6,7 @@ import type { LocalWindow } from '@/src/utils/local-calendar';
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import type { RecordKind } from '@/src/exercise-calculations/records';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import {
   buildSessionRecordLine,
   PERSONAL_RECORD_NOUN,
@@ -126,10 +127,13 @@ export const formatSessionSummaryFigures = (session: SessionSummaryFigures): str
 export const formatSessionSummaryDuration = (session: SessionSummaryFigures): string =>
   formatCompactDuration(session.durationSec);
 
-export const sessionSummaryAccessibilityLabel = (session: SessionSummaryFigures): string => {
+export const sessionSummaryAccessibilityLabel = (
+  session: SessionSummaryFigures,
+  dateFormat?: ExerciseDateFormat
+): string => {
   const gym = session.gymName?.trim();
   return [
-    `Completed session on ${formatMonthDayTime(session.startedAt.getTime())}`,
+    `Completed session on ${formatMonthDayTime(session.startedAt.getTime(), dateFormat)}`,
     formatSessionSummaryDuration(session),
     plural(session.workingSets, 'set', 'sets'),
     plural(session.exerciseCount, 'exercise', 'exercises'),

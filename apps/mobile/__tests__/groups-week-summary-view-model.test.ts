@@ -182,6 +182,28 @@ describe('buildLatestActivity', () => {
       accessibilityLabel:
         'dave, completed session on 10/16 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 kg · group record',
     });
+
+    const ddMm = buildLatestActivity(
+      {
+        training_now: [],
+        latest_completed: completed(),
+      },
+      ME,
+      NOW,
+      'DD-MM-YYYY',
+    );
+    expect(ddMm).toMatchObject({ stamp: '16/10 06:10' });
+
+    const iso = buildLatestActivity(
+      {
+        training_now: [],
+        latest_completed: completed(),
+      },
+      ME,
+      NOW,
+      'YYYY-MM-DD',
+    );
+    expect(iso).toMatchObject({ stamp: '2026-10-16 06:10' });
   });
 
   it('derives a missing duration from the completion time, and shows none without either', () => {

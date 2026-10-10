@@ -14,6 +14,8 @@ import {
   type WeekBoardViewModel,
 } from '@/src/groups';
 
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SessionSummaryRow, TrainingNowMark } from './session-summary-row';
 import { todayText } from './text-styles';
@@ -28,6 +30,7 @@ export type TodayGroupCardProps = {
   /** The Groups screen on this group (the board, several training now). */
   onOpenGroup: (groupId: string) => void;
   onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
+  dateFormat?: ExerciseDateFormat;
 };
 
 // A board figure: Plex Mono 500 at `sm`, right-aligned in its column.
@@ -210,9 +213,12 @@ export function TodayGroupCard({
   nowMs,
   onOpenGroup,
   onOpenSession,
+  dateFormat,
 }: TodayGroupCardProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const board = buildWeekBoard(summary.members, myUserId);
-  const activity = buildLatestActivity(summary, myUserId, nowMs);
+  const activity = buildLatestActivity(summary, myUserId, nowMs, resolvedDateFormat);
   const groupName = groups.find((group) => group.group_id === selectedGroupId)?.name ?? '';
   const switcher = groups.length > 1;
   const openGroup = () => onOpenGroup(selectedGroupId);

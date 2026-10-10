@@ -218,6 +218,12 @@ describe('the latest session row', () => {
     expect(sessionSummaryAccessibilityLabel(latest())).toBe(
       'Completed session on 10/15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );
+    expect(sessionSummaryAccessibilityLabel(latest(), 'DD-MM-YYYY')).toBe(
+      'Completed session on 15/10 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
+    );
+    expect(sessionSummaryAccessibilityLabel(latest(), 'YYYY-MM-DD')).toBe(
+      'Completed session on 2026-10-15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
+    );
   });
 
   it('leaves out a missing gym and a session without PRs', () => {

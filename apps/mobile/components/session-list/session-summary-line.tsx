@@ -1,13 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatCompactDuration, type SessionListItem } from './types';
 
-/** The session's local `M/D HH:MM` start stamp, from a stored ISO instant. */
-export function formatDateTimeStamp(isoTimestamp: string): string {
-  return formatMonthDayTime(Date.parse(isoTimestamp));
+/** The session's local start stamp respecting preferences, from a stored ISO instant. */
+export function formatDateTimeStamp(isoTimestamp: string, dateFormat?: ExerciseDateFormat): string {
+  return formatMonthDayTime(Date.parse(isoTimestamp), dateFormat);
 }
 
 export function formatSetCount(setCount: number): string {
@@ -29,13 +31,17 @@ export type SessionSummaryLineProps = {
   // What an active session's elapsed time is measured to; without it an
   // active session shows its stored duration.
   nowMs?: number;
+  dateFormat?: ExerciseDateFormat;
 };
 
 export function SessionSummaryLine({
   session,
   testIdPrefix,
   nowMs,
+  dateFormat,
 }: SessionSummaryLineProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const durationLabel =
     session.status === 'active' && nowMs !== undefined
       ? formatCompactDuration(
@@ -53,7 +59,7 @@ export function SessionSummaryLine({
           numberOfLines={1}
           style={[styles.summaryToken, styles.summaryTokenPrimary, styles.summaryTokenStrong]}
           testID={`${testIdPrefix}-start`}>
-          {formatDateTimeStamp(session.startedAt)}
+          {formatDateTimeStamp(session.startedAt, resolvedDateFormat)}
         </Text>
         <Text allowFontScaling={false} selectable style={styles.summarySeparator}>
           ·
