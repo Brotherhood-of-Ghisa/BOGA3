@@ -1,7 +1,11 @@
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
-import { collectMuscleSetContributions, type MuscleAnalyticsInput, type MuscleSetContribution } from './muscle-analytics';
+import {
+  collectMuscleSetContributions, countMuscleSet, createMuscleSetCounter,
+  type MuscleAnalyticsInput, type MuscleSetContribution, type MuscleSetCounter,
+} from './muscle-analytics';
 
 export type ProgressPeriodValues = {
+  /** The row's [[muscle.set-count]], so a half-step figure. */
   workingSetCount: number;
   /** Null only when the sum is not finite (`sumVolume`). */
   totalVolume: number | null;
@@ -52,21 +56,21 @@ export const compareProgressVolume = (current: number | null, previous: number |
   return Number.isFinite(percent) ? { kind: 'percent', percent } : { kind: 'increased' };
 };
 
-type PeriodAccumulator = ProgressPeriodValues & { workingSetIdentities: Set<string> };
+type PeriodAccumulator = ProgressPeriodValues & { setCounter: MuscleSetCounter };
 const emptyPeriod = (): PeriodAccumulator => ({
-  workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, workingSetIdentities: new Set(),
+  workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, setCounter: createMuscleSetCounter(),
 });
 
 const accumulate = (values: PeriodAccumulator, contribution: MuscleSetContribution): void => {
-  if (contribution.working) values.workingSetIdentities.add(contribution.setIdentity);
-  values.workingSetCount = values.workingSetIdentities.size;
+  countMuscleSet(values.setCounter, contribution);
+  values.workingSetCount = values.setCounter.counts.weightedSetCount;
   if (!contribution.volumeIncluded) return;
   values.volumeSetCount += 1;
   // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
   values.totalVolume = addFiniteVolume(values.totalVolume, contribution.weightedVolume ?? 0);
 };
 
-const periodValues = ({ workingSetIdentities: _identities, ...values }: PeriodAccumulator): ProgressPeriodValues => values;
+const periodValues = ({ setCounter: _counter, ...values }: PeriodAccumulator): ProgressPeriodValues => values;
 type ComparisonAccumulator = { current: PeriodAccumulator; previous: PeriodAccumulator };
 const emptyComparison = (): ComparisonAccumulator => ({ current: emptyPeriod(), previous: emptyPeriod() });
 const comparison = (values: ComparisonAccumulator): ProgressComparison => ({

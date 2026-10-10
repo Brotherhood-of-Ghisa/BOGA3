@@ -469,6 +469,25 @@ describe('Stats over real data', () => {
       .toBe('chevron-right');
   });
 
+  it('shows a secondary muscle its half-steps unrounded, in the row and the change', async () => {
+    mockSearchParams = { period: '7' };
+    await loadMaestroFixture('exercise-block-history');
+    // Quads becomes a secondary mapping, keeping the fixture's real sets
+    // (7 now, 2 before) and the production aggregation/rendering path.
+    localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
+    await renderStats();
+    await screen.findByTestId('stats-muscle-row-quads-now');
+
+    expect(value('quads', 'now')).toHaveTextContent(/^3\.5$/);
+    expect(value('quads', 'previous')).toHaveTextContent(/^1$/);
+    expect(value('quads', 'change')).toHaveTextContent('+2.5');
+    // The contributor block still reconciles with its muscle row.
+    select('quads');
+    for (const column of ['now', 'previous', 'change']) {
+      expect(contribution(column).props.children).toBe(value('quads', column).props.children);
+    }
+  });
+
   it.each(['workingSetCount', 'totalVolume'])('reconciles multiple %s contributors in both periods without a Total row', async metric => {
     await loadMaestroFixture('exercise-block-history');
     // Give the fixture's second exercise the same muscle, retaining its real

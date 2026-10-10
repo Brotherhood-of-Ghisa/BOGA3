@@ -84,21 +84,25 @@ const readAndReconcile = async () => {
 
 it('reads migrated SQLite with repeated blocks, previous-only zero-load rows and no identity joins by name', async () => {
   const row = await readAndReconcile();
-  expect(row).toMatchObject({ current: { workingSetCount: 2, totalVolume: 200 },
-    previous: { workingSetCount: 2, totalVolume: 100 }, workingSetChange: 0, volumeChange: { kind: 'percent', percent: 100 } });
+  // Back is secondary on `lift` and primary on `previous-only` ([[muscle.set-count]]):
+  // two halves now against a half plus a whole before.
+  expect(row).toMatchObject({ current: { workingSetCount: 1, totalVolume: 200 },
+    previous: { workingSetCount: 1.5, totalVolume: 100 }, workingSetChange: -0.5, volumeChange: { kind: 'percent', percent: 100 } });
   expect(row.exercises.map(exercise => exercise.exerciseDefinitionId)).toEqual(['lift', 'previous-only']);
-  expect(row.exercises[0]).toMatchObject({ displayName: 'Lift', role: 'secondary', current: { workingSetCount: 2 } });
+  expect(row.exercises[0]).toMatchObject({ displayName: 'Lift', role: 'secondary', current: { workingSetCount: 1 } });
   expect(row.exercises[1]).toMatchObject({ current: { workingSetCount: 0, volumeSetCount: 0 },
     previous: { workingSetCount: 1, totalVolume: 0, volumeSetCount: 1 } });
   expect((await computeProgressComparisons(options)).muscles[1].exercises).toEqual([]);
 });
 
+// The expected count is Back's [[muscle.set-count]]: whole sets through
+// `volume-only`'s primary mapping, halves through `lift`'s secondary one.
 it.each([
-  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 2, 200, 2],
+  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 1, 200, 2],
   ['included warm-up', { workingSetEfforts: ['warm_up'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
-  ['excluded RIR and independent columns', { workingSetEfforts: ['technique'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
+  ['excluded RIR and independent columns', { workingSetEfforts: ['technique'], volumeEfforts: ['warm_up'] }, 0.5, 200, 1],
   ['empty Working set column', { workingSetEfforts: [], volumeEfforts: ['warm_up'] }, 0, 200, 1],
-  ['empty Volume column', { workingSetEfforts: ['technique'], volumeEfforts: [] }, 1, 0, 0],
+  ['empty Volume column', { workingSetEfforts: ['technique'], volumeEfforts: [] }, 0.5, 0, 0],
   ['both calculation columns empty', { workingSetEfforts: [], volumeEfforts: [] }, 0, 0, 0],
 ] as [string, EffortCalculationPolicy, number, number, number][])(
   'uses durable %s choices independently of Display on refresh', async (_name, policy, workingSetCount, totalVolume, volumeSetCount) => {
@@ -150,7 +154,7 @@ it('restores account-local policy on relaunch and account switches without reusi
   await account();
   expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 0, totalVolume: 200 });
   await account('B');
-  expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 2, totalVolume: 200 });
+  expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 1, totalVolume: 200 });
   await account('A');
   expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 0, totalVolume: 200 });
 });
@@ -181,8 +185,11 @@ it('includes the whole preceding four-week block, retaining 27 current sets and 
   expect(result.previous).toEqual(summary.previous);
   expect(result.current.period).toMatchObject({ start: new Date(2026, 8, 14), end: at });
   expect(result.previous.period).toMatchObject({ start: new Date(2026, 7, 17), end: new Date(2026, 8, 14) });
-  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 27, totalVolume: 2700 },
-    previous: { workingSetCount: 7, totalVolume: 700 }, workingSetChange: 20,
+  expect(result.current.totals.workingSetCount).toBe(27);
+  expect(result.previous.totals.workingSetCount).toBe(7);
+  // Back is secondary on `lift`, so its row is half of each window's physical sets.
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 13.5, totalVolume: 2700 },
+    previous: { workingSetCount: 3.5, totalVolume: 700 }, workingSetChange: 10,
     volumeChange: { kind: 'percent', percent: 286 } });
 });
 
@@ -221,6 +228,7 @@ it.each([
   const currentCount = at > start ? 1 : 0;
   expect(result.current.totals).toMatchObject({ sessionCount: currentCount, workingSetCount: currentCount });
   expect(result.previous.totals).toMatchObject({ sessionCount: 2, workingSetCount: 2 });
-  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: currentCount, totalVolume: currentCount * 100 },
-    previous: { workingSetCount: 2, totalVolume: 200 } });
+  // Back is secondary on `lift`: half a set per physical set ([[muscle.set-count]]).
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: currentCount * 0.5, totalVolume: currentCount * 100 },
+    previous: { workingSetCount: 1, totalVolume: 200 } });
 });

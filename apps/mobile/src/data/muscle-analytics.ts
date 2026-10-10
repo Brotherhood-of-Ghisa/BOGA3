@@ -110,6 +110,58 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
+/**
+ * The working sets a muscle got, by role and combined ([[muscle.set-count]]).
+ * `weightedSetCount` is what an unqualified `Sets` for a muscle shows; the two
+ * role figures are there for a surface that names them.
+ */
+export type MuscleSetCounts = {
+  /** Sets counted at the muscle's primary role. */
+  primarySetCount: number;
+  /** Sets counted at its secondary role, having no primary mapping. */
+  secondarySetCount: number;
+  /** The combined total the fact defines, always an exact half-step. */
+  weightedSetCount: number;
+};
+
+/**
+ * One bucket's running [[muscle.set-count]] — a muscle, or a family over its
+ * muscles. Read `counts`; fold with `countMuscleSet`. A set counts once per
+ * bucket at its strongest role there, so primary + secondary to one muscle is
+ * 1 and not 1½, and a stabilizer adds nothing.
+ */
+export type MuscleSetCounter = {
+  counts: MuscleSetCounts;
+  /** The strongest role weight each counted set holds in this bucket, by set identity. */
+  roleWeightBySet: Map<string, number>;
+};
+
+export const createMuscleSetCounter = (): MuscleSetCounter => ({
+  counts: { primarySetCount: 0, secondarySetCount: 0, weightedSetCount: 0 },
+  roleWeightBySet: new Map(),
+});
+
+/** Folds one contribution in. A non-working set or a stabilizer adds nothing. */
+export const countMuscleSet = (counter: MuscleSetCounter, contribution: MuscleSetContribution): void => {
+  if (contribution.working === false || contribution.roleWeight === 0) return;
+  const previous = counter.roleWeightBySet.get(contribution.setIdentity) ?? 0;
+  if (previous >= contribution.roleWeight) return;
+  counter.roleWeightBySet.set(contribution.setIdentity, contribution.roleWeight);
+  const counts = counter.counts;
+  // A set upgraded from secondary to primary leaves the secondary tally.
+  if (previous === 0.5) counts.secondarySetCount -= 1;
+  if (contribution.roleWeight === 1) counts.primarySetCount += 1;
+  else counts.secondarySetCount += 1;
+  counts.weightedSetCount = counts.primarySetCount + counts.secondarySetCount / 2;
+};
+
+/** One bucket's [[muscle.set-count]] over a whole list of contributions. */
+export const countMuscleSets = (contributions: Iterable<MuscleSetContribution>): MuscleSetCounts => {
+  const counter = createMuscleSetCounter();
+  for (const contribution of contributions) countMuscleSet(counter, contribution);
+  return counter.counts;
+};
+
 /** Personal working-set eligibility controls counts and strength metrics. */
 const isMuscleAnalyticsWorkingSet = (
   set: MuscleAnalyticsInput['exerciseSets'][number], policy?: EffortCalculationPolicy,
@@ -284,7 +336,7 @@ export const aggregateSelectedMuscleDailyEffort = (
 ): SelectedMuscleDailyEffort[] => {
   const entriesByDate = new Map<
     string,
-    SelectedMuscleDailyEffort & { sessionIds: Set<string> }
+    SelectedMuscleDailyEffort & { sessionIds: Set<string>; setCounter: MuscleSetCounter }
   >();
   const muscleGroupIdSet = new Set(options.muscleGroupIds);
   const contributions = collectMuscleSetContributions(input).filter(
@@ -301,11 +353,13 @@ export const aggregateSelectedMuscleDailyEffort = (
       totalWeight: 0,
       contributions: [],
       sessionIds: new Set<string>(),
+      setCounter: createMuscleSetCounter(),
     };
 
     entriesByDate.set(dateKey, entry);
     if (contribution.working !== false) {
-      entry.setCount += 1;
+      countMuscleSet(entry.setCounter, contribution);
+      entry.setCount = entry.setCounter.counts.weightedSetCount;
       entry.sessionIds.add(contribution.sessionId);
     }
     entry.totalWeight = addFiniteVolume(entry.totalWeight, contribution.weightedVolume ?? 0);
@@ -314,7 +368,7 @@ export const aggregateSelectedMuscleDailyEffort = (
 
   // A volume-only day has a volume cell and zero counted sets/sessions.
   return Array.from(entriesByDate.values())
-    .map(({ sessionIds, ...entry }) => ({
+    .map(({ sessionIds, setCounter: _counter, ...entry }) => ({
       ...entry,
       sessionCount: sessionIds.size,
       contributions: [...entry.contributions].sort(compareContribution),
@@ -342,7 +396,7 @@ export type SelectedMuscleWeeklyEffort = {
  */
 export type DailyEffortMetrics = {
   dateKey: string;
-  /** Per-muscle counts for target grading; the existing displayed metrics are unchanged. */
+  /** Per-muscle [[muscle.set-count]] for target grading, so a graded cell matches its figure. */
   workingSetCountsByMuscle?: Record<string, number>;
   /** The completed sessions whose sets make up the day, each once: a day tile opens them. */
   sessionIds?: string[];
@@ -356,7 +410,9 @@ export type DailyEffortMetrics = {
 
 type EffortMetricAccumulator = {
   totalVolume: number | null;
+  /** The bucket's [[muscle.set-count]]; `setCounter` keeps it weighted. */
   workingSetCount: number;
+  setCounter: MuscleSetCounter;
   bestRM1: number | null;
   highestWeight: number | null;
 };
@@ -364,6 +420,7 @@ type EffortMetricAccumulator = {
 export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
   totalVolume: 0,
   workingSetCount: 0,
+  setCounter: createMuscleSetCounter(),
   bestRM1: null,
   highestWeight: null,
 });
@@ -377,7 +434,8 @@ export const accumulateContributionMetrics = (
   acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume ?? 0);
 
   if (contribution.working === false) return;
-  acc.workingSetCount += 1;
+  countMuscleSet(acc.setCounter, contribution);
+  acc.workingSetCount = acc.setCounter.counts.weightedSetCount;
 
   const weight = contribution.enteredWeightKg;
   if (weight !== null) acc.highestWeight = Math.max(acc.highestWeight ?? 0, weight);
@@ -405,13 +463,9 @@ const startOfMondayWeek = (date: Date): Date => {
 export const aggregateSelectedMuscleWeeklyEffort = (
   dailyEffort: SelectedMuscleDailyEffort[]
 ): SelectedMuscleWeeklyEffort[] => {
-  type WeekAccumulator = {
+  type WeekAccumulator = EffortMetricAccumulator & {
     weekStartDateKey: string;
     monthKey: string;
-    totalVolume: number | null;
-    workingSetCount: number;
-    bestRM1: number | null;
-    highestWeight: number | null;
   };
 
   const weekMap = new Map<string, WeekAccumulator>();
@@ -425,10 +479,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
     const acc = weekMap.get(weekStartDateKey) ?? {
       weekStartDateKey,
       monthKey,
-      totalVolume: 0,
-      workingSetCount: 0,
-      bestRM1: null,
-      highestWeight: null,
+      ...createEffortMetricAccumulator(),
     };
 
     for (const contribution of day.contributions) {
@@ -477,17 +528,18 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
   dailyEffort
     .map((day) => {
       const acc = createEffortMetricAccumulator();
-      const identitiesByMuscle = new Map<string, Set<string>>();
+      const counterByMuscle = new Map<string, MuscleSetCounter>();
       for (const contribution of day.contributions) {
         accumulateContributionMetrics(acc, contribution);
-        if (contribution.working === false) continue;
-        const identities = identitiesByMuscle.get(contribution.muscleGroupId) ?? new Set<string>();
-        identities.add(contribution.setIdentity);
-        identitiesByMuscle.set(contribution.muscleGroupId, identities);
+        if (contribution.working === false || contribution.roleWeight === 0) continue;
+        const counter = counterByMuscle.get(contribution.muscleGroupId) ?? createMuscleSetCounter();
+        counterByMuscle.set(contribution.muscleGroupId, counter);
+        countMuscleSet(counter, contribution);
       }
       return {
         dateKey: day.dateKey,
-        workingSetCountsByMuscle: Object.fromEntries([...identitiesByMuscle].map(([id, identities]) => [id, identities.size])),
+        workingSetCountsByMuscle: Object.fromEntries(
+          [...counterByMuscle].map(([id, counter]) => [id, counter.counts.weightedSetCount])),
         sessionIds: [...new Set(day.contributions.map((contribution) => contribution.sessionId))],
         totalVolume: acc.totalVolume,
         workingSetCount: acc.workingSetCount,

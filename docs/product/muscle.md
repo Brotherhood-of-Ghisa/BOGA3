@@ -22,9 +22,6 @@ secondaries are shown at all is a separate question.
 
 Why: one set meant two numbers depending on the screen; a secondary mapping is
 real work, but not the muscle the lift is for.
-Code: `summarizeCurrentSessionMuscleLoad` in
-`apps/mobile/src/session-insights/calculations.ts`. Progress and the muscle
-heatmaps still count every mapped set as 1 (issue #665):
-`apps/mobile/src/data/progress-comparisons.ts`,
-`apps/mobile/src/data/muscle-analytics.ts`, `apps/mobile/src/data/stats.ts`.
+Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
+the session summary, Progress, the muscle heatmaps and Stats.
 Signature: `primary + ½ secondary`

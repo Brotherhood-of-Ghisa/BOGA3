@@ -275,7 +275,8 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
       }),
       expect.objectContaining({
         id: "triceps",
-        workingSetCount: 1,
+        // Secondary on bench: half a set ([[muscle.set-count]]), as `workingSetsByMuscle` says.
+        workingSetCount: 0.5,
         weightedVolume: 125,
         relativeVolume: 0.5,
       }),
