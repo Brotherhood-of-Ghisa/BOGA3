@@ -48,7 +48,7 @@ import SessionPlanDetailRoute from '@/app/session-plan/[planId]';
 import SessionPlanNewRoute, { SessionPlanNewScreen } from '@/app/session-plan/new';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { sessions } from '@/src/data/schema';
 import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
 import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
@@ -124,11 +124,22 @@ const createPlanThroughRepository = async (overrides: {
 
 const fillTitle = (title: string) => fireEvent.changeText(screen.getByTestId('plan-form-title'), title);
 const fillSchedule = (text: string) => fireEvent.changeText(screen.getByTestId('plan-form-schedule'), text);
+const addExerciseBlock = async (name: string, mode: 'empty' | 'repeat' = 'empty') => {
+  fireEvent.press(screen.getByTestId('plan-form-add-block'));
+  fireEvent.changeText(await screen.findByTestId('plan-exercise-pick-search'), name);
+  fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+  if (mode === 'repeat') {
+    fireEvent.press(await screen.findByTestId('exercise-picker-repeat-last-button'));
+  } else {
+    fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
+  }
+};
 const fillBlockName = async (blockIndex: number, name: string) => {
   fireEvent.press(screen.getByTestId(`plan-form-block-${blockIndex}-pick`));
   // Search results render flat, as in the session picker.
-  fireEvent.changeText(screen.getByTestId('plan-exercise-pick-search'), name);
+  fireEvent.changeText(await screen.findByTestId('plan-exercise-pick-search'), name);
   fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+  fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
 };
 const fillSet = (blockIndex: number, setIndex: number, weight: string, reps: string) => {
   fireEvent.changeText(screen.getByTestId(`plan-form-block-${blockIndex}-set-${setIndex}-weight`), weight);
@@ -159,7 +170,7 @@ describe('plan form: create', () => {
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     fillTitle('Heavy Day');
-    await fillBlockName(1, 'Barbell Squat');
+    await addExerciseBlock('Barbell Squat');
     fillSet(1, 1, '100', '5');
     fireEvent.press(screen.getByTestId('plan-form-save'));
 
@@ -174,7 +185,7 @@ describe('plan form: create', () => {
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     // No title and invalid reps: their errors stay at the fields.
-    await fillBlockName(1, 'Barbell Squat');
+    await addExerciseBlock('Barbell Squat');
     fillSet(1, 1, '120', '0');
     fireEvent.press(screen.getByTestId('plan-form-save'));
 
@@ -191,7 +202,7 @@ describe('plan form: create', () => {
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     fillTitle('Tomorrow Work');
-    await fillBlockName(1, 'Barbell Squat');
+    await addExerciseBlock('Barbell Squat');
     fillSet(1, 1, '100', '5');
     fillSchedule('2026-10-07 07:00');
     fireEvent.press(screen.getByTestId('plan-form-save'));
@@ -220,6 +231,48 @@ describe('plan form: create', () => {
       ...(await planQueries.listUpcomingPlans()),
     ];
     expect(plans.map((plan) => plan.title).sort()).toEqual(['Duplicate of Original', 'Original']);
+  });
+
+  it('allows adding an exercise with Repeat last to prefill target sets from history', async () => {
+    await seedCatalog();
+    const historySessionId = 'hist-sess-1';
+    const historyDate = new Date(2026, 9, 1, 10, 0, 0);
+    await persistSessionDraftSnapshot(
+      {
+        sessionId: historySessionId,
+        startedAt: historyDate,
+        gymId: null,
+        exercises: [
+          {
+            id: 'hist-ex-1',
+            exerciseDefinitionId: 'ex-squat',
+            name: 'Barbell Squat',
+            sets: [
+              { id: 'set-1', weightValue: '140', repsValue: '5', setType: null, performanceStatus: null },
+              { id: 'set-2', weightValue: '140', repsValue: '5', setType: null, performanceStatus: null },
+            ],
+          },
+        ],
+      },
+      { now: historyDate },
+    );
+    await completeSessionDraft(historySessionId, { completedAt: historyDate, now: historyDate });
+
+    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+
+    fillTitle('Repeat Plan');
+    await addExerciseBlock('Barbell Squat', 'repeat');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const unscheduled = await planQueries.listUnscheduledPlans();
+    expect(unscheduled).toHaveLength(1);
+    const detail = await planQueries.loadPlanDetail(unscheduled[0].id);
+    expect(detail?.blocks).toHaveLength(1);
+    expect(detail?.blocks[0].name).toBe('Barbell Squat');
+    expect(detail?.blocks[0].targets).toHaveLength(2);
+    expect(detail?.blocks[0].targets[0]).toMatchObject({ targetWeightValue: '140', targetReps: 5 });
+    expect(detail?.blocks[0].targets[1]).toMatchObject({ targetWeightValue: '140', targetReps: 5 });
   });
 });
 
