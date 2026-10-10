@@ -117,6 +117,32 @@ const atGym = async (gymId: string, name: string, sessionIds: string[]) => {
   }
 };
 
+const rowActionNames = (setNumber: number) =>
+  (screen.getByTestId(`exercise-set-${setNumber}-open`).props.accessibilityActions ?? []).map(
+    (action: { name: string }) => action.name
+  );
+
+// The symbols of one side's swipe underlay, one per cross-fading ground.
+const swipeSymbols = (setNumber: number, side: 'left' | 'right') =>
+  within(screen.getByTestId(`exercise-set-swipe-${setNumber}-${side}`))
+    .UNSAFE_getAllByType(Icon)
+    .map((icon) => icon.props.name);
+
+// Confirms the fixture's three planned rows, leaving no row open: the closed
+// ones from their glyph, the open one from the logger's confirm action (not the
+// last row, so nothing is added).
+const confirmEveryPlannedSet = async () => {
+  for (const number of [4, 5]) {
+    fireEvent.press(screen.getByTestId(`exercise-set-${number}-toggle`));
+    // eslint-disable-next-line no-await-in-loop -- one confirmation at a time.
+    await waitFor(async () => expect((await benchSets())[number - 1]?.performanceStatus).toBeNull());
+  }
+  fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'confirm' },
+  });
+  await waitFor(async () => expect((await benchSets())[2]?.performanceStatus).toBeNull());
+};
+
 const pressAlertButton = (label: string) => {
   const call = jest.mocked(Alert.alert).mock.calls.at(-1);
   const button = (call?.[2] as AlertButton[] | undefined)?.find((candidate) => candidate.text === label);
@@ -209,46 +235,45 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-record-band-1')).toHaveTextContent('New 1RM · 108.3 + top weight90.0 × 6');
   });
 
-  it('keeps both swipe symbols inside the exposed edge of the opaque logger', async () => {
+  it('keeps each swipe symbol inside the edge the 36pt trigger exposes', async () => {
     await openPage();
     // A typed entry makes the drop available, so both sides are offered.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
 
-    const row = screen.getByTestId('exercise-set-swipe-3');
-    const [confirm, discard] = within(row).UNSAFE_getAllByType(Icon);
-    for (const [icon, edge] of [[confirm, 'left'], [discard, 'right']] as const) {
-      const style = StyleSheet.flatten(icon.parent?.props.style);
+    for (const [side, edge] of [['right', 'left'], ['left', 'right']] as const) {
+      const underlay = screen.getByTestId(`exercise-set-swipe-3-${side}`);
+      expect(StyleSheet.flatten(underlay.props.style)).toMatchObject({ [edge]: 0 });
+      const style = StyleSheet.flatten(
+        screen.getByTestId(`exercise-set-swipe-3-${side}-symbols`).props.style
+      );
       expect(style).toMatchObject({ [edge]: 0, alignItems: 'center' });
       expect(style[edge === 'left' ? 'right' : 'left']).toBeUndefined();
-      // The whole glyph must clear the foreground by the 56pt trigger,
-      // independent of row width (the drag is capped at 88pt).
-      const glyphSize = uiIconSize[(icon.props.size ?? 'md') as keyof typeof uiIconSize];
-      expect((style.width - glyphSize) / 2).toBeGreaterThanOrEqual(0);
-      expect((style.width + glyphSize) / 2).toBeLessThanOrEqual(56);
+      // The whole glyph must clear the foreground by the trigger, independent
+      // of row width — past it the drag only resists.
+      expect((style.width - uiIconSize.md) / 2).toBeGreaterThanOrEqual(0);
+      expect((style.width + uiIconSize.md) / 2).toBeLessThanOrEqual(36);
     }
-    expect(confirm.props.name).toBe('check');
-    expect(discard.props.name).toBe('x');
+    // Each side carries its symbol once per ground, the two cross-fading.
+    expect(swipeSymbols(3, 'right')).toEqual(['check', 'check']);
+    expect(swipeSymbols(3, 'left')).toEqual(['x', 'x']);
   });
 
   it('offers each swipe side, and its accessibility action, only when it would change the row', async () => {
     await openPage();
-    // The underlay symbols are the shell's non-interactive icons, not the logger's.
-    const swipeSymbols = () =>
-      within(screen.getByTestId('exercise-set-swipe-3'))
-        .UNSAFE_queryAllByType(Icon)
-        .filter((icon) => icon.parent?.props.pointerEvents === 'none')
-        .map((icon) => icon.props.name);
     const actions = () =>
       (screen.getByTestId('exercise-set-logger-header').props.accessibilityActions as { name: string }[])
         .map((action) => action.name);
 
-    // Untouched planned set: its plan confirms, but there is nothing to drop.
-    expect(swipeSymbols()).toEqual(['check']);
+    // Untouched planned set: its plan confirms, but there is nothing to drop,
+    // so that side is not even mounted.
+    expect(swipeSymbols(3, 'right')).toEqual(['check', 'check']);
+    expect(screen.queryByTestId('exercise-set-swipe-3-left')).toBeNull();
     expect(actions()).toEqual(['confirm']);
 
     // Invalid reps: droppable, not confirmable.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '0');
-    await waitFor(() => expect(swipeSymbols()).toEqual(['x']));
+    await waitFor(() => expect(swipeSymbols(3, 'left')).toEqual(['x', 'x']));
+    expect(screen.queryByTestId('exercise-set-swipe-3-right')).toBeNull();
     expect(actions()).toEqual(['discard']);
   });
 
@@ -267,9 +292,14 @@ describe('ExercisePageScreen', () => {
     await waitFor(async () =>
       expect((await benchSets())[2]).toMatchObject({ weightValue: '82.5', repsValue: '6', performanceStatus: null })
     );
-    // The cursor moved on: the swipe shell now sits on set 4, not 3.
-    await waitForGone(() => screen.queryByTestId('exercise-set-swipe-3'));
-    expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
+    // The cursor moved on: the logger — and with it the confirming swipe —
+    // now sits on set 4, while set 3 keeps only its removing swipe.
+    await waitFor(() =>
+      expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 4')).toBeTruthy()
+    );
+    expect(swipeSymbols(4, 'right')).toEqual(['check', 'check']);
+    expect(screen.queryByTestId('exercise-set-swipe-3-right')).toBeNull();
+    expect(swipeSymbols(3, 'left')).toEqual(['x', 'x']);
   });
 
   it('confirming the last set from the swipe action adds the next one, ready in the logger', async () => {
@@ -342,7 +372,7 @@ describe('ExercisePageScreen', () => {
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
-  it('carries the swipes on the open row only, not on the cursor row as well', async () => {
+  it('carries the confirming swipe on the open row only, the removing one on every row', async () => {
     await openPage();
 
     // Set 3 is the cursor; tapping Set 4's body opens it in the logger.
@@ -350,10 +380,14 @@ describe('ExercisePageScreen', () => {
     await waitFor(() =>
       expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 4')).toBeTruthy()
     );
-    expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
-    expect(screen.queryByTestId('exercise-set-swipe-3')).toBeNull();
-    // The collapsed cursor row carries no swipe equivalents.
-    expect(screen.getByTestId('exercise-set-3-open').props.accessibilityActions ?? []).toEqual([]);
+    expect(swipeSymbols(4, 'right')).toEqual(['check', 'check']);
+    // Only the open row confirms by swipe. The confirmed Set 1 now drops from
+    // its own row; the untouched planned Set 3 still offers nothing to drop.
+    expect(screen.queryByTestId('exercise-set-swipe-3-right')).toBeNull();
+    expect(swipeSymbols(1, 'left')).toEqual(['x', 'x']);
+    expect(rowActionNames(1)).toEqual(['discard']);
+    expect(screen.queryByTestId('exercise-set-swipe-3-left')).toBeNull();
+    expect(rowActionNames(3)).toEqual([]);
 
     // Confirming the open row commits Set 4, leaving Set 3 as it was.
     fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
@@ -362,6 +396,21 @@ describe('ExercisePageScreen', () => {
     await waitFor(async () => expect((await benchSets())[3]?.performanceStatus).toBeNull());
     expect((await benchSets())[2]?.performanceStatus).toBe('planned');
     expect(await benchSets()).toHaveLength(5);
+  });
+
+  it('removes a confirmed set from its own row, so a finished list stays editable', async () => {
+    await openPage();
+    // With every set confirmed there is no row open, so no logger: the
+    // removing swipe is the only way left to drop a set.
+    await confirmEveryPlannedSet();
+    expect(screen.queryByTestId('exercise-set-logger')).toBeNull();
+
+    fireEvent(screen.getByTestId('exercise-set-2-open'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'discard' },
+    });
+
+    await waitFor(async () => expect((await benchSets()).map((set) => set.repsValue)).toEqual(['10', '6', '6', '5']));
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   it('measures a completed session being edited against the sessions before it only', async () => {
@@ -643,14 +692,14 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByLabelText('Change effort, currently RIR 4')).toBeTruthy();
   });
 
-  it('warns before Complete discards planned sets, keeps them as not performed, then goes back', async () => {
+  it('warns before Complete removes the sets that were not confirmed, then goes back', async () => {
     await openPage();
     const before = await setStates();
 
     fireEvent.press(screen.getByTestId('exercise-complete'));
     expect(Alert.alert).toHaveBeenCalledWith(
       'Complete exercise?',
-      '3 planned sets will be discarded.',
+      '3 unfinished sets will be removed.',
       expect.any(Array)
     );
 
@@ -660,17 +709,24 @@ describe('ExercisePageScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-complete'));
     pressAlertButton('Complete');
     await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    // The exercise keeps exactly the two sets that were performed; the three
+    // planned rows the alert named are gone from the draft.
     await waitFor(async () =>
-      expect(
-        (await benchSets()).map((row) => [row.performanceStatus ?? null, row.plannedRepsValue ?? null])
-      ).toEqual([
-        [null, null],
-        [null, null],
-        ['unperformed', '6'],
-        ['unperformed', '6'],
-        ['unperformed', '5'],
+      expect((await benchSets()).map((row) => [row.id, row.repsValue])).toEqual([
+        ['maestro_exercise_page_bench_set_1', '10'],
+        ['maestro_exercise_page_bench_set_2', '8'],
       ])
     );
+  });
+
+  it('completes without asking when nothing unfinished holds a value', async () => {
+    await openPage();
+    await confirmEveryPlannedSet();
+
+    fireEvent.press(screen.getByTestId('exercise-complete'));
+    expect(Alert.alert).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    expect(await benchSets()).toHaveLength(5);
   });
 
   it('goes back without touching set states', async () => {

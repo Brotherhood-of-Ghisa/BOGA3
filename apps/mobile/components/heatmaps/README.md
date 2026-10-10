@@ -44,6 +44,8 @@ smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 `hasTraining` distinguishes a known zero from rest in tiles and accessibility;
 `unavailable` marks a figure that cannot be shown (a Volume sum that is not
 finite) instead of treating it as zero.
+Exercise history also carries all-time session-fact PR counts into the selected
+metric's cells ([[comparison.history-prs]]); muscle history carries none.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
 against one shared weekly target, capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;

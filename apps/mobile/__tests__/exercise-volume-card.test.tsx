@@ -19,16 +19,17 @@ it('dashes an unavailable Volume with no note and no comparison line', () => {
   expect(screen.getByLabelText('Bench Press, 2 sets. Session volume unavailable.')).toBeTruthy();
 });
 
-it.each([0, 1, 2, 3, 4, 5])('shows Building history with %i prior observations and keeps sets beside the name', count => {
+// Its host pools a comparison with too little history by name, so the card
+// is never asked to draw one; asked anyway, it states the figures and no
+// comparison rather than an empty plot ([[session.volume-comparison]]).
+it.each([0, 1, 2, 3, 4, 5])('draws no distribution and no history label with %i prior observations', count => {
   render(<ExerciseVolumeCard comparison={{ ...comparison, historicalSessionCount: count,
     medianVolume: count ? 400 : null, percentile25Volume: count ? 300 : null, percentile75Volume: count ? 600 : null }} testID="card" />);
   expect(screen.getByText('500')).toBeTruthy();
-  expect(screen.getByText('2 sets')).toBeTruthy();
   expect(screen.getByTestId('card-heading')).toHaveTextContent(/Bench Press.*2 sets/);
-  expect(screen.getByText('Building history')).toBeTruthy();
   expect(screen.queryByTestId('card-distribution')).toBeNull();
-  expect(screen.queryByText(/prior|median|first comparable/i)).toBeNull();
-  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500 kg reps. Building history.')).toBeTruthy();
+  expect(screen.queryByText(/Building history|prior|median|first comparable/i)).toBeNull();
+  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500 kg reps.')).toBeTruthy();
 });
 
 const distribution: ExerciseVolumeComparison = { ...comparison, historicalSessionCount: 6,

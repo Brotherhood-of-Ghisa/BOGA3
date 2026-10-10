@@ -32,6 +32,12 @@ export {
   type SessionMuscleVolumeComparisonsInput,
 } from "./calculations";
 export {
+  buildSessionBreakdownExerciseRows,
+  buildSessionBreakdownMuscleRows,
+  type SessionBreakdownExerciseRow,
+  type SessionBreakdownMuscleRow,
+} from "./session-breakdown";
+export {
   createCompletedSessionInsightsRepository,
   createDrizzleSessionInsightsStore,
   loadCompletedSessionInsights,
@@ -43,6 +49,11 @@ export {
   type SessionInsightsStore,
   type SessionInsightSetRow,
 } from "./repository";
+export {
+  hasVolumeReference,
+  partitionVolumeComparisons,
+  type PartitionedVolumeComparisons,
+} from "./volume-reference";
 export {
   captureSessionShareImage,
   releaseSessionShareImage,

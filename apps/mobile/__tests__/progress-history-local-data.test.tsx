@@ -43,6 +43,7 @@ jest.mock('expo-router', () => ({
 import ProgressHistoryRoute from '../app/progress-history';
 import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
+import { loadExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import * as statsRepository from '@/src/data/stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
@@ -135,13 +136,15 @@ describe('The history page over real data', () => {
     expect(sampled.map(tile => tile.dateKey).sort()[0]).toBe(localDateKey(start));
   });
 
-  it('reads exercise history once and preserves both standalone projections over real data', async () => {
+  it('reads the exercise graph once alongside cached PR facts and preserves standalone metric projections', async () => {
     await loadMaestroFixture('exercise-block-history');
+    await loadExerciseSessionFacts(SQUAT);
     const read = jest.spyOn(localDataClient(), 'prepare');
     const options = { ...calendarWeekBounds(52), exerciseDefinitionId: SQUAT };
     const history = await exerciseAnalytics.computeSelectedExerciseHistoryEffort(options);
     expect(read.mock.calls.filter(([sql]) => sql.includes('from "exercise_sets"'))).toHaveLength(1);
-    expect(history.daily).toEqual(await exerciseAnalytics.computeSelectedExerciseDailyEffort(options));
+    expect(history.daily.map(({ personalRecordCounts: _records, ...day }) => day))
+      .toEqual(await exerciseAnalytics.computeSelectedExerciseDailyEffort(options));
     expect(history.weekly).toEqual(await exerciseAnalytics.computeSelectedExerciseWeeklyEffort(options));
     expect(history.daily.length).toBeGreaterThan(0);
   });

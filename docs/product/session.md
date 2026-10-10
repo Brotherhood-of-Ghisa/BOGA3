@@ -30,8 +30,8 @@ unless a time is given; `/` separates the lines shown, top to bottom.
 | Wed 31 Dec 2025 | No sessions · 40 weeks / Mon 29 Dec 2025 – Sun 4 Jan 2026 · 1 session |
 | Wed 15 Oct 2025 | No sessions · 51 weeks / Mon 13 – Sun 19 Oct 2025 · 1 session |
 
-Why: one week means one thing across Progress, Today and Sessions, and a
-break in training reads as one line instead of a run of empty headings.
+Why: one week means one thing across Progress, Today and Sessions, and a break
+in training reads as one line, not a run of empty headings.
 Code: `groupSessionsByWeek`, `historyWeekHeading` and `formatEmptyWeeks` in
 `apps/mobile/components/session-list/history-weeks.ts`; `HistoryList` in
 `apps/mobile/components/session-list/history-list.tsx`.
@@ -48,42 +48,78 @@ A tap on an exercise or muscle history grid opens the sessions behind it.
 | A Daily Week tile or a Weekly row with training | Sessions, at that week's heading |
 | A rest day or a rest week | nothing: it is not a button |
 
-Sessions opens whole, as [[session.history-weeks]] lists it, only scrolled:
-nothing is filtered or hidden. A day without a listed session opens at its
-week's heading; a week without one opens at the top.
+Sessions opens whole, as [[session.history-weeks]] lists it, only scrolled —
+nothing filtered or hidden. A day without a listed session opens at its week's
+heading; a week without one, at the top.
 
-Why: the grid shows where training happened; a tap should reach those
-sessions in the one history the user already knows.
+Why: the grid shows where training happened; a tap should reach it in the one
+history the user already knows.
 Code: `DailyHeatmap` in `apps/mobile/components/heatmaps/DailyHeatmap.tsx`;
 `historyDayHref` in `apps/mobile/src/navigation/routes.ts`;
 `historyJumpLocation` in `apps/mobile/components/session-list/history-jump.ts`;
 the openers in `apps/mobile/app/progress-history.tsx`.
 
+### session.summary-card · presentation · accepted
+
+The summary card after Finish: results, then context, then a two-page
+breakdown. Decided 2026-10-09.
+
+| Element | Shown |
+| --- | --- |
+| Title | `Session summary` · Done |
+| Results row | `Records` (every record it took), `Ex`, `Sets` ([[set.eligibility]]), `Volume` |
+| Context row | `Gym` (`No gym` without one), `Duration` |
+| Breakdown | two pages, `By muscle` then `By exercise`; a swipe or a tap on either dot pages it. A session with no working set has none |
+| By muscle | a row per mapped muscle: `Pri` and `Sec` as counted, no weighted total, then `Vol` (role-weighted, so it does not sum to `Volume`) and `PR` |
+| By exercise | a row per exercise, in session order: `Sets`, `Vol`, `Max` (top working-set weight), `PR` |
+| A row's `PR` | that exercise's records, or those whose **primary** muscle it is, so the column does not sum to `Records` |
+| Zero in a row | `—`, as the role columns draw; `Records` is a valid zero and reads `0` |
+
+Why: the results were absent from a card that spent a row on the gym, whose
+table said what was trained but not how each lift went.
+Code: `SessionCompletionScreen` and `SessionBreakdownPager` in
+`apps/mobile/components/session-complete/`;
+`apps/mobile/src/session-insights/session-breakdown.ts`.
+
 ### session.volume-comparison · presentation · accepted
 
-Session Summary, live comparison and the share image use the same volume
-card. The name and set count share a row.
-After six known prior comparable sessions, show P25, Median and P75 as
-vertical marks, current Volume as a black dot and its median delta. Genuine zero history
-counts. Prior sessions use Settings' History look-back and
-[[comparison.history-window]], anchored to the completed session's End or now
-while active. The start is inclusive; the target and later sessions are excluded,
-with earlier IDs breaking equal-End ties. Set eligibility is unchanged; record
-baselines remain all-time.
+Session Summary, live comparison and the share image use the same volume card,
+its name and set count on one row. After six known prior comparable sessions,
+show P25, Median and P75 as vertical marks, current Volume as a black dot and
+its median delta; genuine zero history counts. Prior sessions use Settings'
+History look-back and [[comparison.history-window]], anchored to the completed
+session's End, or now while active. The start is inclusive; the target and
+later sessions are excluded, earlier IDs breaking equal-End ties. Set
+eligibility is unchanged; record baselines stay all-time.
 
 The linear scale centers the median and includes the current reading.
 Each reference label sits above its mark, its value below. If annotations
 overlap or extend beyond the bar, keep only Median and its value; the marks
 and current dot remain. Equal quartiles collapse to one mark.
 
-With fewer observations, show Volume and `Building history`, without a
-comparison. An unavailable Volume is `—` with no history label. There is no
-prior-session subtitle or comparison footnote.
+A card is drawn only where the observations exist. The rest are pooled into one
+secondary card closing the section: `Comparison unavailable — needs at least 7
+sessions` — the six prior comparable sessions plus this one — then their names
+in session order, names only; an unavailable Volume is listed there too. A
+session with nothing to compare shows that card alone, and the share image
+carries the drawn cards only, omitting its volume section when there are none.
+There is no prior-session subtitle or footnote.
 
-Why: a readable typical range and a consistent low-history card.
+A pending or failed history read is never drawn as a session without history:
+the section says `Loading comparisons…` or `Comparisons unavailable. Return to
+this session to retry.`, on the completion screen as on Session Summary. The
+summary card ([[session.summary-card]]), records and the share image do not
+wait on that read.
+
+Why: an empty distribution plot reads as a broken card, so the section shows
+a comparison or says plainly that it has none.
 Code: `ExerciseVolumeCard` in
 `apps/mobile/components/session-complete/exercise-volume-card.tsx`;
+`ComparisonUnavailableCard` in
+`apps/mobile/components/session-complete/comparison-unavailable-card.tsx`;
+`partitionVolumeComparisons` in
+`apps/mobile/src/session-insights/volume-reference.ts`;
 `apps/mobile/src/session-insights/calculations.ts`;
 `apps/mobile/src/utils/history-reference.ts` shares the cutoff with the
 weekly heatmap.
-Signature: `Building history`
+Signature: `Comparison unavailable`

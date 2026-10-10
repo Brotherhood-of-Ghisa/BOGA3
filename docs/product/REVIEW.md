@@ -1,22 +1,22 @@
 # Product review
 
-A prompt any agent runs on a change. It checks the change against the product
-decisions in this directory, not code quality (that is `/code-review`).
+A prompt any agent runs on a change, checking it against the product decisions
+in this directory — not code quality (that is `/code-review`).
 
 ## Inputs
 
-- Every `*.md` file in `docs/product/` except this one: the facts.
+- Every `*.md` in `docs/product/` except this one: the facts.
 - The change: a PR diff (`gh pr diff <n>`) or a branch diff against
-  `origin/main`, and the PR title and body if there is one.
+  `origin/main`, plus the PR title and body if there is one.
 - The repository at the change's base, for context only (what a component
   renders, which function a screen calls).
 
 ## Method
 
 1. Read every fact. Note each fact's status and any `Pending:` line.
-2. For each changed file, ask what a user could now observe differently:
-   which figures, counts, rows, labels or words, on which screens. Changes to
-   shared calculation or aggregation code reach every screen that reads it.
+2. For each changed file, ask what a user could now observe differently: which
+   figures, counts, rows, labels or words, on which screens. Shared
+   calculation or aggregation code reaches every screen that reads it.
 3. Compare each observable change with the facts:
    - it alters a rule at its source, so the product now follows a different
      rule than an accepted fact states (a shared predicate, constant,

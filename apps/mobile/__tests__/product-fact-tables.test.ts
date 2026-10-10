@@ -19,6 +19,7 @@ import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effo
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { isVolumeSet, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
 import { normalizeGroupSetFacts } from '@/src/groups/set-facts';
+import { summarizeCurrentSessionMuscleLoad, type SessionInsightMuscleMapping } from '@/src/session-insights';
 import { formatEmptyWeeks, groupSessionsByWeek, historyWeekHeading } from '@/components/session-list/history-weeks';
 import type { SessionListItem } from '@/components/session-list/types';
 
@@ -54,10 +55,11 @@ const PENDING: Record<string, readonly string[]> = {
   'set.eligibility': [],
   '1rm.formula': [],
   'session.history-weeks': [],
+  'muscle.set-count': [],
 };
 
 /** The facts whose tables this file runs; every fact-table marker must be one. */
-const HANDLED = ['set.eligibility', '1rm.formula', 'session.history-weeks'];
+const HANDLED = ['set.eligibility', '1rm.formula', 'session.history-weeks', 'muscle.set-count'];
 
 const ranCells = new Set<string>();
 
@@ -235,4 +237,58 @@ describe('Pending: lines', () => {
   ])('%s keeps a Pending: line for %s exactly while it has pending cells', (file, id) => {
     expect(readFactTable(file, id).pending).toBe(PENDING[id].length > 0);
   });
+});
+
+describe('muscle.set-count', () => {
+  const table = readFactTable('muscle.md', 'muscle.set-count');
+  const KEY = 'Working sets mapped to one muscle';
+  const COLUMN = 'It gets';
+
+  // Each row as the roles its sets map to the one muscle under test. A row
+  // naming two roles for one set maps that set twice.
+  const ROLES: Record<string, ('primary' | 'secondary' | 'stabilizer')[][]> = {
+    '3 primary': [['primary'], ['primary'], ['primary']],
+    '3 secondary': [['secondary'], ['secondary'], ['secondary']],
+    '2 primary, 3 secondary': [
+      ['primary'], ['primary'], ['secondary'], ['secondary'], ['secondary'],
+    ],
+    '1 set, primary and secondary to that muscle': [['primary', 'secondary']],
+    '4 stabilizer': [['stabilizer'], ['stabilizer'], ['stabilizer'], ['stabilizer']],
+  };
+
+  // One exercise definition per set, so a set's roles are its own: the summary
+  // takes the strongest role a set holds for a muscle, not the strongest in
+  // the session.
+  const weightedSetCountFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): number => {
+    const muscleMappings: SessionInsightMuscleMapping[] = sets.flatMap((roles, index) =>
+      roles.map((role) => ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role }))
+    );
+    const summary = summarizeCurrentSessionMuscleLoad({
+      sessionId: 'session',
+      sessionAt: new Date('2026-10-09T18:00:00.000Z'),
+      exercises: sets.map((_roles, index) => ({
+        id: `ex-${index}`,
+        orderIndex: index,
+        exerciseDefinitionId: `def-${index}`,
+        exerciseName: `Exercise ${index}`,
+        sets: [{ id: `set-${index}`, orderIndex: 0, weightValue: '100', repsValue: '5', setType: 'rir_1' }],
+      })),
+      exerciseDefinitions: sets.map((_roles, index) => ({
+        id: `def-${index}`,
+        loadInputMode: 'total_load' as const,
+        bodyweightContribution: 0,
+      })),
+      muscleMappings,
+      muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 }],
+    });
+    // A muscle that gets nothing is absent from the table, which is zero sets.
+    return summary.workingSetsByMuscle.find((muscle) => muscle.id === 'chest')?.weightedSetCount ?? 0;
+  };
+
+  for (const row of table.rows) {
+    runCell('muscle.set-count', row[KEY], COLUMN, () => ({
+      actual: weightedSetCountFor(ROLES[row[KEY]]),
+      want: Number(row[COLUMN]),
+    }));
+  }
 });

@@ -300,26 +300,28 @@ export const toggleSetPerformed = (sets: ExercisePageSet[], setId: string): Exer
 };
 
 /**
- * Swipe-left drop (`ux-rules.md` "Swipes on the exercise page"), for a row not yet performed:
- * - an ad-hoc row (no plan) is removed from the list;
- * - a planned row the lifter has touched returns to its pristine state —
- *   typed weight and reps clear and its actual effort goes back to blank, so
- *   it reads as its plan again (the display falls back to the prescribed
- *   effort). It keeps its place, and the cursor stays on it.
- * Returns the same array when there is nothing to drop: an untouched planned
- * row, or a performed row (the glyph un-performs it; a swipe never touches it).
+ * Swipe-left drop (`ux-rules.md` "Swipes on the exercise page"), on any row:
+ * - an ad-hoc row (no plan) is removed from the list, confirmed or not;
+ * - a planned row returns to its pristine state — typed weight and reps clear,
+ *   its actual effort goes back to blank and it reads as its plan again (the
+ *   display falls back to the prescribed effort), planned rather than
+ *   performed. It keeps its place, and the cursor stays on it: a swipe never
+ *   deletes a plan.
+ * Returns the same array when there is nothing to drop — an untouched planned
+ * row, or an unknown id.
  */
 export const dropSet = (sets: ExercisePageSet[], setId: string): ExercisePageSet[] => {
   const set = sets.find((candidate) => candidate.id === setId);
-  if (!set || isPerformed(set)) return sets;
+  if (!set) return sets;
   if (!hasPlannedValues(set)) return sets.filter((candidate) => candidate.id !== setId);
-  const untouched = !hasEnteredValues(set) && (set.setType ?? null) === null;
+  const untouched = !isPerformed(set) && !hasEnteredValues(set) && (set.setType ?? null) === null;
   if (untouched) return sets;
   return replaceSet(sets, setId, (current) => ({
     ...current,
     weightValue: '',
     repsValue: '',
     setType: null,
+    performanceStatus: 'planned',
   }));
 };
 
@@ -359,57 +361,47 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(),
 };
 
 export type CompleteExercisePlan = {
-  // Planned rows still waiting: Complete marks them `unperformed` and keeps
-  // their planned triple, so "planned 5, did 3" stays answerable.
-  plannedToDiscard: number;
-  // Ad-hoc rows holding values that were never ticked: Complete removes them.
-  unloggedToRemove: number;
+  // Rows Complete removes that the lifter would miss: a planned set never
+  // done, or typed values never confirmed. A blank row is removed too, but
+  // silently — it holds nothing to lose.
+  unfinishedToRemove: number;
   // True when Complete should ask before going ahead.
   needsConfirmation: boolean;
   nextSets: ExercisePageSet[];
 };
 
 /**
- * `Complete exercise`. Performed rows are untouched; planned rows still waiting
- * become `unperformed` (never deleted); ad-hoc rows that were not ticked are
- * removed, blank ones silently. A planned row already discarded by an earlier
- * Complete is left as it is.
+ * `Complete exercise`: the exercise keeps exactly the sets that were confirmed
+ * performed. Every other row goes — a planned set never done, a row holding
+ * typed values that were never ticked, a blank row — so the list after
+ * Complete is what was actually trained. Blank rows go without asking.
  */
 export const planCompleteExercise = (sets: ExercisePageSet[]): CompleteExercisePlan => {
-  let plannedToDiscard = 0;
-  let unloggedToRemove = 0;
+  let unfinishedToRemove = 0;
   const nextSets: ExercisePageSet[] = [];
 
   for (const set of sets) {
     if (isPerformed(set)) {
       nextSets.push(set);
-    } else if (set.performanceStatus === 'planned') {
-      plannedToDiscard += 1;
-      nextSets.push({ ...set, performanceStatus: 'unperformed' });
-    } else if (hasPlannedValues(set)) {
-      nextSets.push(set);
-    } else if (hasEnteredValues(set)) {
-      unloggedToRemove += 1;
+    } else if (hasEnteredValues(set) || hasPlannedValues(set)) {
+      unfinishedToRemove += 1;
     }
   }
 
   return {
-    plannedToDiscard,
-    unloggedToRemove,
-    needsConfirmation: plannedToDiscard + unloggedToRemove > 0,
+    unfinishedToRemove,
+    needsConfirmation: unfinishedToRemove > 0,
     nextSets,
   };
 };
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-export const describeCompleteExercisePlan = (plan: CompleteExercisePlan): string => {
-  const parts: string[] = [];
-  if (plan.plannedToDiscard > 0) {
-    parts.push(`${plural(plan.plannedToDiscard, 'planned set')} will be discarded.`);
-  }
-  if (plan.unloggedToRemove > 0) {
-    parts.push(`${plural(plan.unloggedToRemove, 'set')} you did not log will be removed.`);
-  }
-  return parts.join(' ');
-};
+/**
+ * The alert's words: what is lost, nothing about how Complete works
+ * (`copy.no-inline-explanation`, the destructive-confirmation exception).
+ */
+export const describeCompleteExercisePlan = (plan: CompleteExercisePlan): string =>
+  plan.unfinishedToRemove > 0
+    ? `${plural(plan.unfinishedToRemove, 'unfinished set')} will be removed.`
+    : '';

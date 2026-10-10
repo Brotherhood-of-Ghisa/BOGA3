@@ -1,5 +1,5 @@
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
-import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
+import { buildCompletedSessionDetailModel, sessionVolumeFigure } from '@/src/session-recorder/completed-session-detail-model';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 // View Session's model: confirmed sets with valid values only, the session
@@ -152,5 +152,23 @@ describe('formatSetRow', () => {
       oneRepMax: '—',
       volume: '—',
     });
+  });
+});
+
+describe('sessionVolumeFigure', () => {
+  // The completion summary's `Volume` and View Session's are one figure: the
+  // helper is the model's own volume, so the two screens cannot disagree.
+  it('matches the detail model for the same session', () => {
+    expect(sessionVolumeFigure([bench, legacy])).toBe(
+      buildCompletedSessionDetailModel([bench, legacy], new Map()).volume
+    );
+  });
+
+  it('sums volume-included performed sets only, and reads 0 for a session with none', () => {
+    // 100×5 + 0×5 + 82.5×8 = 1160; the warm-up, the invalid and the skipped
+    // set add nothing.
+    expect(sessionVolumeFigure([bench, legacy])).toBe('1160');
+    expect(sessionVolumeFigure([])).toBe('0');
+    expect(sessionVolumeFigure([{ ...bench, sets: [bench.sets[0]] }])).toBe('0');
   });
 });

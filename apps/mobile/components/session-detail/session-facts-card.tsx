@@ -113,9 +113,14 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
   },
+  // A row of figures alone spreads across the card, so the eye reads four
+  // columns rather than a left-packed cluster. A row holding a `text` fact
+  // (the gym on View Session and the group view) is unaffected: its flexible
+  // cell already takes the slack, so there is none to distribute.
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: uiSpace.lg,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,

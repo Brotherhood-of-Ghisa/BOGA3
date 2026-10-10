@@ -1,12 +1,12 @@
 # Notifications
 
-The product owner accepted these rules on 2026-10-07. They describe the first
-notification release; runtime implementation is pending.
+Accepted 2026-10-07, describing the first notification release; runtime
+implementation is pending.
 
 ### notifications.platform · definition · accepted
 
-The first release delivers native iOS push notifications. Android delivery is
-outside this release.
+The first release delivers native iOS push notifications; Android is outside
+it.
 
 Why: ship and verify the platform the app currently exercises locally first.
 Pending: native notification registration and delivery are not implemented.
@@ -14,18 +14,18 @@ Pending: native notification registration and delivery are not implemented.
 ### notifications.audience · definition · accepted
 
 Group workout notifications go to every other current member of the groups
-sharing the workout, subject to that recipient's permission and notification
-preferences. They are not limited to the person overtaken on a leaderboard.
-The lifter does not receive their own workout alert.
+sharing the workout, subject to that recipient's permission and preferences —
+not only the person overtaken on a leaderboard. The lifter never receives their
+own workout alert.
 
 Why: the group follows its members' training and competition together.
 Pending: recipient selection and preference checks are not implemented.
 
 ### notifications.defaults · definition · accepted
 
-After the user opts in, Activity, Group exercise bests and Leaderboard changes
-are all enabled by default. Each category can be disabled, and a group can be
-muted. Enabling app preferences never bypasses the iOS notification permission.
+After opt-in, Activity, Group exercise bests and Leaderboard changes are all
+enabled by default. Each category can be disabled and a group muted; app
+preferences never bypass the iOS notification permission.
 
 Why: activity is part of the requested experience alongside achievements.
 Pending: app controls and server preferences are not implemented.

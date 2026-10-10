@@ -196,18 +196,24 @@ exercise history filters by them.
 
 ### Swipes on the exercise page
 
-Decided 2026-10-01, revised 2026-10-04. Only the open row, the logger,
-answers swipes. Right confirms it exactly like the tick and moves on;
-confirming the last set adds one, opened with the copied values. Left drops
-it: an ad-hoc row is removed; a touched planned row loses its typed values and
-effort and reads as its plan again, still open (a swipe never deletes a plan).
-A side is offered only when its move would change the row: no left swipe on an
-untouched planned row, no right swipe without a valid set; a side not offered
-neither drags nor shows its symbol. Both swipes dismiss the keyboard, and
-neither navigates. The `Confirm set` / `Drop set` accessibility actions are
-the non-gesture path, under the same conditions. Code:
-`components/exercise-page/swipe-set-row.tsx`, `canDropSet` and `dropSet` in
-`src/session-recorder/exercise-page-model.ts`.
+Decided 2026-10-01, revised 2026-10-09. Every row answers the dropping
+swipe-left; only the open row, the logger, answers swipe-right, which the
+other rows carry as their glyph. Right confirms the row exactly like the tick
+and moves on; confirming the last set adds one, opened with the copied values.
+Left drops the row: an ad-hoc row is removed, confirmed or not; a planned row
+loses its typed values and effort and reads as its plan again, planned and in
+its place (a swipe never deletes a plan). A side is offered only when its move
+would change the row: no left swipe on an untouched planned row, no right
+swipe without a valid set; a side not offered neither drags nor shows its
+symbol. Both swipes dismiss the keyboard, and neither navigates. The
+`Confirm set` / `Drop set` accessibility actions are the non-gesture path,
+under the same conditions.
+
+The gesture states its own threshold: the row follows the finger to the
+trigger, then resists to a hard stop, and the side goes from its wash to its
+solid colour exactly where a release starts firing. Code:
+`components/exercise-page/swipe-set-row.tsx`,
+`canDropSet` and `dropSet` in `src/session-recorder/exercise-page-model.ts`.
 
 ### Planned sessions on Sessions and the plan screens
 
