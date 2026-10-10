@@ -313,7 +313,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     // A failed history read says so: it is never drawn as a session with no
-    // history ([[session.volume-comparison]]). The rest of the screen stands.
+    // history. The rest of the screen stands.
     expect(screen.getByTestId('session-insight-empty')).toHaveTextContent(
       'Comparisons unavailable. Return to this session to retry.'
     );

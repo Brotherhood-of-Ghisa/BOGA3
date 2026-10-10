@@ -40,7 +40,7 @@ export type HistoryListProps = {
   header: ReactElement;
   /**
    * Where to open, applied once on the first settled load
-   * ([[session.history-open]]). The host passes it only once everything above
+   * The host passes it only once everything above
    * the history has loaded, so the target is not pushed down after it lands.
    */
   jumpTo?: HistoryJump | null;
@@ -57,7 +57,7 @@ const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
 
 /**
  * The page's one scroll: the host's `header`, then the completed history
- * ([[session.history-weeks]]) as one virtualized section per week, so a long
+ * as one virtualized section per week, so a long
  * history renders only what is near the screen.
  */
 export function HistoryList({

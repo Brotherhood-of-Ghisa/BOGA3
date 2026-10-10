@@ -31,7 +31,7 @@ type SessionCompletionScreenProps = {
   breakdownExerciseRows: SessionBreakdownExerciseRow[];
   muscleCatalogState: MuscleCatalogState;
   // The insights read: pending and failed states say so rather than reading as
-  // a session with no history ([[session.volume-comparison]]).
+  // a session with no history.
   historyState?: 'loading' | 'ready' | 'error';
   shouldFailNextShare?: boolean;
   onDone: () => void;

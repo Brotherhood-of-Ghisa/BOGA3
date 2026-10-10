@@ -58,9 +58,9 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
 };
 
 /**
- * Implements [[session.volume-comparison]] for exercise and muscle volume:
- * current value and sets, then P25/median/P75 and
- * delta after six known prior observations. The linear scale centers the
+ * Draws exercise and muscle volume against recent history
+ * (`docs/specs/tech/training-metrics-contract.md`): current value and sets,
+ * then P25/median/P75 and delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
  * Equal quartiles collapse to a rule. A comparison without a distribution
  * gets no card: its host pools it by name (`ComparisonUnavailableCard`).

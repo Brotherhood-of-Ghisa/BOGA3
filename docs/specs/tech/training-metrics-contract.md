@@ -85,8 +85,16 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
-Session volume comparison presentation is [[session.volume-comparison]];
-its history and quartiles derive in `apps/mobile/src/session-insights/calculations.ts`.
+**Session volume comparison.** A comparison draws its distribution — P25,
+median and P75, with the current Volume and its median delta — only from six
+known prior comparable sessions, genuine zeros included; the seventh reading is
+the session itself. Those priors are Settings' History look-back over
+[[comparison.history-window]], anchored to the session's End, or now while
+active. Set eligibility is unchanged and record baselines stay all-time. Below
+the minimum nothing is drawn: no comparison is ever shown as an empty plot.
+History and quartiles derive in
+`apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
+the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.
 
 **Counted-session statistics.**
 

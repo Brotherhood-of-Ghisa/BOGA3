@@ -29,7 +29,7 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
 - Decision: Current-session feedback keeps exercise PRs, exercise-volume context, and session muscle load as separate, derived signals.
 - Notes:
   - a PR belongs to the exercise that produced it and requires a strict estimated-1RM improvement over prior eligible completed history; a first performance without a baseline is not a PR,
-  - session volume comparisons follow [[session.volume-comparison]],
+  - session volume comparisons follow `docs/specs/tech/training-metrics-contract.md`,
   - muscle load is a session-wide summary using the same current-metadata, per-side, role-weighted semantics as history analytics,
   - successful submission opens a one-time completion presentation on the existing completed-session route; the presentation is not a persisted award or a historical-detail mode,
   - the share action previews and generates a session-summary PNG containing all PRs and exercise comparisons, then opens the platform share sheet; the app does not upload media, publish directly, include private gym/location data, or store a share record.

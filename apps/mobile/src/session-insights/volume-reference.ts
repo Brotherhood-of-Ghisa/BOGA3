@@ -3,9 +3,9 @@ import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 import type { ExerciseVolumeComparison } from './calculations';
 
 /**
- * Whether a comparison can draw its distribution ([[session.volume-comparison]]):
- * a finite session Volume and enough known prior comparable sessions for
- * quartiles. Everything else is pooled by name under `Comparison
+ * Whether a comparison can draw its distribution
+ * (`docs/specs/tech/training-metrics-contract.md`): a finite session Volume and
+ * enough known prior comparable sessions for quartiles. Everything else is pooled by name under `Comparison
  * unavailable`, so the volume card never renders an empty plot.
  */
 export const hasVolumeReference = (comparison: ExerciseVolumeComparison): boolean =>

@@ -31,7 +31,12 @@ in this directory — not code quality (that is `/code-review`).
      display or wording rule) → **new decision**;
    - a line the diff adds to a doc, comment or UI string states a fact's
      rule in its own words instead of citing `[[id]]` → **restates**. Lines
-     the diff does not add are out of scope (whole docs: Audit mode).
+     the diff does not add are out of scope (whole docs: Audit mode);
+   - the diff makes a fact's own line false or redundant — it describes a
+     layout the diff redesigned, or detail the code and its tests now pin
+     that no builder would need the product owner to change →
+     **over-specified**. This is the only class that takes words out, so
+     look for it on every diff that touches a screen a fact describes.
 
    When unsure between **changes** and **violates**, choose **changes**: the
    product owner decides either way.
@@ -54,6 +59,7 @@ Verdict: clean | needs decision | needs fix
   own, before this change merges.
   For a new decision, propose the fact (ID, kind, statement) in one line.
 - **restates** → `needs fix` (replace with `[[id]]`).
+- **over-specified** → `needs decision`: name the fact's lines to drop.
 - No findings → `Verdict: clean`. Do not pad with style or code remarks.
 
 ## Audit mode
@@ -64,9 +70,10 @@ that restated it.
 - **Input:** every persistent doc (tracked `*.md` outside `docs/plans/**`,
   `docs/brainstorms/**` and this directory) instead of a diff, plus the facts.
 - **Classes:** the same, but report only **restates** (the doc states a
-  fact's rule in its own words instead of citing `[[id]]`) and **violates**
-  (the doc states a rule an accepted fact contradicts). A spec describing how
-  the code implements a fact, while citing it, is neither.
+  fact's rule in its own words instead of citing `[[id]]`), **violates**
+  (the doc states a rule an accepted fact contradicts) and **over-specified**
+  (a fact's line the code has outgrown). A spec describing how the code
+  implements a fact, while citing it, is neither of the first two.
 - **Output:** as above, with the doc's `<file>:<line>`; verdict `clean` or
   `needs fix`. `docs-check` already fails on a fact's literal `Signature:`
   text; the audit finds the paraphrases.

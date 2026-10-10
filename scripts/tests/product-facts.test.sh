@@ -5,8 +5,9 @@
 # one): fact headers parse and live in their subject's file, IDs are unique,
 # kinds and statuses are known, `[[id]]` references and fact-table markers
 # name a fact, a `Signature:` outside docs/product/ needs a citation in its
-# paragraph (fenced code included), the grandfathered-restatement list only
-# shrinks, and the docs/product/ corpus fits its combined budget.
+# paragraph (fenced code included), every fact's statement fits the per-fact
+# word cap (examples and the `Why:` trailer excluded), and the docs/product/
+# corpus fits its combined budget.
 
 set -euo pipefail
 
@@ -22,7 +23,7 @@ cp "${REPO_ROOT}/scripts/gen-docs.sh" "${REPO_ROOT}/scripts/lane-timing.sh" "${F
 printf 'lint\textra\tnone\tyes\t.\ttrue\n' > "${FIX}/scripts/lanes.tsv"
 printf '# Fixture\n\n> **Owns:** fixture.\n\n<!-- boga:gen:lane-matrix -->\n<!-- /boga:gen:lane-matrix -->\n' \
   > "${FIX}/docs/specs/02-quality-and-test-gates.md"
-printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t200\n' > "${FIX}/scripts/doc-budgets.tsv"
+printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t900\n' > "${FIX}/scripts/doc-budgets.tsv"
 printf 'Always load: `docs/product/README.md` and `docs/spec.md`.\n' > "${FIX}/AGENTS.md"
 # README and REVIEW hold format examples, never facts.
 printf '# Facts\n\n### Format\n\n```markdown\n### <subject>.<slug> · <kind> · <status>\nSignature: `<text>`\n```\n\nCite as `[[<id>]]`, tables as `<!-- fact-table: <id> -->`.\n' \
@@ -78,7 +79,9 @@ expect_fail() { # <what> <expected output fragment>...
 gd gen >/dev/null || fail "fixture gen must pass: $(gd gen)"
 gd check >/dev/null || fail "a well-formed corpus with cited signatures must pass: $(gd check)"
 out="$(gd budgets)"
-grep -q "corpus docs/product/: [0-9]* of 200 words in 3 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
+grep -q "corpus docs/product/: [0-9]* of 900 words in 3 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
+grep -q "3 product facts, [0-9]* statement words;.* cap 130" <<<"${out}" || fail "budgets must report fact sizes: ${out}"
+grep -qx "over the cap: none" <<<"${out}" || fail "budgets must report an empty over-cap list: ${out}"
 
 # Fact headers.
 FACTS="${FIX}/docs/product/lift.md"
@@ -129,24 +132,27 @@ grep -q "spec.md:14" <<<"${out}" && fail "one paragraph is one finding, at its f
 printf '\nCites [[lift.formula]] but states nothing.\n' >> "${SPEC}"
 expect_fail "a citation in another paragraph" "docs/spec.md:9: restates" "docs/spec.md:12: restates"
 
-# Grandfathered restatements: the count allows exactly that many paragraphs.
-GF="${FIX}/scripts/product-fact-restatements.tsv"
-printf '# header\ndocs/spec.md\tlift.formula\t2\n' > "${GF}"
-gd check >/dev/null || fail "grandfathered restatements must pass: $(gd check)"
-printf '\nAnd 48.8 once more.\n' >> "${SPEC}"
-expect_fail "a restatement beyond the grandfathered count" "docs/spec.md:20: restates [[lift.formula]]"
-sed -i.bak '$d' "${SPEC}"; sed -i.bak '$d' "${SPEC}"; rm -f "${SPEC}.bak"
-printf 'docs/spec.md\tlift.formula\t3\n' > "${GF}"
-expect_fail "a stale grandfathered count" "'docs/spec.md' restates [[lift.formula]] in 2 paragraph(s), not 3 — lower the row"
-printf 'docs/spec.md\tlift.count\t1\ndocs/spec.md\tlift.formula\ndocs/other.md\tlift.formula\t0\n' > "${GF}"
-printf 'docs/spec.md\tlift.formula\t2\ndocs/spec.md\tlift.formula\t2\n' >> "${GF}"
-expect_fail "rows for a fact with no signature, without a count, at 0, or repeated" \
-  "malformed row (doc, fact with a Signature, paragraphs above 0; one row per doc and fact): 'docs/spec.md\\tlift.count\\t1'" \
-  "one row per doc and fact): 'docs/spec.md\\tlift.formula'" \
-  "one row per doc and fact): 'docs/other.md\\tlift.formula\\t0'"
-grep -cF "one row per doc and fact): 'docs/spec.md\\tlift.formula\\t2'" <<<"${out}" | grep -qx 1 \
-  || fail "a repeated row must fail once, the first one counting: ${out}"
-rm -f "${GF}"
+cp "${FIX}/spec.orig" "${SPEC}"
+gd check >/dev/null || fail "restoring the spec must pass: $(gd check)"
+
+# Per-fact statement cap: the statement is the header-to-`Why:` text, so
+# fact-table examples and the trailer are free of it.
+words() { python3 -c 'import sys; print("word " * int(sys.argv[1]))' "$1"; }
+restore; { printf '\n### lift.wordy · definition · accepted\n\n'; words 131; } >> "${FACTS}"
+expect_fail "a statement over the cap" \
+  "lift.md:26: fact 'lift.wordy' states 131 words, over the 130-word cap"
+restore; { printf '\n### lift.terse · definition · accepted\n\n'; words 130; } >> "${FACTS}"
+gd check >/dev/null || fail "a statement at the cap must pass: $(gd check)"
+restore
+{ printf '\n### lift.tabled · definition · accepted\n\n'; words 100
+  printf '\n<!-- fact-table: lift.tabled -->\n\n| In | Out |\n| --- | --- |\n'
+  for _ in $(seq 20); do printf '| %s | %s |\n' "$(words 3)" "$(words 3)"; done
+  printf '\nWhy: '; words 60; printf 'Code: '; words 60; } >> "${FACTS}"
+gd check >/dev/null || fail "examples and the trailer must not count toward the cap: $(gd check)"
+out="$(gd budgets)"
+grep -q "4 product facts," <<<"${out}" || fail "budgets must count the new fact: ${out}"
+grep -qx "over the cap: none" <<<"${out}" || fail "a tabled fact must not report over the cap: ${out}"
+restore; gd check >/dev/null || fail "restored facts must pass: $(gd check)"
 
 # Corpus budget: the directory's docs share one limit.
 printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t20\n' > "${FIX}/scripts/doc-budgets.tsv"

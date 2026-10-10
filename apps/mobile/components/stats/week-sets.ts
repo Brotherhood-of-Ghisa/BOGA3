@@ -1,5 +1,5 @@
 // The sets of one history week for the Timeline's week list
-// ([[comparison.timeline-history]]): the blocks to list, each drawn with View
+// the blocks to list, each drawn with View
 // Session's card for it (`loadCompletedSessionCards`).
 import { useEffect, useState } from 'react';
 

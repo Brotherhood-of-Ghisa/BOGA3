@@ -24,7 +24,7 @@ export interface DayCell {
   isToday: boolean;
   level: CalendarHeatmapBucket;
   value: number;
-  /** Matching exercise PRs ([[comparison.history-prs]]). */
+  /** Matching exercise PRs: the all-time session records for the selected metric. */
   prCount?: number;
   unavailable?: boolean;
   hasTraining?: boolean;

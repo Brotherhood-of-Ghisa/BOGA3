@@ -108,7 +108,7 @@ access level, and `useRootRouteAccess`
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
 | `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one, required; both, neither or a blank id renders the unavailable state, as does an id the exercise catalogue no longer holds. The page reads the subject's name from that cache — never from a param |
-| `/sessions` | `week`, `day` | where the list opens ([[session.history-open]]); malformed: the top |
+| `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `7` / `30` / `all`; absent or invalid is `30` |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |

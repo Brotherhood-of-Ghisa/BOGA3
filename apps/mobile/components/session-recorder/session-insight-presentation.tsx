@@ -37,7 +37,7 @@ export function SessionInsightPresentation({
   const comparisons = mode === 'exercise' ? exerciseComparisons : muscleComparisons;
   const state = historyState !== 'ready' ? historyState : mode === 'muscle' ? muscleCatalogState : 'ready';
   // A comparison with no distribution gets no card: it is pooled by name
-  // ([[session.volume-comparison]]), so no card ever draws an empty plot.
+  // by name, so no card ever draws an empty plot.
   const { comparable, unavailable } = partitionVolumeComparisons(comparisons);
   return (
     <View style={styles.section} testID="session-insight-presentation">

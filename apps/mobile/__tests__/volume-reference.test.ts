@@ -11,7 +11,7 @@ const comparison = (
   ...overrides,
 });
 
-// The cutoff decides which exercise gets a card ([[session.volume-comparison]]).
+// The cutoff decides which exercise gets a card.
 it.each([[MIN_HISTORY_OBSERVATIONS - 1, false], [MIN_HISTORY_OBSERVATIONS, true]])(
   'draws a card at %i prior observations: %s',
   (historicalSessionCount, drawn) => {

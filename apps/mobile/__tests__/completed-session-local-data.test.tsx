@@ -192,7 +192,7 @@ const PULLDOWN_SETS: SeedSet[] = [{ weight: '120', reps: '12', type: null }];
 
 // Bench-only sessions before the design session, one per day, each a
 // different volume: enough of them make the bench and chest comparisons
-// comparable ([[session.volume-comparison]]).
+// comparable.
 const seedPriorBenchSessions = async (count: number) => {
   for (let index = 0; index < count; index += 1) {
     const completedAt = new Date(Date.now() - (index + 2) * 24 * 60 * 60 * 1000);

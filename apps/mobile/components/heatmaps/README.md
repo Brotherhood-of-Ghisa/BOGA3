@@ -12,7 +12,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → columns and the month labels that fit. Pure. |
-| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as columns ([[comparison.timeline-history]]): readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection. |
+| `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection. |
 | `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; a training week opens its sessions. |
 
 ## Data flow
@@ -45,7 +45,7 @@ smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 `unavailable` marks a figure that cannot be shown (a Volume sum that is not
 finite) instead of treating it as zero.
 Exercise history also carries all-time session-fact PR counts into the selected
-metric's cells ([[comparison.history-prs]]); muscle history carries none.
+metric's cells; muscle history carries none.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
 against one shared weekly target, capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
@@ -62,8 +62,8 @@ Daily retains a neutral dashed rule.
 
 ## Props & opening
 
-A day or week with training opens its sessions ([[session.history-open]]): the
-host passes the openers and routes; a rest day or week stays text.
+A day or week with training opens its sessions: the host passes the openers
+and routes; a rest day or week stays text.
 
 ```tsx
 <DailyHeatmap
@@ -86,7 +86,7 @@ host passes the openers and routes; a rest day or week stays text.
 />
 ```
 
-- **Daily** follows [[comparison.daily-history]]. `daily-calendar.ts` builds
+- **Daily** owns its calendar framing. `daily-calendar.ts` builds
   the month/row framing without changing adapter values or colours. Tiles have no
   selection or black outlines. Figure visibility follows
   [[copy.blank-history]]. Missing/future positions are empty spacers without

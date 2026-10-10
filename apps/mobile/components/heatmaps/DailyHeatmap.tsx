@@ -1,5 +1,5 @@
 // The virtualized month list owns scrolling. Calendar layout follows
-// [[comparison.daily-history]]; figure visibility follows [[copy.blank-history]].
+// Figure visibility follows [[copy.blank-history]].
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -20,16 +20,16 @@ interface Props {
   formatValue: (value: number) => string;
   legendLabel?: string;
   header?: ReactNode;
-  /** Opens a day's sessions ([[session.history-open]]). */
+  /** Opens a day's sessions. */
   onOpenDay?: (day: DayCell) => void;
-  /** Opens a Week tile's sessions ([[session.history-open]]). */
+  /** Opens a Week tile's sessions. */
   onOpenWeek?: (weekStartDateKey: string) => void;
 }
 
 type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek'>;
 
 const dayHint = (day: DayCell) => day.sessionIds.length === 1 ? 'Opens the session' : "Opens the day's sessions";
-// [[session.history-open]]: a day opens by its sessions.
+// A day opens by its sessions.
 const dayOpener = (day: DayCell, onOpenDay: Props['onOpenDay']) =>
   onOpenDay && day.sessionIds.length > 0 ? () => onOpenDay(day) : undefined;
 

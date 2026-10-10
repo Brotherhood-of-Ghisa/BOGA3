@@ -269,7 +269,7 @@ describe('The history page over real data', () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
 
-    // [[session.history-open]]: the sessions behind each day come from the same read.
+    // The sessions behind each day come from the same read.
     const days = await exerciseAnalytics.computeSelectedExerciseDailyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT });
     const single = days.find(day => day.sessionIds?.length === 1)!;
     expect(single.sessionIds).toHaveLength(1);
@@ -351,7 +351,7 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
     act(() => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
-    // Today holds a Squat session, so it opens it ([[session.history-open]]).
+    // Today holds a Squat session, so it opens it.
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
       .toHaveProp('accessibilityRole', 'button');
     expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();

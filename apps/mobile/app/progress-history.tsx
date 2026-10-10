@@ -74,7 +74,7 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
   const unavailable = !subject || (catalog.status === 'ready' && name === null);
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
-  // [[session.history-open]]. Stable, so the charts' memoised trees survive a re-render.
+  // Stable, so the charts' memoised trees survive a re-render.
   const openDay = useCallback((day: DayCell) => {
     const href = historyDayHref(day.dateKey, day.sessionIds);
     if (href) router.push(href);

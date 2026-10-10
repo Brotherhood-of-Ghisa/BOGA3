@@ -1,7 +1,8 @@
 // timeline.ts — the Timeline history view's data and geometry: one value per
 // week of the adapter's weekly series (`heatmapData.ts`), its zero-based y
 // scale, month labels and the columns. Pure, no React / react-native imports.
-// Week values and rest weeks follow [[comparison.timeline-history]].
+// Week values are the week's sum for Volume and Sets, its best for 1RM and Top
+// weight; a rest week gets no column.
 
 import type { CalendarHeatmapMetric } from '@/src/data';
 

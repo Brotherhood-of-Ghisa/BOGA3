@@ -1,5 +1,5 @@
 // Timeline: the selected metric week by week across the history window, oldest
-// on the left, as zero-based columns ([[comparison.timeline-history]]). A month
+// on the left, as zero-based columns. A month
 // is labelled at the first week that starts in it. The window fits the width
 // down to `MIN_TIMELINE_COLUMN_WIDTH` per week, then scrolls sideways, opening
 // on the newest week. Tapping a week selects it, a second tap clears it, as a
@@ -62,7 +62,8 @@ const isSum = (metric: CalendarHeatmapMetric) => metric === 'totalVolume' || met
 
 type Figure = { value: string; unit: string | null };
 
-// The readout's words for rest and unavailable weeks follow [[comparison.timeline-history]].
+// The readout's words for rest and unavailable weeks: `0` or `No sets` by metric,
+// else `Unavailable`.
 const weekFigure = (week: TimelineWeek, metric: CalendarHeatmapMetric, formatValue: Props['formatValue'],
   unitLabel: Props['unitLabel']): Figure => {
   if (week.state === 'unavailable' || week.value === null) return { value: 'Unavailable', unit: null };
