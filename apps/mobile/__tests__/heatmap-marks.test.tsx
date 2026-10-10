@@ -111,13 +111,13 @@ describe('Bodyweight heatmap coverage', () => {
 
   it.each([
     [[0, 0, 0, 0, 100, 200], 0],
-  ])('places the median and percentiles on the zero-based horizontal scale including known zero training', (values, median) => {
+  ])('places zero references at the origin and positive references on the observed-range scale', (values, median) => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
     render(<WeeklyHeatmap data={coverage} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
     expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `53-week median ~${median}`);
     expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p25`).left).toBe('0%');
-    expect(style(`${PREFIX}-heatmap-p75`).left).toBe('37.5%');
+    expect(style(`${PREFIX}-heatmap-p75`).left).toBe('45%');
   });
 });

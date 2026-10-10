@@ -1,4 +1,4 @@
-// Newest-first weekly rows. Length uses a shared zero origin; colour retains
+// Newest-first weekly rows. Length follows [[comparison.weekly-reference]]; colour retains
 // the adapter's independent intensity/target meaning. Reference calculations
 // follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
 import React, { useMemo, type ReactNode } from 'react';
@@ -45,9 +45,9 @@ function ReferenceRule({ position, testID }: { position: number; testID?: string
   </View>;
 }
 
-function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, max, references, valueWidth, currentYear, testID }: {
+function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, position, references, valueWidth, currentYear, testID }: {
   week: WeekCell; onPress?: () => void; formatValue: Props['formatValue']; metricLabel: string;
-  targetAveraged?: boolean; max: number; references: Reference[]; valueWidth: number; currentYear: number; testID: string;
+  targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; currentYear: number; testID: string;
 }) {
   const year = week.monday.getUTCFullYear();
   const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
@@ -68,7 +68,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, ma
     <View style={styles.plot}>
       <View style={styles.track}>
         <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
-          { width: `${max > 0 && !week.unavailable ? week.value / max * 100 : 0}%`,
+          { width: `${week.unavailable ? 0 : position(week.value)}%`,
             backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
       </View>
       {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
@@ -89,11 +89,16 @@ export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
   const max = data.weekly.reduce((largest, week) => week.unavailable ? largest : Math.max(largest, week.value), 0);
   const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
+  const min = values[0] ?? 0;
+  const scaleMax = Math.max(1, max);
+  const span = scaleMax - min;
+  const position = (value: number) => value <= 0 ? 0 : span > 0 ? 12 + (value - min) / span * 88 : 100;
+  const axisValues = max <= 0 ? [0] : span > 0 ? [min, min + span / 2, scaleMax] : [min];
   // Reference eligibility follows [[comparison.weekly-reference]].
   const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);
-      return { id, label, value: formatReferenceValue(value), position: value / max * 100 };
+      return { id, label, value: formatReferenceValue(value), position: position(value) };
     }) : [];
   const valueWidth = Math.min(96, Math.max(36, ...weeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));
   const testID = `${testIDPrefix}-heatmap`;
@@ -107,7 +112,9 @@ export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
       <View style={styles.axisRow}>
         <View style={styles.date} />
         <View style={styles.axis} testID={`${testID}-axis`}>
-          {(max > 0 ? [0, 0.5, 1] : [0]).map(fraction => <Text key={fraction} allowFontScaling={false} style={[styles.axisLabel, { textAlign: fraction === 0 ? 'left' : fraction === 1 ? 'right' : 'center' }]}>{formatValue(max * fraction)}</Text>)}
+          {axisValues.map(value => <Text key={value} allowFontScaling={false}
+            testID={`${testID}-axis-value-${value}`} style={[styles.axisLabel,
+              position(value) === 100 ? { right: 0, textAlign: 'right' } : { left: `${position(value)}%` }]}>{formatValue(value)}</Text>)}
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
             accessibilityLabel={`${data.weekly.length}-week ${reference.label} ${reference.value}`}
@@ -119,7 +126,7 @@ export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
     renderItem={({ item }) => <WeeklyRow week={item}
       onPress={onOpenWeek && item.hasTraining ? () => onOpenWeek(item.weekStartDateKey) : undefined}
       formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
-      max={max} references={references} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
+      position={position} references={references} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
       <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
     </View>}
@@ -146,8 +153,8 @@ const styles = StyleSheet.create({
   dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
-  axis: { flex: 1, flexDirection: 'row', paddingBottom: uiSpace.sm },
-  axisLabel: { ...heatmapStyles.legendText, flex: 1, flexShrink: 1 },
+  axis: { flex: 1, height: uiTypography.lineHeight.xxs + uiSpace.sm },
+  axisLabel: { ...heatmapStyles.legendText, position: 'absolute', maxWidth: '44%' },
   footer: { gap: uiSpace.xs, paddingTop: uiSpace.lg },
 });
 

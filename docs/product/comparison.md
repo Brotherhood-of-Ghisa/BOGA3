@@ -104,19 +104,19 @@ Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/hea
 
 ### comparison.weekly-reference · calculation · accepted
 
-Within [[comparison.history-window]], known training weeks form the reference
-population — genuine zeros included, rest, future and unavailable weeks
-excluded. It needs six eligible weeks and a positive window maximum; otherwise
-omit references.
+Known training weeks in [[comparison.history-window]] supply references,
+including genuine zeros; exclude rest, future and unavailable weeks. Require
+six observations and a positive window maximum.
 
 | Metric | Reference lines |
 | --- | --- |
 | Sets | Median |
 | Volume, 1RM, Top weight | 25th percentile, median, 75th percentile |
 
-Percentiles are linear interpolation on sorted weekly values. Lines sit on the
-bars' shared zero-based scale, keeping exact positions even when they coincide.
-Values stay accessible without visible reference labels.
+Percentiles interpolate sorted values. Bars and lines use training min and
+window max (at least 1): positive `12+88×(value−min)/(max−min)%`, collapsed
+`100%`, zero `0%`. Axis: min/mid/max; collapsed one label, empty/all-zero `0`.
+Coincident positions and accessible values remain; no visible reference labels.
 
-Why: the middle half of the selected history supplies a consistent reference range.
+Why: a consistent middle-half reference for selected history.
 Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.

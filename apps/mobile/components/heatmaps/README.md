@@ -13,7 +13,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → columns and the month labels that fit. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as columns ([[comparison.timeline-history]]): readout with `View sessions`, y axis, month axis, the selected column in `ink`; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection. |
-| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; a training week opens its sessions. |
+| `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; lengths and references follow [[comparison.weekly-reference]], colour is independent; a training week opens its sessions. |
 
 ## Data flow
 
@@ -53,7 +53,7 @@ the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
 report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
-(max). Weekly lengths share a zero origin and the known window maximum;
+(max). Weekly lengths follow [[comparison.weekly-reference]];
 unknown load never gets a filled length. Figure visibility follows
 [[copy.blank-history]]; Weekly reference calculations follow
 [[comparison.weekly-reference]] across [[comparison.history-window]]. A Volume sum that is not finite is never
@@ -125,7 +125,7 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- Weekly references use discrete vertical dashes on the same zero-based scale
+- Weekly references use discrete vertical dashes on the same scale
   as the bars ([[comparison.weekly-reference]]). Accessible values use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
   retain the selected metric format. Axis marks announce the saved window, each
