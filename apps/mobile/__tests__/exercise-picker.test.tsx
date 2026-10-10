@@ -754,7 +754,6 @@ describe('picker: from planner', () => {
           {
             exerciseDefinitionId: 'seed_barbell_back_squat',
             name: 'Barbell Squat',
-            machineName: '',
             sets: [
               { targetWeightText: '100', targetRepsText: '5', targetSetType: null },
               { targetWeightText: '', targetRepsText: '8', targetSetType: null },
@@ -763,7 +762,6 @@ describe('picker: from planner', () => {
           {
             exerciseDefinitionId: 'seed_barbell_bench_press',
             name: 'Bench Press',
-            machineName: '',
             sets: [{ targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
           },
         ],

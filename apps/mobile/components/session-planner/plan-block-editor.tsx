@@ -18,6 +18,8 @@ export type PlanBlockEditorProps = {
   onRemoveBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, step: -1 | 1) => void;
   onPickExercise: (blockId: string) => void;
+  /** Custom error path prefix, e.g. 'plans.0.exercises'. Defaults to 'exercises'. */
+  errorPrefix?: string;
   /** The account's displayed efforts, cycling the type field like the recorder. */
   displayEfforts?: readonly EffortChoice[];
 };
@@ -56,9 +58,9 @@ function TypeField({
 
 /**
  * One block's editor in the plan form: the picked exercise (its name row
- * opens the pick sheet), an optional machine note, and the ordered target
- * sets — type, weight, reps per set. The weight field's label follows the
- * exercise's load input mode (`per side · kg` when loaded per side).
+ * opens the pick sheet) and the ordered target sets — type, weight, reps per
+ * set. The weight field's label follows the exercise's load input mode
+ * (`per side · kg` when loaded per side).
  */
 export function PlanBlockEditor({
   block,
@@ -72,10 +74,12 @@ export function PlanBlockEditor({
   onRemoveBlock,
   onMoveBlock,
   onPickExercise,
+  errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
   const weightLabel = block.loadInputMode === 'per_side_load' ? 'Weight per side · kg' : 'Weight · kg';
-  const blockPath = `exercises.${index}`;
+  const prefix = errorPrefix ?? 'exercises';
+  const blockPath = `${prefix}.${index}`;
 
   return (
     <View style={styles.block} testID={`plan-form-block-${index + 1}`}>
@@ -118,16 +122,6 @@ export function PlanBlockEditor({
           {errors.get(`${blockPath}.name`)}
         </Text>
       ) : null}
-      <FormField
-        accessibilityLabel={`Machine note for ${block.name || 'exercise'}`}
-        autoCapitalize="none"
-        error={errors.get(`${blockPath}.machineName`)}
-        face="text"
-        label="Machine (optional)"
-        onChangeText={(machineName) => onChangeBlock(block.id, { machineName })}
-        testID={`plan-form-block-${index + 1}-machine`}
-        value={block.machineName}
-      />
       {block.sets.map((set, setIndex) => {
         const weightError = errors.get(`${blockPath}.sets.${setIndex}.targetWeight`);
         const repsError = errors.get(`${blockPath}.sets.${setIndex}.targetReps`);

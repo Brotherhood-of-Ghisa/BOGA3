@@ -59,8 +59,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // The Grid virtualizes its months, so the sample it was handed is what the
 // window claim is about, not the handful of months laid out in a test render.
-const renderedDailySample = () => {
-  const list = screen.UNSAFE_getAllByType(FlatList).find(node => node.props.testID === 'stats-exercise-history-scroll');
+const renderedDailySample = (subject: 'exercise' | 'muscle' = 'exercise') => {
+  const list = screen.UNSAFE_getAllByType(FlatList).find(node => node.props.testID === `stats-${subject}-history-scroll`);
   const months: CalendarMonth[] = list!.props.data;
   return months.flatMap(month => month.weeks.flatMap(week => week.days)).filter(day => day.day);
 };
@@ -375,6 +375,27 @@ describe('The history page over real data', () => {
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
     expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+  });
+
+  it('shows a secondary muscle\'s day cells its half-steps, unrounded', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    // Quads becomes a secondary mapping, keeping the fixture's real sets
+    // ([[muscle.set-count]]) and the production aggregation/rendering path.
+    localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    await openHistory({ muscleGroupId: 'quads' });
+    await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
+
+    const trained = renderedDailySample('muscle').filter(tile => tile.day?.hasTraining);
+    expect(trained.length).toBeGreaterThan(0);
+    // Every day is a half-step, and at least one is a genuine half.
+    expect(trained.every(tile => (tile.day!.value * 2) % 1 === 0)).toBe(true);
+    expect(trained.some(tile => tile.day!.value % 1 === 0.5)).toBe(true);
+    for (const tile of trained) {
+      expect(screen.getByTestId(`stats-muscle-history-heatmap-cell-${tile.dateKey}-value`))
+        .toHaveTextContent(String(tile.day!.value));
+    }
   });
 
   it('retries a failed muscle history read without leaving the page', async () => {

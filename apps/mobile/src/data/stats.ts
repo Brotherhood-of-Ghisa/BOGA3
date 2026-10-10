@@ -11,9 +11,12 @@ import {
   collectMuscleSetContributions,
   countedMuscleAnalyticsSessionIds,
   countMuscleAnalyticsWorkingSets,
+  countMuscleSet,
+  createMuscleSetCounter,
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
   type MuscleAnalyticsInput,
+  type MuscleSetCounter,
   type SelectedMuscleDailyEffort,
   type SelectedMuscleWeeklyEffort,
 } from './muscle-analytics';
@@ -43,6 +46,7 @@ export type StatsMusclePerformance = {
   displayName: string;
   familyName: string;
   sortOrder: number;
+  /** The muscle's [[muscle.set-count]], so a half-step figure. */
   workingSetCount: number;
   totalVolume: number | null;
 };
@@ -50,6 +54,7 @@ export type StatsMusclePerformance = {
 export type StatsMuscleFamilyPerformance = {
   familyName: string;
   sortOrder: number;
+  /** The family's [[muscle.set-count]], deduplicating sets across its muscles. */
   workingSetCount: number;
   totalVolume: number | null;
   muscles: StatsMusclePerformance[];
@@ -57,6 +62,7 @@ export type StatsMuscleFamilyPerformance = {
 
 export type StatsTotals = {
   sessionCount: number;
+  /** Physical working sets in the window — not per muscle, so never weighted. */
   workingSetCount: number;
   muscleFamilies: StatsMuscleFamilyPerformance[];
 };
@@ -128,34 +134,49 @@ const inputInPeriod = (input: StatsAggregationInput, period: StatsPeriodBounds):
   ...input, sessions: input.sessions.filter(session => session.completedAt >= period.start && session.completedAt < period.end),
 });
 
-export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
-  type MuscleAccumulator = {
-    workingSetIdentities: Set<string>;
-    totalVolume: number | null;
-  };
-  const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
+type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null };
 
-  // Count physical working-set identities separately from included volume.
+/**
+ * Per-muscle and per-family [[muscle.set-count]] and Volume, from one pass over
+ * the contributions. A family counts each physical set once at its strongest
+ * role across the family's muscles, so overlapping muscle counts are never
+ * summed into it. A contribution for a muscle outside the taxonomy joins no family.
+ */
+const accumulateMuscleTotals = (input: StatsAggregationInput) => {
+  const byMuscleId = new Map<string, StatsMuscleAccumulator>();
+  const counterByFamilyName = new Map<string, MuscleSetCounter>();
+  const familyNameByMuscleId = new Map(input.muscleGroups.map((group) => [group.id, group.familyName]));
+
   for (const contribution of collectMuscleSetContributions(input)) {
-    const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
-      workingSetIdentities: new Set<string>(),
-      totalVolume: 0,
-    };
-    accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
-    if (contribution.working !== false) accumulator.workingSetIdentities.add(contribution.setIdentity);
+    const accumulator = byMuscleId.get(contribution.muscleGroupId)
+      ?? { setCounter: createMuscleSetCounter(), totalVolume: 0 };
+    byMuscleId.set(contribution.muscleGroupId, accumulator);
+    countMuscleSet(accumulator.setCounter, contribution);
     // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
     accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume ?? 0);
+
+    const familyName = familyNameByMuscleId.get(contribution.muscleGroupId);
+    if (familyName === undefined) continue;
+    const familyCounter = counterByFamilyName.get(familyName) ?? createMuscleSetCounter();
+    counterByFamilyName.set(familyName, familyCounter);
+    countMuscleSet(familyCounter, contribution);
   }
+
+  return { byMuscleId, counterByFamilyName };
+};
+
+export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
+  const { byMuscleId, counterByFamilyName } = accumulateMuscleTotals(input);
 
   const musclesByFamily = new Map<string, StatsMusclePerformance[]>();
   for (const group of input.muscleGroups) {
-    const accumulator = accumulatorsByMuscleId.get(group.id);
+    const accumulator = byMuscleId.get(group.id);
     const muscle: StatsMusclePerformance = {
       muscleGroupId: group.id,
       displayName: group.displayName,
       familyName: group.familyName,
       sortOrder: group.sortOrder,
-      workingSetCount: accumulator?.workingSetIdentities.size ?? 0,
+      workingSetCount: accumulator?.setCounter.counts.weightedSetCount ?? 0,
       totalVolume: accumulator ? accumulator.totalVolume : 0,
     };
     const bucket = musclesByFamily.get(group.familyName) ?? [];
@@ -165,18 +186,11 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   const muscleFamilies: StatsMuscleFamilyPerformance[] = Array.from(musclesByFamily.entries())
     .map(([familyName, muscles]) => {
-      const familyWorkingSetIdentities = new Set<string>();
       let familyTotalVolume: number | null = 0;
       let familySortOrder = Number.POSITIVE_INFINITY;
       for (const muscle of muscles) {
         familyTotalVolume = addFiniteVolume(familyTotalVolume, muscle.totalVolume);
         if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
-        const accumulator = accumulatorsByMuscleId.get(muscle.muscleGroupId);
-        if (accumulator) {
-          for (const identity of accumulator.workingSetIdentities) {
-            familyWorkingSetIdentities.add(identity);
-          }
-        }
       }
       const sortedMuscles = [...muscles].sort((left, right) => {
         if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
@@ -185,7 +199,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       return {
         familyName,
         sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
-        workingSetCount: familyWorkingSetIdentities.size,
+        workingSetCount: counterByFamilyName.get(familyName)?.counts.weightedSetCount ?? 0,
         totalVolume: familyTotalVolume,
         muscles: sortedMuscles,
       };

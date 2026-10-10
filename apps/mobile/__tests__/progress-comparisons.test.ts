@@ -58,17 +58,19 @@ it('keeps taxonomy order, zero muscles and previous-only definitions; repeated b
   const source = input();
   const rows = aggregateProgressComparisons(source, periods);
   expect(rows.map(row => row.muscleGroupId)).toEqual(['back', 'arms', 'empty']);
-  expect(rows[0]).toMatchObject({ current: { workingSetCount: 2, totalVolume: 125 },
-    previous: { workingSetCount: 1, totalVolume: 150 }, workingSetChange: 1,
+  // Back is secondary on `lift` and primary on `old`: two halves now, one whole before.
+  expect(rows[0]).toMatchObject({ current: { workingSetCount: 1, totalVolume: 125 },
+    previous: { workingSetCount: 1, totalVolume: 150 }, workingSetChange: 0,
     volumeChange: { kind: 'percent', percent: -17 } });
   expect(rows[0].exercises).toMatchObject([
     { exerciseDefinitionId: 'lift', displayName: 'Lift', role: 'secondary',
-      current: { workingSetCount: 2, totalVolume: 125 }, previous: { workingSetCount: 0 }, volumeChange: { kind: 'new' } },
+      current: { workingSetCount: 1, totalVolume: 125 }, previous: { workingSetCount: 0 }, volumeChange: { kind: 'new' } },
     { exerciseDefinitionId: 'old', displayName: 'Lift', role: 'primary',
       current: { workingSetCount: 0 }, previous: { workingSetCount: 1, totalVolume: 150 }, volumeChange: { kind: 'percent', percent: -100 } },
   ]);
   expect(rows[2]).toMatchObject({ current: { workingSetCount: 0, totalVolume: 0 }, previous: { workingSetCount: 0, totalVolume: 0 }, exercises: [] });
-  // Back and Arms overlap. There is deliberately no sum of their counts.
+  // Back and Arms overlap. There is deliberately no sum of their counts, and
+  // Arms is primary on `lift` so its two sets stay whole.
   expect(rows[1].current.workingSetCount).toBe(2);
   reconcile(rows, source);
 });
@@ -87,12 +89,13 @@ it('deduplicates source mappings at the strongest role, regardless of order or l
   reconcile(rows, source);
 });
 
+// Back is secondary on `lift`, so each working set it keeps is half a set.
 it.each([
-  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 2, 125, 2],
-  ['warm-ups included', { workingSetEfforts: ['warm_up'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
-  ['independent columns / excluded RIR', { workingSetEfforts: ['unspecified'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
+  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 1, 125, 2],
+  ['warm-ups included', { workingSetEfforts: ['warm_up'], volumeEfforts: ['warm_up'] }, 0.5, 200, 1],
+  ['independent columns / excluded RIR', { workingSetEfforts: ['unspecified'], volumeEfforts: ['warm_up'] }, 0.5, 200, 1],
   ['volume only', { workingSetEfforts: [], volumeEfforts: ['warm_up'] }, 0, 200, 1],
-  ['working only', { workingSetEfforts: ['rir_2'], volumeEfforts: [] }, 1, 0, 0],
+  ['working only', { workingSetEfforts: ['rir_2'], volumeEfforts: [] }, 0.5, 0, 0],
   ['both empty', { workingSetEfforts: [], volumeEfforts: [] }, 0, 0, 0],
 ] as [string, EffortCalculationPolicy, number, number, number][])(
   'settles %s effort choices independently and reconciles the summary', (_name, policy, workingSetCount, totalVolume, volumeSetCount) => {
@@ -125,7 +128,7 @@ it('leaves sets whose load cannot be calculated out of Volume ([[copy.no-inline-
   source.bodyweightCalculationsEnabled = true;
   source.exerciseDefinitions![0].bodyweightContribution = 2; // Malformed historical metadata: unknown load.
   const rows = aggregateProgressComparisons(source, periods);
-  expect(rows[0]).toMatchObject({ current: { workingSetCount: 2, totalVolume: 0, volumeSetCount: 2 } });
+  expect(rows[0]).toMatchObject({ current: { workingSetCount: 1, totalVolume: 0, volumeSetCount: 2 } });
   expect(rows[0].volumeChange.kind).not.toBe('unavailable');
   reconcile(rows, source);
 });
@@ -183,6 +186,7 @@ it('loads both periods once, including the previous weekend', async () => {
   expect(store.loadAggregationInput).toHaveBeenCalledWith({ start: new Date('2026-05-10T23:00:00Z'), end: periods.current.end });
   expect(result.current.totals.workingSetCount).toBe(2);
   expect(result.previous.totals.workingSetCount).toBe(2);
-  expect(result.muscles[0].previous).toMatchObject({ workingSetCount: 2, totalVolume: 1398.75 });
+  // Back: the weekend `lift` set at its secondary half plus the primary `old-set`.
+  expect(result.muscles[0].previous).toMatchObject({ workingSetCount: 1.5, totalVolume: 1398.75 });
   expect(result.muscles[0].current.totalVolume).toBe(125);
 });

@@ -12,6 +12,7 @@ import {
   type PlanFormSet,
   type PlanFormState,
 } from '@/src/session-planner/plan-form-model';
+import { upsertLocalGym } from '@/src/data';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -27,7 +28,7 @@ export type SaveOutcome =
   | { status: 'saved'; planId: string | null }
   | { status: 'failed'; message: string | null };
 
-function PlanGymSheet({
+export function PlanGymSheet({
   gyms,
   visible,
   onDismiss,
@@ -38,6 +39,11 @@ function PlanGymSheet({
   onDismiss: () => void;
   onPick: (gymId: string | null) => void;
 }) {
+  // A seeded gym is written to the local `gyms` table first, as the recorder's
+  // `setSessionGym` does, so the plan's `gym_id` always names a local row.
+  const pickGym = (gym: SessionGymOption) => {
+    void upsertLocalGym({ id: gym.id, name: gym.name }).then(() => onPick(gym.id));
+  };
   return (
     <Sheet
       dismissLabel="Dismiss gym picker"
@@ -64,7 +70,7 @@ function PlanGymSheet({
               divider={index < gyms.length - 1}
               key={gym.id}
               label={gym.name}
-              onPress={() => onPick(gym.id)}
+              onPress={() => pickGym(gym)}
               testID={`plan-form-gym-${gym.id}`}
             />
           ))}

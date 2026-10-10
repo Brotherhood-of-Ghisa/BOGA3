@@ -275,14 +275,17 @@ choices may change which recorded set qualifies.
   then halves it.
 - The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
 
-**A muscle's set count** is [[muscle.set-count]]. The session summary applies
-it; Progress muscle comparisons do not yet (issue #665). In both, a set counts
-once per muscle at its strongest role (duplicate mappings use the strongest
-role for that exercise/muscle pair), and a stabilizer adds nothing
-(`summarizeCurrentSessionMuscleLoad`; `progress-comparisons.ts`). In
-Progress the role factor applies only to Volume. Family counts deduplicate
-physical sets; overlapping individual muscle counts must never be summed into
-a global total.
+**A muscle's set count** is [[muscle.set-count]]. One shared counter derives
+it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
+muscle at its strongest role (duplicate mappings use the strongest role for
+that exercise/muscle pair), weighted by that role, and a stabilizer adds
+nothing. The session summary, Progress muscle comparisons, the muscle heatmaps
+and the Stats muscle breakdown all read it, so they cannot disagree. Family
+counts deduplicate physical sets at the strongest role across the family's
+muscles; overlapping individual muscle counts must never be summed into a
+global total. Every figure is an exact half-step, shown unrounded. Nothing is
+stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
+them. The window's own working-set total stays a count of physical sets.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
 durable active effort-policy snapshot in one read transaction for both

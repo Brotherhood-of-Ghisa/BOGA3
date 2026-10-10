@@ -18,8 +18,13 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { isVolumeSet, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
+import { aggregateSelectedMuscleDailyEffort, aggregateSelectedMuscleDailyEffortMetrics,
+  aggregateSelectedMuscleWeeklyEffort } from '@/src/data/muscle-analytics';
+import { aggregateProgressComparisons } from '@/src/data/progress-comparisons';
+import { aggregateStats } from '@/src/data/stats';
 import { normalizeGroupSetFacts } from '@/src/groups/set-facts';
-import { summarizeCurrentSessionMuscleLoad, type SessionInsightMuscleMapping } from '@/src/session-insights';
+import { adaptCurrentSessionToMuscleAnalyticsInput, summarizeCurrentSessionMuscleLoad,
+  type CurrentSessionMuscleSummaryInput, type SessionInsightMuscleMapping } from '@/src/session-insights';
 
 const PRODUCT_DIR = path.resolve(__dirname, '..', '..', '..', 'docs', 'product');
 
@@ -209,39 +214,64 @@ describe('muscle.set-count', () => {
     '4 stabilizer': [['stabilizer'], ['stabilizer'], ['stabilizer'], ['stabilizer']],
   };
 
-  // One exercise definition per set, so a set's roles are its own: the summary
-  // takes the strongest role a set holds for a muscle, not the strongest in
-  // the session.
-  const weightedSetCountFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): number => {
-    const muscleMappings: SessionInsightMuscleMapping[] = sets.flatMap((roles, index) =>
-      roles.map((role) => ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role }))
-    );
-    const summary = summarizeCurrentSessionMuscleLoad({
-      sessionId: 'session',
-      sessionAt: new Date('2026-10-09T18:00:00.000Z'),
-      exercises: sets.map((_roles, index) => ({
-        id: `ex-${index}`,
-        orderIndex: index,
-        exerciseDefinitionId: `def-${index}`,
-        exerciseName: `Exercise ${index}`,
-        sets: [{ id: `set-${index}`, orderIndex: 0, weightValue: '100', repsValue: '5', setType: 'rir_1' }],
-      })),
-      exerciseDefinitions: sets.map((_roles, index) => ({
-        id: `def-${index}`,
-        loadInputMode: 'total_load' as const,
-        bodyweightContribution: 0,
-      })),
-      muscleMappings,
-      muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 }],
-    });
-    // A muscle that gets nothing is absent from the table, which is zero sets.
-    return summary.workingSetsByMuscle.find((muscle) => muscle.id === 'chest')?.weightedSetCount ?? 0;
+  const AT = new Date('2026-10-09T18:00:00.000Z');
+  // The fact applies on every screen that shows sets per muscle, so a row is
+  // only satisfied when all of them agree. One exercise definition per set, so
+  // a set's roles are its own: each surface takes the strongest role a set
+  // holds for the muscle, not the strongest in the session.
+  const sessionFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): CurrentSessionMuscleSummaryInput => ({
+    sessionId: 'session',
+    sessionAt: AT,
+    exercises: sets.map((_roles, index) => ({
+      id: `ex-${index}`,
+      orderIndex: index,
+      exerciseDefinitionId: `def-${index}`,
+      exerciseName: `Exercise ${index}`,
+      sets: [{ id: `set-${index}`, orderIndex: 0, weightValue: '100', repsValue: '5', setType: 'rir_1' }],
+    })),
+    exerciseDefinitions: sets.map((_roles, index) => ({
+      id: `def-${index}`,
+      loadInputMode: 'total_load' as const,
+      bodyweightContribution: 0,
+    })),
+    muscleMappings: sets.flatMap((roles, index) =>
+      roles.map((role): SessionInsightMuscleMapping =>
+        ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role }))),
+    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 }],
+  });
+
+  /** What each surface reports for the muscle. A muscle that gets nothing is absent, which is zero. */
+  const figuresFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): Record<string, number> => {
+    const summary = summarizeCurrentSessionMuscleLoad(sessionFor(sets));
+    const input = adaptCurrentSessionToMuscleAnalyticsInput(sessionFor(sets));
+    const periods = { current: { start: new Date(AT.getTime() - 1), end: new Date(AT.getTime() + 1) },
+      previous: { start: new Date(AT.getTime() - 3), end: new Date(AT.getTime() - 1) } };
+    const daily = aggregateSelectedMuscleDailyEffort(input, { muscleGroupIds: ['chest'], timeZone: 'UTC' });
+    const chest = (rows: { muscleGroupId: string }[], read: (row: never) => number) => {
+      const row = rows.find((candidate) => candidate.muscleGroupId === 'chest');
+      return row === undefined ? 0 : read(row as never);
+    };
+    return {
+      'session summary': summary.workingSetsByMuscle.find((muscle) => muscle.id === 'chest')?.weightedSetCount ?? 0,
+      'session summary load': summary.muscles.find((muscle) => muscle.id === 'chest')?.workingSetCount ?? 0,
+      progress: chest(aggregateProgressComparisons(input, periods),
+        (row: { current: { workingSetCount: number } }) => row.current.workingSetCount),
+      stats: chest(aggregateStats(input).muscleFamilies.flatMap((family) => family.muscles),
+        (row: { workingSetCount: number }) => row.workingSetCount),
+      'heatmap day': aggregateSelectedMuscleDailyEffortMetrics(daily)[0]?.workingSetCount ?? 0,
+      'heatmap week': aggregateSelectedMuscleWeeklyEffort(daily)[0]?.workingSetCount ?? 0,
+      'heatmap target': aggregateSelectedMuscleDailyEffortMetrics(daily)[0]?.workingSetCountsByMuscle?.chest ?? 0,
+    };
   };
 
   for (const row of table.rows) {
-    runCell('muscle.set-count', row[KEY], COLUMN, () => ({
-      actual: weightedSetCountFor(ROLES[row[KEY]]),
-      want: Number(row[COLUMN]),
-    }));
+    runCell('muscle.set-count', row[KEY], COLUMN, () => {
+      const want = Number(row[COLUMN]);
+      const figures = figuresFor(ROLES[row[KEY]]);
+      return {
+        actual: figures,
+        want: Object.fromEntries(Object.keys(figures).map((surface) => [surface, want])),
+      };
+    });
   }
 });

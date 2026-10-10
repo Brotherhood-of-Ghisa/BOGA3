@@ -22,15 +22,17 @@ export type AvailablePlanBlockView = {
 };
 
 export const listAvailablePlanBlocks = async (): Promise<AvailablePlanBlockView[]> => {
-  const [upcoming, unscheduled] = await Promise.all([
+  const [upcoming, unscheduled, programmes] = await Promise.all([
     planQueries.listUpcomingPlans(),
     planQueries.listUnscheduledPlans(),
+    planQueries.listProgrammeSummaries(),
   ]);
-  const details = await Promise.all(
-    [...upcoming, ...unscheduled].map((summary) => planQueries.loadPlanDetail(summary.id)),
-  );
+  const [planDetails, programmeDetails] = await Promise.all([
+    Promise.all([...upcoming, ...unscheduled].map((summary) => planQueries.loadPlanDetail(summary.id))),
+    Promise.all(programmes.map((p) => planQueries.loadProgrammeDetail(p.id))),
+  ]);
   const rows: AvailablePlanBlockView[] = [];
-  for (const detail of details) {
+  for (const detail of planDetails) {
     if (!detail) {
       continue;
     }
@@ -42,6 +44,26 @@ export const listAvailablePlanBlocks = async (): Promise<AvailablePlanBlockView[
           planBlockCount: detail.blocks.length,
           block,
         });
+      }
+    }
+  }
+  for (const prog of programmeDetails) {
+    if (!prog) {
+      continue;
+    }
+    for (const plan of prog.plans) {
+      for (const block of plan.blocks) {
+        if (block.status === 'pending' && block.exerciseDefinitionId !== null && block.targets.length > 0) {
+          if (rows.some((existing) => existing.block.id === block.id)) {
+            continue;
+          }
+          rows.push({
+            planId: plan.id,
+            planTitle: `${prog.name} · ${plan.title}`,
+            planBlockCount: plan.blocks.length,
+            block,
+          });
+        }
       }
     }
   }

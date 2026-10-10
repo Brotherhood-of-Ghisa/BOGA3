@@ -62,6 +62,8 @@ export function RootStack() {
         <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
         <Stack.Screen name="session-plan/new" options={{ title: 'New session plan' }} />
         <Stack.Screen name="session-plan/[planId]" options={{ title: 'Plan' }} />
+        <Stack.Screen name="programme/new" options={{ title: 'New programme' }} />
+        <Stack.Screen name="programme/[programmeId]" options={{ title: 'Programme' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen
           name="connected-agents"
