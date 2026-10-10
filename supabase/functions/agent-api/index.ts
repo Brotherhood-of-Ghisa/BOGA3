@@ -19,14 +19,25 @@ const DEFAULT_WORKOUT_LIMIT = 10;
 const MAX_WORKOUT_LIMIT = 25;
 const MAX_CONTEXT_BLOCKS = 500;
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_REQUEST_BYTES = 64 * 1024;
 const RATE_LIMIT_REQUESTS = 120;
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const WRITE_RATE_LIMIT_REQUESTS = 30;
+const DEFAULT_PLAN_LIMIT = 20;
+const MAX_PLAN_LIMIT = 50;
+const MIN_PROGRAMME_PLANS = 2;
+const MAX_PROGRAMME_PLANS = 50;
+const MAX_PLAN_BLOCKS = 30;
+const MAX_PLAN_SETS = 30;
+const MAX_TITLE_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const ISO_DATE_MIN_MS = -8_640_000_000_000_000;
 const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 
 const CORS_HEADERS = {
-  'access-control-allow-headers': 'authorization, content-type, x-request-id',
-  'access-control-allow-methods': 'GET, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type, x-request-id, idempotency-key',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
   'access-control-allow-origin': '*',
 };
 
@@ -36,6 +47,7 @@ type AuthenticatedAgent = {
   accessToken: string;
   clientId: string;
   expiresAt: number;
+  grantedAt: string;
   scopes: string[];
   userId: string;
 };
@@ -98,6 +110,7 @@ class ApiError extends Error {
 }
 
 const rateWindows = new Map<string, RateWindow>();
+const writeRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -176,6 +189,11 @@ const grantClientId = (grant: JsonObject): string | null => {
   return null;
 };
 
+const grantGrantedAt = (grant: JsonObject): string | null => {
+  const value = grant.granted_at;
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+};
+
 const authUnavailable = (step: string, status: unknown): ApiError => {
   console.error('[agent-api] Supabase Auth unavailable', { step, status: status ?? null });
   return new ApiError(
@@ -252,7 +270,9 @@ const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> 
   }
 
   const grants = await fetchActiveGrants(accessToken);
-  if (!grants.some((grant) => grantClientId(grant) === clientId)) {
+  const matchedGrant = grants.find((grant) => grantClientId(grant) === clientId);
+  const grantedAt = matchedGrant ? grantGrantedAt(matchedGrant) : null;
+  if (!grantedAt) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
 
@@ -260,6 +280,7 @@ const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> 
     accessToken,
     clientId,
     expiresAt: expiry,
+    grantedAt,
     scopes: typeof rawScope === 'string'
       ? rawScope.split(/\s+/).filter((scope) => scope.length > 0)
       : [],
@@ -278,11 +299,15 @@ const canonicalAgentPath = (url: URL): string => {
   return markerIndex >= 0 ? url.pathname.slice(markerIndex) : url.pathname;
 };
 
-const routeToolName = (path: string): string => {
+const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/session') return 'mcp_session';
   if (path === '/v1/agent/profile') return 'get_training_profile';
   if (path === '/v1/agent/exercises') return 'search_exercises';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
+  if (path === '/v1/agent/session-plans') {
+    return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
+  }
+  if (path === '/v1/agent/programmes') return 'create_training_programme';
   if (/^\/v1\/agent\/exercises\/[^/]+\/context$/.test(path)) {
     return 'get_exercise_context';
   }
@@ -313,19 +338,29 @@ const rejectRequestBody = (request: Request): void => {
   }
 };
 
-const enforceRateLimit = (agent: AuthenticatedAgent): void => {
+const enforceRateLimit = (
+  windows: Map<string, RateWindow>,
+  agent: AuthenticatedAgent,
+  limit: number,
+): void => {
   const key = `${agent.userId}:${agent.clientId}`;
   const now = Date.now();
-  const existing = rateWindows.get(key);
+  const existing = windows.get(key);
   if (!existing || existing.resetAt <= now) {
-    rateWindows.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    windows.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return;
   }
   existing.count += 1;
-  if (existing.count > RATE_LIMIT_REQUESTS) {
+  if (existing.count > limit) {
     throw new ApiError(429, 'RATE_LIMITED', 'Too many agent requests. Try again shortly.');
   }
 };
+
+const enforceReadRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(rateWindows, agent, RATE_LIMIT_REQUESTS);
+
+const enforceWriteRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(writeRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
 
 const parseBoundedInteger = (
   raw: string | null,
@@ -1158,6 +1193,448 @@ const getRecentWorkouts = async (
   };
 };
 
+const rejectIdentityBody = (value: unknown, depth = 0): void => {
+  if (depth > 8 || typeof value !== 'object' || value === null) return;
+  if (Array.isArray(value)) {
+    for (const entry of value) rejectIdentityBody(entry, depth + 1);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value as JsonObject)) {
+    const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normalized === 'userid' || normalized === 'owneruserid' || normalized === 'ownerid') {
+      throw new ApiError(400, 'INVALID_ARGUMENT', 'User identity is derived from the token.');
+    }
+    rejectIdentityBody(entry, depth + 1);
+  }
+};
+
+const readJsonBody = async (request: Request): Promise<JsonObject> => {
+  const contentType = (request.headers.get('content-type') ?? '').trim().toLowerCase();
+  if (!contentType.startsWith('application/json')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'Content-Type must be application/json.');
+  }
+  const text = await request.text();
+  if (text.length === 0) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'A JSON request body is required.');
+  }
+  if (new TextEncoder().encode(text).byteLength > MAX_REQUEST_BYTES) {
+    throw new ApiError(413, 'REQUEST_TOO_LARGE', 'The request body is too large.');
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request body is not valid JSON.');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request body must be a JSON object.');
+  }
+  const body = parsed as JsonObject;
+  rejectIdentityBody(body);
+  return body;
+};
+
+const loadPlanPermission = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+): Promise<void> => {
+  const { data, error } = await client
+    .from('agent_plan_permissions')
+    .select('plan_access_enabled,granted_at')
+    .eq('owner_user_id', agent.userId)
+    .eq('client_id', agent.clientId)
+    .maybeSingle<{ granted_at: string | null; plan_access_enabled: boolean }>();
+  throwDatabaseError(error);
+  const liveGrant = Date.parse(agent.grantedAt);
+  const storedGrant = typeof data?.granted_at === 'string' ? Date.parse(data.granted_at) : Number.NaN;
+  const allowed = data?.plan_access_enabled === true
+    && Number.isFinite(liveGrant)
+    && Number.isFinite(storedGrant)
+    && liveGrant === storedGrant;
+  if (!allowed) {
+    throw new ApiError(403, 'PLAN_PERMISSION_REQUIRED', 'Plan creation is not enabled for this coach.');
+  }
+};
+
+const sha256Hex = async (value: string): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const readIdempotencyKey = (request: Request): string => {
+  const key = (request.headers.get('idempotency-key') ?? '').trim();
+  if (key.length < 1 || key.length > MAX_IDEMPOTENCY_KEY_LENGTH || !/^[\x21-\x7e]+$/.test(key)) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'A valid Idempotency-Key header is required.');
+  }
+  return key;
+};
+
+const asObject = (value: unknown, label: string): JsonObject => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be an object.`);
+  }
+  return value as JsonObject;
+};
+
+const readRequiredTitle = (value: unknown, label: string): string => {
+  if (typeof value !== 'string') {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} is required.`);
+  }
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  if (trimmed.length < 1 || trimmed.length > MAX_TITLE_LENGTH) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be 1 to ${MAX_TITLE_LENGTH} characters.`);
+  }
+  return trimmed;
+};
+
+const readOptionalText = (value: unknown, maximum: number, label: string): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be text.`);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > maximum) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} is too long.`);
+  }
+  return trimmed;
+};
+
+const readOptionalEpochMs = (value: unknown, label: string): number | null => {
+  if (value === undefined || value === null) return null;
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value < ISO_DATE_MIN_MS ||
+    value > ISO_DATE_MAX_MS
+  ) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be an epoch-millisecond integer.`);
+  }
+  return value;
+};
+
+const readTargetWeight = (value: unknown, label: string): string | null => {
+  if (value === undefined || value === null) return null;
+  const text = typeof value === 'number'
+    ? String(value)
+    : typeof value === 'string' ? value.trim() : null;
+  if (text === null || !/^\d{1,4}(\.\d{1,2})?$/.test(text)) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be a non-negative decimal up to 9999.99.`);
+  }
+  return text;
+};
+
+const readTargetReps = (value: unknown, label: string): number => {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 999) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be an integer between 1 and 999.`);
+  }
+  return value;
+};
+
+const normalizePlanInput = (value: unknown): JsonObject => {
+  const input = asObject(value, 'plan');
+  const title = readRequiredTitle(input.title, 'title');
+  const gymId = readOptionalText(input.gym_id, 200, 'gym_id');
+  const scheduledFor = readOptionalEpochMs(input.scheduled_for, 'scheduled_for');
+  const exercisesRaw = input.exercises;
+  if (!Array.isArray(exercisesRaw) || exercisesRaw.length < 1 || exercisesRaw.length > MAX_PLAN_BLOCKS) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `exercises must contain 1 to ${MAX_PLAN_BLOCKS} blocks.`);
+  }
+  const exercises = exercisesRaw.map((entry, index) => {
+    const block = asObject(entry, `exercises[${index}]`);
+    const name = readRequiredTitle(block.name, `exercises[${index}].name`);
+    const exerciseDefinitionId = readOptionalText(
+      block.exercise_definition_id,
+      200,
+      `exercises[${index}].exercise_definition_id`,
+    );
+    const setsRaw = block.sets;
+    if (!Array.isArray(setsRaw) || setsRaw.length < 1 || setsRaw.length > MAX_PLAN_SETS) {
+      throw new ApiError(400, 'INVALID_ARGUMENT', `exercises[${index}].sets must contain 1 to ${MAX_PLAN_SETS} sets.`);
+    }
+    const sets = setsRaw.map((setEntry, setIndex) => {
+      const set = asObject(setEntry, `exercises[${index}].sets[${setIndex}]`);
+      return {
+        target_reps: readTargetReps(set.target_reps, `exercises[${index}].sets[${setIndex}].target_reps`),
+        target_weight_value: readTargetWeight(
+          set.target_weight_value,
+          `exercises[${index}].sets[${setIndex}].target_weight_value`,
+        ),
+        target_set_type: readOptionalText(
+          set.target_set_type,
+          40,
+          `exercises[${index}].sets[${setIndex}].target_set_type`,
+        ),
+      };
+    });
+    return { exercise_definition_id: exerciseDefinitionId, name, sets };
+  });
+  return { title, gym_id: gymId, scheduled_for: scheduledFor, exercises };
+};
+
+const normalizeProgrammeInput = (value: JsonObject): JsonObject => {
+  const name = readRequiredTitle(value.name, 'name');
+  const description = readOptionalText(value.description, MAX_DESCRIPTION_LENGTH, 'description');
+  const plansRaw = value.plans;
+  if (!Array.isArray(plansRaw) || plansRaw.length < MIN_PROGRAMME_PLANS || plansRaw.length > MAX_PROGRAMME_PLANS) {
+    throw new ApiError(
+      400,
+      'INVALID_ARGUMENT',
+      `plans must contain ${MIN_PROGRAMME_PLANS} to ${MAX_PROGRAMME_PLANS} sessions.`,
+    );
+  }
+  const plans = plansRaw.map((entry) => normalizePlanInput(entry));
+  return { name, description, plans };
+};
+
+const throwPlanWriteError = (error: { message?: string } | null): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('FOREIGN_RESOURCE_REFERENCE')) {
+    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'A referenced exercise or gym is not available.');
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+const parseOptionalBoolean = (raw: string | null, fallback: boolean): boolean => {
+  if (raw === null || raw === '') return fallback;
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  throw new ApiError(400, 'INVALID_ARGUMENT', 'include_unscheduled must be true or false.');
+};
+
+type PlanRow = {
+  gym_id: string | null;
+  id: string;
+  programme_id: string | null;
+  programme_order_index: number | null;
+  provenance: string;
+  scheduled_for: number | null;
+  title: string;
+};
+
+type PlanBlockRow = {
+  exercise_definition_id: string | null;
+  id: string;
+  name: string;
+  order_index: number;
+  progress_status: string;
+  resolved_at: number | null;
+  session_plan_id: string;
+};
+
+type PlanSetRow = {
+  id: string;
+  order_index: number;
+  session_plan_exercise_id: string;
+  target_reps: number;
+  target_set_type: string | null;
+  target_weight_value: string | null;
+};
+
+const createSessionPlan = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  body: JsonObject,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const plan = normalizePlanInput(body);
+  const payloadSha = await sha256Hex(JSON.stringify(plan));
+  const { data, error } = await client.schema('app_public').rpc('agent_create_session_plan', {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    p_payload_sha256: payloadSha,
+    p_plan: plan,
+  });
+  throwPlanWriteError(error);
+  return data as JsonObject;
+};
+
+const createTrainingProgramme = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  body: JsonObject,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const programme = normalizeProgrammeInput(body);
+  const payloadSha = await sha256Hex(JSON.stringify(programme));
+  const { data, error } = await client.schema('app_public').rpc('agent_create_training_programme', {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    p_payload_sha256: payloadSha,
+    p_programme: programme,
+  });
+  throwPlanWriteError(error);
+  return data as JsonObject;
+};
+
+const getUpcomingSessionPlans = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  url: URL,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['limit', 'cursor', 'include_unscheduled']));
+  const limit = parseBoundedInteger(url.searchParams.get('limit'), DEFAULT_PLAN_LIMIT, 1, MAX_PLAN_LIMIT, 'limit');
+  const includeUnscheduled = parseOptionalBoolean(url.searchParams.get('include_unscheduled'), false);
+  const cursor = decodeCursor(url.searchParams.get('cursor'), 'session_plan');
+
+  let query = client
+    .schema('app_public')
+    .from('session_plans')
+    .select('id,title,scheduled_for,gym_id,provenance,programme_id,programme_order_index')
+    .eq('owner_user_id', agent.userId)
+    .is('deleted_at', null)
+    .order('scheduled_for', { ascending: true, nullsFirst: false })
+    .order('id', { ascending: true })
+    .limit(limit + 1);
+
+  if (!includeUnscheduled) {
+    query = query.gte('scheduled_for', Date.now());
+  }
+  if (cursor) {
+    if (typeof cursor.id !== 'string') {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
+    }
+    if (cursor.scheduled_for !== null && typeof cursor.scheduled_for !== 'number') {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
+    }
+    if (cursor.scheduled_for === null) {
+      query = query.is('scheduled_for', null).gt('id', cursor.id);
+    } else {
+      const value = cursor.scheduled_for;
+      const base = `scheduled_for.gt.${value},and(scheduled_for.eq.${value},id.gt.${postgrestQuote(cursor.id)})`;
+      query = query.or(includeUnscheduled ? `${base},scheduled_for.is.null` : base);
+    }
+  }
+
+  const { data, error } = await query.returns<PlanRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
+  const planIds = page.map((row) => row.id);
+
+  const { data: blocks, error: blockError } = planIds.length === 0
+    ? { data: [] as PlanBlockRow[], error: null }
+    : await client
+      .schema('app_public')
+      .from('session_plan_exercises')
+      .select('id,session_plan_id,exercise_definition_id,order_index,name,progress_status,resolved_at')
+      .eq('owner_user_id', agent.userId)
+      .is('deleted_at', null)
+      .in('session_plan_id', planIds)
+      .order('order_index')
+      .order('id')
+      .limit(planIds.length * MAX_PLAN_BLOCKS + 1)
+      .returns<PlanBlockRow[]>();
+  throwDatabaseError(blockError);
+
+  const blockIds = (blocks ?? []).map((row) => row.id);
+  const { data: sets, error: setError } = blockIds.length === 0
+    ? { data: [] as PlanSetRow[], error: null }
+    : await client
+      .schema('app_public')
+      .from('session_plan_sets')
+      .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+      .eq('owner_user_id', agent.userId)
+      .is('deleted_at', null)
+      .in('session_plan_exercise_id', blockIds)
+      .order('order_index')
+      .order('id')
+      .limit(blockIds.length * MAX_PLAN_SETS + 1)
+      .returns<PlanSetRow[]>();
+  throwDatabaseError(setError);
+
+  const gymIds = uniqueStrings(page.map((row) => row.gym_id), 50);
+  const { data: gyms, error: gymError } = gymIds.length === 0
+    ? { data: [] as Array<{ id: string; name: string }>, error: null }
+    : await client
+      .schema('app_public')
+      .from('gyms')
+      .select('id,name')
+      .eq('owner_user_id', agent.userId)
+      .in('id', gymIds)
+      .limit(50)
+      .returns<Array<{ id: string; name: string }>>();
+  throwDatabaseError(gymError);
+  const gymById = new Map((gyms ?? []).map((row) => [row.id, row.name]));
+
+  const blocksByPlan = new Map<string, PlanBlockRow[]>();
+  for (const block of blocks ?? []) {
+    const bucket = blocksByPlan.get(block.session_plan_id) ?? [];
+    bucket.push(block);
+    blocksByPlan.set(block.session_plan_id, bucket);
+  }
+  const setsByBlock = new Map<string, PlanSetRow[]>();
+  for (const set of sets ?? []) {
+    const bucket = setsByBlock.get(set.session_plan_exercise_id) ?? [];
+    bucket.push(set);
+    setsByBlock.set(set.session_plan_exercise_id, bucket);
+  }
+
+  return {
+    plans: page.map((plan) => {
+      const planBlocks = blocksByPlan.get(plan.id) ?? [];
+      const resolved = planBlocks.filter((block) => block.progress_status !== 'pending').length;
+      const progress = planBlocks.length === 0 || resolved === 0
+        ? 'planned'
+        : resolved === planBlocks.length ? 'completed' : 'in_progress';
+      const nextBlock = planBlocks.find((block) => block.progress_status === 'pending') ?? null;
+      const blocksTruncated = planBlocks.length > MAX_PLAN_BLOCKS;
+      return {
+        id: plan.id,
+        title: plan.title,
+        scheduled_for: toIsoTimestamp(plan.scheduled_for),
+        gym: plan.gym_id
+          ? { id: plan.gym_id, name: gymById.get(plan.gym_id) ?? null }
+          : null,
+        provenance: plan.provenance,
+        programme_id: plan.programme_id,
+        programme_order_index: plan.programme_order_index,
+        progress,
+        next_block_id: nextBlock?.id ?? null,
+        exercises: planBlocks.slice(0, MAX_PLAN_BLOCKS).map((block) => {
+          const blockSets = setsByBlock.get(block.id) ?? [];
+          return {
+            id: block.id,
+            exercise_definition_id: block.exercise_definition_id,
+            name: block.name,
+            order_index: block.order_index,
+            progress_status: block.progress_status,
+            resolved_at: toIsoTimestamp(block.resolved_at),
+            sets: blockSets.slice(0, MAX_PLAN_SETS).map((set) => ({
+              id: set.id,
+              order_index: set.order_index,
+              target_weight_value: set.target_weight_value,
+              target_reps: set.target_reps,
+              target_set_type: set.target_set_type,
+            })),
+            truncated: blockSets.length > MAX_PLAN_SETS,
+          };
+        }),
+        truncated: blocksTruncated,
+      };
+    }),
+    next_cursor: hasMore && page.length > 0
+      ? encodeCursor({
+        kind: 'session_plan',
+        scheduled_for: page[page.length - 1].scheduled_for,
+        id: page[page.length - 1].id,
+      })
+      : null,
+  };
+};
+
 const dispatchAgentRequest = async (
   request: Request,
   agent: AuthenticatedAgent,
@@ -1165,10 +1642,18 @@ const dispatchAgentRequest = async (
 ): Promise<JsonObject> => {
   const url = new URL(request.url);
   const path = canonicalAgentPath(url);
+  const method = request.method;
   rejectIdentityInputs(url);
-  rejectRequestBody(request);
+  if (method === 'GET') {
+    rejectRequestBody(request);
+  } else {
+    rejectUnexpectedQuery(url, new Set());
+  }
 
   if (path === '/v1/agent/session') {
+    if (method !== 'GET') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
+    }
     rejectUnexpectedQuery(url, new Set());
     return {
       authorized: true,
@@ -1178,6 +1663,29 @@ const dispatchAgentRequest = async (
       scopes: agent.scopes,
     };
   }
+
+  if (path === '/v1/agent/session-plans') {
+    enforceWriteRateLimit(agent);
+    await loadPlanPermission(client, agent);
+    if (method === 'GET') {
+      return getUpcomingSessionPlans(client, agent, url);
+    }
+    return createSessionPlan(client, agent, request, await readJsonBody(request));
+  }
+
+  if (path === '/v1/agent/programmes') {
+    if (method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.');
+    }
+    enforceWriteRateLimit(agent);
+    await loadPlanPermission(client, agent);
+    return createTrainingProgramme(client, agent, request, await readJsonBody(request));
+  }
+
+  if (method !== 'GET') {
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
+  }
+
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);
   if (path === '/v1/agent/profile') {
     rejectUnexpectedQuery(url, new Set());
@@ -1231,8 +1739,8 @@ const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
-  if (request.method !== 'GET') {
-    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.'));
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST.'));
   }
 
   const startedAt = performance.now();
@@ -1242,7 +1750,7 @@ const handleRequest = async (request: Request): Promise<Response> => {
   const path = canonicalAgentPath(new URL(request.url));
   try {
     agent = await authenticateAgent(request);
-    enforceRateLimit(agent);
+    enforceReadRateLimit(agent);
     serviceClient = createServerClient(getServiceRoleKey());
     const data = await dispatchAgentRequest(request, agent, serviceClient);
     response = successResponse(requestId, data);
@@ -1261,7 +1769,7 @@ const handleRequest = async (request: Request): Promise<Response> => {
     await recordAudit(
       serviceClient,
       agent,
-      routeToolName(path),
+      routeToolName(path, request.method),
       requestId,
       response.status,
       performance.now() - startedAt,

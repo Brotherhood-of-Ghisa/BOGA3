@@ -23,6 +23,11 @@ consent; the MCP service advertises it to every client). It renders every
 requested permission before approval and fails closed when a client requests
 any unknown/additional scope.
 
+The base OAuth grant this app issues stays read-only. Creating plans and
+programmes is a separate, default-off permission the person enables per client
+in the mobile app's Connected Agents screen, bound to the current grant; it is
+never represented as an OAuth scope on this consent surface.
+
 It is a static Vite application. It contains only a Supabase project URL and
 client-safe publishable key. Never provide it a service-role/secret key.
 

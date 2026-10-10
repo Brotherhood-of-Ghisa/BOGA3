@@ -256,9 +256,9 @@ Parallel-run note:
 - tests require the deterministic fixture baseline to exist but do not require empty app tables.
 - run `./boga worktree doctor` when a backend suite appears to hit another worktree's local runtime.
 
-## Read-only agent API and OAuth boundary
+## Agent API and OAuth boundary
 
-The Virtual Coach read path is:
+The Virtual Coach data path is:
 
 ```text
 MCP client -> services/boga-mcp -> functions/v1/agent-api -> app_public
@@ -268,14 +268,29 @@ MCP client -> services/boga-mcp -> functions/v1/agent-api -> app_public
 every request it validates the bearer token live with Supabase Auth, requires
 the validated JWT to contain an OAuth `client_id`, verifies that the matching
 user grant is still active, derives the owner only from the validated subject,
-and then performs an explicit owner-filtered service-role read. Its public
-routes are:
+and then performs an explicit owner-filtered service-role read or write. Its
+public routes are:
 
 - `GET /functions/v1/agent-api/v1/agent/session`
 - `GET /functions/v1/agent-api/v1/agent/profile`
 - `GET /functions/v1/agent-api/v1/agent/exercises`
 - `GET /functions/v1/agent-api/v1/agent/exercises/:id/context`
 - `GET /functions/v1/agent-api/v1/agent/workouts/recent`
+- `GET /functions/v1/agent-api/v1/agent/session-plans`
+- `POST /functions/v1/agent-api/v1/agent/session-plans`
+- `POST /functions/v1/agent-api/v1/agent/programmes`
+
+The base OAuth grant stays read-only. The two `POST` routes and the
+`session-plans` read additionally require a current-grant row in
+`public.agent_plan_permissions` (enabled by the person per client on the
+Connected Agents screen); otherwise they return `403 PLAN_PERMISSION_REQUIRED`.
+Agent writes run through the service-role-only
+`app_public.agent_create_session_plan` / `agent_create_training_programme` RPCs,
+which create the whole graph atomically with `pending` blocks, record
+`Idempotency-Key` receipts in `public.agent_plan_write_receipts`, and never touch
+the performed session/exercise/set graph. The permission and receipt tables are
+non-sync control data: an app session reads/writes only its own permission row,
+and neither an OAuth token nor `anon` can reach either table.
 
 The function is configured with `verify_jwt = false` because it must perform
 live Auth and grant validation itself and return one stable API envelope.

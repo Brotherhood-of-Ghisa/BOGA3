@@ -1,7 +1,7 @@
 ---
 task_id: M23-T06-Agent_plan_permission_and_write_API
 milestone_id: "M23"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|supabase|deno|sql"
@@ -171,8 +171,39 @@ database access; a custom OAuth application scope; hosted recommendation logic.
 
 ## Evidence
 
+- Migration `supabase/migrations/20261010120000_m23_agent_plan_permission.sql`:
+  `public.agent_plan_permissions` (default-denied, current-grant-bound, app-only
+  RLS) and `public.agent_plan_write_receipts` (service-role only, hash + IDs);
+  service-role-only atomic `agent_create_session_plan` /
+  `agent_create_training_programme` / `agent_insert_plan_graph`; dev-wipe parity.
+- `supabase/functions/agent-api/index.ts`: grant-timestamp capture, the
+  permission gate, `GET/POST /v1/agent/session-plans` and
+  `POST /v1/agent/programmes`, strict body/schema validation, `Idempotency-Key`
+  handling, stable error mapping, POST CORS/method support, metadata-only audit.
+- `apps/mobile/src/auth/connected-agents.ts` + `app/connected-agents.tsx`: the
+  per-client **Allow this coach to create plans** toggle with the dual-capability
+  disclosure, default-off, optimistic-with-revert, and revocation preserved.
+- Tests: `supabase/tests/agent-api-contract.sh` (default-deny, app-only RLS,
+  stale grant/disable/re-enable, atomic writes, idempotency replay/conflict,
+  foreign/cross-owner refs, identity inputs, rollback, performed-free,
+  direct-OAuth denial); `__tests__/connected-agents-service.test.ts` and
+  `__tests__/connected-agents-screen.test.tsx`.
+- Android device evidence (no Xcode on this machine; ran in a scratch checkout
+  of the Android Maestro lanes): `android-smoke` PASS, plus a Connected Agents
+  flow PASS capturing disabled, enabled and revoked states, with the enabled
+  permission row verified in the database. Screenshots:
+  `/tmp/opencode/m23t06-android-evidence/ca-0{1,2,3}-*.png`.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: the default-denied per-coach plan permission, the two control
+  tables, three safe agent routes with idempotent atomic writes, and the
+  Connected Agents toggle; owning specs and READMEs updated.
+- What tests ran: `boga test fast`, `boga test backend`, `boga test
+  jest-coverage`, `boga test complexity`, `boga test dependencies`, `boga docs
+  check`; Android `android-smoke` and the Connected Agents flow (no Xcode, so the
+  iOS lanes are unavailable on this machine).
+- What remains: PR review and merge; the enabling/error and revoked/relinked
+  transitions are Jest-covered (the on-device run captured disabled, enabled and
+  revoked). Protocol-level MCP and hosted smoke belong to `M23-T07`; closeout to
+  `M23-T08`.
