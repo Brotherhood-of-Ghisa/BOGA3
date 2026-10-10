@@ -100,7 +100,7 @@ function ShareRecordRow({ record, set }: ShareRecord) {
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
   const shareRecords = shareRecordsOf(snapshot.personalRecords);
   // The image carries comparisons, not shortfalls: an exercise the session
-  // cannot compare yet is left out rather than pooled ([[session.volume-comparison]]).
+  // cannot compare yet is left out rather than pooled.
   const comparisons = snapshot.exerciseVolumeComparisons.filter(hasVolumeReference);
   return (
     <View style={styles.shareCard} testID="session-share-card">

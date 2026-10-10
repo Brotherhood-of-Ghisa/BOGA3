@@ -34,9 +34,9 @@
 #        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings),
 #      - product facts (docs/product/README.md): every fact heading parses,
 #        IDs are unique, every `[[id]]` and fact-table marker names a fact,
-#        and a fact's `Signature:` text appears outside docs/product/ only in
-#        a paragraph that cites it (grandfathered restatements:
-#        scripts/product-fact-restatements.tsv, which only shrinks),
+#        every fact's statement fits the per-fact word cap, and a fact's
+#        `Signature:` text appears outside docs/product/ only in a paragraph
+#        that cites it,
 #      - no file under docs/specs/ui/design-targets/: a design target is a
 #        build input, kept with the task or PR (docs/specs/ui/ai-design-policy.md).
 
@@ -576,20 +576,54 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
 #    A fact's `Signature:` texts (literal, case- and wrap-insensitive) appear
 #    outside docs/product/ only in a paragraph that cites the fact: anything
 #    else restates it. Paragraphs split at blank lines outside fenced code, so
-#    fenced code counts too. scripts/product-fact-restatements.tsv
-#    grandfathers the restatements that predate the check, per doc and fact;
-#    a row only shrinks, and a stale count fails like a stale exemption. A
-#    count, not a list of places: a restatement moved within a grandfathered
-#    doc keeps passing, as a suppression count does in the eslint baseline.
+#    fenced code counts too.
+#    Every fact's statement fits FACT_STATEMENT_WORDS. The statement is what an
+#    agent must read to apply the fact: the lines between the header and the
+#    `Why:` trailer, less the `<!-- fact-table -->` example rows (those are test
+#    fixtures, bounded by the corpus budget, not by this cap). A fact over the
+#    cap is stating a screen rather than a decision — split it, or move the
+#    render detail to the component that owns it.
 PRODUCT_DIR = "docs/product/"
 PRODUCT_NON_FACT = {"README.md", "REVIEW.md"}
+FACT_STATEMENT_WORDS = 130
 FACT_KINDS = {"definition", "calculation", "presentation", "principle"}
 FACT_HEADER = re.compile(r"^### (\S+) · (\S+) · (.+?)\s*$")
 FACT_ID = re.compile(r"^([a-z0-9]+)\.[a-z0-9]+(?:-[a-z0-9]+)*$")
 FACT_REF = re.compile(r"\[\[([^\[\]\s<>]+\.[^\[\]\s<>]+)\]\]")
 FACT_TABLE = re.compile(r"<!-- fact-table: ([^\s<>]+) -->")
 SIGNATURE = re.compile(r"^Signature:(.*)$")
-RESTATEMENTS_REL = "scripts/product-fact-restatements.tsv"
+
+def statement_words(rel):
+    """fact id -> words of statement: header to `Why:`, less fact-table examples."""
+    out, current, examples = {}, None, False
+    for line in open(os.path.join(root, rel), encoding="utf-8"):
+        line = line.rstrip("\n")
+        if line.startswith("### "):
+            m = FACT_HEADER.match(line)
+            current, examples = (m.group(1) if m else None), False
+            continue
+        if current is None:
+            continue
+        if re.match(r"#{1,6} ", line) or line.startswith("Why:"):
+            current = None  # the trailer (Why/Code/Pending/Signature) is not statement
+            continue
+        if FACT_TABLE.search(line):
+            examples = True  # survives the blank line some facts leave before the table
+            continue
+        if not line.strip():
+            continue
+        if line.lstrip().startswith("|"):
+            if examples:
+                continue
+            # Cell text only: the `|` rules and the `| --- |` separator are
+            # syntax, and the format prefers tables over prose.
+            cells = line.strip().strip("|").replace("|", " ")
+            if not re.fullmatch(r"[\s:-]*", cells):
+                out[current] = out.get(current, 0) + len(cells.split())
+            continue
+        examples = False
+        out[current] = out.get(current, 0) + len(line.split())
+    return out
 
 def parse_fact_file(rel, facts, signatures):
     """Fill facts (id -> (rel, line, status)) and signatures (id -> texts)."""
@@ -682,11 +716,19 @@ def restatements(signatures):
                     found.setdefault((rel, fid), []).append((start + para.count("\n", 0, pos), text))
     return found
 
-facts, signatures = {}, {}
+facts, signatures, fact_words = {}, {}, {}
 for rel in PERSISTENT_DOCS:
     if (rel.startswith(PRODUCT_DIR) and "/" not in rel[len(PRODUCT_DIR):]
             and os.path.basename(rel) not in PRODUCT_NON_FACT):
         parse_fact_file(rel, facts, signatures)
+        fact_words.update(statement_words(rel))
+for fid, (rel, ln, status) in sorted(facts.items()):
+    words = fact_words.get(fid, 0)
+    if words > FACT_STATEMENT_WORDS:
+        problems.append(f"{rel}:{ln}: fact '{fid}' states {words} words, over the "
+                        f"{FACT_STATEMENT_WORDS}-word cap — state the decision, not the screen: split "
+                        "it, or move render detail to the component that owns it "
+                        "(rules: docs/product/README.md)")
 for fid, (rel, ln, status) in sorted(facts.items()):
     target = status.split(": ", 1)[1] if status.startswith("superseded-by: ") else None
     if target is not None and target not in facts:
@@ -697,30 +739,10 @@ for rel in PERSISTENT_DOCS:
             if fid not in facts:
                 problems.append(f"{rel}:{ln}: '{fid}' names no fact in {PRODUCT_DIR} — fix the ID")
 
-grandfathered = {}
-RESTATEMENTS = os.path.join(root, RESTATEMENTS_REL)
-with open(RESTATEMENTS) if os.path.exists(RESTATEMENTS) else open(os.devnull) as f:
-    for line in f:
-        parts = line.rstrip("\n").split("\t")
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if (len(parts) == 3 and parts[2].isdigit() and int(parts[2]) > 0 and parts[1] in signatures
-                and (parts[0], parts[1]) not in grandfathered):
-            grandfathered[(parts[0], parts[1])] = int(parts[2])
-        else:
-            problems.append(f"{RESTATEMENTS_REL}: malformed row (doc, fact with a Signature, "
-                            f"paragraphs above 0; one row per doc and fact): {line.rstrip()!r}")
-found = restatements(signatures)
-for key in sorted(set(found) | set(grandfathered)):
-    rel, fid = key
-    hits, allowed = found.get(key, []), grandfathered.get(key, 0)
-    if len(hits) > allowed:
-        for ln, text in hits:
-            problems.append(f"{rel}:{ln}: restates [[{fid}]] ('{text}') — cite [[{fid}]] in this "
-                            "paragraph, or state only what the doc owns")
-    elif len(hits) < allowed:
-        problems.append(f"{RESTATEMENTS_REL}: '{rel}' restates [[{fid}]] in {len(hits)} paragraph(s), "
-                        f"not {allowed} — lower the row (drop it at 0); it only shrinks")
+for (rel, fid), hits in sorted(restatements(signatures).items()):
+    for ln, text in hits:
+        problems.append(f"{rel}:{ln}: restates [[{fid}]] ('{text}') — cite [[{fid}]] in this "
+                        "paragraph, or state only what the doc owns")
 
 # 10. design targets are build inputs, never specs (ui/ai-design-policy.md):
 #     nothing tracked or new lives under docs/specs/ui/design-targets/.
@@ -740,6 +762,13 @@ if mode == "budgets":
           f"{sum(r[0] - r[1] for r in budgeted if r[0] > r[1])} words in total")
     for words, limit, prefix, count in corpus_rows:
         print(f"corpus {prefix}: {words} of {limit} words in {count} docs ({'ok' if words <= limit else 'OVER'})")
+    if fact_words:
+        ranked = sorted(fact_words.items(), key=lambda kv: -kv[1])
+        over = [f"{fid} ({n})" for fid, n in ranked if n > FACT_STATEMENT_WORDS]
+        print(f"\n{len(fact_words)} product facts, {sum(fact_words.values())} statement words; "
+              f"largest {ranked[0][1]}, median {sorted(fact_words.values())[len(fact_words) // 2]}, "
+              f"cap {FACT_STATEMENT_WORDS}")
+        print(f"over the cap: {', '.join(over) if over else 'none'}")
     sys.exit(0)
 
 if problems:

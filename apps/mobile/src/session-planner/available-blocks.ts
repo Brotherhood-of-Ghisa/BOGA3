@@ -1,4 +1,4 @@
-import { planQueries, type PlanBlockView } from './plan-queries';
+import { planQueries, type PlanBlockView, type PlanDetailView, type ProgrammeDetailView } from './plan-queries';
 
 /**
  * The picker's "From planner" read model: the authored one-off blocks the
@@ -21,6 +21,19 @@ export type AvailablePlanBlockView = {
   block: PlanBlockView;
 };
 
+/** Pending, references an owned definition, and carries at least one target. */
+const isOfferable = (block: PlanBlockView): boolean =>
+  block.status === 'pending' && block.exerciseDefinitionId !== null && block.targets.length > 0;
+
+/** The offerable blocks of one plan, titled as `title` names it. */
+const rowsOfPlan = (plan: PlanDetailView, title: string): AvailablePlanBlockView[] =>
+  plan.blocks.filter(isOfferable).map((block) => ({
+    planId: plan.id,
+    planTitle: title,
+    planBlockCount: plan.blocks.length,
+    block,
+  }));
+
 export const listAvailablePlanBlocks = async (): Promise<AvailablePlanBlockView[]> => {
   const [upcoming, unscheduled, programmes] = await Promise.all([
     planQueries.listUpcomingPlans(),
@@ -31,40 +44,19 @@ export const listAvailablePlanBlocks = async (): Promise<AvailablePlanBlockView[
     Promise.all([...upcoming, ...unscheduled].map((summary) => planQueries.loadPlanDetail(summary.id))),
     Promise.all(programmes.map((p) => planQueries.loadProgrammeDetail(p.id))),
   ]);
-  const rows: AvailablePlanBlockView[] = [];
-  for (const detail of planDetails) {
-    if (!detail) {
-      continue;
-    }
-    for (const block of detail.blocks) {
-      if (block.status === 'pending' && block.exerciseDefinitionId !== null && block.targets.length > 0) {
-        rows.push({
-          planId: detail.id,
-          planTitle: detail.title,
-          planBlockCount: detail.blocks.length,
-          block,
-        });
-      }
-    }
-  }
-  for (const prog of programmeDetails) {
-    if (!prog) {
-      continue;
-    }
-    for (const plan of prog.plans) {
-      for (const block of plan.blocks) {
-        if (block.status === 'pending' && block.exerciseDefinitionId !== null && block.targets.length > 0) {
-          if (rows.some((existing) => existing.block.id === block.id)) {
-            continue;
-          }
-          rows.push({
-            planId: plan.id,
-            planTitle: `${prog.name} · ${plan.title}`,
-            planBlockCount: plan.blocks.length,
-            block,
-          });
-        }
-      }
+  const rows = planDetails
+    .filter((detail): detail is PlanDetailView => detail !== null)
+    .flatMap((detail) => rowsOfPlan(detail, detail.title));
+  // A standalone plan and a programme child can reach one block; the first
+  // row for it stands, so a programme never re-lists what is already offered.
+  const seen = new Set(rows.map((row) => row.block.id));
+  const fromProgrammes = programmeDetails
+    .filter((prog): prog is ProgrammeDetailView => prog !== null)
+    .flatMap((prog) => prog.plans.flatMap((plan) => rowsOfPlan(plan, `${prog.name} · ${plan.title}`)));
+  for (const row of fromProgrammes) {
+    if (!seen.has(row.block.id)) {
+      seen.add(row.block.id);
+      rows.push(row);
     }
   }
   return rows;

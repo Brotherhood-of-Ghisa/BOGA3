@@ -19,7 +19,7 @@ const DATE_WIDTH = 96;
 
 interface Props {
   data: HeatmapData;
-  /** Opens a week's sessions ([[session.history-open]]). */
+  /** Opens a week's sessions. */
   onOpenWeek?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
   formatValue: (value: number) => string;
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
   value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, textAlign: 'right' },
-  // Keep the existing metric/bar axis when adding [[comparison.history-prs]].
+  // Keep the existing metric/bar axis when adding record counts.
   prs: { position: 'absolute', top: '50%', marginTop: uiSpace.sm + uiTypography.lineHeight.base / 2, right: 0,
     fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.xxs,
     lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.record, textAlign: 'right' },

@@ -1,4 +1,4 @@
-// The Timeline's week list ([[comparison.timeline-history]]): one
+// The Timeline's week list: one
 // `ExerciseSetsCard` per block from `week-sets.ts`. A card opens its session.
 import { StyleSheet, Text, View } from 'react-native';
 

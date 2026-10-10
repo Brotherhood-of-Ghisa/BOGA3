@@ -21,7 +21,7 @@ it('dashes an unavailable Volume with no note and no comparison line', () => {
 
 // Its host pools a comparison with too little history by name, so the card
 // is never asked to draw one; asked anyway, it states the figures and no
-// comparison rather than an empty plot ([[session.volume-comparison]]).
+// comparison rather than an empty plot.
 it.each([0, 1, 2, 3, 4, 5])('draws no distribution and no history label with %i prior observations', count => {
   render(<ExerciseVolumeCard comparison={{ ...comparison, historicalSessionCount: count,
     medianVolume: count ? 400 : null, percentile25Volume: count ? 300 : null, percentile75Volume: count ? 600 : null }} testID="card" />);

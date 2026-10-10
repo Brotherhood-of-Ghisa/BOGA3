@@ -1,5 +1,5 @@
 // Where Sessions opens for a history grid's week or day (pure):
-// [[session.history-open]], over the weeks of [[session.history-weeks]].
+// over the listed calendar weeks.
 
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -42,7 +42,7 @@ export const parseHistoryJump = (params: { week?: RouteParam; day?: RouteParam }
   return week !== undefined ? { weekKey } : { weekKey, dayKey: localDateKey(date) };
 };
 
-/** Where the jump lands in the listed weeks ([[session.history-open]]); null when it has none. */
+/** Where the jump lands in the listed weeks; null when it has none. */
 export const historyJumpLocation = (
   sections: readonly HistoryWeekSection[],
   jump: HistoryJump,

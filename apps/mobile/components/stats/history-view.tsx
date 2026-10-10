@@ -65,7 +65,7 @@ const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
   }
 };
 
-// The Timeline readout's unit word for a figure ([[comparison.timeline-history]]).
+// The Timeline readout's unit word for a figure.
 const UNIT_LABELS: Record<CalendarHeatmapMetric, (value: number) => string> = {
   totalVolume: () => 'volume',
   workingSetCount: value => value === 1 ? 'set' : 'sets',
@@ -226,7 +226,7 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   // The loaded window, named in the empty state.
   lookbackWeeks: number;
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
-  // A day or week with training opens its sessions ([[session.history-open]]).
+  // A day or week with training opens its sessions.
   onOpenDay?: (day: DayCell) => void;
   onOpenWeek?: (weekStartDateKey: string) => void;
   onRetry?: () => void;

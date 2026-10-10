@@ -400,7 +400,7 @@ export type DailyEffortMetrics = {
   workingSetCountsByMuscle?: Record<string, number>;
   /** The completed sessions whose sets make up the day, each once: a day tile opens them. */
   sessionIds?: string[];
-  /** Existing all-time session-fact counts for [[comparison.history-prs]]. */
+  /** Existing all-time session-fact counts for the history views' record marks. */
   personalRecordCounts?: Record<Exclude<CalendarHeatmapMetric, 'workingSetCount'>, number>;
   totalVolume: number | null;
   workingSetCount: number;

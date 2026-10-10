@@ -37,6 +37,54 @@ export type ProgrammeFormScreenProps = {
 };
 
 /**
+ * One child plan's block and set edits, as patches to that plan. Pure: every
+ * edit is a `blocks` patch the form's reducer applies, so the sheet holds no
+ * block state of its own.
+ */
+const childPlanBlockEdits = (
+  plan: ProgrammeChildPlanForm,
+  planIndex: number,
+  onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void
+) => {
+  const patchBlocks = (blocks: PlanFormBlock[]) => onUpdatePlan(planIndex, { blocks });
+  const mapBlock = (blockId: string, map: (block: PlanFormBlock) => PlanFormBlock) =>
+    patchBlocks(plan.blocks.map((block) => (block.id === blockId ? map(block) : block)));
+  const updateBlock = (blockId: string, patch: Partial<PlanFormBlock>) =>
+    mapBlock(blockId, (block) => ({ ...block, ...patch }));
+  return {
+    updateBlock,
+    updateSet: (blockId: string, setId: string, patch: Partial<PlanFormSet>) =>
+      mapBlock(blockId, (block) => ({
+        ...block,
+        sets: block.sets.map((set) => (set.id === setId ? { ...set, ...patch } : set)),
+      })),
+    addSet: (blockId: string) =>
+      mapBlock(blockId, (block) => ({ ...block, sets: [...block.sets, emptyPlanFormSet()] })),
+    // The last set stays: a block always keeps at least one target.
+    removeSet: (blockId: string, setId: string) =>
+      mapBlock(blockId, (block) =>
+        block.sets.length > 1 ? { ...block, sets: block.sets.filter((set) => set.id !== setId) } : block
+      ),
+    addBlock: () => patchBlocks([...plan.blocks, emptyPlanFormBlock()]),
+    // As with sets, the last block stays.
+    removeBlock: (blockId: string) => {
+      if (plan.blocks.length > 1) {
+        patchBlocks(plan.blocks.filter((b) => b.id !== blockId));
+      }
+    },
+    moveBlock: (blockId: string, step: -1 | 1) => {
+      const fromIndex = plan.blocks.findIndex((b) => b.id === blockId);
+      const toIndex = fromIndex + step;
+      if (fromIndex < 0 || toIndex < 0 || toIndex >= plan.blocks.length) return;
+      const reordered = [...plan.blocks];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+      patchBlocks(reordered);
+    },
+  };
+};
+
+/**
  * Child session editor sheet: isolates the full block/target set editor
  * to one child session at a time, avoiding an unbounded mega-form on mobile.
  */
@@ -80,65 +128,8 @@ function ProgrammeSessionEditSheet({
   const selectedGymName =
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
 
-  const updateBlock = (blockId: string, patch: Partial<PlanFormBlock>) => {
-    onUpdatePlan(planIndex, {
-      blocks: plan.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
-    });
-  };
-
-  const updateSet = (blockId: string, setId: string, patch: Partial<PlanFormSet>) => {
-    onUpdatePlan(planIndex, {
-      blocks: plan.blocks.map((block) =>
-        block.id === blockId
-          ? {
-              ...block,
-              sets: block.sets.map((set) => (set.id === setId ? { ...set, ...patch } : set)),
-            }
-          : block
-      ),
-    });
-  };
-
-  const addSet = (blockId: string) => {
-    onUpdatePlan(planIndex, {
-      blocks: plan.blocks.map((block) =>
-        block.id === blockId ? { ...block, sets: [...block.sets, emptyPlanFormSet()] } : block
-      ),
-    });
-  };
-
-  const removeSet = (blockId: string, setId: string) => {
-    onUpdatePlan(planIndex, {
-      blocks: plan.blocks.map((block) =>
-        block.id === blockId && block.sets.length > 1
-          ? { ...block, sets: block.sets.filter((set) => set.id !== setId) }
-          : block
-      ),
-    });
-  };
-
-  const addBlock = () => {
-    onUpdatePlan(planIndex, {
-      blocks: [...plan.blocks, emptyPlanFormBlock()],
-    });
-  };
-
-  const removeBlock = (blockId: string) => {
-    if (plan.blocks.length <= 1) return;
-    onUpdatePlan(planIndex, {
-      blocks: plan.blocks.filter((b) => b.id !== blockId),
-    });
-  };
-
-  const moveBlock = (blockId: string, step: -1 | 1) => {
-    const fromIndex = plan.blocks.findIndex((b) => b.id === blockId);
-    const toIndex = fromIndex + step;
-    if (fromIndex < 0 || toIndex < 0 || toIndex >= plan.blocks.length) return;
-    const reordered = [...plan.blocks];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
-    onUpdatePlan(planIndex, { blocks: reordered });
-  };
+  const { updateBlock, updateSet, addSet, removeSet, addBlock, removeBlock, moveBlock } =
+    childPlanBlockEdits(plan, planIndex, onUpdatePlan);
 
   const onPickExercise = (blockId: string, pick: PlanExercisePick) => {
     updateBlock(blockId, {
@@ -269,6 +260,156 @@ function ProgrammeSessionEditSheet({
  * Renders programme metadata, an ordered list of child sessions with
  * playlist-style reordering handles, and atomic transactional save.
  */
+/** A fresh form-local id; ids only need to be unique within the open form. */
+const formUid = (kind: string) =>
+  `${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/** `source` again as a new, unsaved child plan: fresh ids, no provenance. */
+const duplicateChildPlan = (source: ProgrammeChildPlanForm): ProgrammeChildPlanForm => ({
+  ...source,
+  id: formUid('plan'),
+  sourcePlanId: null,
+  title: `${source.title} (Copy)`,
+  blocks: source.blocks.map((block) => ({
+    ...block,
+    id: formUid('block'),
+    sourceBlockId: null,
+    sets: block.sets.map((set) => ({ ...set, id: formUid('set') })),
+  })),
+});
+
+/**
+ * The programme form's child-session edits. `duplicateSession` and
+ * `moveSession` read the rendered `form`, as they did inline: both are driven
+ * by a row the user can see, so the list they reorder is the one on screen.
+ */
+const programmeSessionEdits = (
+  form: ProgrammeFormState,
+  setForm: React.Dispatch<React.SetStateAction<ProgrammeFormState>>
+) => {
+  const patchPlans = (plans: ProgrammeChildPlanForm[]) => setForm((current) => ({ ...current, plans }));
+  return {
+    updateChildPlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) =>
+      setForm((current) => ({
+        ...current,
+        plans: current.plans.map((p, idx) => (idx === index ? { ...p, ...patch } : p)),
+      })),
+    addSession: () =>
+      setForm((current) => ({
+        ...current,
+        plans: [...current.plans, emptyProgrammeChildPlan(current.plans.length)],
+      })),
+    duplicateSession: (index: number) => {
+      const source = form.plans[index];
+      if (!source) return;
+      const updated = [...form.plans];
+      updated.splice(index + 1, 0, duplicateChildPlan(source));
+      patchPlans(updated);
+    },
+    removeSession: (index: number) =>
+      setForm((current) => ({ ...current, plans: current.plans.filter((_, idx) => idx !== index) })),
+    moveSession: (index: number, step: -1 | 1) => {
+      const targetIndex = index + step;
+      if (targetIndex < 0 || targetIndex >= form.plans.length) return;
+      const reordered = [...form.plans];
+      const [moved] = reordered.splice(index, 1);
+      reordered.splice(targetIndex, 0, moved);
+      patchPlans(reordered);
+    },
+  };
+};
+
+/** One child session's row in the programme form: its summary and its actions. */
+function ProgrammeChildPlanCard({
+  plan,
+  index,
+  total,
+  hasError,
+  onEdit,
+  onMove,
+  onDuplicate,
+  onRemove,
+}: {
+  plan: ProgrammeChildPlanForm;
+  index: number;
+  total: number;
+  hasError: boolean;
+  onEdit: () => void;
+  onMove: (step: -1 | 1) => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}) {
+  const blockCount = plan.blocks.length;
+  const scheduleSummary = plan.scheduleText.trim().length > 0 ? plan.scheduleText : 'Unscheduled';
+  const name = plan.title || `Session ${index + 1}`;
+  const testID = `programme-form-plan-${index + 1}`;
+
+  return (
+    <Card style={[styles.planCard, hasError && styles.planCardError]} testID={testID}>
+      <View style={styles.planCardTopRow}>
+        <View style={styles.planCardInfo}>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardTitle}>
+            {name}
+          </Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardSummary}>
+            {scheduleSummary} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
+          </Text>
+        </View>
+
+        <View style={styles.reorderControls}>
+          <IconButton
+            accessibilityLabel={`Move session ${plan.title || index + 1} earlier`}
+            disabled={index === 0}
+            name="arrow-up"
+            onPress={() => onMove(-1)}
+            size="sm"
+            testID={`${testID}-up`}
+          />
+          <IconButton
+            accessibilityLabel={`Move session ${plan.title || index + 1} later`}
+            disabled={index === total - 1}
+            name="arrow-down"
+            onPress={() => onMove(1)}
+            size="sm"
+            testID={`${testID}-down`}
+          />
+        </View>
+      </View>
+
+      <View style={styles.planCardActions}>
+        <ActionButton
+          accessibilityLabel={`Edit exercises in ${name}`}
+          label="Edit session"
+          onPress={onEdit}
+          testID={`${testID}-edit`}
+          variant="outline"
+        />
+        <ActionButton
+          accessibilityLabel={`Duplicate session ${plan.title || index + 1}`}
+          label="Duplicate"
+          onPress={onDuplicate}
+          testID={`${testID}-duplicate`}
+          variant="text"
+        />
+        <ActionButton
+          accessibilityLabel={`Remove session ${plan.title || index + 1}`}
+          label="Remove"
+          onPress={onRemove}
+          testID={`${testID}-remove`}
+          tone="danger"
+          variant="text"
+        />
+      </View>
+
+      {hasError ? (
+        <Text allowFontScaling={false} style={styles.planCardErrorText}>
+          Please review errors inside this session.
+        </Text>
+      ) : null}
+    </Card>
+  );
+}
+
 export function ProgrammeFormScreen({
   initialForm,
   onSave,
@@ -281,58 +422,8 @@ export function ProgrammeFormScreen({
 
   const errors = programmeFormErrors(form);
 
-  const updateChildPlan = (index: number, patch: Partial<ProgrammeChildPlanForm>) => {
-    setForm((current) => ({
-      ...current,
-      plans: current.plans.map((p, idx) => (idx === index ? { ...p, ...patch } : p)),
-    }));
-  };
-
-  const addSession = () => {
-    setForm((current) => ({
-      ...current,
-      plans: [...current.plans, emptyProgrammeChildPlan(current.plans.length)],
-    }));
-  };
-
-  const duplicateSession = (index: number) => {
-    const source = form.plans[index];
-    if (!source) return;
-    const duplicated: ProgrammeChildPlanForm = {
-      ...source,
-      id: `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      sourcePlanId: null,
-      title: `${source.title} (Copy)`,
-      blocks: source.blocks.map((block) => ({
-        ...block,
-        id: `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-        sourceBlockId: null,
-        sets: block.sets.map((set) => ({
-          ...set,
-          id: `set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-        })),
-      })),
-    };
-    const updated = [...form.plans];
-    updated.splice(index + 1, 0, duplicated);
-    setForm((current) => ({ ...current, plans: updated }));
-  };
-
-  const removeSession = (index: number) => {
-    setForm((current) => ({
-      ...current,
-      plans: current.plans.filter((_, idx) => idx !== index),
-    }));
-  };
-
-  const moveSession = (index: number, step: -1 | 1) => {
-    const targetIndex = index + step;
-    if (targetIndex < 0 || targetIndex >= form.plans.length) return;
-    const reordered = [...form.plans];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(targetIndex, 0, moved);
-    setForm((current) => ({ ...current, plans: reordered }));
-  };
+  const { updateChildPlan, addSession, duplicateSession, removeSession, moveSession } =
+    programmeSessionEdits(form, setForm);
 
   const handleSave = async () => {
     if (busy) return;
@@ -419,79 +510,19 @@ export function ProgrammeFormScreen({
       ) : null}
 
       <View style={styles.plansList}>
-        {form.plans.map((plan, index) => {
-          const blockCount = plan.blocks.length;
-          const scheduleSummary = plan.scheduleText.trim().length > 0 ? plan.scheduleText : 'Unscheduled';
-          const hasError = hasChildPlanError(index);
-
-          return (
-            <Card
-              key={plan.id}
-              style={[styles.planCard, hasError && styles.planCardError]}
-              testID={`programme-form-plan-${index + 1}`}>
-              <View style={styles.planCardTopRow}>
-                <View style={styles.planCardInfo}>
-                  <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardTitle}>
-                    {plan.title || `Session ${index + 1}`}
-                  </Text>
-                  <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardSummary}>
-                    {scheduleSummary} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
-                  </Text>
-                </View>
-
-                <View style={styles.reorderControls}>
-                  <IconButton
-                    accessibilityLabel={`Move session ${plan.title || index + 1} earlier`}
-                    disabled={index === 0}
-                    name="arrow-up"
-                    onPress={() => moveSession(index, -1)}
-                    size="sm"
-                    testID={`programme-form-plan-${index + 1}-up`}
-                  />
-                  <IconButton
-                    accessibilityLabel={`Move session ${plan.title || index + 1} later`}
-                    disabled={index === form.plans.length - 1}
-                    name="arrow-down"
-                    onPress={() => moveSession(index, 1)}
-                    size="sm"
-                    testID={`programme-form-plan-${index + 1}-down`}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.planCardActions}>
-                <ActionButton
-                  accessibilityLabel={`Edit exercises in ${plan.title || `Session ${index + 1}`}`}
-                  label="Edit session"
-                  onPress={() => setEditingPlanIndex(index)}
-                  testID={`programme-form-plan-${index + 1}-edit`}
-                  variant="outline"
-                />
-                <ActionButton
-                  accessibilityLabel={`Duplicate session ${plan.title || index + 1}`}
-                  label="Duplicate"
-                  onPress={() => duplicateSession(index)}
-                  testID={`programme-form-plan-${index + 1}-duplicate`}
-                  variant="text"
-                />
-                <ActionButton
-                  accessibilityLabel={`Remove session ${plan.title || index + 1}`}
-                  label="Remove"
-                  onPress={() => removeSession(index)}
-                  testID={`programme-form-plan-${index + 1}-remove`}
-                  tone="danger"
-                  variant="text"
-                />
-              </View>
-
-              {hasError ? (
-                <Text allowFontScaling={false} style={styles.planCardErrorText}>
-                  Please review errors inside this session.
-                </Text>
-              ) : null}
-            </Card>
-          );
-        })}
+        {form.plans.map((plan, index) => (
+          <ProgrammeChildPlanCard
+            hasError={hasChildPlanError(index)}
+            index={index}
+            key={plan.id}
+            onDuplicate={() => duplicateSession(index)}
+            onEdit={() => setEditingPlanIndex(index)}
+            onMove={(step) => moveSession(index, step)}
+            onRemove={() => removeSession(index)}
+            plan={plan}
+            total={form.plans.length}
+          />
+        ))}
       </View>
 
       <View style={styles.saveSection}>

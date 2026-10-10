@@ -16,9 +16,8 @@ type ComparisonUnavailableCardProps = {
 };
 
 /**
- * Implements the low-history half of [[session.volume-comparison]]: the
- * exercises (or muscles) a session cannot compare yet, pooled by name in one
- * secondary card instead of a comparison card each. Names only — the volume
+ * The exercises (or muscles) a session cannot compare yet, pooled by name in
+ * one secondary card instead of a comparison card each. Names only — the volume
  * card is the only place a distribution is drawn, so nothing here suggests a
  * plot is missing. One accessible node: a shortfall is read as one statement.
  */

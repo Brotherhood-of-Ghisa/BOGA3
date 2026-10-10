@@ -1,5 +1,6 @@
-// The completed history in calendar weeks (pure): [[session.history-weeks]],
-// over [[comparison.window]]'s week, Monday 00:00 local.
+// The completed history in calendar weeks (pure), over [[comparison.window]]'s
+// week, Monday 00:00 local. A session sits in the week it completed; a run of
+// empty weeks collapses to one line.
 
 import { formatWeekRange, weekDayLabel } from '@/components/today/progress-format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
