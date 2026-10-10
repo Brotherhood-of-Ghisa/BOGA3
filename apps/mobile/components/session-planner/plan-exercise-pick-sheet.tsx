@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseListContent, useFamilyExpansion } from '@/components/exercise-catalog/exercise-list-controls';
@@ -6,7 +6,7 @@ import { SearchField, Sheet, uiSpace } from '@/components/ui';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildExerciseListModel } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import type { ExerciseCatalogStats } from '@/src/data/exercise-catalog-stats';
+import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
 export type PlanExercisePick = {
   id: string;
@@ -21,14 +21,6 @@ export type PlanExercisePickSheetProps = {
   onDismiss: () => void;
 };
 
-// The pick sheet shows the catalogue without lifetime figures: no stats read.
-const NO_STATS: ExerciseCatalogStats = {
-  aggregatesById: new Map(),
-  recencyScoresById: new Map(),
-  everDoneIds: new Set(),
-  lastCompletedAtById: new Map(),
-};
-
 /**
  * The plan form's exercise picker for one block: the catalogue list the
  * session picker shares, in a sheet. A pick names the block and carries the
@@ -39,7 +31,15 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss }: PlanExerci
   const catalog = useExerciseCatalog();
   const [search, setSearch] = useState('');
   const [preferences] = useExerciseListPreferences();
+  const history = useExerciseCatalogStats('all');
+  const { reload: reloadHistory } = history;
   const familyExpansion = useFamilyExpansion(search.trim().length > 0);
+
+  useEffect(() => {
+    if (request) {
+      reloadHistory();
+    }
+  }, [request, reloadHistory]);
 
   const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
   const loadError =
@@ -53,12 +53,12 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss }: PlanExerci
       buildExerciseListModel({
         exercises: options,
         muscleGroups: catalog.muscleGroups,
-        stats: NO_STATS,
+        stats: history.stats,
         preferences,
         query: search,
         includeDeleted: false,
       }),
-    [options, catalog.muscleGroups, preferences, search],
+    [options, catalog.muscleGroups, history.stats, preferences, search],
   );
 
   if (!request) {
@@ -87,7 +87,8 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss }: PlanExerci
         <ExerciseListContent
           emptyText={isLoading ? 'Loading exercises...' : loadError ?? 'No exercises match that filter.'}
           familyExpansion={familyExpansion}
-          historyStatus="ready"
+          historyStatus={history.status}
+          onRetryHistory={reloadHistory}
           items={isLoading || loadError ? [] : listModel.items}
           onPressExercise={(exercise) => {
             onDismiss();

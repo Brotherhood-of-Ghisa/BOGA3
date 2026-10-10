@@ -57,7 +57,7 @@ import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/pl
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
-import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 
 let alertSpy: jest.SpyInstance;
@@ -872,4 +872,43 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
       "Couldn't save the plan. Try again."
     );
   });
+
+  it('plan exercise pick sheet shows historical session data instead of Never done', async () => {
+    await loadMaestroFixture('exercise-browser');
+    await bootLocalApp();
+
+    render(
+      <PlanFormScreen
+        initialForm={{
+          title: 'Plan With History',
+          scheduleText: '',
+          gymId: null,
+          blocks: [
+            {
+              id: 'b1',
+              sourceBlockId: null,
+              exerciseDefinitionId: null,
+              name: '',
+              loadInputMode: null,
+              sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+            },
+          ],
+        }}
+        onSave={jest.fn()}
+        saveLabel="Save"
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('plan-form-block-1-pick'));
+    await screen.findByTestId('plan-exercise-pick-sheet');
+
+    // Filter by search to expand matching families and show Barbell Squat
+    fireEvent.changeText(screen.getByTestId('plan-exercise-pick-search'), 'Barbell Squat');
+
+    // In the exercise-browser fixture, Barbell Squat has past sessions.
+    // It should render its last completed date / session count rather than "Never done".
+    expect(await screen.findByText(/Last:.*·.*session/)).toBeTruthy();
+  });
 });
+
+
