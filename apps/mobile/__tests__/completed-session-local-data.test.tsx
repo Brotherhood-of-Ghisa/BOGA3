@@ -337,11 +337,11 @@ describe('completion presentation over real data', () => {
 
     expect(await screen.findByTestId(SQUAT_PR)).toBeTruthy();
     expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
-    expect(screen.getByText('Session complete')).toBeTruthy();
+    expect(screen.getByText('Session summary')).toBeTruthy();
     expect(screen.getByText('Personal records')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
     expect(screen.getByTestId('session-completion-sets')).toBeTruthy();
-    expect(screen.getByTestId('session-completion-muscle-quads')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-breakdown-muscle-quads')).toBeTruthy();
     expect(screen.getByTestId(`session-completion-exercise-${ONE_PR_SQUAT}`)).toBeTruthy();
   });
 
@@ -351,8 +351,9 @@ describe('completion presentation over real data', () => {
     expect(await screen.findByTestId(SQUAT_PR)).toBeTruthy();
     expect(screen.getByTestId('session-completion-pr-seed_barbell_bench_press')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
-    // One fixed heading above the grouping; no subtitle.
-    expect(screen.getByText('Volume')).toBeTruthy();
+    // One fixed heading above the grouping; no subtitle. Scoped: the summary
+    // card's `Volume` fact carries the same word.
+    expect(within(screen.getByTestId('session-insight-presentation')).getByText('Volume')).toBeTruthy();
     expect(screen.queryByText('Session vs history')).toBeNull();
     // Squat has at least six prior observations; the bench history is shorter.
     expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat')).toHaveTextContent(
@@ -362,7 +363,8 @@ describe('completion presentation over real data', () => {
     expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_two_prs_bench-distribution')).toBeNull();
     expect(screen.queryByText(/prior sessions/)).toBeNull();
     // Neither set has an effort; untagged sets are working sets.
-    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set: 1 primary, 0 secondary');
+    expect(label('session-completion-breakdown-muscle-quads'))
+      .toBe('Quads, 1 primary, 0 secondary; volume 750; 2 records');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
@@ -371,9 +373,9 @@ describe('completion presentation over real data', () => {
     await openSession({ sessionId: NO_PR, presentation: 'completion', maestroCatalog: 'fail-once' });
 
     expect(await screen.findByText('Muscle breakdown unavailable.')).toBeTruthy();
-    expect(screen.getByText('Session complete')).toBeTruthy();
+    expect(screen.getByText('Session summary')).toBeTruthy();
     expect(screen.queryByText('Personal records')).toBeNull();
-    expect(screen.getByTestId('session-completion-muscle-empty-state')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-breakdown-muscle-empty')).toBeTruthy();
     expect(screen.queryByText('Retry session muscle load')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
 
@@ -385,7 +387,7 @@ describe('completion presentation over real data', () => {
     await openSession({ sessionId: UNMAPPED, presentation: 'completion' });
 
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
-    expect(screen.getByText('Session complete')).toBeTruthy();
+    expect(screen.getByText('Session summary')).toBeTruthy();
     expect(screen.queryByText('Personal records')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
@@ -628,24 +630,38 @@ describe('a session written through the app', () => {
   it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
     await openDesignSession({ presentation: 'completion' });
 
-    // Its own top bar, `Session complete` · Done, and no back gesture.
+    // Its own top bar, `Session summary` · Done, and no back gesture.
     expect(mockStackScreen).toHaveBeenLastCalledWith({
-      options: { title: 'Session complete', headerShown: false, gestureEnabled: false },
+      options: { title: 'Session summary', headerShown: false, gestureEnabled: false },
     });
-    expect(within(screen.getByTestId('session-completion-top-bar')).getByText('Session complete')).toBeTruthy();
+    expect(within(screen.getByTestId('session-completion-top-bar')).getByText('Session summary')).toBeTruthy();
+    // The card leads with the session's results and drops gym and duration to
+    // a context row, so the gym no longer takes a row of its own.
+    expect(screen.getByTestId('session-completion-context'))
+      .toHaveTextContent(/Records0Ex2Sets4Volume4955GymWestside Barbell ClubDuration58m/);
+    // No record in this session is a valid zero, not a dash.
+    expect(label('session-completion-records')).toBe('Records 0');
     expect(label('session-completion-duration')).toBe('Duration 58m');
+    // `Ex` is abbreviated on the card and spoken in full.
     expect(label('session-completion-exercises')).toBe('Exercises 2');
     // One set count, the working sets: no separate `Working` fact.
     expect(label('session-completion-sets')).toBe('Sets 4');
+    // The same figure View Session shows for this session, from one helper.
+    expect(label('session-completion-volume')).toBe('Volume 4955');
     expect(screen.queryByTestId('session-completion-working-sets')).toBeNull();
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets: 3 primary, 0 secondary');
+    expect(label('session-completion-breakdown-muscle-chest'))
+      .toBe('Chest, 3 primary, 0 secondary; volume 1758; 0 records');
     // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
-    expect(label('session-completion-muscle-triceps')).toBe('Triceps, 1.5 sets: 0 primary, 3 secondary');
-    expect(screen.getByTestId('session-completion-muscle-triceps')).toHaveTextContent('Triceps—31.5');
-    // The card's title is a header; the table carries no formula footnote.
-    expect(screen.getByRole('header', { name: 'Sets by muscle' })).toBeTruthy();
+    expect(label('session-completion-breakdown-muscle-triceps'))
+      .toBe('Triceps, 0 primary, 3 secondary; volume 879; 0 records');
+    // The row carries the roles as counted, then the muscle's weighted volume
+    // and its record count; a zero is a dash, as the role columns have drawn.
+    expect(screen.getByTestId('session-completion-breakdown-muscle-triceps'))
+      .toHaveTextContent('Triceps—3879—');
+    // The page's title is a header; the table carries no formula footnote.
+    expect(screen.getByRole('header', { name: 'By muscle' })).toBeTruthy();
     expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();
     // No comparison card is drawn: both names sit in one secondary card.
     expect(screen.getByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(
@@ -743,11 +759,38 @@ describe('a session written through the app', () => {
     expect(screen.getByTestId('session-insight-mode-exercise')).toHaveProp('accessibilityState', { selected: true });
   });
 
+  it('pages the summary card breakdown from muscle to exercise, by tap as well as swipe', async () => {
+    await openDesignSession({ presentation: 'completion' });
+
+    // Page one is by muscle, and its tab is the selected one.
+    expect(screen.getByTestId('session-completion-breakdown-title')).toHaveTextContent('By muscle');
+    expect(screen.getByTestId('session-completion-breakdown-dots-muscle').props.accessibilityState)
+      .toMatchObject({ selected: true });
+    expect(screen.getByTestId('session-completion-breakdown-dots-exercise').props.accessibilityState)
+      .toMatchObject({ selected: false });
+
+    // The dots are a tablist, so the swipe is never the only way through.
+    fireEvent.press(screen.getByTestId('session-completion-breakdown-dots-exercise'));
+    expect(screen.getByTestId('session-completion-breakdown-title')).toHaveTextContent('By exercise');
+    expect(screen.getByTestId('session-completion-breakdown-dots-exercise').props.accessibilityState)
+      .toMatchObject({ selected: true });
+
+    // The exercise page's four figures: working sets, volume, top weight and
+    // records. Its sets and volume are the comparison cards' own figures.
+    expect(label(`session-completion-breakdown-exercise-${DESIGN.bench}`))
+      .toBe('Barbell Bench Press, 3 sets; volume 3515; top weight 185.0; 0 records');
+    // 120 × 12 once: the pulldown's only working set is also its top weight.
+    expect(label(`session-completion-breakdown-exercise-${DESIGN.pulldown}`))
+      .toBe('Lat Pulldown, 1 set; volume 1440; top weight 120.0; 0 records');
+    // Those volumes are the session's 4955 on the card above.
+    expect(label('session-completion-volume')).toBe('Volume 4955');
+  });
+
   it('says so when a completed session has no exercises, in completion and in detail', async () => {
     await openDesignSession({ presentation: 'completion' }, { benchSets: [], pulldownSets: [] });
 
     expect(label('session-completion-sets')).toBe('Sets 0');
-    expect(screen.queryByTestId('session-completion-muscle-breakdown')).toBeNull();
+    expect(screen.queryByTestId('session-completion-breakdown')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
 
@@ -825,6 +868,9 @@ describe('records, sharing and deleted sessions over real data', () => {
 
     const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
     const pulldown = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
+    // The card's `Records` counts every record of the session, not the
+    // exercises holding them: bench 2 (Top weight, Volume) + pulldown 3.
+    expect(label('session-completion-records')).toBe('Records 5');
     // Its 185 × 8 is heavier than 180 × 12 but its 1RM 236.2 is below 254.7: a
     // Weight record; its 3515 volume beats 2160 too.
     expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: Top weight, 185.0 × 8; Volume 3515')).toBeTruthy();

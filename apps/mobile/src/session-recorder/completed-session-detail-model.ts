@@ -65,6 +65,30 @@ const performedFigures = (set: CompletedSessionDetailSetInput) => {
   return weight === null || reps === null ? null : { weight, reps };
 };
 
+// The volume-included performed sets of every exercise, as metrics. Shared by
+// the detail model and `sessionVolumeFigure`, so the two can never disagree.
+const volumeMetrics = (exercises: CompletedSessionDetailExerciseInput[]): SetMetrics[] =>
+  exercises.flatMap((exercise) =>
+    exercise.sets
+      .filter((set) => performedFigures(set) !== null && isVolumeSet(set, exercise.loadContext?.effortPolicy))
+      .map((set) =>
+        calculateAnalyticsSetMetrics({
+          ...(exercise.loadContext ?? ordinaryLoadContext()),
+          weightValue: set.weight,
+          repsValue: set.reps,
+          performanceStatus: set.performanceStatus,
+        })
+      )
+  );
+
+/**
+ * A session's `Volume`: every performed, volume-included set summed and
+ * formatted once (`training-metrics-contract.md` §4). The completion summary
+ * shows this without building the whole detail model.
+ */
+export const sessionVolumeFigure = (exercises: CompletedSessionDetailExerciseInput[]): string =>
+  formatVolumeFigure(sumVolume(volumeMetrics(exercises)));
+
 const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): SessionInsightExerciseInput[] =>
   exercises.map((exercise, exerciseIndex) => ({
     id: exercise.id,
@@ -90,7 +114,6 @@ export const buildCompletedSessionDetailModel = (
   recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
-  const metrics: SetMetrics[] = [];
   let workingSetCount = 0;
 
   const cards = exercises.flatMap((exercise): CompletedSessionDetailCard[] => {
@@ -109,18 +132,10 @@ export const buildCompletedSessionDetailModel = (
           baseline: recordBaselineByDefinitionId.get(definitionId) ?? null,
         });
 
-    // Count working sets and sum independently included volume; each row
-    // retains its own figures.
+    // Count working sets; each row retains its own figures. Volume is summed
+    // once for the whole session by `sessionVolumeFigure`.
     const working = performed.filter(({ set }) => isWorkingSet(set, exercise.loadContext?.effortPolicy));
     workingSetCount += working.length;
-    for (const { set } of performed.filter(({ set }) => isVolumeSet(set, exercise.loadContext?.effortPolicy))) {
-      metrics.push(calculateAnalyticsSetMetrics({
-        ...(exercise.loadContext ?? ordinaryLoadContext()),
-        weightValue: set.weight,
-        repsValue: set.reps,
-        performanceStatus: set.performanceStatus,
-      }));
-    }
 
     return [
       {
@@ -143,5 +158,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(metrics)) };
+  return { cards, workingSetCount, volume: sessionVolumeFigure(exercises) };
 };

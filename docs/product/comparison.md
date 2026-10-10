@@ -2,11 +2,11 @@
 
 ### comparison.history-prs · presentation · accepted
 
-Exercise history PRs follow the selected metric: Volume, 1RM or Top weight,
-using the existing all-time session records. Sets and muscle history have no
-PRs. Daily shows one top-right triangle on a day with matching PRs, regardless
-of their count, without a bottom detail box. Weekly shows the matching PR
-count beneath the metric value when positive. Accessibility announces the count.
+Exercise history PRs follow the selected metric — Volume, 1RM or Top weight —
+from the all-time session records. Sets and muscle history have no PRs. Daily
+marks a day holding any with one top-right triangle, whatever the count, and
+no detail box. Weekly shows the count beneath the metric value when positive.
+Accessibility announces it.
 
 Why: the record mark must describe the figure being viewed.
 Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`;
@@ -21,8 +21,8 @@ How a change between two periods is shown.
 | A set or session count (Progress tables, Today's month pace) | the signed absolute difference, never a percentage | `+4`, `−3`, `±0` |
 | Volume (Progress tables) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `±0%`; `new` when the earlier period is 0; `—` when both are 0 |
 
-Today's week figures show no change figure: each fills a bar in laps of last
-week's total (up to it, twice it, three times it).
+Today's week figures show none: each fills a bar in laps of last week's total
+(up to it, twice, three times).
 
 Why: a count is small and whole, so its difference reads directly; a Volume's
 size depends on the lifter, so only a ratio compares.
@@ -47,11 +47,11 @@ Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calen
 
 ### comparison.history-window · definition · accepted
 
-Exercise and muscle history use Settings' History look-back (weeks), N complete
-Monday–Sunday weeks through today. On Monday–Saturday, start on the Monday N
-weeks before this week's Monday; on Sunday, start N − 1 weeks before it. The
-current partial week follows the complete weeks. Both displayed weeks and
-Weekly reference calculations use this entire window.
+Exercise and muscle history use Settings' History look-back (weeks): N complete
+Monday–Sunday weeks through today. On Monday–Saturday start on the Monday N
+weeks before this week's Monday; on Sunday, N − 1 weeks before it. The current
+partial week follows them. Displayed weeks and Weekly reference calculations
+use the whole window.
 
 Why: a history setting must select the same sample for the chart and its baseline.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
@@ -60,16 +60,15 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 ### comparison.daily-history · presentation · accepted
 
 Daily history months and week rows are newest first. Each Monday–Sunday row
-belongs to the month in which Monday falls, including its adjoining-month
-days. Each sampled day appears once; future and out-of-sample positions have
-no tile. The week's start-day number sits outside the tiles as its row label;
-month headings use smaller secondary text.
+belongs to the month its Monday falls in, adjoining-month days included. Each
+sampled day appears once; future and out-of-sample positions have no tile. The
+week's start-day number is its row label, outside the tiles; month headings are
+smaller secondary text.
 
-A Week tile appears on that row only when Sunday has arrived and all seven
-Monday–Sunday dates are in the full sample. Rest days count; a week may span
-two months. Today counts when it is Sunday. Use the whole week's value and
-colour; a missing date or partial first sample week omits its Week tile while
-retaining sampled daily tiles.
+A Week tile appears only once Sunday has arrived with all seven dates in the
+full sample. Rest days count; a week may span two months; today counts when it
+is Sunday. It takes the whole week's value and colour. A missing date or a
+partial first week omits the Week tile and keeps its daily tiles.
 
 Why: each daily figure and completed weekly total appears once, in its starting week.
 Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/components/heatmaps/DailyHeatmap.tsx`.
@@ -88,18 +87,16 @@ January's and the first one kept, and those two carry the year.
 | 1RM, Top weight | the week's best | no column; the readout says `No sets` | no column; the readout says `Unavailable` |
 
 The readout above the chart shows the selected week, else the newest: its
-figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions` for any
-week with training, which opens Sessions at that week as a Weekly row does
-([[session.history-open]]). Tapping a
-week selects it and fills its column in `ink`; a second tap clears it. Unlike
-Daily and Weekly ([[copy.blank-history]]), the readout writes a rest week's
-figure.
+figure and unit (`volume`, `set`/`sets`, `kg`), and `View sessions` for a week
+with training, which opens Sessions there as a Weekly row does
+([[session.history-open]]). Tapping a week selects it and fills its column in
+`ink`; a second tap clears it. Unlike Daily and Weekly
+([[copy.blank-history]]), the readout writes a rest week's figure.
 
-The readout's week's sets follow the chart as View Session's cards, record
-highlights and bands included, Monday first. An exercise's cards are its
-session blocks with a performed set, titled by day with the gym; a muscle's
-are the exercise blocks whose sets counted for it, titled by exercise with the
-day.
+That week's sets follow the chart as View Session's cards, record highlights
+and bands included, Monday first. An exercise's cards are its session blocks
+holding a performed set, titled by day with the gym; a muscle's are the
+exercise blocks whose sets counted for it, titled by exercise with the day.
 
 Why: one form reads the same for every metric; a week without training sums
 to zero, and a best has no value without sets.
@@ -108,18 +105,18 @@ Code: `apps/mobile/components/heatmaps/timeline.ts`; `apps/mobile/components/hea
 ### comparison.weekly-reference · calculation · accepted
 
 Within [[comparison.history-window]], known training weeks form the reference
-population, including genuine zeros and excluding rest, future and unavailable
-weeks. Require at least six eligible weeks and a positive window maximum;
-otherwise omit references.
+population — genuine zeros included, rest, future and unavailable weeks
+excluded. It needs six eligible weeks and a positive window maximum; otherwise
+omit references.
 
 | Metric | Reference lines |
 | --- | --- |
 | Sets | Median |
 | Volume, 1RM, Top weight | 25th percentile, median, 75th percentile |
 
-Calculate percentiles by linear interpolation on sorted weekly values. Place
-lines on the bars' shared zero-based scale, keeping exact positions even when
-they coincide. Values remain accessible without visible reference labels.
+Percentiles are linear interpolation on sorted weekly values. Lines sit on the
+bars' shared zero-based scale, keeping exact positions even when they coincide.
+Values stay accessible without visible reference labels.
 
 Why: the middle half of the selected history supplies a consistent reference range.
 Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.

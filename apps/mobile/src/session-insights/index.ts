@@ -32,6 +32,12 @@ export {
   type SessionMuscleVolumeComparisonsInput,
 } from "./calculations";
 export {
+  buildSessionBreakdownExerciseRows,
+  buildSessionBreakdownMuscleRows,
+  type SessionBreakdownExerciseRow,
+  type SessionBreakdownMuscleRow,
+} from "./session-breakdown";
+export {
   createCompletedSessionInsightsRepository,
   createDrizzleSessionInsightsStore,
   loadCompletedSessionInsights,
