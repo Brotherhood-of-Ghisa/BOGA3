@@ -61,6 +61,7 @@ import * as exerciseSessionFacts from '@/src/data/exercise-session-facts';
 import * as logEventModule from '@/src/logging/logEvent';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { planQueries, planRepository } from '@/src/session-planner';
@@ -312,7 +313,22 @@ describe('Sessions over real data', () => {
       await completeSessionDraft(lateId, { completedAt, now: completedAt });
     });
 
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24/7 23:45');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'MM-DD-YYYY' });
+    });
     expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('7/24 23:45');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' });
+    });
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('2026-07-24 23:45');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'DD-MM-YYYY' });
+    });
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24/7 23:45');
   });
 });
 

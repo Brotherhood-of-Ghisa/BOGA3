@@ -9,6 +9,7 @@ import {
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
@@ -84,8 +85,8 @@ export const formatWeekSessionFigures = (session: { working_sets: number; exerci
 const isSameLocalDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
 
 /** `Started 07:40` today; `Started 10/15 23:10` when it began on an earlier day. */
-export const formatTrainingStart = (startedAtMs: number, nowMs: number): string =>
-  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatMonthDayTime(startedAtMs)}`;
+export const formatTrainingStart = (startedAtMs: number, nowMs: number, dateFormat?: ExerciseDateFormat): string =>
+  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatMonthDayTime(startedAtMs, dateFormat)}`;
 
 const joinContext = (...parts: (string | null | undefined)[]): string =>
   parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(' · ');
@@ -136,9 +137,14 @@ const personName = (member: GroupMemberRef, myUserId: string) => formatStreamPer
 const sessionLabel = (parts: (string | null | undefined)[]): string =>
   parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(', ');
 
-const trainingRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: number): LatestActivityViewModel => {
+const trainingRow = (
+  session: GroupWeekTrainingSession,
+  myUserId: string,
+  nowMs: number,
+  dateFormat?: ExerciseDateFormat,
+): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
-  const stamp = formatTrainingStart(session.started_at_ms, nowMs);
+  const stamp = formatTrainingStart(session.started_at_ms, nowMs, dateFormat);
   const figures = formatWeekSessionFigures(session);
   return {
     kind: 'training',
@@ -174,10 +180,14 @@ const completedDuration = (session: GroupWeekLatestSession): number | null => {
   return null;
 };
 
-const completedRow = (session: GroupWeekLatestSession, myUserId: string): LatestActivityViewModel => {
+const completedRow = (
+  session: GroupWeekLatestSession,
+  myUserId: string,
+  dateFormat?: ExerciseDateFormat,
+): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
   const durationSec = completedDuration(session);
-  const stamp = formatMonthDayTime(session.started_at_ms);
+  const stamp = formatMonthDayTime(session.started_at_ms, dateFormat);
   const duration = durationSec === null ? null : formatCompactDuration(durationSec);
   const figures = formatWeekSessionFigures(session);
   const record = buildGroupRecordLine(session.group_records);
@@ -211,9 +221,10 @@ export const buildLatestActivity = (
   summary: Pick<GroupWeekSummaryResult, 'training_now' | 'latest_completed'>,
   myUserId: string,
   nowMs: number,
+  dateFormat?: ExerciseDateFormat,
 ): LatestActivityViewModel | null => {
   const [first, ...rest] = summary.training_now;
-  if (first && rest.length === 0) return trainingRow(first, myUserId, nowMs);
+  if (first && rest.length === 0) return trainingRow(first, myUserId, nowMs, dateFormat);
   if (first) return severalRow(summary.training_now, myUserId);
-  return summary.latest_completed ? completedRow(summary.latest_completed, myUserId) : null;
+  return summary.latest_completed ? completedRow(summary.latest_completed, myUserId, dateFormat) : null;
 };

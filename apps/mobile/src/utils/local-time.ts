@@ -3,6 +3,8 @@
  * epoch ms) are UTC; every time the app shows is read locally from them here.
  */
 
+import type { ExerciseDateFormat } from '@/src/preferences/model';
+
 const pad2 = (value: number): string => `${value}`.padStart(2, '0');
 
 /** Local `HH:MM`. */
@@ -11,10 +13,31 @@ export const formatClockTime = (epochMs: number): string => {
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 };
 
-/** Local `M/D HH:MM`, the session list's start stamp. */
-export const formatMonthDayTime = (epochMs: number): string => {
+/** Local `YYYY-MM-DD` / `MM-DD-YYYY` / `DD-MM-YYYY`. */
+export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  const year = date.getFullYear();
+  if (dateFormat === 'YYYY-MM-DD') {
+    return `${year}-${month}-${day}`;
+  }
+  if (dateFormat === 'MM-DD-YYYY') {
+    return `${month}-${day}-${year}`;
+  }
+  return `${day}-${month}-${year}`;
+};
+
+/** Local start stamp respecting dateFormat: `M/D HH:mm`, `D/M HH:mm`, or `YYYY-MM-DD HH:mm`. */
+export const formatMonthDayTime = (epochMs: number, dateFormat?: ExerciseDateFormat): string => {
   const date = new Date(epochMs);
-  return `${date.getMonth() + 1}/${date.getDate()} ${formatClockTime(epochMs)}`;
+  const time = formatClockTime(epochMs);
+  if (dateFormat === 'DD-MM-YYYY') {
+    return `${date.getDate()}/${date.getMonth() + 1} ${time}`;
+  }
+  if (dateFormat === 'YYYY-MM-DD') {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${time}`;
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
 };
 
 /** Local `YYYY-MM-DD HH:MM`. */

@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { LatestSessionSummary, TodayProgress } from '@/src/progress-summary';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
@@ -23,21 +25,30 @@ export type TodayProgressCardProps = {
   progress: ReadyProgress;
   onOpenSessions: () => void;
   onOpenSession: (sessionId: string) => void;
+  dateFormat?: ExerciseDateFormat;
 };
 
 // The most recent completed session as one link row. No in-progress state:
 // an active workout is reached from Train.
-function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; onPress: () => void }) {
+function LatestSessionRow({
+  latest,
+  dateFormat,
+  onPress,
+}: {
+  latest: LatestSessionSummary;
+  dateFormat?: ExerciseDateFormat;
+  onPress: () => void;
+}) {
   return (
     <SessionSummaryRow
       accessibilityHint="Opens the completed session"
-      accessibilityLabel={sessionSummaryAccessibilityLabel(latest)}
+      accessibilityLabel={sessionSummaryAccessibilityLabel(latest, dateFormat)}
       duration={formatSessionSummaryDuration(latest)}
       figures={formatSessionSummaryFigures(latest)}
       gym={latest.gymName}
       onPress={onPress}
       record={sessionSummaryRecordLine(latest)}
-      stamp={formatMonthDayTime(latest.startedAt.getTime())}
+      stamp={formatMonthDayTime(latest.startedAt.getTime(), dateFormat)}
       testID="today-latest-session"
     />
   );
@@ -45,7 +56,9 @@ function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; o
 
 // Today's Progress card: this week against last week, the month against the
 // previous month's pace, the latest session.
-export function TodayProgressCard({ progress, onOpenSessions, onOpenSession }: TodayProgressCardProps) {
+export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat }: TodayProgressCardProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   return (
     <Card style={styles.card} testID="today-progress-card">
       <WeekFigures week={progress.week} />
@@ -58,7 +71,11 @@ export function TodayProgressCard({ progress, onOpenSessions, onOpenSession }: T
         </Text>
         <ActionButton label="All sessions" onPress={onOpenSessions} testID="today-all-sessions-button" variant="text" />
       </View>
-      <LatestSessionRow latest={progress.latest} onPress={() => onOpenSession(progress.latest.id)} />
+      <LatestSessionRow
+        dateFormat={resolvedDateFormat}
+        latest={progress.latest}
+        onPress={() => onOpenSession(progress.latest.id)}
+      />
     </Card>
   );
 }
