@@ -41,6 +41,19 @@ Why: warm-ups, technique and cooldown work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
 Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults and the fixed group and coaching rule (`SHARED_EFFORT_POLICY`) in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
 
+### set.complete-cleanup · definition · accepted
+
+`Complete exercise` keeps only that exercise's sets confirmed performed
+([[set.performed]]); every other row is removed — a planned set never done,
+typed values never confirmed, a blank row — so the exercise reads as what was
+trained. It asks first, naming the count, unless the only rows going are
+blank. This is the one place a plan is deleted: a swipe never deletes one, and
+the session view's Done keeps planned rows.
+
+Why: the alert promised removal, so the rows must go; a finished exercise that
+still lists sets nobody did misreports the session to its own reader.
+Code: `planCompleteExercise` in `apps/mobile/src/session-recorder/exercise-page-model.ts`.
+
 ### set.count-display · presentation · accepted
 
 An unqualified `Sets` is the working-set count ([[set.eligibility]]) on every

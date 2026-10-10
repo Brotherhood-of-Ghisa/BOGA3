@@ -17,6 +17,10 @@ type SetRowProps = {
   divider: boolean;
   onOpen: (setId: string) => void;
   onToggle: (setId: string) => void;
+  // Swipe-left's non-gesture path, offered only when the drop would change the
+  // row (`canDropSet`): removes an ad-hoc row, returns a planned one to its
+  // plan.
+  onDrop?: () => void;
 };
 
 const DASH = '—';
@@ -32,9 +36,10 @@ const describeValues = (row: SetRowView) =>
  * The glyph carries the state (`design-language.md` §5). Every figure takes the
  * row's colour and weight; only a record weight or 1RM stands out, in `record`.
  * The row body opens the row in the logger; the glyph performs or un-performs it.
- * Swipes and their accessibility actions belong to the open row (`SetLogger`).
+ * The removing swipe-left reaches every row (`ExerciseSetRowItem` wraps this
+ * one in the shell); `onDrop` is its accessibility action.
  */
-export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
+export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
@@ -87,9 +92,13 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         </Pressable>
       }>
       <Pressable
+        accessibilityActions={onDrop ? [{ name: 'discard', label: `Drop set ${row.number}` }] : []}
         accessibilityHint="Opens the set for editing"
         accessibilityLabel={`Set ${row.number}, ${effort}, ${meaning}, ${values}, ${performed ? 'performed' : 'not performed'}`}
         accessibilityRole="button"
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'discard') onDrop?.();
+        }}
         onPress={() => onOpen(row.id)}
         style={styles.body}
         testID={`exercise-set-${row.number}-open`}>

@@ -14,6 +14,7 @@ import {
   dropSet,
   displayedValues,
   findCursorIndex,
+  isPerformed,
   planCompleteExercise,
   recordBandFor,
   toggleSetPerformed,
@@ -377,12 +378,36 @@ describe('exercise page model', () => {
     expect(dropSet([adHoc('only', '60', '8')], 'only')).toEqual([]);
   });
 
-  it('leaves an untouched planned row, a performed row and an unknown id alone', () => {
+  it('leaves an untouched planned row and an unknown id alone', () => {
     const sets = quietSets();
     expect(dropSet(sets, 's3')).toBe(sets);
-    // Performed rows are the glyph's business, not the swipe's.
-    expect(dropSet(sets, 's1')).toBe(sets);
     expect(dropSet(sets, 'missing')).toBe(sets);
+  });
+
+  it('drops a confirmed ad-hoc row by removing it, so a finished list stays editable', () => {
+    const sets = quietSets();
+    // s1 and s2 are confirmed and carry no plan: the swipe removes them.
+    expect(dropSet(sets, 's1').map((set) => set.id)).toEqual(['s2', 's3', 's4', 's5']);
+    expect(canDropSet(sets, 's1')).toBe(true);
+  });
+
+  it('drops a confirmed planned row back to its plan instead of deleting it', () => {
+    const sets = quietSets();
+    const performed = commitSet(sets, 's3', displayedValues(sets[2]));
+    expect(isPerformed(performed[2])).toBe(true);
+
+    const dropped = dropSet(performed, 's3');
+    expect(dropped).toHaveLength(5);
+    expect(dropped[2]).toMatchObject({
+      id: 's3',
+      weightValue: '',
+      repsValue: '',
+      setType: null,
+      performanceStatus: 'planned',
+      plannedWeightValue: '82.5',
+      plannedRepsValue: '6',
+    });
+    expect(findCursorIndex(dropped)).toBe(2);
   });
 
   it('offers a swipe side only when its move would change the row', () => {
@@ -394,8 +419,7 @@ describe('exercise page model', () => {
     const invalid = updateLoggerValues(sets, 's3', { repsValue: '0' });
     expect(canDropSet(invalid, 's3')).toBe(true);
     expect(canConfirmSet(invalid, 's3')).toBe(false);
-    // A performed row is never dropped by a swipe.
-    expect(canDropSet(sets, 's1')).toBe(false);
+    expect(canDropSet(sets, 'missing')).toBe(false);
     expect(canConfirmSet(sets, 'missing')).toBe(false);
   });
 
@@ -449,7 +473,7 @@ describe('exercise page model', () => {
     expect(confirmed[0].plannedSetType).toBe('rir_3');
   });
 
-  it('completes by discarding pending planned sets as unperformed, never deleting them', () => {
+  it('completes by removing every set that was not confirmed, planned ones included', () => {
     const sets = [
       ...quietSets(),
       {
@@ -463,31 +487,38 @@ describe('exercise page model', () => {
     };
     const plan = planCompleteExercise([...sets, blank]);
 
-    expect(plan).toMatchObject({
-      plannedToDiscard: 3,
-      unloggedToRemove: 1,
-      needsConfirmation: true,
-    });
+    // The three planned rows and the typed-but-unticked one are counted; the
+    // blank row goes without being named.
+    expect(plan).toMatchObject({ unfinishedToRemove: 4, needsConfirmation: true });
     expect(plan.nextSets.map((set) => [set.id, set.performanceStatus])).toEqual([
       ['s1', null],
       ['s2', null],
-      ['s3', 'unperformed'],
-      ['s4', 'unperformed'],
-      ['s5', 'unperformed'],
     ]);
-    expect(plan.nextSets[2]).toMatchObject({
-      plannedWeightValue: '82.5',
-      plannedRepsValue: '6',
-    });
     expect(describeCompleteExercisePlan(plan)).toBe(
-      '3 planned sets will be discarded. 1 set you did not log will be removed.'
+      '4 unfinished sets will be removed.'
     );
 
     // A second Complete has nothing left to ask about.
     expect(planCompleteExercise(plan.nextSets)).toMatchObject({
       needsConfirmation: false,
-      plannedToDiscard: 0,
+      unfinishedToRemove: 0,
     });
+    expect(describeCompleteExercisePlan(planCompleteExercise(plan.nextSets))).toBe('');
+  });
+
+  it('completes a blank trailing row without asking, since it holds nothing to lose', () => {
+    const blank = { ...performedSet('blank', '', '', null), performanceStatus: 'unperformed' as const };
+    const plan = planCompleteExercise([...quietSets().slice(0, 2), blank]);
+
+    expect(plan).toMatchObject({ unfinishedToRemove: 0, needsConfirmation: false });
+    expect(plan.nextSets.map((set) => set.id)).toEqual(['s1', 's2']);
+  });
+
+  it('names one unfinished set in the singular', () => {
+    const sets = updateLoggerValues(quietSets().slice(0, 3), 's3', { repsValue: '4' });
+    expect(describeCompleteExercisePlan(planCompleteExercise(sets))).toBe(
+      '1 unfinished set will be removed.'
+    );
   });
 
   it('completes without asking when every set is performed', () => {
