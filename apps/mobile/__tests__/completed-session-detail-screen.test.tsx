@@ -263,7 +263,36 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
   });
 
-  it('keeps completion and current exercise rows available when optional insight history fails', async () => {
+  it('says the comparisons are loading on completion while the insight history reads', async () => {
+    let resolveInsights!: (value: unknown) => void;
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadInsights: jest.fn().mockReturnValue(new Promise((resolve) => { resolveInsights = resolve; })),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    // A pending read is never drawn as a session with no history.
+    expect(await screen.findByText('Loading comparisons…')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
+    // The stored context carries the screen meanwhile.
+    expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-share-session')).toBeTruthy();
+
+    await act(async () =>
+      resolveInsights({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] })
+    );
+    expect(screen.getByTestId('session-insight-empty')).toHaveTextContent('No working sets to compare.');
+  });
+
+  it('says the comparisons are unavailable on completion when the insight history fails', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockRejectedValue(new Error('Insight history unavailable')),
@@ -283,9 +312,13 @@ describe('CompletedSessionDetailScreenShell', () => {
     });
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    expect(screen.queryByText('No comparison history yet')).toBeNull();
-    expect(screen.queryByTestId('session-completion-exercise-exercise-1-distribution')).toBeNull();
+    // A failed history read says so: it is never drawn as a session with no
+    // history ([[session.volume-comparison]]). The rest of the screen stands.
+    expect(screen.getByTestId('session-insight-empty')).toHaveTextContent(
+      'Comparisons unavailable. Return to this session to retry.'
+    );
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 

@@ -190,10 +190,36 @@ const BENCH_SETS: SeedSet[] = [
 ];
 const PULLDOWN_SETS: SeedSet[] = [{ weight: '120', reps: '12', type: null }];
 
+// Bench-only sessions before the design session, one per day, each a
+// different volume: enough of them make the bench and chest comparisons
+// comparable ([[session.volume-comparison]]).
+const seedPriorBenchSessions = async (count: number) => {
+  for (let index = 0; index < count; index += 1) {
+    const completedAt = new Date(Date.now() - (index + 2) * 24 * 60 * 60 * 1000);
+    const sessionId = `design_prior_${index}`;
+    await persistSessionDraftSnapshot(
+      {
+        sessionId,
+        gymId: DESIGN.gymId,
+        startedAt: new Date(completedAt.getTime() - 45 * 60 * 1000),
+        exercises: [{
+          id: `prior_bench_${index}`,
+          exerciseDefinitionId: 'seed_barbell_bench_press',
+          name: 'Barbell Bench Press',
+          sets: toDraftSets(`prior_bench_${index}`, [{ weight: '185', reps: String(8 + index), type: 'rir_0' }]),
+        }],
+      },
+      { now: completedAt }
+    );
+    await completeSessionDraft(sessionId, { completedAt, now: completedAt });
+  }
+};
+
 const seedDesignSession = async ({
   benchSets = BENCH_SETS,
   pulldownSets = PULLDOWN_SETS,
-}: { benchSets?: SeedSet[]; pulldownSets?: SeedSet[] } = {}) => {
+  priorBenchSessions = 0,
+}: { benchSets?: SeedSet[]; pulldownSets?: SeedSet[]; priorBenchSessions?: number } = {}) => {
   const completedAt = new Date(Date.now() - 60 * 60 * 1000);
   const startedAt = new Date(completedAt.getTime() - 58 * 60 * 1000);
   await upsertLocalGym({ id: DESIGN.gymId, name: 'Westside Barbell Club', now: startedAt });
@@ -229,6 +255,7 @@ const seedDesignSession = async ({
     { now: completedAt }
   );
   await completeSessionDraft(DESIGN.sessionId, { completedAt, now: completedAt });
+  await seedPriorBenchSessions(priorBenchSessions);
 };
 
 // A completed session the day before the design session, with its exercises.
@@ -295,11 +322,14 @@ describe('completion presentation over real data', () => {
     const card = `session-completion-exercise-${ONE_PR_SQUAT}`;
     expect(await screen.findByTestId(`${card}-distribution`)).toBeTruthy();
     act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
-    await waitFor(() => expect(screen.getByTestId(card)).toHaveTextContent(/Building history/));
-    expect(screen.queryByTestId(`${card}-distribution`)).toBeNull();
+    // The window leaves too few observations: no card at all, the name pooled.
+    await waitFor(() =>
+      expect(screen.getByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(/Barbell Back Squat/)
+    );
+    expect(screen.queryByTestId(card)).toBeNull();
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
-    expect(screen.getByTestId(`session-share-exercise-${ONE_PR_SQUAT}`)).toHaveTextContent(/Building history/);
-    expect(screen.queryByTestId(`session-share-exercise-${ONE_PR_SQUAT}-distribution`)).toBeNull();
+    expect(screen.queryByTestId(`session-share-exercise-${ONE_PR_SQUAT}`)).toBeNull();
+    expect(screen.queryByTestId('session-share-card-exercises')).toBeNull();
   });
 
   it('shows the one-PR session: its record, sets and muscle row, with no pager', async () => {
@@ -400,11 +430,11 @@ describe('completed-session detail over real data', () => {
     await openSession({ sessionId: UNMAPPED });
 
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
-    expect(
-      within(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise'))
-        .queryByText(/No comparison history yet/)
-    ).toBeNull();
-    expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toHaveTextContent(/Vol500Building history/);
+    expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toBeNull();
+    const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
+    expect(pooled).toHaveTextContent(/^Comparison unavailable — needs at least 7 sessions/);
+    expect(within(pooled).queryByText(/No comparison history yet|Vol|500/)).toBeNull();
+    expect(label('completed-session-detail-volume')).toBe('Volume 500');
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-insight-empty')).toHaveTextContent('No mapped working sets for this session.');
@@ -497,11 +527,11 @@ describe('a session written through the app', () => {
     // separator; the 135×8 warm-up is neither a set nor volume.
     expect(label('completed-session-detail-sets')).toBe('Sets 4');
     expect(label('completed-session-detail-volume')).toBe('Volume 4955');
-    // The bench comparison reads the same working sets: 185×8 + 185×6 + 185×5.
-    expect(
-      (await screen.findByTestId(`session-completion-exercise-${DESIGN.bench}`)).findByProps({ accessible: true })
-        .props.accessibilityLabel
-    ).toMatch(/Session volume 3515 kg/);
+    // Neither exercise can be compared yet, so both are pooled by name.
+    expect(await screen.findByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(
+      /Barbell Bench PressLat Pulldown/
+    );
+    expect(screen.queryByTestId(`session-completion-exercise-${DESIGN.bench}`)).toBeNull();
 
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     const bench = within(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}`));
@@ -617,10 +647,10 @@ describe('a session written through the app', () => {
     // The card's title is a header; the table carries no formula footnote.
     expect(screen.getByRole('header', { name: 'Sets by muscle' })).toBeTruthy();
     expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();
-    // Each comparison card counts working sets only, with no second count.
-    expect(screen.getByText('3 sets')).toBeTruthy();
-    // The untagged pulldown set is a working set.
-    expect(screen.getByText('1 set')).toBeTruthy();
+    // No comparison card is drawn: both names sit in one secondary card.
+    expect(screen.getByTestId('session-completion-comparison-unavailable-exercise')).toHaveTextContent(
+      /Barbell Bench PressLat Pulldown/
+    );
     expect(screen.queryByText(/· \d+ working/)).toBeNull();
     expect(screen.queryByText('Numbers in brackets are working sets.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
@@ -638,7 +668,9 @@ describe('a session written through the app', () => {
   });
 
   it('restores section and grouping on return from editing, re-reading facts, sets and comparisons', async () => {
-    await openDesignSession();
+    // Six bench sessions before this one make the chest comparison comparable,
+    // so an edited set changes a card that is actually drawn.
+    await openDesignSession({}, { priorBenchSessions: 6 });
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     const chestBefore = (await screen.findByLabelText(/^Chest,.*Session volume \d+/)).props.accessibilityLabel;
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
@@ -667,6 +699,34 @@ describe('a session written through the app', () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/^Chest,.*Session volume \d+/).props.accessibilityLabel).not.toBe(chestBefore)
     );
+  });
+
+  it('draws a card only for the comparison with enough history, and pools the rest by name', async () => {
+    await openDesignSession({ presentation: 'completion' }, { priorBenchSessions: 6 });
+
+    // The bench comparison reads the same working sets: 185×8 + 185×6 + 185×5.
+    const bench = await screen.findByTestId(`session-completion-exercise-${DESIGN.bench}`);
+    expect(bench.findByProps({ accessible: true }).props.accessibilityLabel).toMatch(
+      /Barbell Bench Press, 3 sets\. Session volume 3515 kg reps\..*above median.*twenty-fifth to seventy-fifth percentile/
+    );
+    expect(screen.getByTestId(`session-completion-exercise-${DESIGN.bench}-distribution`)).toBeTruthy();
+
+    // The pulldown has no history: one secondary card, its name only.
+    const pooled = screen.getByTestId('session-completion-comparison-unavailable-exercise');
+    expect(pooled).toHaveTextContent(/needs at least 7 sessionsLat Pulldown$/);
+    expect(within(pooled).queryByText(/Vol|120|1 set/)).toBeNull();
+    expect(screen.queryByTestId(`session-completion-exercise-${DESIGN.pulldown}`)).toBeNull();
+
+    // The muscle tab pools its own shortfalls: chest is comparable, triceps too.
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(await screen.findByTestId('session-completion-muscle-comparison-chest')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
+
+    // The image carries the drawn card only, never the shortfall card.
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    expect(screen.getByTestId(`session-share-exercise-${DESIGN.bench}`)).toBeTruthy();
+    expect(screen.queryByTestId(`session-share-exercise-${DESIGN.pulldown}`)).toBeNull();
+    expect(within(screen.getByTestId('session-share-card')).queryByText(/Building history/)).toBeNull();
   });
 
   it('resets section and grouping when a different session opens', async () => {

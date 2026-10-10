@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { ComparisonUnavailableCard } from '@/components/session-complete/comparison-unavailable-card';
 import { ExerciseVolumeCard } from '@/components/session-complete/exercise-volume-card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SectionHeader } from '@/components/ui/page-header';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { ExerciseVolumeComparison } from '@/src/session-insights';
+import { partitionVolumeComparisons, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 export type SessionComparisonMode = 'exercise' | 'muscle';
 
@@ -35,6 +36,9 @@ export function SessionInsightPresentation({
   const setMode = onModeChange ?? setLocalMode;
   const comparisons = mode === 'exercise' ? exerciseComparisons : muscleComparisons;
   const state = historyState !== 'ready' ? historyState : mode === 'muscle' ? muscleCatalogState : 'ready';
+  // A comparison with no distribution gets no card: it is pooled by name
+  // ([[session.volume-comparison]]), so no card ever draws an empty plot.
+  const { comparable, unavailable } = partitionVolumeComparisons(comparisons);
   return (
     <View style={styles.section} testID="session-insight-presentation">
       <SectionHeader title="Volume" />
@@ -46,13 +50,18 @@ export function SessionInsightPresentation({
         value={mode}
       />
       <View style={styles.section} testID={`${testIdPrefix}-${mode}-volume`}>
-        {state === 'ready' && comparisons.length ? comparisons.map((comparison) => (
-          <ExerciseVolumeCard
-            comparison={comparison}
-            key={`${mode}-${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
-            testID={`${testIdPrefix}-${mode === 'muscle' ? 'muscle-comparison' : 'exercise'}-${comparison.sessionExerciseIds[0]}`}
-          />
-        )) : (
+        {state === 'ready' && comparisons.length ? (
+          <>
+            {comparable.map((comparison) => (
+              <ExerciseVolumeCard
+                comparison={comparison}
+                key={`${mode}-${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
+                testID={`${testIdPrefix}-${mode === 'muscle' ? 'muscle-comparison' : 'exercise'}-${comparison.sessionExerciseIds[0]}`}
+              />
+            ))}
+            <ComparisonUnavailableCard names={unavailable} testID={`${testIdPrefix}-comparison-unavailable-${mode}`} />
+          </>
+        ) : (
           <Text allowFontScaling={false} style={styles.muted} testID="session-insight-empty">
             {state === 'loading' ? 'Loading comparisons…'
               : state === 'error' ? unavailableMessage

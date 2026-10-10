@@ -44,6 +44,11 @@ export {
   type SessionInsightSetRow,
 } from "./repository";
 export {
+  hasVolumeReference,
+  partitionVolumeComparisons,
+  type PartitionedVolumeComparisons,
+} from "./volume-reference";
+export {
   captureSessionShareImage,
   releaseSessionShareImage,
   shareSessionImage,
