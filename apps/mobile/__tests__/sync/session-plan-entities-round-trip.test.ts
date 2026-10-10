@@ -169,7 +169,6 @@ const seedDirtyPlanGraph = (db: InMemoryTestDatabase): void => {
       exerciseDefinitionId: 'def-squat',
       orderIndex: 0,
       name: 'Squat',
-      machineName: 'Rack',
       progressStatus: 'pending',
       localDirty: true,
       localUpdatedAtMs: stamp(),

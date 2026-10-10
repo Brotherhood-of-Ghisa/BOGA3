@@ -13,7 +13,12 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { PlanSection, PlanSessionAction, usePlanSections } from '@/components/session-planner/plan-sections';
+import {
+  NewProgrammeAction,
+  PlanSection,
+  PlanSessionAction,
+  usePlanSections,
+} from '@/components/session-planner/plan-sections';
 import { StatePanel } from '@/components/ui/state-panel';
 import {
   IconButton,
@@ -72,7 +77,8 @@ export function SessionsScreen({
     !planSections.isLoading &&
     !planSections.loadErrorMessage &&
     planSections.upcoming.length === 0 &&
-    planSections.unscheduled.length === 0;
+    planSections.unscheduled.length === 0 &&
+    planSections.programmes.length === 0;
 
   const showGlobalEmptyState =
     !isLoadingSessions &&
@@ -121,6 +127,14 @@ export function SessionsScreen({
     router.push(`/session-plan/${encodeURIComponent(planId)}` as Href);
   };
 
+  const openProgrammeNew = () => {
+    router.push('/programme/new' as Href);
+  };
+
+  const openProgramme = (programmeId: string) => {
+    router.push(`/programme/${encodeURIComponent(programmeId)}` as Href);
+  };
+
   const openCompletedSessionSummary = (sessionId: string) => {
     router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
@@ -147,6 +161,7 @@ export function SessionsScreen({
       {/* The hub's persistent authoring entry; the planning sections' rows
           open the plan detail. */}
       <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
+      <NewProgrammeAction onPress={openProgrammeNew} testID="sessions-new-programme-action" />
       {planSections.loadErrorMessage ? (
         <StatePanel
           body={planSections.loadErrorMessage}
@@ -164,7 +179,9 @@ export function SessionsScreen({
       <PlanSection
         label="Unscheduled"
         onOpenPlan={openPlan}
+        onOpenProgramme={openProgramme}
         plans={planSections.unscheduled}
+        programmes={planSections.programmes}
         testID="sessions-plan-section-unscheduled"
       />
     </>

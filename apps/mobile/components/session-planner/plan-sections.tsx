@@ -6,15 +6,15 @@ import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Card } from '@/components/ui/card';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { planQueries, type PlanSummaryView } from '@/src/session-planner';
+import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
 
 /**
  * The Sessions screen's planning sections: **Upcoming** (scheduled one-off
- * plans, soonest first) and **Unscheduled** (standalone plans, most recently
- * updated first), over the plan queries. Queue management stays here; the
- * Today landing page owns surfacing the next scheduled workout, and
- * programmes join these sections with their own screens. Derived only —
- * nothing here writes plan tables.
+ * and programme-child plans, soonest first) and **Unscheduled** (standalone plans
+ * and training programmes, most recently updated first), over the plan queries.
+ * Queue management stays here; the Today landing page owns surfacing the next
+ * scheduled workout or programme block, and programmes join these sections
+ * with their own screens. Derived only — nothing here writes plan tables.
  */
 
 /** Formats the quiet schedule line under a plan's title. */
@@ -30,13 +30,22 @@ const scheduleLine = (plan: PlanSummaryView): string => {
 export type PlanSectionProps = {
   label: string;
   plans: PlanSummaryView[];
+  programmes?: ProgrammeSummaryView[];
   testID: string;
   onOpenPlan: (planId: string) => void;
+  onOpenProgramme?: (programmeId: string) => void;
 };
 
 /** One planning section: its micro-label, the rows in one card, or nothing. */
-export function PlanSection({ label, plans, testID, onOpenPlan }: PlanSectionProps) {
-  if (plans.length === 0) {
+export function PlanSection({
+  label,
+  plans,
+  programmes = [],
+  testID,
+  onOpenPlan,
+  onOpenProgramme,
+}: PlanSectionProps) {
+  if (plans.length === 0 && programmes.length === 0) {
     return null;
   }
   return (
@@ -45,11 +54,29 @@ export function PlanSection({ label, plans, testID, onOpenPlan }: PlanSectionPro
         {label}
       </Text>
       <Card>
+        {programmes.map((programme, index) => (
+          <ListRow
+            accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions`}
+            density="list"
+            divider={index > 0}
+            key={programme.id}
+            onPress={() => onOpenProgramme?.(programme.id)}
+            testID={`${testID}-programme-${programme.id}`}>
+            <View style={styles.rowText}>
+              <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>
+                {programme.name}
+              </Text>
+              <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
+                Programme · {programme.planCount} {programme.planCount === 1 ? 'session' : 'sessions'}
+              </Text>
+            </View>
+          </ListRow>
+        ))}
         {plans.map((plan, index) => (
           <ListRow
             accessibilityLabel={`${plan.title}, ${scheduleLine(plan)}`}
             density="list"
-            divider={index > 0}
+            divider={programmes.length > 0 || index > 0}
             key={plan.id}
             onPress={() => onOpenPlan(plan.id)}
             testID={`${testID}-row-${plan.id}`}>
@@ -89,9 +116,25 @@ export function PlanSessionAction({ onPress, testID = 'plan-session-action' }: {
   );
 }
 
+/** The New programme action: the hub's entry for authoring multi-session programmes. */
+export function NewProgrammeAction({ onPress, testID = 'sessions-new-programme-action' }: { onPress: () => void; testID?: string }) {
+  return (
+    <ListRow
+      accessibilityLabel="New training programme"
+      density="list"
+      divider={false}
+      leading={<Icon color={uiRoles.ink} name="plus" size="xs" />}
+      label="New programme"
+      onPress={onPress}
+      testID={testID}
+    />
+  );
+}
+
 export type PlanSectionsState = {
   upcoming: PlanSummaryView[];
   unscheduled: PlanSummaryView[];
+  programmes: ProgrammeSummaryView[];
   isLoading: boolean;
   loadErrorMessage: string | null;
   reload: () => Promise<void>;
@@ -102,19 +145,21 @@ export const usePlanSections = (): PlanSectionsState => {
   const [state, setState] = useState<{
     upcoming: PlanSummaryView[];
     unscheduled: PlanSummaryView[];
+    programmes: ProgrammeSummaryView[];
     isLoading: boolean;
     loadErrorMessage: string | null;
-  }>({ upcoming: [], unscheduled: [], isLoading: true, loadErrorMessage: null });
+  }>({ upcoming: [], unscheduled: [], programmes: [], isLoading: true, loadErrorMessage: null });
 
   const load = useCallback(async () => {
     // The previous load's rows stay visible across a refocus reload; the
     // first load starts with the hook's own loading state.
     try {
-      const [upcoming, unscheduled] = await Promise.all([
+      const [upcoming, unscheduled, programmes] = await Promise.all([
         planQueries.listUpcomingPlans(),
         planQueries.listUnscheduledPlans(),
+        planQueries.listProgrammeSummaries(),
       ]);
-      setState({ upcoming, unscheduled, isLoading: false, loadErrorMessage: null });
+      setState({ upcoming, unscheduled, programmes, isLoading: false, loadErrorMessage: null });
     } catch {
       setState((current) => ({
         ...current,

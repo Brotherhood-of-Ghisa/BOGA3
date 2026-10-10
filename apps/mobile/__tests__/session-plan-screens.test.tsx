@@ -110,7 +110,6 @@ const createPlanThroughRepository = async (overrides: {
       {
         exerciseDefinitionId: 'ex-squat',
         name: overrides.name ?? 'Barbell Squat',
-        machineName: '',
         sets:
           overrides.sets?.map((set) => ({ ...set, targetSetType: null as null })) ??
           [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
@@ -513,7 +512,6 @@ describe('plan edit sync: order and refusals', () => {
       sourceBlockId: null,
       exerciseDefinitionId: null,
       name: block.name,
-      machineName: '',
       loadInputMode: null,
       sets: [{ id: `set-${block.name}`, targetWeightText: block.weight, targetRepsText: block.reps, targetSetType: null }],
     })),
@@ -526,7 +524,6 @@ describe('plan edit sync: order and refusals', () => {
     await planRepository.addPlanBlock(planId, {
       exerciseDefinitionId: 'ex-bench',
       name: 'Bench Press',
-      machineName: '',
       sets: [{ targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
     });
     const before = await planQueries.loadPlanDetail(planId);
@@ -543,7 +540,6 @@ describe('plan edit sync: order and refusals', () => {
           sourceBlockId: before?.blocks[0].id ?? null,
           exerciseDefinitionId: 'ex-squat',
           name: 'Barbell Squat',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
         },
@@ -552,7 +548,6 @@ describe('plan edit sync: order and refusals', () => {
           sourceBlockId: null,
           exerciseDefinitionId: 'ex-bench',
           name: 'Bench Press',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's2', targetWeightText: '80', targetRepsText: '6', targetSetType: null }],
         },
@@ -561,7 +556,6 @@ describe('plan edit sync: order and refusals', () => {
           sourceBlockId: before?.blocks[1].id ?? null,
           exerciseDefinitionId: 'ex-bench',
           name: 'Bench Press',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's3', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
         },
@@ -596,7 +590,6 @@ describe('plan edit sync: order and refusals', () => {
           sourceBlockId: null,
           exerciseDefinitionId: 'ex-bench',
           name: 'Bench Press',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 'sn', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
         },
@@ -605,7 +598,6 @@ describe('plan edit sync: order and refusals', () => {
           sourceBlockId: before?.blocks[0].id ?? null,
           exerciseDefinitionId: 'ex-squat',
           name: 'Barbell Squat',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 'sk', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
         },
@@ -733,7 +725,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
           sourceBlockId: detail?.blocks[0].id ?? null,
           exerciseDefinitionId: 'ex-squat',
           name: 'Barbell Squat',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
         },
@@ -742,7 +733,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
           sourceBlockId: null,
           exerciseDefinitionId: 'ex-bench',
           name: 'Bench Press',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's2', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
         },
@@ -764,7 +754,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
       await planRepository.addPlanBlock(planId, {
         exerciseDefinitionId: 'ex-squat',
         name: `Squat ${i}`,
-        machineName: '',
         sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
       });
     }
@@ -781,7 +770,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
           sourceBlockId: b.id,
           exerciseDefinitionId: b.exerciseDefinitionId,
           name: b.name,
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: `s-${idx}`, targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
         })),
@@ -790,7 +778,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
           sourceBlockId: null,
           exerciseDefinitionId: 'ex-bench',
           name: 'Bench Press',
-          machineName: '',
           loadInputMode: null,
           sets: [{ id: 's-new', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
         },
@@ -857,21 +844,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     expect(form.blocks[0].loadInputMode).toBe('per_side_load');
   });
 
-  it('displays machine-note validation errors when exceeding 100 characters', async () => {
-    await seedCatalog();
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
-    await screen.findByTestId('plan-form-title');
-    fillTitle('Valid Title');
-    await fillBlockName(1, 'Barbell Squat');
-    fillSet(1, 1, '100', '5');
-    const tooLongNote = 'a'.repeat(101);
-    fireEvent.changeText(screen.getByTestId('plan-form-block-1-machine'), tooLongNote);
-    fireEvent.press(screen.getByTestId('plan-form-save'));
-    expect(await screen.findByTestId('plan-form-block-1-machine-error')).toHaveTextContent(
-      'Use at most 100 characters.'
-    );
-  });
-
   it('catches rejected planner saves and displays error notice', async () => {
     const onSave = jest.fn().mockRejectedValueOnce(new Error('SQLITE_FULL'));
     render(
@@ -886,7 +858,6 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
               sourceBlockId: null,
               exerciseDefinitionId: 'ex-1',
               name: 'Squat',
-              machineName: '',
               loadInputMode: null,
               sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
             },

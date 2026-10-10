@@ -123,6 +123,9 @@ access level, and `useRootRouteAccess`
 | `/session-plan/new` | `edit` | edits that plan: prefill, then the guarded per-operation sync; back returns to the plan detail |
 | | `from` | prefills a duplicate; Save creates a new plan, never an in-place copy |
 | `/session-plan/[planId]` | `planId` | required; missing, unknown or deleted renders the in-route unavailable state |
+| `/programme/new` | `edit` | edits that programme: prefill, atomic update on save; back returns to programme detail |
+| | `from` | prefills a duplicate; Save creates a new programme |
+| `/programme/[programmeId]` | `programmeId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
 
 `source=more` is a navigation marker, not screen state:
@@ -164,8 +167,13 @@ Nothing outside this table navigates. A route not listed as a source
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week (`historyDayHref`, `sessionsWeekHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
+| `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
 | `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
 | `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |
+| `/programme/<id>` | `/session/<sessionId>` | **Add to session** on next unresolved block routes into recorder through `sessionViewHref` (`push`) — conflict offers Resume, ambiguous card choice is a sheet, not a route |
+| `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
+| `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
+| `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
 | `/today` | `/progress`, `/sessions`, `/completed-session/<id>`, `/train` | the Progress card's `View progress`, `All sessions`, latest-session row, and the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
@@ -208,30 +216,17 @@ above.
 Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
 `apps/mobile/app/(tabs)/_layout.tsx` for the tab group. The conventions:
 
-- A static title is declared in the root stack. A title that depends on loaded
-  data is set in the route file's own `Stack.Screen`, replacing the declared
-  placeholder once it resolves and falling back to it until then: the group
-  screen's name for `Group`, a board's group exercise, `exercise-history`'s
-  exercise name, `exercise-link`'s `Link "<name>"`.
-- `headerShown: false` for every `(tabs)` route (the visible shell is
-  `MainTabBar`) and for every screen that draws its own design-language top bar
-  or needs no header at all (`session/[sessionId]/index`, the exercise page, the
-  picker, `completed-session/[sessionId]`, `sign-in`, `sync-setup`). A headerless
-  screen still declares a title: it is the back label VoiceOver reads on the
-  screens it pushes. `exercise-history` is the one hybrid — a native header
-  *and* `MainTabBar` with Progress selected.
-- Every native header takes one style from the root stack's `screenOptions`: a
-  `surface` background, an Archivo 700 `ink` title at `xl`, an `ink` back arrow,
-  and `headerBackButtonDisplayMode: 'minimal'` for an arrow-only back.
-  **Never add a `headerBackTitle`** — react-native-screens then builds a custom
-  back item that ignores the display mode and morphs its label in during the
-  push. The hidden label is the previous route's title, which is why the
-  headerless `(tabs)` group is titled `Back` rather than `(tabs)`.
-- The chevron's hidden label depends on the iOS runtime ("Back" on iOS 27, the
-  previous route's title on iOS 26), so Maestro flows tap it by UIKit's
-  `BackButton` id, never by label.
+- A static title is declared in the root stack. Dynamic titles are set in the
+  route's `Stack.Screen`, falling back to the placeholder until resolved.
+- `headerShown: false` for `(tabs)` routes (visible shell is `MainTabBar`) and
+  screens drawing their own top bar or needing none (`session/[sessionId]/index`,
+  the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,
+  `sync-setup`). Headerless screens still declare a title for VoiceOver back
+  labels. `exercise-history` is the one hybrid: native header with `MainTabBar`.
+- Native headers take styling from the root stack's `screenOptions`: `surface`
+  background, Archivo 700 `ink` title at `xl`, and minimal arrow-only back.
+  **Never add a `headerBackTitle`**: react-native-screens builds a custom back
+  item that ignores display mode.
 - Two screens replace the native back item with the shared `IconButton` arrow
-  (`exercise-history`, `body-weight`) because the native item stops dispatching
-  on iOS 26.4 when the screen is reached repeatedly from an active session. Both
-  pop the stack, or `replace` with their owner (`/progress`, `/settings`) when
-  nothing is below them; the native title, header and 44pt target stay.
+  (`exercise-history`, `body-weight`) due to an iOS 26.4 event dispatch bug. Both
+  pop the stack or `replace` with their owner (`/progress`, `/settings`).

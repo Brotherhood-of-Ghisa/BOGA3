@@ -36,7 +36,6 @@ export type PlanBlockView = {
   planId: string;
   exerciseDefinitionId: string | null;
   name: string;
-  machineName: string | null;
   orderIndex: number;
   /** Stored resolution state from `session_plan_exercises.progress_status`. */
   progressStatus: 'pending' | 'completed' | 'skipped';
@@ -111,7 +110,6 @@ const toBlockViews = (
       planId: block.sessionPlanId,
       exerciseDefinitionId: block.exerciseDefinitionId,
       name: block.name,
-      machineName: block.machineName,
       orderIndex: block.orderIndex,
       progressStatus: block.progressStatus,
       status:
