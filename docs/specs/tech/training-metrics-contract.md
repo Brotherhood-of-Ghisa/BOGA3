@@ -267,11 +267,10 @@ choices may change which recorded set qualifies.
   then halves it.
 - The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
 
-**A muscle's set count** is [[muscle.set-count]], an open fact: today the
-session summary's Sets by muscle and Progress muscle comparisons count
-differently, as its table shows. In both, a set counts once per muscle at its
-strongest role (duplicate mappings use the strongest role for that
-exercise/muscle pair), and a stabilizer adds nothing
+**A muscle's set count** is [[muscle.set-count]]. The session summary applies
+it; Progress muscle comparisons do not yet (issue #665). In both, a set counts
+once per muscle at its strongest role (duplicate mappings use the strongest
+role for that exercise/muscle pair), and a stabilizer adds nothing
 (`summarizeCurrentSessionMuscleLoad`; `progress-comparisons.ts`). In
 Progress the role factor applies only to Volume. Family counts deduplicate
 physical sets; overlapping individual muscle counts must never be summed into

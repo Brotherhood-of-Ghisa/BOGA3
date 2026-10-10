@@ -439,7 +439,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId('session-completion-muscle-empty-state')).toHaveTextContent(
+      expect(screen.getByTestId('session-completion-breakdown-muscle-empty')).toHaveTextContent(
         'Muscle breakdown unavailable.'
       )
     );

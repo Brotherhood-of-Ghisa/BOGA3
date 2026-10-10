@@ -3,13 +3,16 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SessionFactsCard } from '@/components/session-detail';
 import { SessionTopBar } from '@/components/session-view';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
-import type {
-  CurrentSessionMuscleSummary,
-  ExercisePersonalRecord,
-  ExerciseVolumeComparison,
+import {
+  personalRecordCount,
+  type ExercisePersonalRecord,
+  type ExerciseVolumeComparison,
+  type SessionBreakdownExerciseRow,
+  type SessionBreakdownMuscleRow,
 } from '@/src/session-insights';
 
-import { SessionMuscleBreakdown, SessionSummaryContent, type MuscleCatalogState } from './session-summary-content';
+import { SessionBreakdownPager } from './session-breakdown-pager';
+import { SessionSummaryContent, type MuscleCatalogState } from './session-summary-content';
 export type { MuscleCatalogState } from './session-summary-content';
 
 type SessionCompletionScreenProps = {
@@ -18,10 +21,14 @@ type SessionCompletionScreenProps = {
   exerciseCount: number;
   gymName: string | null;
   workingSetCount: number;
+  // The session's `Volume`, pre-formatted (`sessionVolumeFigure`).
+  volume: string;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
   muscleVolumeComparisons?: ExerciseVolumeComparison[];
-  muscleSummary: CurrentSessionMuscleSummary | null;
+  // The card's two breakdown pages (`session-breakdown.ts`).
+  breakdownMuscleRows: SessionBreakdownMuscleRow[];
+  breakdownExerciseRows: SessionBreakdownExerciseRow[];
   muscleCatalogState: MuscleCatalogState;
   // The insights read: pending and failed states say so rather than reading as
   // a session with no history ([[session.volume-comparison]]).
@@ -32,9 +39,18 @@ type SessionCompletionScreenProps = {
 
 /**
  * The completion screen after Finish, in the design language: `Session
- * complete` · Done (where Finish sat), the summary card with sets by muscle, every record set (1RM, else Weight), each exercise's volume against its history,
- * and `Share session`. Stored context carries the screen; the comparisons wait
- * on the history read and say when it is pending or failed.
+ * summary` · Done (where Finish sat), the summary card, every record set (1RM,
+ * else Weight), each exercise's volume against its history, and `Share
+ * session`. Stored context carries the screen; the comparisons wait on the
+ * history read and say when it is pending or failed.
+ *
+ * The summary card leads with the session's results — `Records`, `Ex`, `Sets`,
+ * `Volume` — and drops `Gym` and `Duration` to a context row beneath them, so
+ * the gym no longer takes a row of its own. `Records` is the session's record
+ * count across every exercise; a session without one reads `0`, a valid zero
+ * (`design-language.md` §6), not a dash. Beneath them the card's breakdown is
+ * a two-page pager, by muscle then by exercise, in place of the `Sets by
+ * muscle` table. Everything below the card is unchanged.
  */
 export function SessionCompletionScreen({
   completedAt,
@@ -42,10 +58,12 @@ export function SessionCompletionScreen({
   exerciseCount,
   gymName,
   workingSetCount,
+  volume,
   personalRecords,
   exerciseVolumeComparisons,
   muscleVolumeComparisons = [],
-  muscleSummary,
+  breakdownMuscleRows,
+  breakdownExerciseRows,
   muscleCatalogState,
   historyState = 'ready',
   shouldFailNextShare = false,
@@ -58,9 +76,14 @@ export function SessionCompletionScreen({
         <SessionFactsCard
           facts={[
             [
-              { label: 'Duration', value: durationDisplay, testID: 'session-completion-duration' },
-              { label: 'Exercises', value: String(exerciseCount), testID: 'session-completion-exercises' },
-              { label: 'Sets', value: String(workingSetCount), align: 'end', testID: 'session-completion-sets' },
+              {
+                label: 'Records',
+                value: String(personalRecords.reduce((total, record) => total + personalRecordCount(record), 0)),
+                testID: 'session-completion-records',
+              },
+              { label: 'Ex', spokenLabel: 'Exercises', value: String(exerciseCount), testID: 'session-completion-exercises' },
+              { label: 'Sets', value: String(workingSetCount), testID: 'session-completion-sets' },
+              { label: 'Volume', value: volume, align: 'end', testID: 'session-completion-volume' },
             ],
             [
               {
@@ -69,14 +92,17 @@ export function SessionCompletionScreen({
                 kind: 'text',
                 testID: 'session-completion-gym',
               },
+              { label: 'Duration', value: durationDisplay, align: 'end', testID: 'session-completion-duration' },
             ],
           ]}
           testID="session-completion-context">
-          <SessionMuscleBreakdown
-            workingSetCount={workingSetCount}
-            muscleSummary={muscleSummary}
-            muscleCatalogState={muscleCatalogState}
-          />
+          {workingSetCount > 0 ? (
+            <SessionBreakdownPager
+              catalogState={muscleCatalogState}
+              exerciseRows={breakdownExerciseRows}
+              muscleRows={breakdownMuscleRows}
+            />
+          ) : null}
         </SessionFactsCard>
 
         <SessionSummaryContent

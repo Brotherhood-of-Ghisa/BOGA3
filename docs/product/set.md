@@ -8,8 +8,7 @@ decimal point; blank Weight with valid reps is `0`), and no performance status.
 Planned, unperformed and skipped rows never count for any figure.
 
 Why: one validity rule means a value is valid everywhere or nowhere. The reps
-cap keeps every count exact on every device and server; no real set comes
-near it.
+cap keeps counts exact on every device and server; no real set comes near it.
 Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser and `MAX_SET_REPS` in `apps/mobile/src/exercise-calculations/parse.ts`.
 
 ### set.eligibility · definition · accepted
@@ -19,9 +18,9 @@ and session counts and 1RM and Weight records. A **volume-included set** feeds
 Volume and Volume records. The two are independent.
 
 Personal figures follow the account's effort policy (Settings → efforts:
-independent Working set and Volume columns). The table gives its defaults.
-Group and coaching figures use one fixed rule, the same as the personal
-defaults, and never read a device's policy.
+independent Working set and Volume columns); the table gives its defaults.
+Group and coaching figures use one fixed rule — the personal defaults — and
+never read a device's policy.
 
 <!-- fact-table: set.eligibility -->
 
@@ -43,15 +42,15 @@ Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/se
 
 ### set.complete-cleanup · definition · accepted
 
-`Complete exercise` keeps only that exercise's sets confirmed performed
-([[set.performed]]); every other row is removed — a planned set never done,
-typed values never confirmed, a blank row — so the exercise reads as what was
-trained. It asks first, naming the count, unless the only rows going are
-blank. This is the one place a plan is deleted: a swipe never deletes one, and
-the session view's Done keeps planned rows.
+`Complete exercise` keeps only that exercise's confirmed performed sets
+([[set.performed]]); every other row goes — a planned set never done, typed
+values never confirmed, a blank row — so the exercise reads as what was
+trained. It asks first, naming the count, unless every row going is blank.
+This is the one place a plan is deleted: a swipe never deletes one, and the
+session view's Done keeps planned rows.
 
-Why: the alert promised removal, so the rows must go; a finished exercise that
-still lists sets nobody did misreports the session to its own reader.
+Why: the alert promised removal; a finished exercise still listing sets nobody
+did misreports the session to its own reader.
 Code: `planCompleteExercise` in `apps/mobile/src/session-recorder/exercise-page-model.ts`.
 
 ### set.count-display · presentation · accepted
@@ -69,15 +68,14 @@ Signature: `n of m sets done`
 ### set.row-figures · presentation · accepted
 
 Every set row shows every figure it can compute (Weight, reps, 1RM, Volume),
-planned and warm-up rows included. Figures not yet realised (planned rows)
-are faded. A warm-up row shows its real 1RM and Volume, which describe that
-row only. A set feeds records only as [[set.eligibility]] allows: a working
-set can make a 1RM or Weight record, a volume-included set a Volume record,
-and a set that is neither is never a record, PR or best. The only highlights
-on a set list are the exercise's record sets: the set that took the 1RM record
-and the set that took the Weight record (one set may take both). The group
-session view highlights instead the set that took #1 on a group 1RM board:
-one `#1 in group` band per set (decided 2026-10-08).
+planned and warm-up rows included; unrealised figures are faded. A warm-up
+row's real 1RM and Volume describe that row only. A set feeds records only as
+[[set.eligibility]] allows: a working set can make a 1RM or Weight record, a
+volume-included set a Volume record, one that is neither never a record, PR or
+best. The only highlights on a set list are the exercise's record sets: the
+one that took the 1RM record and the one that took the Weight record (a set
+may take both). The group session view highlights instead the set that took #1
+on a group 1RM board: one `#1 in group` band per set (decided 2026-10-08).
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
