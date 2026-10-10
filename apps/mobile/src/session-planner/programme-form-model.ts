@@ -1,6 +1,5 @@
 import type { ProgrammeDetailView } from './plan-queries';
 import {
-  emptyPlanFormBlock,
   errorMap,
   planFormFromDetail,
   planFormToDraft,
@@ -37,7 +36,7 @@ export const emptyProgrammeChildPlan = (index: number): ProgrammeChildPlanForm =
   title: `Session ${index + 1}`,
   scheduleText: '',
   gymId: null,
-  blocks: [emptyPlanFormBlock()],
+  blocks: [],
 });
 
 export const emptyProgrammeForm = (): ProgrammeFormState => ({

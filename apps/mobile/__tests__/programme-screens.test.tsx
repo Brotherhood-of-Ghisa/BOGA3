@@ -67,9 +67,10 @@ describe('programme screens', () => {
   };
 
   const pickExercise = async (name: string) => {
-    fireEvent.press(screen.getByTestId('plan-form-block-1-pick'));
+    fireEvent.press(screen.getByTestId('programme-child-plan-add-block'));
     fireEvent.changeText(await screen.findByTestId('plan-exercise-pick-search'), name);
     fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+    fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
   };
 
   beforeAll(async () => {

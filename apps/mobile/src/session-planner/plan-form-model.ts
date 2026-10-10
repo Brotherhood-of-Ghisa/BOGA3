@@ -48,20 +48,42 @@ export const emptyPlanFormSet = (): PlanFormSet => ({
   targetSetType: null,
 });
 
-export const emptyPlanFormBlock = (): PlanFormBlock => ({
+export const planFormBlockFromEmptySet = (
+  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null }
+): PlanFormBlock => ({
   id: nextKey('block'),
   sourceBlockId: null,
-  exerciseDefinitionId: null,
-  name: '',
-  loadInputMode: null,
+  exerciseDefinitionId: exercise.id,
+  name: exercise.name,
+  loadInputMode: exercise.loadInputMode ?? null,
   sets: [emptyPlanFormSet()],
+});
+
+export const planFormBlockFromSuggestion = (
+  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
+  suggestedSets: { weightValue: string; repsValue: string; setType: string | null }[]
+): PlanFormBlock => ({
+  id: nextKey('block'),
+  sourceBlockId: null,
+  exerciseDefinitionId: exercise.id,
+  name: exercise.name,
+  loadInputMode: exercise.loadInputMode ?? null,
+  sets:
+    suggestedSets.length > 0
+      ? suggestedSets.map((s) => ({
+          id: nextKey('set'),
+          targetWeightText: s.weightValue,
+          targetRepsText: s.repsValue,
+          targetSetType: s.setType as SessionSetTypeValue,
+        }))
+      : [emptyPlanFormSet()],
 });
 
 export const emptyPlanForm = (): PlanFormState => ({
   title: '',
   scheduleText: '',
   gymId: null,
-  blocks: [emptyPlanFormBlock()],
+  blocks: [],
 });
 
 export type LoadInputModeLookup =

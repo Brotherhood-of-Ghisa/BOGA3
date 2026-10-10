@@ -16,17 +16,21 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
-import { PlanExercisePickSheet, type PlanExercisePick } from '@/components/session-planner/plan-exercise-pick-sheet';
+import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanGymSheet, type SaveOutcome } from '@/components/session-planner/plan-form-screen';
 import {
   emptyProgrammeChildPlan,
-  emptyPlanFormBlock,
   emptyPlanFormSet,
   programmeFormErrors,
   type ProgrammeChildPlanForm,
   type ProgrammeFormState,
 } from '@/src/session-planner';
-import type { PlanFormBlock, PlanFormSet } from '@/src/session-planner/plan-form-model';
+import {
+  planFormBlockFromEmptySet,
+  planFormBlockFromSuggestion,
+  type PlanFormBlock,
+  type PlanFormSet,
+} from '@/src/session-planner/plan-form-model';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -65,12 +69,9 @@ const childPlanBlockEdits = (
       mapBlock(blockId, (block) =>
         block.sets.length > 1 ? { ...block, sets: block.sets.filter((set) => set.id !== setId) } : block
       ),
-    addBlock: () => patchBlocks([...plan.blocks, emptyPlanFormBlock()]),
-    // As with sets, the last block stays.
+    appendBlock: (block: PlanFormBlock) => patchBlocks([...plan.blocks, block]),
     removeBlock: (blockId: string) => {
-      if (plan.blocks.length > 1) {
-        patchBlocks(plan.blocks.filter((b) => b.id !== blockId));
-      }
+      patchBlocks(plan.blocks.filter((b) => b.id !== blockId));
     },
     moveBlock: (blockId: string, step: -1 | 1) => {
       const fromIndex = plan.blocks.findIndex((b) => b.id === blockId);
@@ -106,6 +107,7 @@ function ProgrammeSessionEditSheet({
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
   const [pickBlockId, setPickBlockId] = useState<string | null>(null);
+  const [isPickingNew, setIsPickingNew] = useState(false);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
 
   if (!plan || planIndex === null) {
@@ -128,16 +130,31 @@ function ProgrammeSessionEditSheet({
   const selectedGymName =
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
 
-  const { updateBlock, updateSet, addSet, removeSet, addBlock, removeBlock, moveBlock } =
+  const { updateBlock, updateSet, addSet, removeSet, appendBlock, removeBlock, moveBlock } =
     childPlanBlockEdits(plan, planIndex, onUpdatePlan);
 
-  const onPickExercise = (blockId: string, pick: PlanExercisePick) => {
-    updateBlock(blockId, {
-      exerciseDefinitionId: pick.id,
-      name: pick.name,
-      loadInputMode: pick.loadInputMode,
-    });
+  const onPickExercise = (blockId: string | null, result: PlanExercisePickResult) => {
+    const { exercise, suggestion } = result;
+    if (blockId === null) {
+      const newBlock =
+        suggestion && suggestion.sets.length > 0
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets)
+          : planFormBlockFromEmptySet(exercise);
+      appendBlock(newBlock);
+    } else {
+      const newSets =
+        suggestion && suggestion.sets.length > 0
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets).sets
+          : [emptyPlanFormSet()];
+      updateBlock(blockId, {
+        exerciseDefinitionId: exercise.id,
+        name: exercise.name,
+        loadInputMode: exercise.loadInputMode,
+        sets: newSets,
+      });
+    }
     setPickBlockId(null);
+    setIsPickingNew(false);
   };
 
   return (
@@ -200,7 +217,7 @@ function ProgrammeSessionEditSheet({
               <ActionButton
                 accessibilityLabel="Add exercise block"
                 label="+ Add exercise"
-                onPress={addBlock}
+                onPress={() => setIsPickingNew(true)}
                 testID="programme-child-plan-add-block"
                 variant="outline"
               />
@@ -224,6 +241,11 @@ function ProgrammeSessionEditSheet({
                 onRemoveSet={removeSet}
               />
             ))}
+            {plan.blocks.length === 0 ? (
+              <Text allowFontScaling={false} style={styles.hint} testID="programme-child-plan-blocks-empty">
+                A session needs at least one exercise.
+              </Text>
+            ) : null}
           </View>
 
           <ActionButton
@@ -245,9 +267,12 @@ function ProgrammeSessionEditSheet({
           />
 
           <PlanExercisePickSheet
-            onDismiss={() => setPickBlockId(null)}
+            onDismiss={() => {
+              setPickBlockId(null);
+              setIsPickingNew(false);
+            }}
             onPick={onPickExercise}
-            request={pickBlockId !== null ? { blockId: pickBlockId } : null}
+            request={isPickingNew ? { blockId: null } : pickBlockId !== null ? { blockId: pickBlockId } : null}
           />
         </View>
       </ScrollView>
@@ -650,5 +675,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  hint: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
 });

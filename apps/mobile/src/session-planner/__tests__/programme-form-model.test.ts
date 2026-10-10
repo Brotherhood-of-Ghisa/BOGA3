@@ -16,8 +16,8 @@ describe('programme-form-model', () => {
     expect(form.plans).toHaveLength(2);
     expect(form.plans[0].title).toBe('Session 1');
     expect(form.plans[1].title).toBe('Session 2');
-    expect(form.plans[0].blocks).toHaveLength(1);
-    expect(form.plans[0].blocks[0].sets).toHaveLength(1);
+    expect(form.plans[0].blocks).toHaveLength(0);
+    expect(form.plans[1].blocks).toHaveLength(0);
   });
 
   it('validates required name and minimum 2 sessions', () => {
@@ -46,8 +46,23 @@ describe('programme-form-model', () => {
   it('catches nested exercise and set validation errors', () => {
     const form = emptyProgrammeForm();
     form.name = 'Valid Programme';
-    form.plans[0].blocks[0].name = ''; // Empty exercise name
-    form.plans[0].blocks[0].sets[0].targetRepsText = '0'; // Non-positive reps
+    form.plans[0].blocks = [
+      {
+        id: 'b-1',
+        sourceBlockId: null,
+        exerciseDefinitionId: 'ex-1',
+        name: '', // Empty exercise name
+        loadInputMode: null,
+        sets: [
+          {
+            id: 's-1',
+            targetWeightText: '',
+            targetRepsText: '0', // Non-positive reps
+            targetSetType: null,
+          },
+        ],
+      },
+    ];
     const errors = programmeFormErrors(form);
     expect(errors.get('plans.0.exercises.0.name')).toBe('Name the exercise.');
     expect(errors.get('plans.0.exercises.0.sets.0.targetReps')).toBe('Reps must be a whole number from 1 to 999.');
@@ -58,14 +73,28 @@ describe('programme-form-model', () => {
     form.name = 'Upper Lower Split';
     form.description = '4-week cycle';
     form.plans[0].title = 'Upper A';
-    form.plans[0].blocks[0].name = 'Bench Press';
-    form.plans[0].blocks[0].sets[0].targetRepsText = '5';
-    form.plans[0].blocks[0].sets[0].targetWeightText = '100';
+    form.plans[0].blocks = [
+      {
+        id: 'b-1',
+        sourceBlockId: null,
+        exerciseDefinitionId: 'ex-bench',
+        name: 'Bench Press',
+        loadInputMode: null,
+        sets: [{ id: 's-1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+      },
+    ];
 
     form.plans[1].title = 'Lower A';
-    form.plans[1].blocks[0].name = 'Back Squat';
-    form.plans[1].blocks[0].sets[0].targetRepsText = '5';
-    form.plans[1].blocks[0].sets[0].targetWeightText = '140';
+    form.plans[1].blocks = [
+      {
+        id: 'b-2',
+        sourceBlockId: null,
+        exerciseDefinitionId: 'ex-squat',
+        name: 'Back Squat',
+        loadInputMode: null,
+        sets: [{ id: 's-2', targetWeightText: '140', targetRepsText: '5', targetSetType: null }],
+      },
+    ];
 
     const result = programmeFormToDraft(form);
     expect(result.draft).not.toBeNull();

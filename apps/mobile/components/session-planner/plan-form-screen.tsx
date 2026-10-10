@@ -3,10 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
-import { PlanExercisePickSheet, type PlanExercisePick } from '@/components/session-planner/plan-exercise-pick-sheet';
+import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import {
-  emptyPlanFormBlock,
   emptyPlanFormSet,
+  planFormBlockFromEmptySet,
+  planFormBlockFromSuggestion,
   planFormErrors,
   type PlanFormBlock,
   type PlanFormSet,
@@ -93,7 +94,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
   const [saving, setSaving] = useState(false);
   const [gymSheetOpen, setGymSheetOpen] = useState(false);
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
-  const [pickRequest, setPickRequest] = useState<{ blockId: string } | null>(null);
+  const [pickRequest, setPickRequest] = useState<{ blockId: string | null } | null>(null);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
 
   const errors = submitted ? planFormErrors(form) : new Map<string, string>();
@@ -114,8 +115,6 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       ),
     }));
 
-  const addBlock = () =>
-    setForm((current) => ({ ...current, blocks: [...current.blocks, emptyPlanFormBlock()] }));
   const removeBlock = (blockId: string) =>
     setForm((current) => ({ ...current, blocks: current.blocks.filter((block) => block.id !== blockId) }));
   const addSet = (blockId: string) =>
@@ -142,6 +141,28 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       blocks.splice(toIndex, 0, moved);
       return { ...current, blocks };
     });
+
+  const handlePickResult = (blockId: string | null, result: PlanExercisePickResult) => {
+    const { exercise, suggestion } = result;
+    if (blockId === null) {
+      const newBlock =
+        suggestion && suggestion.sets.length > 0
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets)
+          : planFormBlockFromEmptySet(exercise);
+      setForm((current) => ({ ...current, blocks: [...current.blocks, newBlock] }));
+    } else {
+      const newSets =
+        suggestion && suggestion.sets.length > 0
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets).sets
+          : [emptyPlanFormSet()];
+      patchBlock(blockId, {
+        exerciseDefinitionId: exercise.id,
+        name: exercise.name,
+        loadInputMode: exercise.loadInputMode,
+        sets: newSets,
+      });
+    }
+  };
 
   const openGymSheet = async () => {
     setGymSheetOpen(true);
@@ -230,7 +251,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           density="list"
           divider
           label="Add exercise"
-          onPress={() => addBlock()}
+          onPress={() => setPickRequest({ blockId: null })}
           testID="plan-form-add-block"
         />
         {errors.get('exercises') ? (
@@ -266,13 +287,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
 
       <PlanExercisePickSheet
         onDismiss={() => setPickRequest(null)}
-        onPick={(blockId, pick: PlanExercisePick) =>
-          patchBlock(blockId, {
-            exerciseDefinitionId: pick.id,
-            name: pick.name,
-            loadInputMode: pick.loadInputMode,
-          })
-        }
+        onPick={handlePickResult}
         request={pickRequest}
       />
     </View>
