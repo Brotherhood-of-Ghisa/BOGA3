@@ -8,14 +8,13 @@ import {
   type GroupHomeBoard,
   type GroupHomeBoardRow,
 } from '@/src/groups/home-view-model';
-import type { GroupHomeMetric } from '@/src/groups/home-mock';
+import type { GroupHomeMetric } from '@/src/groups/home-periods';
 
-// `Vol` figures run to five digits, so the value column widens for them.
-const VALUE_WIDTH: Record<GroupHomeMetric, number> = { sets: 40, volume: 62, prs: 40 };
+const VALUE_WIDTH = 40;
 
-function BoardValue({ metric, record, testID, value }: { metric: GroupHomeMetric; record: boolean; testID: string; value: string }) {
+function BoardValue({ record, testID, value }: { record: boolean; testID: string; value: string }) {
   return (
-    <View style={[styles.valueCell, { width: VALUE_WIDTH[metric] }]}>
+    <View style={[styles.valueCell, { width: VALUE_WIDTH }]}>
       {record ? <Icon color={uiRoles.record} name="arrow-up" size="xs" /> : null}
       <Text allowFontScaling={false} style={[styles.value, record ? todayText.record : null]} testID={testID}>
         {value}
@@ -45,7 +44,7 @@ function BoardRow({ metric, row }: { metric: GroupHomeMetric; row: GroupHomeBoar
           testID={`${testID}-fill`}
         />
       </View>
-      <BoardValue metric={metric} record={metric === 'prs' && row.value > 0} testID={`${testID}-value`} value={row.valueLabel} />
+      <BoardValue record={metric === 'prs' && row.value > 0} testID={`${testID}-value`} value={row.valueLabel} />
     </View>
   );
 }
@@ -63,7 +62,7 @@ export function GroupHomeBoard({ board, metric }: { board: GroupHomeBoard; metri
         </Text>
         <Text
           allowFontScaling={false}
-          style={[todayText.microLabel, todayText.microLabelFaint, styles.headingValue, { width: VALUE_WIDTH[metric] }]}>
+          style={[todayText.microLabel, todayText.microLabelFaint, styles.headingValue, { width: VALUE_WIDTH }]}>
           {GROUP_HOME_METRIC_COLUMN[metric]}
         </Text>
       </View>
@@ -78,7 +77,7 @@ export function GroupHomeBoard({ board, metric }: { board: GroupHomeBoard; metri
             </Text>
             <Text allowFontScaling={false} style={styles.muted}>{` · ${board.me.rankLabel}`}</Text>
           </Text>
-          <BoardValue metric={metric} record={false} testID="group-home-board-me-value" value={board.me.valueLabel} />
+          <BoardValue record={false} testID="group-home-board-me-value" value={board.me.valueLabel} />
         </View>
       ) : null}
     </View>

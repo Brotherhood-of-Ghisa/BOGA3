@@ -4,7 +4,7 @@ import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPe
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
-  CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire.ts';
+  CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire.ts';
 
 const exact = (v: unknown, fields: readonly string[]): v is Record<string, unknown> => v !== null && typeof v === 'object' &&
   !Array.isArray(v) && Object.keys(v).length === fields.length && fields.every(f => Object.prototype.hasOwnProperty.call(v,f));
@@ -179,4 +179,12 @@ function latest(v: unknown): boolean {
 export function isCompetitionWeekSummaryWire(v: unknown): v is CompetitionWeekSummaryWire {
   return exact(v,['contract_version','group_id','members','training_now','latest_completed']) && v.contract_version === 4 && id(v.group_id) &&
     arrayOf(v.members,weekMember) && arrayOf(v.training_now,training) && latest(v.latest_completed);
+}
+const periodMember = (v: unknown) => exact(v,['member','working_sets','group_records']) && member(v.member) &&
+  count(v.working_sets) && count(v.group_records);
+const period = (v: unknown) => exact(v,['start_ms','end_ms','members']) && integer(v.start_ms) && v.start_ms >= 0 &&
+  integer(v.end_ms) && v.end_ms > v.start_ms && arrayOf(v.members,periodMember);
+export function isCompetitionPeriodTotalsWire(v: unknown): v is CompetitionPeriodTotalsWire {
+  return exact(v,['contract_version','group_id','periods']) && v.contract_version === 4 && id(v.group_id) &&
+    Array.isArray(v.periods) && v.periods.length > 0 && v.periods.every(period);
 }

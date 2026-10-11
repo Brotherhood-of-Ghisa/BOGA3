@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-mock';
+import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-periods';
 import { GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
 
 import { GroupCycleButton } from './group-cycle-button';
@@ -27,7 +27,6 @@ const SECTION_OPTIONS = [
 
 const METRIC_OPTIONS = [
   { value: 'sets' as const, label: GROUP_HOME_METRIC_LABELS.sets },
-  { value: 'volume' as const, label: GROUP_HOME_METRIC_LABELS.volume },
   { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
 ];
 

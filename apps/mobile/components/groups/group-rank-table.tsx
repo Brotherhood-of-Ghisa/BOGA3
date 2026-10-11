@@ -2,23 +2,30 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { todayText } from '@/components/today/text-styles';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { GroupHomeMetric } from '@/src/groups/home-mock';
 import { GROUP_HOME_METRIC_COLUMN, type GroupRankEntry } from '@/src/groups/home-view-model';
 
-function HeadCell({ label, width }: { label: string; width: number }) {
+function HeadCell({ label }: { label: string }) {
   return (
-    <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.figure, { width }]}>
+    <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.figure, { width: FIGURE_WIDTH }]}>
       {label}
     </Text>
   );
 }
 
-function Row({ entry, metric, showMetric }: { entry: GroupRankEntry; metric: GroupHomeMetric; showMetric: boolean }) {
+function Figure({ label, testID }: { label: string; testID: string }) {
+  return (
+    <Text allowFontScaling={false} style={[styles.figure, styles.value, { width: FIGURE_WIDTH }]} testID={testID}>
+      {label}
+    </Text>
+  );
+}
+
+function Row({ entry }: { entry: GroupRankEntry }) {
   const testID = `group-rank-table-row-${entry.userId}`;
   return (
     <View
       accessible
-      accessibilityLabel={`${entry.rank}, ${entry.name}, ${entry.valueLabel}, ${entry.volumeLabel} kg·reps`}
+      accessibilityLabel={`${entry.rank}, ${entry.name}, ${entry.setsLabel} working sets, ${entry.prsLabel} group records`}
       style={[styles.row, entry.isMe ? styles.rowMine : null]}
       testID={testID}>
       <Text allowFontScaling={false} style={styles.rank}>
@@ -27,41 +34,32 @@ function Row({ entry, metric, showMetric }: { entry: GroupRankEntry; metric: Gro
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[styles.name, entry.isMe ? styles.nameMine : null]}>
         {entry.name}
       </Text>
-      {showMetric ? (
-        <Text allowFontScaling={false} style={[styles.figure, styles.value, { width: METRIC_WIDTH }]} testID={`${testID}-value`}>
-          {entry.valueLabel}
-        </Text>
-      ) : null}
-      <Text allowFontScaling={false} style={[styles.figure, styles.value, { width: VOLUME_WIDTH }]} testID={`${testID}-volume`}>
-        {entry.volumeLabel}
-      </Text>
+      <Figure label={entry.setsLabel} testID={`${testID}-sets`} />
+      <Figure label={entry.prsLabel} testID={`${testID}-prs`} />
     </View>
   );
 }
 
-/** The selected period's full ranking: place, member, the metric, the volume. */
-export function GroupRankTable({ entries, metric }: { entries: GroupRankEntry[]; metric: GroupHomeMetric }) {
-  // Volume is always the last column, so it is not also the metric column.
-  const showMetric = metric !== 'volume';
+/** The selected period's full ranking: place, member, then both figures. */
+export function GroupRankTable({ entries }: { entries: GroupRankEntry[] }) {
   return (
     <View style={styles.table} testID="group-rank-table">
       <View style={styles.head}>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.headSpacer]}>
           Place
         </Text>
-        {showMetric ? <HeadCell label={GROUP_HOME_METRIC_COLUMN[metric]} width={METRIC_WIDTH} /> : null}
-        <HeadCell label="Vol" width={VOLUME_WIDTH} />
+        <HeadCell label={GROUP_HOME_METRIC_COLUMN.sets} />
+        <HeadCell label={GROUP_HOME_METRIC_COLUMN.prs} />
       </View>
       {entries.map((entry) => (
-        <Row entry={entry} key={entry.userId} metric={metric} showMetric={showMetric} />
+        <Row entry={entry} key={entry.userId} />
       ))}
     </View>
   );
 }
 
 const RANK_WIDTH = 18;
-const METRIC_WIDTH = 44;
-const VOLUME_WIDTH = 62;
+const FIGURE_WIDTH = 44;
 
 const styles = StyleSheet.create({
   table: {

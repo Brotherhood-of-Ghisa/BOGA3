@@ -1,6 +1,6 @@
 import { isCompetitionBoardWire,isCompetitionRulesWire } from './competition-wire-guards';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionHistoryWire,isCompetitionRevisionsWire,isCompetitionSessionDetailWire,
-  isCompetitionStreamWire,isCompetitionWeekSummaryWire } from './competition-reader-guards';
+  isCompetitionPeriodTotalsWire,isCompetitionStreamWire,isCompetitionWeekSummaryWire } from './competition-reader-guards';
 import type { CompetitionExerciseWire, CompetitionRulesWire, CompetitionSessionWire } from './competition-wire';
 
 type ExercisePolicy = { id: string; rules: CompetitionRulesWire; archived: boolean };
@@ -46,7 +46,7 @@ function currentPolicyObservations(key: string,value: unknown): CompetitionPolic
       ?[catalogueObservation(item.event.group.group_id,[item.event.record_context.exercise])]:[{ groupId: item.event.group.group_id }];
     return [];
   });
-  if (isCompetitionWeekSummaryWire(value)) return [{ groupId: value.group_id }];
+  if (isCompetitionWeekSummaryWire(value) || isCompetitionPeriodTotalsWire(value)) return [{ groupId: value.group_id }];
   if (!value || typeof value !== 'object') return [];
   if ('summary' in value && isCompetitionWeekSummaryWire(value.summary)) return [{ groupId: value.summary.group_id }];
   const record = value as { groups?: { group_id: string; bodyweight_calculations_enabled: boolean }[];

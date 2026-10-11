@@ -131,15 +131,16 @@ competitive. Every group RPC requires the `x-boga-group-contract: 4` header
 (`UPDATE_REQUIRED` otherwise). The legacy kg and protocol-3 RPCs are gone; their
 stored rows remain history.
 
-**Week summary.** The client sends its local week (≤ 8 days): the server never
-guesses a time zone. It reads completed, untombstoned sessions shared to the
-group by current members and started in the window, and counts their
-performed, live, working facts whose rows still exist (trailing the
-evaluator; [[set.eligibility]]) and their non-voided group records, one per
-board taken. It reports no session count. Every current member is ranked, zeros
-included, on `(working_sets desc, group_records desc)`. Training now is an
-active session written within 2 h (max `server_received_at` over session,
-exercises, sets); latest completed is any time.
+**Week summary and period totals.** The client sends local windows; the
+server never guesses a time zone. Both count, over completed, untombstoned
+sessions shared to the group by current members and started in a window,
+their performed, live, working facts whose rows still exist (trailing the
+evaluator; [[set.eligibility]]) and non-voided group records, one per board
+taken; no session count or volume. The week summary (≤ 8 days) ranks every
+current member, zeros included, on `(working_sets desc, group_records desc)`;
+training now is an active session written within 2 h (latest
+`server_received_at` of any row); latest completed is any time. Period
+totals (At a glance): 1–12 windows of ≤ 32 days, in order, unranked.
 
 **Record stream** (`group_competition_stream_v2`) adds each record's
 `record`: its set, and per board taken the previous #1 (holder and set, or
@@ -331,7 +332,7 @@ Code and tests cite these.
 | P1, D8 | Owners/admins add, rename, archive group exercises; archive keeps links read-only |
 | P2, P4, D17 | Sets count only through a link (one per exercise per group); links are retroactive, offline, inactive while away |
 | P3, D9, D13 | Group exercises only in picker search, the Link screen and the group page |
-| P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's Stream · Leaderboards |
+| P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's At a glance · Stream · Leaderboards |
 | P6–P9, D11, D12 | Volume/1RM × Certified/All boards; one row per member; podiums on Certified · 1RM; history is lead changes |
 | P10–P13, D3–D5 | Another current member certifies a record set; one suffices; certifier withdraws, admin cancels; edits void it |
 | P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |

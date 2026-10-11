@@ -315,9 +315,13 @@ check 'full session redacts normalized sets, retains unrelated ordinary context 
 rpc "${OWNER_TOKEN}" group_competition_week_summary "$(jq -nc --arg g "${GID}" --argjson s "$((START-1000))" --argjson e "$((START+86400000))" \
   '{p_group_id:$g,p_window_start_ms:$s,p_window_end_ms:$e}')"; expect_ok week; assert_wire isCompetitionWeekSummaryWire
 check 'week scores redacted, counts retained, no subtraction total' '.members|length==4'
+rpc "${OWNER_TOKEN}" group_competition_period_totals "$(jq -nc --arg g "${GID}" --argjson s "$((START-1000))" --argjson e "$((START+86400000))" \
+  '{p_group_id:$g,p_windows:[{start_ms:$s,end_ms:$e}]}')"; expect_ok period; assert_wire isCompetitionPeriodTotalsWire
+check 'period totals carry counts only: no kg, volume or score' \
+  '([paths|select(.[-1]|IN("weight_kg","weight_value","volume_kg_reps","value","unit"))]|length==0) and (.periods[0].members|length==4)'
 GX="${ZERO_GX}"; board e1rm; check 'ordinary counterpart from normalized source cannot bypass same-group boundary' '.entries==[]'
 GX="${MAIN_GX}"
-pass 'actual catalog/podium/revision/history/stream/session/week payloads decode with enabled privacy'
+pass 'actual catalog/podium/revision/history/stream/session/week/period payloads decode with enabled privacy'
 
 # A published percentage remains joinable by set ID while source work is
 # queued. Moving that source to an ordinary definition cannot reveal its kg.

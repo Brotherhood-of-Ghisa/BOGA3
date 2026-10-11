@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { todayText } from '@/components/today/text-styles';
 import { IconButton } from '@/components/ui/icon-button';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { GroupHomePeriod } from '@/src/groups/home-mock';
+import type { GroupHomePeriod } from '@/src/groups/home-periods';
 
 import type { GroupHomePeriodLabel } from './group-home-labels';
 

@@ -27,9 +27,12 @@ export const groupCacheKeys = {
   boards: (groupId: string) => `boards:v5:${groupId}`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
   weekSummary: (groupId: string) => `week:v5:${groupId}`,
+  /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
+  glance: (groupId: string, period: 'week' | 'month', offset: number) => `glance:v5:${groupId}:${period}:${offset}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
+const glanceKeyPattern = (groupId: string) => `glance:v5:${groupId}:%`;
 
 export type GroupCacheEntry<T> = {
   payload: T;
@@ -101,14 +104,14 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 
 /**
  * Access loss removes the current versioned group, stream, exercise, board,
- * week summary, and every session entry. A session can be shared into several
+ * week summary, At a glance, and every session entry. A session can be shared into several
  * groups, so all cached group-specific session projections go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
  */
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
     groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),groupCacheKeys.weekSummary(groupId),`group-policy:v5:${groupId}`]),
-    like(groupCache.cacheKey,SESSION_KEY_PATTERN));
+    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();
   accounts.forEach(invalidateCompetitionMemory);
