@@ -648,10 +648,10 @@ Each card is intended to be one reviewable PR.
    recorder block/reordering UX (`completed`; card archived).
 5. `docs/plans/tasks/M23-T05-Mobile_training_programmes.md` — programme create,
    order, edit, detail, next-block, Complete/Skip, and child-plan flows
-   (`planned`).
+   (`completed`; card archived).
 6. `docs/plans/tasks/M23-T06-Agent_plan_permission_and_write_API.md` — current-grant
    permission, idempotency receipts, atomic agent API writes, and Connected
-   Agents control (`planned`).
+   Agents control (`completed`; card archived).
 7. `docs/plans/tasks/M23-T07-MCP_planning_tools_and_cross_stack_verification.md` —
    exact-history API upgrades, two pageable history tools, three planning tools,
    protocol smoke, server-to-mobile seam coverage, and the planning Maestro
