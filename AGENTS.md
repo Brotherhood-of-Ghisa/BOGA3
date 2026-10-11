@@ -200,6 +200,15 @@ brainstorm.** Source-of-truth lives in `docs/specs/**`, `AGENTS.md`, and
 
 ## Pull requests
 
+AI-assisted commits and reviews carry truthful attribution from the client
+or harness. Identify the harness and actual model when known; all providers
+and harnesses are welcome. Use supported attribution metadata; if a review
+has none, add a brief AI disclosure to its report or comment. This covers
+shell commits, code/product review reports and PR review comments. Before
+opening a PR or publishing a review, verify attribution; preserve commit
+metadata through squash/merge. Never invent identities or attribute
+human-only work to AI.
+
 Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md`:
 **Objective / Tests / Review hard / Deviations**, using data and `file:line`
 pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
