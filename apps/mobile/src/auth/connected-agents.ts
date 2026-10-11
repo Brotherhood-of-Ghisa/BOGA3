@@ -7,7 +7,7 @@ export type ConnectedAgent = {
   grantedAt: string;
   lastAccessAt: string | null;
   name: string;
-  planAccessEnabled: boolean;
+  planAccessEnabled: boolean | 'unavailable';
   scopes: string[];
 };
 
@@ -85,17 +85,26 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
     }
   }
 
-  // Plan access is default-denied: a missing or unreadable permission row
-  // simply leaves the toggle off rather than failing the whole list.
+  // Plan access is default-denied when readable: a missing row leaves the
+  // toggle off. If permissions cannot be queried (e.g. network failure),
+  // they are marked 'unavailable' so the UI can disable toggling and warn the
+  // user without falsely indicating that access is disabled.
+  const permissionsUnavailable = Boolean(permissionResult.error);
   const permissionByClient = new Map<string, PlanPermissionRow>();
-  if (!permissionResult.error) {
+  if (!permissionsUnavailable) {
     for (const row of permissionResult.data ?? []) {
       permissionByClient.set(row.client_id, row);
     }
   }
 
   return grants
-    .map((grant) => normalizeGrant(grant, lastAccessByClient, permissionByClient))
+    .map((grant) => {
+      const normalized = normalizeGrant(grant, lastAccessByClient, permissionByClient);
+      if (permissionsUnavailable) {
+        return { ...normalized, planAccessEnabled: 'unavailable' as const };
+      }
+      return normalized;
+    })
     .sort((left, right) =>
       right.grantedAt.localeCompare(left.grantedAt) ||
       left.name.localeCompare(right.name)

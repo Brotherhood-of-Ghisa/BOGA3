@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.9
 
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
+import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
 import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
@@ -1331,6 +1332,15 @@ const readTargetReps = (value: unknown, label: string): number => {
   return value;
 };
 
+const readTargetSetType = (value: unknown, label: string): string | null => {
+  const text = readOptionalText(value, 40, label);
+  if (text === null) return null;
+  if (!isSessionSetType(text)) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} is not a supported set type.`);
+  }
+  return text;
+};
+
 const normalizePlanInput = (value: unknown): JsonObject => {
   const input = asObject(value, 'plan');
   const title = readRequiredTitle(input.title, 'title');
@@ -1360,9 +1370,8 @@ const normalizePlanInput = (value: unknown): JsonObject => {
           set.target_weight_value,
           `exercises[${index}].sets[${setIndex}].target_weight_value`,
         ),
-        target_set_type: readOptionalText(
+        target_set_type: readTargetSetType(
           set.target_set_type,
-          40,
           `exercises[${index}].sets[${setIndex}].target_set_type`,
         ),
       };
@@ -1524,36 +1533,91 @@ const getUpcomingSessionPlans = async (
   const page = rows.slice(0, limit);
   const planIds = page.map((row) => row.id);
 
-  const { data: blocks, error: blockError } = planIds.length === 0
-    ? { data: [] as PlanBlockRow[], error: null }
-    : await client
-      .schema('app_public')
-      .from('session_plan_exercises')
-      .select('id,session_plan_id,exercise_definition_id,order_index,name,progress_status,resolved_at')
-      .eq('owner_user_id', agent.userId)
-      .is('deleted_at', null)
-      .in('session_plan_id', planIds)
-      .order('order_index')
-      .order('id')
-      .limit(planIds.length * MAX_PLAN_BLOCKS + 1)
-      .returns<PlanBlockRow[]>();
-  throwDatabaseError(blockError);
+  const blocks: PlanBlockRow[] = [];
+  for (const ids of chunk(planIds, 25)) {
+    let from = 0;
+    const batchPage = 500;
+    while (true) {
+      const { data: batch, error: blockError } = await client
+        .schema('app_public')
+        .from('session_plan_exercises')
+        .select('id,session_plan_id,exercise_definition_id,order_index,name,progress_status,resolved_at')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('session_plan_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(from, from + batchPage - 1)
+        .returns<PlanBlockRow[]>();
+      throwDatabaseError(blockError);
+      const batchRows = batch ?? [];
+      blocks.push(...batchRows);
+      if (batchRows.length < batchPage) break;
+      from += batchPage;
+    }
+  }
 
-  const blockIds = (blocks ?? []).map((row) => row.id);
-  const { data: sets, error: setError } = blockIds.length === 0
-    ? { data: [] as PlanSetRow[], error: null }
-    : await client
+  const blockIds = blocks.map((row) => row.id);
+  const sets: PlanSetRow[] = [];
+  for (const ids of chunk(blockIds, 50)) {
+    let from = 0;
+    const batchPage = 500;
+    while (true) {
+      const { data: batch, error: setError } = await client
+        .schema('app_public')
+        .from('session_plan_sets')
+        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('session_plan_exercise_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(from, from + batchPage - 1)
+        .returns<PlanSetRow[]>();
+      throwDatabaseError(setError);
+      const batchRows = batch ?? [];
+      sets.push(...batchRows);
+      if (batchRows.length < batchPage) break;
+      from += batchPage;
+    }
+  }
+
+  const attachedBlockIds = new Set<string>();
+  for (const ids of chunk(blockIds, 50)) {
+    const { data: cards, error: cardError } = await client
       .schema('app_public')
-      .from('session_plan_sets')
-      .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+      .from('session_exercises')
+      .select('source_plan_exercise_id,session_id')
       .eq('owner_user_id', agent.userId)
       .is('deleted_at', null)
-      .in('session_plan_exercise_id', blockIds)
-      .order('order_index')
-      .order('id')
-      .limit(blockIds.length * MAX_PLAN_SETS + 1)
-      .returns<PlanSetRow[]>();
-  throwDatabaseError(setError);
+      .in('source_plan_exercise_id', ids)
+      .limit(1000)
+      .returns<Array<{ source_plan_exercise_id: string | null; session_id: string }>>();
+    throwDatabaseError(cardError);
+    const candidateCards = (cards ?? []).filter(
+      (c): c is { source_plan_exercise_id: string; session_id: string } =>
+        typeof c.source_plan_exercise_id === 'string' && typeof c.session_id === 'string',
+    );
+    if (candidateCards.length > 0) {
+      const sessionIds = uniqueStrings(candidateCards.map((c) => c.session_id), 100);
+      const { data: activeSessions, error: activeSessionsError } = await client
+        .schema('app_public')
+        .from('sessions')
+        .select('id')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('id', sessionIds)
+        .limit(100)
+        .returns<Array<{ id: string }>>();
+      throwDatabaseError(activeSessionsError);
+      const validSessionIds = new Set((activeSessions ?? []).map((s) => s.id));
+      for (const card of candidateCards) {
+        if (validSessionIds.has(card.session_id)) {
+          attachedBlockIds.add(card.source_plan_exercise_id);
+        }
+      }
+    }
+  }
 
   const gymIds = uniqueStrings(page.map((row) => row.gym_id), 50);
   const { data: gyms, error: gymError } = gymIds.length === 0
@@ -1570,13 +1634,13 @@ const getUpcomingSessionPlans = async (
   const gymById = new Map((gyms ?? []).map((row) => [row.id, row.name]));
 
   const blocksByPlan = new Map<string, PlanBlockRow[]>();
-  for (const block of blocks ?? []) {
+  for (const block of blocks) {
     const bucket = blocksByPlan.get(block.session_plan_id) ?? [];
     bucket.push(block);
     blocksByPlan.set(block.session_plan_id, bucket);
   }
   const setsByBlock = new Map<string, PlanSetRow[]>();
-  for (const set of sets ?? []) {
+  for (const set of sets) {
     const bucket = setsByBlock.get(set.session_plan_exercise_id) ?? [];
     bucket.push(set);
     setsByBlock.set(set.session_plan_exercise_id, bucket);
@@ -1585,11 +1649,23 @@ const getUpcomingSessionPlans = async (
   return {
     plans: page.map((plan) => {
       const planBlocks = blocksByPlan.get(plan.id) ?? [];
-      const resolved = planBlocks.filter((block) => block.progress_status !== 'pending').length;
-      const progress = planBlocks.length === 0 || resolved === 0
-        ? 'planned'
-        : resolved === planBlocks.length ? 'completed' : 'in_progress';
-      const nextBlock = planBlocks.find((block) => block.progress_status === 'pending') ?? null;
+      let pendingCount = 0;
+      let attachedCount = 0;
+      let completedCount = 0;
+      let skippedCount = 0;
+      for (const block of planBlocks) {
+        if (block.progress_status === 'completed') completedCount += 1;
+        else if (block.progress_status === 'skipped') skippedCount += 1;
+        else if (attachedBlockIds.has(block.id)) attachedCount += 1;
+        else pendingCount += 1;
+      }
+      const unresolved = pendingCount + attachedCount;
+      const progress = unresolved === 0 && completedCount + skippedCount > 0
+        ? 'completed'
+        : attachedCount + completedCount + skippedCount > 0 ? 'in_progress' : 'planned';
+      const nextBlock = planBlocks.find(
+        (block) => block.progress_status === 'pending' && !attachedBlockIds.has(block.id),
+      ) ?? null;
       const blocksTruncated = planBlocks.length > MAX_PLAN_BLOCKS;
       return {
         id: plan.id,

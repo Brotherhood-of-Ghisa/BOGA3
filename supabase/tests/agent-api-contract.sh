@@ -724,7 +724,7 @@ PROG_KEY="agent-api-${RUN_TAG}-prog-key"
 PLAN_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
   {title:"Agent upcoming plan",gym_id:$gym,scheduled_for:($now + 86400000),
    exercises:[{exercise_definition_id:$ex,name:"Bench press",
-     sets:[{target_reps:5,target_weight_value:"100",target_set_type:"work"},
+     sets:[{target_reps:5,target_weight_value:"100",target_set_type:"rir_2"},
            {target_reps:8,target_weight_value:null}]}]}')"
 UNSCHEDULED_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
   {title:"Agent unscheduled plan",
@@ -812,6 +812,32 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
   --arg unscheduled "${UNSCHEDULED_ID}" '(.data.plans | map(.id) | index($unscheduled)) != null' \
   >/dev/null || fail "include_unscheduled did not return the unscheduled plan"
 
+echo "[agent-api-test] verifying live session card attached to block derives in_progress and excludes next_block_id"
+BLOCK_ID="$(run_psql "
+  select id from app_public.session_plan_exercises
+  where owner_user_id = '${USER_A_UUID}'::uuid and session_plan_id = '${PLAN_ID}'
+  limit 1;
+")"
+ATTACH_SESSION_ID="agent-api-${RUN_TAG}-attach-sess"
+ATTACH_CARD_ID="agent-api-${RUN_TAG}-attach-card"
+run_psql "
+  insert into app_public.sessions (id, owner_user_id, status, started_at, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_SESSION_ID}', '${USER_A_UUID}'::uuid, 'active', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_exercises (id, owner_user_id, session_id, exercise_definition_id, order_index, name, source_plan_exercise_id, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_CARD_ID}', '${USER_A_UUID}'::uuid, '${ATTACH_SESSION_ID}', '${EXERCISE_A}', 0, 'Bench press', '${BLOCK_ID}', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+agent_get "session-plans"
+assert_status "200" "plan read with attached block"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg plan "${PLAN_ID}" '
+    (.data.plans[] | select(.id == $plan) | .progress) == "in_progress"
+    and (.data.plans[] | select(.id == $plan) | .next_block_id) == null
+  ' >/dev/null || fail "attached live session did not derive in_progress or clear next_block_id"
+run_psql "
+  delete from app_public.session_exercises where id = '${ATTACH_CARD_ID}';
+  delete from app_public.sessions where id = '${ATTACH_SESSION_ID}';
+" >/dev/null
+
 echo "[agent-api-test] verifying the write graph is pending-only and performed-free"
 PLAN_STATE="$(run_psql "
   select p.provenance || '|' ||
@@ -877,6 +903,12 @@ OVERSIZED_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
   {title:"Too many",exercises:[range(31) | {exercise_definition_id:$ex,name:"X",sets:[{target_reps:5}]}]}')"
 agent_post "session-plans" "${OVERSIZED_BODY}" "agent-api-${RUN_TAG}-oversized"
 assert_status "400" "oversized plan graph"
+INVALID_SET_TYPE_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
+  {title:"Bad set type",exercises:[{exercise_definition_id:$ex,name:"X",sets:[{target_reps:5,target_set_type:"invalid_type"}]}]}')"
+agent_post "session-plans" "${INVALID_SET_TYPE_BODY}" "agent-api-${RUN_TAG}-bad-set-type"
+assert_status "400" "invalid target set type"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_ARGUMENT" ]] ||
+  fail "invalid target set type did not return INVALID_ARGUMENT"
 PARTIAL_ROWS="$(run_psql "
   select
     (select count(*) from app_public.session_plans

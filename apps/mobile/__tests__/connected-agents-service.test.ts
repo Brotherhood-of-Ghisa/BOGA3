@@ -144,6 +144,27 @@ describe('connected agent service', () => {
     expect(agents.find((entry) => entry.clientId === 'client-b')?.planAccessEnabled).toBe(false);
   });
 
+  it('marks plan access unavailable when the permission query fails', async () => {
+    mockListGrants.mockResolvedValue({
+      data: [
+        {
+          client: { id: 'client-a', name: 'Coach A' },
+          granted_at: '2026-07-24T12:00:00.000Z',
+          scopes: ['openid'],
+        },
+      ],
+      error: null,
+    });
+    mockPermissionReturns.mockResolvedValue({
+      data: null,
+      error: { message: 'permission table unreachable' },
+    });
+
+    const agents = await listConnectedAgents();
+    expect(agents).toHaveLength(1);
+    expect(agents[0].planAccessEnabled).toBe('unavailable');
+  });
+
   it('keeps revocation available when optional audit metadata cannot load', async () => {
     mockListGrants.mockResolvedValue({
       data: [

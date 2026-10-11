@@ -357,8 +357,8 @@ the base read-only grant.
   `(session_completed_at, session_id, exercise_order, set_order)` with an opaque
   continuation cursor, filtering database-side so no row is silently omitted.
 
-**As-built.** The three plan routes are live in `supabase/functions/agent-api/`
-(which also serves the two history routes above under the base read-only grant).
+**As-built.** The three plan routes are live in `supabase/functions/agent-api/`.
+(The exercise-history and workout-detail routes remain pending.)
 The plan routes require a current-grant `public.agent_plan_permissions` row and
 `Idempotency-Key` on both `POST`s. Writes land through the service-role-only
 `app_public.agent_create_session_plan` / `agent_create_training_programme` RPCs,

@@ -38,6 +38,7 @@ type ConnectedAgentCardProps = {
   onTogglePlanAccess: (agent: ConnectedAgent, next: boolean) => void;
   revokeDisabled: boolean;
   revoking: boolean;
+  saving: boolean;
 };
 
 function ConnectedAgentCard({
@@ -46,7 +47,12 @@ function ConnectedAgentCard({
   onTogglePlanAccess,
   revokeDisabled,
   revoking,
+  saving,
 }: ConnectedAgentCardProps) {
+  const isUnavailable = agent.planAccessEnabled === 'unavailable';
+  const isSwitchDisabled = saving || isUnavailable;
+  const switchValue = agent.planAccessEnabled === true;
+
   return (
     <Card testID={`connected-agent-${agent.clientId}`}>
       <View style={styles.agentHeader}>
@@ -77,13 +83,22 @@ function ConnectedAgentCard({
       {/* A separate, opt-in authorization: the base OAuth grant stays read-only. */}
       <View style={styles.permission}>
         <SwitchRow
+          disabled={isSwitchDisabled}
           label="Allow this coach to create plans"
           onValueChange={(value) => {
             onTogglePlanAccess(agent, value);
           }}
           testID={`connected-agent-plan-access-${agent.clientId}`}
-          value={agent.planAccessEnabled}
+          value={switchValue}
         />
+        {isUnavailable ? (
+          <Text
+            allowFontScaling={false}
+            style={styles.permissionUnavailable}
+            testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
+            Plan access settings are temporarily unavailable for this coach.
+          </Text>
+        ) : null}
         <Text
           allowFontScaling={false}
           style={styles.permissionDisclosure}
@@ -113,7 +128,7 @@ export default function ConnectedAgentsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
-  const [savingClientId, setSavingClientId] = useState<string | null>(null);
+  const [savingClientIds, setSavingClientIds] = useState<ReadonlySet<string>>(new Set());
 
   // Fetches and applies the agents; the caller has already shown loading.
   const fetchAgents = () =>
@@ -192,9 +207,11 @@ export default function ConnectedAgentsScreen() {
 
   // Optimistic only because a failed write reverts to the server value and
   // surfaces a retryable error. Plan access stays off until the server agrees.
+  // Writes are serialized per client ID so concurrent toggles across distinct
+  // coaches settle independently without clobbering each other.
   const togglePlanAccess = async (agent: ConnectedAgent, next: boolean) => {
-    if (savingClientId === agent.clientId) return;
-    setSavingClientId(agent.clientId);
+    if (savingClientIds.has(agent.clientId)) return;
+    setSavingClientIds((current) => new Set([...current, agent.clientId]));
     setError(null);
     setAgents((current) =>
       current.map((candidate) =>
@@ -219,7 +236,11 @@ export default function ConnectedAgentsScreen() {
           : 'Unable to update plan access right now.',
       );
     } finally {
-      setSavingClientId(null);
+      setSavingClientIds((current) => {
+        const nextSet = new Set(current);
+        nextSet.delete(agent.clientId);
+        return nextSet;
+      });
     }
   };
 
@@ -267,6 +288,7 @@ export default function ConnectedAgentsScreen() {
           onTogglePlanAccess={togglePlanAccess}
           revokeDisabled={revokingClientId !== null}
           revoking={revokingClientId === agent.clientId}
+          saving={savingClientIds.has(agent.clientId)}
         />
       ))}
 
@@ -332,6 +354,15 @@ const styles = StyleSheet.create({
   },
   permission: {
     paddingBottom: uiSpace.sm,
+  },
+  permissionUnavailable: {
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.xs,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.danger,
   },
   permissionDisclosure: {
     paddingHorizontal: uiSpace.lg,
