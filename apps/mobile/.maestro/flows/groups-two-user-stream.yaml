@@ -178,9 +178,13 @@ appId: com.dinoderek.mobile
     visible:
       id: "groups-stream-list"
     timeout: 15000
-# One group: no group picker.
+# One group: the title names it, and tapping it offers no switch.
+- assertVisible:
+    id: "groups-title-name"
+- tapOn:
+    id: "groups-title"
 - assertNotVisible:
-    id: "groups-stream-filter-row"
+    id: "groups-switch-sheet"
 # Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
 - openLink: "boga3://group/mine"
 - extendedWaitUntil:
@@ -362,10 +366,14 @@ appId: com.dinoderek.mobile
     visible: { id: "group-mine-list" }
     timeout: 15000
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+# A link opens the Stream; the section pill cycles on to Leaderboards.
 - extendedWaitUntil:
-    visible: { id: "groups-segment-leaderboards" }
+    visible: { id: "groups-filter-section" }
     timeout: 15000
-- tapOn: { id: "groups-segment-leaderboards" }
+- tapOn: { id: "groups-filter-section" }
+- extendedWaitUntil:
+    visible: { id: "groups-filter-section", text: "Leaderboards" }
+    timeout: 15000
 - extendedWaitUntil:
     visible: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
     timeout: 20000

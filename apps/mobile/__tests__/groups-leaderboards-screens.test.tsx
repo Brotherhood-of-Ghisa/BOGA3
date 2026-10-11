@@ -178,19 +178,27 @@ afterEach(() => {
 });
 
 describe('Groups screen Leaderboards segment (E1.1)', () => {
+  // The section pill cycles At a glance -> Stream -> Leaderboards; a link
+  // opens the Stream, so Leaderboards is one press away.
+  const goToSection = (label: string) => {
+    for (let step = 0; step < 3 && !String(screen.getByTestId('groups-filter-section').props.accessibilityLabel).includes(label); step += 1) {
+      fireEvent.press(screen.getByTestId('groups-filter-section'));
+    }
+  };
   const openLeaderboards = async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    fireEvent.press(await screen.findByTestId('groups-segment-leaderboards'));
+    await screen.findByTestId('groups-filters');
+    goToSection('Leaderboards');
   };
 
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-segment-leaderboards');
+    await screen.findByTestId('groups-filters');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
+    goToSection('Leaderboards');
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID);
 
@@ -253,8 +261,8 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     api.getCompetitionPodiums.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     api.listMyGroups.mockResolvedValue({ groups: [] });
 
-    fireEvent(screen.getByTestId('groups-segment-stream'), 'press');
-    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
+    goToSection('Stream');
+    goToSection('Leaderboards');
 
     expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     await waitFor(() => expect(cacheKeys()).not.toContain(groupCacheKeys.boards(GROUP_ID)));

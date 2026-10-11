@@ -244,6 +244,26 @@ const pullToRefresh = async (testID: string) => {
 
 const cardID = (key: string) => `group-stream-session-card-${key}`;
 
+// The screen opens At a glance; the section pill names the view and cycles
+// At a glance -> Stream -> Leaderboards.
+const sectionLabel = () => String(screen.getByTestId('groups-filter-section').props.accessibilityLabel);
+const goToSection = (label: string) => {
+  for (let step = 0; step < 3 && !sectionLabel().includes(label); step += 1) {
+    fireEvent.press(screen.getByTestId('groups-filter-section'));
+  }
+};
+const openStream = async () => {
+  await screen.findByTestId('groups-filters');
+  goToSection('Stream');
+  await screen.findByTestId('groups-stream-list');
+};
+// The group switch lives in the title.
+const pickGroup = (groupId: string) => {
+  fireEvent.press(screen.getByTestId('groups-title'));
+  fireEvent.press(screen.getByTestId(`groups-switch-${groupId}`));
+};
+const shownGroupName = () => screen.getByTestId('groups-title-name');
+
 beforeEach(() => {
   jest.clearAllMocks();
   fixture = createInMemoryDatabase();
@@ -291,18 +311,20 @@ describe('Groups tab', () => {
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     expect(screen.getByText('No groups yet')).toBeTruthy();
-    expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
+    // Nothing to filter and nowhere to be: the title stands alone.
+    expect(screen.queryByTestId('groups-filters')).toBeNull();
     // No group selected: the stream reads nothing (there is no all-groups stream).
     expect(api.getCompetitionStream).not.toHaveBeenCalled();
   });
 
-  it('shows no group picker with a single group, and its stream and leaderboards still open', async () => {
+  it('with a single group the title names it and does not switch', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
     render(<GroupsTabRoute />);
-    expect(await screen.findByTestId('groups-segment-stream')).toBeTruthy();
+    expect(await screen.findByTestId('groups-filters')).toBeTruthy();
     await waitFor(() => expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a'));
-    expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
-    expect(screen.queryByTestId('groups-stream-filter-group-a')).toBeNull();
+    expect(shownGroupName()).toHaveTextContent('Garage Gym');
+    fireEvent.press(screen.getByTestId('groups-title'));
+    expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
   });
 
   it("renders the first group's cached stream at once, then newest-first cards", async () => {
@@ -312,6 +334,7 @@ describe('Groups tab', () => {
     api.getCompetitionStream.mockReturnValue(fresh.promise);
 
     render(<GroupsTabRoute />);
+    await openStream();
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
     expect(screen.queryByTestId(cardID('friend-2:s-2'))).toBeNull();
 
@@ -346,16 +369,17 @@ describe('Groups tab', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/group/mine');
   });
 
-  it('always shows one group: chips switch it, and there is no All chip', async () => {
+  it('always shows one group: the title switches it, and there is no All', async () => {
     api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-1:s-1'));
-    expect(screen.queryByTestId('groups-stream-filter-all')).toBeNull();
-    expect(screen.getByTestId('groups-stream-filter-group-a').props.accessibilityState).toEqual({ selected: true });
+    expect(shownGroupName()).toHaveTextContent('Garage Gym');
+    expect(screen.queryByTestId('groups-switch-all')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
+    pickGroup('group-b');
     await waitForGone(() => screen.queryByTestId(cardID('friend-1:s-1')));
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
@@ -368,7 +392,7 @@ describe('Groups tab', () => {
     );
     render(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-2:s-2'));
-    expect(screen.getByTestId('groups-stream-filter-group-b').props.accessibilityState).toEqual({ selected: true });
+    expect(shownGroupName()).toHaveTextContent('Lunch Lifters');
     expect(api.getCompetitionStream).not.toHaveBeenCalledWith('group-a');
   });
 
@@ -377,13 +401,14 @@ describe('Groups tab', () => {
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
-    fireEvent.press(await screen.findByTestId('groups-segment-leaderboards'));
+    await screen.findByTestId('groups-filters');
+    goToSection('Leaderboards');
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
 
     mockParams = { groupId: 'group-b' };
     screen.rerender(<GroupsTabRoute />);
     expect(await screen.findByTestId(cardID('friend-2:s-2'))).toBeTruthy();
-    expect(screen.getByTestId('groups-segment-stream').props.accessibilityState).toEqual({ selected: true });
+    expect(sectionLabel()).toContain('Stream');
   });
 
   it('reopens on the group last viewed', async () => {
@@ -391,14 +416,16 @@ describe('Groups tab', () => {
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     const first = render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-1:s-1'));
-    fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
+    pickGroup('group-b');
     await screen.findByTestId(cardID('friend-2:s-2'));
     first.unmount();
 
     render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-2:s-2'));
-    expect(screen.getByTestId('groups-stream-filter-group-b').props.accessibilityState).toEqual({ selected: true });
+    expect(shownGroupName()).toHaveTextContent('Lunch Lifters');
   });
 
   it("shares its selection with Today's group card: a later pick there wins over an earlier chip here", async () => {
@@ -406,8 +433,9 @@ describe('Groups tab', () => {
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-1:s-1'));
-    fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
+    pickGroup('group-b');
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(getLastViewedGroupId()).toBe('group-b');
 
@@ -415,15 +443,15 @@ describe('Groups tab', () => {
     setLastViewedGroupId('group-a');
     screen.rerender(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-1:s-1'));
-    expect(screen.getByTestId('groups-stream-filter-group-a').props.accessibilityState).toEqual({ selected: true });
+    expect(shownGroupName()).toHaveTextContent('Garage Gym');
   });
 
   it("switches to the selected group's leaderboards", async () => {
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-segment-leaderboards');
+    await screen.findByTestId('groups-filters');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
+    goToSection('Leaderboards');
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a');
   });
@@ -431,6 +459,7 @@ describe('Groups tab', () => {
   it('pull-to-refresh refetches My groups and the stream', async () => {
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-1:s-1'));
     await waitFor(() => expect(api.listMyGroups).toHaveBeenCalledTimes(1));
     const streamCalls = api.getCompetitionStream.mock.calls.length;
@@ -448,6 +477,7 @@ describe('Groups tab', () => {
 
     render(<GroupsTabRoute />);
     expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
+    await openStream();
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
     expect(screen.queryByTestId('groups-inline-error')).toBeNull();
   });
@@ -470,6 +500,7 @@ describe('Groups tab', () => {
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     fireEvent.press(screen.getByTestId('groups-error-state-retry'));
+    await openStream();
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
   });
 
@@ -479,7 +510,28 @@ describe('Groups tab', () => {
     api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_competition_stream returned an unexpected competition payload.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
+    await openStream();
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
+  });
+
+  it('opens At a glance, where the filter row names the metric and the period', async () => {
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-filters');
+
+    expect(sectionLabel()).toContain('At a glance');
+    expect(screen.getByTestId('group-home-board')).toBeTruthy();
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
+    expect(screen.getByTestId('groups-filter-period')).toHaveTextContent('Week');
+
+    // The metric pill cycles, and the board follows it.
+    fireEvent.press(screen.getByTestId('groups-filter-metric'));
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Volume');
+    expect(within(screen.getByTestId('group-home-board')).getByText('Vol')).toBeTruthy();
+
+    // The metric and period pills belong to At a glance alone; the section pill stays.
+    goToSection('Stream');
+    expect(screen.queryByTestId('groups-filter-metric')).toBeNull();
+    expect(screen.getByTestId('groups-filter-section')).toBeTruthy();
   });
 
   it('loads older pages online at the end of the list (infinite scroll)', async () => {
@@ -488,6 +540,7 @@ describe('Groups tab', () => {
       before ? page([completedItem()]) : page([{ ...liveItem,groups: [{ group_id: 'group-a',name: 'Garage Gym' }] }], { has_more: true, next_cursor: cursor }),
     );
     render(<GroupsTabRoute />);
+    await openStream();
     await screen.findByTestId(cardID('friend-2:s-2'));
 
     await act(async () => {

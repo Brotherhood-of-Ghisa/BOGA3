@@ -2,15 +2,17 @@ import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useReducer, useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 
 import {
-  GroupFilterChips,
+  GroupGlancePage,
   GroupInlineError,
   GroupLeaderboardsPage,
   GroupMissingDataState,
   GroupOfflineBanner,
+  GroupScreenHeader,
   GroupStateView,
+  GroupStreamEventsSheet,
   GroupStreamList,
   GroupsEmptyActions,
   GroupsEmptyState,
@@ -18,8 +20,12 @@ import {
   groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
+  type GroupsSection,
 } from '@/components/groups';
-import { ActionButton, PageHeader, ScreenScroll, SegmentedControl, uiSpace } from '@/components/ui';
+import { IconButton, ScreenScroll } from '@/components/ui';
+import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
+import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-mock';
+import { isDevMode } from '@/src/utils/isDevMode';
 import { useAuth } from '@/src/auth';
 import {
   getLastViewedGroupId,
@@ -32,21 +38,18 @@ import {
   type GroupListMineResult,
 } from '@/src/groups';
 
-type GroupsSegment = 'stream' | 'leaderboards';
-
-const SEGMENT_OPTIONS = [
-  { value: 'stream', label: 'Stream' },
-  { value: 'leaderboards', label: 'Leaderboards' },
-] as const;
-
 const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
+const toSection = (value: string | null): GroupsSection | null =>
+  value === 'glance' || value === 'stream' || value === 'leaderboards' ? value : null;
+
 /**
- * The Groups screen (groups contract): one group at a time, picked with
- * the group chips (none with a single group), showing its Stream or Leaderboards. Managing groups (join,
- * create, the group page) lives behind My groups. `?groupId=` preselects a
- * group.
+ * The Groups screen (groups contract): one group at a time, named by the
+ * title and picked from it, in one of three views — At a glance, Stream,
+ * Leaderboards — chosen by the filter row's first pill. Managing groups
+ * (join, create, the group page) lives behind My groups. `?groupId=`
+ * preselects a group and `?section=` its view.
  */
 export default function GroupsTabRoute() {
   const { isConfigured, user } = useAuth();
@@ -58,7 +61,9 @@ export default function GroupsTabRoute() {
 
 function GroupsTabContent({ userId }: { userId: string }) {
   const router = useRouter();
-  const requestedGroupId = firstParam(useLocalSearchParams<{ groupId?: string | string[] }>().groupId);
+  const params = useLocalSearchParams<{ groupId?: string | string[]; section?: string | string[] }>();
+  const requestedGroupId = firstParam(params.groupId);
+  const requestedSection = toSection(firstParam(params.section));
   const mine = useGroupResource<GroupListMineResult>({ userId, cacheKey: groupCacheKeys.mine, fetcher: listMyGroups });
   const groups = mine.data?.groups ?? null;
 
@@ -70,14 +75,21 @@ function GroupsTabContent({ userId }: { userId: string }) {
     setLastViewedGroupId(groupId);
     rerender();
   }, []);
-  const [segment, setSegment] = useState<GroupsSegment>('stream');
-  // A new link (Today's `View groups`, a membership row) wins over the last pick and opens its Stream.
+  const [segment, setSegment] = useState<GroupsSection>('glance');
+  // At a glance's two figures: which metric it ranks by and whether a step is
+  // a week or a month. They live for the visit, like the Progress filters.
+  const [metric, setMetric] = useState<GroupHomeMetric>('sets');
+  const [period, setPeriod] = useState<GroupHomePeriod>('week');
+  const [hiddenEventKinds, setHiddenEventKinds] = useState<readonly StreamEventKind[]>(DEFAULT_HIDDEN_STREAM_EVENT_KINDS);
+  const [eventsSheet, setEventsSheet] = useState(false);
+  // A new link (Today's group title, a membership row) wins over the last
+  // pick; it opens the section it names, and the Stream when it names none.
   const [followedRequest, setFollowedRequest] = useState<string | null>(null);
   if (followedRequest !== requestedGroupId) {
     setFollowedRequest(requestedGroupId);
     if (requestedGroupId) {
       setLastViewedGroupId(requestedGroupId);
-      setSegment('stream');
+      setSegment(requestedSection ?? 'stream');
     }
   }
   const selectedGroupId = groups ? resolveSelectedGroupId(groups, getLastViewedGroupId()) : null;
@@ -112,42 +124,52 @@ function GroupsTabContent({ userId }: { userId: string }) {
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
-  const segmentResource = segment === 'stream' ? stream : boards;
+  // At a glance has no read of its own while its figures are mocked, so it
+  // reports the stream's: the offline marker and the inline error stay true.
+  const segmentResource = segment === 'leaderboards' ? boards : stream;
   const offline = mine.offline || segmentResource.offline;
   const inlineError = pickInlineError(mine.error, segmentResource.error);
   const hasGroups = groups !== null && groups.length > 0;
   const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
 
+  const groupName = groups?.find((group) => group.group_id === selectedGroupId)?.name ?? 'Groups';
   const header = (
     <View style={groupScreenStyles.header}>
-      <View style={styles.titleRow}>
-        <View style={styles.title} testID="groups-title">
-          <PageHeader title="Groups" />
-        </View>
-        <ActionButton
-          label="My groups"
-          onPress={() => router.push('/group/mine')}
-          testID="groups-my-groups-button"
-          variant="text"
-        />
-      </View>
+      <GroupScreenHeader
+        filterTrailing={
+          segment === 'stream' && isDevMode() ? (
+            <IconButton
+              accessibilityHint="Chooses which event types the stream draws"
+              accessibilityLabel="Event types"
+              name="more-vertical"
+              onPress={() => setEventsSheet(true)}
+              testID="groups-stream-events-button"
+              tone="muted"
+            />
+          ) : undefined
+        }
+        groupName={groupName}
+        groups={(groups ?? []).map((group) => ({ groupId: group.group_id, name: group.name }))}
+        metric={metric}
+        onMetricChange={setMetric}
+        onOpenMyGroups={() => router.push('/group/mine')}
+        onPeriodChange={setPeriod}
+        onSectionChange={setSegment}
+        onSelectGroup={pickGroup}
+        period={period}
+        section={segment}
+        selectedGroupId={selectedGroupId}
+      />
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={segmentResource.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && (groups !== null || segmentResource.data !== null) ? (
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="groups-inline-error" />
       ) : null}
-      {hasGroups ? (
-        <>
-          {/* One group needs no picker. */}
-          {groups.length > 1 ? <GroupFilterChips groups={groups} onChange={pickGroup} selectedGroupId={selectedGroupId} /> : null}
-          <SegmentedControl
-            accessibilityLabel="Stream or leaderboards"
-            onChange={setSegment}
-            options={SEGMENT_OPTIONS}
-            testIDPrefix="groups-segment"
-            value={segment}
-          />
-        </>
-      ) : null}
+      <GroupStreamEventsSheet
+        hiddenKinds={hiddenEventKinds}
+        onChange={setHiddenEventKinds}
+        onDismiss={() => setEventsSheet(false)}
+        visible={eventsSheet}
+      />
     </View>
   );
 
@@ -162,6 +184,15 @@ function GroupsTabContent({ userId }: { userId: string }) {
         ) : (
           <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRefresh} testIDPrefix="groups" />
         )}
+      </ScreenScroll>
+    );
+  }
+
+  if (segment === 'glance') {
+    return (
+      <ScreenScroll refreshControl={refreshControl} testID="groups-screen">
+        {header}
+        <GroupGlancePage metric={metric} myUserId={userId} now={new Date()} period={period} />
       </ScreenScroll>
     );
   }
@@ -205,6 +236,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}?groupId=${encodeURIComponent(card.groupId)}`)}
       onRefresh={onRefresh}
       pulling={pulling}
+      hiddenEventKinds={hiddenEventKinds}
       roleForGroup={(groupId) => groups.find((group) => group.group_id === groupId)?.my_role ?? null}
       showGroupNames={false}
       stream={stream}
@@ -214,13 +246,4 @@ function GroupsTabContent({ userId }: { userId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  title: {
-    flex: 1,
-  },
-});
+

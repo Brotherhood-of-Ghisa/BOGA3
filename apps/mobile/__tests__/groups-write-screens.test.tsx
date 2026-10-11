@@ -174,6 +174,8 @@ describe('Groups tab and My groups actions', () => {
     render(<GroupsTabRoute />);
     await settleReads();
     expect(api.getCompetitionStream).toHaveBeenCalledTimes(1);
+    // The screen opens At a glance; the Stream is the next section along.
+    fireEvent.press(screen.getByTestId('groups-filter-section'));
     expect(screen.getByTestId('groups-stream-empty')).toBeTruthy();
     expect(screen.queryByTestId('groups-create-button')).toBeNull();
     expect(screen.queryByTestId('groups-join-button')).toBeNull();
