@@ -49,6 +49,9 @@ const latest = { member, session_id: 's', started_at_ms: 100, completed_at_ms: 2
 const week = { contract_version: 4, group_id: 'g', members: [{ rank: 1, member, working_sets: 1, group_records: 1 }],
   training_now: [{ member, session_id: 's', started_at_ms: 100, gym_name: null, working_sets: 1, exercise_count: 1 }], latest_completed: latest };
 const podiums = { contract_version: 4, certified: true, podiums: [{ exercise, board }] };
+const PERIOD_WINDOWS = [{ start_ms: 0, end_ms: 1000 }, { start_ms: 1000, end_ms: 2000 }];
+const periodTotals = { contract_version: 4, group_id: 'g',
+  periods: PERIOD_WINDOWS.map(window => ({ ...window, members: [{ member, working_sets: 3, group_records: 1 }] })) };
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
 test('every new reader accepts only its exact versioned envelope', () => {
@@ -62,6 +65,7 @@ test('every new reader accepts only its exact versioned envelope', () => {
     [guards.isCompetitionSessionWire,session], [guards.isCompetitionSessionDetailWire,detail],
     [guards.isCompetitionSessionRecordsWire,records],
     [guards.isCompetitionStreamWire,stream], [guards.isCompetitionWeekSummaryWire,week],
+    [guards.isCompetitionPeriodTotalsWire,periodTotals],
   ] as const;
   for (const [guard,value] of cases) {
     expect(guard(value)).toBe(true); expect(guard(null)).toBe(false); expect(guard({ ...value, private_reading: 80 })).toBe(false);
@@ -108,6 +112,18 @@ test('group-bound sessions keep ordinary context while rejecting normalized kg a
   expect(guards.isCompetitionSessionWire({ ...session, volume_kg_reps: 100 })).toBe(false);
   expect(guards.isCompetitionWeekSummaryWire({ ...week, volume_kg_reps: 100 })).toBe(false);
   expect(guards.isCompetitionWeekSummaryWire({ ...week,latest_completed: null, members: [],training_now: [] })).toBe(true);
+  // Period totals are counts only: no volume, rank or score at any level, and a window is ordered and whole.
+  const withRow = (row: Record<string, unknown>) => ({ ...periodTotals, periods: [{ ...PERIOD_WINDOWS[0], members: [row] }] });
+  expect(guards.isCompetitionPeriodTotalsWire(withRow({ member, working_sets: 0, group_records: 0 }))).toBe(true);
+  for (const field of ['volume_kg_reps','rank','value']) {
+    expect(guards.isCompetitionPeriodTotalsWire(withRow({ member, working_sets: 0, group_records: 0, [field]: 1 }))).toBe(false);
+  }
+  expect(guards.isCompetitionPeriodTotalsWire(withRow({ member, working_sets: -1, group_records: 0 }))).toBe(false);
+  expect(guards.isCompetitionPeriodTotalsWire(withRow({ member, working_sets: 1.5, group_records: 0 }))).toBe(false);
+  expect(guards.isCompetitionPeriodTotalsWire({ ...periodTotals, periods: [] })).toBe(false);
+  expect(guards.isCompetitionPeriodTotalsWire({ ...periodTotals, periods: [{ start_ms: 5, end_ms: 5, members: [] }] })).toBe(false);
+  expect(guards.isCompetitionPeriodTotalsWire({ ...periodTotals, periods: [{ start_ms: -1, end_ms: 5, members: [] }] })).toBe(false);
+  expect(guards.isCompetitionPeriodTotalsWire({ ...periodTotals, periods: [{ ...periodTotals.periods[0], volume_kg_reps: 1 }] })).toBe(false);
   expect(guards.isCompetitionStreamWire({ ...stream, has_more: true, next_cursor: 'scoped-cursor' })).toBe(true);
   expect(guards.isCompetitionStreamWire({ ...stream, has_more: true })).toBe(false);
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'future', key: 'k' }] })).toBe(false);
@@ -191,6 +207,7 @@ describe('request-scoped protocol-4 API', () => {
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],
+    ['period_totals',() => api.getCompetitionPeriodTotals('g',PERIOD_WINDOWS),periodTotals],
     ['certify',() => api.certifyCompetition({ groupId: 'g',exerciseId: 'ge',memberId: 'u1',setId: 'set',metric: 'e1rm',revision: 2,token: 'random-uuid' }),{ contract_version: 4, certification, created: true }],
     ['certification_get',() => api.getCompetitionCertification('g','c1','e1rm'),{ contract_version: 4, certification }],
     ['certification_end',() => api.endCompetitionCertification('g','c1','e1rm','cancel'),{ contract_version: 4, certification }],
@@ -212,6 +229,12 @@ describe('request-scoped protocol-4 API', () => {
     respond({ ...records,group_id: 'other',records: [] }); await expect(api.getCompetitionSessionRecords('g','u1','s')).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...history,certified: true }); await expect(api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false })).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...week,group_id: 'other' }); await expect(api.getCompetitionWeek('g',0,1000)).rejects.toMatchObject({ code: 'INTERNAL' });
+    // Period totals answer exactly the windows asked, in order, for this group.
+    respond({ ...periodTotals,group_id: 'other' }); await expect(api.getCompetitionPeriodTotals('g',PERIOD_WINDOWS)).rejects.toMatchObject({ code: 'INTERNAL' });
+    respond({ ...periodTotals,periods: [...periodTotals.periods].reverse() }); await expect(api.getCompetitionPeriodTotals('g',PERIOD_WINDOWS)).rejects.toMatchObject({ code: 'INTERNAL' });
+    respond({ ...periodTotals,periods: periodTotals.periods.slice(0,1) }); await expect(api.getCompetitionPeriodTotals('g',PERIOD_WINDOWS)).rejects.toMatchObject({ code: 'INTERNAL' });
+    respond(periodTotals); await api.getCompetitionPeriodTotals('g',PERIOD_WINDOWS);
+    expect(rpc).toHaveBeenLastCalledWith('group_competition_period_totals',{ p_group_id: 'g',p_windows: PERIOD_WINDOWS });
     for (const item of stream.items) {
       const foreign = clone(item) as CompetitionStreamItemWire;
       if ('groups' in foreign) foreign.groups[0].group_id = 'other';

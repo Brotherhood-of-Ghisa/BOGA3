@@ -11,6 +11,8 @@ const put = (key: string,payload: unknown,userId = 'u1',fetchedAtMs = 1000) =>
 const raw = (key: string,payload: unknown,userId = 'u1') => fixture.database.insert(groupCache)
   .values({ cacheKey: key,payloadJson: JSON.stringify(payload),userId,fetchedAtMs: 1 }).run();
 const keys = () => fixture.database.select().from(groupCache).all().filter(row => !row.cacheKey.startsWith('group-policy:')).map(row => row.cacheKey).sort();
+const periodTotals = (groupId: string) => ({ contract_version: 4,group_id: groupId,
+  periods: [{ start_ms: 0,end_ms: 1000,members: [{ member: { user_id: 'u1',username: 'me' },working_sets: 3,group_records: 1 }] }] });
 beforeEach(() => { fixture=createInMemoryDatabase(); });
 afterEach(() => fixture.close());
 
@@ -29,10 +31,23 @@ it.each([
   [groupCacheKeys.stream('g1'),competitionStream],
   [groupCacheKeys.session('g1','other','s1'),competitionSession],
   [groupCacheKeys.weekSummary('g1'),{ windowStartMs: 100,summary: competitionWeek }],
+  [groupCacheKeys.glance('g1','week',0),periodTotals('g1')],
+  [groupCacheKeys.glance('g1','month',-3),periodTotals('g1')],
 ])('round-trips a closed public payload: %s', (key,payload) => {
   put(key as string,payload);
   expect(readGroupCache(fixture.database,key as string,'u1')).toEqual({ payload,fetchedAtMs: 1000 });
   expect(readGroupCache(fixture.database,key as string,'u2')).toBeNull();
+});
+it.each([
+  ['another group',groupCacheKeys.glance('g1','week',0),periodTotals('g2')],
+  ['an unknown period',groupCacheKeys.glance('g1','week',0).replace(':week:',':year:'),periodTotals('g1')],
+  ['a later offset',groupCacheKeys.glance('g1','week',1),periodTotals('g1')],
+  ['a padded offset',groupCacheKeys.glance('g1','week',0).replace(/:0$/,':-0'),periodTotals('g1')],
+  ['a volume figure',groupCacheKeys.glance('g1','week',0),{ ...periodTotals('g1'),volume_kg_reps: 5 }],
+])('refuses an At a glance entry for %s', (_label,key,payload) => {
+  expect(() => put(key,payload)).toThrow('Unsafe group cache payload.');
+  raw(key,payload);
+  expect(readGroupCache(fixture.database,key,'u1')).toBeNull();
 });
 it('upserts owner and fetch time without exposing the earlier account', () => {
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
@@ -85,9 +100,13 @@ it('access loss drops group projections and every session join; local links rema
   put(groupCacheKeys.group('g1'),competitionGroupDetail);
   put(groupCacheKeys.stream('g1'),competitionStream);
   put(groupCacheKeys.session('g1','other','s1'),competitionSession);
+  put(groupCacheKeys.glance('g1','week',0),periodTotals('g1'));
+  put(groupCacheKeys.glance('g1','month',-2),periodTotals('g1'));
+  put(groupCacheKeys.glance('g10','week',0),periodTotals('g10'));
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   evictGroup(fixture.database,'g1');
-  expect(keys()).toEqual([groupCacheKeys.mine]);
+  // Every At a glance entry of g1 goes; g10's (a longer id with the same prefix) stays.
+  expect(keys()).toEqual([groupCacheKeys.glance('g10','week',0),groupCacheKeys.mine].sort());
 });
 it('account eviction, entry deletion and a wipe have distinct scopes', () => {
   put(groupCacheKeys.mine,{ groups: [] });

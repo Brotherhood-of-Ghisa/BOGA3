@@ -1,5 +1,5 @@
 import { formatWeekRange, monthName, shortMonthName } from '@/components/today/progress-format';
-import type { GroupHomePeriod } from '@/src/groups/home-mock';
+import type { GroupHomePeriod } from '@/src/groups/home-periods';
 import type { LocalWindow } from '@/src/utils/local-calendar';
 
 /** The stepper's two lines: the period's name, then the dates it covers. */
@@ -24,10 +24,6 @@ export const groupHomePeriodLabel = (period: GroupHomePeriod, window: LocalWindo
     ? { title: relative, detail: formatWeekRange(window) }
     : { title: formatWeekRange(window), detail: monthDetail(window) };
 };
-
-/** A winners row's period: `Mon 6 – Sun 12` for a week, `Oct 2026` for a month. */
-export const groupHomeWinnerPeriodLabel = (period: GroupHomePeriod, window: LocalWindow): string =>
-  period === 'week' ? formatWeekRange(window) : `${shortMonthName(window.start)} ${window.start.getFullYear()}`;
 
 /** A chart column: `5 Oct` for a week (its Monday), `Oct` for a month. */
 export const groupHomeColumnLabel = (period: GroupHomePeriod, window: LocalWindow): string =>

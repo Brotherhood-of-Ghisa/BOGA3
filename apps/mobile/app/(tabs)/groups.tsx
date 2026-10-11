@@ -24,7 +24,8 @@ import {
 } from '@/components/groups';
 import { IconButton, ScreenScroll } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
-import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-mock';
+import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-periods';
+import { useGroupGlance } from '@/src/groups/use-group-glance';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { useAuth } from '@/src/auth';
 import {
@@ -80,6 +81,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
   // a week or a month. They live for the visit, like the Progress filters.
   const [metric, setMetric] = useState<GroupHomeMetric>('sets');
   const [period, setPeriod] = useState<GroupHomePeriod>('week');
+  // The stepper: 0 is the period in progress, -1 the one before.
+  const [glanceOffset, setGlanceOffset] = useState(0);
   const [hiddenEventKinds, setHiddenEventKinds] = useState<readonly StreamEventKind[]>(DEFAULT_HIDDEN_STREAM_EVENT_KINDS);
   const [eventsSheet, setEventsSheet] = useState(false);
   // A new link (Today's group title, a membership row) wins over the last
@@ -108,25 +111,33 @@ function GroupsTabContent({ userId }: { userId: string }) {
     evictGroupIdOnNotFound: selectedGroupId,
   });
 
+  // Cache-first, read only while At a glance is open.
+  const glance = useGroupGlance({
+    userId,
+    groupId: segment === 'glance' ? selectedGroupId : null,
+    period,
+    offset: glanceOffset,
+    now: new Date(),
+  });
+
   // Lost access to the selected group: refresh My groups so its chip goes
   // and the selection moves to another group.
   const refreshMine = mine.refresh;
-  const lostAccess = stream.lostAccess || boards.lostAccess;
+  const lostAccess = stream.lostAccess || boards.lostAccess || glance.resource.lostAccess;
   useEffect(() => {
     if (lostAccess) void refreshMine();
   }, [lostAccess, refreshMine]);
 
   const refreshStream = stream.refresh;
   const refreshBoards = boards.refresh;
+  const refreshGlance = glance.resource.refresh;
   const refreshAll = useCallback(
-    () => Promise.all([refreshMine(), refreshStream(), refreshBoards()]),
-    [refreshMine, refreshStream, refreshBoards],
+    () => Promise.all([refreshMine(), refreshStream(), refreshBoards(), refreshGlance()]),
+    [refreshMine, refreshStream, refreshBoards, refreshGlance],
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
-  // At a glance has no read of its own while its figures are mocked, so it
-  // reports the stream's: the offline marker and the inline error stay true.
-  const segmentResource = segment === 'leaderboards' ? boards : stream;
+  const segmentResource = segment === 'leaderboards' ? boards : segment === 'glance' ? glance.resource : stream;
   const offline = mine.offline || segmentResource.offline;
   const inlineError = pickInlineError(mine.error, segmentResource.error);
   const hasGroups = groups !== null && groups.length > 0;
@@ -192,7 +203,18 @@ function GroupsTabContent({ userId }: { userId: string }) {
     return (
       <ScreenScroll refreshControl={refreshControl} testID="groups-screen">
         {header}
-        <GroupGlancePage metric={metric} myUserId={userId} now={new Date()} period={period} />
+        <GroupGlancePage
+          error={inlineError}
+          metric={metric}
+          myUserId={userId}
+          now={new Date()}
+          offline={offline}
+          offset={glanceOffset}
+          onOffsetChange={setGlanceOffset}
+          onRetry={onRefresh}
+          period={period}
+          series={glance.series}
+        />
       </ScreenScroll>
     );
   }

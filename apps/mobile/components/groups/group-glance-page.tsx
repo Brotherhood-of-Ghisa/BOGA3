@@ -1,33 +1,40 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { todayText } from '@/components/today/text-styles';
 import { Card } from '@/components/ui/card';
 import { SectionHeader } from '@/components/ui/page-header';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import type { GroupApiError } from '@/src/groups/api';
 import {
-  readGroupHomeWindow,
+  GROUP_RANK_PERIODS,
+  groupHomeWindowFor,
   type GroupHomeMetric,
   type GroupHomePeriod,
-} from '@/src/groups/home-mock';
-import {
-  buildGroupHomeBoard,
-  buildGroupRankSeries,
-  GROUP_HOME_METRIC_LABELS,
-  GROUP_RANK_PERIODS,
-} from '@/src/groups/home-view-model';
+  type GroupHomeWindow,
+} from '@/src/groups/home-periods';
+import { buildGroupHomeBoard, buildGroupRankSeries, GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
 
 import { GroupHomeBoard } from './group-home-board';
 import { groupHomeColumnLabel, groupHomePeriodLabel } from './group-home-labels';
 import { GroupHomeStepper } from './group-home-stepper';
 import { GroupRankChart } from './group-rank-chart';
 import { GroupRankTable } from './group-rank-table';
+import { GroupMissingDataState } from './group-state-view';
 
 export type GroupGlancePageProps = {
   myUserId: string;
   now: Date;
   metric: GroupHomeMetric;
   period: GroupHomePeriod;
+  /** 0 is the period in progress; the stepper only walks backwards from it. */
+  offset: number;
+  onOffsetChange: (next: number) => void;
+  /** The period at `offset` and the five before it, oldest first; null until read. */
+  series: GroupHomeWindow[] | null;
+  error: GroupApiError | null;
+  offline: boolean;
+  onRetry: () => void;
 };
 
 const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks', month: 'months' };
@@ -36,41 +43,46 @@ const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks', month: 'mo
  * At a glance: the period's top five by the chosen metric, with a stepper back
  * through earlier periods, then every member's place over the last six
  * periods. Selecting a column in the chart reads that period's full ranking
- * into the table under it.
- *
- * MOCK: every figure comes from `src/groups/home-mock`, so the section can be
- * reviewed before the server read exists. Nothing is written or cached.
+ * into the table under it. The figures are the screen's period-totals read.
  */
-export function GroupGlancePage({ myUserId, now, metric, period }: GroupGlancePageProps) {
-  // 0 is the period in progress; the stepper only walks backwards from it.
-  const [offset, setOffset] = useState(0);
+export function GroupGlancePage({ myUserId, now, metric, period, offset, onOffsetChange, series, error, offline, onRetry }: GroupGlancePageProps) {
   // The chart column is held by its period, so it survives a metric change and
   // follows the same calendar period while the stepper keeps it in range.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const nowMs = now.getTime();
-
-  const read = useMemo(() => readGroupHomeWindow({ period, offset, now: new Date(nowMs) }), [period, offset, nowMs]);
-  const series = useMemo(
-    () => buildGroupRankSeries({ period, offset, now: new Date(nowMs), metric }),
-    [period, offset, nowMs, metric],
+  const label = groupHomePeriodLabel(period, groupHomeWindowFor(period, now, offset), offset);
+  const stepper = (
+    <GroupHomeStepper
+      canGoLater={offset < 0}
+      label={label}
+      onEarlier={() => onOffsetChange(offset - 1)}
+      onLater={() => onOffsetChange(Math.min(0, offset + 1))}
+      period={period}
+    />
   );
-  const board = buildGroupHomeBoard({ members: read.members, metric, myUserId });
-  const label = groupHomePeriodLabel(period, read.window, offset);
-  const found = series.periods.findIndex((entry) => entry.key === selectedKey);
-  const selectedIndex = found >= 0 ? found : series.periods.length - 1;
-  const selected = series.periods[selectedIndex];
+
+  if (!series) {
+    return (
+      <View style={styles.sections} testID="group-glance">
+        <Card testID="group-home-board-card">
+          <View style={styles.card}>{stepper}</View>
+        </Card>
+        <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
+      </View>
+    );
+  }
+
+  const read = series[series.length - 1];
+  const board = buildGroupHomeBoard({ members: read?.members ?? [], metric, myUserId });
+  const rankSeries = buildGroupRankSeries({ period, reads: series, metric, includesCurrent: offset === 0 });
+  const found = rankSeries.periods.findIndex((entry) => entry.key === selectedKey);
+  const selectedIndex = found >= 0 ? found : rankSeries.periods.length - 1;
+  const selected = rankSeries.periods[selectedIndex];
 
   return (
     <View style={styles.sections} testID="group-glance">
       <Card testID="group-home-board-card">
         <View style={styles.card}>
-          <GroupHomeStepper
-            canGoLater={offset < 0}
-            label={label}
-            onEarlier={() => setOffset((current) => current - 1)}
-            onLater={() => setOffset((current) => Math.min(0, current + 1))}
-            period={period}
-          />
+          {stepper}
           <GroupHomeBoard board={board} metric={metric} />
         </View>
       </Card>
@@ -84,10 +96,10 @@ export function GroupGlancePage({ myUserId, now, metric, period }: GroupGlancePa
             </Text>
             <GroupRankChart
               accessibilityLabel={`Place over the last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
-              columnLabels={series.periods.map((entry) => groupHomeColumnLabel(period, entry.window))}
-              onSelect={(index) => setSelectedKey(series.periods[index]?.key ?? null)}
+              columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(period, entry.window))}
+              onSelect={(index) => setSelectedKey(rankSeries.periods[index]?.key ?? null)}
               selectedIndex={selectedIndex}
-              series={series}
+              series={rankSeries}
             />
             {selected ? (
               <>
@@ -95,7 +107,7 @@ export function GroupGlancePage({ myUserId, now, metric, period }: GroupGlancePa
                 <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="group-position-selected">
                   {`${groupHomePeriodLabel(period, selected.window, 0).detail}${selected.current ? ' · so far' : ''}`}
                 </Text>
-                <GroupRankTable entries={selected.entries} metric={metric} />
+                <GroupRankTable entries={selected.entries} />
               </>
             ) : null}
           </View>

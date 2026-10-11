@@ -138,6 +138,11 @@ export type CompetitionStreamItemWire =
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef };
 export type CompetitionStreamWire = { contract_version: 4; items: CompetitionStreamItemWire[]; next_cursor: string | null; has_more: boolean };
+/** At a glance: every current member's working sets and group records per requested window, in request order. */
+export type CompetitionPeriodTotalsWire = {
+  contract_version: 4; group_id: string;
+  periods: { start_ms: number; end_ms: number; members: { member: GroupMemberRef; working_sets: number; group_records: number }[] }[];
+};
 export type CompetitionWeekSummaryWire = {
   contract_version: 4; group_id: string;
   members: { rank: number; member: GroupMemberRef; working_sets: number; group_records: number }[];

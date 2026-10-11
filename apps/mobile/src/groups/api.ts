@@ -2,10 +2,10 @@ import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
   isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
-  isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
+  isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
 import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire,
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
-  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
+  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionPeriodTotalsWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
@@ -120,7 +120,8 @@ export type GroupRpcName =
   | 'group_competition_stream_v2'
   | 'group_competition_session_detail'
   | 'group_competition_session_records'
-  | 'group_competition_week_summary';
+  | 'group_competition_week_summary'
+  | 'group_competition_period_totals';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -311,6 +312,13 @@ export const getCompetitionSessionRecords = (groupId: string, memberId: string, 
   competitionRpc('group_competition_session_records',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionRecordsWire,p => p.group_id === groupId && p.member_user_id === memberId && p.session_id === sessionId);
 export const getCompetitionWeek = (groupId: string, start: number, end: number): Promise<CompetitionWeekSummaryWire> =>
   competitionRpc('group_competition_week_summary',{ p_group_id: groupId, p_window_start_ms: start, p_window_end_ms: end },isCompetitionWeekSummaryWire,p => p.group_id === groupId);
+/** One window, as the client's local calendar draws it: `[start_ms, end_ms)`. */
+export type CompetitionPeriodWindow = { start_ms: number; end_ms: number };
+/** The windows' totals, answered for exactly the windows asked, in order. */
+export const getCompetitionPeriodTotals = (groupId: string, windows: CompetitionPeriodWindow[]): Promise<CompetitionPeriodTotalsWire> =>
+  competitionRpc('group_competition_period_totals',{ p_group_id: groupId, p_windows: windows },isCompetitionPeriodTotalsWire,
+    p => p.group_id === groupId && p.periods.length === windows.length &&
+      p.periods.every((entry,index) => entry.start_ms === windows[index]?.start_ms && entry.end_ms === windows[index]?.end_ms));
 export const certifyCompetition = ({ groupId, exerciseId, memberId, setId, metric, revision, token }: {
   groupId: string; exerciseId: string; memberId: string; setId: string; metric: CompetitionMetric; revision: number; token: string }): Promise<CompetitionCertifyResultWire> =>
   competitionRpc('group_competition_certify',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_member_user_id: memberId,

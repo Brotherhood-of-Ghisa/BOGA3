@@ -60,6 +60,7 @@ jest.mock('@/src/groups/api', () => {
   endCompetitionCertification: jest.fn(),
   listCompetitionExercises: jest.fn(),
   getCompetitionPodiums: jest.fn(),
+  getCompetitionPeriodTotals: jest.fn(),
   };
 });
 
@@ -78,6 +79,8 @@ import {
 } from '@/src/groups';
 import type { CompetitionCertificationWire,CompetitionSessionRecordsWire,CompetitionStreamWire as GroupStreamResult,CompetitionStreamItemWire as StreamItem,CompetitionSessionDetailWire as GroupSessionDetailResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
+import type { CompetitionPeriodWindow } from '@/src/groups/api';
+import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
@@ -159,6 +162,18 @@ const page = (items: StreamItem[], overrides: Partial<GroupStreamResult> = {}): 
   next_cursor: null,
   has_more: false,
   ...overrides,
+});
+
+// At a glance's read: the requested windows, each with the same three members.
+const GLANCE_ROWS = [
+  { member: { user_id: 'friend-1', username: 'alex' }, working_sets: 12, group_records: 1 },
+  { member: { user_id: USER_ID, username: 'me' }, working_sets: 9, group_records: 3 },
+  { member: { user_id: 'friend-2', username: 'sam' }, working_sets: 4, group_records: 0 },
+];
+const periodTotals = (groupId: string, windows: CompetitionPeriodWindow[]): CompetitionPeriodTotalsWire => ({
+  contract_version: 4,
+  group_id: groupId,
+  periods: windows.map((window) => ({ ...window, members: GLANCE_ROWS })),
 });
 
 const GROUP_A_DETAIL: GroupGetResult = {
@@ -273,6 +288,7 @@ beforeEach(() => {
   api.listMyGroups.mockResolvedValue({ groups: [GROUP_A, GROUP_B] });
   api.getCompetitionStream.mockResolvedValue(page([]));
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
+  api.getCompetitionPeriodTotals.mockImplementation(async (groupId, windows) => periodTotals(groupId, windows));
   api.getCompetitionSession.mockResolvedValue(sessionDetail());
   api.getCompetitionSessionRecords.mockResolvedValue({ ...sessionRecords(), records: [] });
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listCompetitionExercises>>);
@@ -474,10 +490,14 @@ describe('Groups tab', () => {
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     api.listMyGroups.mockRejectedValue(networkError());
     api.getCompetitionStream.mockRejectedValue(networkError());
+    api.getCompetitionPeriodTotals.mockRejectedValue(networkError());
 
     render(<GroupsTabRoute />);
+    // At a glance has nothing cached, so the marker dates My groups.
     expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
+    expect(await screen.findByTestId('group-glance-offline-empty-state')).toBeTruthy();
     await openStream();
+    expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
     expect(screen.queryByTestId('groups-inline-error')).toBeNull();
   });
@@ -509,8 +529,8 @@ describe('Groups tab', () => {
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_competition_stream returned an unexpected competition payload.'));
     render(<GroupsTabRoute />);
-    expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
     await openStream();
+    expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
   });
 
@@ -519,19 +539,79 @@ describe('Groups tab', () => {
     await screen.findByTestId('groups-filters');
 
     expect(sectionLabel()).toContain('At a glance');
-    expect(screen.getByTestId('group-home-board')).toBeTruthy();
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
     expect(screen.getByTestId('groups-filter-period')).toHaveTextContent('Week');
 
-    // The metric pill cycles, and the board follows it.
+    // The metric pill cycles Sets -> PRs (no Volume), and the board follows it.
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
-    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Volume');
-    expect(within(screen.getByTestId('group-home-board')).getByText('Vol')).toBeTruthy();
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('PRs');
+    expect(within(screen.getByTestId('group-home-board')).getByText('PRs')).toBeTruthy();
+    expect(screen.getByTestId(`group-home-board-row-${USER_ID}-value`)).toHaveTextContent('3');
+    fireEvent.press(screen.getByTestId('groups-filter-metric'));
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
 
     // The metric and period pills belong to At a glance alone; the section pill stays.
     goToSection('Stream');
     expect(screen.queryByTestId('groups-filter-metric')).toBeNull();
     expect(screen.getByTestId('groups-filter-section')).toBeTruthy();
+  });
+
+  it('reads At a glance from the selected group: six windows, the newest the current week', async () => {
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('group-home-board');
+
+    expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(1);
+    const [groupId, windows] = api.getCompetitionPeriodTotals.mock.calls[0]!;
+    expect(groupId).toBe('group-a');
+    expect(windows).toHaveLength(6);
+    // Consecutive local weeks, oldest first, the last one holding now.
+    windows.slice(1).forEach((window, index) => expect(window.start_ms).toBe(windows[index]!.end_ms));
+    const now = Date.now();
+    expect(windows[5]!.start_ms).toBeLessThanOrEqual(now);
+    expect(windows[5]!.end_ms).toBeGreaterThan(now);
+    // The server's figures, ranked here; my own row reads as You.
+    expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
+    expect(within(screen.getByTestId(`group-home-board-row-${USER_ID}`)).getByText('You')).toBeTruthy();
+    expect(within(screen.getByTestId('group-rank-table')).getByText('alex')).toBeTruthy();
+    expect(cached(groupCacheKeys.glance('group-a', 'week', 0))?.payload).toEqual(periodTotals('group-a', windows));
+
+    // A step back is its own read: the same six-window span, one week earlier.
+    fireEvent.press(screen.getByTestId('group-home-period-earlier'));
+    await waitFor(() => expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(2));
+    const [, earlier] = api.getCompetitionPeriodTotals.mock.calls[1]!;
+    expect(earlier[5]).toEqual(windows[4]);
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
+    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
+  });
+
+  it('never shows a cached At a glance read for other windows, and reads the current ones at once', async () => {
+    seed(groupCacheKeys.mine, { groups: [GROUP_A, GROUP_B] });
+    // Cached before the week turned over: other windows than the ones in view.
+    seed(groupCacheKeys.glance('group-a', 'week', 0), periodTotals('group-a', [{ start_ms: 0, end_ms: 1 }]));
+    const read = deferred<CompetitionPeriodTotalsWire>();
+    api.getCompetitionPeriodTotals.mockReturnValue(read.promise);
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-filters');
+
+    expect(await screen.findByTestId('group-glance-loading')).toBeTruthy();
+    expect(screen.queryByTestId('group-home-board')).toBeNull();
+    // The stepper stays, so the period in view is still named.
+    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('This week');
+    const [, windows] = api.getCompetitionPeriodTotals.mock.calls[0]!;
+    await act(async () => read.resolve(periodTotals('group-a', windows)));
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
+  });
+
+  it('shows an At a glance read failure in place of the board, with a retry', async () => {
+    api.getCompetitionPeriodTotals.mockRejectedValue(new GroupApiError('INTERNAL', 'group_competition_period_totals failed.'));
+    render(<GroupsTabRoute />);
+
+    expect(await screen.findByTestId('group-glance-error-state')).toBeTruthy();
+    expect(screen.queryByTestId('group-home-board')).toBeNull();
+    api.getCompetitionPeriodTotals.mockImplementation(async (groupId, windows) => periodTotals(groupId, windows));
+    fireEvent.press(screen.getByTestId('group-glance-error-state-retry'));
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
   });
 
   it('loads older pages online at the end of the list (infinite scroll)', async () => {

@@ -11,7 +11,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
 } }));
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
-  getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
+  getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup } from '@/src/groups/api';
 
 const env=readGroupsLiveEnv();
@@ -88,6 +88,14 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const stream=await as(owner,() => getCompetitionStream(groupId));
   expect(stream.items.some(item => item.kind==='session' && item.session.session_id===sessionId)).toBe(true);
   expect(await as(owner,() => getCompetitionWeek(groupId,joined.sort_at_ms-1,joined.sort_at_ms+120_000))).toMatchObject({ contract_version: 4,group_id: groupId });
+  // At a glance: the windows come back in request order with every member's
+  // counts (the session's one working set and its record on both boards).
+  const windows=[{ start_ms: joined.sort_at_ms-1,end_ms: joined.sort_at_ms+120_000 },{ start_ms: 0,end_ms: 1 }];
+  const totals=await as(owner,() => getCompetitionPeriodTotals(groupId,windows));
+  expect(totals.periods.map(entry => [entry.start_ms,entry.end_ms])).toEqual(windows.map(entry => [entry.start_ms,entry.end_ms]));
+  expect(totals.periods[0].members.find(row => row.member.user_id===member.userId)).toMatchObject({ working_sets: 1,group_records: 2 });
+  expect(totals.periods[0].members.find(row => row.member.user_id===owner.userId)).toMatchObject({ working_sets: 0,group_records: 0 });
+  expect(totals.periods[1].members.every(row => row.working_sets===0 && row.group_records===0)).toBe(true);
   expect((await as(owner,() => getCompetitionPodiums(groupId,false))).podiums[0].board.metric).toBe('volume');
   expect((await as(owner,() => getCompetitionRevisions(groupId,exerciseId))).revisions.length).toBeGreaterThan(0);
   expect(await as(owner,() => getCompetitionHistory({ groupId,exerciseId,metric: 'volume',certified: false }))).toMatchObject({ metric: 'volume',certified: false });
