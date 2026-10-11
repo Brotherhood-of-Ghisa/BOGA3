@@ -22,10 +22,13 @@ const MICRO_LABEL_ADVANCE = 0.95;
 /**
  * The width a figure column reserves: the widest full figure it must hold, and
  * never less than its own header label, so neither one wraps while the other
- * has room.
+ * has room. `labelExtra` is anything the header draws beside that label — a
+ * sort indicator — which would otherwise push the label out of its column.
  */
-export const statsTableColumnWidth = (headerLabel: string, figures: string[]): number => Math.max(
-  headerLabel.length * uiTypography.size.xxs * MICRO_LABEL_ADVANCE,
+export const statsTableColumnWidth = (
+  headerLabel: string, figures: string[], labelExtra = 0,
+): number => Math.max(
+  headerLabel.length * uiTypography.size.xxs * MICRO_LABEL_ADVANCE + labelExtra,
   ...figures.map(figure => figure.length * uiTypography.size.md * FIGURE_ADVANCE + uiSpace.xs),
 );
 

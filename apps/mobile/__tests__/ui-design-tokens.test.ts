@@ -1,4 +1,5 @@
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import { generateRoles } from '@/components/ui/theme';
 import * as tokens from '@/components/ui/tokens';
 
 // The token rules that stay true for good (`docs/specs/ui/design-language.md`
@@ -26,10 +27,12 @@ describe('design-language tokens', () => {
         'accent',
         'accentWash',
         'danger',
+        'gain',
         'ink',
         'inkFaint',
         'inkGhost',
         'inkMuted',
+        'loss',
         'paper',
         'record',
         'recordRule',
@@ -141,6 +144,35 @@ describe('design-language tokens', () => {
     // real reading surface too — and the wash is the value most likely to be
     // "warmed up" later.
     expect(contrastRatio(uiRoles.record, uiRoles.recordWash)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  describe('a change\'s two directions (design-language.md §6)', () => {
+    // Every change figure takes one of these, and nothing else does, so an
+    // improvement and a decrease can never read as each other — or as the
+    // delete red, which `loss` must stay distinct from.
+    it('keeps both legible as figures on either ground', () => {
+      for (const direction of [uiRoles.gain, uiRoles.loss]) {
+        expect(contrastRatio(direction, uiRoles.paper)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(direction, uiRoles.surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it('tells the two apart by hue at one weight, and neither from `danger`', () => {
+      // One L* for both: the pair reads as equals that differ only in
+      // direction, rather than one shouting.
+      expect(Math.abs(lightness(uiRoles.gain) - lightness(uiRoles.loss))).toBeLessThanOrEqual(2);
+      expect(hueDistance(lch(uiRoles.gain).hue, lch(uiRoles.loss).hue)).toBeGreaterThanOrEqual(90);
+      expect(uiRoles.loss).not.toBe(uiRoles.danger);
+      expect(hueDistance(lch(uiRoles.loss).hue, lch(uiRoles.danger).hue)).toBeGreaterThanOrEqual(10);
+    });
+
+    it('is fixed in every theme, whatever the seeds', () => {
+      // `danger` and the two directions are not seeded: a decrease stays red
+      // and an improvement green however the accent is picked.
+      const rose = generateRoles({ ground: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' });
+      expect(rose.gain).toBe(uiRoles.gain);
+      expect(rose.loss).toBe(uiRoles.loss);
+    });
   });
 
   describe('data-visualisation ramp (design-language.md §2)', () => {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { changeToneColour, type ChangeTone } from '@/components/ui/change-tone';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { hasVolumeReference, type ExerciseVolumeComparison } from '@/src/session-insights';
 
@@ -31,6 +32,17 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
   const percentage = Math.round((Math.abs(delta) / comparison.medianVolume) * 100);
   if (!Number.isFinite(percentage)) return delta > 0 ? 'Above median' : 'Below median';
   return `${percentage}% ${delta > 0 ? 'above' : 'below'} median`;
+};
+
+/**
+ * Which way this session's Volume went against its median, for the colour
+ * every change figure takes (`design-language.md` §6). At the median, with no
+ * reference, or with no volume at all, there is no direction.
+ */
+export const exerciseVolumeTone = (comparison: ExerciseVolumeComparison): ChangeTone => {
+  if (comparison.currentVolume === null || comparison.medianVolume === null) return 'neutral';
+  const delta = comparison.currentVolume - comparison.medianVolume;
+  return delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral';
 };
 
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
@@ -99,7 +111,8 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
             <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
             <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
           </View>
-          {hasDistribution ? <Text allowFontScaling={false} style={styles.delta}>
+          {hasDistribution ? <Text allowFontScaling={false}
+            style={[styles.delta, { color: changeToneColour(exerciseVolumeTone(comparison)) }]}>
             {formatExerciseVolumeComparison(comparison)}
           </Text> : null}
         </View>

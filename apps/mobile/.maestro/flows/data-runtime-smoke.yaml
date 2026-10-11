@@ -162,6 +162,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-exercise-list"
     timeout: 15000
+# The metric is remembered on the device too, and no deep link carries it, so
+# cycle the chip onto Sets rather than trusting what the last run stored: the
+# rows a table draws depend on which figure it is showing.
+- repeat:
+    while:
+      notVisible:
+        id: "stats-metric-chip-workingSetCount"
+    commands:
+      - tapOn:
+          id: "stats-metric-chip"
 - assertVisible:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - assertNotVisible:

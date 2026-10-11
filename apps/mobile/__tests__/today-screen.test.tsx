@@ -170,6 +170,9 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.getByText('October so far')).toBeTruthy();
     expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     expect(text('today-progress-month-difference')).toHaveTextContent('+12');
+    // Ahead of the pace is an improvement, in the one colour every change
+    // figure uses for one (`design-language.md` §6).
+    expect(text('today-progress-month-difference')).toHaveStyle({ color: uiRoles.gain });
     expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
     // No summary line under the chart; its spoken label still carries the
     // projection the chart draws (18 over 16 days, across 31: 34.9 → 35).

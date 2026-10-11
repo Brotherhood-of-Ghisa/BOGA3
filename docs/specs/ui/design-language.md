@@ -42,6 +42,8 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
   `ink-muted` → `ink-faint` → `ink-ghost`. `scrim` follows `ink`, at 42%.
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
+- **`danger` and the two change directions are not seeded** (§6): a decrease
+  must not read as a delete, so `loss` keeps its own hue away from `danger`'s.
 
 **Four seeds make a theme.** `generateRoles(seeds)` turns `ground`, `accent`,
 `record` and `viz` into every role, synchronously at module load so every
@@ -174,8 +176,17 @@ additionally render faded ([[set.row-figures]], §6).
   Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
-- **Deltas carry their sign, not a hue.** `+3`, `−12%` and `new` take ink
-  roles, never red or green by direction.
+- **A change carries its direction**, in colour as well as in its sign: an
+  improvement is `gain`, a decrease `loss`, and no direction — level,
+  unavailable — stays `ink`. A figure with no earlier value to fall from
+  (`new`) is an improvement. This holds for a change against an earlier period
+  ([[comparison.change-display]]) and against a reference (a session's Volume
+  on its median). The two colours are fixed in every theme, like `danger`, so
+  "better" never follows the picked accent's hue; they sit at one lightness and
+  differ only in hue, so neither shouts. **Colour is never the only channel:**
+  the figure still says `+3`, `−12%`, `±0`, `new` or `—`. One rule, every
+  change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
+  it lives, and no screen picks a delta colour of its own.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.

@@ -82,8 +82,13 @@ it('restores the remembered Progress filters after relaunch, per account, as pla
   await account();
   expect(values().progressBreakdown).toBe('muscle');
   expect(values().progressMetric).toBe('workingSetCount');
+  // Each table remembers its own metric: only the Exercise table can hold 1RM.
+  expect(values().progressExerciseMetric).toBe('workingSetCount');
   expect(Object.keys(values())).not.toContain('progressPeriod');
 
+  setAccountLocalPreferences({ progressExerciseMetric: 'estimatedOneRepMax' });
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressExerciseMetric'))).toBe('estimatedOneRepMax');
+  expect(values().progressMetric).toBe('workingSetCount');
   setAccountLocalPreferences({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
   // Each is its own scoped key, written as its own text: a JSON-quoted value
   // is what the shared `heatmapView` branch avoids, and would read back null.
@@ -92,15 +97,17 @@ it('restores the remembered Progress filters after relaunch, per account, as pla
 
   __resetAccountLocalPreferencesForTests();
   await account();
-  expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressMetric: 'totalVolume' });
+  expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressMetric: 'totalVolume',
+    progressExerciseMetric: 'estimatedOneRepMax' });
 
   await account('B');
-  expect(values()).toMatchObject({ progressBreakdown: 'muscle', progressMetric: 'workingSetCount' });
+  expect(values()).toMatchObject({ progressBreakdown: 'muscle', progressMetric: 'workingSetCount',
+    progressExerciseMetric: 'workingSetCount' });
   await account('A');
   expect(values().progressMetric).toBe('totalVolume');
 });
 
-it.each(['progressBreakdown', 'progressMetric'] as const)(
+it.each(['progressBreakdown', 'progressMetric', 'progressExerciseMetric'] as const)(
   'keeps the stored %s when an unreadable value is offered, and reports why', async field => {
     Storage.setItemSync(preferenceKey('account:A', field), '"muscle"');
     await account();
@@ -118,6 +125,10 @@ it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('historyLookbackWeeks', 521)).toBe(false);
   expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
+  // 1RM is the Exercise table's alone: the Muscle table's metric rejects it.
+  expect(isPreferenceValue('progressMetric', 'estimatedOneRepMax')).toBe(false);
+  expect(isPreferenceValue('progressExerciseMetric', 'estimatedOneRepMax')).toBe(true);
+  expect(isPreferenceValue('progressExerciseMetric', 'sideways')).toBe(false);
   for (const invalid of [[], [0, 0], [-1], [1.5], [NaN], [Infinity], [Number.MAX_SAFE_INTEGER + 1]]) {
     expect(isPreferenceValue('displayEfforts', invalid)).toBe(false);
   }
