@@ -117,12 +117,130 @@ export class BogaAgentApi {
     return this.#getObject('v1/agent/workouts/recent', accessToken, input);
   }
 
+  async getExerciseHistory(
+    accessToken: string,
+    input: { cursor?: string; exercise_id: string; limit?: number },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject(
+      `v1/agent/exercises/${encodeURIComponent(input.exercise_id)}/history`,
+      accessToken,
+      { cursor: input.cursor, limit: input.limit },
+    );
+  }
+
+  async getWorkoutDetail(
+    accessToken: string,
+    input: { cursor?: string; limit?: number; session_id: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject(
+      `v1/agent/workouts/${encodeURIComponent(input.session_id)}`,
+      accessToken,
+      { cursor: input.cursor, limit: input.limit },
+    );
+  }
+
+  async getUpcomingSessionPlans(
+    accessToken: string,
+    input: { cursor?: string; include_unscheduled?: boolean; limit?: number },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject(
+      'v1/agent/session-plans',
+      accessToken,
+      {
+        cursor: input.cursor,
+        include_unscheduled: input.include_unscheduled,
+        limit: input.limit,
+      },
+    );
+  }
+
+  async createSessionPlan(
+    accessToken: string,
+    input: {
+      idempotency_key: string;
+      plan: {
+        exercises: Array<{
+          exercise_definition_id?: string;
+          name: string;
+          sets: Array<{
+            target_reps: number;
+            target_set_type?: string;
+            target_weight_value?: string;
+          }>;
+        }>;
+        gym_id?: string;
+        scheduled_for?: number;
+        title: string;
+      };
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      'v1/agent/session-plans',
+      accessToken,
+      input.idempotency_key,
+      input.plan,
+    );
+  }
+
+  async createTrainingProgramme(
+    accessToken: string,
+    input: {
+      idempotency_key: string;
+      programme: {
+        description?: string;
+        name: string;
+        plans: Array<{
+          exercises: Array<{
+            exercise_definition_id?: string;
+            name: string;
+            sets: Array<{
+              target_reps: number;
+              target_set_type?: string;
+              target_weight_value?: string;
+            }>;
+          }>;
+          gym_id?: string;
+          scheduled_for?: number;
+          title: string;
+        }>;
+      };
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      'v1/agent/programmes',
+      accessToken,
+      input.idempotency_key,
+      input.programme,
+    );
+  }
+
   async #getObject(
     relativePath: string,
     accessToken: string,
-    query: Record<string, string | number | undefined> = {},
+    query: Record<string, string | number | boolean | undefined> = {},
   ): Promise<Record<string, unknown>> {
     const value = await this.#get(relativePath, accessToken, query);
+    if (!isObject(value)) {
+      throw new BogaAgentApiError(
+        502,
+        'INVALID_UPSTREAM_RESPONSE',
+        'BoGa returned an invalid response.',
+        null,
+      );
+    }
+    return value;
+  }
+
+  async #postObject(
+    relativePath: string,
+    accessToken: string,
+    idempotencyKey: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const value = await this.#request('POST', relativePath, accessToken, {
+      body,
+      idempotencyKey,
+    });
     if (!isObject(value)) {
       throw new BogaAgentApiError(
         502,
@@ -137,50 +255,85 @@ export class BogaAgentApi {
   async #get(
     relativePath: string,
     accessToken: string,
-    query: Record<string, string | number | undefined> = {},
+    query: Record<string, string | number | boolean | undefined> = {},
+  ): Promise<unknown> {
+    return this.#request('GET', relativePath, accessToken, { query });
+  }
+
+  async #request(
+    method: 'GET' | 'POST',
+    relativePath: string,
+    accessToken: string,
+    options: {
+      body?: Record<string, unknown>;
+      idempotencyKey?: string;
+      query?: Record<string, string | number | boolean | undefined>;
+    } = {},
   ): Promise<unknown> {
     if (!accessToken.trim()) {
       throw new BogaAgentApiError(401, 'UNAUTHORIZED', 'Authentication required.', null);
     }
+    if (method === 'POST' && (!options.idempotencyKey || !options.idempotencyKey.trim())) {
+      throw new BogaAgentApiError(400, 'INVALID_ARGUMENT', 'Idempotency key is required.', null);
+    }
     const url = new URL(relativePath, this.#baseUrl);
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) url.searchParams.set(key, String(value));
+    if (options.query) {
+      for (const [key, value] of Object.entries(options.query)) {
+        if (value !== undefined) url.searchParams.set(key, String(value));
+      }
     }
     const requestId = randomUUID();
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), this.#timeoutMs);
 
     let response: Response;
+    let payload: unknown;
     try {
+      const headers: Record<string, string> = {
+        accept: 'application/json',
+        authorization: `Bearer ${accessToken}`,
+        'x-request-id': requestId,
+      };
+      let requestBody: string | undefined;
+      if (method === 'POST') {
+        headers['content-type'] = 'application/json';
+        headers['idempotency-key'] = options.idempotencyKey!;
+        requestBody = JSON.stringify(options.body ?? {});
+      }
+
       response = await this.#fetch(url, {
-        headers: {
-          accept: 'application/json',
-          authorization: `Bearer ${accessToken}`,
-          'x-request-id': requestId,
-        },
-        method: 'GET',
+        body: requestBody,
+        headers,
+        method,
         redirect: 'error',
         signal: abortController.signal,
       });
+
+      try {
+        payload = await response.json();
+      } catch (bodyError) {
+        if (abortController.signal.aborted) {
+          throw bodyError;
+        }
+        throw new BogaAgentApiError(
+          502,
+          'INVALID_UPSTREAM_RESPONSE',
+          'BoGa returned an invalid response.',
+          response.headers.get('x-request-id') ?? requestId,
+        );
+      }
     } catch (error) {
-      const message = error instanceof Error && error.name === 'AbortError'
+      if (error instanceof BogaAgentApiError) {
+        throw error;
+      }
+      const isAbort = abortController.signal.aborted ||
+        (error instanceof Error && error.name === 'AbortError');
+      const message = isAbort
         ? 'BoGa agent API timed out.'
         : 'BoGa agent API is unavailable.';
       throw new BogaAgentApiError(502, 'UPSTREAM_UNAVAILABLE', message, requestId);
     } finally {
       clearTimeout(timeout);
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new BogaAgentApiError(
-        502,
-        'INVALID_UPSTREAM_RESPONSE',
-        'BoGa returned an invalid response.',
-        response.headers.get('x-request-id') ?? requestId,
-      );
     }
 
     if (!response.ok) {

@@ -552,6 +552,129 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and (.data.workouts[0].completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
   ' >/dev/null || fail "recent workout response is not compact and explicit"
 
+echo "[agent-api-test] verifying exact keyset-paginated exercise history"
+agent_get "exercises/${EXERCISE_A}/history?limit=1"
+assert_status "200" "first exercise history page"
+HISTORY_FIRST_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+HISTORY_NEXT_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ -n "${HISTORY_NEXT_CURSOR}" && "${HISTORY_NEXT_CURSOR}" != "null" ]] ||
+  fail "first exercise history page did not return a cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg session "${SESSION_A}" \
+  --arg set "${SET_A1}" '
+    .data.sets[0].id == $set
+    and .data.sets[0].session_id == $session
+    and .data.sets[0].load.value == 100
+    and .data.sets[0].reps == 8
+    and .data.sets[0].set_type == "rir_2"
+    and .data.sets[0].volume.unit == "kg_reps"
+    and (.data.sets[0].session_completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
+  ' >/dev/null || fail "first exercise history set payload is invalid"
+
+agent_get "exercises/${EXERCISE_A}/history?limit=1&cursor=${HISTORY_NEXT_CURSOR}"
+assert_status "200" "second exercise history page"
+HISTORY_SECOND_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+[[ "${HISTORY_FIRST_SET_ID}" != "${HISTORY_SECOND_SET_ID}" ]] ||
+  fail "exercise history cursor repeated the first page"
+[[ "${HISTORY_SECOND_SET_ID}" == "${SET_A2}" ]] ||
+  fail "second exercise history page was not SET_A2"
+
+# Cross-owner and missing exercise history
+agent_get "exercises/${EXERCISE_B}/history"
+assert_status "404" "cross-owner exercise history"
+agent_get "exercises/agent-api-${RUN_TAG}-missing/history"
+assert_status "404" "missing exercise history"
+
+echo "[agent-api-test] verifying exact completed workout detail"
+agent_get "workouts/${SESSION_A}?limit=1"
+assert_status "200" "workout detail first page"
+WORKOUT_FIRST_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+WORKOUT_NEXT_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.next_cursor')"
+[[ -n "${WORKOUT_NEXT_CURSOR}" && "${WORKOUT_NEXT_CURSOR}" != "null" ]] ||
+  fail "workout detail first page did not return a cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg session "${SESSION_A}" \
+  --arg gym "Agent A Gym" \
+  --arg set "${SET_A1}" '
+    .data.workout.id == $session
+    and .data.workout.gym.name == $gym
+    and .data.workout.total_volume.unit == "kg_reps"
+    and (.data.workout.completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
+    and (.data.workout.exercises | length) == 2
+    and .data.workout.sets[0].id == $set
+  ' >/dev/null || fail "workout detail payload is invalid"
+
+agent_get "workouts/${SESSION_A}?limit=1&cursor=${WORKOUT_NEXT_CURSOR}"
+assert_status "200" "workout detail second page"
+WORKOUT_SECOND_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+[[ "${WORKOUT_FIRST_SET_ID}" != "${WORKOUT_SECOND_SET_ID}" ]] ||
+  fail "workout detail cursor repeated the first page"
+[[ "${WORKOUT_SECOND_SET_ID}" == "${SET_A2}" ]] ||
+  fail "second workout detail page was not SET_A2"
+
+# Missing workout detail
+agent_get "workouts/agent-api-${RUN_TAG}-missing"
+assert_status "404" "missing workout detail"
+
+echo "[agent-api-test] verifying equal order_index set pagination preserves sets via set_id tie-breaker"
+EXERCISE_EQ="agent-api-${RUN_TAG}-exercise-eq"
+EQ_SESSION="agent-api-${RUN_TAG}-eq-session"
+EQ_BLOCK="agent-api-${RUN_TAG}-eq-block"
+EQ_SET_1="agent-api-${RUN_TAG}-eq-set-1"
+EQ_SET_2="agent-api-${RUN_TAG}-eq-set-2"
+run_psql "
+  begin;
+    set constraints all deferred;
+    insert into app_public.exercise_definitions
+      (owner_user_id,id,name,load_input_mode,created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${EXERCISE_EQ}','Agent A Overhead','total_load',${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.sessions
+      (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,
+       created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${EQ_SESSION}','${GYM_A}','completed',
+       $((NOW_MS - 5000000)),$((NOW_MS - 4500000)),300,${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.session_exercises
+      (owner_user_id,id,session_id,exercise_definition_id,order_index,name,machine_name,
+       created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${EQ_BLOCK}','${EQ_SESSION}','${EXERCISE_EQ}',0,
+       'Agent A Overhead',null,${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.exercise_sets
+      (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
+       performance_status,created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${EQ_SET_1}','${EQ_BLOCK}',0,'110','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${EQ_SET_2}','${EQ_BLOCK}',0,'115','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS});
+  commit;
+" >/dev/null
+
+agent_get "workouts/${EQ_SESSION}?limit=1"
+assert_status "200" "equal order_index workout detail page 1"
+EQ_PAGE1_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+EQ_PAGE1_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.next_cursor')"
+[[ "${EQ_PAGE1_SET_ID}" == "${EQ_SET_1}" ]] || fail "expected page 1 to return EQ_SET_1"
+[[ -n "${EQ_PAGE1_CURSOR}" && "${EQ_PAGE1_CURSOR}" != "null" ]] || fail "expected page 1 to return a cursor"
+
+agent_get "workouts/${EQ_SESSION}?limit=1&cursor=${EQ_PAGE1_CURSOR}"
+assert_status "200" "equal order_index workout detail page 2"
+EQ_PAGE2_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+[[ "${EQ_PAGE2_SET_ID}" == "${EQ_SET_2}" ]] || fail "equal order_index workout detail page 2 did not return EQ_SET_2"
+
+agent_get "exercises/${EXERCISE_EQ}/history?limit=1"
+assert_status "200" "history with EQ_SESSION page 1"
+EQ_HIST_PAGE1_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+EQ_HIST_PAGE1_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ "${EQ_HIST_PAGE1_SET_ID}" == "${EQ_SET_1}" ]] || fail "expected history page 1 to return latest completed set EQ_SET_1"
+
+agent_get "exercises/${EXERCISE_EQ}/history?limit=1&cursor=${EQ_HIST_PAGE1_CURSOR}"
+assert_status "200" "history with EQ_SESSION page 2"
+EQ_HIST_PAGE2_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+[[ "${EQ_HIST_PAGE2_SET_ID}" == "${EQ_SET_2}" ]] || fail "equal order_index history page 2 did not return EQ_SET_2 via tie-breaker"
+
 echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"

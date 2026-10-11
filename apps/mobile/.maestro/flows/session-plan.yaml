@@ -1,0 +1,94 @@
+appId: com.dinoderek.mobile
+---
+# Session plan authoring and start-all execution (infra-free).
+#
+# Proves:
+#   1. New session plan form opens via deep link / harness;
+#   2. Title input and exercise picker sheet search/select Barbell Back Squat;
+#   3. Target set weight and reps commit to local SQLite;
+#   4. Saving the plan redirects to the plan detail view;
+#   5. "Start all" creates the active recorder session seeded from the planned block.
+# Why device:
+#   1. Real keyboard inputs, modal sheet animations, and expo-sqlite transaction.
+#   2. Root stack navigation transition from plan authoring -> plan detail -> session view.
+# Jest counterpart: __tests__/session-plan-screens.test.tsx.
+
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-plan-new"
+- extendedWaitUntil:
+    visible:
+      id: "plan-form-title"
+    timeout: 30000
+
+- tapOn:
+    id: "plan-form-title"
+- inputText: "Maestro Strength Plan"
+- hideKeyboard
+
+- tapOn:
+    id: "plan-form-add-block"
+- extendedWaitUntil:
+    visible:
+      id: "plan-exercise-pick-sheet"
+    timeout: 10000
+
+- tapOn:
+    id: "plan-exercise-pick-search"
+- inputText: "Barbell Back Squat"
+- hideKeyboard
+
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Back Squat"
+    timeout: 10000
+
+- tapOn:
+    text: "Select exercise Barbell Back Squat"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-picker-add-empty-set-button"
+    timeout: 10000
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "plan-form-block-1-set-1-weight"
+    timeout: 10000
+
+- tapOn:
+    id: "plan-form-block-1-set-1-weight"
+- inputText: "100"
+- hideKeyboard
+
+- tapOn:
+    id: "plan-form-block-1-set-1-reps"
+- inputText: "5"
+- hideKeyboard
+
+- takeScreenshot: "01-plan-form-filled"
+
+- tapOn:
+    id: "plan-form-save"
+
+- extendedWaitUntil:
+    visible:
+      id: "plan-detail-start-all"
+    timeout: 15000
+
+- assertVisible:
+    id: "plan-detail-summary"
+- assertVisible:
+    text: "Maestro Strength Plan"
+- takeScreenshot: "02-plan-detail-ready"
+
+- tapOn:
+    id: "plan-detail-start-all"
+
+- extendedWaitUntil:
+    visible:
+      id: "session-view-screen"
+    timeout: 15000
+
+- assertVisible:
+    id: "session-view-finish-button"
+- takeScreenshot: "03-session-view-started-from-plan"

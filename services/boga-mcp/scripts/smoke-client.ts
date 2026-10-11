@@ -71,9 +71,14 @@ try {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
+    'create_session_plan',
+    'create_training_programme',
     'get_exercise_context',
+    'get_exercise_history',
     'get_recent_workouts',
     'get_training_profile',
+    'get_upcoming_session_plans',
+    'get_workout_detail',
     'search_exercises',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
@@ -130,6 +135,196 @@ try {
   ) {
     throw new Error('Recent workouts did not return the test user session.');
   }
+
+  // Drain exact exercise history across pages
+  const historyPage1 = structured(
+    await client.callTool({
+      arguments: { exercise_id: expectedExerciseId, limit: 1 },
+      name: 'get_exercise_history',
+    }),
+    'get_exercise_history page 1',
+  );
+  const setsPage1 = Array.isArray(historyPage1.sets) ? historyPage1.sets : [];
+  if (setsPage1.length !== 1 || !historyPage1.next_cursor) {
+    throw new Error('Exercise history page 1 did not return exactly 1 set with next_cursor.');
+  }
+  const historyPage2 = structured(
+    await client.callTool({
+      arguments: {
+        cursor: String(historyPage1.next_cursor),
+        exercise_id: expectedExerciseId,
+        limit: 1,
+      },
+      name: 'get_exercise_history',
+    }),
+    'get_exercise_history page 2',
+  );
+  const setsPage2 = Array.isArray(historyPage2.sets) ? historyPage2.sets : [];
+  if (setsPage2.length !== 1) {
+    throw new Error('Exercise history page 2 did not return the second set.');
+  }
+  if ((setsPage1[0] as any).id === (setsPage2[0] as any).id) {
+    throw new Error('Exercise history repeated the first set across pages.');
+  }
+
+  // Drain exact completed workout detail
+  const workoutPage1 = structured(
+    await client.callTool({
+      arguments: { limit: 1, session_id: expectedSessionId },
+      name: 'get_workout_detail',
+    }),
+    'get_workout_detail page 1',
+  );
+  const detailWorkout = isObject(workoutPage1.workout) ? workoutPage1.workout : null;
+  const detailSets1 = detailWorkout && Array.isArray(detailWorkout.sets) ? detailWorkout.sets : [];
+  if (!detailWorkout || detailSets1.length !== 1 || !detailWorkout.next_cursor) {
+    throw new Error('Workout detail page 1 did not return expected workout with cursor.');
+  }
+  const workoutPage2 = structured(
+    await client.callTool({
+      arguments: {
+        cursor: String(detailWorkout.next_cursor),
+        limit: 1,
+        session_id: expectedSessionId,
+      },
+      name: 'get_workout_detail',
+    }),
+    'get_workout_detail page 2',
+  );
+  const detailWorkout2 = isObject(workoutPage2.workout) ? workoutPage2.workout : null;
+  const detailSets2 = detailWorkout2 && Array.isArray(detailWorkout2.sets) ? detailWorkout2.sets : [];
+  if (!detailWorkout2 || detailSets2.length !== 1) {
+    throw new Error('Workout detail page 2 did not return the second set.');
+  }
+
+  // Planning tools: when permission is disabled, plan tools MUST fail with PLAN_PERMISSION_REQUIRED
+  const planPermissionEnabled = process.env.BOGA_MCP_SMOKE_PLAN_ENABLED === '1';
+  if (!planPermissionEnabled) {
+    const unauthPlan = await client.callTool({
+      arguments: {
+        idempotency_key: 'denied-plan-key',
+        plan: {
+          exercises: [{ name: 'Bench', sets: [{ target_reps: 5 }] }],
+          title: 'Unauthorized plan',
+        },
+      },
+      name: 'create_session_plan',
+    });
+    if (!unauthPlan.isError || !JSON.stringify(unauthPlan).includes('PLAN_PERMISSION_REQUIRED')) {
+      throw new Error('create_session_plan succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
+    }
+
+    const unauthRead = await client.callTool({
+      arguments: {},
+      name: 'get_upcoming_session_plans',
+    });
+    if (!unauthRead.isError || !JSON.stringify(unauthRead).includes('PLAN_PERMISSION_REQUIRED')) {
+      throw new Error('get_upcoming_session_plans succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
+    }
+  } else {
+    // Planning permission is enabled: test create_session_plan, create_training_programme, idempotency replay/conflict, and read
+    const planKey = `smoke-plan-key-${Date.now()}`;
+    const planPayload = {
+      idempotency_key: planKey,
+      plan: {
+        exercises: [
+          {
+            exercise_definition_id: expectedExerciseId,
+            name: 'Bench Press',
+            sets: [
+              { target_reps: 5, target_set_type: 'rir_2', target_weight_value: '80' },
+              { target_reps: 8 },
+            ],
+          },
+        ],
+        scheduled_for: Date.now() + 86400000,
+        title: 'Smoke Test Plan',
+      },
+    };
+    const createdPlan = structured(
+      await client.callTool({
+        arguments: planPayload,
+        name: 'create_session_plan',
+      }),
+      'create_session_plan',
+    );
+    const planId = String(createdPlan.plan_id ?? '');
+    if (!planId || createdPlan.idempotent_replay !== false) {
+      throw new Error('create_session_plan failed to return new plan_id or had incorrect replay flag.');
+    }
+
+    // Replay with exact same payload and key: returns same plan_id with idempotent_replay: true
+    const replayedPlan = structured(
+      await client.callTool({
+        arguments: planPayload,
+        name: 'create_session_plan',
+      }),
+      'create_session_plan replay',
+    );
+    if (replayedPlan.plan_id !== planId || replayedPlan.idempotent_replay !== true) {
+      throw new Error('Idempotent replay did not return matching plan_id and true flag.');
+    }
+
+    // Conflict: same key, different payload -> IDEMPOTENCY_CONFLICT
+    const conflictResult = await client.callTool({
+      arguments: {
+        idempotency_key: planKey,
+        plan: {
+          exercises: [{ name: 'Bench Press', sets: [{ target_reps: 10 }] }],
+          title: 'Different Title',
+        },
+      },
+      name: 'create_session_plan',
+    });
+    if (!conflictResult.isError || !JSON.stringify(conflictResult).includes('IDEMPOTENCY_CONFLICT')) {
+      throw new Error('Conflicting idempotency key did not produce IDEMPOTENCY_CONFLICT.');
+    }
+
+    // Create a multi-session programme
+    const progKey = `smoke-prog-key-${Date.now()}`;
+    const createdProgramme = structured(
+      await client.callTool({
+        arguments: {
+          idempotency_key: progKey,
+          programme: {
+            description: 'Two week split',
+            name: 'Smoke Programme',
+            plans: [
+              {
+                exercises: [{ name: 'Day 1', sets: [{ target_reps: 5 }] }],
+                title: 'Week 1 Day 1',
+              },
+              {
+                exercises: [{ name: 'Day 2', sets: [{ target_reps: 6 }] }],
+                title: 'Week 1 Day 2',
+              },
+            ],
+          },
+        },
+        name: 'create_training_programme',
+      }),
+      'create_training_programme',
+    );
+    const progId = String(createdProgramme.programme_id ?? '');
+    const progPlanIds = Array.isArray(createdProgramme.plan_ids) ? createdProgramme.plan_ids : [];
+    if (!progId || progPlanIds.length !== 2) {
+      throw new Error('create_training_programme failed to emit programme_id and two plan_ids.');
+    }
+
+    // Read upcoming session plans
+    const upcoming = structured(
+      await client.callTool({
+        arguments: { include_unscheduled: true },
+        name: 'get_upcoming_session_plans',
+      }),
+      'get_upcoming_session_plans',
+    );
+    const plansList = Array.isArray(upcoming.plans) ? upcoming.plans : [];
+    if (!plansList.some((p) => isObject(p) && p.id === planId && p.provenance === 'agent')) {
+      throw new Error('get_upcoming_session_plans did not return the agent-created plan.');
+    }
+  }
+
   if (process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
     const performance = Array.isArray(context.recent_performances) ? context.recent_performances[0] : null;
     const sets = isObject(performance) && Array.isArray(performance.sets) ? performance.sets : [];
@@ -152,4 +347,5 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: rejected token challenged; four tools discovered and called through the real agent API');
+console.log('[boga-mcp-smoke] PASS: rejected token challenged; nine tools discovered and verified');
+

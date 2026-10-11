@@ -289,4 +289,139 @@ describe('session planning graph round-trips through the sync cycle and survives
       expect([parent, child, firstIndex(parent) < firstIndex(child)]).toEqual([parent, child, true]);
     }
   });
+
+  it('pulls server-created agent-provenance programme and plan graph without becoming locally dirty', async () => {
+    const server = createStubServer();
+    mockRpc.mockImplementation(server.rpc);
+    markBootstrapDone();
+
+    const stamp = 1_700_000_100_000;
+    // Pre-populate server store with gym, definition, programme, plan, blocks, and target sets created by an agent
+    const serverEntities: WireEntity[] = [
+      {
+        type: 'gyms',
+        id: 'gym-server',
+        client_updated_at_ms: stamp,
+        fields: { name: 'Metro Gym', created_at: stamp, updated_at: stamp },
+      },
+      {
+        type: 'exercise_definitions',
+        id: 'def-bench',
+        client_updated_at_ms: stamp,
+        fields: {
+          name: 'Bench Press',
+          load_input_mode: 'total_load',
+          bodyweight_contribution: 0,
+          created_at: stamp,
+          updated_at: stamp,
+        },
+      },
+      {
+        type: 'training_programmes',
+        id: 'tp-agent',
+        client_updated_at_ms: stamp,
+        fields: { name: 'Agent Wave', description: 'Coaching plan', created_at: stamp, updated_at: stamp },
+      },
+      {
+        type: 'session_plans',
+        id: 'sp-agent-1',
+        client_updated_at_ms: stamp,
+        fields: {
+          programme_id: 'tp-agent',
+          programme_order_index: 0,
+          gym_id: 'gym-server',
+          title: 'Day 1 Bench',
+          scheduled_for: 1_700_001_000_000,
+          provenance: 'agent',
+          created_at: stamp,
+          updated_at: stamp,
+        },
+      },
+      {
+        type: 'session_plan_exercises',
+        id: 'spe-agent-1',
+        client_updated_at_ms: stamp,
+        fields: {
+          session_plan_id: 'sp-agent-1',
+          exercise_definition_id: 'def-bench',
+          order_index: 0,
+          name: 'Bench Press',
+          progress_status: 'pending',
+          resolved_at: null,
+          created_at: stamp,
+          updated_at: stamp,
+        },
+      },
+      {
+        type: 'session_plan_sets',
+        id: 'sps-agent-1',
+        client_updated_at_ms: stamp,
+        fields: {
+          session_plan_exercise_id: 'spe-agent-1',
+          order_index: 0,
+          target_weight_value: '80',
+          target_reps: 6,
+          target_set_type: 'rir_2',
+          created_at: stamp,
+          updated_at: stamp,
+        },
+      },
+    ];
+
+    // Seed into server stub
+    await server.rpc('sync_push', { entities: serverEntities });
+
+    // Client pulls clean server graph on first sync
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    const plan = database.select().from(sessionPlans).where(eq(sessionPlans.id, 'sp-agent-1')).get();
+    expect(plan).toBeDefined();
+    expect(plan).toMatchObject({
+      programmeId: 'tp-agent',
+      gymId: 'gym-server',
+      title: 'Day 1 Bench',
+      provenance: 'agent',
+      localDirty: false,
+    });
+
+    const block = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'spe-agent-1')).get();
+    expect(block).toBeDefined();
+    expect(block).toMatchObject({
+      sessionPlanId: 'sp-agent-1',
+      exerciseDefinitionId: 'def-bench',
+      progressStatus: 'pending',
+      resolvedAt: null,
+      localDirty: false,
+    });
+
+    const target = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'sps-agent-1')).get();
+    expect(target).toBeDefined();
+    expect(target).toMatchObject({
+      sessionPlanExerciseId: 'spe-agent-1',
+      targetWeightValue: '80',
+      targetReps: 6,
+      targetSetType: 'rir_2',
+      localDirty: false,
+    });
+
+    const programme = database.select().from(trainingProgrammes).where(eq(trainingProgrammes.id, 'tp-agent')).get();
+    expect(programme).toBeDefined();
+    expect(programme).toMatchObject({
+      name: 'Agent Wave',
+      description: 'Coaching plan',
+      localDirty: false,
+    });
+
+    // Wipe and re-pull (first-sync restore)
+    reinstallLocalStore();
+    markBootstrapDone();
+    expect(database.select().from(sessionPlans).all()).toHaveLength(0);
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    const restoredPlan = database.select().from(sessionPlans).where(eq(sessionPlans.id, 'sp-agent-1')).get();
+    expect(restoredPlan).toBeDefined();
+    expect(restoredPlan?.localDirty).toBe(false);
+    expect(restoredPlan?.provenance).toBe('agent');
+  });
 });

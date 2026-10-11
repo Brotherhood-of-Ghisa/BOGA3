@@ -1,9 +1,10 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes exactly four read-only tools over stateless
-Streamable HTTP and delegates every data read to the dedicated BoGa agent API.
-It has no database client, Supabase data credentials, SQL, or service-role key.
+BoGa Virtual Coach. It exposes nine tools over stateless Streamable HTTP (seven
+read-only tools and two create-only planning tools) and delegates every data
+read or write to the dedicated BoGa agent API. It has no database client,
+Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
 
@@ -29,10 +30,18 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-- `get_training_profile`
-- `search_exercises`
-- `get_exercise_context`
-- `get_recent_workouts`
+Seven read-only tools:
+- `get_training_profile` — training preferences, equipment, gyms.
+- `search_exercises` — database-side filter by name, muscle, equipment.
+- `get_exercise_context` — compact recent preview, lifetime PRs and totals.
+- `get_recent_workouts` — completed workout list with working-set volume.
+- `get_exercise_history` — keyset-paginated performed set history.
+- `get_workout_detail` — exact session header, volume, and paginated sets.
+- `get_upcoming_session_plans` — upcoming and unscheduled authored plans.
+
+Two create-only planning tools (require explicit plan permission, idempotent):
+- `create_session_plan` — create one authored session plan with pending blocks.
+- `create_training_programme` — create a multi-session programme with pending blocks.
 
 Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled

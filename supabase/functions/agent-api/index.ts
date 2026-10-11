@@ -18,6 +18,8 @@ const DEFAULT_RECENT_SESSIONS = 5;
 const MAX_RECENT_SESSIONS = 20;
 const DEFAULT_WORKOUT_LIMIT = 10;
 const MAX_WORKOUT_LIMIT = 25;
+const DEFAULT_SET_LIMIT = 20;
+const MAX_SET_LIMIT = 100;
 const MAX_CONTEXT_BLOCKS = 500;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_REQUEST_BYTES = 64 * 1024;
@@ -311,6 +313,12 @@ const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/programmes') return 'create_training_programme';
   if (/^\/v1\/agent\/exercises\/[^/]+\/context$/.test(path)) {
     return 'get_exercise_context';
+  }
+  if (/^\/v1\/agent\/exercises\/[^/]+\/history$/.test(path)) {
+    return 'get_exercise_history';
+  }
+  if (/^\/v1\/agent\/workouts\/[^/]+$/.test(path)) {
+    return 'get_workout_detail';
   }
   return 'unknown_agent_route';
 };
@@ -888,6 +896,40 @@ const loadSetsByBlock = async (
   return { rows, truncated };
 };
 
+const loadAllSetsForBlocks = async (
+  client: SupabaseClient,
+  userId: string,
+  blockIds: string[],
+): Promise<SetRow[]> => {
+  const rows: SetRow[] = [];
+  for (const ids of chunk(blockIds, 80)) {
+    let offset = 0;
+    const batchLimit = 1000;
+    while (true) {
+      const { data, error } = await client
+        .schema('app_public')
+        .from('exercise_sets')
+        .select(
+          'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status',
+        )
+        .eq('owner_user_id', userId)
+        .is('deleted_at', null)
+        .is('performance_status', null)
+        .in('session_exercise_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(offset, offset + batchLimit - 1)
+        .returns<SetRow[]>();
+      throwDatabaseError(error);
+      const batch = data ?? [];
+      rows.push(...batch);
+      if (batch.length < batchLimit) break;
+      offset += batchLimit;
+    }
+  }
+  return rows;
+};
+
 const loadDefinitionsById = async (
   client: SupabaseClient, userId: string, exerciseIds: string[],
 ): Promise<Map<string, ExerciseDefinitionRow>> => {
@@ -1191,6 +1233,408 @@ const getRecentWorkouts = async (
         id: page[page.length - 1].id,
       })
       : null,
+  };
+};
+
+const getExerciseHistory = async (
+  client: SupabaseClient,
+  userId: string,
+  exerciseId: string,
+  url: URL,
+  bodyweightCalculationsEnabled: boolean,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['limit', 'cursor']));
+  if (exerciseId.length === 0 || exerciseId.length > 200) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
+  }
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'),
+    DEFAULT_SET_LIMIT,
+    1,
+    MAX_SET_LIMIT,
+    'limit',
+  );
+  const cursor = decodeCursor(url.searchParams.get('cursor'), 'exercise_history');
+
+  const { data: definition, error: definitionError } = await client
+    .schema('app_public')
+    .from('exercise_definitions')
+    .select(EXERCISE_COLUMNS)
+    .eq('owner_user_id', userId)
+    .eq('id', exerciseId)
+    .is('deleted_at', null)
+    .maybeSingle<ExerciseDefinitionRow>();
+  throwDatabaseError(definitionError);
+  if (!definition) {
+    throw new ApiError(404, 'NOT_FOUND', 'Exercise not found.');
+  }
+
+  // Load all non-deleted session_exercises for this exercise definition
+  const { data: blocks, error: blockError } = await client
+    .schema('app_public')
+    .from('session_exercises')
+    .select('id,session_id,order_index,name,machine_name')
+    .eq('owner_user_id', userId)
+    .eq('exercise_definition_id', exerciseId)
+    .is('deleted_at', null)
+    .limit(5000)
+    .returns<SessionExerciseRow[]>();
+  throwDatabaseError(blockError);
+  const allBlocks = blocks ?? [];
+
+  if (allBlocks.length === 0) {
+    return {
+      metric_revision: METRIC_REVISION,
+      exercise: {
+        id: definition.id,
+        name: definition.name,
+        ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
+      },
+      sets: [],
+      next_cursor: null,
+    };
+  }
+
+  const sessionIds = uniqueStrings(allBlocks.map((b) => b.session_id), 5000);
+  const { data: sessions, error: sessionError } = await client
+    .schema('app_public')
+    .from('sessions')
+    .select(SESSION_COLUMNS)
+    .eq('owner_user_id', userId)
+    .eq('status', 'completed')
+    .is('deleted_at', null)
+    .not('completed_at', 'is', null)
+    .in('id', sessionIds)
+    .limit(5000)
+    .returns<SessionRow[]>();
+  throwDatabaseError(sessionError);
+
+  const completedSessions = (sessions ?? []).filter(
+    (s): s is SessionRow & { completed_at: number } => s.completed_at !== null,
+  );
+  if (completedSessions.length === 0) {
+    return {
+      metric_revision: METRIC_REVISION,
+      exercise: {
+        id: definition.id,
+        name: definition.name,
+        ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
+      },
+      sets: [],
+      next_cursor: null,
+    };
+  }
+
+  const completedById = new Map(completedSessions.map((s) => [s.id, s]));
+  const qualifyingBlocks = allBlocks.filter((b) => completedById.has(b.session_id));
+  const blockById = new Map(qualifyingBlocks.map((b) => [b.id, b]));
+  const qualifyingBlockIds = qualifyingBlocks.map((b) => b.id);
+
+  const { rows: setRows } = await loadAllSetsForBlocks(client, userId, qualifyingBlockIds).then(
+    (rows) => ({ rows }),
+  );
+
+  type HistorySortableItem = {
+    set: SetRow;
+    block: SessionExerciseRow;
+    session: SessionRow & { completed_at: number };
+  };
+
+  const allItems: HistorySortableItem[] = [];
+  for (const set of setRows) {
+    const block = blockById.get(set.session_exercise_id);
+    if (!block) continue;
+    const session = completedById.get(block.session_id);
+    if (!session) continue;
+    allItems.push({ set, block, session });
+  }
+
+  allItems.sort((a, b) => {
+    if (a.session.completed_at !== b.session.completed_at) {
+      return b.session.completed_at - a.session.completed_at;
+    }
+    const cmpSession = a.session.id.localeCompare(b.session.id);
+    if (cmpSession !== 0) return cmpSession;
+    if (a.block.order_index !== b.block.order_index) {
+      return a.block.order_index - b.block.order_index;
+    }
+    if (a.set.order_index !== b.set.order_index) {
+      return a.set.order_index - b.set.order_index;
+    }
+    return a.set.id.localeCompare(b.set.id);
+  });
+
+  let filteredItems = allItems;
+  if (cursor) {
+    if (
+      typeof cursor.session_completed_at !== 'number' ||
+      !Number.isSafeInteger(cursor.session_completed_at) ||
+      typeof cursor.session_id !== 'string' ||
+      typeof cursor.exercise_order !== 'number' ||
+      typeof cursor.set_order !== 'number' ||
+      typeof cursor.set_id !== 'string'
+    ) {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
+    }
+    filteredItems = allItems.filter((item) => {
+      if (item.session.completed_at < cursor.session_completed_at) return true;
+      if (item.session.completed_at > cursor.session_completed_at) return false;
+      const cmpS = item.session.id.localeCompare(cursor.session_id);
+      if (cmpS > 0) return true;
+      if (cmpS < 0) return false;
+      if (item.block.order_index > cursor.exercise_order) return true;
+      if (item.block.order_index < cursor.exercise_order) return false;
+      if (item.set.order_index > cursor.set_order) return true;
+      if (item.set.order_index < cursor.set_order) return false;
+      return item.set.id.localeCompare(cursor.set_id) > 0;
+    });
+  }
+
+  const hasMore = filteredItems.length > limit;
+  const pageItems = filteredItems.slice(0, limit);
+
+  const neededSessions = uniqueStrings(pageItems.map((item) => item.session.id), 100);
+  const sessionRowsForContext = completedSessions.filter((s) => neededSessions.includes(s.id));
+  const sessionsWithContext = await attachSessionWeightContexts(
+    client,
+    userId,
+    sessionRowsForContext,
+    bodyweightCalculationsEnabled && definition.bodyweight_contribution > 0,
+  );
+  const contextSessionById = new Map(sessionsWithContext.map((s) => [s.id, s]));
+
+  const projectedSets = pageItems.flatMap((item) => {
+    const sessionWithContext = contextSessionById.get(item.session.id) ?? item.session;
+    const projected = projectTrainingSets(
+      [item.set],
+      definition,
+      sessionWithContext,
+      bodyweightCalculationsEnabled,
+    );
+    const setPayload = projected.sets[0];
+    if (!setPayload) return [];
+    return [{
+      ...setPayload,
+      session_id: item.session.id,
+      session_completed_at: toIsoTimestamp(item.session.completed_at),
+      exercise_order: item.block.order_index,
+      exercise_name: item.block.name,
+      equipment: item.block.machine_name,
+    }];
+  });
+
+  const lastItem = pageItems[pageItems.length - 1];
+  return {
+    metric_revision: METRIC_REVISION,
+    exercise: {
+      id: definition.id,
+      name: definition.name,
+      ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
+    },
+    sets: projectedSets,
+    next_cursor: hasMore && lastItem
+      ? encodeCursor({
+        kind: 'exercise_history',
+        session_completed_at: lastItem.session.completed_at,
+        session_id: lastItem.session.id,
+        exercise_order: lastItem.block.order_index,
+        set_order: lastItem.set.order_index,
+        set_id: lastItem.set.id,
+      })
+      : null,
+  };
+};
+
+const getWorkoutDetail = async (
+  client: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  url: URL,
+  bodyweightCalculationsEnabled: boolean,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['limit', 'cursor']));
+  if (sessionId.length === 0 || sessionId.length > 200) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'session_id is invalid.');
+  }
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'),
+    DEFAULT_SET_LIMIT,
+    1,
+    MAX_SET_LIMIT,
+    'limit',
+  );
+  const cursor = decodeCursor(url.searchParams.get('cursor'), 'workout_detail');
+
+  const { data: sessionData, error: sessionError } = await client
+    .schema('app_public')
+    .from('sessions')
+    .select(SESSION_COLUMNS)
+    .eq('owner_user_id', userId)
+    .eq('id', sessionId)
+    .eq('status', 'completed')
+    .is('deleted_at', null)
+    .not('completed_at', 'is', null)
+    .maybeSingle<SessionRow>();
+  throwDatabaseError(sessionError);
+  if (!sessionData) {
+    throw new ApiError(404, 'NOT_FOUND', 'Workout not found.');
+  }
+
+  const [sessionWithContext] = await attachSessionWeightContexts(
+    client,
+    userId,
+    [sessionData],
+    bodyweightCalculationsEnabled,
+  );
+
+  const { data: blocks, error: blockError } = await client
+    .schema('app_public')
+    .from('session_exercises')
+    .select('id,session_id,exercise_definition_id,order_index,name,machine_name')
+    .eq('owner_user_id', userId)
+    .eq('session_id', sessionId)
+    .is('deleted_at', null)
+    .order('order_index')
+    .order('id')
+    .limit(500)
+    .returns<SessionExerciseRow[]>();
+  throwDatabaseError(blockError);
+  const workoutBlocks = blocks ?? [];
+
+  const [setResult, definitionsById] = await Promise.all([
+    loadSetsByBlock(client, userId, workoutBlocks.map((b) => b.id)),
+    loadDefinitionsById(
+      client,
+      userId,
+      workoutBlocks.flatMap((b) => (b.exercise_definition_id ? [b.exercise_definition_id] : [])),
+    ),
+  ]);
+
+  const gymName = sessionWithContext.gym_id
+    ? (
+      await client
+        .schema('app_public')
+        .from('gyms')
+        .select('name')
+        .eq('owner_user_id', userId)
+        .eq('id', sessionWithContext.gym_id)
+        .maybeSingle<{ name: string }>()
+    ).data?.name ?? null
+    : null;
+
+  const setsByBlock = new Map<string, SetRow[]>();
+  for (const set of setResult.rows) {
+    const bucket = setsByBlock.get(set.session_exercise_id) ?? [];
+    bucket.push(set);
+    setsByBlock.set(set.session_exercise_id, bucket);
+  }
+
+  const projections = workoutBlocks.map((block) =>
+    projectTrainingSets(
+      setsByBlock.get(block.id) ?? [],
+      definitionsById.get(block.exercise_definition_id ?? '') ?? null,
+      sessionWithContext,
+      bodyweightCalculationsEnabled,
+    )
+  );
+  const coverage = summarizeVolume(projections.flatMap((row) => row.workingMetrics));
+  const usesBodyweightContext = projections.some((row) => row.usesBodyweightContext);
+
+  type WorkoutDetailSortableSet = {
+    setPayload: ReturnType<typeof projectTrainingSets>['sets'][number];
+    block: SessionExerciseRow;
+    setOrder: number;
+  };
+
+  const allDetailSets: WorkoutDetailSortableSet[] = [];
+  workoutBlocks.forEach((block, index) => {
+    const proj = projections[index];
+    for (const setPayload of proj.sets) {
+      allDetailSets.push({
+        setPayload,
+        block,
+        setOrder: setPayload.order_index,
+      });
+    }
+  });
+
+  allDetailSets.sort((a, b) => {
+    if (a.block.order_index !== b.block.order_index) {
+      return a.block.order_index - b.block.order_index;
+    }
+    if (a.setOrder !== b.setOrder) {
+      return a.setOrder - b.setOrder;
+    }
+    return a.setPayload.id.localeCompare(b.setPayload.id);
+  });
+
+  let filteredDetailSets = allDetailSets;
+  if (cursor) {
+    if (
+      typeof cursor.exercise_order !== 'number' ||
+      typeof cursor.set_order !== 'number' ||
+      typeof cursor.set_id !== 'string'
+    ) {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
+    }
+    filteredDetailSets = allDetailSets.filter((item) => {
+      if (item.block.order_index > cursor.exercise_order) return true;
+      if (item.block.order_index < cursor.exercise_order) return false;
+      if (item.setOrder > cursor.set_order) return true;
+      if (item.setOrder < cursor.set_order) return false;
+      return item.setPayload.id.localeCompare(cursor.set_id) > 0;
+    });
+  }
+
+  const hasMore = filteredDetailSets.length > limit;
+  const pagedDetailSets = filteredDetailSets.slice(0, limit);
+  const lastDetailSet = pagedDetailSets[pagedDetailSets.length - 1];
+
+  return {
+    metric_revision: METRIC_REVISION,
+    workout: {
+      id: sessionWithContext.id,
+      started_at: toIsoTimestamp(sessionWithContext.started_at),
+      completed_at: toIsoTimestamp(sessionWithContext.completed_at),
+      duration_seconds: sessionWithContext.duration_sec,
+      gym: sessionWithContext.gym_id
+        ? { id: sessionWithContext.gym_id, name: gymName }
+        : null,
+      exercise_count: projections.filter((row) => row.workingSetCount > 0).length,
+      completed_set_count: coverage.eligibleSetCount,
+      ...(usesBodyweightContext ? { session_body_weight: sessionWeightPayload(sessionWithContext) } : {}),
+      total_volume: volumePayload(coverage, setResult.truncated),
+      exercises: workoutBlocks.map((block, index) => ({
+        id: block.id,
+        exercise_id: block.exercise_definition_id,
+        name: block.name,
+        equipment: block.machine_name,
+        set_count: projections[index].workingSetCount,
+        ...(definitionsById.has(block.exercise_definition_id ?? '')
+          ? exerciseLoadPayload(
+            definitionsById.get(block.exercise_definition_id ?? '')!,
+            bodyweightCalculationsEnabled,
+          )
+          : {}),
+        volume: volumePayload(projections[index].volumeCoverage, setResult.truncated),
+      })),
+      sets: pagedDetailSets.map((item) => ({
+        ...item.setPayload,
+        exercise_id: item.block.exercise_definition_id,
+        exercise_name: item.block.name,
+        exercise_order: item.block.order_index,
+        equipment: item.block.machine_name,
+      })),
+      next_cursor: hasMore && lastDetailSet
+        ? encodeCursor({
+          kind: 'workout_detail',
+          exercise_order: lastDetailSet.block.order_index,
+          set_order: lastDetailSet.setOrder,
+          set_id: lastDetailSet.setPayload.id,
+        })
+        : null,
+      truncated: setResult.truncated,
+    },
   };
 };
 
@@ -1782,6 +2226,26 @@ const dispatchAgentRequest = async (
       throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
     }
     return getExerciseContext(client, agent.userId, exerciseId, url, bodyweightCalculationsEnabled);
+  }
+  const historyMatch = /^\/v1\/agent\/exercises\/([^/]+)\/history$/.exec(path);
+  if (historyMatch) {
+    let exerciseId: string;
+    try {
+      exerciseId = decodeURIComponent(historyMatch[1]);
+    } catch {
+      throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
+    }
+    return getExerciseHistory(client, agent.userId, exerciseId, url, bodyweightCalculationsEnabled);
+  }
+  const workoutMatch = /^\/v1\/agent\/workouts\/([^/]+)$/.exec(path);
+  if (workoutMatch) {
+    let sessionId: string;
+    try {
+      sessionId = decodeURIComponent(workoutMatch[1]);
+    } catch {
+      throw new ApiError(400, 'INVALID_ARGUMENT', 'session_id is invalid.');
+    }
+    return getWorkoutDetail(client, agent.userId, sessionId, url, bodyweightCalculationsEnabled);
   }
   throw new ApiError(404, 'NOT_FOUND', 'Agent route not found.');
 };
