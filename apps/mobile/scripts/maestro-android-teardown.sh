@@ -45,15 +45,21 @@ maestro_android_force_stop "${ANDROID_SERIAL:-}" "${MAESTRO_ANDROID_PACKAGE:-}"
 
 # Only a lane emulator this run started (EMULATOR_PID set) is shut down; a
 # reused, pre-existing emulator is left as found.
-if [[ -n "${EMULATOR_PID:-}" && -n "${ANDROID_SERIAL:-}" ]]; then
-  if [[ "${MAESTRO_KEEP_EMULATOR_BOOTED:-0}" == "1" ]]; then
+if [[ -n "${EMULATOR_PID:-}" ]]; then
+  if [[ -n "${ANDROID_SERIAL:-}" && "${MAESTRO_KEEP_EMULATOR_BOOTED:-0}" == "1" ]]; then
     echo "[maestro-android-teardown] Keeping emulator booted: $ANDROID_SERIAL (pid $EMULATOR_PID)"
   else
-    echo "[maestro-android-teardown] Shutting down emulator $ANDROID_SERIAL"
-    adb -s "$ANDROID_SERIAL" emu kill >/dev/null 2>&1 || true
-    if ! maestro_wait_for_process_exit "$EMULATOR_PID" 30; then
+    if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+      echo "[maestro-android-teardown] Shutting down emulator $ANDROID_SERIAL"
+      adb -s "$ANDROID_SERIAL" emu kill >/dev/null 2>&1 || true
+    fi
+    if ! maestro_wait_for_process_exit "$EMULATOR_PID" 10; then
       echo "[maestro-android-teardown] Emulator process did not exit; sending SIGTERM"
       kill "$EMULATOR_PID" >/dev/null 2>&1 || true
+      if ! maestro_wait_for_process_exit "$EMULATOR_PID" 5; then
+        echo "[maestro-android-teardown] Emulator process still running; sending SIGKILL"
+        kill -9 "$EMULATOR_PID" >/dev/null 2>&1 || true
+      fi
     fi
   fi
 fi

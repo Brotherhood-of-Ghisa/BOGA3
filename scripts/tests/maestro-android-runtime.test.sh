@@ -81,15 +81,16 @@ assert '[[ "$(maestro_android_find_serial_for_avd BOGA_wt5)" == emulator-5556 ]]
 assert '[[ -z "$(maestro_android_find_serial_for_avd BOGA_wt9)" ]]' "no serial for an unstarted AVD"
 export STUB_ADB_DEVICES="List of devices attached"
 
-# 5. AVD creation clones the template config with the new identity.
+# 5. AVD creation clones the template config with the new identity, stripping writable disk paths.
 mkdir -p "$ANDROID_AVD_HOME/Seed.avd"
-printf 'AvdId=Seed\navd.ini.displayname=Seed\nimage.sysdir.1=system-images/android-37.1/x86_64/\ntarget=android-37.1\n' \
+printf 'AvdId=Seed\navd.ini.displayname=Seed\nimage.sysdir.1=system-images/android-37.1/x86_64/\ntarget=android-37.1\nsdcard.path=/tmp/seed/sdcard.img\ndisk.dataPartition.path=/tmp/seed/userdata.img\ndisk.dataPartition.initPath=/tmp/seed/userdata.img\n' \
   >"$ANDROID_AVD_HOME/Seed.avd/config.ini"
 maestro_android_create_avd BOGA_wt7 Seed >/dev/null
 assert '[[ -f "$ANDROID_AVD_HOME/BOGA_wt7.ini" && -f "$ANDROID_AVD_HOME/BOGA_wt7.avd/config.ini" ]]' "create writes the ini + config"
 assert 'grep -qxF "AvdId=BOGA_wt7" "$ANDROID_AVD_HOME/BOGA_wt7.avd/config.ini"' "config identity is rewritten"
 assert 'grep -qxF "target=android-37.1" "$ANDROID_AVD_HOME/BOGA_wt7.ini"' "ini carries the template target"
 assert 'grep -qF "path=$ANDROID_AVD_HOME/BOGA_wt7.avd" "$ANDROID_AVD_HOME/BOGA_wt7.ini"' "ini points at the new AVD dir"
+assert '! grep -qE "^(sdcard\.path|disk\.dataPartition\.path|disk\.dataPartition\.initPath)=" "$ANDROID_AVD_HOME/BOGA_wt7.avd/config.ini"' "writable disk paths are stripped from config.ini"
 
 # 6. Boot-complete polling honours the property.
 export STUB_BOOT_COMPLETED=1
@@ -121,5 +122,17 @@ assert 'grep -qF "MAESTRO_ANDROID_PACKAGE=com.phano.boga3.dev" "$WORK/runtime.en
 maestro_android_preauthorize_permissions emulator-5554 com.phano.boga3.dev
 assert 'grep -qxF "adb -s emulator-5554 shell pm grant com.phano.boga3.dev android.permission.ACCESS_LOCAL_NETWORK" "$STUB_LOG"' "pre-grants ACCESS_LOCAL_NETWORK"
 assert 'grep -qxF "adb -s emulator-5554 shell pm grant com.phano.boga3.dev android.permission.ACCESS_FINE_LOCATION" "$STUB_LOG"' "pre-grants fine location"
+
+# 10. Teardown shuts down EMULATOR_PID even when ANDROID_SERIAL is unset.
+sleep 10 &
+DUMMY_PID=$!
+TEARDOWN_ENV="$WORK/teardown-early-failure.env"
+cat > "$TEARDOWN_ENV" <<EOF
+TASK_ID=ad-hoc
+MAESTRO_ARTIFACT_ROOT=$WORK/artifacts
+EMULATOR_PID=$DUMMY_PID
+EOF
+bash "$SRC_ROOT/apps/mobile/scripts/maestro-android-teardown.sh" "$TEARDOWN_ENV" >/dev/null 2>&1
+assert '! kill -0 "$DUMMY_PID" 2>/dev/null' "teardown kills EMULATOR_PID when ANDROID_SERIAL is empty"
 
 echo "[maestro-android-runtime.test] $PASS assertions passed"

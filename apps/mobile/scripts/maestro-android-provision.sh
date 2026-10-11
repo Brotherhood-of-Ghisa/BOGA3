@@ -61,6 +61,7 @@ maestro_android_boot_lane_emulator() {
     -gpu swiftshader_indirect >"$log_file" 2>&1 &
   EMULATOR_PID=$!
   export EMULATOR_PID
+  maestro_write_runtime_env "$RUNTIME_ENV_FILE"
 
   started_at="$(date +%s)"
   while true; do

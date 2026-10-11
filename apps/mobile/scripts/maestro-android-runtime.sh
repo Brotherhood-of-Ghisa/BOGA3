@@ -139,7 +139,11 @@ path=$avd_home/$name.avd
 path.rel=avd/$name.avd
 target=$target
 EOF
-  sed -e "s/^AvdId=.*/AvdId=$name/" -e "s/^avd.ini.displayname=.*/avd.ini.displayname=$name/" \
+  sed -e "s/^AvdId=.*/AvdId=$name/" \
+      -e "s/^avd.ini.displayname=.*/avd.ini.displayname=$name/" \
+      -e "/^sdcard\.path=/d" \
+      -e "/^disk\.dataPartition\.path=/d" \
+      -e "/^disk\.dataPartition\.initPath=/d" \
     "$seed_config" > "$avd_home/$name.avd/config.ini"
 
   echo "[maestro] created lane AVD '$name' cloned from '$template' ($avd_home/$name.avd)"
