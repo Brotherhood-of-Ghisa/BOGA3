@@ -4,7 +4,8 @@
 // member formatting they share. Nothing here re-ranks or re-sorts.
 
 import { formatMemberName } from './stream-view-model';
-import type { GroupBoardMetric, GroupMemberRef } from './types';
+import type { CompetitionMetric } from './competition-contract';
+import type { GroupMemberRef } from './types';
 
 // ---- Views and routes ---------------------------------------------------------
 
@@ -24,7 +25,7 @@ export const parseBoardScopeParam = (value: string | string[] | undefined | null
 export const groupBoardPath = (
   groupId: string,
   groupExerciseId: string,
-  view?: { metric: GroupBoardMetric; scope: GroupBoardScope },
+  view?: { metric: CompetitionMetric; scope: GroupBoardScope },
 ) =>
   view
     ? (`/group/${groupId}/leaderboards/${groupExerciseId}?metric=${view.metric}&scope=${view.scope}` as const)

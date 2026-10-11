@@ -3,6 +3,7 @@ import { getMobileAuthRuntimeConfig } from '@/src/auth/supabase';
 import {
   ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState,
+  getAccountLocalPreferenceAccountRevision,
   initializeAccountLocalPreferences,
   retryAccountLocalPreferences,
   setAccountLocalPreferences,
@@ -30,5 +31,5 @@ export function useAccountLocalPreferenceState() {
     subscribeToAccountLocalPreferences, getAccountLocalPreferenceState, getAccountLocalPreferenceState,
   );
   useEffect(() => { void ensurePreferencesLoaded(); }, []);
-  return { ...state, retry: retryAccountLocalPreferences };
+  return { ...state, accountRevision: getAccountLocalPreferenceAccountRevision(), retry: retryAccountLocalPreferences };
 }

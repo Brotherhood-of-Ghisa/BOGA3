@@ -1,0 +1,1 @@
+ALTER TABLE `session_plan_exercises` DROP COLUMN `machine_name`;

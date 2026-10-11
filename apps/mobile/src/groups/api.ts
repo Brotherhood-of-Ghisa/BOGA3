@@ -1,11 +1,11 @@
 import { isCompetitionCachePayload } from './competition-cache-guards';
-import { isCompetitionBoardWire, isCompetitionContractWire } from './competition-wire-guards';
+import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
   isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
-  isCompetitionSessionDetailWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
-import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionContractWire,
+  isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
+import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire,
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
-  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
+  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
@@ -106,7 +106,6 @@ export type GroupRpcName =
   | 'group_remove_member'
   | 'group_set_role'
   | 'group_transfer_ownership'
-  | 'group_competition_contract'
   | 'group_competition_board'
   | 'group_competition_podiums'
   | 'group_competition_exercise_list'
@@ -118,18 +117,16 @@ export type GroupRpcName =
   | 'group_competition_certification_end'
   | 'group_competition_revisions'
   | 'group_competition_history'
-  | 'group_competition_stream'
+  | 'group_competition_stream_v2'
   | 'group_competition_session_detail'
+  | 'group_competition_session_records'
   | 'group_competition_week_summary';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
-// Shared membership/settings RPCs remain public-safe and send the contract-4
-// header like the competition readers.
-const PUBLIC_GROUP_RPCS = new Set<GroupRpcName>(['group_list_mine','group_get','group_invite_preview',
-  'group_create','group_update','group_invite_get','group_invite_regenerate','group_join','group_leave',
-  'group_remove_member','group_set_role','group_transfer_ownership']);
-const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>, capability?: 4): Promise<unknown> => {
+// Every group RPC requires the contract-4 header. Headers belong to the
+// request, never mutable client-wide auth/config.
+const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>): Promise<unknown> => {
   let client: ReturnType<typeof getRequiredSupabaseMobileClient>;
   try {
     client = getRequiredSupabaseMobileClient();
@@ -139,8 +136,7 @@ const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>, c
 
   let response: RpcResponse;
   try {
-    const request = client.schema('app_public').rpc(name, args);
-    response = (await (capability === 4 || PUBLIC_GROUP_RPCS.has(name) ? request.setHeader('x-boga-group-contract','4') : request)) as RpcResponse;
+    response = (await client.schema('app_public').rpc(name, args).setHeader('x-boga-group-contract','4')) as RpcResponse;
   } catch (error) {
     throw new GroupApiError('NETWORK', describeUnknownError(error, 'Network request failed.'));
   }
@@ -285,15 +281,11 @@ export const isGroupNotFound = (error: unknown): boolean => isNotFoundMessage(er
 /** `NOT_FOUND: member not found`: the lifter is no longer a current member. */
 export const isGroupMemberNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'member not found');
 
-// Protocol 4 stays dormant until negotiation is active; UI activation is separate.
-// Headers belong to the request, never mutable client-wide auth/config.
 const competitionRpc = async <T>(name: GroupRpcName, args: Record<string, unknown>, guard: (v: unknown) => v is T, matches?: (v: T) => boolean): Promise<T> => {
-  const data = await callGroupRpc(name,args,4);
+  const data = await callGroupRpc(name,args);
   if (!guard(data) || (matches !== undefined && !matches(data))) throw new GroupApiError('INTERNAL', `${name} returned an unexpected competition payload.`,true);
   return data;
 };
-export const getCompetitionContract = (groupId: string): Promise<CompetitionContractWire> =>
-  competitionRpc('group_competition_contract',{ p_group_id: groupId },isCompetitionContractWire);
 export const listCompetitionExercises = (groupId: string): Promise<CompetitionExerciseListWire> =>
   competitionRpc('group_competition_exercise_list',{ p_group_id: groupId },isCompetitionExerciseListWire);
 export const getCompetitionBoard = ({ groupId, exerciseId, metric, certified = true, limit = 50, cursor = null }: {
@@ -310,11 +302,13 @@ export const getCompetitionHistory = ({ groupId, exerciseId, metric, certified, 
     p_certified: certified, p_revision: revision, p_before: before, p_limit: limit },isCompetitionHistoryWire,p => p.exercise.group_exercise_id === exerciseId && p.metric === metric &&
       p.certified === certified && p.revision.rules_revision === (revision ?? p.exercise.rules.rules_revision));
 export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
-  competitionRpc('group_competition_stream',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
+  competitionRpc('group_competition_stream_v2',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
     p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
       item.kind === 'competition' ? item.event.group.group_id === groupId : item.group.group_id === groupId));
 export const getCompetitionSession = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionDetailWire> =>
   competitionRpc('group_competition_session_detail',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionDetailWire,p => p.group_id === groupId && p.session.member.user_id === memberId && p.session.session_id === sessionId);
+export const getCompetitionSessionRecords = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionRecordsWire> =>
+  competitionRpc('group_competition_session_records',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionRecordsWire,p => p.group_id === groupId && p.member_user_id === memberId && p.session_id === sessionId);
 export const getCompetitionWeek = (groupId: string, start: number, end: number): Promise<CompetitionWeekSummaryWire> =>
   competitionRpc('group_competition_week_summary',{ p_group_id: groupId, p_window_start_ms: start, p_window_end_ms: end },isCompetitionWeekSummaryWire,p => p.group_id === groupId);
 export const certifyCompetition = ({ groupId, exerciseId, memberId, setId, metric, revision, token }: {

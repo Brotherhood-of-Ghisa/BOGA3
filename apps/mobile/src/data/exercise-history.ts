@@ -582,24 +582,43 @@ export const createExerciseHistoryRepository = (
     });
   },
   /** One completed session's blocks of the exercise, in block order, without tags. */
-  async loadSessionEntries(input: {
+  loadSessionEntries(input: {
     exerciseDefinitionId: string;
     sessionId: string;
   }): Promise<ExerciseHistorySessionEntry[]> {
-    const exerciseDefinition = await store.loadExerciseDefinition({
-      exerciseDefinitionId: input.exerciseDefinitionId,
-    });
-    if (!exerciseDefinition) return [];
-    const blocks = await store.loadSessionsForExercise({ ...input, start: null, end: null });
-    const sets = groupBySessionExerciseId(await store.loadSetsForSessionExercises({
-      sessionExerciseIds: blocks.map((row) => row.sessionExerciseId),
-    }));
-    return blocks.map((row) => buildSessionEntry(row, sets[row.sessionExerciseId] ?? [], [], exerciseDefinition));
+    return loadEntries(store, { ...input, start: null, end: null });
+  },
+  /** The exercise's blocks completed in [start, end), without tags. */
+  async loadRangeEntries(input: {
+    exerciseDefinitionId: string;
+    start: Date;
+    end: Date;
+  }): Promise<ExerciseHistorySessionEntry[]> {
+    ensureValidDate(input.start, 'start');
+    ensureValidDate(input.end, 'end');
+    return loadEntries(store, input);
   },
 });
+
+const loadEntries = async (
+  store: ExerciseHistoryStore,
+  input: { exerciseDefinitionId: string; sessionId?: string; start: Date | null; end: Date | null }
+): Promise<ExerciseHistorySessionEntry[]> => {
+  const exerciseDefinition = await store.loadExerciseDefinition({
+    exerciseDefinitionId: input.exerciseDefinitionId,
+  });
+  if (!exerciseDefinition) return [];
+  const blocks = await store.loadSessionsForExercise(input);
+  const sets = groupBySessionExerciseId(await store.loadSetsForSessionExercises({
+    sessionExerciseIds: blocks.map((row) => row.sessionExerciseId),
+  }));
+  return blocks.map((row) => buildSessionEntry(row, sets[row.sessionExerciseId] ?? [], [], exerciseDefinition));
+};
 
 const defaultExerciseHistoryRepository = createExerciseHistoryRepository();
 
 export const loadExercisePerformanceHistory = defaultExerciseHistoryRepository.load;
 
 export const loadExerciseSessionEntries = defaultExerciseHistoryRepository.loadSessionEntries;
+
+export const loadExerciseRangeEntries = defaultExerciseHistoryRepository.loadRangeEntries;

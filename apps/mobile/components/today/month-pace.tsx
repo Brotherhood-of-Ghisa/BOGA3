@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from 'react-native-svg';
 
+import { changeToneColour } from '@/components/ui/change-tone';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { TodayProgressMonth } from '@/src/progress-summary';
 
@@ -10,6 +11,7 @@ import {
   formatPacePhrase,
   formatSignedCount,
   monthChartAccessibilityLabel,
+  paceTone,
   monthChartGeometry,
   monthName,
   paceDifference,
@@ -130,7 +132,10 @@ export function MonthPace({ month }: { month: TodayProgressMonth }) {
           </Text>
         </View>
         <View style={styles.difference}>
-          <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-month-difference">
+          {/* The pace difference takes its direction's colour, like every
+              other change figure (`design-language.md` §6). */}
+          <Text allowFontScaling={false} testID="today-progress-month-difference"
+            style={[todayText.differenceFigure, { color: changeToneColour(paceTone(paceDifference(month))) }]}>
             {formatSignedCount(paceDifference(month))}
           </Text>
           <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-progress-month-pace">

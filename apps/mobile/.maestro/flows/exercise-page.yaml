@@ -21,7 +21,7 @@ appId: com.dinoderek.mobile
 #      page sheet must be re-created to present again.
 # Jest counterpart: __tests__/exercise-page-screen.test.tsx (the page over
 #   the same fixture: records, Last, effort cycle and sheet, menu, swap,
-#   `+ Add set`, Complete's warning, discarded planned sets read back from the
+#   `+ Add set`, Complete's warning, the sets it keeps read back from the
 #   database), __tests__/ui-sheet-drag.test.tsx, __tests__/ui-page-sheet.test.tsx,
 #   __tests__/exercise-page-model.test.ts (effort inheritance),
 #   __tests__/exercise-history-screen.test.tsx (periods, bests, cards).

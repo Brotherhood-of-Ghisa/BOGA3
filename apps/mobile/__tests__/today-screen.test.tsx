@@ -30,10 +30,12 @@ import { uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
 import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 import { TodayScreen, type TodayScreenProps } from '../app/(tabs)/today';
 
@@ -89,7 +91,7 @@ const logHistory = async () => {
 const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
   await bootLocalApp();
   const view = render(<TodayScreen now={clock} groupState={signedOut} {...props} />);
-  await waitFor(() => expect(screen.queryByTestId('today-progress-loading')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('today-progress-loading'));
   return view;
 };
 
@@ -168,6 +170,9 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.getByText('October so far')).toBeTruthy();
     expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     expect(text('today-progress-month-difference')).toHaveTextContent('+12');
+    // Ahead of the pace is an improvement, in the one colour every change
+    // figure uses for one (`design-language.md` §6).
+    expect(text('today-progress-month-difference')).toHaveStyle({ color: uiRoles.gain });
     expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
     // No summary line under the chart; its spoken label still carries the
     // projection the chart draws (18 over 16 days, across 31: 34.9 → 35).
@@ -187,9 +192,9 @@ describe('Today: the Progress card over real data', () => {
     const row = text('today-latest-session');
     expect(row).toHaveProp(
       'accessibilityLabel',
-      'Completed session on 10/15 07:12, 1h, 6 sets, 2 exercises, at Iron House, 3 PRs',
+      'Completed session on 15/10 07:12, 1h, 6 sets, 2 exercises, at Iron House, 3 PRs',
     );
-    expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12');
+    expect(text('today-latest-session-start')).toHaveTextContent('15/10 07:12');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 sets · 2 exercises');
     // A count, not the names: the row matches the group stream session card.
     expect(screen.queryByTestId('today-latest-session-exercises')).toBeNull();
@@ -204,6 +209,29 @@ describe('Today: the Progress card over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions'], ['/progress']]);
   });
 
+  it('formats the latest session start stamp according to user date format preferences', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+
+    expect(text('today-latest-session-start')).toHaveTextContent('15/10 07:12');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'MM-DD-YYYY' });
+    });
+    expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' });
+    });
+    expect(text('today-latest-session-start')).toHaveTextContent('2026-10-15 07:12');
+
+    await act(async () => {
+      setExerciseListPreferences({ dateFormat: 'DD-MM-YYYY' });
+    });
+    expect(text('today-latest-session-start')).toHaveTextContent('15/10 07:12');
+  });
+
   it('reads again on focus, keeping the figures on screen, so a finished or deleted session shows', async () => {
     await bootLocalApp();
     await logHistory();
@@ -215,14 +243,14 @@ describe('Today: the Progress card over real data', () => {
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     expect(screen.queryByTestId('today-progress-loading')).toBeNull();
     await waitFor(() => expect(text('today-progress-week-sessions-value')).toHaveTextContent('2'));
-    expect(text('today-latest-session-start')).toHaveTextContent('10/16 08:00');
+    expect(text('today-latest-session-start')).toHaveTextContent('16/10 08:00');
 
     await act(async () => {
       await setSessionDeletedState('oct-16', true);
     });
     screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
-    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15/10 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
     expect(loadProgress).toHaveBeenLastCalledWith(NOW);
   });
@@ -240,7 +268,7 @@ describe('Today: the today-progress harness fixture', () => {
     // One bench climb this week: its 1RM, Weight and Volume.
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
     expect(text('today-progress-month-difference')).toHaveTextContent('+36');
-    expect(text('today-latest-session-start')).toHaveTextContent('10/16 07:00');
+    expect(text('today-latest-session-start')).toHaveTextContent('16/10 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');
   });
 });

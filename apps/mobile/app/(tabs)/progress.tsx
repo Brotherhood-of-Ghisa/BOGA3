@@ -1,7 +1,5 @@
-import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -11,16 +9,11 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
-import {
-  EXERCISE_HISTORY_METRIC_OPTIONS,
-  HistorySheet,
-  MUSCLE_HISTORY_METRIC_OPTIONS,
-  type MuscleHistoryMetric,
-} from '@/components/stats/history-sheet';
 import {
   Card,
   Icon,
@@ -28,90 +21,118 @@ import {
   Screen,
   ScreenScroll,
   SearchField,
-  SegmentedControl,
   StatePanel,
-  uiFonts,
-  uiGeometry,
+  ToggleChip,
   uiRoles,
   uiSpace,
-  uiTypography,
 } from '@/components/ui';
-import {
-  type CalendarHeatmapMetric,
-  type DailyEffortMetrics,
-  type SelectedExerciseWeeklyEffort,
-  type SelectedMuscleWeeklyEffort,
-  type ProgressComparisons,
-} from '@/src/data';
+import { type ProgressComparisons } from '@/src/data';
+import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { HeatmapView } from '@/src/preferences/model';
-import { ProgressTables, type ProgressTableMetric } from '@/components/stats/progress-tables';
-import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
+import type { ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
+import { ProgressTables } from '@/components/stats/progress-tables';
+import {
+  COLUMN_KEYS,
+  COLUMN_NAMES,
+  ComparisonHeaders,
+  ComparisonValues,
+  comparisonFigures,
+  comparisonSortValues,
+  hasComparisonMetric,
+  metricUnit,
+  resolveComparisonLayout,
+  type ComparisonColumnKey,
+  type ComparisonPeriodFigures,
+} from '@/components/stats/comparison-columns';
+import {
+  StatsTable,
+  StatsTableHeaderLabel,
+  statsTableStyles,
+} from '@/components/stats/stats-table';
+import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
+import { progressHistoryHref } from '@/src/navigation/routes';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
+import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 
-export type MuscleHistoryTarget = {
-  muscleGroupIds: [string];
-  displayName: string;
-  familyName: string;
-};
+export type MuscleHistoryTarget = { muscleGroupId: string };
+export type ExerciseHeatmapTarget = { exerciseDefinitionId: string };
 
-export type ExerciseHeatmapTarget = {
-  exerciseDefinitionId: string;
-  displayName: string;
-};
-
+/** One exercise's two periods, drawn in the columns both breakdowns share. */
 export type ExerciseListItem = {
   id: string;
   name: string;
-  workingSetCount: number;
-  totalVolume: number | null;
-  estimatedOneRepMax: number | null;
+  current: ComparisonPeriodFigures;
+  previous: ComparisonPeriodFigures;
   lastCompletedAt: Date | null;
 };
 
-export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume';
+// The name column sorts by recency; each figure column sorts by its own figure
+// for the metric in force, so the sort survives a metric change.
+export type ExerciseSortHeader = 'exercise' | ComparisonColumnKey;
 export type ExerciseSortMode =
   | 'recency-desc'
   | 'recency-asc'
-  | 'sets-desc'
-  | 'sets-asc'
-  | 'volume-desc'
-  | 'volume-asc';
+  | 'now-desc'
+  | 'now-asc'
+  | 'previous-desc'
+  | 'previous-asc'
+  | 'change-desc'
+  | 'change-asc';
 
-export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
+export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'now-desc';
 
 const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
   exercise: ['recency-desc', 'recency-asc'],
-  sets: ['sets-desc', 'sets-asc'],
-  volume: ['volume-desc', 'volume-asc'],
+  now: ['now-desc', 'now-asc'],
+  previous: ['previous-desc', 'previous-asc'],
+  change: ['change-desc', 'change-asc'],
 };
 
 const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader> = {
   'recency-desc': 'exercise',
   'recency-asc': 'exercise',
-  'sets-desc': 'sets',
-  'sets-asc': 'sets',
-  'volume-desc': 'volume',
-  'volume-asc': 'volume',
+  'now-desc': 'now',
+  'now-asc': 'now',
+  'previous-desc': 'previous',
+  'previous-asc': 'previous',
+  'change-desc': 'change',
+  'change-asc': 'change',
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+// The filter row holds three chips at phone width, so each carries one word.
+// `Sets` unqualified is the working-set count ([[set.count-display]]).
 const VIEW_MODE_OPTIONS = [
-  { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
-  { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
+  { value: 'exercise' as StatsViewMode, label: 'Exercise' },
+  { value: 'muscle' as StatsViewMode, label: 'Muscle' },
+] as const;
+const METRIC_OPTIONS = [
+  { value: 'workingSetCount' as ProgressMetric, label: 'Sets' },
+  { value: 'totalVolume' as ProgressMetric, label: 'Volume' },
+] as const;
+// An exercise has a 1RM estimate; a muscle does not, so only this breakdown
+// offers the third ([[comparison.change-display]] says how its change reads).
+const EXERCISE_METRIC_OPTIONS = [
+  { value: 'workingSetCount' as ProgressExerciseMetric, label: 'Sets' },
+  { value: 'totalVolume' as ProgressExerciseMetric, label: 'Volume' },
+  { value: 'estimatedOneRepMax' as ProgressExerciseMetric, label: '1RM' },
 ] as const;
 
-const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
+// Period choices and accessibility wording follow [[comparison.window]].
+// `This week` is the only choice when Settings' Progress period is one week,
+// which leaves the chip inert rather than offering the same span twice.
+const periodOptions = (targetWindowWeeks: number) => {
+  const thisWeek = { value: 'this-week' as ProgressPeriod, label: 'This week',
+    accessibilityLabel: `This week, ${formatPeriodComparison(7)}, full previous calendar week` };
+  if (targetWindowWeeks === 1) return [thisWeek];
+  return [{ value: 'window' as ProgressPeriod, label: `${targetWindowWeeks} weeks`,
+    accessibilityLabel: `${targetWindowWeeks} weeks, ${formatPeriodComparison(targetWindowWeeks * 7)}, full previous calendar weeks` },
+    thisWeek];
+};
 
-export const resolveStatsInitialBreakdown = (
-  value: string | string[] | undefined
-): StatsViewMode => (firstRouteParam(value) === 'exercise' ? 'exercise' : 'muscle');
-
-export { formatCountDelta, formatVolumeDelta } from '@/components/stats/comparison-format';
+export { formatCountDelta, formatOneRepMaxDelta, formatVolumeDelta } from '@/components/stats/comparison-format';
 export const formatPeriodComparison = (periodDays: number): string =>
   periodDays === 7 ? 'vs previous week' : `vs previous ${periodDays / 7} weeks`;
 
@@ -127,31 +148,15 @@ export const nextExerciseSortMode = (
 };
 
 export const describeExerciseSortMode = (mode: ExerciseSortMode): string => {
-  switch (mode) {
-    case 'recency-desc':
-      return 'Most recent exercise';
-    case 'recency-asc':
-      return 'Least recent exercise';
-    case 'sets-desc':
-      return 'Sets — high to low';
-    case 'sets-asc':
-      return 'Sets — low to high';
-    case 'volume-desc':
-      return 'Volume — high to low';
-    case 'volume-asc':
-      return 'Volume — low to high';
-  }
+  if (mode === 'recency-desc') return 'Most recent exercise';
+  if (mode === 'recency-asc') return 'Least recent exercise';
+  const header = EXERCISE_SORT_HEADER_BY_MODE[mode];
+  return `${exerciseSortHeaderLabel(header)} — ${mode.endsWith('-asc') ? 'low to high' : 'high to low'}`;
 };
 
 const compareExerciseIdentity = (left: ExerciseListItem, right: ExerciseListItem): number => {
   const nameComparison = left.name.localeCompare(right.name);
   return nameComparison === 0 ? left.id.localeCompare(right.id) : nameComparison;
-};
-
-const compareNumbers = (left: number, right: number, descending: boolean): number => {
-  if (left === right) return 0;
-  if (descending) return left > right ? -1 : 1;
-  return left < right ? -1 : 1;
 };
 
 const compareOptionalNumbers = (
@@ -164,7 +169,9 @@ const compareOptionalNumbers = (
   if (validLeft === null && validRight === null) return 0;
   if (validLeft === null) return 1;
   if (validRight === null) return -1;
-  return compareNumbers(validLeft, validRight, descending);
+  if (validLeft === validRight) return 0;
+  if (descending) return validLeft > validRight ? -1 : 1;
+  return validLeft < validRight ? -1 : 1;
 };
 
 const completedTimestamp = (item: ExerciseListItem): number | null => {
@@ -172,77 +179,52 @@ const completedTimestamp = (item: ExerciseListItem): number | null => {
   return timestamp !== null && Number.isFinite(timestamp) ? timestamp : null;
 };
 
+/**
+ * The list in the order the pressed header asks for. A row with nothing in the
+ * sorted column — no estimate, or a change that is `new` or unavailable —
+ * sorts last in both directions, so a column never leads with blanks; ties
+ * fall back to the name, then the id, so the order is total.
+ */
 export const sortExerciseListItems = (
   items: ExerciseListItem[],
-  mode: ExerciseSortMode = DEFAULT_EXERCISE_SORT_MODE
-): ExerciseListItem[] =>
-  [...items].sort((left, right) => {
-    let comparison = 0;
-    switch (mode) {
-      case 'recency-desc':
-        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), true);
-        break;
-      case 'recency-asc':
-        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), false);
-        break;
-      case 'sets-desc':
-        comparison = compareNumbers(left.workingSetCount, right.workingSetCount, true);
-        break;
-      case 'sets-asc':
-        comparison = compareNumbers(left.workingSetCount, right.workingSetCount, false);
-        break;
-      case 'volume-desc':
-        comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, true);
-        break;
-      case 'volume-asc':
-        comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, false);
-        break;
-    }
-    return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
-  });
+  mode: ExerciseSortMode = DEFAULT_EXERCISE_SORT_MODE,
+  metric: ProgressExerciseMetric = 'workingSetCount'
+): ExerciseListItem[] => {
+  const header = EXERCISE_SORT_HEADER_BY_MODE[mode];
+  const descending = !mode.endsWith('-asc');
+  const sortValue = (item: ExerciseListItem) => header === 'exercise'
+    ? completedTimestamp(item)
+    : comparisonSortValues(item, metric)[header];
+  return items
+    .map(item => ({ item, value: sortValue(item) }))
+    .sort((left, right) => compareOptionalNumbers(left.value, right.value, descending)
+      || compareExerciseIdentity(left.item, right.item))
+    .map(({ item }) => item);
+};
 
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
   onRetry?: () => void;
-  periodDays: number;
+  period: ProgressPeriod;
   targetWindowWeeks?: number;
-  historyLookbackWeeks?: number;
-  weeklyWorkingSetTarget?: number;
-  onSelectPeriod: (period: number) => void;
+  onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
-  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
-  onDismissMuscleHistory: () => void;
-  onRetryMuscleHistory?: () => void;
-  onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
+  // A muscle or exercise name opens its history page; Progress keeps its own
+  // state and scroll behind it.
+  onOpenMuscleHistory: (muscle: MuscleHistoryTarget) => void;
+  onOpenExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   isLoading: boolean;
   errorMessage: string | null;
-  selectedMuscle: MuscleHistoryTarget | null;
-  muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
-  muscleHistoryDailyMetrics: DailyEffortMetrics[];
-  isMuscleHistoryLoading: boolean;
-  muscleHistoryErrorMessage: string | null;
-  selectedMuscleHistoryWeekKey: string | null;
-  muscleHistoryMetric: MuscleHistoryMetric;
-  muscleHistoryView: HeatmapView;
-  onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
+  tableMetric: ProgressMetric;
+  onSelectTableMetric: (metric: ProgressMetric) => void;
+  // The Exercise table's own metric, which may be one the Muscle table cannot show.
+  exerciseMetric: ProgressExerciseMetric;
+  onSelectExerciseMetric: (metric: ProgressExerciseMetric) => void;
   exerciseListItems: ExerciseListItem[];
-  selectedExercise: ExerciseHeatmapTarget | null;
-  exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
-  exerciseHistoryDailyMetrics: DailyEffortMetrics[];
-  isExerciseHistoryLoading: boolean;
-  exerciseHistoryErrorMessage: string | null;
-  selectedExerciseHistoryWeekKey: string | null;
-  exerciseHistoryMetric: CalendarHeatmapMetric;
-  exerciseHistoryView: HeatmapView;
-  onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
-  onDismissExerciseHistory: () => void;
-  onRetryExerciseHistory?: () => void;
-  onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
-  onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
-  /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
-  historyTodayDateKey?: string;
+  // False while the history page is on top: returning restores reader focus.
+  isFocused?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
 };
@@ -250,76 +232,75 @@ export type StatsScreenShellProps = {
 export function StatsScreenShell({
   summary,
   onRetry,
-  periodDays,
+  period,
   targetWindowWeeks = 4,
-  historyLookbackWeeks = 52,
-  weeklyWorkingSetTarget = 8,
   onSelectPeriod,
   onPressSessionsCard,
-  onPressMuscleHistory,
-  onDismissMuscleHistory,
-  onRetryMuscleHistory,
-  onSelectMuscleHistoryWeek,
+  onOpenMuscleHistory,
+  onOpenExerciseHistory,
   isLoading,
   errorMessage,
-  selectedMuscle,
-  muscleHistoryWeeklyEffort,
-  muscleHistoryDailyMetrics,
-  isMuscleHistoryLoading,
-  muscleHistoryErrorMessage,
-  selectedMuscleHistoryWeekKey,
-  muscleHistoryMetric,
-  muscleHistoryView,
-  onSelectMuscleHistoryMetric,
   viewMode,
   onSelectViewMode,
+  tableMetric,
+  onSelectTableMetric,
+  exerciseMetric,
+  onSelectExerciseMetric,
   exerciseListItems,
-  selectedExercise,
-  exerciseHistoryWeeklyEffort,
-  exerciseHistoryDailyMetrics,
-  isExerciseHistoryLoading,
-  exerciseHistoryErrorMessage,
-  selectedExerciseHistoryWeekKey,
-  exerciseHistoryMetric,
-  exerciseHistoryView,
-  onPressExerciseHistory,
-  onDismissExerciseHistory,
-  onRetryExerciseHistory,
-  onSelectExerciseHistoryWeek,
-  onSelectExerciseHistoryMetric,
-  historyTodayDateKey,
+  isFocused = true,
   searchQuery,
   onSearchQueryChange,
 }: StatsScreenShellProps) {
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
-  const [tableMetric, setTableMetric] = useState<ProgressTableMetric>('workingSetCount');
   const [contributionId, setContributionId] = useState<string | null>(null);
+  // The row whose history was opened, held only until the return it is for:
+  // any other way back to Progress (a tab, the Sessions link) leaves the
+  // reader where it landed.
   const launchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const focusRequest = useRef(0);
   useEffect(() => () => { focusRequest.current += 1; }, []);
-  const focus = (target: ComponentRef<typeof View> | null) => {
+  const focus = useCallback((target: ComponentRef<typeof View> | null) => {
     const request = ++focusRequest.current;
     void AccessibilityInfo.isScreenReaderEnabled().then(enabled => {
       if (request !== focusRequest.current) return;
       const handle = target && findNodeHandle(target);
       if (enabled && handle) AccessibilityInfo.setAccessibilityFocus(handle);
     });
-  };
+  }, []);
+  const wasFocused = useRef(isFocused);
+  useEffect(() => {
+    const returned = isFocused && !wasFocused.current;
+    wasFocused.current = isFocused;
+    if (!returned) return;
+    const row = launchTarget.current;
+    launchTarget.current = null;
+    if (row) focus(row);
+  }, [focus, isFocused]);
   const showContributions = (id: string) => {
     setContributionId(current => current === id ? null : id);
   };
-  const dismissMuscle = () => { onDismissMuscleHistory(); focus(launchTarget.current); };
-  const dismissExercise = () => { onDismissExerciseHistory(); focus(launchTarget.current); };
+  // The press that opens history: the keyboard goes, the row is remembered for
+  // the return, and any pending focus request for an earlier row is dropped.
+  const openHistory = useCallback(
+    <T,>(open: (target: T) => void, target: T, row: ComponentRef<typeof View> | null) => {
+      focusRequest.current += 1;
+      Keyboard.dismiss();
+      launchTarget.current = row;
+      open(target);
+    },
+    []
+  );
 
+  // A row with nothing for the metric in either period is not drawn, as in the
+  // Muscle table's contributions.
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    const filteredItems = query
-      ? exerciseListItems.filter((item) => item.name.toLowerCase().includes(query))
-      : exerciseListItems;
-    return sortExerciseListItems(filteredItems, exerciseSortMode);
-  }, [exerciseListItems, exerciseSortMode, searchQuery]);
+    const matching = exerciseListItems.filter(item => hasComparisonMetric(item, exerciseMetric)
+      && (query === '' || item.name.toLowerCase().includes(query)));
+    return sortExerciseListItems(matching, exerciseSortMode, exerciseMetric);
+  }, [exerciseListItems, exerciseMetric, exerciseSortMode, searchQuery]);
 
   const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
@@ -330,217 +311,168 @@ export function StatsScreenShell({
   return (
     <Screen testID="stats-history-screen">
       <View style={styles.controls} testID="stats-controls">
-        <View testID="stats-view-switch">
-          <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-            value={viewMode} onChange={onSelectViewMode} selectedGround="viz" testIDPrefix="stats-view-mode-chip" />
+        <View style={styles.filters} testID="stats-view-switch">
+          <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
+            value={viewMode} onChange={onSelectViewMode} testID="stats-view-mode-chip" />
+          <ToggleChip accessibilityLabel="Stats period" options={periodOptions(targetWindowWeeks)}
+            value={targetWindowWeeks === 1 ? 'this-week' : period} onChange={onSelectPeriod} testID="stats-period-chip" />
+          {viewMode === 'muscle' ? (
+            <ToggleChip accessibilityLabel="Progress metric" options={METRIC_OPTIONS}
+              value={tableMetric} onChange={onSelectTableMetric} testID="stats-metric-chip" />
+          ) : (
+            <ToggleChip accessibilityLabel="Progress metric" options={EXERCISE_METRIC_OPTIONS}
+              value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
+          )}
         </View>
-        <SegmentedControl
-          accessibilityLabel="Select stats time range"
-          options={(targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
-            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
-            .map(option => ({ ...option, accessibilityLabel:
-              `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
-          value={periodDays} onChange={onSelectPeriod} selectedGround="viz" testIDPrefix="stats-period-chip" />
-        {viewMode === 'muscle' ? (
-          <SegmentedControl accessibilityLabel="Select progress metric"
-            options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} selectedGround="viz" testIDPrefix="stats-metric-chip" />
-        ) : (
+        {viewMode === 'exercise' ? (
           <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
             onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
-        )}
+        ) : null}
       </View>
-      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <ScreenScroll contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
         {viewMode === 'exercise' ? (
-          <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
-            isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
+          <ExerciseListView items={filteredExerciseListItems} metric={exerciseMetric}
+            onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
+            emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
+            sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
         ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
-          weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
-          onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
-          onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
+          onSelect={showContributions}
+          onMuscleHistory={(row, target) => openHistory(onOpenMuscleHistory, { muscleGroupId: row.muscleGroupId }, target)}
+          onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
-          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={styles.exerciseName}>Sessions</Text></ListRow>
+          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={statsTableStyles.name}>Sessions</Text></ListRow>
       </ScreenScroll>
 
-      {selectedMuscle && isIndividualMuscleHistoryTarget(selectedMuscle) ? (
-        <HistorySheet
-          key={`muscle-${selectedMuscle.muscleGroupIds[0]}`}
-          dailyMetrics={muscleHistoryDailyMetrics}
-          errorMessage={muscleHistoryErrorMessage}
-          eyebrow="Muscle History"
-          isLoading={isMuscleHistoryLoading}
-          kind="muscle"
-          metric={muscleHistoryMetric}
-          metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissMuscle}
-          onRetry={onRetryMuscleHistory}
-          onSelectMetric={onSelectMuscleHistoryMetric}
-          onSelectWeek={onSelectMuscleHistoryWeek}
-          selectedWeekKey={selectedMuscleHistoryWeekKey}
-          title={selectedMuscle.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={muscleHistoryView}
-          weeklyEffort={muscleHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTarget: weeklyWorkingSetTarget }}
-        />
-      ) : null}
-      {selectedExercise ? (
-        <HistorySheet
-          key={`exercise-${selectedExercise.exerciseDefinitionId}`}
-          dailyMetrics={exerciseHistoryDailyMetrics}
-          errorMessage={exerciseHistoryErrorMessage}
-          eyebrow="Exercise History"
-          isLoading={isExerciseHistoryLoading}
-          kind="exercise"
-          metric={exerciseHistoryMetric}
-          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
-          onDismiss={dismissExercise}
-          onRetry={onRetryExerciseHistory}
-          onSelectMetric={onSelectExerciseHistoryMetric}
-          onSelectWeek={onSelectExerciseHistoryWeek}
-          selectedWeekKey={selectedExerciseHistoryWeekKey}
-          title={selectedExercise.displayName}
-          todayDateKey={historyTodayDateKey}
-          view={exerciseHistoryView}
-          weeklyEffort={exerciseHistoryWeeklyEffort}
-          lookbackWeeks={historyLookbackWeeks}
-        />
-      ) : null}
     </Screen>
   );
 }
 
+// An empty table says which of the three it is: no history at all, nothing
+// for the metric in force, or nothing matching the search. The metric comes
+// first, so a search whose exercises do exist is not blamed for a metric none
+// of them has.
+const exerciseEmptyBody = (items: ExerciseListItem[], metric: ProgressExerciseMetric): string => {
+  if (items.length === 0) return 'No exercises with recorded history yet.';
+  if (!items.some(item => hasComparisonMetric(item, metric))) {
+    const figure = metric === 'workingSetCount' ? 'working sets'
+      : metric === 'totalVolume' ? 'volume-included sets' : '1RM estimates';
+    return `No exercises with ${figure} in either period.`;
+  }
+  // Something has the metric, so only the search can have emptied the table.
+  return 'No exercises match the search query.';
+};
+
 function ExerciseListView({
   items,
+  metric,
   onPressExercise,
-  isFiltered,
+  emptyBody,
   sortMode,
   onPressSortHeader,
 }: {
   items: ExerciseListItem[];
+  metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
-  isFiltered: boolean;
+  emptyBody: string;
   sortMode: ExerciseSortMode;
   onPressSortHeader: (header: ExerciseSortHeader) => void;
 }) {
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
+  const { width } = useWindowDimensions();
   if (items.length === 0) {
     return (
       <Card>
-        <StatePanel
-          body={isFiltered ? 'No exercises match the search query.' : 'No exercises with recorded history yet.'}
-          fill={false}
-          testID="stats-exercise-list-empty"
-        />
+        <StatePanel body={emptyBody} fill={false} testID="stats-exercise-list-empty" />
       </Card>
     );
   }
 
+  // The rows carry no trailing control, so no axis is reserved for one; the
+  // headers sort, so each column keeps room for its indicator.
+  const layout = resolveComparisonLayout(width, items, metric, false, true);
   return (
-    <Card testID="stats-exercise-list">
-      <View style={styles.tableHeader} testID="stats-exercise-table-header">
-        <ExerciseSortHeaderCell
-          header="exercise"
-          label="Exercise"
-          sortMode={sortMode}
-          onPress={onPressSortHeader}
-          style={styles.nameColumn}
-        />
-        <View style={styles.tableColumns}>
+    <StatsTable testID="stats-exercise-list">
+      <ComparisonHeaders
+        axis={false}
+        column={(position, columnWidth) => (
           <ExerciseSortHeaderCell
-            header="sets"
-            label="Sets"
-            sortMode={sortMode}
-            onPress={onPressSortHeader}
-            style={styles.setsColumn}
+            header={position.key}
+            label={position.label}
+            metric={metric}
             numeric
+            onPress={onPressSortHeader}
+            sortMode={sortMode}
+            style={{ width: columnWidth }}
           />
+        )}
+        layout={layout}
+        metric={metric}
+        name={
           <ExerciseSortHeaderCell
-            header="volume"
-            label="Vol"
-            sortMode={sortMode}
+            header="exercise"
+            label="Exercise"
+            metric={metric}
             onPress={onPressSortHeader}
-            style={styles.volumeColumn}
-            numeric
+            sortMode={sortMode}
+            style={styles.nameColumn}
           />
-          <View
-            accessibilityRole="header"
-            style={[styles.headerCell, styles.headerCellNumeric, styles.oneRepMaxColumn]}
-            testID="stats-exercise-header-oneRepMax">
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.headerLabel}>
-              1RM
+        }
+        testID="stats-exercise-table-header"
+      />
+      {items.map((item) => {
+        const values = (
+          <ComparisonValues
+            layout={layout}
+            metric={metric}
+            prefix={`stats-exercise-row-${item.id}`}
+            row={item}
+            speak={false}
+          />
+        );
+        return (
+          <ListRow
+            key={item.id}
+            ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
+            accessibilityLabel={exerciseRowLabel(item, metric)}
+            density="list"
+            meta={layout.stacked ? undefined : values}
+            onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
+            testID={`stats-exercise-row-${item.id}`}>
+            <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
+              {item.name}
             </Text>
-          </View>
-        </View>
-      </View>
-      {items.map((item) => (
-        <ListRow
-          key={item.id}
-          ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
-          accessibilityLabel={`Open ${item.name} heatmap. ${String(
-            item.workingSetCount
-          )} sets. Volume ${formatVolumeFigure(item.totalVolume)}${
-            item.estimatedOneRepMax === null
-              ? '. Estimated one rep max unavailable'
-              : `. Estimated one rep max ${formatOneRepMax(item.estimatedOneRepMax)} kg`
-          }`}
-          density="list"
-          meta={
-            <View style={styles.tableColumns}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.tableFigure, styles.setsColumn]}
-                testID={`stats-exercise-sets-${item.id}`}>
-                {String(item.workingSetCount)}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.tableFigure, styles.volumeColumn]}
-                testID={`stats-exercise-volume-${item.id}`}>
-                {formatVolumeFigure(item.totalVolume)}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.tableFigure, styles.oneRepMaxColumn]}
-                testID={`stats-exercise-1rm-${item.id}`}>
-                {item.estimatedOneRepMax === null ? '—' : formatOneRepMax(item.estimatedOneRepMax)}
-              </Text>
-            </View>
-          }
-          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name }, links.current.get(item.id) ?? null)}
-          testID={`stats-exercise-row-${item.id}`}>
-          <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
-            {item.name}
-          </Text>
-        </ListRow>
-      ))}
-    </Card>
+            {layout.stacked ? values : null}
+          </ListRow>
+        );
+      })}
+    </StatsTable>
   );
 }
+
+// The whole row is one target, so it speaks its own figures; the cells inside
+// stay plain rather than offering a second, unreachable element.
+const exerciseRowLabel = (item: ExerciseListItem, metric: ProgressExerciseMetric): string => {
+  const figures = comparisonFigures(item, metric);
+  return `Open ${item.name} heatmap. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.`;
+};
 
 const exerciseSortDirection = (mode: ExerciseSortMode): 'up' | 'down' =>
   mode.endsWith('-asc') ? 'up' : 'down';
 
-const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
-  switch (header) {
-    case 'exercise':
-      return 'Exercise';
-    case 'sets':
-      return 'Sets';
-    case 'volume':
-      return 'Volume';
-  }
-};
+// A figure column is named as the columns name themselves (`Previous`, not the
+// header's abbreviated `Prev`).
+const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string =>
+  header === 'exercise' ? 'Exercise' : COLUMN_NAMES[COLUMN_KEYS.indexOf(header)];
 
 function ExerciseSortHeaderCell({
   header,
   label,
+  metric,
   sortMode,
   onPress,
   style,
@@ -548,6 +480,7 @@ function ExerciseSortHeaderCell({
 }: {
   header: ExerciseSortHeader;
   label: string;
+  metric: ProgressExerciseMetric;
   sortMode: ExerciseSortMode;
   onPress: (header: ExerciseSortHeader) => void;
   style: StyleProp<ViewStyle>;
@@ -558,11 +491,13 @@ function ExerciseSortHeaderCell({
   // An inactive header still lays out a (transparent) indicator, so the
   // column does not shift when it becomes the active sort.
   const direction = isActive ? exerciseSortDirection(sortMode) : 'down';
+  // A figure column names its unit, like the Muscle table's spoken headers.
+  const named = numeric
+    ? `${exerciseSortHeaderLabel(header)}, ${metricUnit(metric)}`
+    : exerciseSortHeaderLabel(header);
   const accessibilityLabel = isActive
-    ? `${exerciseSortHeaderLabel(header)}. Current sort: ${describeExerciseSortMode(
-        sortMode
-      )}. Activate to sort ${describeExerciseSortMode(nextMode)}.`
-    : `${exerciseSortHeaderLabel(header)}. Activate to sort ${describeExerciseSortMode(nextMode)}.`;
+    ? `${named}. Current sort: ${describeExerciseSortMode(sortMode)}. Activate to sort ${describeExerciseSortMode(nextMode)}.`
+    : `${named}. Activate to sort ${describeExerciseSortMode(nextMode)}.`;
 
   return (
     <Pressable
@@ -571,18 +506,13 @@ function ExerciseSortHeaderCell({
       accessibilityState={{ selected: isActive }}
       onPress={() => onPress(header)}
       style={({ pressed }) => [
-        styles.headerCell,
+        statsTableStyles.headerCell,
         style,
-        numeric && styles.headerCellNumeric,
+        numeric && statsTableStyles.headerCellNumeric,
         pressed && styles.headerCellPressed,
       ]}
       testID={`stats-exercise-sort-${header}`}>
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.headerLabel, isActive && styles.headerLabelActive]}>
-        {label}
-      </Text>
+      <StatsTableHeaderLabel active={isActive} label={label} />
       <View
         accessible={false}
         style={[
@@ -592,9 +522,7 @@ function ExerciseSortHeaderCell({
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
         {header === 'exercise' ? (
-          <Text allowFontScaling={false} accessible={false} style={styles.headerLabel}>
-            Recent
-          </Text>
+          <StatsTableHeaderLabel label="Recent" />
         ) : null}
         <Icon
           color={uiRoles.ink}
@@ -614,89 +542,62 @@ export default function StatsRoute() {
 
 function StatsContent() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
   const { values } = useAccountLocalPreferenceState();
-  const [thisWeek, setThisWeek] = useState(firstRouteParam(params.period) === '7');
-  const weeks = thisWeek ? 1 : values.targetWindowWeeks;
-  const periodDays = weeks * 7;
-  const catalogPeriod = useMemo(() => ({ weeks }), [weeks]);
+  const filters = useProgressFilters(params);
+  const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalog = useExerciseCatalog();
-  const { stats, reload } = useExerciseCatalogStats(catalogPeriod);
+  const { current: thisPeriod, previous: lastPeriod, reload } = useExerciseCatalogComparison(weeks);
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, revision, reload);
-  const historyRevision = revision + summary.refreshRevision;
-  const muscle = useHistory<MuscleHistoryTarget>(values.historyLookbackWeeks, historyRevision);
-  const exercise = useHistory<ExerciseHeatmapTarget>(values.historyLookbackWeeks, historyRevision);
-  const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
-  const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
-  const [viewMode, setViewMode] = useState<StatsViewMode>(() => resolveStatsInitialBreakdown(params.breakdown));
   const [searchQuery, setSearchQuery] = useState('');
+  // An exercise is listed when either period counted a set for it: one that
+  // stopped is as much a comparison as one that started.
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
-    .filter(item => stats.aggregatesById.has(item.id))
-    .map(item => {
-      const aggregate = stats.aggregatesById.get(item.id)!;
-      return { id: item.id, name: item.name, workingSetCount: aggregate.workingSetCount,
-        totalVolume: aggregate.totalVolume,
-        estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
-    }), [catalog.exercises, stats]);
-  return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
-    historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
-    onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
-    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onRetryMuscleHistory={muscle.retry} onSelectMuscleHistoryWeek={muscle.selectWeek}
-    selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
-    isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
-    muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
-    viewMode={viewMode} onSelectViewMode={mode => { setViewMode(mode); exercise.dismiss(); muscle.dismiss(); }}
-    exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
-    exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
-    selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
-    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onRetryExerciseHistory={exercise.retry} onSelectExerciseHistoryWeek={exercise.selectWeek}
-    onSelectExerciseHistoryMetric={setExerciseMetric} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
+    .filter(item => thisPeriod.aggregatesById.has(item.id) || lastPeriod.aggregatesById.has(item.id))
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      current: periodFigures(thisPeriod.aggregatesById.get(item.id)),
+      previous: periodFigures(lastPeriod.aggregatesById.get(item.id)),
+      lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
+    })), [catalog.exercises, thisPeriod, lastPeriod]);
+  return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
+    onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
+    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle, filters.metric))}
+    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise, filters.metric))}
+    viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
+    tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
+    exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
+    isFocused={isFocused}
+    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
 }
+
+// A period the exercise has no aggregate for is a genuine nothing: zero sets,
+// zero volume and no estimate. One it does keeps its own figures — a
+// `totalVolume` of null is a sum that overflowed, which stays unavailable
+// rather than becoming a zero ([[copy.no-inline-explanation]]).
+const periodFigures = (aggregate: ExerciseAggregate | undefined): ComparisonPeriodFigures =>
+  aggregate
+    ? { workingSetCount: aggregate.workingSetCount, totalVolume: aggregate.totalVolume,
+      volumeSetCount: aggregate.volumeSetCount, estimatedOneRepMax: aggregate.estimatedOneRepMax }
+    : { workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, estimatedOneRepMax: null };
 
 // The width the Exercise header reserves for its `Recent` + arrow indicator,
 // visible or not, so the label never moves when the sort changes.
 const RECENCY_INDICATOR_WIDTH = 64;
 
-const microLabel = {
-  fontFamily: uiFonts.display.family,
-  fontWeight: '700',
-  fontSize: uiTypography.size.xxs,
-  lineHeight: uiTypography.lineHeight.xxs,
-  letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  textTransform: 'uppercase',
-  color: uiRoles.inkMuted,
-} as const;
-
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-  },
-  tableColumns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  headerCell: {
-    minHeight: uiGeometry.tapTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  headerCellNumeric: {
-    justifyContent: 'flex-end',
-  },
+  filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
+  // The page's last row clears the display's rounded corner above the tab bar,
+  // which otherwise clips it: one more step of the spacing scale than the
+  // gutter `ScreenScroll` already applies.
+  scrollContent: { paddingBottom: uiSpace.xxl },
   headerCellPressed: {
     backgroundColor: uiRoles.paper,
-  },
-  headerLabel: microLabel,
-  headerLabelActive: {
-    color: uiRoles.ink,
   },
   headerIndicator: {
     flexDirection: 'row',
@@ -709,39 +610,12 @@ const styles = StyleSheet.create({
   headerIndicatorHidden: {
     opacity: 0,
   },
-  // The table's columns: the name takes the rest; the figures sit in fixed,
-  // right-aligned columns so digits align down the list. `Vol` fits a
-  // six-digit volume (`123456`) in Plex Mono.
+  // The name takes whatever the three figure columns leave, and lets `Recent`
+  // wrap below the label when both cannot fit beside `Now`.
   nameColumn: {
     flex: 1,
     minWidth: 0,
-    // Let Recent wrap below the label when both cannot fit beside Sets.
     flexWrap: 'wrap',
     alignContent: 'center',
-  },
-  setsColumn: {
-    width: 60,
-  },
-  volumeColumn: {
-    width: 52,
-  },
-  oneRepMaxColumn: {
-    width: 40,
-  },
-  exerciseName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-    paddingVertical: uiSpace.xs,
-  },
-  tableFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-    textAlign: 'right',
   },
 });

@@ -1,6 +1,6 @@
 // Closed protocol-4 schemas prevent cache/history fields from smuggling kg/B.
 import { isCompetitionMetric, isCompetitionValue, validateCompetitionRules } from './competition-contract.ts';
-import type { CompetitionBoardWire, CompetitionContractWire, CompetitionPerformanceWire,
+import type { CompetitionBoardWire, CompetitionPerformanceWire,
   CompetitionRulesWire, CompetitionCertificationWire } from './competition-wire.ts';
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -15,15 +15,6 @@ const RULES = ['bodyweight_calculations_enabled','bodyweight_contribution','load
 const PERFORMANCE = ['visibility','session_id','session_exercise_id','exercise_definition_id','set_id','reps',
   'performance_status','source_load_input_mode','achieved_at_ms','exercise_order_index','set_order_index'];
 const CERTIFICATION = ['certification_id','metric','certified_by','certified_at_ms','observed_rules_revision','ended_at_ms','end_reason'];
-
-export function isCompetitionContractWire(value: unknown): value is CompetitionContractWire {
-  if (!exact(value, ['contract_version','activation_state','cache_version','metrics','ordinary_units','normalized_units','default_metric'])) return false;
-  return value.contract_version === 4 && value.cache_version === 5 && value.default_metric === 'e1rm' &&
-    ['pending','active'].includes(String(value.activation_state)) && Array.isArray(value.metrics) &&
-    value.metrics.length === 2 && value.metrics[0] === 'volume' && value.metrics[1] === 'e1rm' &&
-    exact(value.ordinary_units, ['volume','e1rm']) && value.ordinary_units.volume === 'kg_reps' && value.ordinary_units.e1rm === 'kg' &&
-    exact(value.normalized_units, ['volume','e1rm']) && value.normalized_units.volume === 'percent_bw_reps' && value.normalized_units.e1rm === 'percent_bw';
-}
 
 export function isCompetitionRulesWire(value: unknown): value is CompetitionRulesWire {
   return exact(value, RULES) && integer(value.rules_revision) && value.rules_revision > 0 &&

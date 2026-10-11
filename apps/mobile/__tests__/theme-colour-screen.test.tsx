@@ -86,12 +86,13 @@ it('stores the hue for the next launch and asks to reload', async () => {
 
   fireEvent.press(screen.getByTestId('theme-colour-apply'));
 
-  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57'));
-  expect(reload).toHaveBeenCalledTimes(1);
+  // Wait on the label, not the store: the fake store holds the value before the
+  // write's promise settles, so the saved state may not have rendered yet.
   // The button carries the restart: saved, from the next launch, until the hue moves.
-  const apply = screen.getByTestId('theme-colour-apply');
-  expect(apply).toHaveTextContent('Saved · next launch');
-  expect(apply.props.accessibilityState).toEqual({ disabled: true });
+  await waitFor(() => expect(screen.getByTestId('theme-colour-apply')).toHaveTextContent('Saved · next launch'));
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57');
+  expect(reload).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('theme-colour-apply').props.accessibilityState).toEqual({ disabled: true });
 
   fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
   expect(screen.getByTestId('theme-colour-apply')).toHaveTextContent('Use this colour');

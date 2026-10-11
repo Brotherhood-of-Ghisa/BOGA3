@@ -5,9 +5,8 @@ calculated, what a set row shows, how screens use words. Each decision is
 stated once, here, with a stable ID. Specs describe how the code implements a
 fact; they cite it and never restate it.
 
-**Pilot status.** This corpus covers sets, 1RM, muscle set counts and screen
-copy. Where a spec and a fact disagree, the fact records the decision and the
-spec records today's code (see each fact's `Pending:` line).
+Where a spec and a fact disagree, the fact records the decision and the spec
+records today's code (see each fact's `Pending:` line).
 
 ## Subjects
 
@@ -17,16 +16,22 @@ purpose, in its own PR.
 
 | Subject | File | Covers |
 | --- | --- | --- |
-| `set` | `set.md` | What a performed set is, which sets feed which figure, how set counts and set rows are shown |
+| `set` | `set.md` | A performed set, which sets feed which figure, set counts and rows |
 | `1rm` | `1rm.md` | The 1RM estimate and its display |
 | `muscle` | `muscle.md` | How sets and work are attributed to muscles |
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
-| `comparison` | `comparison.md` | Which periods are compared and how a change between them is shown |
-| `notifications` | `notifications.md` | Group workout alerts, recipients, defaults, batching and freshness |
+| `comparison` | `comparison.md` | Which periods are compared, and how a change is shown |
+| `notifications` | `notifications.md` | Group alerts: recipients, defaults, batching, freshness |
+| `groups` | `groups.md` | Group competition: certification's scope and end |
 
-Not yet here: volume totals, records, sessions, bodyweight, groups-only
-scoring. Until they move in, `docs/specs/tech/training-metrics-contract.md`
-owns them.
+A fact states a rule that holds across the app. How one screen or view lays a
+rule out is not a fact: that belongs to the screen's spec
+(`docs/specs/ui/screen-map.md`, `docs/specs/ui/components-catalog.md`), the
+component's own README, and the tests that pin it.
+
+Not yet here: volume totals, records, session counts, bodyweight, groups-only
+scoring, and the session summary and volume comparison. Until they move in,
+`docs/specs/tech/training-metrics-contract.md` owns them.
 
 ## Fact format
 
@@ -44,35 +49,39 @@ Signature: `<text>`, `<text>`  (optional)
 - **ID** never changes. A replaced fact keeps its heading with status
   `superseded-by: <id>` and one line saying what changed.
 - **Kind**: `definition` (what something is), `calculation` (how a figure is
-  computed), `presentation` (how something is shown), `principle` (a rule
-  applied by judgement, with a test, examples and exceptions).
+  computed), `presentation` (how something is shown, and only where another
+  choice would be a product mistake rather than a design iteration),
+  `principle` (a rule applied by judgement, with a test and its exceptions).
 - **Status**: `accepted`, `open` (undecided: a builder who needs it stops and
   asks), or `superseded-by: <id>`.
 - **Tables over prose** for rules with cases; every cell is a decision.
+- **Small**: a statement — the header down to `Why:`, examples excluded — is at
+  most 130 words. Longer means the fact is describing a screen instead of
+  deciding something: split it into the decisions it holds, or leave the render
+  detail to the component that owns it and the tests that pin it. The test for
+  a line is whether a builder changing it would need the product owner.
 - **Examples** for definitions and calculations are table rows a test can run.
-  Principles grow by cases: each review verdict the product owner gives is
-  added as a case.
-- **Executable tables** carry `<!-- fact-table: <id> -->` above them; a Jest
-  test (`apps/mobile/__tests__/product-fact-tables.test.ts`) runs every row
-  through the real code. A row the `Pending:` line explains runs as an
-  expected failure, so implementing the decision fails the test until the
-  `Pending:` line goes.
+  A principle carries at most three: one bad, one good, one kept exception. Its
+  review verdicts are not logged here — git and the PR bodies hold those.
+- **Executable tables** carry `<!-- fact-table: <id> -->`; a Jest test
+  (`apps/mobile/__tests__/product-fact-tables.test.ts`) runs every row through
+  the real code. A row the `Pending:` line explains runs as an expected
+  failure, so implementing it fails the test until that line goes.
 - **Signature**: a few literal texts only a restatement of the fact would
   contain (a formula constant, an exact label). Principles rarely have one.
 - **Reference** a fact from any doc as `[[set.eligibility]]`.
 
 `docs-check` enforces the format: a malformed header, a duplicate ID, an
-unknown kind or status, or a `[[id]]` naming no fact fails it. So does a
-signature in a persistent doc outside this directory whose paragraph does not
-cite the fact: cite it there, or remove the restatement. Restatements older
-than the check are listed in `scripts/product-fact-restatements.tsv`, which
-only shrinks.
+unknown kind or status, a `[[id]]` naming no fact, or a statement over the cap
+fails it. So does a signature outside this directory whose paragraph does not
+cite the fact — cite it, or remove the restatement. `./boga docs budgets`
+prints every fact's statement size against the cap.
 
 ## Changing a fact
 
 1. A fact may change in its own PR or in the PR that implements it. The
-   product owner approves the fact change; that approval is the decision.
-   The PR body names each fact ID it changes.
+   product owner's approval is the decision; the PR body names each fact ID
+   it changes.
 2. Implementation PRs cite the fact IDs they implement and remove its
    `Pending:` line when the code matches.
 3. A builder never changes an accepted fact or answers an open one without

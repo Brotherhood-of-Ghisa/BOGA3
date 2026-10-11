@@ -1,5 +1,5 @@
 // Raw kg set facts consumed by the group evaluator. Bodyweight-aware scores
-// are derived separately by performance-score.ts.
+// are derived separately by competition-score.ts.
 // Deno imports stay relative and explicitly name their .ts files.
 
 import { estimateOneRepMax, parseCalculationSet } from '../exercise-calculations/index.ts';

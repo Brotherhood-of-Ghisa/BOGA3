@@ -14,3 +14,6 @@ artifacts/builds/
 
 # Dedicated local dev Supabase workdir (generated; see supabase/scripts/dev-stack-lib.sh)
 .supabase-dev/
+
+# PAT for Github
+.env.github

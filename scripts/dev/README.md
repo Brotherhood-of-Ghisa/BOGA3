@@ -16,7 +16,8 @@ no reason to run these.
   stack (`./boga db up`).
 - `use-hosted-mobile-env.sh` — point the mobile app at hosted Supabase using
   credentials from `supabase/.env.hosted` (also `./boga env hosted`).
-- `tag-dev-ios.sh` / `tag-preview-ios.sh` — release bookkeeping for local iOS
-  builds: validate an `.ipa`'s bundle id, then git-tag the commit it was built
-  from (dev vs preview profile). Usage: `./scripts/dev/tag-dev-ios.sh <path.ipa>`
-  (see `apps/mobile/README-LOCAL-DEV-BUILD.md`).
+- `tag-dev-ios.sh` / `tag-preview-ios.sh` — manually read an IPA's version/build,
+  tag current `HEAD`, and push to `origin`. Only the dev helper validates the
+  bundle ID; neither verifies which commit produced the IPA. Usage:
+  `./scripts/dev/tag-dev-ios.sh <path.ipa>`. For the full release sequence with
+  optional tagging of an explicit commit SHA, load `docs/procedures/ios-release.md`.

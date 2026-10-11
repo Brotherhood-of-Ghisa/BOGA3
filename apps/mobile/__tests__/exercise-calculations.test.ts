@@ -4,6 +4,7 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
+import { MAX_SET_REPS } from '@/src/exercise-calculations/parse';
 import { workingSetsOnly } from '@/src/exercise-calculations/analytics';
 
 describe('exercise calculations: parsing', () => {
@@ -46,6 +47,15 @@ describe('exercise calculations: parsing', () => {
       expect(parseSetReps('abc')).toBeNull();
       expect(parseSetReps('')).toBeNull();
       expect(parseSetReps(null)).toBeNull();
+    });
+
+    it('accepts reps up to MAX_SET_REPS and rejects anything above it', () => {
+      expect(MAX_SET_REPS).toBe(999);
+      expect(parseSetReps('999')).toBe(999);
+      expect(parseSetReps('0999')).toBe(999);
+      expect(parseSetReps('1000')).toBeNull();
+      // Number() makes this 1e20, an integer no board payload can carry exactly.
+      expect(parseSetReps('99999999999999999999')).toBeNull();
     });
   });
 

@@ -39,7 +39,7 @@ const PRIMARY = {
   // The active title is live (`ActiveTitle`).
   active: { title: null, label: 'Finish', a11y: 'Finish session', testID: 'session-view-finish-button' },
   completed: { title: 'Edit session', label: 'Done', a11y: 'Done editing session', testID: 'session-view-done-button' },
-  complete: { title: 'Session complete', label: 'Done', a11y: 'Done with session completion', testID: 'session-completion-done' },
+  complete: { title: 'Session summary', label: 'Done', a11y: 'Done with session completion', testID: 'session-completion-done' },
 } as const;
 
 const systemNow = () => new Date();
@@ -64,7 +64,7 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
 }
 
 // `<Time of day> training · <elapsed>` · ⋮ · Finish;
-// `Edit session` · Done for a completed session; `Session complete` · Done
+// `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
   const insets = useSafeAreaInsets();

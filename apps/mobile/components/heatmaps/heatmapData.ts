@@ -7,6 +7,7 @@
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
+import { historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 
 import {
   getCalendarHeatmapBucket,
@@ -23,10 +24,14 @@ export interface DayCell {
   isToday: boolean;
   level: CalendarHeatmapBucket;
   value: number;
+  /** Matching exercise PRs: the all-time session records for the selected metric. */
+  prCount?: number;
   unavailable?: boolean;
   hasTraining?: boolean;
   targetAttainment?: number;
   workingSetCountsByMuscle?: Record<string, number>;
+  /** The sessions behind the day's figure; empty on a rest day. */
+  sessionIds: string[];
 }
 
 export interface WeekCell {
@@ -37,6 +42,7 @@ export interface WeekCell {
   sessions: number;
   level: CalendarHeatmapBucket;
   value: number;
+  prCount?: number;
   unavailable?: boolean;
   hasTraining?: boolean;
   targetAttainment?: number;
@@ -54,7 +60,7 @@ export interface BuildHeatmapDataOptions {
   /** Defaults to the local "today". Pass a `YYYY-MM-DD` key to make tests deterministic. */
   todayDateKey?: string;
   /**
-   * History window in weeks (Monday-aligned span ending today). Default 52.
+   * Minimum complete weeks through today ([[comparison.history-window]]). Default 52.
    * Pass `'all'` to span from the earliest day present in `dailyMetrics` (falling back
    * to the 52-week default when there is less data), so the grid grows with the data.
    */
@@ -94,9 +100,10 @@ const bestOf = (left: number | null, right: number | null | undefined): number =
 
 const DEFAULT_WEEKS = 52;
 
-/** Monday of the week `weeks - 1` weeks before today's week. */
-const windowStart = (today: Date, weeks: number): Date =>
-  addUtcDays(startOfMondayWeek(today), -(weeks - 1) * 7);
+const windowStart = (today: Date, weeks: number): Date => {
+  const localToday = new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return dateKeyToUtcDate(localDateKey(historyWeekBounds(weeks, localToday).start));
+};
 
 const earliestDay = (dailyMetrics: DailyEffortMetrics[]): Date | null => {
   let earliest: Date | null = null;
@@ -161,9 +168,11 @@ const toDayCell = (
     dow: mondayIndex(date),
     isToday: dateKey === todayDateKey,
     value,
+    prCount: metric === 'workingSetCount' ? 0 : source?.personalRecordCounts?.[metric] ?? 0,
     unavailable,
     hasTraining: source !== undefined,
     workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
+    sessionIds: source?.sessionIds ?? [],
   };
 };
 
@@ -171,6 +180,7 @@ type WeekTotals = {
   monday: Date;
   sessions: number;
   value: number;
+  prCount: number;
   unavailable: boolean;
   hasKnown: boolean;
   workingSetCountsByMuscle: Record<string, number>;
@@ -180,12 +190,14 @@ const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
   monday: dateKeyToUtcDate(weekStartDateKey),
   sessions: 0,
   value: 0,
+  prCount: 0,
   unavailable: false,
   hasKnown: false,
   workingSetCountsByMuscle: {},
 });
 
 const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMetric): void => {
+  week.prCount += day.prCount ?? 0;
   for (const [id, count] of Object.entries(day.workingSetCountsByMuscle ?? {})) {
     week.workingSetCountsByMuscle[id] = (week.workingSetCountsByMuscle[id] ?? 0) + count;
   }
@@ -223,6 +235,7 @@ const toWeekCell = (weekStartDateKey: string, week: WeekTotals, todayWeekKey: st
     isCurrentWeek: weekStartDateKey === todayWeekKey,
     sessions: week.sessions,
     value: unavailable ? 0 : week.value,
+    prCount: week.prCount,
     unavailable,
     hasTraining: week.sessions > 0,
   };

@@ -73,7 +73,6 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/exercise-calculations/set-semantics.ts',
       // The group evaluator stores the effort half as `working` on each fact.
       'apps/mobile/src/groups/set-facts.ts',
-      'apps/mobile/src/groups/metric-evaluation.ts',
       // The competition scorer already admits only performed projections.
       'apps/mobile/src/groups/competition-evaluation.ts',
       // The public session view admits performed reps before counting effort; normalized load stays private.
@@ -84,9 +83,7 @@ describe('training-metric rules have one implementation', () => {
   it('formats training figures only in format.ts', () => {
     expect(offenders(/\.toFixed\(/, [
       'apps/mobile/src/exercise-calculations/format.ts',
-      // Not training figures: a percentage, a body weight, chart coordinates
-      // and set counts.
-      'apps/mobile/src/groups/link-view-model.ts',
+      // Not training figures: a body weight, chart coordinates and set counts.
       'apps/mobile/components/bodyweight/body-weight-screen.tsx',
       'apps/mobile/components/today/progress-format.ts',
     ])).toEqual([]);

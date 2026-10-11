@@ -23,7 +23,6 @@ const set = (overrides: Partial<PlanExerciseDraft['sets'][number]> = {}) => ({
 const exercise = (overrides: Partial<PlanExerciseDraft> = {}): PlanExerciseDraft => ({
   exerciseDefinitionId: 'def-1',
   name: 'Back Squat',
-  machineName: '',
   sets: [set()],
   ...overrides,
 });
@@ -84,7 +83,6 @@ describe('validatePlanDraft', () => {
         exercises: [
           exercise({
             name: '  Back Squat  ',
-            machineName: '  Rack 1  ',
             sets: [set({ targetWeightText: '080.00', targetRepsText: '08' }), set({ targetWeightText: '' })],
           }),
         ],
@@ -102,7 +100,6 @@ describe('validatePlanDraft', () => {
             {
               exerciseDefinitionId: 'def-1',
               name: 'Back Squat',
-              machineName: 'Rack 1',
               sets: [
                 { targetWeightValue: '80', targetReps: 8, targetSetType: null },
                 { targetWeightValue: null, targetReps: 8, targetSetType: null },
@@ -181,18 +178,17 @@ describe('validatePlanDraft', () => {
     }
   });
 
-  it('rejects overlong titles, exercise names and machine names at their fields', () => {
+  it('rejects overlong titles and exercise names at their fields', () => {
     const long = 'x'.repeat(PLAN_LIMITS.name.max + 1);
     const result = validatePlanDraft(
       plan({
         title: long,
-        exercises: [exercise({ name: long, machineName: long })],
+        exercises: [exercise({ name: long })],
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors.map((e) => e.path).sort()).toEqual([
-        'exercises.0.machineName',
         'exercises.0.name',
         'title',
       ]);

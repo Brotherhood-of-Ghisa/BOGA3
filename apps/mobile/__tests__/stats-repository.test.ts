@@ -90,9 +90,9 @@ describe('aggregateStats', () => {
     // the 100×5 warm-up adds no set and no volume.
     expect(byId.get('chest_sternal')?.totalVolume).toBe(1300);
     expect(byId.get('chest_sternal')?.workingSetCount).toBe(3);
-    // triceps (secondary on bench): 1300 × 0.5 = 650
+    // triceps (secondary on bench): 1300 × 0.5 = 650, and half a set each ([[muscle.set-count]]).
     expect(byId.get('triceps')?.totalVolume).toBe(650);
-    expect(byId.get('triceps')?.workingSetCount).toBe(3);
+    expect(byId.get('triceps')?.workingSetCount).toBe(1.5);
     // biceps (primary on curl): 20×10 + 20×8 = 360
     expect(byId.get('biceps')?.totalVolume).toBe(360);
     expect(byId.get('biceps')?.workingSetCount).toBe(2);
@@ -110,8 +110,9 @@ describe('aggregateStats', () => {
     expect(familiesByName.get('Chest')?.workingSetCount).toBe(3);
     expect(familiesByName.get('Chest')?.totalVolume).toBe(1300);
 
-    // Arms family: five distinct physical working sets across biceps and triceps.
-    expect(familiesByName.get('Arms')?.workingSetCount).toBe(5);
+    // Arms family: two primary curl sets plus the three bench sets at triceps'
+    // secondary half ([[muscle.set-count]]).
+    expect(familiesByName.get('Arms')?.workingSetCount).toBe(3.5);
     expect(familiesByName.get('Arms')?.totalVolume).toBe(360 + 650);
 
     // Legs untrained.
@@ -131,7 +132,8 @@ describe('aggregateStats', () => {
     const arms = totals.muscleFamilies.find((family) => family.familyName === 'Arms');
 
     // The three working bench sets contribute to both biceps and triceps, but
-    // count once at family level; the two curl sets remain distinct.
+    // count once at family level, at the strongest role of the two (biceps'
+    // primary); the two curl sets remain distinct.
     expect(arms?.workingSetCount).toBe(5);
     expect(arms?.totalVolume).toBe(360 + 1300 + 650);
   });
@@ -301,5 +303,30 @@ describe('createStatsRepository.computeSummary', () => {
       exerciseName: 'Bench Press',
       setId: 'set-1',
     });
+  });
+});
+
+
+describe('selected-muscle history snapshot', () => {
+  it('derives both chart views from one read, preserving the standalone projections', async () => {
+    const store: jest.Mocked<StatsStore> = {
+      loadAggregationInput: jest.fn().mockResolvedValue(buildAggregationInput()),
+      loadMuscleGroupTaxonomy: jest.fn(),
+    };
+    const repository = createStatsRepository(store);
+    const options = { start: new Date('2026-05-01'), end: new Date('2026-06-01'), muscleGroupIds: ['chest_sternal'], timeZone: 'UTC' };
+    const history = await repository.computeSelectedMuscleHistoryEffort(options);
+    expect(store.loadAggregationInput).toHaveBeenCalledTimes(1);
+    expect(store.loadAggregationInput).toHaveBeenCalledWith({ start: options.start, end: options.end });
+    expect(history.daily).toEqual(await repository.computeSelectedMuscleDailyEffortMetrics(options));
+    expect(history.weekly).toEqual(await repository.computeSelectedMuscleWeeklyEffort(options));
+    expect(history.daily).toHaveLength(2);
+  });
+
+  it.each(['start', 'end'] as const)('rejects an invalid %s before reading', async field => {
+    const store: jest.Mocked<StatsStore> = { loadAggregationInput: jest.fn(), loadMuscleGroupTaxonomy: jest.fn() };
+    const options = { start: new Date('2026-05-01'), end: new Date('2026-06-01'), muscleGroupIds: ['chest_sternal'], [field]: new Date(NaN) };
+    await expect(createStatsRepository(store).computeSelectedMuscleHistoryEffort(options)).rejects.toThrow();
+    expect(store.loadAggregationInput).not.toHaveBeenCalled();
   });
 });

@@ -55,12 +55,15 @@ type ExerciseOptionsSheetProps = {
   // Signed in only: opens the Link screen for this exercise (product E0.3).
   onLink?: () => void;
   onRemove: () => void;
+  // A card sourced from a plan block: Complete block is its explicit
+  // resolution, offered here and nowhere else.
+  onCompleteBlock?: () => void;
   onDismiss: () => void;
 };
 
-// The exercise's ⋮: Edit / Swap / Link to group exercise… / Remove from
-// session. Removing lives here, not on the session view's card
-// (spec 08, "Read-only link card pattern").
+// The exercise's ⋮: Edit / Swap / Link to group exercise… / Complete block
+// (sourced cards) / Remove from session. Removing lives here, not on the
+// session view's card (spec 08, "Read-only link card pattern").
 export function ExerciseOptionsSheet({
   visible,
   exerciseName,
@@ -68,6 +71,7 @@ export function ExerciseOptionsSheet({
   onSwap,
   onLink,
   onRemove,
+  onCompleteBlock,
   onDismiss,
 }: ExerciseOptionsSheetProps) {
   return (
@@ -77,6 +81,14 @@ export function ExerciseOptionsSheet({
       testID="exercise-options-sheet"
       title={exerciseName}
       visible={visible}>
+      {onCompleteBlock ? (
+        <ListRow
+          label="Complete block"
+          leading={<Icon color={uiRoles.ink} name="check" />}
+          onPress={onCompleteBlock}
+          testID="exercise-options-complete-block"
+        />
+      ) : null}
       <ListRow
         label="Edit exercise"
         leading={<Icon color={uiRoles.ink} name="pencil" />}

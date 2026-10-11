@@ -151,20 +151,6 @@ it('re-resolves changed and deleted readings without persisting context on the s
   expect(entityToWire(before!, 'sessions').fields).not.toHaveProperty('body_weight_kg');
 });
 
-it('copies raw performed Weight into a new plan and resolves the target date independently', async () => {
-  const { repository, sessionId } = await seedGraph();
-  await repository.completeSession(sessionId, { completedAt: new Date(62000) });
-  mockFixture.database.insert(bodyWeightMeasurements).values({
-    id: 'current-reading', weightKg: 85, measuredAt: new Date(90000),
-  }).run();
-  const target = await repository.appendCompletedSessionAsPlanned(sessionId, { now: new Date(100000) });
-  const snapshot = await repository.loadSessionSnapshotById(target.sessionId);
-  expect(snapshot).toMatchObject({ bodyWeightKg: 85, bodyWeightMeasurementId: 'current-reading' });
-  expect(snapshot?.exercises[0].sets[0]).toMatchObject({
-    weightValue: '', repsValue: '', plannedWeightValue: '20', performanceStatus: 'planned',
-  });
-});
-
 it('round-trips a clean kg reading through sync and applies tombstone/undelete by LWW', () => {
   const db = mockFixture.database;
   const original = {

@@ -1,14 +1,18 @@
-// Protocol 4 competition representation. Activation is negotiated separately
-// from the owner's private Sync v2 protocol and the current protocol-3 UI.
-import { validateExerciseCore } from '../exercise-core/index.ts';
+// Protocol 4 competition representation, negotiated separately from the
+// owner's private Sync v2 protocol.
+import { validateExerciseCore, type ExerciseCore } from '../exercise-core/index.ts';
 import { validateBodyweightContribution } from '../exercise-core/bodyweight-contribution.ts';
-import type { GroupExerciseRules } from './metric-contract.ts';
 
 export const GROUP_COMPETITION_VERSION = 4;
 export const GROUP_COMPETITION_CACHE_VERSION = 5;
 export const GROUP_COMPETITION_METRICS = ['volume', 'e1rm'] as const;
 export type CompetitionMetric = typeof GROUP_COMPETITION_METRICS[number];
-export type CompetitionRules = Omit<GroupExerciseRules, 'defaultMetric'> & { defaultMetric: CompetitionMetric };
+/** Rules revision is server-owned; a client may send its expected revision for concurrency. */
+export type CompetitionRules = ExerciseCore & {
+  bodyweightCalculationsEnabled: boolean;
+  bodyweightContribution: number;
+  defaultMetric: CompetitionMetric;
+};
 export type CompetitionValue =
   | { metric: 'volume'; value: number; unit: 'kg_reps' | 'percent_bw_reps' }
   | { metric: 'e1rm'; value: number; unit: 'kg' | 'percent_bw' };

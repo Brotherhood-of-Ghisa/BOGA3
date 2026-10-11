@@ -423,6 +423,31 @@ describe('aggregateSelectedMuscleDailyEffortMetrics', () => {
     expect(metrics.map((m) => m.dateKey)).toEqual(daily.map((d) => d.dateKey));
   });
 
+  it('names each session behind a day once, across every selected muscle it trained', () => {
+    const daily = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
+      ...options,
+      muscleGroupIds: ['chest_sternal', 'triceps', 'biceps'],
+    });
+    const sessionIdsByDay = Object.fromEntries(
+      aggregateSelectedMuscleDailyEffortMetrics(daily).map((day) => [day.dateKey, day.sessionIds])
+    );
+
+    expect(sessionIdsByDay).toEqual({
+      '2026-03-29': ['session-sunday'],
+      '2026-03-30': ['session-monday-a', 'session-monday-b'],
+      '2026-05-01': ['session-month-edge'],
+    });
+  });
+
+  it('names the session behind a volume-only day, which has no working set', () => {
+    const input = buildAnalyticsInput({
+      effortPolicy: { workingSetEfforts: [], volumeEfforts: ['unspecified', 'rir_1'] },
+    });
+    const [sunday] = aggregateSelectedMuscleDailyEffortMetrics(aggregateSelectedMuscleDailyEffort(input, options));
+
+    expect(sunday).toMatchObject({ dateKey: '2026-03-29', workingSetCount: 0, sessionIds: ['session-sunday'] });
+  });
+
   it('derives totalVolume from the same weighted contributions as totalWeight', () => {
     const daily = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), options);
     const metrics = aggregateSelectedMuscleDailyEffortMetrics(daily);

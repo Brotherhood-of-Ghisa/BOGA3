@@ -42,11 +42,6 @@
       "count": 1
     }
   },
-  "components/groups/group-exercise-pick-sheet.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/groups/group-exercises-page.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -57,26 +52,11 @@
       "count": 1
     }
   },
-  "components/groups/group-metric-history.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/gyms/gym-editor.tsx": {
     "max-lines-per-function": {
       "count": 1
     },
     "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/session-complete/exercise-volume-card.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/session-list/history-list.tsx": {
-    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -92,7 +72,7 @@
   },
   "src/data/session-drafts.ts": {
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   }
 }

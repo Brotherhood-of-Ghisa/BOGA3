@@ -29,7 +29,7 @@ type ViewSessionScreenProps = {
   summaryContent: ReactNode;
   summary: ViewSessionSummary;
   model: CompletedSessionDetailModel;
-  // A failed write (delete, undelete, append), shown until the next action.
+  // A failed write (delete, undelete), shown until the next action.
   error: string | null;
   onBack: () => void;
   onEdit: () => void;

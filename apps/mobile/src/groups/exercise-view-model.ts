@@ -9,8 +9,6 @@ import { LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core'
 
 import type { GroupApiError } from './api';
 import type { GroupExercise, GroupRole } from './types';
-import { isGroupMetricExerciseWire } from './metric-wire-guards';
-import { describeGroupRules } from './metric-view-model';
 import { canManageGroup, describeGroupWriteError } from './write-view-model';
 
 // ---- Rows ---------------------------------------------------------------------
@@ -78,7 +76,7 @@ export const formatGroupExerciseLinkStatus = (exerciseNames: (string | null)[]):
 
 /**
  * Active exercises first, then archived ones (D8: kept read-only, marked),
- * each group in server order (`group_exercise_list`: by name). `links` null
+ * each group in server order (`group_competition_exercise_list`: by name). `links` null
  * means my links have not loaded yet.
  */
 export const buildGroupExerciseRows = (
@@ -97,8 +95,7 @@ export const buildGroupExerciseRows = (
     return {
       groupExerciseId: exercise.group_exercise_id,
       name: exercise.name,
-      loadInputModeLabel: isGroupMetricExerciseWire(exercise) && !exercise.legacy
-        ? describeGroupRules(exercise) : LOAD_INPUT_MODE_LABELS[exercise.load_input_mode],
+      loadInputModeLabel: LOAD_INPUT_MODE_LABELS[exercise.load_input_mode],
       archived,
       linkStatus: links === null ? null : formatGroupExerciseLinkStatus(linkedNames),
       linkable: links !== null && !archived && linkedNames.length === 0,

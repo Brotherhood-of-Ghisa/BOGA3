@@ -7,6 +7,7 @@ import {
   type ExerciseCatalogStatsPeriod,
   type ExerciseCatalogStatsRawHistory,
 } from '@/src/data/exercise-catalog-stats';
+import { progressComparisonWindows } from '@/src/data/stats';
 
 import { isDevMode } from '@/src/utils/isDevMode';
 
@@ -157,6 +158,51 @@ export type UseExerciseCatalogStatsResult = {
   rawHistory: ExerciseCatalogStatsRawHistory | null;
   lastError: string | null;
   reload: () => void;
+};
+
+export type UseExerciseCatalogComparisonResult = {
+  status: ExerciseCatalogStatsCacheStatus;
+  /** The period in force, and the one before it ([[comparison.window]]). */
+  current: ExerciseCatalogStats;
+  previous: ExerciseCatalogStats;
+  lastError: string | null;
+  reload: () => void;
+};
+
+/**
+ * One exercise's two periods, for Progress's exercise breakdown: both windows
+ * are derived from the same clock and the same loaded history, so a row's Now,
+ * Prev and Change can never come from different reads.
+ */
+export const useExerciseCatalogComparison = (weeks: number): UseExerciseCatalogComparisonResult => {
+  const snapshot = useSyncExternalStore(
+    subscribeToExerciseCatalogStats,
+    getExerciseCatalogStatsSnapshot,
+    getExerciseCatalogStatsSnapshot
+  );
+
+  useEffect(() => {
+    void ensureExerciseCatalogStatsLoaded();
+  }, []);
+
+  const periods = useMemo(() => {
+    const raw = snapshot.rawHistory ?? EMPTY_RAW_HISTORY;
+    // Measured to when the history loaded, like `useExerciseCatalogStats`.
+    const now = new Date(snapshot.loadedAt);
+    const windows = progressComparisonWindows(weeks, now);
+    return {
+      current: aggregateExerciseCatalogStats(raw, windows.current, now),
+      previous: aggregateExerciseCatalogStats(raw, windows.previous, now),
+    };
+  }, [snapshot.rawHistory, snapshot.loadedAt, weeks]);
+
+  return {
+    status: snapshot.status,
+    current: periods.current,
+    previous: periods.previous,
+    lastError: snapshot.lastError,
+    reload: refreshExerciseCatalogStats,
+  };
 };
 
 export const useExerciseCatalogStats = (

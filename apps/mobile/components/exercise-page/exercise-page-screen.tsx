@@ -1,6 +1,6 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   type TextInputInstance,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,7 +20,9 @@ import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-edit
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
+import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
@@ -31,8 +34,6 @@ import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
-  canConfirmSet,
-  canDropSet,
   sessionRecordBlocks,
   commitSet,
   describeCompleteExercisePlan,
@@ -45,17 +46,16 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
+import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
-import { useSessionExerciseDraft } from '@/src/session-recorder/use-session-exercise-draft';
+import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
-import { SetLogger } from './set-logger';
-import { SetRow } from './set-row';
-import { SwipeSetRow } from './swipe-set-row';
+import { ExerciseSetRowItem } from './exercise-set-row-item';
 import { pageText } from './text-styles';
 
 type ExercisePageScreenProps = {
@@ -74,6 +74,25 @@ const LOAD_ERROR_MESSAGES = {
   'missing-exercise': 'This exercise is no longer in the session.',
   'load-failed': 'The exercise could not be loaded.',
 } as const;
+
+/** The records panel filters to the current gym only under that preference. */
+const isGymFiltered = (scope: string, gymId: string | null): boolean => scope === 'current-gym' && gymId !== null;
+
+/** A completed session is edited in place (history, not a draft). */
+const isCompletedEdit = (state: { status: string; sessionStatus?: string }): boolean =>
+  state.status === 'ready' && state.sessionStatus === 'completed';
+
+/** The inline words for one typed block-resolution result, against the
+ * block state the page already knows. */
+const blockResolutionNotice = (status: string, knownStatus: 'pending' | 'resolved' | null): string => {
+  if (status === 'completed') return 'Block completed. It no longer counts as waiting.';
+  if (status === 'not-resolvable') {
+    return knownStatus === 'pending'
+      ? 'Finish one planned set first: confirm a set the block planned.'
+      : 'This block is already resolved.';
+  }
+  return "Couldn't complete the block. Try again.";
+};
 
 // Until the session view (step 5) is the entry point, a page opened without
 // history (a deep link) has nothing to go back to; Train is the training hub.
@@ -105,7 +124,7 @@ export function ExercisePageScreen({
     client: draftClient,
   });
   const exercise = draft.state.status === 'ready' ? draft.state.exercise : null;
-  const isCompletedSession = draft.state.status === 'ready' && draft.state.sessionStatus === 'completed';
+  const isCompletedSession = isCompletedEdit(draft.state);
   const catalog = useExerciseCatalog();
   const editingExercise = exercise
     ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
@@ -114,7 +133,7 @@ export function ExercisePageScreen({
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
-  const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
+  const isFilteredByGym = isGymFiltered(listPreferences.pastRecordsGymScope, currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
     loadRecords,
@@ -132,7 +151,29 @@ export function ExercisePageScreen({
   // `null` follows the cursor: the logger sits on the first set not performed.
   const [openSetId, setOpenSetId] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [blockNotice, setBlockNotice] = useState<string | null>(null);
+  // The sourced card's block state: Complete block is offered while the
+  // block is still pending, never after it is resolved.
+  const [blockStatus, setBlockStatus] = useState<'pending' | 'resolved' | null>(null);
   const weightInputRef = useRef<TextInputInstance>(null);
+
+  // The sourced card's block state decides whether Complete block is
+  // offered at all: a block that is already resolved never offers it again.
+  const sourcePlanExerciseId = exercise?.sourcePlanExerciseId ?? null;
+  useEffect(() => {
+    if (sourcePlanExerciseId === null) {
+      return;
+    }
+    let cancelled = false;
+    void loadPlanBlockProgressStatus(sourcePlanExerciseId).then((status) => {
+      if (cancelled) return;
+      // Settled asynchronously, so the effect never sets state synchronously.
+      setBlockStatus(status === 'pending' ? 'pending' : status === 'not-found' ? null : 'resolved');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sourcePlanExerciseId]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -160,13 +201,23 @@ export function ExercisePageScreen({
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
   const loggerValues = openSet ? loggerValuesFor(openSet) : null;
 
+  const applyDraftUpdate = useCallback(
+    (
+      recipe: (exercise: SessionDraftExerciseSnapshot) => SessionDraftExerciseSnapshot,
+      kind: SessionExerciseMutationKind,
+    ) => {
+      draft.update(recipe, kind);
+    },
+    [draft]
+  );
+
   const updateSets = useCallback(
-    (recipe: (current: typeof sets) => typeof sets, kind: 'text' | 'structural') =>
-      draft.update((current) => {
+    (recipe: (current: typeof sets) => typeof sets, kind: SessionExerciseMutationKind) =>
+      applyDraftUpdate((current) => {
         const nextSets = recipe(current.sets);
         return nextSets === current.sets ? current : { ...current, sets: nextSets };
       }, kind),
-    [draft]
+    [applyDraftUpdate]
   );
 
   const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
@@ -231,10 +282,10 @@ export function ExercisePageScreen({
   };
 
   /**
-   * Swipe left on the open set (`ux-rules.md` "Swipes on the exercise page"):
-   * drop it (`dropSet`) — an ad-hoc row is removed and the logger falls back
-   * to the cursor; a touched planned row reads as its plan again and stays
-   * open. Never navigates.
+   * Swipe left on any set (`ux-rules.md` "Swipes on the exercise page"):
+   * drop it (`dropSet`) — an ad-hoc row is removed, confirmed or not, and the
+   * logger falls back to the cursor; a planned row reads as its plan again and
+   * keeps its place. Never navigates.
    */
   const onSwipeLeft = (setId: string) => {
     Keyboard.dismiss();
@@ -296,6 +347,24 @@ export function ExercisePageScreen({
     );
   };
 
+  /**
+   * Complete block: the sourced card's explicit resolution — the only
+   * operation that advances the plan block, never attachment or confirming
+   * alone. A refusal (no confirmed source-derived set yet) says so inline
+   * and the recorder stays open.
+   */
+  const onCompleteBlock = () => {
+    setOpenSheet('none');
+    const sourceId = exercise?.sourcePlanExerciseId;
+    if (!sourceId) return;
+    void completePlanBlock(sourceId).then((result) => {
+      if (result.status === 'completed') {
+        setBlockStatus('resolved');
+      }
+      setBlockNotice(blockResolutionNotice(result.status, blockStatus));
+    });
+  };
+
   if (draft.state.status !== 'ready' || !exercise) {
     return (
       <SafeAreaView edges={['top']} style={styles.screen}>
@@ -335,50 +404,33 @@ export function ExercisePageScreen({
             view={recordsView}
           />
           <Card testID="exercise-set-list">
+            {blockNotice ? (
+              <Notice live message={blockNotice} testID="exercise-block-notice" tone="neutral" />
+            ) : null}
             <RecordBand lines={recordLines} placement="header" testID="exercise-record-band" />
-            {rows.map((row, index) => {
-              const isOpen = row.id === openSet?.id;
-              const followsLogger = index > 0 && rows[index - 1]?.id === openSet?.id;
-              if (isOpen && loggerValues) {
-                // Only the open row carries the swipes, and each side only
-                // when its move would change the row; the accessibility
-                // actions are the non-gesture path for the same two moves.
-                const onConfirm = canConfirmSet(sets, row.id) ? () => onSwipeRight(row.id) : undefined;
-                const onDrop = canDropSet(sets, row.id) ? () => onSwipeLeft(row.id) : undefined;
-                return (
-                  <SwipeSetRow
-                    key={row.id}
-                    onSwipeLeft={onDrop}
-                    onSwipeRight={onConfirm}
-                    testID={`exercise-set-swipe-${row.number}`}>
-                    <SetLogger
-                      loadContext={loadContext}
-                      number={row.number}
-                      onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
-                      onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
-                      onCommit={onCommit}
-                      onConfirm={onConfirm}
-                      onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType, trainingPreferences.displayEfforts))}
-                      onDrop={onDrop}
-                      onOpenEffort={() => setOpenSheet('effort')}
-                      ref={weightInputRef}
-                      repsValue={loggerValues.repsValue}
-                      setType={loggerValues.setType}
-                      weightValue={loggerValues.weightValue}
-                    />
-                  </SwipeSetRow>
-                );
-              }
-              return (
-                <SetRow
-                  divider={index > 0 && !followsLogger}
+            <View testID="exercise-set-list-rows">
+              {rows.map((row, index) => (
+                <ExerciseSetRowItem
+                  allSets={sets}
+                  index={index}
                   key={row.id}
-                  onOpen={setOpenSetId}
-                  onToggle={onToggle}
+                  loadContext={loadContext}
+                  loggerValues={loggerValues}
+                  nextSessionSetType={(setType) => nextSessionSetType(setType, trainingPreferences.displayEfforts)}
+                  onChangeLogger={onChangeLogger}
+                  onCommit={onCommit}
+                  onCycleEffort={onSelectEffort}
+                  onOpenEffort={() => setOpenSheet('effort')}
+                  onOpenRow={setOpenSetId}
+                  onSwipeLeft={onSwipeLeft}
+                  onSwipeRight={onSwipeRight}
+                  onToggleRow={onToggle}
+                  openSetId={openSet?.id ?? null}
                   row={row}
+                  weightInputRef={weightInputRef}
                 />
-              );
-            })}
+              ))}
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={onAddSet}
@@ -423,6 +475,9 @@ export function ExercisePageScreen({
       />
       <ExerciseOptionsSheet
         exerciseName={exercise.name}
+        onCompleteBlock={
+          exercise.sourcePlanExerciseId != null && blockStatus !== 'resolved' ? onCompleteBlock : undefined
+        }
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}
         onLink={
@@ -447,7 +502,7 @@ export function ExercisePageScreen({
         onDismiss={() => setOpenSheet('none')}
         onSelect={(picked) => {
           setOpenSheet('none');
-          draft.update(
+          applyDraftUpdate(
             (current) => ({
               ...current,
               exerciseDefinitionId: picked.id,

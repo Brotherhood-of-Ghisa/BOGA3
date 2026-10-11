@@ -14,28 +14,38 @@ deploying it.
 Prerequisite for every CLI step: `supabase login` has been run and the project is
 linked (`supabase link --project-ref <ref>`).
 
-## Production mobile release
+## Mobile release database gate
 
 Every production release plan includes hosted database migrations and verification.
 An EAS upload alone does not complete the release. This applies even when there
 are no pending migrations: record the verified no-op.
 
-1. Pull `main`, pin the release commit, and run its required full sweep. Keep
-   the application, migrations and any function deployments on that same commit;
-   do not deploy later migrations while finishing an older IPA's release.
-2. Privately compare the linked project's identity with the Supabase target in
-   the EAS `production` environment used by the `prod` build profile. Stop on a
-   mismatch or unavailable hosted access.
-3. From the repository root, inspect migration history and preview pending SQL
-   with the repository's pinned CLI:
+For the full preview/production build, submission and optional-tag sequence,
+load `docs/procedures/ios-release.md`. Use this database gate for every hosted
+project selected there, including preview's backend.
+
+1. From the pinned release worktree, use the repository's pinned CLI:
    ```bash
    source supabase/scripts/_common.sh
+   BOGA_RELEASE_PROJECT_REF='<agreed-project-ref>'
+   run_supabase link --project-ref "$BOGA_RELEASE_PROJECT_REF"
+   ```
+   Substitute the agreed project ref. If the CLI is not already authenticated,
+   run `run_supabase login` after sourcing the helper and before linking.
+   Repeat the link and checks for
+   each agreed target; never use an ambient link without verifying its identity.
+   Privately compare the linked project's identity with the Supabase target in
+   the EAS environment selected by the build profile. Stop on a
+   mismatch or unavailable hosted access.
+2. From the repository root, inspect migration history and preview pending SQL
+   with the repository's pinned CLI:
+   ```bash
    run_supabase migration list --linked
    run_supabase db push --linked --include-all --dry-run
    ```
    Review pending migrations, remote-only history, data preservation, older
    client compatibility and required function updates before applying anything.
-4. Apply reviewed compatible migrations before building/submitting production:
+3. Apply reviewed compatible migrations before building/submitting:
    `run_supabase db push --linked --include-all`. Deploy affected functions from
    the same checkout using their sections below. A normal release never resets
    the hosted database or includes development seeds.
@@ -44,16 +54,16 @@ are no pending migrations: record the verified no-op.
    `docs/specs/tech/sync-v2-server-contract.md`, "Migration-in-flight contract";
    coordinate compatible-client availability and the server cutover in their
    required order. If group publication changes, load
-   `docs/specs/tech/group-competition-contract.md`, "Activation order and evidence".
+   `docs/specs/tech/group-competition-contract.md`, "Hosted changes".
    Record any staged migration as outstanding until its cutover and hosted
    verification finish.
-5. Recheck hosted migration history against the pinned commit, then verify the
-   deployed schema, auth/RLS and the release client's sync push/pull. Exercise
-   affected hosted functions and group flows. Record results alongside the IPA
-   commit and build number; local tests do not prove these hosted checks.
-6. Build locally with EAS `prod`, verify the production bundle/build number, and
-   submit that exact IPA with the `prod` submit profile. Follow any coordinated
-   cutover from step 4; report both Apple submission and backend verification.
+4. Recheck hosted migration history against the pinned commit, then verify the
+   deployed schema, auth/RLS and sync push/pull through a hosted API/dev-client
+   smoke. Exercise affected hosted functions and group flows. Once the submitted
+   IPA is available, verify these paths with that release client too; record
+   that check as pending until then. Record results alongside the IPA commit
+   and build number; local tests do not prove these hosted checks.
+   Do not deploy later migrations while finishing an older IPA's release.
    Missing migrations or failed hosted checks leave the release incomplete.
 
 ## Current BoGa MCP deployment

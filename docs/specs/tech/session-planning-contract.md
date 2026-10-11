@@ -2,7 +2,7 @@
 
 Load when you are building or changing authored plans and programmes: their
 schema, the Sync v2 16-entity expansion, materialization onto performed rows,
-block lifecycle, set reordering, or the agent plan-write API and MCP tools.
+block lifecycle, or the agent plan-write API and MCP tools.
 
 ## 1. Architectural Decisions and Principles
 
@@ -24,15 +24,12 @@ block lifecycle, set reordering, or the agent plan-write API and MCP tools.
    at most one live performed session per whole-plan start, one live card per plan
    block, and one live set per plan target set — so retries, multi-device sync and
    concurrent attachments converge deterministically (§4.5).
-5. **Set reordering invariant.** Performed sets reorder freely inside a card by
-   mutating only `exercise_sets.order_index`; reordering never alters source-plan
-   target order, row identities, or `source_plan_set_id`.
-6. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
+5. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
    stays strictly read-only. Coaching agents read upcoming plans and create new
    plans/programmes only under explicit per-client permission in
    `public.agent_plan_permissions`; they can never edit or delete plans, start
    workouts, or mutate performed history.
-7. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
+6. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
    via stable keyset cursors to exhaustion. Silent row caps and unpaginated
    truncation are prohibited.
 
@@ -41,9 +38,9 @@ block lifecycle, set reordering, or the agent plan-write API and MCP tools.
 ### 2.1 Synced Entity Tables (Sync v2)
 
 Four entities, all user-owned, composite-keyed `(owner_user_id, id)` with ULID
-`id`, carrying the standard Sync v2 server fields (`client_updated_at_ms`,
-`server_received_at`, `deleted_at`) plus client `createdAt` / `updatedAt` /
-`deletedAt` epoch-ms columns, with foreign keys `DEFERRABLE INITIALLY DEFERRED`.
+`id`, carrying the standard Sync v2 server fields plus client
+`createdAt` / `updatedAt` / `deletedAt` epoch-ms columns; foreign keys are
+`DEFERRABLE INITIALLY DEFERRED`.
 Every composite FK below is `(owner_user_id, <col>) -> <parent>(owner_user_id,
 id)`; camelCase ↔ snake_case mapping follows `apps/mobile/src/data/schema/`.
 
@@ -65,8 +62,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
 - `exercise_definition_id` — nullable FK → `exercise_definitions`,
   `ON DELETE SET NULL`
 - `order_index` — 0-based dense sequence within the plan
-- `name` / `machine_name` — exercise and equipment name snapshots; `name`
-  required 1..100 chars
+- `name` — exercise name snapshot; required 1..100 chars
 - `progress_status` — `'pending' | 'completed' | 'skipped'`, default
   `'pending'`, `CHECK`-constrained
 - `resolved_at` — nullable;
@@ -115,8 +111,8 @@ that plan set's parent `session_plan_exercise_id`.
 Neither table is a synced entity.
 
 **`public.agent_plan_permissions`** — one row per connected coaching client,
-PK `(owner_user_id, client_id)`, with `plan_access_enabled boolean not null
-default false`, `granted_at timestamptz not null`, created/updated timestamps.
+PK `(owner_user_id, client_id)`, `plan_access_enabled boolean not null default
+false`, `granted_at timestamptz not null`, created/updated timestamps.
 
 - Direct table access only for authenticated users where
   `auth.uid() = owner_user_id` **and** `(auth.jwt() ->> 'client_id') IS NULL` —
@@ -207,14 +203,12 @@ stateDiagram-v2
 
 - **Pending:** available for use; eligible unattached blocks stay fully editable.
 - **Attached:** materialized onto an active session card, and read-only.
-- **Completed:** requires explicit user completion after at least one confirmed
-  source-derived set (`exercise_sets.source_plan_set_id IS NOT NULL`). Manual
-  warm-ups alone cannot complete a block; target deviations in reps or weight do
-  not prevent completion.
-- **Skipped:** explicitly skipped from programme detail, creating no performed
-  rows.
-- **Derived progress:** parent progress (`planned | in_progress | completed`) is
-  computed from child block states, never stored.
+- **Completed:** requires explicit user completion after ≥1 confirmed
+  source-derived set (`source_plan_set_id IS NOT NULL`). Manual warm-ups alone
+  cannot complete a block; target deviations do not prevent completion.
+- **Skipped:** explicitly skipped from programme detail (no performed rows).
+- **Derived progress:** parent progress (`planned | in_progress | completed`)
+  is computed on the fly from child block states, never stored.
 
 ### 4.2 Start All (`startSessionPlan`)
 
@@ -223,17 +217,12 @@ stateDiagram-v2
    **Resume Active Session** and never replaces or auto-completes it.
 2. **One local transaction.** With no qualifying block, return typed
    `NO_PENDING_BLOCKS` and create nothing. Otherwise create the `sessions` row
-   (`source_plan_id = plan.id`, `gym_id = plan.gym_id`, `status = 'active'`,
-   `started_at = Date.now()`), then per eligible block — `progress_status =
-   'pending'`, `deleted_at IS NULL`, in `order_index` order — a
-   `session_exercises` row (`source_plan_exercise_id`, name and machine
-   snapshots, `order_index`), and per non-deleted `session_plan_sets` row an
-   `exercise_sets` row with `source_plan_set_id`, the plan set's `order_index`,
-   targets copied into `planned_weight_value` / `planned_reps_value` /
-   `planned_set_type`, blank actuals (`weight_value = ''`, `reps_value = ''`,
-   `set_type = 'work'`) and `performance_status = 'planned'`.
-   Completed and skipped blocks are never re-materialized — that would violate
-   source-block uniqueness and re-materialize skipped work.
+   (`source_plan_id = plan.id`, `gym_id = plan.gym_id`, `status = 'active'`),
+   then per eligible pending block create a `session_exercises` row
+   (`source_plan_exercise_id`, snapshots), and per non-deleted plan set an
+   `exercise_sets` row with `source_plan_set_id`, targets copied to planned
+   columns, blank actuals, and `performance_status = 'planned'`.
+   Completed and skipped blocks are never re-materialized.
 3. **Deterministic IDs.** Reuse the deterministic text-ID pattern
    (`exerciseGroupLinkId` in `apps/mobile/src/data/exercise-group-links.ts`),
    composed from owner and source ID — `` `${ownerId}:${plan.id}:start` ``,
@@ -263,20 +252,6 @@ Appends one planned block to an active session, or starts one if none exists.
    default. Each set sets `source_plan_set_id` and
    `performance_status = 'planned'`.
 
-### 4.4 Set Reordering (`reorderSessionExerciseSets`)
-
-```ts
-reorderSessionExerciseSets(sessionExerciseId: string, orderedSetIds: string[]): Promise<void>
-```
-
-- `orderedSetIds` must be an exact permutation of all non-deleted set IDs
-  currently on `sessionExerciseId`; missing, duplicate and cross-card IDs are
-  rejected atomically.
-- Updates `exercise_sets.order_index` to the array index (0, 1, 2, …) and leaves
-  `id`, `source_plan_set_id`, `planned_*`, actual values and performance state
-  untouched.
-- Source plan order in `session_plan_sets` is immutable.
-
 ### 4.5 Provenance Arbitration for Concurrent Attachments
 
 Two offline devices can attach the same block to two different unsourced cards
@@ -290,15 +265,15 @@ path is defined so the permitted operation can never block sync.
    `session_exercises` — or the same `source_plan_set_id` on `exercise_sets` —
    the whole batch fails with typed `BLOCK_ALREADY_ATTACHED` carrying the winning
    card ID. Server commit order is the only tiebreak.
-2. **Loser repair (deterministic).** On `BLOCK_ALREADY_ATTACHED` the client pulls
-   first so the winning card is visible, then clears `source_plan_exercise_id` on
-   its losing card and `source_plan_set_id` on that card's source-derived sets,
-   and re-pushes. Entered actuals and manual sets are preserved; the card returns
-   to unsourced, keeping the Cross-Level Provenance Invariant intact.
-3. **Convergence.** Every device ends with exactly one live card carrying the
-   provenance link, while the losing card keeps all user work as unsourced rows.
-   Whole-plan starts need no arbitration: their deterministic IDs (§4.2) make a
-   competing Start all resolve to the same row, not a second one.
+2. **Loser repair (deterministic).** On `BLOCK_ALREADY_ATTACHED` the client
+   pulls, clears `source_plan_exercise_id` on its losing card and
+   `source_plan_set_id` on that card's source-derived sets, and re-pushes.
+   Entered actuals and manual sets are preserved; the card returns to
+   unsourced, keeping the Cross-Level Provenance Invariant intact.
+3. **Convergence.** Every device ends with one live card carrying the
+   provenance link; the losing card keeps all user work as unsourced rows.
+   Whole-plan starts need no arbitration: deterministic IDs (§4.2) make a
+   competing Start all resolve to the same row.
 
 ### 4.6 As-built: mobile module map and deviations
 
@@ -309,8 +284,12 @@ path is defined so the permitted operation can never block sync.
   `apps/mobile/src/session-planner/` owns the screen-facing API: types,
   pure validation (§7.1 limits, field-addressable errors), deterministic IDs,
   the plan/programme repository, read models, `startSessionPlan`,
-  `addPlanBlockToSession`, `reorderSessionExerciseSets`, and
-  `completePlanBlock` / `skipPlanBlock`. Screens never write plan tables.
+  `addPlanBlockToSession`, and `completePlanBlock` / `skipPlanBlock`. Screens
+  never write plan tables.
+  As-built UI: `/sessions`' planning sections, the two `/session-plan/…`
+  routes (create/edit/duplicate via `plan-edit-sync`), the picker's
+  **Repeat last**/**From planner** entries, and **Complete block** on sourced
+  cards.
 - **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` as §4.2; a
   signed-out device uses the `local` owner (nothing syncs, keys only need
   local stability).
@@ -320,12 +299,22 @@ path is defined so the permitted operation can never block sync.
 - **Add block.** The created-session id is a fresh local id, not the
   §4.2 recipe: its `source_plan_id` stays null and a retry reuses the
   existing active session; card/set ids still follow §4.2 so Start all and
-  Add block converge on the same rows.- **Arbitration.** The token message carries the failed constraint name, not
+  Add block converge on the same rows.
+- **Arbitration.** The token message carries the failed constraint name, not
   the winning id — the repair needs no id: pull, clear every live local
-  claimant of exactly the pulled claims, re-push. The pull leg repairs on
-  the local violation; the push leg repairs inside its recovery pull.
-- **Reorder.** Two-phase: lift above every parent row (tombstones included),
-  then dense `0..n-1`; provenance, targets, and state untouched.
+  claimant of exactly the pulled claims, re-push (the pull leg repairs on the
+  local violation; the push leg inside its recovery pull).
+- **Mobile training programmes.** `programme-form-model.ts` validates draft
+  graphs (>=2 child plans). Authoring (`/programme/new`) edits child sessions via
+  the `ProgrammeSessionEditSheet` page-sheet editor. Detail (`/programme/[programmeId]`,
+  `useProgrammeDetail.ts`) surfaces `nextBlock` (first unresolved block across
+  plans in programme then exercise order); Add attaches via
+  `addPlanBlockToSession` and Skip advances via `skipPlanBlock`. Reordering
+  (`reorderProgrammePlans`) updates `programme_order_index`. Delete
+  (`deleteProgramme`) soft-deletes the programme and detaches child plans
+  (`programme_id = null`) as standalone plans, preserving performed history.
+  `listAvailablePlanBlocks` includes unconsumed programme blocks for picker
+  selection.
 
 ## 5. UI and UX Contracts
 
@@ -333,24 +322,15 @@ path is defined so the permitted operation can never block sync.
 
 | Route | Contract |
 | :--- | :--- |
-| `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here. |
-| `/session-plan/new` | Author a one-off plan; target loads show the load input mode (`per_side_load` vs `total_load`). |
+| `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
+| `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target loads show the load input mode (`per_side_load` vs `total_load`). |
 | `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans. |
 | `/programme/[programmeId]` | Overall progress, next unresolved block in sequence, child plan summaries. |
 
-- **Today tab:** surfaces the next upcoming scheduled workout or programme block
-  as a primary card with a direct Start action.
+- **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
   last**, and a new **From planner** entry selects available authored blocks.
-
-### 5.2 Set Reordering UX
-
-- Sets in the recorder carry a subtle trailing grab handle; drag and drop lifts
-  the row with clear insertion feedback, with no separate modal "Edit" mode.
-- Non-drag accessibility: VoiceOver custom actions **Move earlier** and **Move
-  later** on each set row.
-- Reduced motion disables lift animations, keeping full reorder functionality.
 
 ## 6. Agent API and MCP Tools
 
@@ -379,22 +359,15 @@ the base read-only grant.
 
 ### 6.2 MCP Tool Surface (`services/boga-mcp/`)
 
-Nine tools. Seven read-only:
+Nine tools. Seven read-only: `get_training_profile`, `search_exercises`
+(database filtering, no preselection cap), `get_exercise_context` (lifetime
+PRs/totals), `get_recent_workouts` (exact workout counts/volume),
+`get_exercise_history` (pageable performed sets), `get_workout_detail` (header
+and sets), `get_upcoming_session_plans` (plan queues).
 
-- `get_training_profile`
-- `search_exercises` — database-side filtering, no candidate preselection cap
-- `get_exercise_context` — exact lifetime PRs and totals, invariant under page size
-- `get_recent_workouts` — exact workout counts and volume
-- `get_exercise_history` — pageable exhaustive performed-set history
-- `get_workout_detail` — exact workout header, paginated performed sets
-- `get_upcoming_session_plans` — upcoming and unscheduled plan queues
-
-Two create-only, each requiring plan permission and declaring
-`readOnlyHint: false`, `idempotentHint: true`, `destructiveHint: false`,
-`openWorldHint: false`:
-
-- `create_session_plan` — one complete plan
-- `create_training_programme` — one multi-session programme
+Two create-only (`readOnlyHint: false`, `idempotentHint: true`,
+`destructiveHint: false`, `openWorldHint: false`), requiring plan permission:
+`create_session_plan`, `create_training_programme`.
 
 ## 7. Error Tokens and Validation Limits
 

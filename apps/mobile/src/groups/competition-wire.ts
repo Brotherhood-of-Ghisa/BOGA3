@@ -2,15 +2,6 @@ import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
 
-export type CompetitionContractWire = {
-  contract_version: 4;
-  activation_state: 'pending' | 'active';
-  cache_version: 5;
-  metrics: ['volume', 'e1rm'];
-  ordinary_units: { volume: 'kg_reps'; e1rm: 'kg' };
-  normalized_units: { volume: 'percent_bw_reps'; e1rm: 'percent_bw' };
-  default_metric: 'e1rm';
-};
 export type CompetitionRulesWire = {
   bodyweight_calculations_enabled: boolean;
   bodyweight_contribution: number;
@@ -127,8 +118,22 @@ export type CompetitionSessionWire = {
   exercises: CompetitionSessionExerciseWire[];
 };
 export type CompetitionSessionDetailWire = { contract_version: 4; group_id: string; session: CompetitionSessionWire };
+/** One #1 board a session's record took, and that All board's current leader (null when the record's revision or metric has no current board). */
+export type CompetitionSessionRecordBoardWire = { metric: CompetitionHistoricalMetric; leader: GroupMemberRef | null; leads: boolean };
+/** A record event whose `record` values are the #1 boards only, one `boards` entry each. */
+export type CompetitionSessionRecordWire = { event: CompetitionEventWire; boards: CompetitionSessionRecordBoardWire[] };
+export type CompetitionSessionRecordsWire = {
+  contract_version: 4; group_id: string; member_user_id: string; session_id: string; records: CompetitionSessionRecordWire[];
+};
+/** A stream record's set as performed, and the group's previous #1 on each board it took (1RM first). */
+export type CompetitionStreamRecordWire = {
+  performance: CompetitionPerformanceWire | null;
+  previous: { value: CompetitionHistoryValueWire; performance: CompetitionPerformanceWire | null }[];
+};
 export type CompetitionStreamItemWire =
-  | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire }
+  | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
+      /** Record events only, from group_competition_stream_v2; absent in a payload cached from the first reader. */
+      record?: CompetitionStreamRecordWire }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef };

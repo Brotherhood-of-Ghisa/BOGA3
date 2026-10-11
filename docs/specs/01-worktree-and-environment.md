@@ -41,6 +41,14 @@ nested.**
 - A session that died before step 4 leaves leftovers. `./boga worktree ls` shows
   them; clear them with [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md).
 
+## Release checkout
+
+A release uses a dedicated detached worktree at a recorded full commit SHA.
+Keep it untouched while building; an optional tag targets that SHA explicitly.
+Preserve release artifacts outside the worktree before releasing its lease and
+checkout. When building/submitting an iOS release, load `docs/procedures/ios-release.md` for
+the upfront choices and ordered steps.
+
 ## Machine prerequisites (once)
 
 Docker running, Node, Xcode + simulators, Maestro, `jq`, and an authenticated

@@ -24,7 +24,7 @@ import {
  */
 
 export const PLAN_LIMITS = {
-  /** `title` / programme `name` / exercise `name` / `machineName`: 1..100 or 0..100. */
+  /** `title` / programme `name` / exercise `name`: 1..100 or 0..100. */
   name: { min: 1, max: 100 },
   description: { max: 500 },
   /** Plans per programme: 2..50. */
@@ -142,11 +142,6 @@ export const validatePlanExerciseDraft = (
     errors.push(error(base('name'), 'too_long', `Use at most ${PLAN_LIMITS.name.max} characters.`));
   }
 
-  const machineName = draft.machineName.trim();
-  if (machineName.length > PLAN_LIMITS.name.max) {
-    errors.push(error(base('machineName'), 'too_long', `Use at most ${PLAN_LIMITS.name.max} characters.`));
-  }
-
   if (draft.sets.length < PLAN_LIMITS.exerciseSets.min) {
     errors.push(error(base('sets'), 'too_few', 'Add at least one target set.'));
   } else if (draft.sets.length > PLAN_LIMITS.exerciseSets.max) {
@@ -172,7 +167,6 @@ export const validatePlanExerciseDraft = (
       exercise: {
         exerciseDefinitionId: draft.exerciseDefinitionId,
         name,
-        machineName: machineName.length === 0 ? null : machineName,
         sets,
       },
     },

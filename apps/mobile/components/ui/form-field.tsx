@@ -13,6 +13,10 @@ export type FormFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColo
   error?: string | null;
   // Defaults to `<testID>-error`.
   errorTestID?: string;
+  // Render the error message under the field. Set false when the host draws it
+  // itself (a dense row of fields whose error spans the whole row); the field
+  // still turns `danger`.
+  showErrorText?: boolean;
   // A line under the field in `ink-muted`: a format, or a counter (`12/280`).
   hint?: string;
   face?: FormFieldFace;
@@ -29,6 +33,7 @@ export function FormField({
   error,
   errorTestID,
   hint,
+  showErrorText = true,
   face = 'figure',
   containerStyle,
   multiline,
@@ -48,7 +53,7 @@ export function FormField({
           testID={testID}
         />
       </View>
-      {error ? (
+      {error && showErrorText ? (
         <Text
           allowFontScaling={false}
           accessibilityLiveRegion="polite"

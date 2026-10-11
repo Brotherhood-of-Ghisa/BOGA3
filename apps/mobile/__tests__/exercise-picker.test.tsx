@@ -68,9 +68,10 @@ import { uiRoles } from '@/components/ui/tokens';
 import * as blockHistory from '@/src/data/exercise-block-history';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import * as linksRepository from '@/src/data/exercise-group-links';
-import { exerciseDefinitions, exerciseGroupLinks, exerciseMuscleMappings } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseGroupLinks, exerciseMuscleMappings, sessionExercises, sessionPlanExercises, sessions } from '@/src/data/schema';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
+import { planRepository } from '@/src/session-planner';
 import {
   groupCacheKeys,
   writeGroupCache,
@@ -85,6 +86,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -224,6 +226,7 @@ type PickerCallbacks = {
   onClose: jest.Mock;
   onSelectExercise: jest.Mock;
   onAppendPlan: jest.Mock;
+  onAddPlanBlock: jest.Mock;
   onOpenManage: jest.Mock;
 };
 
@@ -237,6 +240,7 @@ const renderPicker = async (seed: () => Promise<void>, expandFamilies = true) =>
     onClose: jest.fn(),
     onSelectExercise: jest.fn(),
     onAppendPlan: jest.fn(),
+    onAddPlanBlock: jest.fn(),
     onOpenManage: jest.fn(),
   };
   const result = render(<ExercisePicker {...callbacks} />);
@@ -422,11 +426,10 @@ describe('pick sheet (E0.2)', () => {
     expect(within(squat).getByText('already linked in Tuesday Crew')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-seed_barbell_bench_press'));
-    expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(
-      'Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load. Your personal exercise settings stay unchanged.',
-    );
+    expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
+    expect(screen.queryByText(/Rules \d|Bodyweight scoring|personal exercise settings/)).toBeNull();
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-ex-hotel'));
-    expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(/Rules 1.*Bodyweight scoring Off/);
+    expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
   });
 
   it('with no suggestion, Add as new is preselected; dismissing returns to the picker', async () => {
@@ -498,38 +501,36 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
       await history?.();
     }, expandFamilies);
 
-  it('opens preselection for add-row picks, keeps Append plan disabled without valid history, and clears on search', async () => {
+  it('opens preselection for add-row picks, keeps Repeat last disabled without valid history, and clears on search', async () => {
     const { onSelectExercise, onAppendPlan } = await openInteractions();
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
     expect(screen.getByText('Add empty set')).toBeTruthy();
-    const appendButton = screen.getByTestId('exercise-picker-append-plan-button');
-    await waitFor(() => expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull());
-    expect(appendButton.props.accessibilityState?.disabled).toBe(true);
+    const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
+    await waitForGone(() => screen.queryByTestId('exercise-picker-plan-source'));
+    expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
     expect(screen.queryByText(/Unable/i)).toBeNull();
     // Choosing a row only preselects; nothing reaches the host yet.
     expect(onSelectExercise).not.toHaveBeenCalled();
 
-    fireEvent.press(appendButton);
+    fireEvent.press(repeatButton);
     expect(onAppendPlan).not.toHaveBeenCalled();
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'bench');
-    await waitFor(() => {
-      expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
-      expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
-    });
+    await waitForGone(() => screen.queryByTestId('exercise-picker-preselection-panel'));
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
     expect(onSelectExercise).not.toHaveBeenCalled();
   });
 
-  it('shows Append plan disabled while the historical suggestion is loading (a pending read)', async () => {
+  it('shows Repeat last disabled while the historical suggestion is loading (a pending read)', async () => {
     jest.spyOn(blockHistory, 'loadSuggestedExercisePlan').mockImplementationOnce(() => new Promise(() => undefined));
 
     await openInteractions(true, logSquatHistory);
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
-    const appendButton = await screen.findByTestId('exercise-picker-append-plan-button');
-    expect(appendButton.props.accessibilityState?.disabled).toBe(true);
+    const repeatButton = await screen.findByTestId('exercise-picker-repeat-last-button');
+    expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
     expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull();
   });
 
@@ -548,17 +549,17 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
       uiRoles.inkFaint,
     );
 
-    const appendButton = screen.getByTestId('exercise-picker-append-plan-button');
-    expect(appendButton.props.accessibilityState?.disabled).toBe(false);
-    // Append plan is the sheet's one accent (G6); Add empty set is an outline.
+    const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
+    expect(repeatButton.props.accessibilityState?.disabled).toBe(false);
+    // Repeat last is the sheet's one accent (G6); Add empty set is an outline.
     type Node = typeof screen.UNSAFE_root;
     const accentNodes = screen.UNSAFE_root.findAll(
       (node: Node) =>
         typeof node.type === 'string' &&
         (StyleSheet.flatten(node.props.style as any) ?? {}).backgroundColor === uiRoles.accent,
     );
-    expect(accentNodes.map((node: Node) => node.props.testID)).toEqual(['exercise-picker-append-plan-button']);
-    fireEvent.press(appendButton);
+    expect(accentNodes.map((node: Node) => node.props.testID)).toEqual(['exercise-picker-repeat-last-button']);
+    fireEvent.press(repeatButton);
 
     expect(onAppendPlan).toHaveBeenCalledTimes(1);
     expect(onAppendPlan).toHaveBeenCalledWith(
@@ -624,45 +625,27 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(screen.getByLabelText('Select exercise Overhead Press')).toBeTruthy();
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '   squAT   press  ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    const rows = (...names: string[]) => () => names.map((name) => screen.queryByLabelText(`Select exercise ${name}`));
+    await waitForGone(rows('Barbell Squat', 'Bench Press', 'Deadlift', 'Overhead Press'));
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  CHEST bench ');
-    await waitFor(() => {
-      expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
+    await waitForGone(rows('Barbell Squat', 'Deadlift', 'Overhead Press'));
 
-    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  front press ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.getByLabelText('Select exercise Overhead Press')).toBeTruthy();
-    });
-
+    // Bench Press's secondary muscle is triceps: secondaries are not searched.
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  triceps ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-      expect(screen.getByText('No exercises match that filter.')).toBeTruthy();
-    });
+    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
+    await waitForGone(rows('Bench Press'));
 
+    // Overhead Press's primary muscle is Front Delts (id `delts_front`).
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  front press ');
+    expect(await screen.findByLabelText('Select exercise Overhead Press')).toBeTruthy();
+    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift'));
+
+    // The muscle's display name is searched, never its id.
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  delts_front ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
+    await waitForGone(rows('Overhead Press'));
   }, 30000);
 
   it('starts with family rows collapsed and shared history', async () => {
@@ -753,6 +736,115 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSelectExercise).not.toHaveBeenCalled();
+  });
+});
+
+describe('picker: from planner', () => {
+  beforeEach(() => {
+    mockUserId = null;
+  });
+
+  const seedHeavyDay = async () => {
+    await planRepository.createPlan(
+      {
+        title: 'Heavy Day',
+        gymId: null,
+        scheduledFor: null,
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_back_squat',
+            name: 'Barbell Squat',
+            sets: [
+              { targetWeightText: '100', targetRepsText: '5', targetSetType: null },
+              { targetWeightText: '', targetRepsText: '8', targetSetType: null },
+            ],
+          },
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            sets: [{ targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 5, 8, 0),
+    );
+  };
+
+  const openPlanner = async (seed: () => Promise<void> = async () => {
+    await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
+    await seedHeavyDay();
+  }) => {
+    await seed();
+    await bootLocalApp();
+    callbacks = {
+      onClose: jest.fn(),
+      onSelectExercise: jest.fn(),
+      onAppendPlan: jest.fn(),
+      onAddPlanBlock: jest.fn(),
+      onOpenManage: jest.fn(),
+    };
+    const result = render(<ExercisePicker {...callbacks} />);
+    unmountPicker = result.unmount;
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('exercise-picker-planner-toggle'));
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('exercise-picker-planner-section') ?? screen.queryByTestId('exercise-picker-planner-empty'),
+      ).toBeTruthy();
+    });
+    return callbacks;
+  };
+
+  const blockRows = () =>
+    localDatabase()
+      .select()
+      .from(sessionPlanExercises)
+      .all()
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+
+  it('lists authored blocks with their plan source and hands a pick to the host', async () => {
+    const { onAddPlanBlock } = await openPlanner();
+    const section = screen.getByTestId('exercise-picker-planner-section');
+
+    expect(within(section).getByLabelText('Planned block Barbell Squat from Heavy Day, block 1 of 2')).toBeTruthy();
+    expect(within(section).getByLabelText('Planned block Bench Press from Heavy Day, block 2 of 2')).toBeTruthy();
+
+    const [, benchBlock] = blockRows();
+    fireEvent.press(screen.getByTestId(`exercise-picker-planner-block-${benchBlock.id}`));
+    expect(onAddPlanBlock).toHaveBeenCalledTimes(1);
+    expect(onAddPlanBlock).toHaveBeenCalledWith(benchBlock.id);
+    expect(onAddPlanBlock).not.toHaveBeenCalledWith(expect.anything(), expect.anything());
+  });
+
+  it('offers nothing to add when no plans exist', async () => {
+    await openPlanner(async () => {
+      await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
+    });
+    expect(screen.getByTestId('exercise-picker-planner-empty')).toBeTruthy();
+  });
+
+  it('a block a live performed card claims is not offered', async () => {
+    await openPlanner(async () => {
+      await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
+      await seedHeavyDay();
+      const [squatBlock] = blockRows();
+      localDatabase().insert(sessions).values({ id: 'live-session-1', startedAt: new Date() }).run();
+      localDatabase()
+        .insert(sessionExercises)
+        .values({
+          id: 'live-card-1',
+          sessionId: 'live-session-1',
+          exerciseDefinitionId: 'seed_barbell_back_squat',
+          orderIndex: 0,
+          name: 'Barbell Squat',
+          sourcePlanExerciseId: squatBlock.id,
+        })
+        .run();
+    });
+
+    const section = screen.getByTestId('exercise-picker-planner-section');
+    expect(within(section).getByLabelText('Planned block Bench Press from Heavy Day, block 2 of 2')).toBeTruthy();
+    expect(within(section).queryByLabelText(/Barbell Squat/)).toBeNull();
   });
 });
 

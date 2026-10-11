@@ -32,6 +32,7 @@ import { deleteBodyWeightReading, saveBodyWeightReading } from '@/src/data/bodyw
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { __resetClockForTests, type Transaction } from '@/src/data/clock';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import { computeSelectedExerciseHistoryEffort } from '@/src/data/exercise-analytics';
 import {
   drainExerciseSessionFacts,
   loadEarlierBestsByDefinition,
@@ -153,6 +154,32 @@ afterEach(() => {
 });
 
 describe('exercise session facts — rows and reads', () => {
+  it('supplies metric-specific history PR counts from all-time facts, once per session across repeated blocks', async () => {
+    insertSession('baseline', 1, [{ definitionId: BENCH, sets: [['100', '10']] }]);
+    insertSession('a-weight', 8, [{ definitionId: BENCH, sets: [['120', '1']] }]);
+    insertSession('b-volume', 8, [
+      { definitionId: BENCH, sets: [['90', '12']] },
+      { definitionId: BENCH, sets: [['90', '12']] },
+      { definitionId: SQUAT, sets: [['200', '12']] },
+    ]);
+    insertSession('c-1rm', 8, [{ definitionId: BENCH, sets: [['110', '12']] }]);
+    insertSession('d-1rm', 8, [{ definitionId: BENCH, sets: [['115', '12']] }]);
+    insertSession('zero', 9, [{ definitionId: BENCH, sets: [['0', '10']] }]);
+    insertSession('deleted', 8, [{ definitionId: BENCH, sets: [['200', '12']] }], { deletedAt: day(9) });
+    insertSession('active', 8, [{ definitionId: BENCH, sets: [['200', '12']] }], { status: 'active' });
+
+    const options = { exerciseDefinitionId: BENCH, start: day(8, 0), end: day(10, 0), timeZone: 'UTC' };
+    const history = await computeSelectedExerciseHistoryEffort(options);
+    expect(history.daily).toHaveLength(2);
+    expect(history.daily[0].personalRecordCounts).toEqual({ totalVolume: 1, estimatedRM1: 2, highestWeight: 1 });
+    expect(history.daily[1]).toMatchObject({ totalVolume: 0, personalRecordCounts: { totalVolume: 0, estimatedRM1: 0, highestWeight: 0 } });
+
+    // Widening the displayed sample must not change any day's all-time flags.
+    const wider = await computeSelectedExerciseHistoryEffort({ ...options, start: day(1, 0) });
+    expect(wider.daily[0].personalRecordCounts).toEqual({ totalVolume: 0, estimatedRM1: 0, highestWeight: 0 });
+    expect(wider.daily.slice(1)).toEqual(history.daily);
+  });
+
   it('builds rows only for linked exercises in completed, non-deleted sessions', async () => {
     insertSession('s1', 1, [
       { definitionId: BENCH, sets: [['100', '5']] },
@@ -487,13 +514,13 @@ describe('exercise session facts — PR flags and completed-session PRs equal de
     expect(flagged.length).toBeGreaterThan(3);
 
     // Every completed graph once; the replay itself skips sessions not before its target.
-    const graphs = await loadSessionInsightHistory({ completedAt: day(365), targetSessionId: '' });
+    const graphs = await loadSessionInsightHistory({ completedAt: day(365), targetSessionId: '', historyLookbackWeeks: 520 });
     for (const sessionId of sessionIds) {
       const replayed = deriveSessionPersonalRecords({
         targetSession: graphs.find((graph) => graph.sessionId === sessionId)!,
         historicalSessions: graphs,
       });
-      const insights = await loadCompletedSessionInsights(sessionId);
+      const insights = await loadCompletedSessionInsights(sessionId, 520);
       // The facts-backed list is the replay's list: same sets, order and values.
       expect({ sessionId, records: insights!.personalRecords }).toEqual({ sessionId, records: replayed });
       // Every flag is a record: `pr_e1rm` on the best set, `pr_weight` on the

@@ -1,8 +1,8 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
-// "Derivation"). Every colour role is generated from these four; `danger` is
-// the one role no theme changes.
+// "Derivation"). The palette follows these seeds; danger, the two change
+// directions, surface and filter selection retain fixed colours in every theme.
 export type ThemeSeeds = {
   // A mid neutral. Its hue and chroma tint every neutral role, from `ink` to
   // `paper`, so the whole ground reads as one warm (or cool) family.
@@ -28,6 +28,14 @@ export const defaultThemeSeeds: ThemeSeeds = {
 
 // Destructive actions only — red means "this deletes" in every theme.
 const DANGER = '#A4262C';
+
+// A change's direction (`design-language.md` §6): an improvement and a
+// decrease. Fixed in every theme, like `danger`, so "better" and "worse" never
+// follow the picked accent's hue. One L* (≈41), two hues: the pair reads as
+// equals that differ only in direction, and `loss` is a crimson rather than
+// `danger`'s brick, so a decreasing figure does not read as a delete.
+const GAIN = '#15703F';
+const LOSS = '#C01048';
 
 type SeedName = keyof ThemeSeeds;
 
@@ -76,6 +84,8 @@ export type UiRoles = {
   paper: string;
   // Cards, sheets and inputs.
   surface: string;
+  // Active Progress/history filters: fixed black in every theme.
+  selection: string;
   // Hairlines. Depth is a rule plus a ground change — never a shadow. `rule`
   // borders cards and controls and draws the sheet handle; `ruleSoft` divides
   // rows inside a card or panel.
@@ -92,6 +102,11 @@ export type UiRoles = {
   recordRule: string;
   // Destructive actions only.
   danger: string;
+  // A change against an earlier period: `gain` an improvement, `loss` a
+  // decrease (`changeToneColour` in `change-tone.ts` is the only caller). The
+  // sign is always drawn too — colour is never the only channel.
+  gain: string;
+  loss: string;
   // Data visualisation: one sequential ramp, one meaning ("more"). `viz0` is
   // empty / rest. Text on a `viz` ground is `ink`.
   viz0: string;
@@ -124,6 +139,7 @@ export function generateRoles(seeds: ThemeSeeds): UiRoles {
     paper: at(STEPS.paper),
     // Cards stay white in every theme; the ground's tint is carried by `paper`.
     surface: '#FFFFFF',
+    selection: '#000000',
     rule: at(STEPS.rule),
     ruleSoft: at(STEPS.ruleSoft),
     accent: seeds.accent.toUpperCase(),
@@ -132,6 +148,8 @@ export function generateRoles(seeds: ThemeSeeds): UiRoles {
     recordWash: at(STEPS.recordWash),
     recordRule: at(STEPS.recordRule),
     danger: DANGER,
+    gain: GAIN,
+    loss: LOSS,
     viz0: at(STEPS.viz0),
     viz1: at(STEPS.viz1),
     viz2: at(STEPS.viz2),

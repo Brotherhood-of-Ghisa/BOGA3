@@ -9,6 +9,7 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
+import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
 
 import CompletedSessionDetailRoute, {
   CompletedSessionDetailScreenShell,
@@ -243,7 +244,55 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
   });
 
-  it('keeps completion and current exercise rows available when optional insight history fails', async () => {
+  it.each(['look-back', 'account'])('rejects obsolete comparisons after changing the %s', async change => {
+    setAccountLocalPreferenceAccount('A', true);
+    let resolveOld!: (value: unknown) => void;
+    const loadInsights = jest.fn()
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error('new context failed'));
+    render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
+    await screen.findByText('Loading comparisons…');
+    expect(loadInsights).toHaveBeenLastCalledWith('completed-under-test', 52);
+    act(() => {
+      if (change === 'look-back') setAccountLocalPreferences({ historyLookbackWeeks: 1 });
+      else setAccountLocalPreferenceAccount('B', true);
+    });
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    expect(loadInsights).toHaveBeenLastCalledWith('completed-under-test', change === 'look-back' ? 1 : 52);
+    await act(async () => resolveOld({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] }));
+    expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
+  });
+
+  it('says the comparisons are loading on completion while the insight history reads', async () => {
+    let resolveInsights!: (value: unknown) => void;
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadInsights: jest.fn().mockReturnValue(new Promise((resolve) => { resolveInsights = resolve; })),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    // A pending read is never drawn as a session with no history.
+    expect(await screen.findByText('Loading comparisons…')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
+    // The stored context carries the screen meanwhile.
+    expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-share-session')).toBeTruthy();
+
+    await act(async () =>
+      resolveInsights({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] })
+    );
+    expect(screen.getByTestId('session-insight-empty')).toHaveTextContent('No working sets to compare.');
+  });
+
+  it('says the comparisons are unavailable on completion when the insight history fails', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockRejectedValue(new Error('Insight history unavailable')),
@@ -263,8 +312,13 @@ describe('CompletedSessionDetailScreenShell', () => {
     });
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    expect(screen.getAllByText('No comparison history yet')).toHaveLength(2);
+    // A failed history read says so: it is never drawn as a session with no
+    // history. The rest of the screen stands.
+    expect(screen.getByTestId('session-insight-empty')).toHaveTextContent(
+      'Comparisons unavailable. Return to this session to retry.'
+    );
+    expect(screen.queryByTestId('session-completion-comparison-unavailable-exercise')).toBeNull();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 
@@ -385,7 +439,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId('session-completion-muscle-empty-state')).toHaveTextContent(
+      expect(screen.getByTestId('session-completion-breakdown-muscle-empty')).toHaveTextContent(
         'Muscle breakdown unavailable.'
       )
     );

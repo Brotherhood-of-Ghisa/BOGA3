@@ -1,6 +1,5 @@
-import { evaluateCompetitionGraph, evaluateGroupComparisonGraph,
-  type CompetitionEvaluationGraph, type CompetitionSourceSet } from '@/src/groups/competition-evaluation';
-import type { GroupMetricEvaluationGraph } from '@/src/groups/metric-evaluation';
+import { evaluateCompetitionGraph, type CompetitionEvaluationGraph,
+  type CompetitionSourceSet } from '@/src/groups/competition-evaluation';
 import { scoreCompetitionPerformance } from '@/src/groups/competition-score';
 
 const source: CompetitionSourceSet = {
@@ -87,14 +86,4 @@ it('fails whole publication on unsupported rules, incomplete sources, missing pi
   expect(() => evaluate({ fingerprints: {} })).toThrow('fingerprint');
   expect(() => evaluate({ counting: undefined } as unknown as CompetitionSourceSet)).toThrow('eligibility');
   expect(() => evaluate({ set_type: undefined } as unknown as CompetitionSourceSet)).toThrow('set type');
-});
-
-it('dispatches the existing pending graph and rejects unknown competition versions', () => {
-  const legacy: GroupMetricEvaluationGraph = { ...graph, rules: { ...graph.rules, default_metric: 'e1rm' },
-    sets: [{ ...source, fingerprints: { weight: 'weight-pin', e1rm: 'rm-pin' } }] };
-  delete (legacy as unknown as Record<string, unknown>).contract_version;
-  expect(evaluateGroupComparisonGraph(legacy).scores.map(score => score.metric)).toEqual(['weight','e1rm']);
-  expect(evaluateGroupComparisonGraph(graph)).toEqual(evaluateCompetitionGraph(graph));
-  expect(() => evaluateGroupComparisonGraph({ ...graph, contract_version: 5 } as unknown as CompetitionEvaluationGraph))
-    .toThrow('Unsupported');
 });

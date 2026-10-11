@@ -1,4 +1,6 @@
 export { FriendSessionContent } from './friend-session-content';
+export { GroupSessionHeaderTitle } from './group-session-header-title';
+export { GroupSessionRecordsCard } from './group-session-records-card';
 export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
 export { GroupBoardHistoryItem } from './group-board-history-item';
 export { GroupBoardRow } from './group-board-row';
@@ -8,6 +10,10 @@ export { GroupExerciseRow } from './group-exercise-row';
 export { GroupExercisesPage } from './group-exercises-page';
 export { GroupFilterChips } from './group-filter-chips';
 export { GroupHeaderCard } from './group-header-card';
+export { GroupGlancePage, type GroupGlancePageProps } from './group-glance-page';
+export { GroupScreenHeader, GROUP_SECTION_LABELS, type GroupsSection } from './group-screen-header';
+export { GroupStreamEventsSheet } from './stream-events-sheet';
+export { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 export { GroupLeaderboardsPage, GroupPodiumCard } from './group-leaderboards-page';
 export { GroupPagesFooter } from './group-pages-footer';
 export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';

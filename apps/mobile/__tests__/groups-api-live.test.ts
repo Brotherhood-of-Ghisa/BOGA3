@@ -4,8 +4,8 @@
  * Outcome: every membership and settings call in the app's groups client
  * (`src/groups/api.ts`) reaches the real server and gets back a payload its
  * own guards accept. The competition calls run in
- * `groups-competition-api-live.test.ts`, the same lane's second suite, with
- * protocol 4 active.
+ * `groups-competition-api-live.test.ts`, this lane's second suite
+ * (supabase/tests/groups-competition-live.sh).
  *
  * The other groups Jest suites mock Supabase, and the backend lanes
  * (groups-contract, groups-leaderboards) call the RPCs with curl, so neither

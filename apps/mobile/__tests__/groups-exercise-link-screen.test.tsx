@@ -13,6 +13,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { eq } from 'drizzle-orm';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+import { waitForGone } from './helpers/wait-for-gone';
 
 let fixture: InMemoryDatabaseFixture;
 const mockCurrentDatabase = () => fixture.database;
@@ -157,8 +158,9 @@ describe('Link screen', () => {
 
     const suggested = await screen.findByTestId('exercise-link-row-gx-bench');
     expect(within(suggested).getByText(/Bench Press/)).toBeTruthy();
-    // Tuesday's "Bench" is a name match → Suggested too, with the load-mode note.
-    expect(screen.getByText(/Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load/)).toBeTruthy();
+    // Tuesday's "Bench" is a name match → Suggested too; no rules line on any row.
+    expect(screen.getByTestId('exercise-link-row-gx-tue-bench')).toBeTruthy();
+    expect(screen.queryByText(/Rules \d|Bodyweight scoring/)).toBeNull();
     expect(screen.getByTestId('exercise-link-row-gx-deadlift')).toBeTruthy();
 
     await act(async () => {
@@ -211,7 +213,7 @@ describe('Link screen', () => {
       .where(eq(exerciseGroupLinks.id, 'g-iron:seed_barbell_bench_press'))
       .get();
     expect(tombstone?.deletedAt).not.toBeNull();
-    await waitFor(() => expect(screen.queryByTestId('exercise-link-linked-row-gx-bench')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-link-linked-row-gx-bench'));
   });
 
   // Offline = NetInfo reports offline AND a request would fail as a transport
@@ -261,7 +263,7 @@ describe('Link screen', () => {
     });
 
     expect(liveLinks()).toEqual([]);
-    await waitFor(() => expect(screen.queryByTestId('exercise-link-linked-row-gx-bench')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-link-linked-row-gx-bench'));
     expect(screen.getByTestId('exercise-link-link-gx-bench')).toBeTruthy();
     expect(api.listMyGroups).not.toHaveBeenCalled();
     expect(api.listCompetitionExercises).not.toHaveBeenCalled();

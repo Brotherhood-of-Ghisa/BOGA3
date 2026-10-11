@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared ExerciseCore validation vectors. jest (exercise-core.test.ts) runs them against validateExerciseCore; supabase/tests/groups-contract.sh runs them against group_exercise_create and the group_exercises CHECKs. expect.name = the stored (trimmed) name; expect.issue = the rejection, checked name first.",
+  "_comment": "Shared ExerciseCore validation vectors. jest (exercise-core.test.ts) runs them against validateExerciseCore; supabase/tests/groups-contract.sh runs them against group_competition_exercise_create and the group_exercises CHECKs. expect.name = the stored (trimmed) name; expect.issue = the rejection, checked name first.",
   "cases": [
     {"label": "plain name", "name": "Bench Press", "loadInputMode": "total_load", "expect": {"name": "Bench Press"}},
     {"label": "per-side mode", "name": "Dumbbell Press", "loadInputMode": "per_side_load", "expect": {"name": "Dumbbell Press"}},

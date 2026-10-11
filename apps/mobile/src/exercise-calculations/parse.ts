@@ -25,8 +25,15 @@ export const parseSetWeight = (value: string | null | undefined): number | null 
 };
 
 /**
- * Reps must be a positive integer to count toward any of these
- * calculations. Matches the exercise page's reps input (`components/exercise-page/set-logger.tsx`).
+ * The most reps a performed set can have ([[set.performed]]). The exercise
+ * page's reps input (`components/exercise-page/set-logger.tsx`) stops at two
+ * digits; imported, synced and agent-written sets stop here.
+ */
+export const MAX_SET_REPS = 999;
+
+/**
+ * Reps must be a positive integer no greater than `MAX_SET_REPS` to count
+ * toward any of these calculations.
  */
 export const parseSetReps = (value: string | null | undefined): number | null => {
   if (typeof value !== 'string') return null;
@@ -34,6 +41,6 @@ export const parseSetReps = (value: string | null | undefined): number | null =>
   if (trimmed.length === 0) return null;
   if (!/^\d+$/.test(trimmed)) return null;
   const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_SET_REPS) return null;
   return parsed;
 };

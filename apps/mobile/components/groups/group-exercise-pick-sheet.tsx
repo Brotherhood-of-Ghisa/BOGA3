@@ -16,8 +16,6 @@ import {
 import {
   buildPickSheetModel,
   describeLinkRetroactivity,
-  describeGroupLinkLoadNote,
-  describeGroupLinkIncompatibility,
   filterPickSheetChoices,
   type GroupExercise,
   type LinkRef,
@@ -110,7 +108,6 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       : option.kind === 'other'
         ? exercises.find((exercise) => exercise.id === option.exerciseId) ?? null
         : null;
-  const loadModeNote = chosen ? describeGroupLinkLoadNote(chosen, target.groupExercise) : null;
   const title = `${target.groupExercise.name} · ${target.groupName}`;
 
   const confirm = async () => {
@@ -119,11 +116,6 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       return;
     }
     if (!chosen) {
-      return;
-    }
-    const incompatible = describeGroupLinkIncompatibility(chosen, target.groupExercise);
-    if (incompatible) {
-      setError(incompatible);
       return;
     }
     setPending(true);
@@ -232,11 +224,6 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
             {chosen ? (
               <Text allowFontScaling={false} style={styles.note} testID="group-pick-sheet-retroactivity">
                 {describeLinkRetroactivity(chosen.name, target.groupName)}
-              </Text>
-            ) : null}
-            {loadModeNote ? (
-              <Text allowFontScaling={false} style={styles.note} testID="group-pick-sheet-load-mode-note">
-                {loadModeNote}
               </Text>
             ) : null}
             {error ? <Notice message={error} testID="group-pick-sheet-error" tone="danger" /> : null}

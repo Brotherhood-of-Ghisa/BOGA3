@@ -1,11 +1,12 @@
-# Group competition representation and cutover
+# Group competition representation
 
-> **Status:** representation, compatible UI, versioned worker/publication, safe
-> readers, witness migration and cache eviction are implemented and accepted.
-> The authorized hosted rollout is complete. A fresh installation defaults to
-> pending until service-only activation after a compatible client is available.
+> **Status:** implemented and live. Protocol 4 is the only group
+> representation: hosted activation ran on 2026-10-05, and the pending
+> protocol-3 server, its readers and the activation step are removed. A fresh
+> installation is protocol 4.
 
-Owns competitive metric meanings and the protocol-4 transition. Authorization,
+Owns competitive metric meanings, the protocol-4 public boundary and the
+history the protocol-3 era left. Authorization,
 queues, coherent publication and current certification storage remain in
 [groups-contract.md](groups-contract.md), private kg arithmetic in
 [training-metrics-contract.md](training-metrics-contract.md) and dated readings in
@@ -30,9 +31,9 @@ witness/aggregation window; personal session Volume records keep their contract.
 | `volume` | `kg_reps`: source entered kg converted to group target mode × reps | `percent_bw_reps`: 100 × effective physical total-load set volume / B |
 | `e1rm` (default) | `kg`: ordinary source 1RM converted to group target mode | `percent_bw`: 100 × effective physical total-load estimated 1RM / B |
 
-New comparisons default to 1RM. At the versioned cutover, a legacy Weight
-default becomes Volume on the new revision; an existing 1RM default stays 1RM.
-Keep retired rule defaults and their historic Weight values unchanged.
+New comparisons default to 1RM. The cutover turned a legacy Weight default
+into Volume on a new revision; an existing 1RM default stayed 1RM. Retired
+rule defaults and their historic Weight values stay unchanged.
 
 Public labels are Volume / 1RM and kg·reps / kg / %BW·reps / %BW. There is no
 raw Weight, reps board or absolute bodyweight alternative in protocol 4. Raw
@@ -59,11 +60,11 @@ nonworking performed projections for audit validation; the publisher applies
 working/counting. A Volume witness covers that set's logged kg×reps, never
 other sets or a session total.
 
-Keep finite unrounded kernel values through publication/ranking. Display rounding
-is presentation only; the old six-decimal rank quantizer must not truncate new
-competition values. Per-member ties use achieved instant, exercise order, set
-order, set-created instant and binary set ID; member ranking ties use achieved
-instant then member UUID. History retains original metric/unit/revision; old kg
+Keep finite unrounded kernel values through publication/ranking. Display
+rounding is presentation only; values are never quantized for ranking.
+Per-member ties use achieved instant, exercise order, set order, set-created
+instant and binary set ID; member ranking ties use achieved instant then member
+UUID. History retains original metric/unit/revision; old kg
 Weight values are historical Weight, never relabeled Volume or percentage.
 
 ## 2. Public boundary
@@ -90,8 +91,7 @@ group/comparison state, including old history, retired/archived revisions and
 View full session. Historic Off rules must not bypass current enabled redaction. Suppress session/week absolute totals if they would recover a
 redacted contribution by subtracting remaining sets. Counts, dates, reps,
 duration and permitted ordinary exercise context stay public. A protocol-4
-full-session read/cache binds one authorized group; an old unscoped session RPC
-must fail closed wherever its response could expose an enabled comparison's kg.
+full-session read/cache binds one authorized group.
 No cross-endpoint join in the same enabled group may recover an absolute
 counterpart. Frozen former-member/archived entries with an incompatible unit or
 disallowed absolute score are omitted from the current board with generic
@@ -117,7 +117,8 @@ instant and kg, not a rounded score or bookkeeping clock. An authoritative
 change ends each already-bound dependent projection (`voided`), recomputes All
 when eligible and removes Certified eligibility. Keep original audit and append
 terminal metadata. Restore never reopens an ended projection; a new witness is
-needed. Raw Weight legacy witnesses stay active after private corrections.
+needed. A witness is the set's ([[groups.certification]]): ending any of its
+projections ends it.
 
 Value/date edits, delete/invalid input with fallback or missing context, winning
 backdated/restore/equal-time ID selection changes all follow this rule. Losing,
@@ -131,71 +132,49 @@ Public state/copy is generic “Certification ended”/“Score unavailable”, 
 private correction reason/value/date. Raw set corrections/deletions and manual
 withdrawal/cancellation keep their existing terminal lifecycle.
 
-At cutover, existing active 1RM witnesses retain their public IDs as 1RM
-projections; their original kg audit remains unchanged. Raw Weight witnesses can
-supply a new Volume projection only after validating the same observed raw set,
-kg, reps, status and source identities: single-set Volume is derived from exactly
-that witnessed performance. Create a distinct internal projection aliased to the
-original public witness ID; do not overwrite or relabel its Weight audit.
-Retain a server-side provenance link to the original witness. A new dependent
-Volume projection binds B on first applicable activation without asserting the
-witness verified it. Already-ended witnesses cannot supply active projections;
-pending corrections cannot be blessed with today's reading during migration.
+Protocol-3 witnesses stay history. An active 1RM witness kept its public ID as
+a 1RM projection with its original kg audit. A raw Weight witness supplies a
+Volume projection only after the publisher validates the same observed raw
+set, kg, reps, status and source identities: single-set Volume derives from
+exactly that witnessed performance. That projection is a distinct row aliased
+to the original public witness ID, never an overwrite or relabel of its Weight
+audit, with a server-side provenance link to the original witness. A dependent
+Volume projection binds B on its first applicable activation without asserting
+the witness verified it. Ended witnesses supply no active projection; pending
+corrections are never blessed with today's reading. A legacy kg certification is
+imported the same way while its comparison is live and its member active;
+archived and departed ones wait for unarchive or rejoin.
 
-When multiple eligible historical witnesses cover the same metric/set, preserve
-the existing 1RM source for 1RM and existing Weight source for Volume, rather than
-merging public IDs. Legacy withdrawal/cancellation ends all projections attached
-to that witness; private correction ends only dependent projections. Preserve
-original raw legacy rows and ended audit throughout. New certifications are
-metric projections of a witnessed single set, not aggregate attestations.
+Several witnesses of one set were merged as [[groups.certification]] records
+(ended ones keep their audit), and every surviving witness gained a
+projection on each current score it lacked. Preserve original raw legacy rows and ended audit
+throughout. Certifications are metric projections of a witnessed single set,
+not aggregate attestations.
 
-## 4. Inventory and additive transition
+## 4. Server surface
 
-| Current surface | Required cutover |
-| --- | --- |
-| `metric-contract.ts`, `metric-wire.ts`, guards: Weight/1RM, protocol 3, kg, raw performance/fingerprints | Protocol-4 Volume/1RM, explicit mode units, exact safe projection shapes and random write tokens |
-| `performance-score.ts`, `metric-evaluation.ts`, `group-eval` | Keep protocol-3 worker until atomic cutover; connect the competition scorer to versioned graphs/publication |
-| `group_metric_set_scores`, board entries and certifications: metric/unit checks and six-decimal ranking | Forward constraints accept Volume and mode units; preserve kg audit/revisions, full-precision competition values and distinct witness projections |
-| `group_rule_revisions`, `group_events`, frozen/former-member entries | New revisions carry representation version; history retains identity/unit, and enabled readers redact disallowed kg without rewriting stored audit |
-| `group_metric_board`, `group_metric_podiums`, `group_metric_history`, `group_metric_revisions` | Safe versioned board/podium/history/revision projections; gate old unsafe readers before percentage publication |
-| `group_board`, `group_board_podiums`, `group_board_history` | Legacy ordinary compatibility only where safe; enabled comparisons reject incompatible clients |
-| `group_stream`, `group_stream_v2`, record/void/link/rules and certification context | Safe stream/session/history projections with the same group disclosure; no nested old kg payload bypass |
-| `group_session_detail`, session card/exercise helpers, `group_week_summary`, `group_get`/summary | Group-bound safe full-session/aggregate output; remove absolute totals that permit subtraction |
-| `group_metric_certify`, `group_metric_certification_get/end`, legacy certify/withdraw/cancel | Revision/random-token fencing, generic redacted state, exact witness aliases and terminal outcomes |
-| Group exercise list/create/update/archive/unarchive, legacy writes and `group_update` | Versioned metric defaults and coherent effective changes; c=0 toggles stay no-ops with preserved history/certificates |
-| `group_cache`, stream/podium/catalogue/week/session keys | Generation 5, group-bound session keys, exact decoding before cache writes/reads; evict all account group projections on upgrade/normalized mode transition |
+Every competitive read and write is a `group_competition_*` RPC decoded by the
+client's exact guards; the membership and settings RPCs are the only others.
+Every group RPC requires the exact `x-boga-group-contract: 4` header before
+source data access: missing, malformed or other versions get `UPDATE_REQUIRED`.
+The header is version negotiation, never authorization or an exemption from
+server redaction. Outsider, nonexistent and deleted groups stay
+indistinguishable; anonymous callers have no execute grant on competition
+RPCs. Private helpers have no client or service execute grants.
 
-The negotiation RPC is `group_competition_contract(group)`.
-It checks app user, OAuth denial and active membership, then requires the exact
-`x-boga-group-contract: 4` header. It returns protocol/unit/cache metadata with
-`activation_state: pending`. Unsupported/missing/malformed versions get
-`UPDATE_REQUIRED`; outsider/nonexistent/deleted groups remain indistinguishable.
-Anonymous callers have no execute grant. There is no bodyweight or performance
-read and no new Sync v2 entity, snapshot, reading schema or stored achievement.
+`group_competition_contract(group)` checks app user, OAuth denial and active
+membership and returns protocol/unit/cache metadata. Its `activation_state` is
+always `active`; the shape is frozen, though no client reads it. Minimum
+client capability is contract 4 plus cache generation 5; private Sync v2
+protocols are separate. No bodyweight or performance read, Sync v2 entity,
+snapshot, reading schema or stored achievement belongs to it.
 
-The additive publication migration leaves the server pending and preserves
-protocol-3 evaluation/readers until `group_competition_activate(4)` commits.
-Its service-only activation waits for in-flight group operations, blocks every
-unsafe legacy reader/write, retires published revisions, preserves compatible
-frozen entries without arithmetic and enqueues active comparisons. Negotiation
-reports active only after that transaction commits. A pending response cannot activate percentage UI;
-unknown contract/unit/cache versions fail closed, without a legacy kg fallback.
-
-`competition-evaluation.ts` dispatches legacy pending graphs to the existing
-metric worker and version-4 graphs to the shared competition scorer. SQL checks
-the evaluation contract, claim/generation, revision and complete source token
-before publishing unrounded scores in one transaction. Source enqueue, source
-completion and metric publication take the same shared activation fence before
-their group/queue locks; activation takes its exclusive side first. Readers take
-shared group locks so a policy change cannot split authorization and disclosure.
-
-Current boards, podiums, catalogue writes, revisions, history, stream, group-bound
-session detail, week summaries and certification writes/metadata use
-`group_competition_*` RPCs and exact client guards. Private helpers and all renamed
-legacy implementations have no client/service execute grants. Old unsafe RPCs
-reject even a forged version-4 header once active. Safe group membership/settings
-operations also require the exact capability header. Random score tokens change
-on replacement; certify additionally refreshes the live source fingerprint.
+The worker evaluates protocol-4 graphs with the shared competition scorer
+(`competition-evaluation.ts`). SQL checks the evaluation contract,
+claim/generation, revision and complete source token before publishing
+unrounded scores in one transaction. Readers take shared group locks so a
+policy change cannot split authorization and disclosure. Random score tokens
+change on replacement; certify also refreshes the live source fingerprint.
 
 Disclosure retains immutable historical source associations and extends them
 through stored ranked set IDs to a moved current exercise. Unlink, archive,
@@ -206,34 +185,17 @@ Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
 
-The migration clears only exact active missing-context dependency sentinels
-(both historic object shapes). Genuine selected-reading pins, pending-correction
-sentinels and ended rows are untouched. First binding requires a valid selected
-reading. Legacy Weight projections supply distinct Volume aliases with null
+First binding requires a valid selected reading. Volume aliases carry null
 observed Volume audit and an explicit witness reference; original audit stays
-at the root. Terminal aliases cannot be imported again. Compatible inactive
-1RM entries keep exact saved values and their original membership period;
-incompatible units/dependency states are omitted, never rescored at cutover.
+at the root. Terminal aliases are never imported again. Frozen 1RM entries the
+cutover preserved keep exact saved values and their original membership
+period; incompatible units or dependency states were omitted, never
+rescored.
 
-## 5. Activation order and evidence
+## 5. Hosted changes
 
-Minimum group client capability after activation is contract 4 plus cache
-generation 5; private Sync v2 stays protocol 3. All group application reads and
-writes require the group-contract header before source data access at the
-cutover. A capable client may use an explicitly safe ordinary legacy endpoint,
-but an enabled comparison must reject every unsafe old RPC even if the caller
-forges the current capability header. The header is version negotiation, never
-authorization or an exemption from server redaction. Before activation, validate every current/legacy reader
-above for member/role, anonymous/OAuth/outsider denial and paired payload privacy,
-including archive/former-member, history, summary and full-session joins.
-
-With explicit hosted authority, deploy reviewed additive contracts first. Deploy
-compatible worker and the atomic schema/public-reader guard cutover together,
-keeping competitions unavailable while rebuilding one coherent representation.
-Block unsafe old reads/writes before any normalized value is visible. Preserve
-Vault secrets, queued jobs and immutable audit. Confirm safe publication and
-exact witness IDs, then release/activate the compatible client, evict prior group
-caches and verify real two-member normalized/ordinary flows. Hold activation and
-repair forward on failure; never restore unsafe old readers or relabel history.
-Local gates, pure scorer availability and pending negotiation do not authorize
-hosted deployment or substitute for human flow acceptance.
+A hosted deploy of competition SQL or the worker needs the operator's explicit
+authority. Preserve Vault secrets, queued jobs and immutable audit. Repair
+forward on failure; never restore a removed reader or relabel history. Local
+gates do not authorize hosted deployment or substitute for human flow
+acceptance.

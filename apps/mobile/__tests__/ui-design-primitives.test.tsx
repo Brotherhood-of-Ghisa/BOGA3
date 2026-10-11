@@ -15,6 +15,7 @@ import {
   ActionButton,
   Card,
   ChipGroup,
+  Icon,
   FormField,
   IconButton,
   ListRow,
@@ -27,7 +28,9 @@ import {
   Sheet,
   Stat,
   StatePanel,
+  SwitchRow,
   Tag,
+  ToggleChip,
   uiGeometry,
   uiRoles,
   uiSpace,
@@ -498,6 +501,18 @@ describe('ActionButton', () => {
     expect(flatStyle(screen.getByText('Archive')).color).toBe(uiRoles.danger);
   });
 
+  it('draws a compact row action 28 tall, with hit slop keeping its 44 tap target', () => {
+    const { rerender } = render(<ActionButton label="Certify" onPress={jest.fn()} size="compact" testID="compact" variant="outline" />);
+    const compact = screen.getByTestId('compact');
+    expect(flatStyle(compact).minHeight).toBe(uiGeometry.compactControlHeight);
+    const slop = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
+    expect(compact.props.hitSlop).toBe(slop);
+    expect(uiGeometry.compactControlHeight + 2 * slop).toBe(uiGeometry.tapTarget);
+    rerender(<ActionButton label="Certify" onPress={jest.fn()} testID="compact" variant="outline" />);
+    expect(flatStyle(screen.getByTestId('compact')).minHeight).toBe(uiGeometry.tapTarget);
+    expect(screen.getByTestId('compact').props.hitSlop).toBeUndefined();
+  });
+
   it('fades when disabled and ignores presses', () => {
     const onPress = jest.fn();
     render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);
@@ -684,11 +699,11 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
-  it('uses the theme accent with a surface label when requested, retaining disabled styling', () => {
+  it('uses fixed black and white for filters, retaining disabled styling', () => {
     const onChange = jest.fn();
-    const { rerender } = render(<SegmentedControl selectedGround="accent" onChange={onChange}
+    const { rerender } = render(<SegmentedControl selectedGround="selection" onChange={onChange}
       options={OPTIONS} testIDPrefix="view" value="records" />);
-    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.accent);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe('#000000');
     expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(uiRoles.surface);
     expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(uiRoles.surface);
     expect(screen.getByTestId('view-records')).toHaveProp('accessibilityState', { selected: true });
@@ -696,26 +711,11 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('last');
 
     onChange.mockClear();
-    rerender(<SegmentedControl disabled selectedGround="accent" onChange={onChange}
+    rerender(<SegmentedControl disabled selectedGround="selection" onChange={onChange}
       options={OPTIONS} testIDPrefix="view" value="records" />);
     expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('supports a palette-grade selection with ink text and retains unselected surfaces', () => {
-    const { rerender } = render(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
-      options={OPTIONS} testIDPrefix="view" value="records" />);
-    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
-    expect(screen.getByText('Records')).toHaveStyle({ color: uiRoles.ink });
-    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.surface });
-    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.inkMuted });
-
-    rerender(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
-      options={OPTIONS} testIDPrefix="view" value="last" />);
-    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.surface });
-    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
-    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.ink });
   });
 
   it('spans the row with label-sized segments that share the rest when fit', () => {
@@ -734,6 +734,66 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('ToggleChip', () => {
+  const OPTIONS = [
+    { value: 'workingSetCount', label: 'Sets' },
+    { value: 'totalVolume', label: 'Volume', accessibilityLabel: 'Volume, kg·reps' },
+  ] as const;
+
+  it('shows the value in force and swaps it for the other on one press', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value="workingSetCount" />);
+
+    expect(screen.getByTestId('metric')).toHaveTextContent('Sets');
+    expect(screen.queryByText('Volume')).toBeNull();
+    expect(screen.getByTestId('metric').props.accessibilityRole).toBe('button');
+    expect(screen.getByTestId('metric').props.accessibilityLabel)
+      .toBe('Progress metric: Sets. Activate to show Volume.');
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenCalledWith('totalVolume');
+
+    rerender(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value="totalVolume" />);
+    // An option's own label is what assistive tech reads for the value in force.
+    expect(screen.getByTestId('metric').props.accessibilityLabel)
+      .toBe('Progress metric: Volume, kg·reps. Activate to show Sets.');
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenLastCalledWith('workingSetCount');
+  });
+
+  it('is an equal-width outline control that keeps a 44pt target at 28pt drawn', () => {
+    render(<ToggleChip accessibilityLabel="Progress metric" onChange={jest.fn()}
+      options={OPTIONS} testID="metric" value="workingSetCount" />);
+    const chip = screen.getByTestId('metric');
+    expect(flatStyle(chip)).toMatchObject({
+      flex: 1, minHeight: uiGeometry.compactControlHeight,
+      backgroundColor: uiRoles.surface, borderColor: uiRoles.rule,
+    });
+    expect(chip.props.hitSlop).toBe((uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2);
+    expect(flatStyle(within(chip).getByText('Sets')).color).toBe(uiRoles.ink);
+    expect(within(chip).getByText('Sets').props.allowFontScaling).toBe(false);
+    // The swap glyph says a tap replaces the value rather than opening a menu.
+    expect(within(chip).UNSAFE_getByType(Icon).props.name).toBe('swap');
+  });
+
+  it('is inert and unglyphed with a single option, and recovers from an unknown value', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<ToggleChip accessibilityLabel="Stats period" onChange={onChange}
+      options={[{ value: 'this-week', label: 'This week' }]} testID="period" value="this-week" />);
+
+    expect(screen.getByTestId('period')).toHaveProp('accessibilityState', { disabled: true });
+    expect(screen.getByTestId('period').props.accessibilityLabel).toBe('Stats period: This week.');
+    expect(within(screen.getByTestId('period')).UNSAFE_queryByType(Icon)).toBeNull();
+    fireEvent.press(screen.getByTestId('period'));
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(<ToggleChip accessibilityLabel="Progress metric" onChange={onChange}
+      options={OPTIONS} testID="metric" value={'gone' as 'workingSetCount'} />);
+    expect(screen.getByTestId('metric')).toHaveTextContent('Sets');
   });
 });
 
@@ -800,6 +860,25 @@ describe('Tag', () => {
     render(<Tag label="Archived" testID="tag" />);
     expect(flatStyle(screen.getByTestId('tag'))).toMatchObject({ borderRadius: uiGeometry.radius.pill, borderColor: uiRoles.rule });
     expect(flatStyle(screen.getByText('Archived'))).toMatchObject({ textTransform: 'uppercase', color: uiRoles.inkMuted });
+  });
+});
+
+describe('SwitchRow', () => {
+  it('is one accessible switch across the row: the row or the drawn switch turns it', () => {
+    const onValueChange = jest.fn();
+    const { rerender } = render(<SwitchRow label="Show deleted sessions" onValueChange={onValueChange} testID="row" value={false} />);
+    const row = screen.getByTestId('row');
+    expect(row).toHaveProp('accessibilityRole', 'switch');
+    expect(row).toHaveProp('accessibilityState', { checked: false });
+    expect(row).toHaveProp('accessibilityLabel', 'Show deleted sessions');
+
+    fireEvent.press(row);
+    expect(onValueChange).toHaveBeenLastCalledWith(true);
+
+    rerender(<SwitchRow label="Show deleted sessions" onValueChange={onValueChange} testID="row" value />);
+    expect(screen.getByTestId('row')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent(screen.getByTestId('row-switch', { includeHiddenElements: true }), 'valueChange', false);
+    expect(onValueChange).toHaveBeenLastCalledWith(false);
   });
 });
 

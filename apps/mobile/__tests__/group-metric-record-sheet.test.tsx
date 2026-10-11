@@ -111,27 +111,25 @@ describe('what the sheet shows', () => {
       member: ROW.member,set_id: 'set',values: [{ ...competitionEvent.values[0],value: 23.3 }],
       record_context: { exercise: EXERCISE,former: false,metrics: [{ metric: 'e1rm',write_token: 'current-pin',eligible: true,certification: null }] }
     }} userId={ME} myRole="member" onClose={onClose} onChanged={onChanged} />);
-    expect(text('1RM 23.3 %BW')).toBeTruthy();
+    expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('23.3 %BW');
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
     expect(mockCertify).toHaveBeenCalledWith(expect.objectContaining({ token: 'current-pin', setId: 'set' }));
-    expect(text('1RM 23.3 %BW')).toBeTruthy();
+    expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('23.3 %BW');
   });
-  it('shows the score, who and when, the raw set, the rules and the strength note for 1RM', () => {
+  it('shows the score, who and when, and the set on its own line, with no rules or explanatory text', () => {
     renderSheet();
     expect(text('23.3 %BW')).toBeTruthy();
     expect(text('Dave · 10 Sep')).toBeTruthy();
-    expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: 5 reps');
-    expect(screen.queryByText(/Rules 2 · 100% contribution · Bodyweight scoring On/)).toBeTruthy();
-    expect(text('Certification attests this logged performance. Rule changes preserve it; corrections can invalidate it.')).toBeTruthy();
-    expect(text('Strength values are estimates. Scores use the group’s rules, independently of personal exercise settings.')).toBeTruthy();
+    expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent(/^5 reps$/);
+    expect(screen.queryByText(/Rules \d|contribution|Bodyweight scoring|attests|Scores use|estimates|As logged/)).toBeNull();
     expect(status()).toHaveTextContent('Uncertified');
     expect(screen.queryByTestId('group-metric-record-metric-e1rm')).toBeNull();
     expect(screen.queryByTestId('group-metric-record-history')).toBeNull();
   });
 
-  it('drops the strength note for Weight', () => {
-    renderSheet({ row: { ...ROW,metric: 'volume',unit: 'percent_bw_reps',value: 20 } });
-    expect(text('Scores use the group’s rules, independently of personal exercise settings.')).toBeTruthy();
+  it('shows an ordinary set as logged', () => {
+    renderSheet({ row: { ...ROW,performance: { ...ROW.performance,visibility: 'ordinary',weight_value: '100' } } });
+    expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('100.0 × 5');
   });
 
   it('shows "Certified" for a certified row while its certification loads', () => {
@@ -151,9 +149,9 @@ describe('what the sheet shows', () => {
     await waitFor(() => expect(status()).toHaveTextContent(expected));
   });
 
-  it('notes a certification observed under earlier rules', () => {
+  it('says nothing about a certification observed under earlier rules', () => {
     renderSheet({ row: ROW, initialCertification: certification({ observed_rules_revision: 1 }) });
-    expect(text('Observed under rules 1; unchanged performance inputs remain attested.')).toBeTruthy();
+    expect(screen.queryByText(/Observed under rules/)).toBeNull();
   });
 
   it.each<[string, Partial<SheetProps>, string]>([

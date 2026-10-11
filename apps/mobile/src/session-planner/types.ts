@@ -21,10 +21,9 @@ export type PlanSetDraft = {
 };
 
 export type PlanExerciseDraft = {
-  /** Nullable owned exercise reference; name/machineName are the durable snapshots. */
+  /** Nullable owned exercise reference; `name` is the durable snapshot. */
   exerciseDefinitionId: string | null;
   name: string;
-  machineName: string;
   sets: PlanSetDraft[];
 };
 
@@ -54,7 +53,6 @@ export type NormalizedPlanSet = {
 export type NormalizedPlanExercise = {
   exerciseDefinitionId: string | null;
   name: string;
-  machineName: string | null;
   sets: NormalizedPlanSet[];
 };
 
@@ -128,8 +126,3 @@ export type ResolvePlanBlockResult =
   | { status: 'completed' | 'skipped'; resolvedAt: Date }
   | { status: 'not-resolvable' }
   | { status: 'block-not-found' };
-
-export type ReorderSessionSetsResult =
-  | { status: 'reordered' }
-  | { status: 'invalid-list' }
-  | { status: 'exercise-not-found' };

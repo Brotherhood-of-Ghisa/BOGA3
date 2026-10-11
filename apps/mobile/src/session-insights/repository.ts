@@ -2,7 +2,8 @@ import { personalCalculationContext } from '@/src/config/personal-effort';
 import { loadAsOfWeightResolver, resolveSessionWeights } from '@/src/data/bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { sessionBodyWeightForCalculation } from '@/src/bodyweight/as-of';
-import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from "@/src/data/exercise-session-facts";
@@ -45,6 +46,7 @@ export type SessionInsightsStore = {
     sessionId: string,
   ): Promise<SessionInsightSessionRow | null>;
   loadEarlierCompletedSessions(input: {
+    start: Date;
     completedAt: Date;
     targetSessionId: string;
   }): Promise<SessionInsightSessionRow[]>;
@@ -83,11 +85,12 @@ export type SessionInsightsStore = {
 export type SessionInsightHistoryQuery = {
   completedAt: Date;
   targetSessionId: string;
+  historyLookbackWeeks: number;
 };
 
 export type CompletedSessionInsightsRepository = {
   loadHistory(input: SessionInsightHistoryQuery): Promise<PersonalRecordSessionInput[]>;
-  loadInsights(sessionId: string): Promise<CompletedSessionInsights | null>;
+  loadInsights(sessionId: string, historyLookbackWeeks: number): Promise<CompletedSessionInsights | null>;
 };
 
 const toSessionRow = (
@@ -143,7 +146,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
     return row ? toSessionRow({ ...row, ...loadAsOfWeightResolver(database)(row.startedAt) }) : null;
   },
 
-  async loadEarlierCompletedSessions({ completedAt, targetSessionId }) {
+  async loadEarlierCompletedSessions({ start, completedAt, targetSessionId }) {
     const database = await bootstrapLocalDataLayer();
     const rows = database
       .select()
@@ -153,6 +156,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
           eq(sessions.status, "completed"),
           isNull(sessions.deletedAt),
           isNotNull(sessions.completedAt),
+          gte(sessions.completedAt, start),
           or(
             lt(sessions.completedAt, completedAt),
             and(
@@ -282,13 +286,17 @@ export const createCompletedSessionInsightsRepository = (
   store: SessionInsightsStore = createDrizzleSessionInsightsStore(),
 ): CompletedSessionInsightsRepository => ({
   async loadHistory(input) {
-    const history = (await store.loadEarlierCompletedSessions(input))
+    const history = (await store.loadEarlierCompletedSessions({
+      start: historyWeekBounds(input.historyLookbackWeeks, input.completedAt).start,
+      completedAt: input.completedAt,
+      targetSessionId: input.targetSessionId,
+    }))
       .filter((session) => session.sessionId !== input.targetSessionId);
     const exercises = await store.loadSessionExercises(history.map((session) => session.sessionId));
     const sets = await store.loadExerciseSets(exercises.map((exercise) => exercise.id));
     return buildSessionGraphs(history, exercises, sets);
   },
-  async loadInsights(sessionId) {
+  async loadInsights(sessionId, historyLookbackWeeks) {
     const target = await store.loadTargetSession(sessionId);
     if (
       !target ||
@@ -300,6 +308,7 @@ export const createCompletedSessionInsightsRepository = (
     }
 
     const history = await store.loadEarlierCompletedSessions({
+      start: historyWeekBounds(historyLookbackWeeks, target.completedAt).start,
       completedAt: target.completedAt,
       targetSessionId: target.sessionId,
     });

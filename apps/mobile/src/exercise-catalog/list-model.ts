@@ -104,18 +104,7 @@ export const formatExerciseMuscleSummary = (
   return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
 };
 
-export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const year = date.getFullYear();
-  if (dateFormat === 'YYYY-MM-DD') {
-    return `${year}-${month}-${day}`;
-  }
-  if (dateFormat === 'MM-DD-YYYY') {
-    return `${month}-${day}-${year}`;
-  }
-  return `${day}-${month}-${year}`;
-};
+export { formatShortDate } from '@/src/utils/local-time';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

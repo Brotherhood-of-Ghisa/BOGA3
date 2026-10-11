@@ -92,7 +92,7 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
         id: planStartCardId(ownerId, block.id),
         exerciseDefinitionId: block.exerciseDefinitionId,
         name: block.name,
-        machineName: block.machineName,
+        machineName: null,
         sourcePlanExerciseId: block.id,
         sets: block.sets.map((target) => ({
           id: planStartSetId(ownerId, target.id),
@@ -239,7 +239,7 @@ export const addPlanBlockToSession = async (
           id: planStartCardId(ownerId, planExerciseId),
           exerciseDefinitionId,
           name: block.exercise.name,
-          machineName: block.exercise.machineName,
+          machineName: null,
           sourcePlanExerciseId: planExerciseId,
           sets: [],
         };
@@ -292,7 +292,7 @@ export const addPlanBlockToSession = async (
           id: cardId,
           exerciseDefinitionId,
           name: block.exercise.name,
-          machineName: block.exercise.machineName,
+          machineName: null,
           sourcePlanExerciseId: planExerciseId,
           sets: block.sets.map((target) => plannedSetInput(cardId, target)),
         },

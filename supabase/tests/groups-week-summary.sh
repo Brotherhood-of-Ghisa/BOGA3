@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 
-# groups-week-summary.sh — the group week summary read (a body of the
-# groups-leaderboards lane: it needs the evaluator's set facts and records).
+# groups-week-summary.sh — the group week summary read,
+# group_competition_week_summary (a body of the groups-leaderboards lane: it
+# needs the evaluator's set facts and records).
 #
 # Contract: docs/specs/tech/groups-contract.md (the facts' `working`, the week summary).
 # Proves, against the real local stack (sync_push, group-eval, PostgREST):
 #
-#   - posture: the RPC is the only client-executable function; preamble,
-#     membership and validation errors, in that order;
+#   - posture: the RPC is executable by signed-in users only; membership and
+#     validation errors, in that order (the anon, OAuth and outsider denials of
+#     every group_competition_* RPC: groups-competitions.sh);
 #   - the evaluator stores the app's working-set rule (every set but a warm-up);
 #     an exercise counts once it has a working set (warm-up-only adds none);
 #   - the board: working sets (working, performed, live, rows present)
@@ -17,14 +19,15 @@
 #     records excluded; a record on an unlinked exercise kept;
 #   - training now: active sessions whose latest write (any row) is under 2 h
 #     old, newest start first; a stale one excluded;
-#   - the latest completed session and its group records, from either
-#     pipeline (contract-1 `value_kg`, contract-2 `value` + `unit`);
+#   - the latest completed session and its group records as competition
+#     events, each carrying only the record values of the boards it took #1 on;
 #   - a removed member leaves the board, training now and the latest session,
 #     and reads NOT_FOUND.
 #
-# Direct-drain mode as groups-boards.sh: the kick URL is unset and the sweep
-# paused for the run; the lane POSTs group-eval itself. Hermetic: per-run
-# users, deleted on exit with everything they own.
+# Every comparison ranks
+# Volume (kg × reps) and 1RM. Direct-drain mode as groups-boards.sh: the kick
+# URL is unset and the sweep paused for the run; the lane POSTs group-eval
+# itself. Hermetic: per-run users, deleted on exit with everything they own.
 
 set -euo pipefail
 
@@ -127,8 +130,8 @@ drain() {
   expect_ok "group-eval drain: $1"
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
-# Session jobs enqueue comparison (contract-2) jobs; a second drain runs any
-# the first one queued after its own claim.
+# Session jobs enqueue comparison jobs; a second drain runs any the first one
+# queued after its own claim.
 drain2() { drain "$1"; drain "$1 (follow-up)"; }
 
 # e_set2 <id> <session_exercise> <order> <weight> <reps> <set_type|""> <status|""> <cuam> [deleted]
@@ -172,9 +175,9 @@ link() {
   push "$1" "link $2 → $3" "$(e_link "$2" "${GID}" "$3" "${CUAM}" "${del}")"
 }
 
-# summary <token> [start] [end] [group]: group_week_summary into BODY.
+# summary <token> [start] [end] [group]: group_competition_week_summary into BODY.
 summary() {
-  rpc "$1" group_week_summary "$(jq -nc --arg g "${4:-${GID}}" --argjson s "${2:-${WS}}" --argjson e "${3:-${WE}}" \
+  rpc "$1" group_competition_week_summary "$(jq -nc --arg g "${4:-${GID}}" --argjson s "${2:-${WS}}" --argjson e "${3:-${WE}}" \
       '{p_group_id: $g, p_window_start_ms: $s, p_window_end_ms: $e}')"
 }
 
@@ -258,22 +261,17 @@ for token in "${ATHLETE_TOKEN}" "${RIVAL_TOKEN}" "${MEMBER_TOKEN}" "${LEAVER_TOK
   expect_ok "join G"
 done
 
-# Group exercises: Bench, Row and Edge on the contract-1 pipeline; Squat a
-# contract-2 comparison.
+# Group exercises: ordinary comparisons (contribution 0), boards Volume and 1RM.
 gx() {
-  rpc "${OWNER_TOKEN}" group_exercise_create \
+  rpc "${OWNER_TOKEN}" group_competition_exercise_create \
     "$(jq -nc --arg g "${GID}" --arg n "$1" '{p_group_id: $g, p_name: $n, p_load_input_mode: "total_load", p_source_exercise_id: null}')"
-  expect_ok "group_exercise_create $1"
+  expect_ok "group_competition_exercise_create $1"
   jq -er '.exercise.group_exercise_id' <<<"${BODY}"
 }
 GX_BENCH="$(gx Bench)"
 GX_ROW="$(gx Row)"
 GX_EDGE="$(gx Edge)"
-rpc "${OWNER_TOKEN}" group_exercise_create_v2 "$(jq -nc --arg g "${GID}" '
-  {p_group_id: $g, p_name: "Squat", p_load_input_mode: "total_load", p_source_exercise_id: null,
-   p_bodyweight_contribution: 0, p_default_metric: "weight"}')"
-expect_ok "group_exercise_create_v2 Squat"
-GX_SQUAT="$(jq -er '.exercise.group_exercise_id' <<<"${BODY}")"
+GX_SQUAT="$(gx Squat)"
 
 T="ws-${RUN_TAG}"
 CUAM="$(now_ms)"
@@ -294,35 +292,27 @@ def "${MEMBER_TOKEN}" "${T}-m-edge"; link "${MEMBER_TOKEN}" "${T}-m-edge" "${GX_
 def "${LEAVER_TOKEN}" "${T}-x-free"
 def "${LATE_TOKEN}" "${T}-l-free"
 drain "setup"
-pass "users, group G (O owner; A, R, M, X members), outsider group H, Bench/Row/Edge (contract 1), Squat (contract 2)"
+pass "users, group G (O owner; A, R, M, X members), outsider group H, comparisons Bench/Row/Edge/Squat"
 
 # =============================================================================
 echo "[${LANE_LABEL}] posture and errors"
 # =============================================================================
 
-expect_sql "the RPC is security definer with a pinned search_path" \
+expect_sql "the RPC is security definer with a pinned search_path, executable by signed-in users only" \
   "select p.prosecdef and coalesce(p.proconfig @> array['search_path=app_public, pg_temp'], false)
+          and has_function_privilege('authenticated', p.oid, 'execute')
+          and not has_function_privilege('anon', p.oid, 'execute')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'app_public' and p.proname = 'group_week_summary';" "t"
-expect_sql "clients execute only group_week_summary of the group_week_* functions" \
-  "select string_agg(p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'app_public' and p.proname = 'group_competition_week_summary';" "t"
+expect_sql "no group_week_* helper is client-executable" \
+  "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%'
-      and has_function_privilege('anon', p.oid, 'execute')
-      and has_function_privilege('authenticated', p.oid, 'execute');" "group_week_summary"
+      and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'));" "0"
 expect_sql "the helpers pin search_path and are not security definer" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%' and p.proname <> 'group_week_summary'
+    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%'
       and (p.prosecdef or not coalesce(p.proconfig @> array['search_path=app_public, pg_temp'], false));" "0"
 
-summary "${ANON_KEY}"
-expect_error AUTH_REQUIRED "anon"
-OAUTH_TOKEN="$(mint_token "${ATHLETE_TOKEN}" "ws-agent-client")"
-summary "${OAUTH_TOKEN}"
-expect_error AGENT_FORBIDDEN "OAuth client token"
-summary "${OUTSIDER_TOKEN}"
-expect_error NOT_FOUND "outsider"
-summary "${OUTSIDER_TOKEN}" 0 0
-expect_error NOT_FOUND "outsider with a bad window (membership before validation)"
 summary "${ATHLETE_TOKEN}" "${WS}" "${WE}" "$(run_psql "select gen_random_uuid();")"
 expect_error NOT_FOUND "nonexistent group"
 summary "${ATHLETE_TOKEN}" "${WS}" "${WS}"
@@ -339,11 +329,13 @@ summary "${ATHLETE_TOKEN}" "${WS}" "$(( WS + 8 * 86400000 ))"
 expect_ok "an 8-day window (a DST week fits)"
 summary "${ATHLETE_TOKEN}"
 expect_ok "an empty week"
-check "an empty week: exact top-level keys" 'keys == ["latest_completed", "members", "training_now"]'
+check "an empty week: exact top-level keys" \
+  'keys == ["contract_version", "group_id", "latest_completed", "members", "training_now"]
+   and .contract_version == 4 and .group_id == $g' --arg g "${GID}"
 check "an empty week: no training, no latest" '.training_now == [] and .latest_completed == null'
 # Equal rows order by username: ws_athlete, ws_late, ws_leaver, ws_member, ws_owner, ws_rival.
 expect_board "A=1/0/0,X=1/0/0,M=1/0/0,O=1/0/0,R=1/0/0" "an empty week"
-pass "posture; AUTH_REQUIRED, AGENT_FORBIDDEN, NOT_FOUND before VALIDATION; every member ranked with nothing"
+pass "posture; NOT_FOUND before VALIDATION; every member ranked with nothing"
 
 # =============================================================================
 echo "[${LANE_LABEL}] the board"
@@ -353,56 +345,52 @@ echo "[${LANE_LABEL}] the board"
 # no effort included.
 sess "${RIVAL_TOKEN}" "${T}-r1" completed "$(at 1)" "${T}-r-bench" \
   r1a:100:5:rir_1 r1b:90:5:rir_2 r1c:60:10:warm_up r1d:80:5: r1e:80:5:rir_0
-drain "R1"
+drain2 "R1"
 # A1: an own best behind R (record, not a group record). Working: rir_0,
 # rir_3, a6 (hard-deleted below), a legacy `working` value and a huge RIR; not
 # a planned set, a tombstoned set or a warm-up.
 sess "${ATHLETE_TOKEN}" "${T}-a1" completed "$(at 2)" "${T}-a-bench" \
   a1:90:5:rir_0 a2:90:5:rir_3 a4:90:5:rir_1:planned "a5:90:5:rir_2::$(at 2)" \
   a6:90:5:rir_0 a7:60:10:warm_up a8:90:5:working a9:90:5:rir_3000000000
-drain "A1"
+drain2 "A1"
 # Each label's working/performed fact is the TS rule (groups-set-facts.test.ts);
 # the counts below prove the summary reads it.
 # One predicate for `working`: a fact the evaluator has not re-normalized yet
 # (working null) counts as working in the week counts and on the boards, and
 # is never a warm-up. R1's warm-up r1c, read as such a fact, in a rolled-back
-# transaction: `sets/exercises|counting on Bench|warm-up`.
+# transaction: `sets/exercises|warm-up` (the boards rank non-warm-up sets).
 expect_sql "a fact with working null counts as working everywhere, and is not a warm-up" \
   "begin;
    select concat_ws('|',
      (select working_sets || '/' || exercise_count from app_public.group_week_session_counts('${RIVAL_UID}', '${T}-r1')),
-     (select count(*) from app_public.group_board_counting('${GID}', '${RIVAL_UID}', '${GX_BENCH}')
-       where session_id = '${T}-r1'),
      app_public.group_set_is_warm_up('${RIVAL_UID}', '${T}-r1c'));
    update app_public.group_set_facts set working = null where member_user_id = '${RIVAL_UID}' and set_id = '${T}-r1c';
    select concat_ws('|',
      (select working_sets || '/' || exercise_count from app_public.group_week_session_counts('${RIVAL_UID}', '${T}-r1')),
-     (select count(*) from app_public.group_board_counting('${GID}', '${RIVAL_UID}', '${GX_BENCH}')
-       where session_id = '${T}-r1'),
      app_public.group_set_is_warm_up('${RIVAL_UID}', '${T}-r1c'));
    rollback;" \
-  "4/1|4|t
-5/1|5|f"
-# m1: 105 × 1 takes #1 on Weight only (one group record): heavier than R1's
-# 100, but its 1RM stays under R1's 100 × 5.
-sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:105:1:rir_0
-drain "m1"
-# R2: a group record whose set is then deleted: voided.
+  "4/1|t
+5/1|f"
+# m1: 130 × 1 takes #1 on 1RM only (one group record): its 1RM 130 beats R1's
+# 100 × 5 (116.6), but its Volume 130 stays under R1's 500.
+sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:130:1:rir_0
+drain2 "m1"
+# R2: a group record (1RM 140) whose set is then deleted: voided.
 sess "${RIVAL_TOKEN}" "${T}-r2" completed "$(at 4)" "${T}-r-bench" r2:140:1:rir_0
-drain "R2"
+drain2 "R2"
 next_cuam
 push "${RIVAL_TOKEN}" "delete r2" "$(e_set2 "${T}-r2" "${T}-r2-se" 0 140 1 rir_0 "" "${CUAM}" "${CUAM}")"
-drain "R2 deleted"
+drain2 "R2 deleted"
 expect_sql "R2's record is voided" \
   "select count(*) from app_public.group_events e
     where e.kind = 'record' and e.set_id = '${T}-r2'
       and exists (select 1 from app_public.group_events v where v.kind = 'record_voided' and v.related_event_id = e.id);" "1"
 # A3: a group record on Row, whose exercise is then unlinked (never voids).
 sess "${ATHLETE_TOKEN}" "${T}-a3" completed "$(at 5)" "${T}-a-row" a3r:80:5:rir_2
-drain "A3"
+drain2 "A3"
 link "${ATHLETE_TOKEN}" "${T}-a-row" "${GX_ROW}" unlink
-drain "A3 unlinked"
-# R3: a contract-2 group record on Squat.
+drain2 "A3 unlinked"
+# R3: a group record on Squat.
 sess "${RIVAL_TOKEN}" "${T}-r3" completed "$(at 6)" "${T}-r-squat" r3:150:3:rir_1
 drain2 "R3"
 # A tombstoned completed session: nothing counts.
@@ -412,13 +400,13 @@ push "${ATHLETE_TOKEN}" "tombstone adel" \
   "$(e_session "${T}-adel" "$(at 7)" completed "$(( $(at 7) + 3600000 ))" 3600 "${CUAM}" "${CUAM}")"
 # Window edges: M's Edge records at exactly the start (in) and the end (out).
 sess "${MEMBER_TOKEN}" "${T}-edge-in" completed "${WS}" "${T}-m-edge" ei:50:1:rir_0
-drain "edge in"
+drain2 "edge in"
 sess "${MEMBER_TOKEN}" "${T}-edge-out" completed "${WE}" "${T}-m-edge" eo:60:1:rir_0
-drain "edge out"
-# A2: a provisional group record (active session, 120 × 5 leads 1RM and
-# Weight: two boards).
+drain2 "edge out"
+# A2: a provisional group record (active session, 120 × 5 leads Volume (600)
+# and 1RM (139.9, over m1's 130 once R2 is voided): two boards).
 sess "${ATHLETE_TOKEN}" "${T}-a2" active "$(at 10)" "${T}-a-bench" a2s:120:5:rir_0
-drain "A2"
+drain2 "A2"
 expect_sql "A2's record is provisional and a group record" \
   "select count(*) from app_public.group_events e, jsonb_array_elements(e.payload -> 'boards') b
     where e.kind = 'record' and e.set_id = '${T}-a2s' and (b ->> 'group_record')::boolean;" "2"
@@ -431,24 +419,20 @@ for spec in "r1a:${RIVAL_UID}:1" "a1:${ATHLETE_UID}:0" "m1:${MEMBER_UID}:1" "a3r
         and exists (select 1 from jsonb_array_elements(e.payload -> 'boards') b where (b ->> 'group_record')::boolean);" "${want}"
 done
 
-expect_sql "m1 takes #1 on Weight only; R1 on both boards" \
+expect_sql "m1 takes #1 on 1RM only; R1 on both boards" \
   "select string_agg(replace(e.set_id, '${T}-', '') || '=' || b.metric, ',' order by e.set_id, b.metric)
      from app_public.group_events e,
           lateral (select x ->> 'metric' as metric from jsonb_array_elements(e.payload -> 'boards') x
                     where (x ->> 'group_record')::boolean) b
-    where e.kind = 'record' and e.set_id in ('${T}-m1', '${T}-r1a');" "m1=weight,r1a=e1rm,r1a=weight"
-
-expect_sql "both record pipelines are covered (Edge contract 1, Squat contract 2)" \
-  "select string_agg(distinct replace(set_id, '${T}-', '') || '=' || contract_version, ',')
-     from app_public.group_events where kind = 'record' and set_id in ('${T}-ei', '${T}-r3');" "ei=1,r3=2"
+    where e.kind = 'record' and e.set_id in ('${T}-m1', '${T}-r1a');" "m1=e1rm,r1a=e1rm,r1a=volume"
 
 summary "${OWNER_TOKEN}"
 expect_ok "the board"
-# Group records count one per board taken (#1 on Weight and on 1RM is two).
+# Group records count one per board taken (#1 on Volume and on 1RM is two).
 # R 5 W/S (r1a, r1b, r1d, r1e, r3), 4 records (R1 and R3 each #1 on both
 # boards; R2 voided). A 6 W/S (a1, a2, a6, a8, a9, a3r), 2 records (A3 on both,
 # unlinked; A1 an own best only, A2 provisional). M 2 W/S (m1, ei), 3 records
-# (m1 on Weight only, edge in on both; edge out is outside). O, X nothing; L
+# (m1 on 1RM only, edge in on both; edge out is outside). O, X nothing; L
 # has not joined yet.
 expect_board "A=1/6/2,R=2/5/4,M=3/2/3,X=4/0/0,O=4/0/0" "the board"
 check "a board row's exact keys" '.members[0] | keys == ["group_records", "member", "rank", "working_sets"]'
@@ -471,7 +455,7 @@ push "${ATHLETE_TOKEN}" "restore a3r" "$(e_set2 "${T}-a3r" "${T}-a3-se" 0 80 5 r
 summary "${ATHLETE_TOKEN}"
 expect_ok "after the restore"
 expect_board "R=1/5/4,A=2/5/2,M=3/2/3,X=4/0/0,O=4/0/0" "a restored set counts again"
-drain "a3r tombstone and restore"
+drain2 "a3r tombstone and restore"
 summary "${ATHLETE_TOKEN}" "$(( WS + 1 ))" "${WE}"
 expect_ok "a window starting after the edge session"
 expect_board "R=1/5/4,A=2/5/2,M=3/1/1,X=4/0/0,O=4/0/0" "the start is inclusive"
@@ -491,7 +475,7 @@ LATE_JOINED="$(run_psql "select floor(extract(epoch from joined_at) * 1000)::big
 LATE_BEFORE=$(( LATE_JOINED - 1 ))
 (( LATE_BEFORE >= WS )) || fail "the late member's pre-join start ${LATE_BEFORE} must be inside the window"
 sess "${LATE_TOKEN}" "${T}-l0" completed "${LATE_BEFORE}" "${T}-l-free" l0a:50:5:rir_0 l0b:50:5:rir_0
-drain "late pre-join"
+drain2 "late pre-join"
 expect_sql "the pre-join session is not shared" \
   "select count(*) from app_public.group_session_shares where member_user_id = '${LATE_UID}';" "0"
 summary "${OWNER_TOKEN}"
@@ -517,7 +501,7 @@ push "${RIVAL_TOKEN}" "R4 warm-up-only exercise" \
 sess "${MEMBER_TOKEN}" "${T}-mst" active "$(at 12)" "${T}-m-bench" ms1:20:5:rir_0
 # X: active and fresh (until removed below).
 sess "${LEAVER_TOKEN}" "${T}-x1" active "$(at 13)" "${T}-x-free" x1:60:5:rir_2
-drain "training"
+drain2 "training"
 backdate "${RIVAL_UID}" "${T}-r4" "session exercises"
 backdate "${MEMBER_UID}" "${T}-mst" "session exercises sets"
 
@@ -544,9 +528,9 @@ pass "training now: latest write of any row under 2 h; stale excluded; counts an
 echo "[${LANE_LABEL}] the latest completed session"
 # =============================================================================
 
-# Before R5: the latest completion is edge-out (contract-1 records).
+# Before R5: the latest completion is edge-out, #1 on both Edge boards.
 summary "${ATHLETE_TOKEN}"
-expect_ok "latest (contract 1)"
+expect_ok "latest (edge-out)"
 expect_latest "edge-out" "the latest completion, outside the window"
 check "latest's exact keys" '.latest_completed | keys ==
   ["completed_at_ms", "duration_sec", "exercise_count", "group_records", "gym_name", "member",
@@ -554,33 +538,37 @@ check "latest's exact keys" '.latest_completed | keys ==
 check_args "latest's figures" --arg m "${MEMBER_UID}" --argjson s "${WE}" '.latest_completed |
   .member.user_id == $m and .started_at_ms == $s and .completed_at_ms == ($s + 3600000) and .duration_sec == 3600
   and .working_sets == 1 and .exercise_count == 1 and .gym_name == null'
-check_args "latest's contract-1 group record, normalized" --arg g "${GX_EDGE}" --arg set "${T}-eo" '
-  .latest_completed.group_records as $r | ($r | length) == 1 and ($r[0] | keys == ["boards", "group_exercise", "key", "set_id"])
+# A group record is the record's competition event; its `record` values are
+# the boards it took #1 on (here both).
+check_args "latest's group record, as a competition event" --arg g "${GX_EDGE}" --arg set "${T}-eo" '
+  .latest_completed.group_records as $r | ($r | length) == 1
+  and $r[0].kind == "record" and $r[0].visibility == "ordinary"
   and $r[0].group_exercise == {group_exercise_id: $g, name: "Edge"} and $r[0].set_id == $set
-  and ($r[0].key | type) == "string"
-  and ($r[0].boards | map(.metric)) == ["e1rm", "weight"]
-  and ($r[0].boards[] | select(.metric == "weight")) == {metric: "weight", value: 60, unit: "kg"}'
+  and ([$r[0].values[] | select(.role == "record") | .metric]) == ["e1rm", "volume"]
+  and ($r[0].values[] | select(.role == "record" and .metric == "volume") | [.value, .unit]) == [60, "kg_reps"]
+  and ($r[0].values[] | select(.role == "record" and .metric == "e1rm") | [.value, .unit]) == [60, "kg"]'
 
-# R5: a later contract-2 group record on Squat.
-sess "${RIVAL_TOKEN}" "${T}-r5" completed "$(( WE + 60000 ))" "${T}-r-squat" r5:160:3:rir_1 r5b:100:5:rir_2
+# R5: a later group record on Squat (160 × 3: Volume 480 and 1RM over R3's
+# 150 × 3; r5b's 100 × 4 is a working set, no record).
+sess "${RIVAL_TOKEN}" "${T}-r5" completed "$(( WE + 60000 ))" "${T}-r-squat" r5:160:3:rir_1 r5b:100:4:rir_2
 drain2 "R5"
 summary "${ATHLETE_TOKEN}"
-expect_ok "latest (contract 2)"
+expect_ok "latest (R5)"
 expect_latest "r5" "the latest completion"
-check_args "latest's contract-2 group record, normalized" --arg g "${GX_SQUAT}" '
+check_args "latest's group record on Squat" --arg g "${GX_SQUAT}" --arg set "${T}-r5" '
   .latest_completed | .working_sets == 2 and (.group_records | length) == 1
-  and .group_records[0].group_exercise == {group_exercise_id: $g, name: "Squat"}
-  and (.group_records[0].boards | map(.metric)) == ["e1rm", "weight"]
-  and (.group_records[0].boards[] | select(.metric == "weight")) == {metric: "weight", value: 160, unit: "kg"}'
+  and .group_records[0].group_exercise == {group_exercise_id: $g, name: "Squat"} and .group_records[0].set_id == $set
+  and ([.group_records[0].values[] | select(.role == "record") | .metric]) == ["e1rm", "volume"]
+  and (.group_records[0].values[] | select(.role == "record" and .metric == "volume") | [.value, .unit]) == [480, "kg_reps"]'
 
 # X: a later completion still, without records.
 sess "${LEAVER_TOKEN}" "${T}-x2" completed "$(( WE + 120000 ))" "${T}-x-free" x2:60:5:rir_2
-drain "X2"
+drain2 "X2"
 summary "${ATHLETE_TOKEN}"
 expect_ok "latest (X)"
 expect_latest "x2" "the latest completion"
 check "a session without group records" '.latest_completed.group_records == []'
-pass "latest completed: any time, latest completed_at, both record pipelines normalized"
+pass "latest completed: any time, latest completed_at, group records as competition events"
 
 # =============================================================================
 echo "[${LANE_LABEL}] a removed member"
@@ -588,7 +576,7 @@ echo "[${LANE_LABEL}] a removed member"
 
 # X's in-window completed session, to show it leaves the board too.
 sess "${LEAVER_TOKEN}" "${T}-x3" completed "$(at 14)" "${T}-x-free" x3a:60:5:rir_2 x3b:60:5:rir_2
-drain "X3"
+drain2 "X3"
 summary "${OWNER_TOKEN}"
 expect_ok "before removal"
 expect_board "R=1/5/4,A=2/5/2,M=3/2/3,X=4/2/0,L=5/0/0,O=5/0/0" "X on the board"

@@ -219,27 +219,6 @@ SQL
   echo "[supabase] stamped baseline for gate ${BOGA_GATE_RUN_ID}"
 }
 
-# ---------- restoring a stack a one-way body left behind ----------
-#
-# Destructive bodies (protocol-4 activation, a reset to an old migration) do not
-# restore the stack themselves: they mark it first (mark_stack_needs_reset,
-# _common.sh) and this preflight resets it before the next lane, so a killed run
-# cannot hand that lane a broken baseline. Protocol 4 active without a mark —
-# activated by hand, or by a script that predates the mark — is reset too.
-# Prints why the stack needs a reset; false when it does not.
-stack_reset_reason() {
-  local marker container
-  marker="$(stack_reset_marker)"
-  if [[ -s "${marker}" ]]; then
-    tr '\n' ';' <"${marker}" | sed 's/;$//'
-    return 0
-  fi
-  container="$(resolve_db_container 2>/dev/null)" || return 1
-  [[ "$(docker exec -i "${container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
-    <<<'select app_public.group_competition_active();' 2>/dev/null)" == t ]] || return 1
-  printf 'group-competition protocol 4 is active'
-}
-
 ensure_runtime_and_baseline() {
   local runtime_was_running=0
 
@@ -255,11 +234,7 @@ ensure_runtime_and_baseline() {
 
   ensure_function_routes_registered
 
-  local reset_reason
-  if (( runtime_was_running == 1 )) && reset_reason="$(stack_reset_reason)"; then
-    echo "[supabase] a one-way body left this stack needing a reset (${reset_reason}); resetting"
-    "${SCRIPT_DIR}/reset-local.sh"
-  elif (( runtime_was_running == 1 )) && baseline_stamp_current; then
+  if (( runtime_was_running == 1 )) && baseline_stamp_current; then
     echo "[supabase] local runtime baseline ready (verified against gate ${BOGA_GATE_RUN_ID}'s stamp; repairs skipped)"
     return 0
   fi

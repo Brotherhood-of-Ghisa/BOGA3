@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Card, Icon, IconButton, ListRow, Sheet, uiRoles, uiSpace } from '@/components/ui';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 
 import { formatDateTimeStamp, SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -12,6 +14,7 @@ export type ActiveSessionRowProps = {
   onResume: () => void;
   onComplete: () => void;
   onDelete: () => void;
+  dateFormat?: ExerciseDateFormat;
 };
 
 /**
@@ -25,7 +28,10 @@ export function ActiveSessionRow({
   onResume,
   onComplete,
   onDelete,
+  dateFormat,
 }: ActiveSessionRowProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const [menuVisible, setMenuVisible] = useState(false);
   const closeMenu = () => setMenuVisible(false);
 
@@ -79,7 +85,12 @@ export function ActiveSessionRow({
             onPress={onResume}
             style={styles.summary}
             testID="resume-active-session-button">
-            <SessionSummaryLine nowMs={nowMs} session={session} testIdPrefix={`session-summary-${session.id}`} />
+            <SessionSummaryLine
+              dateFormat={resolvedDateFormat}
+              nowMs={nowMs}
+              session={session}
+              testIdPrefix={`session-summary-${session.id}`}
+            />
           </Pressable>
         </ListRow>
       </Card>
@@ -88,7 +99,7 @@ export function ActiveSessionRow({
         dismissLabel="Dismiss active session actions"
         onDismiss={closeMenu}
         testID="active-session-menu"
-        title={formatDateTimeStamp(session.startedAt)}
+        title={formatDateTimeStamp(session.startedAt, resolvedDateFormat)}
         visible={menuVisible}>
         <View>
           <ListRow

@@ -10,7 +10,7 @@ it('does not render an infinite percentage from otherwise finite complete volume
   expect(formatVolume(1e308)).toBe('1e+308');
   const comparison: ExerciseVolumeComparison = {
     exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', sessionExerciseIds: ['ex'], sessionExerciseOrderIndex: 0,
-    currentVolume: 1e308, medianVolume: 1e-308, percentile5Volume: 1e-308, percentile95Volume: 1e-308,
+    currentVolume: 1e308, medianVolume: 1e-308, percentile25Volume: 1e-308, percentile75Volume: 1e-308,
     workingSetCount: 1, historicalSessionCount: 1, state: 'single-baseline',
   };
   expect(formatExerciseVolumeComparison(comparison)).toBe('Above median');

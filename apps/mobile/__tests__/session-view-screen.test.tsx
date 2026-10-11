@@ -91,6 +91,7 @@ import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 import * as insightsRepository from '@/src/session-insights/repository';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
+import { setAccountLocalPreferences } from '@/src/preferences/account-local';
 import {
   bootLocalApp,
   closeLocalData,
@@ -98,6 +99,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
@@ -202,7 +204,7 @@ const addExerciseThroughPicker = async (name: string) => {
   await act(async () => {
     fireEvent.press(addEmptySet);
   });
-  await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('exercise-picker'));
   await replayFocus();
 };
 
@@ -431,9 +433,9 @@ describe('Session view', () => {
     fireEvent.press(await screen.findByLabelText(`Select exercise ${squat}`));
     await screen.findByTestId('exercise-picker-plan-source');
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(`Append historical plan for ${squat}`));
+      fireEvent.press(screen.getByLabelText(`Repeat last workout for ${squat}`));
     });
-    await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-picker'));
 
     const added = (await readSession(SESSION))!.exercises.at(-1)!;
     expect(added.name).toBe(squat);
@@ -1108,7 +1110,7 @@ describe('Session view: editing a completed session', () => {
       fireEvent(end, 'blur');
     });
 
-    await waitFor(() => expect(screen.queryByTestId('session-view-exercise-done_bench-record')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('session-view-exercise-done_bench-record'));
     expect(sessionRow(DONE)?.completedAt).toEqual(new Date(2026, 2, 10, 10, 45, 0, 0));
     expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
   });
@@ -1134,14 +1136,46 @@ describe('Session view: editing a completed session', () => {
 });
 
 describe('Session vs history', () => {
-  it('compares the open session with its exercise and muscle history', async () => {
+  it('rejects a delayed comparison when the saved look-back changes on the mounted session', async () => {
+    await seed();
+    let resolveOld!: (history: Awaited<ReturnType<typeof insightsRepository.loadSessionInsightHistory>>) => void;
+    const read = jest.spyOn(insightsRepository, 'loadSessionInsightHistory')
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error('new window failed'));
+    render(<SessionCompareScreen sessionId={SESSION} />);
+    await screen.findByText('Loading comparisons…');
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ historyLookbackWeeks: 1 }));
+    await act(async () => resolveOld([]));
+    expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
+  });
+
+  it('pools the open session by name, in both groupings, while its history builds', async () => {
     await seed();
     render(<SessionCompareScreen sessionId={SESSION} />);
 
-    await screen.findByText(/above median/);
-    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets\. .*Historical median/)).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-exercise')).toHaveTextContent(
+      /Barbell Bench Press/
+    );
+    expect(screen.queryByTestId(`session-insight-exercise-${BENCH}`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByLabelText(/Chest, \d+ sets?\. .*Historical median/)).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Chest/);
+  });
+
+  it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
+    await seed();
+    render(<SessionCompareScreen sessionId={EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId} />);
+
+    expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(await screen.findByLabelText(/Quads, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
+    act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Quads/);
+    fireEvent.press(screen.getByTestId('session-insight-mode-exercise'));
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-exercise')).toHaveTextContent(
+      /Barbell Back Squat/
+    );
   });
 
   it('says the comparisons are unavailable when the history read fails', async () => {

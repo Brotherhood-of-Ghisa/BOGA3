@@ -66,7 +66,6 @@ const set = (overrides: Partial<PlanDraft['exercises'][number]['sets'][number]> 
 const exercise = (overrides: Partial<PlanDraft['exercises'][number]> = {}) => ({
   exerciseDefinitionId: 'def-squat',
   name: 'Back Squat',
-  machineName: '',
   sets: [set()],
   ...overrides,
 });
@@ -124,7 +123,6 @@ describe('plan repository — create', () => {
         scheduledFor: T1,
         exercises: [
           exercise({
-            machineName: '  Rack 1 ',
             sets: [set({ targetWeightText: '080.50', targetRepsText: '08' }), set({ targetWeightText: '' })],
           }),
         ],
@@ -147,7 +145,6 @@ describe('plan repository — create', () => {
       sessionPlanId: plan.id,
       orderIndex: 0,
       name: 'Back Squat',
-      machineName: 'Rack 1',
       exerciseDefinitionId: 'def-squat',
       progressStatus: 'pending',
       localDirty: true,

@@ -1,11 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { EffortSettings } from './effort-settings';
 import { PreferenceNumberField } from './number-field';
-
-export const HEATMAP_VIEW_OPTIONS = [{ value: 'daily' as const, label: 'Daily' }, { value: 'weekly' as const, label: 'Weekly' }];
 
 export function ProgressSettings({ state }: { state: AccountLocalPreferenceState }) {
   const { values, pending } = state;
@@ -21,10 +19,6 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
       <PreferenceNumberField label="History look-back (weeks)" testID="settings-history-lookback"
         value={pending.historyLookbackWeeks ?? values.historyLookbackWeeks}
         onCommit={historyLookbackWeeks => updatePreferences({ historyLookbackWeeks })} />
-      <Text allowFontScaling={false} style={styles.label}>Heatmap view</Text>
-      <SegmentedControl accessibilityLabel="Heatmap view" options={HEATMAP_VIEW_OPTIONS}
-        value={pending.heatmapView ?? values.heatmapView} onChange={heatmapView => updatePreferences({ heatmapView })}
-        testIDPrefix="settings-heatmap-view" />
     </Card>
     <Card style={styles.card}><EffortSettings values={{ ...values, ...pending }} /></Card>
   </View>;

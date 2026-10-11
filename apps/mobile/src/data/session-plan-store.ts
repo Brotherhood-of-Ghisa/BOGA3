@@ -50,7 +50,6 @@ export type SavePlanExerciseGraphInput = {
   id?: string;
   exerciseDefinitionId: string | null;
   name: string;
-  machineName: string | null;
   sets: SavePlanSetGraphInput[];
 };
 
@@ -239,7 +238,6 @@ const savePlanGraphInTransaction = (
         .set({
           orderIndex: exerciseIndex,
           name: exerciseInput.name,
-          machineName: exerciseInput.machineName ?? null,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -255,7 +253,6 @@ const savePlanGraphInTransaction = (
           exerciseDefinitionId: exerciseInput.exerciseDefinitionId,
           orderIndex: exerciseIndex,
           name: exerciseInput.name,
-          machineName: exerciseInput.machineName ?? null,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -415,7 +412,6 @@ export type SessionPlanStore = {
     planExerciseId: string;
     exerciseDefinitionId: string | null;
     name: string;
-    machineName: string | null;
     sets: SavePlanSetGraphInput[];
     now: Date;
   }): Promise<boolean>;
@@ -603,7 +599,7 @@ const updatePlanMeta = async (input: { planId: string; title: string; gymId: str
 
 
 /** See {@link SessionPlanStore}. */
-const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDefinitionId: string | null; name: string; machineName: string | null; sets: SavePlanSetGraphInput[]; now: Date }): Promise<boolean> => {
+const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDefinitionId: string | null; name: string; sets: SavePlanSetGraphInput[]; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let wrote = false;
     database.transaction((tx) => {
@@ -620,7 +616,6 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
         .set({
           exerciseDefinitionId: input.exerciseDefinitionId,
           name: input.name,
-          machineName: input.machineName,
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -720,7 +715,6 @@ const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExe
           exerciseDefinitionId: input.exercise.exerciseDefinitionId,
           orderIndex: nextIndex,
           name: input.exercise.name,
-          machineName: input.exercise.machineName,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,

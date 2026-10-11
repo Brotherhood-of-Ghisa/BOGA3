@@ -29,5 +29,5 @@ it('keeps the fixed titles for an edited and a just-finished session', () => {
   expect(screen.getByText('Edit session')).toBeTruthy();
   expect(screen.queryByTestId('session-view-title')).toBeNull();
   rerender(<SessionTopBar mode="complete" onDone={() => {}} />);
-  expect(screen.getByText('Session complete')).toBeTruthy();
+  expect(screen.getByText('Session summary')).toBeTruthy();
 });

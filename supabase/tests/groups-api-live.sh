@@ -5,8 +5,7 @@
 # Supabase, then deletes the users and everything they made. The server rules
 # are the groups-contract / groups-leaderboards lanes'; this lane proves the
 # app's RPC names, parameters and response guards match the server. The
-# protocol-4 client wire is groups-competition-live.sh (lane groups-protocol4):
-# activating competitions is one-way and forces a stack rebuild.
+# competition client wire is groups-competition-live.sh, this lane's second body.
 # Execute only through its Boga lane.
 set -euo pipefail
 

@@ -42,7 +42,7 @@ export type TodayGroupState =
 const systemNow = () => new Date();
 
 /**
- * Today's group read: My groups, then one `group_week_summary` for the
+ * Today's group read: My groups, then one `group_competition_week_summary` for the
  * selected group over this local week, both cache-first. The selection is the
  * Groups screen's (last viewed, else the first group), so picking a group on
  * either screen moves both.

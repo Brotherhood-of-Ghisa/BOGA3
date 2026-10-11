@@ -178,23 +178,31 @@ afterEach(() => {
 });
 
 describe('Groups screen Leaderboards segment (E1.1)', () => {
+  // The section pill cycles At a glance -> Stream -> Leaderboards; a link
+  // opens the Stream, so Leaderboards is one press away.
+  const goToSection = (label: string) => {
+    for (let step = 0; step < 3 && !String(screen.getByTestId('groups-filter-section').props.accessibilityLabel).includes(label); step += 1) {
+      fireEvent.press(screen.getByTestId('groups-filter-section'));
+    }
+  };
   const openLeaderboards = async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    fireEvent.press(await screen.findByTestId('groups-segment-leaderboards'));
+    await screen.findByTestId('groups-filters');
+    goToSection('Leaderboards');
   };
 
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-segment-leaderboards');
+    await screen.findByTestId('groups-filters');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
+    goToSection('Leaderboards');
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID);
 
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent('Certified · 1RM kg · Rules 2');
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^Certified · 1RM kg$/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10 Sep/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-you`)).toHaveTextContent('You: 5th');
     expect(screen.getByTestId('group-podium-card-ge-old-archived')).toHaveTextContent('Archived');
@@ -207,10 +215,26 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     expect(mockRouter.push).toHaveBeenCalledWith(`/group/${GROUP_ID}/leaderboards/${EXERCISE_ID}`);
   });
 
+  it('narrows the podium cards by exercise name, ignoring case and outer spaces', async () => {
+    await openLeaderboards();
+    await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
+    fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), '  SQUAT ');
+    expect(screen.queryByTestId(`group-podium-card-${EXERCISE_ID}`)).toBeNull();
+    expect(screen.getByTestId('group-podium-card-ge-old')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), 'deadlift');
+    expect(screen.getByTestId('group-leaderboards-no-match')).toHaveTextContent('No exercises match');
+    expect(screen.queryByTestId('group-podium-card-ge-old')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), '');
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}`)).toBeTruthy();
+    expect(screen.getByTestId('group-podium-card-ge-old')).toBeTruthy();
+    expect(screen.queryByTestId('group-leaderboards-no-match')).toBeNull();
+  });
+
   it('shows the empty state when the group has no exercises', async () => {
     api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-empty')).toHaveTextContent(/No group exercises yet/);
+    expect(screen.queryByTestId('group-leaderboards-search')).toBeNull();
   });
 
   it('offline: renders cached podiums with the offline marker, and requests nothing', async () => {
@@ -237,8 +261,8 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     api.getCompetitionPodiums.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     api.listMyGroups.mockResolvedValue({ groups: [] });
 
-    fireEvent(screen.getByTestId('groups-segment-stream'), 'press');
-    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
+    goToSection('Stream');
+    goToSection('Leaderboards');
 
     expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     await waitFor(() => expect(cacheKeys()).not.toContain(groupCacheKeys.boards(GROUP_ID)));
@@ -300,7 +324,7 @@ describe('Full board (E1.2)', () => {
 
     fireEvent.press(screen.getByTestId('group-board-history-button'));
     expect(mockRouter.push).toHaveBeenCalledWith(
-      `/group/${GROUP_ID}/leaderboards/${EXERCISE_ID}/history?metric=volume&scope=all&revision=2`,
+      `/group/${GROUP_ID}/leaderboards/${EXERCISE_ID}/history?metric=volume&scope=all`,
     );
   });
 

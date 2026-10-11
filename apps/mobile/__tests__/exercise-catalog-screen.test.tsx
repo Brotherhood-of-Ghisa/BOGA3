@@ -11,7 +11,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
 import { Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
 
@@ -53,6 +53,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 type TestNode = typeof screen.UNSAFE_root;
 
@@ -316,9 +317,7 @@ describe('ExerciseCatalogScreen', () => {
 
     expect(await screen.findByText('Exercise deleted.')).toBeTruthy();
     expect(definitionNamed('Barbell Bench Press')?.deletedAt).not.toBeNull();
-    await waitFor(() =>
-      expect(screen.queryByLabelText('Edit exercise definition Barbell Bench Press')).toBeNull()
-    );
+    await waitForGone(() => screen.queryByLabelText('Edit exercise definition Barbell Bench Press'));
 
     fireEvent.press(screen.getByLabelText('Exercise catalog options'));
     await screen.findByText('Manage exercises');
@@ -490,9 +489,7 @@ describe('ExerciseCatalogScreen', () => {
       // Never-done off keeps only what was used: the bench (session fixture)
       // and last year's Cable Bench Press; Decline was never done.
       fireEvent.press(screen.getByLabelText('Show never-done'));
-      await waitFor(() =>
-        expect(screen.queryByLabelText('Exercise actions Decline Barbell Bench Press')).toBeNull()
-      );
+      await waitForGone(() => screen.queryByLabelText('Exercise actions Decline Barbell Bench Press'));
       expect(screen.getByLabelText('Exercise actions Cable Bench Press')).toBeTruthy();
 
       fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'NoSuchExercise');

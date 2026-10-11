@@ -241,23 +241,6 @@ refresh_edge_proxy_after_reset() {
   done
 }
 
-# A body that takes a one-way action on this slot's stack (protocol-4
-# activation, a reset to an old migration) marks it before it starts and does
-# not restore it. The next baseline preflight resets a marked stack
-# (ensure-local-runtime-baseline.sh); a successful reset-local.sh clears it.
-stack_reset_marker() {
-  printf '%s/.temp/stack-needs-reset' "${SUPABASE_DIR}"
-}
-
-mark_stack_needs_reset() {
-  ensure_tmp_dir
-  printf '%s\n' "$1" >>"$(stack_reset_marker)"
-}
-
-clear_stack_reset_marker() {
-  rm -f "$(stack_reset_marker)"
-}
-
 # Stop this worktree's edge function server: the whole npx process tree plus
 # any orphans an earlier run left (boga_functions_serve_stop, worktree-lib.sh).
 stop_functions_serve_if_running() {

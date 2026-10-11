@@ -18,7 +18,6 @@ set -e
 if [[ "${status}" -eq 0 ]]; then
   cat "${output_file}"
   refresh_edge_proxy_after_reset
-  clear_stack_reset_marker
   exit 0
 fi
 
@@ -29,7 +28,6 @@ if grep -q 'Error status 502' "${output_file}"; then
   refresh_edge_proxy_after_reset
   if "${SCRIPT_DIR}/smoke-seed.sh"; then
     echo "[supabase] seed smoke passed after upstream 502; treating reset as complete" >&2
-    clear_stack_reset_marker
     exit 0
   fi
 fi

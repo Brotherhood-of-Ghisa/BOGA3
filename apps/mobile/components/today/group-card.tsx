@@ -1,33 +1,31 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { GroupFilterChips } from '@/components/groups/group-filter-chips';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   buildLatestActivity,
   buildWeekBoard,
-  type GroupSummary,
-
   type LatestActivityViewModel,
   type WeekBoardRowViewModel,
   type WeekBoardViewModel,
 } from '@/src/groups';
 
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SessionSummaryRow, TrainingNowMark } from './session-summary-row';
 import { todayText } from './text-styles';
 
 export type TodayGroupCardProps = {
-  groups: GroupSummary[];
   selectedGroupId: string;
-  onSelectGroup: (groupId: string) => void;
   summary: GroupWeekSummaryResult;
   myUserId: string;
   nowMs: number;
   /** The Groups screen on this group (the board, several training now). */
   onOpenGroup: (groupId: string) => void;
   onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
+  dateFormat?: ExerciseDateFormat;
 };
 
 // A board figure: Plex Mono 500 at `sm`, right-aligned in its column.
@@ -199,32 +197,26 @@ function LatestActivity({
   );
 }
 
-// Today's Group activity card: the group switcher (more than one group), this
-// week's board, the latest activity.
+// Today's group card: this week's board, then the latest activity. The
+// section's heading names the group and owns the switch between groups.
 export function TodayGroupCard({
-  groups,
   selectedGroupId,
-  onSelectGroup,
   summary,
   myUserId,
   nowMs,
   onOpenGroup,
   onOpenSession,
+  dateFormat,
 }: TodayGroupCardProps) {
+  const [listPreferences] = useExerciseListPreferences();
+  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const board = buildWeekBoard(summary.members, myUserId);
-  const activity = buildLatestActivity(summary, myUserId, nowMs);
-  const groupName = groups.find((group) => group.group_id === selectedGroupId)?.name ?? '';
-  const switcher = groups.length > 1;
+  const activity = buildLatestActivity(summary, myUserId, nowMs, resolvedDateFormat);
   const openGroup = () => onOpenGroup(selectedGroupId);
 
   return (
     <Card testID="today-group-card">
-      {switcher ? (
-        <View style={styles.switcher} testID="today-group-switcher">
-          <GroupFilterChips groups={groups} onChange={onSelectGroup} selectedGroupId={selectedGroupId} />
-        </View>
-      ) : null}
-      <WeekBoard board={board} onPress={openGroup} title={switcher ? 'This week' : `${groupName} · this week`} />
+      <WeekBoard board={board} onPress={openGroup} title="This week" />
       <View style={styles.latest}>
         <View style={styles.divider} />
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
@@ -247,10 +239,6 @@ const NAME_WIDTH = 72;
 const FIGURE_WIDTH = 36;
 
 const styles = StyleSheet.create({
-  switcher: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
-  },
   board: {
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.sm,

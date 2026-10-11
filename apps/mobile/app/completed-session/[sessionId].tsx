@@ -19,16 +19,17 @@ import {
   formatSessionListCompactDuration,
   loadLocalGymById,
   loadSessionSnapshotById,
-  normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
-import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
+import { loadSessionRecordBaselines, toCompletedSessionDetailExercises } from '@/src/session-recorder/completed-session-cards';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
-import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
+import { buildCompletedSessionDetailModel, sessionVolumeFigure } from '@/src/session-recorder/completed-session-detail-model';
 import { completedSessionTitle } from '@/src/session-recorder/session-view-model';
 import {
   isConfirmedPerformedSet,
@@ -36,7 +37,8 @@ import {
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 import {
-  deriveSessionExerciseVolumeComparisons,
+  buildSessionBreakdownExerciseRows,
+  buildSessionBreakdownMuscleRows,
   loadCompletedSessionInsights,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
@@ -78,7 +80,7 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
-  loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
+  loadInsights?(sessionId: string, historyLookbackWeeks: number): Promise<CompletedSessionInsights | null>;
   // Each exercise's records in the sessions before this one, for the
   // detail's record band. Optional: without it, no record shows.
   loadHistoricalBests?(
@@ -203,30 +205,16 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
         gymName: gymRecord?.name ?? null,
         deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
-        exercises: sessionGraph.exercises.map((exercise) => ({
-          id: exercise.id,
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          name: exercise.name,
-          loadContext: exercise.loadContext,
-          sets: exercise.sets.map((set) => ({
-            id: set.id,
-            weight: set.weightValue,
-            reps: set.repsValue,
-            setType: normalizeSessionSetType(set.setType),
-            performanceStatus: set.performanceStatus,
-          })),
-        })),
+        exercises: toCompletedSessionDetailExercises(sessionGraph.exercises),
       };
     }
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
-  async loadInsights(sessionId) {
-    return loadCompletedSessionInsights(sessionId);
+  async loadInsights(sessionId, historyLookbackWeeks) {
+    return loadCompletedSessionInsights(sessionId, historyLookbackWeeks);
   },
-  async loadHistoricalBests(session, exerciseDefinitionIds) {
-    return recordBaselinesOf(await loadEarlierBestsByDefinition(session, exerciseDefinitionIds));
-  },
+  loadHistoricalBests: loadSessionRecordBaselines,
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
   },
@@ -245,6 +233,7 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const datedWeightRevision = useBodyWeightContextRevision();
+  const { values: { historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -341,6 +330,7 @@ export function CompletedSessionDetailScreenShell({
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      const isCurrent = () => !cancelled && accountRevision === getAccountLocalPreferenceAccountRevision();
       setCompletedInsights(null);
       setInsightState(dataClient.loadInsights ? 'loading' : 'error');
       if (!sessionId || isDeleted) {
@@ -351,15 +341,15 @@ export function CompletedSessionDetailScreenShell({
         setInsightState(maestroInsights);
       } else if (dataClient.loadInsights) {
         void dataClient
-          .loadInsights(sessionId)
+          .loadInsights(sessionId, historyLookbackWeeks)
           .then((loadedInsights) => {
-            if (!cancelled) {
+            if (isCurrent()) {
               setCompletedInsights(loadedInsights);
               setInsightState(loadedInsights ? 'ready' : 'error');
             }
           })
           .catch(() => {
-            if (!cancelled) {
+            if (isCurrent()) {
               setCompletedInsights(null);
               setInsightState('error');
             }
@@ -369,7 +359,7 @@ export function CompletedSessionDetailScreenShell({
       return () => { cancelled = true; };
     // Weight corrections invalidate the derived comparisons too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision])
+    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision, historyLookbackWeeks, accountRevision])
   );
 
   const formattedStartedAt = useMemo(
@@ -395,16 +385,18 @@ export function CompletedSessionDetailScreenShell({
       ),
     [performedExercises]
   );
-  const sessionMuscleSummary = useMemo(() => {
-    if (!session || exerciseCatalog.status !== 'ready') {
-      return null;
-    }
-
-    return summarizeCurrentSessionMuscleLoad({
-      sessionId: session.id,
-      sessionAt: new Date(session.completedAt),
-      bodyWeightKg: session.bodyWeightKg,
-      exercises: session.exercises.map((exercise, exerciseIndex) => ({
+  // The completion summary's `Volume`: the same figure View Session shows,
+  // from the same helper, over the session's stored sets.
+  const sessionVolume = useMemo(
+    () => sessionVolumeFigure(session?.exercises ?? []),
+    [session]
+  );
+  // One mapping of the session's stored exercises into insight inputs: the
+  // muscle summary, the fallback comparisons and the card's breakdown pages
+  // all read these same rows.
+  const sessionInsightExercises = useMemo(
+    () =>
+      session?.exercises.map((exercise, exerciseIndex) => ({
         id: exercise.id,
         orderIndex: exerciseIndex,
         exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
@@ -418,51 +410,78 @@ export function CompletedSessionDetailScreenShell({
           setType: set.setType,
           performanceStatus: set.performanceStatus,
         })),
-      })),
+      })) ?? [],
+    [session]
+  );
+  const catalogMuscleMappings = useMemo(
+    () =>
+      exerciseCatalog.status === 'ready'
+        ? exerciseCatalog.exercises.flatMap((exercise) =>
+            exercise.mappings.map((mapping) => ({
+              exerciseDefinitionId: exercise.id,
+              muscleGroupId: mapping.muscleGroupId,
+              role: mapping.role,
+              weight: mapping.weight,
+            }))
+          )
+        : [],
+    [exerciseCatalog.exercises, exerciseCatalog.status]
+  );
+  const sessionMuscleSummary = useMemo(() => {
+    if (!session || exerciseCatalog.status !== 'ready') {
+      return null;
+    }
+
+    return summarizeCurrentSessionMuscleLoad({
+      sessionId: session.id,
+      sessionAt: new Date(session.completedAt),
+      bodyWeightKg: session.bodyWeightKg,
+      exercises: sessionInsightExercises,
       exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
         id: exercise.id,
         loadInputMode: exercise.loadInputMode ?? 'total_load',
         bodyweightContribution: exercise.bodyweightContribution,
       })),
-      muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
-        exercise.mappings.map((mapping) => ({
-          exerciseDefinitionId: exercise.id,
-          muscleGroupId: mapping.muscleGroupId,
-          role: mapping.role,
-          weight: mapping.weight,
-        }))
-      ),
+      muscleMappings: catalogMuscleMappings,
       muscleGroups: exerciseCatalog.muscleGroups,
     });
-  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, session]);
+  }, [
+    catalogMuscleMappings,
+    exerciseCatalog.exercises,
+    exerciseCatalog.muscleGroups,
+    exerciseCatalog.status,
+    session,
+    sessionInsightExercises,
+  ]);
 
-  const fallbackExerciseVolumeComparisons = useMemo(() => {
-    if (!session) return [];
-    return deriveSessionExerciseVolumeComparisons({
-      targetSession: {
-        sessionId: session.id,
-        status: 'completed',
-        completedAt: new Date(session.completedAt),
-        deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
-        exercises: session.exercises.map((exercise, exerciseIndex) => ({
-          id: exercise.id,
-          orderIndex: exerciseIndex,
-          exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
-          exerciseName: exercise.name,
-        loadContext: exercise.loadContext,
-          sets: exercise.sets.map((set, setIndex) => ({
-            id: set.id,
-            orderIndex: setIndex,
-            weightValue: set.weight,
-            repsValue: set.reps,
-            setType: set.setType,
-            performanceStatus: set.performanceStatus,
-          })),
-        })),
-      },
-      historicalSessions: [],
-    });
-  }, [session]);
+  const completionPersonalRecords = useMemo(
+    () => completedInsights?.personalRecords ?? [],
+    [completedInsights]
+  );
+  const completionExerciseComparisons = useMemo(
+    () => completedInsights?.exerciseVolumeComparisons ?? [],
+    [completedInsights]
+  );
+  // The summary card's two breakdown pages. The Maestro catalog-failure switch
+  // empties the muscle page the same way a failed catalog read does.
+  const breakdownMuscleRows = useMemo(
+    () =>
+      buildSessionBreakdownMuscleRows({
+        muscleSummary: shouldFailNextMaestroCatalog ? null : sessionMuscleSummary,
+        personalRecords: completionPersonalRecords,
+        muscleMappings: catalogMuscleMappings,
+      }),
+    [catalogMuscleMappings, completionPersonalRecords, sessionMuscleSummary, shouldFailNextMaestroCatalog]
+  );
+  const breakdownExerciseRows = useMemo(
+    () =>
+      buildSessionBreakdownExerciseRows({
+        comparisons: completionExerciseComparisons,
+        exercises: sessionInsightExercises,
+        personalRecords: completionPersonalRecords,
+      }),
+    [completionExerciseComparisons, completionPersonalRecords, sessionInsightExercises]
+  );
 
   const handleCompletionExit = useCallback(() => {
     router.replace('/progress');
@@ -495,7 +514,7 @@ export function CompletedSessionDetailScreenShell({
   // Progress). The stack title is the back label of what the detail pushes.
   const stackOptions =
     presentation === 'completion'
-      ? { title: 'Session complete', headerShown: false, gestureEnabled: false }
+      ? { title: 'Session summary', headerShown: false, gestureEnabled: false }
       : { title: 'View Session', headerShown: false };
 
   const handleBack = () => {
@@ -591,11 +610,6 @@ export function CompletedSessionDetailScreenShell({
       : exerciseCatalog.status === 'ready' ? 'ready' : 'loading';
 
   if (presentation === 'completion') {
-    const personalRecords = completedInsights?.personalRecords ?? [];
-    const exerciseVolumeComparisons =
-      completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
-        ? completedInsights.exerciseVolumeComparisons
-        : fallbackExerciseVolumeComparisons;
     return (
       <>
         <Stack.Screen options={stackOptions} />
@@ -603,14 +617,17 @@ export function CompletedSessionDetailScreenShell({
           completedAt={session.completedAt}
           durationDisplay={session.durationDisplay}
           exerciseCount={performedExercises.length}
-          exerciseVolumeComparisons={exerciseVolumeComparisons}
+          breakdownExerciseRows={breakdownExerciseRows}
+          breakdownMuscleRows={breakdownMuscleRows}
+          exerciseVolumeComparisons={completionExerciseComparisons}
           gymName={session.gymName}
+          historyState={insightState}
           muscleCatalogState={muscleCatalogState}
-          muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
           muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
           onDone={handleCompletionExit}
-          personalRecords={personalRecords}
+          personalRecords={completionPersonalRecords}
           shouldFailNextShare={shouldFailNextMaestroShare}
+          volume={sessionVolume}
           workingSetCount={workingSetCount}
         />
       </>

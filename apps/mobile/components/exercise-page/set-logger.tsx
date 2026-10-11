@@ -57,8 +57,10 @@ const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined 
 /**
  * The open set, expanded in place into the logger (spec 08,
  * "In-place row logger pattern"):
- * Weight · Reps · Effort · the commit tick, all fields one height.
- * The tick is the screen's one `accent` primary; it is disabled until the
+ * Effort · Weight · Reps · the commit tick, all fields one height.
+ * The Effort control leads the row, aligned to the set viewer's effort column;
+ * it is followed by the narrower weight input, reps, and the commit tick. The
+ * tick is the screen's one `accent` primary; it is disabled until the
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function SetLogger(
@@ -95,6 +97,22 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         </Text>
       </View>
       <View style={styles.fields}>
+        <Pressable
+          accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
+          accessibilityRole="button"
+          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
+          onPress={onCycleEffort}
+          onLongPress={onOpenEffort}
+          style={[styles.field, styles.effortField]}
+          testID="exercise-set-logger-effort">
+          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
+          <View style={styles.effortValue}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
+              {effortText}
+            </Text>
+            <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
+          </View>
+        </Pressable>
         <View style={[styles.field, styles.weightField]}>
           <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
           <TextInput
@@ -126,22 +144,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
             value={repsValue}
           />
         </View>
-        <Pressable
-          accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
-          accessibilityRole="button"
-          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
-          onPress={onCycleEffort}
-          onLongPress={onOpenEffort}
-          style={[styles.field, styles.effortField]}
-          testID="exercise-set-logger-effort">
-          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
-          <View style={styles.effortValue}>
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
-              {effortText}
-            </Text>
-            <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
-          </View>
-        </Pressable>
         <View style={styles.control}>
           <Pressable
             accessibilityLabel={`Log set ${number} as performed`}
@@ -199,15 +201,20 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
   },
+  // The leading column, aligned to the set viewer's effort column: two tap
+  // targets hold the compact label and its caret.
+  effortField: {
+    width: uiGeometry.tapTarget * 2,
+  },
+  // Narrowed to leave the effort control its room; still wide enough for a
+  // five-digit weight. Shrinks below the cap on small viewports.
   weightField: {
     flex: 1,
+    maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl,
   },
   // Two digits of reps; `W-Up` and its caret.
   repsField: {
     width: uiGeometry.fieldHeight,
-  },
-  effortField: {
-    width: uiGeometry.tapTarget * 2,
   },
   input: {
     flex: 1,
@@ -231,8 +238,10 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
+  // Pinned to the trailing edge so the tick keeps the list's control axis.
   control: {
     width: uiGeometry.tapTarget,
+    marginLeft: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
   },

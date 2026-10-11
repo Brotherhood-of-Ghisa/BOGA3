@@ -42,6 +42,8 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
   `ink-muted` → `ink-faint` → `ink-ghost`. `scrim` follows `ink`, at 42%.
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
+- **`danger` and the two change directions are not seeded** (§6): a decrease
+  must not read as a delete, so `loss` keeps its own hue away from `danger`'s.
 
 **Four seeds make a theme.** `generateRoles(seeds)` turns `ground`, `accent`,
 `record` and `viz` into every role, synchronously at module load so every
@@ -69,10 +71,13 @@ are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
-labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`. Progress's selectors
-also use the strongest grade, `viz4` with `ink` text, for selection
-(`SegmentedControl`'s `selectedGround`).
+labels still say how much. An empty `viz0` cell takes a `rule` hairline,
+being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
+force in fixed black `selection` with white `surface` text in every theme
+(`SegmentedControl`'s `selectedGround`): the history metrics. A `ToggleChip`
+shows one value and has no unselected peer, so it carries `ink` on `surface`
+(Progress's filter row). Heatmap tiles/bars have no black current/selected
+outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
 
@@ -123,14 +128,16 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   and a `rule` handle. **Tapping outside or dragging the handle down
   dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
   page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
-- Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
+- Tap targets ≥44; a compact control draws 28 (`compactControlHeight`) and
+  keeps 44 by hit slop. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
   value is for. **A screen derives its measures from these** instead of
-  adding values (the logger's Reps field is one field height wide, Effort two
-  tap targets), and spacing a design draws off-scale snaps to the scale
-  (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
+  adding values (the logger's Effort field leads at two tap targets, its
+  Weight field caps at the same two tap targets plus one XL step, and its Reps
+  field is one field height wide), and spacing a design draws off-scale snaps to
+  the scale (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
 - The primitives implementing all of this live in
   `apps/mobile/components/ui/` (`components-catalog.md`).
 
@@ -138,6 +145,9 @@ micro-labels Archivo 700, sheet titles Archivo 800.
 
 **One primary action per screen**, in `accent`. Everything else is an outline or
 a plain text button. Two saturated buttons on one screen is a bug.
+A row-level action inside a list row (a group record's Certify / Withdraw) is a
+compact outline (`compactControlHeight` 28), its tap target kept at 44 by hit
+slop.
 
 **One superlative: `record`.** A figure that beats the lifter's all-time best is
 bold `record`, and earns a band on the containing card where the screen has one
@@ -166,8 +176,17 @@ additionally render faded ([[set.row-figures]], §6).
   Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
-- **Deltas carry their sign, not a hue.** `+3`, `−12%` and `new` take ink
-  roles, never red or green by direction.
+- **A change carries its direction**, in colour as well as in its sign: an
+  improvement is `gain`, a decrease `loss`, and no direction — level,
+  unavailable — stays `ink`. A figure with no earlier value to fall from
+  (`new`) is an improvement. This holds for a change against an earlier period
+  ([[comparison.change-display]]) and against a reference (a session's Volume
+  on its median). The two colours are fixed in every theme, like `danger`, so
+  "better" never follows the picked accent's hue; they sit at one lightness and
+  differ only in hue, so neither shouts. **Colour is never the only channel:**
+  the figure still says `+3`, `−12%`, `±0`, `new` or `—`. One rule, every
+  change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
+  it lives, and no screen picks a delta colour of its own.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.

@@ -11,7 +11,6 @@ import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTag
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
-  isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
@@ -152,14 +151,6 @@ export type ReopenCompletedSessionOptions = {
 };
 
 export type ReopenCompletedSessionResult = {
-  sessionId: string;
-};
-
-export type AppendCompletedSessionAsPlannedOptions = {
-  now?: Date;
-};
-
-export type AppendCompletedSessionAsPlannedResult = {
   sessionId: string;
 };
 
@@ -867,102 +858,6 @@ const replaceSessionExerciseGraph = (
 export const __replaceSessionExerciseGraphForTests = replaceSessionExerciseGraph;
 
 /**
- * The live set rows of one exercise card, ordered by `order_index`, or null
- * when the card is missing or tombstoned. Read side of the reorder operation:
- * the caller validates the exact permutation over these ids before asking for
- * the two-phase rewrite.
- */
-export const listSessionExerciseLiveSets = async (
-  sessionExerciseId: string,
-): Promise<{ id: string; orderIndex: number }[] | null> => {
-  const database = await bootstrapLocalDataLayer();
-  const card = database
-    .select({ id: sessionExercises.id, deletedAt: sessionExercises.deletedAt })
-    .from(sessionExercises)
-    .where(eq(sessionExercises.id, sessionExerciseId))
-    .get();
-  if (!card || card.deletedAt !== null) {
-    return null;
-  }
-  return database
-    .select({ id: exerciseSets.id, orderIndex: exerciseSets.orderIndex })
-    .from(exerciseSets)
-    .where(and(eq(exerciseSets.sessionExerciseId, sessionExerciseId), isNull(exerciseSets.deletedAt)))
-    .orderBy(asc(exerciseSets.orderIndex))
-    .all();
-};
-
-/**
- * Rewrites one card's live sets to the dense order given by `orderedSetIds`
- * inside one transaction. `orderedSetIds` must be an exact permutation of the
- * card's live set ids (checked here too — the caller validates first) and the
- * write lifts every row above the card's current maximum `order_index`
- * (tombstones included — they occupy their parked slots) before placing the
- * dense positions, so the non-partial local unique index never collides.
- *
- * Only `order_index` and the dirty/stamp columns change: ids, source links,
- * planned and actual values, and confirmation state are untouched, and the
- * source plan's own order is never involved. Works for active recording and
- * the completed-session edit flow alike.
- *
- * Returns false (writing nothing) when the card is gone or the list is not an
- * exact permutation.
- */
-export const reorderSessionExerciseSetOrder = async (
-  sessionExerciseId: string,
-  orderedSetIds: string[],
-  now: Date = new Date(),
-): Promise<boolean> => {
-  const database = await bootstrapLocalDataLayer();
-  let wrote = false;
-  database.transaction((tx) => {
-    const allRows = tx
-      .select({ id: exerciseSets.id, orderIndex: exerciseSets.orderIndex, deletedAt: exerciseSets.deletedAt })
-      .from(exerciseSets)
-      .where(eq(exerciseSets.sessionExerciseId, sessionExerciseId))
-      .all();
-    const liveRows = allRows.filter((row) => row.deletedAt === null);
-    if (orderedSetIds.length !== liveRows.length) {
-      return;
-    }
-    const liveIds = new Set(liveRows.map((row) => row.id));
-    const seen = new Set<string>();
-    let isPermutation = true;
-    for (const id of orderedSetIds) {
-      if (!liveIds.has(id) || seen.has(id)) {
-        isPermutation = false;
-        break;
-      }
-      seen.add(id);
-    }
-    if (!isPermutation) {
-      return;
-    }
-
-    const localUpdatedAtMs = nowMonotonic(tx);
-    const liftBase =
-      allRows.reduce((max, row) => Math.max(max, row.orderIndex), -1) + 1;
-    orderedSetIds.forEach((id, liftIndex) => {
-      tx.update(exerciseSets)
-        .set({ orderIndex: liftBase + liftIndex, localDirty: true, localUpdatedAtMs, updatedAt: now })
-        .where(eq(exerciseSets.id, id))
-        .run();
-    });
-    orderedSetIds.forEach((id, index) => {
-      tx.update(exerciseSets)
-        .set({ orderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: now })
-        .where(eq(exerciseSets.id, id))
-        .run();
-    });
-    wrote = true;
-  });
-  if (wrote) {
-    notifyLocalWrite();
-  }
-  return wrote;
-};
-
-/**
  * Deterministic provenance-arbitration repair (session-planning contract
  * §4.5): the server commits first, so a pulled attachment claim beats any live
  * local claimant. When an incoming `session_exercises` / `exercise_sets` row
@@ -1452,83 +1347,6 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
 
     return { sessionId };
   },
-  async appendCompletedSessionAsPlanned(
-    sourceSessionId: string,
-    options: AppendCompletedSessionAsPlannedOptions = {}
-  ): Promise<AppendCompletedSessionAsPlannedResult> {
-    const now = options.now ?? new Date();
-    ensureDate(now, 'now');
-
-    const sourceGraph = await store.loadSessionGraphById(sourceSessionId);
-    if (!sourceGraph) {
-      throw new Error(`Session ${sourceSessionId} does not exist`);
-    }
-    if (sourceGraph.session.status !== 'completed') {
-      throw new Error(`Cannot append non-completed session ${sourceSessionId}`);
-    }
-
-    const activeGraph = await store.loadLatestDraftGraph();
-    const targetSessionId = activeGraph?.session.id;
-    const startedAt = activeGraph?.session.startedAt ?? now;
-    const gymId = activeGraph?.session.gymId ?? sourceGraph.session.gymId;
-    const existingExercises = activeGraph?.exercises.map((exercise) => ({
-      id: exercise.id,
-      exerciseDefinitionId: exercise.exerciseDefinitionId,
-      name: exercise.name,
-      machineName: exercise.machineName,
-      sets: exercise.sets.map((set) => ({
-        id: set.id,
-        repsValue: set.repsValue,
-        weightValue: set.weightValue,
-        setType: set.setType,
-        plannedRepsValue: set.plannedRepsValue,
-        plannedWeightValue: set.plannedWeightValue,
-        plannedSetType: set.plannedSetType,
-        performanceStatus: set.performanceStatus,
-      })),
-    })) ?? [];
-
-    const plannedExercises = sourceGraph.exercises
-      .map((exercise) => ({
-        id: createLocalEntityId('exercise'),
-        exerciseDefinitionId: exercise.exerciseDefinitionId,
-        name: exercise.name,
-        machineName: exercise.machineName,
-        sets: exercise.sets
-          .filter((set) =>
-            isConfirmedPerformedSet({
-              reps: set.repsValue,
-              weight: set.weightValue,
-              performanceStatus: set.performanceStatus,
-            })
-          )
-          .map((set) => ({
-            id: createLocalEntityId('set'),
-            repsValue: '',
-            weightValue: '',
-            setType: null,
-            plannedRepsValue: set.repsValue,
-            plannedWeightValue: set.weightValue,
-            plannedSetType: set.setType,
-            performanceStatus: 'planned' as const,
-          })),
-      }))
-      .filter((exercise) => exercise.sets.length > 0);
-    if (plannedExercises.length === 0) {
-      throw new Error(`Session ${sourceSessionId} has no confirmed performed sets`);
-    }
-
-    const saved = await store.saveDraftGraph({
-      sessionId: targetSessionId,
-      gymId,
-      startedAt,
-      status: 'active',
-      exercises: [...existingExercises, ...plannedExercises],
-      now,
-    });
-
-    return { sessionId: saved.sessionId };
-  },
   async completeSession(sessionId: string, options: CompleteSessionOptions = {}): Promise<CompleteSessionResult> {
     const existingSession = await store.loadSessionById(sessionId);
     if (!existingSession) {
@@ -1638,5 +1456,4 @@ export const loadLatestSessionDraftSnapshot = defaultSessionDraftRepository.load
 export const loadSessionSnapshotById = defaultSessionDraftRepository.loadSessionSnapshotById;
 export const completeSessionDraft = defaultSessionDraftRepository.completeSession;
 export const reopenCompletedSessionDraft = defaultSessionDraftRepository.reopenCompletedSession;
-export const appendCompletedSessionAsPlanned = defaultSessionDraftRepository.appendCompletedSessionAsPlanned;
 export const listCompletedSessionsForAnalysis = defaultSessionDraftRepository.listCompletedSessionsForAnalysis;

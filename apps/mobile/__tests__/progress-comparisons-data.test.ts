@@ -84,21 +84,25 @@ const readAndReconcile = async () => {
 
 it('reads migrated SQLite with repeated blocks, previous-only zero-load rows and no identity joins by name', async () => {
   const row = await readAndReconcile();
-  expect(row).toMatchObject({ current: { workingSetCount: 2, totalVolume: 200 },
-    previous: { workingSetCount: 2, totalVolume: 100 }, workingSetChange: 0, volumeChange: { kind: 'percent', percent: 100 } });
+  // Back is secondary on `lift` and primary on `previous-only` ([[muscle.set-count]]):
+  // two halves now against a half plus a whole before.
+  expect(row).toMatchObject({ current: { workingSetCount: 1, totalVolume: 200 },
+    previous: { workingSetCount: 1.5, totalVolume: 100 }, workingSetChange: -0.5, volumeChange: { kind: 'percent', percent: 100 } });
   expect(row.exercises.map(exercise => exercise.exerciseDefinitionId)).toEqual(['lift', 'previous-only']);
-  expect(row.exercises[0]).toMatchObject({ displayName: 'Lift', role: 'secondary', current: { workingSetCount: 2 } });
+  expect(row.exercises[0]).toMatchObject({ displayName: 'Lift', role: 'secondary', current: { workingSetCount: 1 } });
   expect(row.exercises[1]).toMatchObject({ current: { workingSetCount: 0, volumeSetCount: 0 },
     previous: { workingSetCount: 1, totalVolume: 0, volumeSetCount: 1 } });
   expect((await computeProgressComparisons(options)).muscles[1].exercises).toEqual([]);
 });
 
+// The expected count is Back's [[muscle.set-count]]: whole sets through
+// `volume-only`'s primary mapping, halves through `lift`'s secondary one.
 it.each([
-  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 2, 200, 2],
+  ['default', DEFAULT_PERSONAL_EFFORT_POLICY, 1, 200, 2],
   ['included warm-up', { workingSetEfforts: ['warm_up'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
-  ['excluded RIR and independent columns', { workingSetEfforts: ['technique'], volumeEfforts: ['warm_up'] }, 1, 200, 1],
+  ['excluded RIR and independent columns', { workingSetEfforts: ['technique'], volumeEfforts: ['warm_up'] }, 0.5, 200, 1],
   ['empty Working set column', { workingSetEfforts: [], volumeEfforts: ['warm_up'] }, 0, 200, 1],
-  ['empty Volume column', { workingSetEfforts: ['technique'], volumeEfforts: [] }, 1, 0, 0],
+  ['empty Volume column', { workingSetEfforts: ['technique'], volumeEfforts: [] }, 0.5, 0, 0],
   ['both calculation columns empty', { workingSetEfforts: [], volumeEfforts: [] }, 0, 0, 0],
 ] as [string, EffortCalculationPolicy, number, number, number][])(
   'uses durable %s choices independently of Display on refresh', async (_name, policy, workingSetCount, totalVolume, volumeSetCount) => {
@@ -150,29 +154,81 @@ it('restores account-local policy on relaunch and account switches without reusi
   await account();
   expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 0, totalVolume: 200 });
   await account('B');
-  expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 2, totalVolume: 200 });
+  expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 1, totalVolume: 200 });
   await account('A');
   expect((await readAndReconcile()).current).toMatchObject({ workingSetCount: 0, totalVolume: 200 });
 });
 
-it('places sessions by completedAt in half-open calendar bounds, including the DST shift', async () => {
+it('includes the whole preceding four-week block, retaining 27 current sets and 7 previous sets', async () => {
   const db = mockFixture.database;
   db.delete(sessions).run();
-  const at = new Date(2026, 2, 30, 12); // BST: the previous calendar week spans the clock change.
+  const at = new Date(2026, 9, 9, 9, 50);
+  const trainingDays = [
+    [8, 4, 3], [8, 11, 4], [8, 16, 3], [8, 18, 2],
+    [8, 24, 3], [8, 25, 2], [8, 27, 3], [8, 29, 3],
+    [8, 30, 2], [9, 1, 3], [9, 6, 2], [9, 8, 4],
+  ];
+  for (const [month, day, count] of trainingDays) {
+    const id = `${month}-${day}`;
+    const completedAt = new Date(2026, month, day, 18);
+    db.insert(sessions).values({ id, status: 'completed', startedAt: completedAt, completedAt }).run();
+    db.insert(sessionExercises).values({ id: `${id}-block`, sessionId: id, exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
+    db.insert(exerciseSets).values(Array.from({ length: count }, (_, index) => ({
+      id: `${id}-set-${index}`, sessionExerciseId: `${id}-block`, orderIndex: index,
+      setType: 'rir_2', weightValue: '40', repsValue: '5',
+    }))).run();
+  }
+  const selected = { periodWeeks: 4, now: at };
+  const result = await computeProgressComparisons(selected);
+  const summary = await computeStatsSummary(selected);
+  expect(result.current).toEqual(summary.current);
+  expect(result.previous).toEqual(summary.previous);
+  expect(result.current.period).toMatchObject({ start: new Date(2026, 8, 14), end: at });
+  expect(result.previous.period).toMatchObject({ start: new Date(2026, 7, 17), end: new Date(2026, 8, 14) });
+  expect(result.current.totals.workingSetCount).toBe(27);
+  expect(result.previous.totals.workingSetCount).toBe(7);
+  // Back is secondary on `lift`, so its row is half of each window's physical sets.
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 13.5, totalVolume: 2700 },
+    previous: { workingSetCount: 3.5, totalVolume: 700 }, workingSetChange: 10,
+    volumeChange: { kind: 'percent', percent: 286 } });
+});
+
+it.each([
+  ['spring DST', 1, new Date(2026, 2, 30, 12), new Date(2026, 2, 30), new Date(2026, 2, 23)],
+  ['spring DST', 4, new Date(2026, 2, 30, 12), new Date(2026, 2, 9), new Date(2026, 1, 9)],
+  ['autumn DST', 1, new Date(2026, 9, 26, 12), new Date(2026, 9, 26), new Date(2026, 9, 19)],
+  ['autumn DST', 4, new Date(2026, 9, 26, 12), new Date(2026, 9, 5), new Date(2026, 8, 7)],
+  ['year rollover', 1, new Date(2027, 0, 1, 12), new Date(2026, 11, 28), new Date(2026, 11, 21)],
+  ['year rollover', 4, new Date(2027, 0, 1, 12), new Date(2026, 11, 7), new Date(2026, 10, 9)],
+  ['Monday midnight', 1, new Date(2026, 9, 5), new Date(2026, 9, 5), new Date(2026, 8, 28)],
+  ['Monday midnight', 4, new Date(2026, 9, 5), new Date(2026, 8, 14), new Date(2026, 7, 17)],
+] as const)('keeps %s %i-week periods adjacent with a full previous block', async (_case, periodWeeks, at, start, previousStart) => {
+  const db = mockFixture.database;
+  db.delete(sessions).run();
   const boundaries = [
-    ['prev-start', new Date(2026, 2, 23, 0)],
-    ['prev-end', new Date(2026, 2, 23, 12)],
-    ['current-start', new Date(2026, 2, 30, 0)],
+    ['before-previous', new Date(previousStart.getTime() - 1)],
+    ['previous-start', previousStart],
+    ['previous-last', new Date(start.getTime() - 1)],
+    ['current-start', start],
     ['current-end', at],
+    ['after-now', new Date(at.getTime() + 1)],
   ] as const;
   for (const [id, completedAt] of boundaries) {
-    db.insert(sessions).values({ id, status: 'completed', startedAt: new Date(2026, 2, 1), completedAt }).run();
+    db.insert(sessions).values({ id, status: 'completed', startedAt: completedAt, completedAt }).run();
     db.insert(sessionExercises).values({ id: `${id}-block`, sessionId: id, exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
     db.insert(exerciseSets).values({ id: `${id}-set`, sessionExerciseId: `${id}-block`, orderIndex: 0, setType: 'rir_2', weightValue: '40', repsValue: '5' }).run();
   }
-  const result = await computeProgressComparisons({ periodWeeks: 1, now: at });
-  expect(result.current.period.start).toEqual(new Date(2026, 2, 30));
-  expect(result.previous.period).toMatchObject({ start: new Date(2026, 2, 23), end: new Date(2026, 2, 23, 12) });
-  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 1, totalVolume: 100 },
-    previous: { workingSetCount: 1, totalVolume: 100 } });
+  const selected = { periodWeeks, now: at };
+  const result = await computeProgressComparisons(selected);
+  const summary = await computeStatsSummary(selected);
+  expect(result.current).toEqual(summary.current);
+  expect(result.previous).toEqual(summary.previous);
+  expect(result.current.period).toMatchObject({ start, end: at });
+  expect(result.previous.period).toMatchObject({ start: previousStart, end: start });
+  const currentCount = at > start ? 1 : 0;
+  expect(result.current.totals).toMatchObject({ sessionCount: currentCount, workingSetCount: currentCount });
+  expect(result.previous.totals).toMatchObject({ sessionCount: 2, workingSetCount: 2 });
+  // Back is secondary on `lift`: half a set per physical set ([[muscle.set-count]]).
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: currentCount * 0.5, totalVolume: currentCount * 100 },
+    previous: { workingSetCount: 1, totalVolume: 200 } });
 });

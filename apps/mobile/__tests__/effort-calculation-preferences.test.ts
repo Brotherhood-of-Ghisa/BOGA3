@@ -57,7 +57,7 @@ const read = async () => {
     computeSelectedExerciseDailyEffort({ exerciseDefinitionId: 'lift', start, end, timeZone: 'UTC' }),
     computeSelectedMuscleDailyEffort({ muscleGroupIds: ['back'], start, end, timeZone: 'UTC' }),
     loadExerciseCatalogStats('all', end), loadExerciseSessionFacts('lift'), loadExerciseBests({ exerciseDefinitionId: 'lift' }),
-    loadSessionSnapshotById('session'), loadCompletedSessionInsights('session'),
+    loadSessionSnapshotById('session'), loadCompletedSessionInsights('session', 52),
     createDrizzleStatsStore().loadAggregationInput({ start, end }),
   ]);
   if (!graph || !history || !insights) throw Error('Expected saved workout');

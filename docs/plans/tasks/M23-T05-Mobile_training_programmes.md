@@ -1,7 +1,7 @@
 ---
 task_id: M23-T05-Mobile_training_programmes
 milestone_id: "M23"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/08-ux-delivery-standard.md, docs/specs/ui/screen-map.m
 ## Task metadata
 
 - Task ID: `M23-T05-Mobile_training_programmes`
-- Status: `planned`
+- Status: `completed`
 - Depends on: `M23-T04`
 
 ## Parent references (required)
@@ -189,5 +189,20 @@ programme templates, and any special hard-coded "wave" formula.
 ## Completion note
 
 - What changed:
+  - Implemented multi-session training programme authoring and maintenance across routes `/programme/new` and `/programme/[programmeId]`.
+  - Built `programme-form-model.ts` for form drafting, editing, graph conversion, and child plan validation enforcing minimum 2 child plans.
+  - Implemented `ProgrammeFormScreen` and `ProgrammeSessionEditSheet` sub-sheet for focused child session authoring without mega-form scroll fatigue.
+  - Registered stack routes in `root-stack.tsx` with deep-link-safe unavailable handling.
+  - Created `useProgrammeDetail.ts`, `ProgrammeDetailHeader`, `NextProgrammeBlockCard`, and `ProgrammePlanList` to surface programme detail, status, next unresolved block in sequence, and child plan rows with playlist-style accessible reordering.
+  - Implemented Add to session (with candidate choice sheet if ambiguous) and Skip for the next unresolved programme block.
+  - Implemented contract deletion detaching child plans as standalone plans without deleting performed workouts.
+  - Updated `/sessions` Unscheduled section to display programmes alongside standalone plans, and added persistent `New programme` action.
+  - Updated exercise picker's "From planner" to include available programme blocks with deduplication.
+  - Updated canonical UI documentation (`screen-map.md`, `navigation-contract.md`, `components-catalog.md`, `ux-rules.md`, `session-planning-contract.md`).
 - What tests ran:
+  - Unit tests for form model (`apps/mobile/src/session-planner/__tests__/programme-form-model.test.ts`): 6/6 passed.
+  - Screen integration tests (`apps/mobile/__tests__/programme-screens.test.tsx`): 10/10 passed.
+  - Related test suites (`root-stack-routes.test.ts`, `sessions-screen.test.tsx`, `exercise-picker.test.tsx`, `session-plan-screens.test.tsx`): 86/86 passed.
+  - Fast quality gates (`./boga test fast`): all test suites passed.
 - What remains:
+  - T06 (Today tab planning integration) and T07 (Maestro planning flows and E2E verification).

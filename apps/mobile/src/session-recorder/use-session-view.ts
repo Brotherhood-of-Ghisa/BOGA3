@@ -8,6 +8,8 @@ import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 
 import { mapDraftSnapshotToSession } from './session-model';
 
@@ -61,11 +63,12 @@ const loadViewedSession = async (sessionId: string | null) => {
 export function useSessionView(sessionId: string | null) {
   const [state, setState] = useState<SessionViewState>({ status: 'loading' });
   const datedWeightRevision = useBodyWeightContextRevision();
+  const { values: { historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
   const generationRef = useRef(0);
 
   const reload = useCallback(async () => {
     const generation = ++generationRef.current;
-    const isCurrent = () => generation === generationRef.current;
+    const isCurrent = () => generation === generationRef.current && accountRevision === getAccountLocalPreferenceAccountRevision();
 
     try {
       const snapshot = await loadViewedSession(sessionId);
@@ -120,6 +123,7 @@ export function useSessionView(sessionId: string | null) {
         loadSessionInsightHistory({
           targetSessionId: snapshot.sessionId,
           completedAt: base.comparisonAt,
+          historyLookbackWeeks,
         }).then((insightHistory) => {
           if (!isCurrent()) return;
           setState((current) => current.status === 'ready'
@@ -137,7 +141,7 @@ export function useSessionView(sessionId: string | null) {
         setState({ status: 'error' });
       }
     }
-  }, [sessionId]);
+  }, [sessionId, historyLookbackWeeks, accountRevision]);
 
   useFocusEffect(
     useCallback(() => {

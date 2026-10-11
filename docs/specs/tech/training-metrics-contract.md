@@ -85,6 +85,19 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
+**Session volume comparison.** A comparison draws its distribution — P25,
+median and P75, with the current Volume and its median delta — only from six
+known prior comparable sessions, genuine zeros included; the seventh reading is
+the session itself. Those priors are Settings' History look-back over
+[[comparison.history-window]], anchored to the session's End, or now while
+active. Set eligibility is unchanged and record baselines stay all-time. Below
+the minimum nothing is drawn: no comparison is ever shown as an empty plot. The
+median delta carries its direction in colour like every other change figure
+(`ui/design-language.md` §6), above the median being the improvement.
+History and quartiles derive in
+`apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
+the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.
+
 **Counted-session statistics.**
 
 | Figure | Scope |
@@ -264,15 +277,17 @@ choices may change which recorded set qualifies.
   then halves it.
 - The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
 
-**A muscle's set count** is [[muscle.set-count]], an open fact: today the
-session summary's Sets by muscle and Progress muscle comparisons count
-differently, as its table shows. In both, a set counts once per muscle at its
-strongest role (duplicate mappings use the strongest role for that
-exercise/muscle pair), and a stabilizer adds nothing
-(`summarizeCurrentSessionMuscleLoad`; `progress-comparisons.ts`). In
-Progress the role factor applies only to Volume. Family counts deduplicate
-physical sets; overlapping individual muscle counts must never be summed into
-a global total.
+**A muscle's set count** is [[muscle.set-count]]. One shared counter derives
+it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
+muscle at its strongest role (duplicate mappings use the strongest role for
+that exercise/muscle pair), weighted by that role, and a stabilizer adds
+nothing. The session summary, Progress muscle comparisons, the muscle heatmaps
+and the Stats muscle breakdown all read it, so they cannot disagree. Family
+counts deduplicate physical sets at the strongest role across the family's
+muscles; overlapping individual muscle counts must never be summed into a
+global total. Every figure is an exact half-step, shown unrounded. Nothing is
+stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
+them. The window's own working-set total stays a count of physical sets.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
 durable active effort-policy snapshot in one read transaction for both
@@ -308,8 +323,8 @@ adds ` kg` itself.
 | Volume | whole kg·reps | `2560` |
 
 The agent API, the group evaluator and the SQL group functions call this
-kernel rather than copying it; the SQL load factor matches
-`metric-contract.ts` (`groups-bodyweight.sh` vector).
+kernel rather than copying it; the group load-mode factor is
+`link-compatibility.ts` alone.
 
 ## 5. Versioned group competition representation
 
@@ -318,8 +333,5 @@ kernel rather than copying it; the SQL load factor matches
 records in §3. It uses this kernel's effective total-load Volume/estimated 1RM
 and the same private dated B for public percentages; ordinary group scores
 convert source entered units to the declared group target. Display rounding does
-not determine competitive rank. Versioned worker/publication and safe readers
-are implemented and remain pending after installation until service-only
-activation. Compatible UI and authorized hosted release remain separate.
-Personal/coaching calculations,
+not determine competitive rank. Personal/coaching calculations,
 raw kg storage and existing records retain their current semantics.

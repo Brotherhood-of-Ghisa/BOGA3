@@ -38,6 +38,7 @@ import GymsRoute from '../app/gyms';
 import * as localGyms from '@/src/data/local-gyms';
 import { gyms } from '@/src/data/schema';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const FIX = {
   status: 'success' as const,
@@ -291,7 +292,7 @@ describe('Gyms screen over real data', () => {
 
     expect(gymRow('downtown-iron-temple')).toMatchObject({ name: 'Downtown Iron Temple' });
     expect(gymRow('downtown-iron-temple')?.deletedAt).toBeInstanceOf(Date);
-    await waitFor(() => expect(screen.queryByLabelText('Edit gym Downtown Iron Temple')).toBeNull());
+    await waitForGone(() => screen.queryByLabelText('Edit gym Downtown Iron Temple'));
 
     fireEvent.press(screen.getByTestId('gyms-toggle-archived'));
     expect(screen.getByTestId('gyms-toggle-archived')).toHaveTextContent('Hide archived');
@@ -303,7 +304,7 @@ describe('Gyms screen over real data', () => {
     });
 
     expect(gymRow('downtown-iron-temple')?.deletedAt).toBeNull();
-    await waitFor(() => expect(screen.queryByTestId('gyms-toggle-archived')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('gyms-toggle-archived'));
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveTextContent('No location saved');
   });
 

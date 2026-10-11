@@ -1,15 +1,24 @@
-// Pure competition scorer; only activated protocol-4 publication calls it.
-// Every numerator comes from the existing kernel, with the SAME dated B.
-import { isValidSessionWeight } from '../bodyweight/as-of.ts';
+// Pure competition scorer; protocol-4 publication calls it. This boundary
+// receives no personal contribution or personal 1RM: every target supplies its
+// own declared rules. Every numerator comes from the existing kernel, with the
+// SAME dated B.
+import { isValidSessionWeight, type ResolvedSessionWeight } from '../bodyweight/as-of.ts';
 import { groupLoadContext } from '../exercise-calculations/analytics.ts';
 import { calculateSetMetrics } from '../exercise-calculations/load-metrics.ts';
-import { checkGroupLinkCompatibility } from './metric-contract.ts';
-import type { GroupPerformanceInput } from './performance-score.ts';
+import { checkGroupLinkCompatibility, type GroupLinkSource } from './link-compatibility.ts';
 import { isCompetitionValue, isNormalizedCompetition, validateCompetitionRules,
   type CompetitionRules, type CompetitionValue } from './competition-contract.ts';
 
+export type CompetitionPerformanceInput = ResolvedSessionWeight & {
+  weightValue: string;
+  repsValue: string;
+  performanceStatus: string | null;
+  live: boolean;
+  source: GroupLinkSource;
+};
+
 /** Performed-set projections only; the publisher separately applies working/counting. */
-export function scoreCompetitionPerformance(performance: GroupPerformanceInput, rules: CompetitionRules): CompetitionValue[] {
+export function scoreCompetitionPerformance(performance: CompetitionPerformanceInput, rules: CompetitionRules): CompetitionValue[] {
   if (!validateCompetitionRules(rules).ok) return [];
   const compatibility = checkGroupLinkCompatibility(performance.source, rules);
   if (!performance.live || !compatibility.compatible || performance.performanceStatus !== null) return [];

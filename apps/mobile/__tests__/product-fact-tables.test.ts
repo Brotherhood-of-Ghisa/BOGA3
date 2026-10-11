@@ -18,7 +18,13 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { isVolumeSet, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
+import { aggregateSelectedMuscleDailyEffort, aggregateSelectedMuscleDailyEffortMetrics,
+  aggregateSelectedMuscleWeeklyEffort } from '@/src/data/muscle-analytics';
+import { aggregateProgressComparisons } from '@/src/data/progress-comparisons';
+import { aggregateStats } from '@/src/data/stats';
 import { normalizeGroupSetFacts } from '@/src/groups/set-facts';
+import { adaptCurrentSessionToMuscleAnalyticsInput, summarizeCurrentSessionMuscleLoad,
+  type CurrentSessionMuscleSummaryInput, type SessionInsightMuscleMapping } from '@/src/session-insights';
 
 const PRODUCT_DIR = path.resolve(__dirname, '..', '..', '..', 'docs', 'product');
 
@@ -51,10 +57,16 @@ const readFactTable = (file: string, id: string): FactTable => {
 const PENDING: Record<string, readonly string[]> = {
   'set.eligibility': [],
   '1rm.formula': [],
+  'muscle.set-count': [],
 };
 
-/** The facts whose tables this file runs; every fact-table marker must be one. */
-const HANDLED = ['set.eligibility', '1rm.formula'];
+/** The facts whose tables this file runs, by subject file; every marker must be one. */
+const HANDLED_IN: Record<string, string> = {
+  'set.eligibility': 'set.md',
+  '1rm.formula': '1rm.md',
+  'muscle.set-count': 'muscle.md',
+};
+const HANDLED = Object.keys(HANDLED_IN);
 
 const ranCells = new Set<string>();
 
@@ -177,10 +189,89 @@ describe('Pending: lines', () => {
     expect(listed.filter((cell) => !ranCells.has(cell))).toEqual([]);
   });
 
-  it.each([
-    ['set.md', HANDLED[0]],
-    ['1rm.md', HANDLED[1]],
-  ])('%s keeps a Pending: line for %s exactly while it has pending cells', (file, id) => {
-    expect(readFactTable(file, id).pending).toBe(PENDING[id].length > 0);
+  it.each(Object.entries(HANDLED_IN).map(([id, file]) => [file, id]))(
+    '%s keeps a Pending: line for %s exactly while it has pending cells',
+    (file, id) => {
+      expect(readFactTable(file, id).pending).toBe(PENDING[id].length > 0);
+    },
+  );
+});
+
+describe('muscle.set-count', () => {
+  const table = readFactTable('muscle.md', 'muscle.set-count');
+  const KEY = 'Working sets mapped to one muscle';
+  const COLUMN = 'It gets';
+
+  // Each row as the roles its sets map to the one muscle under test. A row
+  // naming two roles for one set maps that set twice.
+  const ROLES: Record<string, ('primary' | 'secondary' | 'stabilizer')[][]> = {
+    '3 primary': [['primary'], ['primary'], ['primary']],
+    '3 secondary': [['secondary'], ['secondary'], ['secondary']],
+    '2 primary, 3 secondary': [
+      ['primary'], ['primary'], ['secondary'], ['secondary'], ['secondary'],
+    ],
+    '1 set, primary and secondary to that muscle': [['primary', 'secondary']],
+    '4 stabilizer': [['stabilizer'], ['stabilizer'], ['stabilizer'], ['stabilizer']],
+  };
+
+  const AT = new Date('2026-10-09T18:00:00.000Z');
+  // The fact applies on every screen that shows sets per muscle, so a row is
+  // only satisfied when all of them agree. One exercise definition per set, so
+  // a set's roles are its own: each surface takes the strongest role a set
+  // holds for the muscle, not the strongest in the session.
+  const sessionFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): CurrentSessionMuscleSummaryInput => ({
+    sessionId: 'session',
+    sessionAt: AT,
+    exercises: sets.map((_roles, index) => ({
+      id: `ex-${index}`,
+      orderIndex: index,
+      exerciseDefinitionId: `def-${index}`,
+      exerciseName: `Exercise ${index}`,
+      sets: [{ id: `set-${index}`, orderIndex: 0, weightValue: '100', repsValue: '5', setType: 'rir_1' }],
+    })),
+    exerciseDefinitions: sets.map((_roles, index) => ({
+      id: `def-${index}`,
+      loadInputMode: 'total_load' as const,
+      bodyweightContribution: 0,
+    })),
+    muscleMappings: sets.flatMap((roles, index) =>
+      roles.map((role): SessionInsightMuscleMapping =>
+        ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role }))),
+    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 }],
   });
+
+  /** What each surface reports for the muscle. A muscle that gets nothing is absent, which is zero. */
+  const figuresFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): Record<string, number> => {
+    const summary = summarizeCurrentSessionMuscleLoad(sessionFor(sets));
+    const input = adaptCurrentSessionToMuscleAnalyticsInput(sessionFor(sets));
+    const periods = { current: { start: new Date(AT.getTime() - 1), end: new Date(AT.getTime() + 1) },
+      previous: { start: new Date(AT.getTime() - 3), end: new Date(AT.getTime() - 1) } };
+    const daily = aggregateSelectedMuscleDailyEffort(input, { muscleGroupIds: ['chest'], timeZone: 'UTC' });
+    const chest = (rows: { muscleGroupId: string }[], read: (row: never) => number) => {
+      const row = rows.find((candidate) => candidate.muscleGroupId === 'chest');
+      return row === undefined ? 0 : read(row as never);
+    };
+    return {
+      'session summary': summary.workingSetsByMuscle.find((muscle) => muscle.id === 'chest')?.weightedSetCount ?? 0,
+      'session summary load': summary.muscles.find((muscle) => muscle.id === 'chest')?.workingSetCount ?? 0,
+      progress: chest(aggregateProgressComparisons(input, periods),
+        (row: { current: { workingSetCount: number } }) => row.current.workingSetCount),
+      stats: chest(aggregateStats(input).muscleFamilies.flatMap((family) => family.muscles),
+        (row: { workingSetCount: number }) => row.workingSetCount),
+      'heatmap day': aggregateSelectedMuscleDailyEffortMetrics(daily)[0]?.workingSetCount ?? 0,
+      'heatmap week': aggregateSelectedMuscleWeeklyEffort(daily)[0]?.workingSetCount ?? 0,
+      'heatmap target': aggregateSelectedMuscleDailyEffortMetrics(daily)[0]?.workingSetCountsByMuscle?.chest ?? 0,
+    };
+  };
+
+  for (const row of table.rows) {
+    runCell('muscle.set-count', row[KEY], COLUMN, () => {
+      const want = Number(row[COLUMN]);
+      const figures = figuresFor(ROLES[row[KEY]]);
+      return {
+        actual: figures,
+        want: Object.fromEntries(Object.keys(figures).map((surface) => [surface, want])),
+      };
+    });
+  }
 });

@@ -53,9 +53,11 @@ the names of its Jest tests are the specification of that component.
    kinds. A **picker or menu** (row actions, management options, a choice of
    one value, a short form) opens a design-language `Sheet` over the current
    screen, sized to its content. A **sub-page** (a browser, an editor, a
-   preview: Swap exercise, the exercise editor, Share session, Progress
-   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
-   uses. Do not document opening either as a route transition.
+   preview: Swap exercise, the exercise editor, Share session) opens a
+   `PageSheet`, the native iOS page sheet the exercise picker uses. Do not
+   document opening either as a route transition. A sub-page whose subject
+   belongs in a native title and whose chart wants the whole screen is a route
+   instead (Progress history, `navigation-contract.md`).
 2. **Dragging down closes every sheet, and dismissal writes nothing.** A
    `Sheet` follows a drag from its handle and title row, closes on a
    deliberate release and springs back otherwise; its body scrolls and taps
@@ -87,7 +89,8 @@ the names of its Jest tests are the specification of that component.
    the ⋮ opens a sheet titled with the item's name.
 2. **Deleted and archived items stay in their list behind a toggle** (`Show
    deleted`, `Show archived`), never a separate route: faded, marked with a
-   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet.
+   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet,
+   or on the destination when the row is a link.
 3. **A summary card that opens a destination is one link** with no controls
    inside it and an accessibility label that states its summary (spec 08,
    "Read-only link card pattern"). Editing and removal live on the destination.
@@ -193,18 +196,70 @@ exercise history filters by them.
 
 ### Swipes on the exercise page
 
-Decided 2026-10-01, revised 2026-10-04. Only the open row, the logger,
-answers swipes. Right confirms it exactly like the tick and moves on;
-confirming the last set adds one, opened with the copied values. Left drops
-it: an ad-hoc row is removed; a touched planned row loses its typed values and
-effort and reads as its plan again, still open (a swipe never deletes a plan).
-A side is offered only when its move would change the row: no left swipe on an
-untouched planned row, no right swipe without a valid set; a side not offered
-neither drags nor shows its symbol. Both swipes dismiss the keyboard, and
-neither navigates. The `Confirm set` / `Drop set` accessibility actions are
-the non-gesture path, under the same conditions. Code:
-`components/exercise-page/swipe-set-row.tsx`, `canDropSet` and `dropSet` in
-`src/session-recorder/exercise-page-model.ts`.
+Decided 2026-10-01, revised 2026-10-09. Every row answers the dropping
+swipe-left; only the open row, the logger, answers swipe-right, which the
+other rows carry as their glyph. Right confirms the row exactly like the tick
+and moves on; confirming the last set adds one, opened with the copied values.
+Left drops the row: an ad-hoc row is removed, confirmed or not; a planned row
+loses its typed values and effort and reads as its plan again, planned and in
+its place (a swipe never deletes a plan). A side is offered only when its move
+would change the row: no left swipe on an untouched planned row, no right
+swipe without a valid set; a side not offered neither drags nor shows its
+symbol. Both swipes dismiss the keyboard, and neither navigates. The
+`Confirm set` / `Drop set` accessibility actions are the non-gesture path,
+under the same conditions.
+
+The gesture states its own threshold: the row follows the finger to the
+trigger, then resists to a hard stop, and the side goes from its wash to its
+solid colour exactly where a release starts firing. Code:
+`components/exercise-page/swipe-set-row.tsx`,
+`canDropSet` and `dropSet` in `src/session-recorder/exercise-page-model.ts`.
+
+### Planned sessions on Sessions and the plan screens
+
+Decided with the one-off planner. `/sessions` owns queue management: planned
+rows never enter, nor are affected by, the completed history's count, filters,
+row actions or deleted toggle; a schedule is optional and Unscheduled is never
+disguised as "today". The picker's completed-history action is **Repeat last**
+(yesterday's session, appended as planned sets) and is separate from **From
+planner**, which offers authored one-off blocks and available programme blocks
+still available (pending, definition-bearing, target-bearing). A block attaches
+to the active session's unsourced card of the same exercise: one match attaches,
+several offer an accessible choice sheet that writes nothing until confirmed,
+none creates a card. **Start all** with another active session offers one Resume
+and creates nothing. Complete is explicit — the sourced card's `Complete block`,
+refused inline until one of the block's planned sets is confirmed; attachment
+alone never advances; skip uses non-performance wording. Code: `src/session-planner/`
+(`plan-form-model`, `programme-form-model`, `plan-edit-sync`,
+`available-blocks`), the plan and programme routes' screen files.
+
+### Training programmes and multi-session plans
+
+Decided with mobile training programmes.
+- **Sequence without dates.** A programme represents an ordered sequence of
+  two or more child sessions (e.g. a 6-week wave, an A/B split). Child sessions
+  can each have an optional schedule and gym, but programme order is strictly
+  sequenced and independent of calendar dates.
+- **Queue and authoring hub.** `/sessions` displays programmes alongside
+  standalone plans under Unscheduled, ordered by recency. Persistent
+  `Plan session` and `New programme` action rows provide direct authoring entry.
+- **Child session editing.** Editing child sessions in the programme form uses
+  a focused page-sheet editor (`ProgrammeSessionEditSheet`) rather than an
+  unbounded mega-form, preventing scroll fatigue and preserving field validation
+  focus.
+- **Next unresolved block.** Programme detail (`/programme/[programmeId]`)
+  determines progress and deterministically surfaces the next unresolved block
+  in programme order, then exercise order. **Add to session** attaches the block
+  to an active session (with candidate card choice when ambiguous) or creates a
+  new session; explicit **Skip** advances to the next unresolved block without
+  recording performed work.
+- **Playlist-style session reordering.** Child sessions reorder with accessible
+  Move controls in both the programme form and programme detail; order indexes
+  update deterministically.
+- **Detached deletion invariant.** Deleting a programme soft-deletes the
+  programme record and detaches all child plans (`programme_id = null`,
+  `programme_order_index = null`), preserving them as standalone plans. Performed
+  session rows, workouts, and recorded sets are never deleted.
 
 ## Maintenance
 

@@ -19,7 +19,6 @@ export const sessionPlanExercises = sqliteTable(
     }),
     orderIndex: integer('order_index').notNull(),
     name: text('name').notNull(),
-    machineName: text('machine_name'),
     progressStatus: text('progress_status', { enum: ['pending', 'completed', 'skipped'] })
       .notNull()
       .default('pending'),

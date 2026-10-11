@@ -4,6 +4,9 @@ import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@
 
 export type ActionButtonVariant = 'primary' | 'outline' | 'text';
 export type ActionButtonTone = 'default' | 'danger';
+// `compact`: a 28-tall outline inside a list row (a group record's Certify),
+// its tap target kept at 44 by hit slop.
+export type ActionButtonSize = 'regular' | 'compact';
 
 export type ActionButtonProps = {
   label: string;
@@ -15,6 +18,7 @@ export type ActionButtonProps = {
   // `danger` recolours an outline or text button; a primary is never danger.
   tone?: ActionButtonTone;
   disabled?: boolean;
+  size?: ActionButtonSize;
   // A text button that toggles a view on and off (Sessions' `Show deleted`):
   // announced as checked, so the state never rides the label alone.
   checked?: boolean;
@@ -32,6 +36,7 @@ export function ActionButton({
   variant,
   tone = 'default',
   disabled = false,
+  size = 'regular',
   checked,
   accessibilityLabel,
   accessibilityHint,
@@ -45,9 +50,11 @@ export function ActionButton({
       accessibilityRole="button"
       accessibilityState={checked === undefined ? { disabled } : { disabled, checked }}
       disabled={disabled}
+      hitSlop={size === 'compact' ? COMPACT_HIT_SLOP : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
+        size === 'compact' ? styles.compact : null,
         variant === 'primary' ? styles.primary : null,
         variant === 'outline' ? [styles.outline, danger ? styles.outlineDanger : null] : null,
         disabled && variant === 'primary' ? styles.primaryDisabled : null,
@@ -59,6 +66,7 @@ export function ActionButton({
         allowFontScaling={false}
         style={[
           styles.label,
+          size === 'compact' ? styles.labelCompact : null,
           variant === 'primary' ? styles.labelPrimary : null,
           danger ? styles.labelDanger : null,
           disabled && variant !== 'primary' ? styles.labelDisabled : null,
@@ -69,6 +77,8 @@ export function ActionButton({
   );
 }
 
+const COMPACT_HIT_SLOP = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
+
 const styles = StyleSheet.create({
   base: {
     minHeight: uiGeometry.tapTarget,
@@ -76,6 +86,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: uiGeometry.radius.control,
+  },
+  compact: {
+    minHeight: uiGeometry.compactControlHeight,
+    paddingHorizontal: uiSpace.sm,
   },
   primary: {
     backgroundColor: uiRoles.accent,
@@ -111,6 +125,11 @@ const styles = StyleSheet.create({
     letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
     color: uiRoles.ink,
+  },
+  labelCompact: {
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
   },
   labelPrimary: {
     color: uiRoles.surface,

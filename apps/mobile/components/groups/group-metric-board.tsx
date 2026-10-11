@@ -6,7 +6,7 @@ import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
-import { buildCompetitionRow as buildGroupMetricRow,describeCompetitionRules as describeGroupRules,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS,competitionViewLabel } from '@/src/groups/competition-view-model';
+import { buildCompetitionRow as buildGroupMetricRow,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS,competitionViewLabel } from '@/src/groups/competition-view-model';
 import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionBoardWire as GroupMetricBoardWire,CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 import { GroupBoardRow } from './group-board-row';
 import { GroupMetricRecordSheet } from './group-metric-record-sheet';
@@ -71,15 +71,13 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.md }}>
       <Text allowFontScaling={false} style={[textStyles.heading, { flex: 1 }]}>{competitionViewLabel(metric,exercise.rules)}</Text>
       <ActionButton label="History" variant="text" testID="group-board-history-button" onPress={() => router.push(
-        `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}&revision=${exercise.rules.rules_revision}`)} />
+        `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}`)} />
     </View>
-    <Text allowFontScaling={false} style={textStyles.muted} testID="group-board-rules">{describeGroupRules(exercise)}</Text>
     {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={textStyles.body} testID="group-board-archived">Archived · read-only</Text> : null}
     <SegmentedControl accessibilityLabel="Metric" options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
       onChange={value => selectView(metric, value)} testIDPrefix="group-board-scope" />
-    <Text allowFontScaling={false} style={textStyles.muted}>Scores use the group’s current rules. Ineligible performances are omitted.</Text>
     {board.offline ? <GroupOfflineBanner lastUpdatedAtMs={board.loadedAtMs} /> : null}
     {error && board.firstPage ? <GroupInlineError error={error} onRetry={onRefresh} testID="group-board-inline-error" /> : null}
     {staleCursor ? <GroupStateView title="The board changed" body="Refresh to load one consistent rules revision."

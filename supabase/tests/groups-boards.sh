@@ -3,21 +3,30 @@
 # groups-boards.sh — boards and events contract (the second body of the
 # groups-leaderboards lane; groups-leaderboards.sh proves the pipeline).
 #
-# Contract: docs/specs/tech/groups-contract.md
-# Proves, against the real local stack (sync_push, group-eval, PostgREST):
+# Contract: docs/specs/tech/group-competition-contract.md (boards, events,
+# readers) and docs/specs/tech/groups-contract.md (the change table).
+# Proves, against the real local stack (sync_push, group-eval, PostgREST), on
+# protocol-4 comparisons that rank Volume (kg × reps × D6 factor) and 1RM:
 #
-#   - posture of group_board_entries / group_board_state and the read RPCs;
-#   - every row of change table (R1–R10), one section each;
-#   - working sets only: a warm-up never ranks, records or certifies, and a
+#   - posture of the board tables (old and comparison) and of the
+#     group_competition_* reads;
+#   - every row of the change table (R1–R10), one section each, through the
+#     comparison job (group_metric_eval_publish → group_metric_apply_member);
+#     a load-mode change rescores silently and a rules change publishes a new
+#     revision with one rules_change event;
+#   - working sets only ([[set.eligibility]]): a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board moves silently (forward only);
-#   - the provisional rule for active sessions (T8), D6 conversion, P7 ties,
-#     rejoin catch-up, the per-group advisory lock;
-#   - group_board_podiums / group_board / group_board_history shapes, paging,
-#     and error tokens; group_stream's record / record_voided / link items.
+#   - the provisional rule for active sessions (T8), D6 conversion, value-based
+#     voids, P7 ties, rejoin catch-up, the per-group advisory lock of a
+#     publication;
+#   - group_competition_podiums / _board / _history shapes, paging and
+#     validation; group_competition_stream's record / record_voided / link /
+#     unlink events and cursor paging. Anonymous, OAuth and outsider denials
+#     and the wire shapes of every reader: groups-competitions.sh.
 #
-# Direct-drain mode as groups-leaderboards.sh: the kick URL is unset and the
-# sweep paused for the run; the lane POSTs group-eval itself. Hermetic:
-# per-run users, deleted on exit with everything they own.
+# Direct-drain mode as groups-leaderboards.sh: the kick
+# URL is unset and the sweep paused for the run; the lane POSTs group-eval
+# itself. Hermetic: per-run users, deleted on exit with everything they own.
 
 set -euo pipefail
 
@@ -58,6 +67,8 @@ set_sweep_active() {
   run_psql "select cron.alter_job(jobid, active := $1) from cron.job where jobname = 'group-eval-sweep';" >/dev/null
 }
 
+# Comparison jobs (group_metric_eval_queue) and every comparison table cascade
+# from the run's groups.
 cleanup() {
   set_kick_url "${ORIGINAL_KICK_URL}"
   if [[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" ]]; then set_sweep_active true; else set_sweep_active false; fi
@@ -68,7 +79,10 @@ cleanup() {
   run_psql "
     begin;
       delete from public.app_logs
-       where event like 'group.%' and user_id in (${ids});
+       where event like 'group.%'
+         and (user_id in (${ids})
+              -- Comparison-job rows carry no user; they name the group.
+              or context ->> 'group_id' in (select id::text from app_public.groups where created_by in (${ids})));
       delete from app_public.group_eval_queue where member_user_id in (${ids});
       delete from app_public.groups
        where created_by in (${ids})
@@ -122,7 +136,8 @@ drain() {
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
 
-# e1rm <weight> <reps>: the 1RM ([[1rm.formula]]), rounded like the boards (6 dp, trimmed).
+# e1rm <weight> <reps> [factor]: the 1RM ([[1rm.formula]]) × the D6 factor,
+# printed like `num` below (6 dp, trimmed).
 e1rm() {
   # awk, not node: the same doubles, without a process start per assertion.
   awk -v w="$1" -v r="$2" -v f="${3:-1}" 'BEGIN {
@@ -130,6 +145,8 @@ e1rm() {
     sub(/0+$/, "", v); sub(/\.$/, "", v); printf "%s", v
   }'
 }
+# num <sql-numeric>: a stored full-precision value as the oracles print it.
+num() { echo "trim_scale(round(($1)::numeric, 6))::text"; }
 
 # who <uuid>: the short label the event and entry summaries print.
 who() {
@@ -144,12 +161,18 @@ WHO_SQL() { # a SQL case expression mapping member uuids in column $1 to A/R/M
   echo "case $1 when '${ATHLETE_UID}' then 'A' when '${RIVAL_UID}' then 'R' when '${AWAY_UID}' then 'M' else '?' end"
 }
 
-# entry <gx> <member-label> <metric>: `value@set` or empty.
+# rev <gx>: the comparison's current rules revision.
+rev() { run_psql "select rules_revision from app_public.group_exercises where id = '$1';"; }
+
+# entry <gx> <member-label> <metric>: `value@set` on the current revision's All
+# board, or empty.
 entry() {
   local uid
   case "$2" in A) uid="${ATHLETE_UID}" ;; R) uid="${RIVAL_UID}" ;; M) uid="${AWAY_UID}" ;; esac
-  run_psql "select value_kg || '@' || replace(set_id, '${T}-', '') from app_public.group_board_entries
-             where group_exercise_id = '$1' and member_user_id = '${uid}' and metric = '$3' and not certified;"
+  run_psql "select $(num e.value) || '@' || replace(e.set_id, '${T}-', '')
+              from app_public.group_metric_board_entries e
+              join app_public.group_exercises ge on ge.id = e.group_exercise_id and ge.rules_revision = e.rules_revision
+             where e.group_exercise_id = '$1' and e.member_user_id = '${uid}' and e.metric = '$3' and not e.certified;"
 }
 expect_entry() {
   local actual
@@ -228,26 +251,75 @@ link() {
   push "$1" "link $2 → $4" "$(e_link "$2" "$3" "$4" "${CUAM}" "${del:-null}")"
 }
 
-# gx <name> <mode> [group]: a new group exercise (owner); echoes its id.
+# --- reads -----------------------------------------------------------------------
+
+# gx <name> <mode> [group] [token]: a new ordinary comparison (contribution 0,
+# default Volume); echoes its id.
 gx() {
-  rpc "${OWNER_TOKEN}" group_exercise_create \
+  rpc "${4:-${OWNER_TOKEN}}" group_competition_exercise_create \
     "$(jq -nc --arg g "${3:-${GID}}" --arg n "$1" --arg m "$2" \
-        '{p_group_id: $g, p_name: $n, p_load_input_mode: $m, p_source_exercise_id: null}')"
-  expect_ok "group_exercise_create $1"
+        '{p_group_id: $g, p_name: $n, p_load_input_mode: $m, p_source_exercise_id: null,
+          p_bodyweight_contribution: 0, p_default_metric: "volume"}')"
+  expect_ok "group_competition_exercise_create $1"
   jq -er '.exercise.group_exercise_id' <<<"${BODY}"
 }
+# gx_archive <gx> <true|false>: archive or unarchive one of G's comparisons.
+gx_archive() {
+  rpc "${OWNER_TOKEN}" group_competition_exercise_archive \
+    "$(jq -nc --arg g "${GID}" --arg e "$1" --argjson a "$2" '{p_group_id: $g, p_exercise_id: $e, p_archived: $a}')"
+}
 
-# board <token> <gx> <metric> <certified> [after-json] [limit]: group_board into BODY.
+# board <token> <gx> <metric> <certified> [limit] [cursor]: group_competition_board into BODY.
 board() {
-  rpc "$1" group_board "$(jq -nc --arg g "${GID}" --arg x "$2" --arg m "$3" --argjson c "$4" \
-      --argjson a "${5:-null}" --argjson l "${6:-null}" \
-      '{p_group_id: $g, p_group_exercise_id: $x, p_metric: $m, p_certified: $c, p_after: $a, p_limit: $l}')"
+  rpc "$1" group_competition_board "$(jq -nc --arg g "${GID}" --arg x "$2" --arg m "$3" --argjson c "$4" \
+      --argjson l "${5:-50}" --arg cur "${6:-}" \
+      '{p_group_id: $g, p_group_exercise_id: $x, p_metric: $m, p_certified: $c, p_limit: $l,
+        p_cursor: (if $cur == "" then null else $cur end)}')"
 }
+# history <token> <gx> <metric> <certified> [limit] [before]: group_competition_history
+# of the current revision into BODY.
 history() {
-  rpc "$1" group_board_history "$(jq -nc --arg g "${GID}" --arg x "$2" --arg m "$3" --argjson c "$4" \
-      --argjson b "${5:-null}" --argjson l "${6:-null}" \
-      '{p_group_id: $g, p_group_exercise_id: $x, p_metric: $m, p_certified: $c, p_before: $b, p_limit: $l}')"
+  rpc "$1" group_competition_history "$(jq -nc --arg g "${GID}" --arg x "$2" --arg m "$3" --argjson c "$4" \
+      --argjson l "${5:-50}" --arg b "${6:-}" \
+      '{p_group_id: $g, p_group_exercise_id: $x, p_metric: $m, p_certified: $c, p_revision: null,
+        p_before: (if $b == "" then null else $b end), p_limit: $l}')"
 }
+
+# stream_items <token>: every item of that member's G stream (all pages) as
+# one JSON array in BODY.
+stream_items() {
+  local cursor=null acc='[]'
+  while :; do
+    rpc "$1" group_competition_stream \
+      "$(jq -nc --arg g "${GID}" --argjson b "${cursor}" '{p_group_id: $g, p_before: $b, p_limit: 50}')"
+    expect_ok "stream page"
+    acc="$(jq -c --argjson a "${acc}" '$a + .items' <<<"${BODY}")"
+    [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
+    cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
+  done
+  BODY="${acc}"
+}
+
+# certify <token> <gx> <lifter-uid> <set-suffix> <metric> <write-token>:
+# group_competition_certify at the comparison's current revision into BODY.
+certify() {
+  rpc "$1" group_competition_certify "$(jq -nc --arg g "${GID}" --arg x "$2" --arg m "$3" --arg s "${T}-$4" \
+      --arg metric "$5" --arg t "$6" --argjson r "$(rev "$2")" \
+      '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s, p_metric: $metric,
+        p_expected_revision: $r, p_write_token: $t}')"
+}
+# score_token <gx> <lifter-uid> <set-suffix> <metric>: a set's write token from
+# its stored score (a warm-up has a score but no board row to read it from).
+score_token() {
+  run_psql "select write_token from app_public.group_metric_set_scores
+             where group_exercise_id = '$1' and rules_revision = $(rev "$1") and member_user_id = '$2'
+               and set_id = '${T}-$3' and metric = '$4';"
+}
+
+# b64 <text> / cursor_with <cursor> <jq-update>: an opaque reader cursor, or a
+# valid one decoded, changed and re-encoded.
+b64() { jq -nr --arg s "$1" '$s | @base64'; }
+cursor_with() { jq -nr --arg s "$1" "\$s | @base64d | fromjson | $2 | tojson | @base64"; }
 
 # =============================================================================
 echo "[${LANE_LABEL}] run ${RUN_TAG}: setup"
@@ -290,7 +362,7 @@ pass "users, group G (athlete A, rival R, member M), outsider group H"
 echo "[${LANE_LABEL}] posture"
 # =============================================================================
 
-for table in group_board_entries group_board_state; do
+for table in group_board_entries group_board_state group_metric_board_entries group_metric_board_state; do
   expect_sql "${table}: RLS on" "select relrowsecurity from pg_class where oid = 'app_public.${table}'::regclass;" "t"
   expect_sql "${table}: no policies" \
     "select count(*) from pg_policies where schemaname = 'app_public' and tablename = '${table}';" "0"
@@ -316,34 +388,39 @@ for table in group_board_entries group_board_state; do
   done
 done
 
-BOARD_FNS="p.proname like 'group\\_board%' or p.proname in ('group_eval_apply', 'group_stream_event_json')"
+READS="'group_competition_board', 'group_competition_history', 'group_competition_podiums', 'group_competition_stream'"
+BOARD_FNS="p.proname like 'group\\_board%' or p.proname in ('group_eval_apply', ${READS})"
 expect_sql "every board function pins search_path" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
       and not coalesce(p.proconfig @> array['search_path=app_public, pg_temp'], false);" "0"
-expect_sql "clients execute exactly the three board reads" \
+expect_sql "signed-in clients execute the four reads; anonymous callers none" \
   "select string_agg(p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'app_public' and p.proname in (${READS})
+      and has_function_privilege('authenticated', p.oid, 'execute')
+      and not has_function_privilege('anon', p.oid, 'execute');" \
+  "group_competition_board,group_competition_history,group_competition_podiums,group_competition_stream"
+expect_sql "clients execute no board internal" \
+  "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
-      and has_function_privilege('anon', p.oid, 'execute')
-      and has_function_privilege('authenticated', p.oid, 'execute');" \
-  "group_board,group_board_history,group_board_podiums"
+      and p.proname not in (${READS})
+      and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'));" "0"
 expect_sql "service_role executes no board internal" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
-      and p.proname not in ('group_board', 'group_board_history', 'group_board_podiums')
+      and p.proname not in (${READS})
       and has_function_privilege('service_role', p.oid, 'execute');" "0"
-expect_sql "the three reads are security definer" \
+expect_sql "the four reads are security definer" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'app_public' and p.prosecdef
-      and p.proname in ('group_board', 'group_board_history', 'group_board_podiums');" "3"
+    where n.nspname = 'app_public' and p.prosecdef and p.proname in (${READS});" "4"
 expect_sql "the rejoin catch-up trigger" \
   "select count(*) from pg_trigger where tgrelid = 'app_public.group_memberships'::regclass
       and tgname = 'group_memberships_board_catch_up' and not tgisinternal;" "1"
 pass "tables, grants, direct-access denial"
 
-# boards_of <gx> <kind>: the latest such event's boards as `metric:previous:group_record`.
+# boards_of <gx>: the latest record's boards as `metric:previous:group_record`.
 boards_of() {
-  run_psql "select string_agg((b ->> 'metric') || ':' || coalesce(b ->> 'previous_value_kg', 'null') || ':'
+  run_psql "select string_agg((b ->> 'metric') || ':' || coalesce($(num "b ->> 'previous_value'"), 'null') || ':'
                               || (b ->> 'group_record'), ',' order by b ->> 'metric')
               from jsonb_array_elements((select payload -> 'boards' from app_public.group_events
                                           where group_exercise_id = '$1' and kind = 'record'
@@ -367,22 +444,23 @@ expect_since "${GX1}" "" "a link with no counting sets moves nothing"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s1a" completed "${DA1}" "r1a1:100:5"
 drain "R1 first set"
-expect_since "${GX1}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "R1 first counting set (D1)"
-[[ "$(boards_of "${GX1}")" == "e1rm:null:true,weight:null:true" ]] || fail "R1 first record boards: $(boards_of "${GX1}")"
-expect_entry "${GX1}" A weight "100@r1a1" "R1"
+expect_since "${GX1}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "R1 first counting set (D1)"
+[[ "$(boards_of "${GX1}")" == "e1rm:null:true,volume:null:true" ]] || fail "R1 first record boards: $(boards_of "${GX1}")"
+expect_entry "${GX1}" A volume "500@r1a1" "R1"
 expect_entry "${GX1}" A e1rm "$(e1rm 100 5)@r1a1" "R1"
 expect_sql "R1 the first lead change points at its record and has no previous leader" \
   "select (related_event_id = (select id from app_public.group_events where group_exercise_id = '${GX1}' and kind = 'record'))
           || ':' || jsonb_typeof(payload -> 'previous') || ':' || (payload -> 'leader' ->> 'member_user_id')
-     from app_public.group_events where group_exercise_id = '${GX1}' and kind = 'lead_change' and metric = 'weight';" \
+     from app_public.group_events where group_exercise_id = '${GX1}' and kind = 'lead_change' and metric = 'volume';" \
   "true:null:${ATHLETE_UID}"
 
+# 110 × 5 beats A on both boards (Volume 550 > 500, 1RM 128.3 > 116.7).
 mark
 next_session_at
-sess "${RIVAL_TOKEN}" "${T}-s1r" completed "${DR1}" "r1r1:110:3"
+sess "${RIVAL_TOKEN}" "${T}-s1r" completed "${DR1}" "r1r1:110:5"
 drain "R1 rival"
-expect_since "${GX1}" "record@R,lead_change:record:weight@R,lead_change:record:e1rm@R" "R1 rival takes #1"
-[[ "$(boards_of "${GX1}")" == "e1rm:null:true,weight:null:true" ]] || fail "R1 rival boards: $(boards_of "${GX1}")"
+expect_since "${GX1}" "record@R,lead_change:record:volume@R,lead_change:record:e1rm@R" "R1 rival takes #1"
+[[ "$(boards_of "${GX1}")" == "e1rm:null:true,volume:null:true" ]] || fail "R1 rival boards: $(boards_of "${GX1}")"
 [[ "$(latest "${GX1}" lead_change "payload -> 'previous' ->> 'member_user_id'")" == "${ATHLETE_UID}" ]] ||
   fail "R1 the lead change names the previous leader"
 
@@ -391,14 +469,15 @@ next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s1b" completed "${DA1}" "r1b1:90:5"
 drain "R1 no beat"
 expect_since "${GX1}" "" "R1 a set that doesn't beat my best writes nothing"
-expect_entry "${GX1}" A weight "100@r1a1" "R1 no beat"
+expect_entry "${GX1}" A volume "500@r1a1" "R1 no beat"
 
+# 90 × 6 beats A's Volume (540 > 500) but not R's (550), and no 1RM (108.3).
 mark
 next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-s1c" completed "${DA1}" "r1c1:105:2"
+sess "${ATHLETE_TOKEN}" "${T}-s1c" completed "${DA1}" "r1c1:90:6"
 drain "R1 personal record only"
 expect_since "${GX1}" "record@A" "R1 a PR that is not #1: record, no lead change"
-[[ "$(boards_of "${GX1}")" == "weight:100:false" ]] || fail "R1 PR boards: $(boards_of "${GX1}")"
+[[ "$(boards_of "${GX1}")" == "volume:500:false" ]] || fail "R1 PR boards: $(boards_of "${GX1}")"
 pass "R1: records (first set included), group-record flag, lead changes only when #1 moves"
 
 # =============================================================================
@@ -416,13 +495,13 @@ sess "${RIVAL_TOKEN}" "${T}-s2r" completed "${DR2}" "r2r1:90:5"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s2a" completed "${DA2}" "r2a1:100:5" "r2a2:70:5"
 drain "R2 setup"
-expect_entry "${GX2}" A weight "100@r2a1" "R2 setup"
+expect_entry "${GX2}" A volume "500@r2a1" "R2 setup"
 
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-s2a" r2a1 0 80 5
 drain "R2 edited down"
-expect_since "${GX2}" "record_voided:edited@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "R2 edited down"
-expect_entry "${GX2}" A weight "80@r2a1" "R2 edited down falls back"
+expect_since "${GX2}" "record_voided:edited@A,lead_change:void:volume@A,lead_change:void:e1rm@A" "R2 edited down"
+expect_entry "${GX2}" A volume "400@r2a1" "R2 edited down falls back"
 expect_sql "R2 the lead change points at the void" \
   "select (select related_event_id from app_public.group_events where group_exercise_id = '${GX2}'
             and kind = 'lead_change' order by seq desc limit 1)
@@ -436,7 +515,7 @@ drain "R2 record again"
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-s2b" r2b1 0 120 5 unperformed
 drain "R2 unperformed"
-expect_since "${GX2}" "record_voided:edited@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "R2 unperformed"
+expect_since "${GX2}" "record_voided:edited@A,lead_change:void:volume@A,lead_change:void:e1rm@A" "R2 unperformed"
 
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s2c" completed "${DA2}" "r2c1:130:5"
@@ -444,8 +523,8 @@ drain "R2 record a third time"
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-s2c" r2c1 0 130 5 "" "$(now_ms)"
 drain "R2 deleted"
-expect_since "${GX2}" "record_voided:deleted@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "R2 deleted"
-expect_entry "${GX2}" A weight "80@r2a1" "R2 deleted falls back"
+expect_since "${GX2}" "record_voided:deleted@A,lead_change:void:volume@A,lead_change:void:e1rm@A" "R2 deleted"
+expect_entry "${GX2}" A volume "400@r2a1" "R2 deleted falls back"
 expect_sql "R2 every record card stays, each voided once" \
   "select count(*) filter (where kind = 'record') || ':' || count(*) filter (where kind = 'record_voided')
      from app_public.group_events where group_exercise_id = '${GX2}' and member_user_id = '${ATHLETE_UID}';" "3:3"
@@ -470,7 +549,7 @@ expect_sql "R3 both records are the same set, one voided" \
   "select count(*) || ':' || count(*) filter (where exists (select 1 from app_public.group_events v
             where v.kind = 'record_voided' and v.related_event_id = e.id))
      from app_public.group_events e where e.group_exercise_id = '${GX3}' and e.kind = 'record' and e.set_id = '${T}-r3a1';" "2:1"
-expect_entry "${GX3}" A weight "110@r3a1" "R3"
+expect_entry "${GX3}" A volume "550@r3a1" "R3"
 pass "R3: edited up → void + new record"
 
 # =============================================================================
@@ -489,22 +568,24 @@ R4_RECORD="$(latest "${GX4}" record "id")"
 mark
 session_row "${ATHLETE_TOKEN}" "${T}-s4" "${S4_AT}" completed "$(now_ms)"
 drain "R4 session deleted"
-expect_since "${GX4}" "record_voided:deleted@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "R4 session deleted"
-expect_entry "${GX4}" A weight "" "R4 the board empties"
+expect_since "${GX4}" "record_voided:deleted@A,lead_change:void:volume@A,lead_change:void:e1rm@A" "R4 session deleted"
+expect_entry "${GX4}" A volume "" "R4 the board empties"
 expect_sql "R4 an emptied board's lead change has no leader" \
   "select jsonb_typeof(payload -> 'leader') from app_public.group_events
     where group_exercise_id = '${GX4}' and kind = 'lead_change' order by seq desc limit 1;" "null"
 
 # The voided card stays in the stream while its session is tombstoned (D15).
-rpc "${RIVAL_TOKEN}" group_stream "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
-expect_ok "stream with a tombstoned session"
-check_args "R4 the voided record card stays in the stream" \
-  --arg k "${R4_RECORD}" '[.items[] | select(.kind == "record" and .key == $k)][0].voided.reason == "deleted"'
+stream_items "${RIVAL_TOKEN}"
+check_args "R4 the voided record card stays in the stream" --arg k "${R4_RECORD}" \
+  '[.[] | select(.kind == "competition" and .key == $k)][0].event | .kind == "record" and .voided == true'
+check_args "R4 its void says the set was deleted" --arg k "${R4_RECORD}" \
+  'any(.[]; .kind == "competition" and .event.kind == "record_voided" and .event.related_event_id == $k
+             and .event.reason == "deleted")'
 
 mark
 session_row "${ATHLETE_TOKEN}" "${T}-s4" "${S4_AT}" completed
 drain "R4 session undeleted"
-expect_since "${GX4}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "R4 undelete: fresh record"
+expect_since "${GX4}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "R4 undelete: fresh record"
 [[ "$(latest "${GX4}" record "id")" != "${R4_RECORD}" ]] || fail "R4 the fresh record is a new event"
 pass "R4: session delete voids; undelete writes fresh records"
 
@@ -531,15 +612,16 @@ drain "R5 setup"
 mark
 link "${ATHLETE_TOKEN}" "${DA5}" "${GID}" "${GX5}"
 drain "R5 link"
-expect_since "${GX5}" "link@A,lead_change:link:weight@A,lead_change:link:e1rm@A" "R5 link"
+expect_since "${GX5}" "link@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 link"
 expect_sql "R5 a retroactive link writes no record (P16)" \
   "select count(*) from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'record'
       and member_user_id = '${ATHLETE_UID}';" "0"
 expect_sql "R5 the link item's effects and exercises" \
   "select (payload -> 'exercise_definition_ids') = '[\"${DA5}\"]'::jsonb
-          and (payload -> 'effects' -> 1 ->> 'metric') = 'weight'
+          and (payload -> 'effects' -> 1 ->> 'metric') = 'volume'
           and jsonb_typeof(payload -> 'effects' -> 1 -> 'before') = 'null'
-          and (payload -> 'effects' -> 1 -> 'after') = '{\"rank\": 1, \"value_kg\": 120}'::jsonb
+          and (payload -> 'effects' -> 1 -> 'after')
+              = '{\"rank\": 1, \"value\": 600, \"metric\": \"volume\", \"unit\": \"kg_reps\", \"rules_revision\": 1}'::jsonb
      from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'link';" "t"
 [[ "$(latest "${GX5}" lead_change "related_event_id")" == "$(latest "${GX5}" link "id")" ]] ||
   fail "R5 the lead change points at the link item"
@@ -552,8 +634,8 @@ expect_since "${GX5}" "" "R5 a link that moves no entry writes no item"
 mark
 link "${ATHLETE_TOKEN}" "${DA5}" "${GID}" "${GX5}" deleted
 drain "R5 unlink"
-expect_since "${GX5}" "unlink@A,lead_change:link:weight@A,lead_change:link:e1rm@A" "R5 unlink"
-expect_entry "${GX5}" A weight "50@r5b1" "R5 unlink falls back to the still-linked exercise"
+expect_since "${GX5}" "unlink@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 unlink"
+expect_entry "${GX5}" A volume "250@r5b1" "R5 unlink falls back to the still-linked exercise"
 expect_sql "R5 unlink never voids a record" \
   "select count(*) from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'record_voided';" "0"
 
@@ -562,8 +644,8 @@ mark
 link "${ATHLETE_TOKEN}" "${DA5B}" "${GID}" "${GX5B}"
 drain "R5 retarget"
 expect_since "${GX5}" "unlink@A" "R5 retarget leaves the old board (R stays #1)"
-expect_since "${GX5B}" "link@A,lead_change:link:weight@A,lead_change:link:e1rm@A" "R5 retarget joins the new board"
-expect_entry "${GX5}" A weight "" "R5 retarget: no entry left on the old board"
+expect_since "${GX5B}" "link@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 retarget joins the new board"
+expect_entry "${GX5}" A volume "" "R5 retarget: no entry left on the old board"
 pass "R5: link, unlink, retarget → link/unlink items, lead_change{link}, no records"
 
 # =============================================================================
@@ -571,18 +653,17 @@ echo "[${LANE_LABEL}] R6 — no certification: Certified boards stay empty (cert
 # =============================================================================
 
 expect_sql "R6 no Certified entry exists" \
-  "select count(*) from app_public.group_board_entries where group_id = '${GID}' and certified;" "0"
-rpc "${ATHLETE_TOKEN}" group_board_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
-expect_ok "podiums (defaults: Certified · e1RM)"
-check_args "R6 Certified podiums are empty, with the All count for the empty state" \
-  --arg x "${GX1}" \
-  '.metric == "e1rm" and .certified == true
-   and all(.exercises[]; .podium == [] and .me == null and .entry_count == 0)
-   and ([.exercises[] | select(.exercise.group_exercise_id == $x)][0].all_entry_count == 2)'
+  "select count(*) from app_public.group_metric_board_entries where group_id = '${GID}' and certified;" "0"
+rpc "${ATHLETE_TOKEN}" group_competition_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
+expect_ok "podiums (default: Certified)"
+check_args "R6 Certified podiums are empty, each on its comparison's default metric" --arg x "${GX1}" \
+  '.certified == true and any(.podiums[]; .exercise.group_exercise_id == $x)
+   and all(.podiums[]; .board.certified == true and .board.metric == .exercise.rules.default_metric
+                       and .board.entries == [] and .board.me == null and .board.entry_count == 0)'
 pass "R6: uncertified sets make no Certified entries; Certified podiums empty"
 
 # =============================================================================
-echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 converts 1RM; Weight stays raw)"
+echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 converts Volume and 1RM; a rescore, not a lift)"
 # =============================================================================
 
 GX7="$(gx "R7 curl (per side)" per_side_load)"
@@ -597,158 +678,35 @@ sess "${ATHLETE_TOKEN}" "${T}-s7" completed "${DA7}" "r7a1:100:5"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s7b" completed "${DA7B}" "r7b1:40:8"
 drain "R7 setup"
-expect_entry "${GX7}" A weight "100@r7a1" "D6 total → per side: Weight is the raw entered kg"
+expect_entry "${GX7}" A volume "250@r7a1" "D6 total → per side: Volume ÷2"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "D6 e1RM ÷2"
-expect_entry "${GX7B}" A weight "40@r7b1" "D6 per side → total: Weight is the raw entered kg"
+expect_entry "${GX7B}" A volume "640@r7b1" "D6 per side → total: Volume ×2"
 expect_entry "${GX7B}" A e1rm "$(e1rm 40 8 2)@r7b1" "D6 e1RM ×2"
-expect_sql "D6 the entered value and factor are kept; the Weight entry's weight_kg is raw" \
-  "select string_agg(entered_weight_kg || 'x' || load_factor || '=' || weight_kg, ',' order by group_exercise_id = '${GX7}' desc)
-     from app_public.group_board_entries
-    where group_exercise_id in ('${GX7}', '${GX7B}') and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" \
-  "100x0.5=100,40x2=40"
-expect_sql "D6 the 1RM entry carries the raw Weight beside the converted 1RM" \
-  "select weight_kg || '/' || e1rm_kg from app_public.group_board_entries
-    where group_exercise_id = '${GX7B}' and member_user_id = '${ATHLETE_UID}' and metric = 'e1rm' and not certified;" \
-  "40/$(e1rm 40 8 2)"
 
+# A source load-mode change is a rules rescore: the entries move, no void or
+# record is written, and the record keeps the rescored values as its baseline.
+rescore_baseline() {
+  run_psql "select (select string_agg(k, ',' order by k) from jsonb_object_keys(rule_rescore_baseline) k)
+                   || ':' || $(num "rule_rescore_baseline -> 'volume' ->> 'value'")
+              from app_public.group_events where group_exercise_id = '${GX7}' and kind = 'record' and set_id = '${T}-r7a1';"
+}
 mark
 def "${ATHLETE_TOKEN}" "${DA7}" per_side_load
 drain "R7 mode up"
-expect_since "${GX7}" "record_voided:edited@A,record@A" "R7 rescale up: the 1RM moves (void + record)"
-expect_entry "${GX7}" A weight "100@r7a1" "R7 rescale up leaves Weight raw"
+expect_since "${GX7}" "" "R7 rescale up writes no event"
+expect_entry "${GX7}" A volume "500@r7a1" "R7 rescale up"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5)@r7a1" "R7 rescale up"
+[[ "$(rescore_baseline)" == "e1rm,volume:500" ]] || fail "R7 rescale up: the record's rescore baseline: $(rescore_baseline)"
 mark
 def "${ATHLETE_TOKEN}" "${DA7}" total_load
 drain "R7 mode down"
-expect_entry "${GX7}" A weight "100@r7a1" "R7 rescale down leaves Weight raw"
+expect_since "${GX7}" "" "R7 rescale down writes no event"
+expect_entry "${GX7}" A volume "250@r7a1" "R7 rescale down"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "R7 rescale down"
-expect_sql "R7 rescale down voids the 1RM record; the replacement keeps only the Weight board" \
-  "select string_agg(kind || coalesce(':' || reason, ''), ',' order by seq) || '|' ||
-          (select string_agg(b ->> 'metric', ',') from jsonb_array_elements(
-             (select payload -> 'boards' from app_public.group_events where group_exercise_id = '${GX7}'
-                and kind = 'record' order by seq desc limit 1)) b)
-     from app_public.group_events where group_exercise_id = '${GX7}' and seq > ${MARK};" \
-  "record_voided:edited,record|weight"
-pass "R7: a load-mode change moves 1RM like an edit and never Weight; D6 in both directions"
-
-# =============================================================================
-echo "[${LANE_LABEL}] raw Weight — a Weight best stored converted falls silently (forward only)"
-# =============================================================================
-
-# Before Weight was raw, a per-side member's Weight on a total-load board was
-# stored ×2. Reproduce that stored state, then apply: the entry falls to the
-# raw value with no event, the stored record stands, and only a set that
-# beats the raw value is a record.
-GXV="$(gx "V press (total)" total_load)"
-DAV="${T}-dAV"; DRV="${T}-dRV"
-def "${ATHLETE_TOKEN}" "${DAV}" per_side_load
-link "${ATHLETE_TOKEN}" "${DAV}" "${GID}" "${GXV}"
-def "${RIVAL_TOKEN}" "${DRV}" total_load
-link "${RIVAL_TOKEN}" "${DRV}" "${GID}" "${GXV}"
-next_session_at
-sess "${RIVAL_TOKEN}" "${T}-sv-r" completed "${DRV}" "v-r1:60:5"
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv-a" completed "${DAV}" "v-a1:40:8"
-drain "V setup"
-expect_entry "${GXV}" A weight "40@v-a1" "V a per-side Weight is raw"
-expect_entry "${GXV}" R weight "60@v-r1" "V the rival leads Weight"
-# Certify both sets so the Certified boards hold the same two entries.
-for pair in "${RIVAL_TOKEN}:${ATHLETE_UID}:v-a1" "${ATHLETE_TOKEN}:${RIVAL_UID}:v-r1"; do
-  IFS=: read -r token lifter suffix <<<"${pair}"
-  rpc "${token}" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GXV}" --arg m "${lifter}" --arg s "${T}-${suffix}" \
-      '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s}')"
-  expect_ok "V certify ${suffix}"
-done
-drain "V certifications"
-V_RECORD="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-v-a1';")"
-[[ -n "${V_RECORD}" ]] || fail "V the athlete's record exists"
-run_psql "update app_public.group_board_entries set value_kg = 80, weight_kg = 80
-           where group_exercise_id = '${GXV}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';
-          update app_public.group_events
-             set payload = payload || jsonb_build_object('weight_kg', 80, 'boards', (
-                   select jsonb_agg(case when b ->> 'metric' = 'weight' then b || '{\"value_kg\": 80}'::jsonb else b end)
-                     from jsonb_array_elements(payload -> 'boards') b))
-           where id = '${V_RECORD}';" >/dev/null
-board "${OWNER_TOKEN}" "${GXV}" weight false
-check_args "V the stored converted Weight leads" --arg a "${ATHLETE_UID}" '.rows[0].member.user_id == $a and .rows[0].value_kg == 80'
-
-mark
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv-a2" completed "${DAV}" "v-a2:35:8"
-drain "V re-evaluation"
-expect_since "${GXV}" "" "V the converted best falls silently: no lead change (All or Certified), void or record"
-expect_entry "${GXV}" A weight "40@v-a1" "V the entry falls to the raw value"
-expect_sql "V the certified Weight falls to the raw value too" \
-  "select value_kg from app_public.group_board_entries
-    where group_exercise_id = '${GXV}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight' and certified;" "40"
-board "${OWNER_TOKEN}" "${GXV}" weight false
-check_args "V the rival leads again" --arg r "${RIVAL_UID}" '.rows[0].member.user_id == $r and .rows[0].value_kg == 60'
-expect_sql "V the stored record stands (forward only)" \
-  "select count(*) from app_public.group_events where kind = 'record_voided' and related_event_id = '${V_RECORD}';" "0"
-
-mark
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv-a3" completed "${DAV}" "v-a3:45:8"
-drain "V a raw Weight PR"
-expect_since "${GXV}" "record@A" "V a set beating the raw value is a record"
-[[ "$(boards_of "${GXV}")" == "e1rm:$(e1rm 40 8 2):true,weight:40:false" ]] ||
-  fail "V record boards (raw Weight baseline): $(boards_of "${GXV}")"
-expect_entry "${GXV}" A weight "45@v-a3" "V the raw PR"
-# stored_converted <gx> <set-suffix>: rewrite the athlete's Weight entries and
-# the set's record as the old rule stored them for a factor-2 link.
-stored_converted() {
-  local rec
-  rec="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-$2';")"
-  [[ -n "${rec}" ]] || fail "stored_converted: no record for $2"
-  run_psql "update app_public.group_board_entries set value_kg = value_kg * 2, weight_kg = weight_kg * 2
-             where group_exercise_id = '$1' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';
-            update app_public.group_events
-               set payload = payload || jsonb_build_object('weight_kg', (payload ->> 'weight_kg')::numeric * 2, 'boards', (
-                     select jsonb_agg(case when b ->> 'metric' = 'weight'
-                                           then b || jsonb_build_object('value_kg', (b ->> 'value_kg')::numeric * 2)
-                                           else b end)
-                       from jsonb_array_elements(payload -> 'boards') b))
-             where id = '${rec}';" >/dev/null
-}
-
-# The first apply after the rule meets a set that beats the raw value but not
-# the stored converted one: a record against the raw baseline, not a rules move.
-GXV2="$(gx "V2 press (total)" total_load)"
-DAV2="${T}-dAV2"
-def "${ATHLETE_TOKEN}" "${DAV2}" per_side_load
-link "${ATHLETE_TOKEN}" "${DAV2}" "${GID}" "${GXV2}"
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv2-a" completed "${DAV2}" "v2-a1:40:8"
-drain "V2 setup"
-stored_converted "${GXV2}" v2-a1
-expect_entry "${GXV2}" A weight "80@v2-a1" "V2 the stored converted Weight"
-mark
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv2-a2" completed "${DAV2}" "v2-a2:45:8"
-drain "V2 raw PR on the first apply"
-expect_since "${GXV2}" "record@A" "V2 beating the raw value (not the converted one) is a record"
-[[ "$(boards_of "${GXV2}")" == "e1rm:$(e1rm 40 8 2):true,weight:40:true" ]] ||
-  fail "V2 record boards (raw Weight baseline): $(boards_of "${GXV2}")"
-expect_entry "${GXV2}" A weight "45@v2-a2" "V2 the raw PR"
-
-# A reps-only edit of a record stored converted keeps its Weight card: the
-# replacement lists Weight at the raw value with its original baseline.
-GXV3="$(gx "V3 press (total)" total_load)"
-DAV3="${T}-dAV3"
-def "${ATHLETE_TOKEN}" "${DAV3}" per_side_load
-link "${ATHLETE_TOKEN}" "${DAV3}" "${GID}" "${GXV3}"
-next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sv3-a" completed "${DAV3}" "v3-a1:40:8"
-drain "V3 setup"
-stored_converted "${GXV3}" v3-a1
-mark
-set_edit "${ATHLETE_TOKEN}" "${T}-sv3-a" v3-a1 0 40 9
-drain "V3 reps edit"
-expect_since "${GXV3}" "record_voided:edited@A,record@A" "V3 a reps edit voids and replaces the record"
-[[ "$(boards_of "${GXV3}")" == "e1rm:$(e1rm 40 8 2):true,weight:null:true" ]] ||
-  fail "V3 the replacement keeps the Weight card: $(boards_of "${GXV3}")"
-expect_entry "${GXV3}" A weight "40@v3-a1" "V3 the entry is raw"
-pass "raw Weight: a stored converted best falls silently, its record stands, the raw value is the baseline"
+[[ "$(rescore_baseline)" == "e1rm,volume:250" ]] || fail "R7 rescale down: the record's rescore baseline: $(rescore_baseline)"
+expect_sql "R7 the record stands" \
+  "select count(*) from app_public.group_events where group_exercise_id = '${GX7}' and kind = 'record_voided';" "0"
+pass "R7: a load-mode change rescales Volume and 1RM silently; D6 in both directions"
 
 # =============================================================================
 echo "[${LANE_LABEL}] R9 — an archived board is frozen; unarchive catches up"
@@ -761,37 +719,47 @@ link "${ATHLETE_TOKEN}" "${DA9}" "${GID}" "${GX9}"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s9a" completed "${DA9}" "r9a1:100:5"
 drain "R9 setup"
-rpc "${OWNER_TOKEN}" group_exercise_archive "$(jq -nc --arg g "${GID}" --arg e "${GX9}" '{p_group_id: $g, p_exercise_id: $e}')"
+gx_archive "${GX9}" true
 expect_ok "archive GX9"
 mark
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s9b" completed "${DA9}" "r9b1:150:5"
 drain "R9 while archived"
 expect_since "${GX9}" "" "R9 no event while archived"
-expect_entry "${GX9}" A weight "100@r9a1" "R9 entries frozen"
-board "${ATHLETE_TOKEN}" "${GX9}" weight false
+expect_entry "${GX9}" A volume "500@r9a1" "R9 entries frozen"
+board "${ATHLETE_TOKEN}" "${GX9}" volume false
 expect_ok "an archived board is readable"
-check "R9 the archived board still serves its rows" '.rows[0].value_kg == 100 and .exercise.archived_at_ms != null'
-rpc "${OWNER_TOKEN}" group_exercise_unarchive "$(jq -nc --arg g "${GID}" --arg e "${GX9}" '{p_group_id: $g, p_exercise_id: $e}')"
+check "R9 the archived board still serves its rows" '.state == "archived" and .entries[0].value == 500'
+gx_archive "${GX9}" false
 expect_ok "unarchive GX9"
 drain "R9 unarchive catch-up"
 expect_since "${GX9}" "record@A" "R9 sets logged while archived count after unarchive"
-expect_entry "${GX9}" A weight "150@r9b1" "R9 catch-up"
+expect_entry "${GX9}" A volume "750@r9b1" "R9 catch-up"
 pass "R9: archived boards frozen and readable; unarchive applies what was missed"
 
 # =============================================================================
-echo "[${LANE_LABEL}] R10 — a rules_version bump recomputes silently"
+echo "[${LANE_LABEL}] R10 — a rules change recomputes silently on a new revision"
 # =============================================================================
 
-run_psql "update app_public.group_board_entries set value_kg = 1
-           where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" >/dev/null
+# Corrupt A's stored Volume, then change GX1's rules (a contribution, inert
+# while the group's bodyweight calculations are off): the new revision is
+# computed from the sets, and its first publication writes only rules_change.
+run_psql "update app_public.group_metric_board_entries set value = 1
+           where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'volume';" >/dev/null
 mark
-expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
+rpc "${OWNER_TOKEN}" group_competition_exercise_update "$(jq -nc --arg g "${GID}" --arg x "${GX1}" --argjson r "$(rev "${GX1}")" \
+  '{p_group_id: $g, p_exercise_id: $x, p_expected_revision: $r, p_name: "R1 bench", p_load_input_mode: "total_load",
+    p_bodyweight_contribution: 0.5, p_default_metric: "volume"}')"
+expect_ok "R10 rules change"
 drain "R10 rules"
-expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
-expect_sql "R10 the recompute writes no event in the group" \
-  "select count(*) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" "0"
-pass "R10: rules recompute corrects entries silently"
+expect_sql "R10 the new revision is published" \
+  "select rules_revision || ':' || published_rules_revision from app_public.group_exercises where id = '${GX1}';" "2:2"
+expect_entry "${GX1}" A volume "540@r1c1" "R10 the recompute corrects entries"
+expect_entry "${GX1}" R volume "550@r1r1" "R10 the recompute corrects entries"
+expect_sql "R10 the recompute writes no event in the group but its rules change" \
+  "select string_agg(kind, ',' order by seq) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" \
+  "rules_change"
+pass "R10: a rules change recomputes entries silently on a new revision"
 
 # =============================================================================
 echo "[${LANE_LABEL}] working sets only — a warm-up never counts, forward only"
@@ -806,19 +774,26 @@ link "${RIVAL_TOKEN}" "${DRW}" "${GID}" "${GXW}"
 next_session_at
 sess "${RIVAL_TOKEN}" "${T}-sw-r1" completed "${DRW}" "wr1:110:5"
 next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-sw-a1" completed "${DAW}" "wa1:100:5" "wa2:130:3:::warm_up"
+sess "${ATHLETE_TOKEN}" "${T}-sw-a1" completed "${DAW}" "wa1:100:5" "wa2:130:5:::warm_up"
 drain "W baseline"
-expect_entry "${GXW}" A weight "100@wa1" "W the warm-up does not count"
+expect_entry "${GXW}" A volume "500@wa1" "W the warm-up does not count"
 expect_entry "${GXW}" A e1rm "$(e1rm 100 5)@wa1" "W the warm-up does not count"
 expect_sql "W the warm-up made no record" \
   "select count(*) from app_public.group_events where set_id = '${T}-wa2';" "0"
 
-# A result stored before the rule: the same apply with the warm-up's fact
-# counted, as the old board filter did. Then the fact is as it really is.
-run_psql "update app_public.group_set_facts set working = true where set_id = '${T}-wa2';
-          select app_public.group_eval_apply_legacy('${GID}', '${ATHLETE_UID}', '${GXW}', array['set']);
-          update app_public.group_set_facts set working = false where set_id = '${T}-wa2';" >/dev/null
-expect_entry "${GXW}" A weight "130@wa2" "W the stored warm-up best"
+# stored_warm_up <member-uid> <set-suffix>: a result stored before the rule —
+# the member's apply with the warm-up's scores counted, as the old board
+# filter did. Then the scores are as they really are.
+stored_warm_up() {
+  run_psql "update app_public.group_metric_set_scores set counting = true
+             where group_exercise_id = '${GXW}' and member_user_id = '$1' and set_id = '${T}-$2';
+            select app_public.group_metric_apply_member('${GID}', '$1', '${GXW}', $(rev "${GXW}"),
+                     app_public.group_metric_eval_source_graph('${GID}', '${GXW}'), false);
+            update app_public.group_metric_set_scores set counting = false
+             where group_exercise_id = '${GXW}' and member_user_id = '$1' and set_id = '${T}-$2';" >/dev/null
+}
+stored_warm_up "${ATHLETE_UID}" wa2
+expect_entry "${GXW}" A volume "650@wa2" "W the stored warm-up best"
 WA2_RECORD="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-wa2';")"
 [[ -n "${WA2_RECORD}" ]] || fail "W the stored warm-up record exists"
 
@@ -827,34 +802,33 @@ next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-sw-a2" completed "${DAW}" "wa3:105:5"
 drain "W re-evaluation"
 expect_since "${GXW}" "" "W the warm-up best falls silently: no lead change, void or record"
-expect_entry "${GXW}" A weight "105@wa3" "W the entry falls to the best working set"
+expect_entry "${GXW}" A volume "525@wa3" "W the entry falls to the best working set"
 expect_entry "${GXW}" A e1rm "$(e1rm 105 5)@wa3" "W the entry falls to the best working set"
-board "${OWNER_TOKEN}" "${GXW}" weight false
+board "${OWNER_TOKEN}" "${GXW}" volume false
 expect_ok "W board"
-check_args "W the rival leads again" --arg r "${RIVAL_UID}" '.rows[0].member.user_id == $r and .rows[0].value_kg == 110'
+check_args "W the rival leads again" --arg r "${RIVAL_UID}" '.entries[0].member.user_id == $r and .entries[0].value == 550'
 expect_sql "W the stored warm-up record stands (forward only)" \
   "select count(*) from app_public.group_events where kind = 'record_voided' and related_event_id = '${WA2_RECORD}';" "0"
 
-# group_certify <token> <lifter-uid> <set-suffix>
-certify_set() {
-  rpc "$1" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GXW}" --arg m "$2" --arg s "${T}-$3" \
-      '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s}')"
-}
-certify_set "${RIVAL_TOKEN}" "${ATHLETE_UID}" wa2
+certify "${RIVAL_TOKEN}" "${GXW}" "${ATHLETE_UID}" wa2 e1rm "$(score_token "${GXW}" "${ATHLETE_UID}" wa2 e1rm)"
 expect_error NOT_FOUND "W a stored warm-up record cannot be certified"
-check "W ... as not a record set" '.message == "NOT_FOUND: record set not found"'
+check "W ... as not a record set" '.message == "NOT_FOUND: record set not found for this metric"'
 
 mark
 next_session_at
 sess "${RIVAL_TOKEN}" "${T}-sw-r2" completed "${DRW}" "wr2:200:3:::warm_up" "wr3:112:5"
 drain "W heavy warm-up"
 expect_since "${GXW}" "record@R" "W only the working set is a record"
-[[ "$(boards_of "${GXW}")" == "e1rm:$(e1rm 110 5):true,weight:110:true" ]] || fail "W record boards: $(boards_of "${GXW}")"
-expect_entry "${GXW}" R weight "112@wr3" "W a warm-up heavier than every working set never ranks"
+[[ "$(boards_of "${GXW}")" == "e1rm:$(e1rm 110 5):true,volume:550:true" ]] || fail "W record boards: $(boards_of "${GXW}")"
+expect_entry "${GXW}" R volume "560@wr3" "W a warm-up heavier than every working set never ranks"
 expect_entry "${GXW}" R e1rm "$(e1rm 112 5)@wr3" "W a warm-up heavier than every working set never ranks"
-certify_set "${ATHLETE_TOKEN}" "${RIVAL_UID}" wr2
+certify "${ATHLETE_TOKEN}" "${GXW}" "${RIVAL_UID}" wr2 e1rm "$(score_token "${GXW}" "${RIVAL_UID}" wr2 e1rm)"
 expect_error NOT_FOUND "W a heavy warm-up cannot be certified"
-certify_set "${ATHLETE_TOKEN}" "${RIVAL_UID}" wr3
+board "${ATHLETE_TOKEN}" "${GXW}" e1rm false
+expect_ok "W 1RM board"
+WR3_TOKEN="$(jq -er --arg r "${RIVAL_UID}" --arg s "${T}-wr3" \
+  '.entries[] | select(.member.user_id == $r and .performance.set_id == $s) | .write_token' <<<"${BODY}")"
+certify "${ATHLETE_TOKEN}" "${GXW}" "${RIVAL_UID}" wr3 e1rm "${WR3_TOKEN}"
 expect_ok "W the working record set can be certified"
 
 # A stored warm-up record whose set is edited is voided as any record is, and
@@ -863,17 +837,15 @@ DMW="${T}-dMW"
 def "${AWAY_TOKEN}" "${DMW}" total_load
 link "${AWAY_TOKEN}" "${DMW}" "${GID}" "${GXW}"
 next_session_at
-sess "${AWAY_TOKEN}" "${T}-sw-m1" completed "${DMW}" "wm0:90:5" "wm1:150:3:::warm_up"
+sess "${AWAY_TOKEN}" "${T}-sw-m1" completed "${DMW}" "wm0:90:5" "wm1:150:5:::warm_up"
 drain "W member warm-up"
-run_psql "update app_public.group_set_facts set working = true where set_id = '${T}-wm1';
-          select app_public.group_eval_apply_legacy('${GID}', '${AWAY_UID}', '${GXW}', array['set']);
-          update app_public.group_set_facts set working = false where set_id = '${T}-wm1';" >/dev/null
-expect_entry "${GXW}" M weight "150@wm1" "W the member's stored warm-up best leads"
+stored_warm_up "${AWAY_UID}" wm1
+expect_entry "${GXW}" M volume "750@wm1" "W the member's stored warm-up best leads"
 mark
 next_cuam
 push "${AWAY_TOKEN}" "edit wm1" "$(e_set "${T}-wm1" "${T}-sw-m1-se" 1 80 3 "" "${CUAM}" null warm_up)"
 drain "W warm-up record edited"
-expect_since "${GXW}" "record_voided:edited@M,lead_change:void:weight@M,lead_change:void:e1rm@M" \
+expect_since "${GXW}" "record_voided:edited@M,lead_change:void:volume@M,lead_change:void:e1rm@M" \
   "W an edited warm-up record is voided with its lead changes"
 pass "working sets only: never ranks, records or certifies; a stored warm-up record stands, its board moves silently"
 
@@ -882,9 +854,8 @@ echo "[${LANE_LABEL}] zero kg — a 0 kg result never ranks, records or fails th
 # =============================================================================
 
 # A member whose only counting sets on a linked exercise are 0 kg (typed 0,
-# or blank weight with reps) has no Weight and no 1RM: the fact stores no
-# e1RM at 0 kg and the boards read a zero 1RM as none, so the apply writes
-# no entry instead of failing group_board_entries' value_kg > 0 check.
+# or blank weight with reps) has no Volume and no 1RM: the scorer emits no
+# value at 0 kg, so the comparison writes no entry and no event.
 GXZ="$(gx "Z zero" per_side_load)"
 DAZ="${T}-dAZ"
 def "${ATHLETE_TOKEN}" "${DAZ}" total_load
@@ -893,17 +864,15 @@ mark
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-sz" completed "${DAZ}" "z1:0:5" "z2::8"
 drain "Z only 0 kg sets"
-# A 0 kg set storing no e1RM is the TS fact rule (groups-set-facts.test.ts);
-# here: the boards never rank it.
-expect_entry "${GXZ}" A weight "" "Z a 0 kg set has no Weight"
+expect_entry "${GXZ}" A volume "" "Z a 0 kg set has no Volume"
 expect_entry "${GXZ}" A e1rm "" "Z a 0 kg set has no 1RM"
 expect_since "${GXZ}" "" "Z a 0 kg set makes no record or lead change"
 mark
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-sz2" completed "${DAZ}" "z3:20:5"
 drain "Z a loaded set"
-expect_since "${GXZ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "Z the first loaded set is the first record"
-expect_entry "${GXZ}" A weight "20@z3" "Z the loaded set ranks"
+expect_since "${GXZ}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "Z the first loaded set is the first record"
+expect_entry "${GXZ}" A volume "50@z3" "Z the loaded set ranks"
 pass "zero kg: no entry, no record, no failed apply"
 
 # =============================================================================
@@ -927,32 +896,30 @@ next_session_at
 SPA_AT="${SESSION_AT}"
 sess "${ATHLETE_TOKEN}" "${T}-spa" active "${DAP}" "pa1:100:5"
 drain "T8 provisional record"
-expect_since "${GXP}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "T8 record cards appear mid-session (D2)"
+expect_since "${GXP}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "T8 record cards appear mid-session (D2)"
 PREC="$(latest "${GXP}" record "id")"
 
+# record_volume: the provisional record's Volume board as `value:previous`,
+# then its Volume lead change's leader value (empty when it has none).
+record_volume() {
+  run_psql "select $(num "b ->> 'value'") || ':' || $(num "b ->> 'previous_value'") || ':'
+                   || coalesce((select $(num "payload -> 'leader' ->> 'value'") from app_public.group_events
+                                 where related_event_id = '${PREC}' and kind = 'lead_change' and metric = 'volume'), '')
+              from jsonb_array_elements((select payload -> 'boards' from app_public.group_events where id = '${PREC}')) b
+             where b ->> 'metric' = 'volume';"
+}
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 1000 5
 drain "T8 typo up"
 expect_since "${GXP}" "" "T8 an edit up while active writes no event"
-expect_sql "T8 the same record is updated in place, with its lead change" \
-  "select (select payload ->> 'weight_kg' from app_public.group_events where id = '${PREC}') || ':' ||
-          (select payload -> 'leader' ->> 'value_kg' from app_public.group_events
-            where related_event_id = '${PREC}' and kind = 'lead_change' and metric = 'weight');" "1000:1000"
-
-expect_sql "T8 an in-place edit keeps the record's previous best" \
-  "select b ->> 'previous_value_kg' from jsonb_array_elements((select payload -> 'boards' from app_public.group_events
-                                                                where id = '${PREC}')) b
-    where b ->> 'metric' = 'weight';" "80"
+[[ "$(record_volume)" == "5000:400:5000" ]] ||
+  fail "T8 the same record is updated in place with its lead change, keeping its previous best: $(record_volume)"
 
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 95 5
 drain "T8 fixed to a value that still beats the previous best"
 expect_since "${GXP}" "" "T8 a fix that still beats the previous best writes no event"
-expect_sql "T8 the card stays at the corrected value, against the same previous best, and still leads" \
-  "select (payload ->> 'weight_kg') || ':'
-          || (select b ->> 'previous_value_kg' from jsonb_array_elements(payload -> 'boards') b where b ->> 'metric' = 'weight')
-          || ':' || (select lc.payload -> 'leader' ->> 'value_kg' from app_public.group_events lc
-                      where lc.related_event_id = '${PREC}' and lc.kind = 'lead_change' and lc.metric = 'weight')
-     from app_public.group_events where id = '${PREC}';" "95:80:95"
+[[ "$(record_volume)" == "475:400:475" ]] ||
+  fail "T8 the card stays at the corrected value, against the same previous best, and still leads: $(record_volume)"
 
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 85 5
 drain "T8 fixed below the rival but above the previous best"
@@ -968,21 +935,21 @@ drain "T8 typo fixed below the previous best"
 expect_since "${GXP}" "" "T8 a fix below the previous best writes no void"
 expect_sql "T8 the record and its lead changes are gone" \
   "select count(*) from app_public.group_events where id = '${PREC}' or related_event_id = '${PREC}';" "0"
-expect_entry "${GXP}" A weight "80@p0" "T8 fallback"
+expect_entry "${GXP}" A volume "400@p0" "T8 fallback"
 [[ "$(latest "${GXP}" lead_change "payload -> 'leader' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
   fail "T8 history again ends with the rival's lead"
 
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 100 5
 drain "T8 record again"
-expect_since "${GXP}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "T8 a fresh provisional record"
+expect_since "${GXP}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "T8 a fresh provisional record"
 mark
 session_row "${ATHLETE_TOKEN}" "${T}-spa" "${SPA_AT}" completed
 drain "T8 complete"
 expect_since "${GXP}" "" "T8 completing the session writes nothing"
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 70 5
 drain "T8 edit after completion"
-expect_since "${GXP}" "record_voided:edited@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "T8 once complete, an edit voids"
+expect_since "${GXP}" "record_voided:edited@A,lead_change:void:volume@A,lead_change:void:e1rm@A" "T8 once complete, an edit voids"
 pass "T8: provisional records update or drop silently; voids only once the session completes"
 
 # =============================================================================
@@ -1006,7 +973,7 @@ next_session_at
 SQA_AT="${SESSION_AT}"
 sess "${ATHLETE_TOKEN}" "${T}-sqa" active "${DAQ}" "q1:200:5"
 drain "typo record"
-expect_since "${GXQ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "a provisional typo record"
+expect_since "${GXQ}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "a provisional typo record"
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-sqa" q2 1 150 5
 drain "a real set below the typo"
@@ -1014,9 +981,9 @@ expect_since "${GXQ}" "" "a set below the typo is not a record yet"
 mark
 set_edit "${ATHLETE_TOKEN}" "${T}-sqa" q1 0 200 5 "" "$(now_ms)"
 drain "the typo deleted"
-expect_since "${GXQ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" \
+expect_since "${GXQ}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" \
   "deleting the typo makes the real set a record against the pre-session best"
-[[ "$(boards_of "${GXQ}")" == "e1rm:$(e1rm 120 5):true,weight:120:true" ]] ||
+[[ "$(boards_of "${GXQ}")" == "e1rm:$(e1rm 120 5):true,volume:600:true" ]] ||
   fail "the record is measured against the pre-session best: $(boards_of "${GXQ}")"
 [[ "$(latest "${GXQ}" lead_change "payload -> 'previous' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
   fail "the lead change rolls back past the retracted typo to the rival"
@@ -1028,7 +995,7 @@ drain "active session tombstoned"
 expect_since "${GXQ}" "" "tombstoning an active session writes no void"
 expect_sql "its provisional record and lead changes are gone" \
   "select count(*) from app_public.group_events where id = '${QREC}' or related_event_id = '${QREC}';" "0"
-expect_entry "${GXQ}" A weight "120@q0" "fallback after the tombstoned session"
+expect_entry "${GXQ}" A volume "600@q0" "fallback after the tombstoned session"
 [[ "$(latest "${GXQ}" lead_change "payload -> 'leader' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
   fail "history again ends with the rival's lead"
 pass "provisional retraction restores the baseline; a tombstoned active session drops silently"
@@ -1048,14 +1015,15 @@ mark
 set_edit "${ATHLETE_TOKEN}" "${T}-ss" s1 0 "100 " 5
 drain "whitespace-only edit"
 expect_since "${GXS}" "" "an edit that leaves every value unchanged voids nothing"
+# 100 × 5 → 50 × 10 keeps Volume (500) and lowers the 1RM.
 mark
-set_edit "${ATHLETE_TOKEN}" "${T}-ss" s1 0 100 3
-drain "reps-only edit"
-expect_since "${GXS}" "record_voided:edited@A,record@A" "a reps edit voids the card and re-records the board it still holds"
-[[ "$(boards_of "${GXS}")" == "weight:null:true" ]] ||
-  fail "the replacement lists the unchanged Weight board: $(boards_of "${GXS}")"
-expect_entry "${GXS}" A e1rm "$(e1rm 100 3)@s1" "the e1RM entry follows the edit"
-pass "voids follow values: a whitespace edit voids nothing; a reps edit keeps the Weight card"
+set_edit "${ATHLETE_TOKEN}" "${T}-ss" s1 0 50 10
+drain "an edit that keeps Volume"
+expect_since "${GXS}" "record_voided:edited@A,record@A" "the edit voids the card and re-records the board it still holds"
+[[ "$(boards_of "${GXS}")" == "volume:null:true" ]] ||
+  fail "the replacement lists the unchanged Volume board: $(boards_of "${GXS}")"
+expect_entry "${GXS}" A e1rm "$(e1rm 50 10)@s1" "the e1RM entry follows the edit"
+pass "voids follow values: a whitespace edit voids nothing; an edit keeping Volume keeps the Volume card"
 
 # =============================================================================
 echo "[${LANE_LABEL}] ties (P7)"
@@ -1081,12 +1049,12 @@ push "${ATHLETE_TOKEN}" "tie session" \
   "$(e_set "${T}-ty1" "${T}-sta-y" 1 100 5 "" "${CUAM}")" \
   "$(e_set "${T}-ty2" "${T}-sta-y" 2 100 5 "" "${CUAM}")"
 drain "P7 ties"
-expect_entry "${GXT}" A weight "100@ty1" "P7 within a member: exercise order, then set order"
-board "${ATHLETE_TOKEN}" "${GXT}" weight false
+expect_entry "${GXT}" A volume "500@ty1" "P7 within a member: exercise order, then set order"
+board "${ATHLETE_TOKEN}" "${GXT}" volume false
 expect_ok "tie board"
 check_args "P7 equal values rank the earlier session first" \
   --arg r "${RIVAL_UID}" --arg a "${ATHLETE_UID}" \
-  '[.rows[] | [.rank, .member.user_id]] == [[1, $r], [2, $a]]'
+  '[.entries[] | [.rank, .member.user_id]] == [[1, $r], [2, $a]]'
 pass "P7: ties go to the earlier date, then exercise order, then set order"
 
 # =============================================================================
@@ -1106,22 +1074,29 @@ mark
 link "${AWAY_TOKEN}" "${DMJ}" "${GID}" "${GXJ}" deleted
 drain "unlink while away"
 expect_since "${GXJ}" "" "a change while away applies nothing (the board is frozen)"
-expect_entry "${GXJ}" M weight "100@j1" "frozen while away"
-board "${ATHLETE_TOKEN}" "${GXJ}" weight false
-check "a member who left is listed as former" '.rows[0].former == true and .rows[0].rank == 1'
+expect_entry "${GXJ}" M volume "500@j1" "frozen while away"
+board "${ATHLETE_TOKEN}" "${GXJ}" volume false
+check "a member who left is listed as former" '.entries[0].former == true and .entries[0].rank == 1'
 rpc "${AWAY_TOKEN}" group_join "$(jq -nc --arg c "${INVITE_CODE}" '{p_code: $c}')"
 expect_ok "M rejoins"
+# A new membership period hides the old period's entry until its catch-up
+# publishes, so #1 has already moved when the catch-up runs: it writes the
+# unlink item and no lead change.
+board "${ATHLETE_TOKEN}" "${GXJ}" volume false
+check "a rejoin hides the old period's entry until the catch-up" '.entries == [] and .entry_count == 0'
 drain "rejoin catch-up"
-expect_since "${GXJ}" "unlink@M,lead_change:link:weight@M,lead_change:link:e1rm@M" "rejoin applies the unlink made while away"
-expect_entry "${GXJ}" M weight "" "rejoin catch-up"
+expect_since "${GXJ}" "unlink@M" "rejoin applies the unlink made while away"
+expect_entry "${GXJ}" M volume "" "rejoin catch-up"
 pass "rejoin: changes made while away are applied with normal attribution"
 
 # =============================================================================
 echo "[${LANE_LABEL}] serialization"
 # =============================================================================
 
-# The holder sleeps far longer than the check needs and is ended explicitly
-# once the blocked apply has timed out, so the lane never waits out the sleep.
+# A comparison publication takes the group's advisory lock before it reads its
+# claimed job. The holder sleeps far longer than the check needs and is ended
+# explicitly once the blocked publication has timed out, so the lane never
+# waits out the sleep. The claimed job is rolled back with the publication.
 run_psql_once "begin; select pg_advisory_xact_lock(${BOARD_LOCK_KEY}, hashtext('${GID}')); select pg_sleep(30); commit;" \
   >/dev/null 2>&1 &
 LOCK_PID=$!
@@ -1134,157 +1109,152 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 if OUT="$(run_psql_once "set lock_timeout = '500ms';
-                         select app_public.group_eval_apply('${GID}', '${ATHLETE_UID}', '${GX1}', array['set']);" 2>&1)"; then
+                         begin;
+                         select app_public.group_metric_eval_enqueue('${GID}', '${GX1}', 'set');
+                         update app_public.group_metric_eval_queue
+                            set claim_id = gen_random_uuid(), claimed_until = now() + interval '1 minute'
+                          where group_exercise_id = '${GX1}';
+                         select app_public.group_metric_eval_publish(id, generation, claim_id, '{}'::jsonb)
+                           from app_public.group_metric_eval_queue where group_exercise_id = '${GX1}';
+                         rollback;" 2>&1)"; then
   release_lock_holder >/dev/null
   wait "${LOCK_PID}" || true
-  fail "an apply must wait for the group's advisory lock"
+  fail "a publication must wait for the group's advisory lock"
 fi
-[[ "$(release_lock_holder)" == "1" ]] || fail "the advisory lock holder must still hold the lock when the apply times out"
+[[ "$(release_lock_holder)" == "1" ]] || fail "the advisory lock holder must still hold the lock when the publication times out"
 wait "${LOCK_PID}" || true
-[[ "${OUT}" == *"lock timeout"* ]] || fail "the blocked apply must fail with a lock timeout (55P03): ${OUT}"
-pass "every apply in a group takes the group's advisory lock"
+[[ "${OUT}" == *"lock timeout"* ]] || fail "the blocked publication must fail with a lock timeout (55P03): ${OUT}"
+expect_sql "the blocked publication left no comparison job" \
+  "select count(*) from app_public.group_metric_eval_queue where group_exercise_id = '${GX1}';" "0"
+pass "every publication in a group takes the group's advisory lock"
 
 # =============================================================================
 echo "[${LANE_LABEL}] board reads"
 # =============================================================================
 
-rpc "${ATHLETE_TOKEN}" group_board_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_metric: "weight", p_certified: false}')"
-expect_ok "podiums All · Weight"
-check_args "podium rows, me, and the BoardRow shape" --arg x "${GX1}" --arg r "${RIVAL_UID}" --arg a "${ATHLETE_UID}" \
-  '([.exercises[] | select(.exercise.group_exercise_id == $x)][0]) as $e
-   | [$e.podium[].member.user_id] == [$r, $a] and $e.me.rank == 2 and $e.me.member.user_id == $a
-   and $e.entry_count == 2
-   and ($e.podium[0] | keys) == ["achieved_at_ms","certification","certified","e1rm_kg","entered_weight_kg","exercise_name",
-                                 "former","load_factor","member","rank","reps","session_id","set_id","value_kg","weight_kg"]
-   and $e.podium[0].value_kg == 110 and $e.podium[0].reps == 3 and $e.podium[0].exercise_name == "Lift"
-   and $e.podium[0].certified == false and $e.podium[0].certification == null'
-check "podium exercise order: active first, archived last" \
-  '[.exercises[].exercise.archived_at_ms == null] | . == (sort | reverse)'
+# An archived comparison has no podium.
+GXA="$(gx "archived" total_load)"
+gx_archive "${GXA}" true
+expect_ok "archive GXA"
+rpc "${ATHLETE_TOKEN}" group_competition_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_certified: false}')"
+expect_ok "podiums All"
+check_args "podium rows, me, and entry count on the default metric" --arg x "${GX1}" --arg r "${RIVAL_UID}" --arg a "${ATHLETE_UID}" \
+  '([.podiums[] | select(.exercise.group_exercise_id == $x)][0].board) as $b
+   | $b.metric == "volume" and $b.certified == false
+   and [$b.entries[].member.user_id] == [$r, $a] and $b.me.rank == 2 and $b.me.member.user_id == $a
+   and $b.entry_count == 2
+   and $b.entries[0].value == 550 and $b.entries[0].unit == "kg_reps" and $b.entries[0].performance.reps == 5
+   and $b.entries[0].certification == null'
+check_args "podiums: active comparisons only, by name" --arg z "${GXA}" \
+  '([.podiums[].exercise.group_exercise_id] | index($z)) == null
+   and all(.podiums[]; .exercise.archived_at_ms == null)
+   and [.podiums[].exercise.name] == ([.podiums[].exercise.name] | sort)'
 
-board "${ATHLETE_TOKEN}" "${GX1}" weight false null 1
+board "${ATHLETE_TOKEN}" "${GX1}" volume false 1
 expect_ok "board page 1"
-check_args "board page 1" --arg r "${RIVAL_UID}" '(.rows | length) == 1 and .rows[0].member.user_id == $r and .has_more == true'
-CURSOR="$(jq -c '.next_cursor' <<<"${BODY}")"
-board "${ATHLETE_TOKEN}" "${GX1}" weight false "${CURSOR}" 1
+check_args "board page 1" --arg r "${RIVAL_UID}" \
+  '(.entries | length) == 1 and .entries[0].member.user_id == $r and .entry_count == 2 and (.next_cursor | type) == "string"'
+BOARD_CURSOR="$(jq -er '.next_cursor' <<<"${BODY}")"
+board "${ATHLETE_TOKEN}" "${GX1}" volume false 1 "${BOARD_CURSOR}"
 expect_ok "board page 2"
 check_args "board page 2 continues with absolute ranks" --arg a "${ATHLETE_UID}" \
-  '(.rows | length) == 1 and .rows[0].member.user_id == $a and .rows[0].rank == 2
-   and .has_more == false and .next_cursor == null'
+  '(.entries | length) == 1 and .entries[0].member.user_id == $a and .entries[0].rank == 2 and .next_cursor == null'
 
 HIST_KEYS=()
-CURSOR=null
+HIST_CURSOR=""
 while :; do
-  history "${ATHLETE_TOKEN}" "${GX2}" weight false "${CURSOR}" 1
+  history "${ATHLETE_TOKEN}" "${GX2}" volume false 1 "${HIST_CURSOR}"
   expect_ok "history page"
-  check "history item shape" \
-    '(.items | length) == 1 and (.items[0] | keys) == ["key","leader","occurred_at_ms","previous","reason","related","seq"]'
-  HIST_KEYS+=("$(jq -r '.items[0].key' <<<"${BODY}")")
-  [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
-  CURSOR="$(jq -c '.next_cursor' <<<"${BODY}")"
+  check "history page of one" '(.events | length) == 1'
+  HIST_KEYS+=("$(jq -r '.events[0].event_id' <<<"${BODY}")")
+  [[ "$(jq -r '.next_cursor' <<<"${BODY}")" != "null" ]] || break
+  HIST_CURSOR="$(jq -er '.next_cursor' <<<"${BODY}")"
 done
-expect_sql "history pages walk every lead change, newest first, without duplicates" \
+expect_sql "history pages walk the revision's lead changes and rules changes, newest first, without duplicates" \
   "select string_agg(id::text, ',' order by seq desc) from app_public.group_events
-    where group_exercise_id = '${GX2}' and kind = 'lead_change' and metric = 'weight';" \
+    where group_exercise_id = '${GX2}' and contract_version = 2 and rules_revision = $(rev "${GX2}")
+      and ((kind = 'lead_change' and metric = 'volume' and not certified) or kind = 'rules_change');" \
   "$(IFS=,; echo "${HIST_KEYS[*]}")"
-history "${ATHLETE_TOKEN}" "${GX2}" weight false
+GX2_VOID="$(run_psql "select id from app_public.group_events where group_exercise_id = '${GX2}' and kind = 'record_voided'
+                       and reason = 'deleted';")"
+GX2_RECORD="$(run_psql "select lc.related_event_id from app_public.group_events lc
+                          join app_public.group_events r on r.id = lc.related_event_id and r.kind = 'record'
+                         where lc.group_exercise_id = '${GX2}' and lc.kind = 'lead_change' and lc.metric = 'volume'
+                           and not lc.certified and lc.reason = 'record'
+                         order by lc.seq desc limit 1;")"
+[[ -n "${GX2_VOID}" && -n "${GX2_RECORD}" ]] || fail "history fixture: GX2's deleted void and a record-reason lead change"
+history "${ATHLETE_TOKEN}" "${GX2}" volume false
 expect_ok "history, one page"
-check_args "history: reasons, related summaries, holders with members" --arg r "${RIVAL_UID}" \
-  '.items[0].reason == "void" and .items[0].related.kind == "record_voided" and .items[0].related.reason == "deleted"
-   and .items[0].leader.member.user_id == $r
-   and ([.items[] | select(.reason == "record")][0].related.kind == "record")'
+check_args "history: reasons, related events, holders with members" \
+  --arg r "${RIVAL_UID}" --arg v "${GX2_VOID}" --arg rec "${GX2_RECORD}" \
+  '.events[0].kind == "lead_change" and .events[0].reason == "void" and .events[0].related_event_id == $v
+   and ([.events[0].values[] | select(.role == "leader")][0].member.user_id == $r)
+   and ([.events[] | select(.reason == "record")][0].related_event_id == $rec)'
 
-AGENT_TOKEN="$(mint_token "${ATHLETE_TOKEN}" "agent-client-${RUN_TAG}")"
 for call in \
-  "group_board_podiums|$(jq -nc --arg g "${GID}" '{p_group_id: $g}')" \
-  "group_board|$(jq -nc --arg g "${GID}" --arg x "${GX1}" '{p_group_id: $g, p_group_exercise_id: $x}')" \
-  "group_board_history|$(jq -nc --arg g "${GID}" --arg x "${GX1}" '{p_group_id: $g, p_group_exercise_id: $x}')"; do
+  "group_competition_podiums|$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_certified: false}')" \
+  "group_competition_board|$(jq -nc --arg g "${GID}" --arg x "${GX1}" '{p_group_id: $g, p_group_exercise_id: $x, p_metric: "volume", p_certified: false}')" \
+  "group_competition_history|$(jq -nc --arg g "${GID}" --arg x "${GX1}" '{p_group_id: $g, p_group_exercise_id: $x, p_metric: "volume", p_certified: false}')"; do
   name="${call%%|*}"; args="${call#*|}"
-  rpc "${ANON_KEY}" "${name}" "${args}"; expect_error AUTH_REQUIRED "${name} anonymous"
-  rpc "${AGENT_TOKEN}" "${name}" "${args}"; expect_error AGENT_FORBIDDEN "${name} agent token"
-  rpc "${OUTSIDER_TOKEN}" "${name}" "${args}"; expect_error NOT_FOUND "${name} non-member"
-  check "${name} non-member body" '.message == "NOT_FOUND: group not found"'
-  rpc "${OUTSIDER_TOKEN}" "${name}" "$(jq -c '. + {p_metric: "x"}' <<<"${args}")"
-  expect_error NOT_FOUND "${name} non-member with bad input (membership is checked first)"
-  rpc "${ATHLETE_TOKEN}" "${name}" "$(jq -c '. + {p_metric: "x"}' <<<"${args}")"
-  expect_error VALIDATION "${name} bad metric"
+  if [[ "${name}" != group_competition_podiums ]]; then
+    rpc "${ATHLETE_TOKEN}" "${name}" "$(jq -c '. + {p_metric: "x"}' <<<"${args}")"
+    expect_error VALIDATION "${name} bad metric"
+  fi
   rpc "${ATHLETE_TOKEN}" "${name}" "$(jq -c '. + {p_certified: null}' <<<"${args}")"
   expect_error VALIDATION "${name} null certified"
 done
-rpc "${OUTSIDER_TOKEN}" group_exercise_create \
-  "$(jq -nc --arg g "${HID}" '{p_group_id: $g, p_name: "Foreign", p_load_input_mode: "total_load", p_source_exercise_id: null}')"
-expect_ok "foreign group exercise"
-HX="$(jq -er '.exercise.group_exercise_id' <<<"${BODY}")"
-board "${ATHLETE_TOKEN}" "${HX}" weight false
+HX="$(gx "Foreign" total_load "${HID}" "${OUTSIDER_TOKEN}")"
+board "${ATHLETE_TOKEN}" "${HX}" volume false
 expect_error NOT_FOUND "board of another group's exercise"
 check "foreign exercise body" '.message == "NOT_FOUND: group exercise not found"'
-history "${ATHLETE_TOKEN}" "${HX}" weight false
+history "${ATHLETE_TOKEN}" "${HX}" volume false
 expect_error NOT_FOUND "history of another group's exercise"
 for bad in 0 101; do
-  board "${ATHLETE_TOKEN}" "${GX1}" weight false null "${bad}"; expect_error VALIDATION "board p_limit ${bad}"
+  board "${ATHLETE_TOKEN}" "${GX1}" volume false "${bad}"; expect_error VALIDATION "board p_limit ${bad}"
+  history "${ATHLETE_TOKEN}" "${GX1}" volume false "${bad}"; expect_error VALIDATION "history p_limit ${bad}"
 done
-for bad in 0 51; do
-  history "${ATHLETE_TOKEN}" "${GX1}" weight false null "${bad}"; expect_error VALIDATION "history p_limit ${bad}"
+for bad in x "$(b64 '"x"')" "$(b64 '{}')" \
+           "$(cursor_with "${BOARD_CURSOR}" '.after_rank = -1')" "$(cursor_with "${BOARD_CURSOR}" '.after_rank = 1.5')" \
+           "$(cursor_with "${BOARD_CURSOR}" '.after_rank = "1"')" "$(cursor_with "${BOARD_CURSOR}" '.rules_revision = 999')" \
+           "$(cursor_with "${BOARD_CURSOR}" '.metric = "e1rm"')"; do
+  board "${ATHLETE_TOKEN}" "${GX1}" volume false 1 "${bad}"; expect_error VALIDATION "board cursor ${bad}"
 done
-for bad in '"x"' '{}' "{\"value_kg\":\"1\",\"achieved_at_ms\":1,\"member_user_id\":\"${ATHLETE_UID}\"}" \
-           "{\"value_kg\":1,\"achieved_at_ms\":1.5,\"member_user_id\":\"${ATHLETE_UID}\"}" \
-           '{"value_kg":1,"achieved_at_ms":1,"member_user_id":"nope"}' \
-           "{\"value_kg\":1,\"achieved_at_ms\":1,\"member_user_id\":\"${ATHLETE_UID}\",\"x\":1}"; do
-  board "${ATHLETE_TOKEN}" "${GX1}" weight false "${bad}"; expect_error VALIDATION "board cursor ${bad}"
+history "${ATHLETE_TOKEN}" "${GX2}" volume false 1
+expect_ok "GX2 history page 1"
+HIST_CURSOR="$(jq -er '.next_cursor' <<<"${BODY}")"
+for bad in x "$(b64 '{}')" \
+           "$(cursor_with "${HIST_CURSOR}" '.seq = -1')" "$(cursor_with "${HIST_CURSOR}" '.seq = 1.5')" \
+           "$(cursor_with "${HIST_CURSOR}" '.seq = "1"')" "$(cursor_with "${HIST_CURSOR}" '. + {x: 1}')" \
+           "$(cursor_with "${HIST_CURSOR}" '.revision = 2')"; do
+  history "${ATHLETE_TOKEN}" "${GX2}" volume false 1 "${bad}"; expect_error VALIDATION "history cursor ${bad}"
 done
-for bad in '"x"' '{}' '{"seq":-1}' '{"seq":1.5}' '{"seq":"1"}' '{"seq":1,"x":1}'; do
-  history "${ATHLETE_TOKEN}" "${GX1}" weight false "${bad}"; expect_error VALIDATION "history cursor ${bad}"
-done
-pass "reads: podiums, board and history paging, AUTH_REQUIRED / AGENT_FORBIDDEN / NOT_FOUND / VALIDATION"
+pass "reads: podiums, board and history paging, NOT_FOUND / VALIDATION"
 
 # =============================================================================
-echo "[${LANE_LABEL}] group_stream: record, record_voided, link items"
+echo "[${LANE_LABEL}] group_competition_stream: record, record_voided, link, unlink events"
 # =============================================================================
 
-# all_items: every item of the athlete's G stream as one array in BODY. The
-# stream runs to several pages, so the checks below look at every page.
-all_items() {
-  local cursor=null acc='[]'
-  while :; do
-    rpc "${ATHLETE_TOKEN}" group_stream \
-      "$(jq -nc --arg g "${GID}" --argjson b "${cursor}" '{p_group_id: $g, p_before: $b, p_limit: 50}')"
-    expect_ok "stream page"
-    acc="$(jq -c --argjson a "${acc}" '$a + .items' <<<"${BODY}")"
-    [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
-    cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
-  done
-  BODY="${acc}"
-}
-all_items
-BODY="$(jq -c '{items: .}' <<<"${BODY}")"
-check "only the five wire kinds; lead_change is never a stream item" \
-  '[.items[].kind] | unique | all(. as $k | ["link","membership","record","record_voided","session"] | index($k))'
-check "the T05 kinds are present" \
-  '([.items[].kind] | unique) as $k | ($k | index("record")) and ($k | index("record_voided")) and ($k | index("link"))'
-check "record item shape; it sorts at its session start" \
-  '[.items[] | select(.kind == "record")][0]
-   | (keys == ["achieved_at_ms","boards","certification","certified","e1rm_kg","entered_weight_kg","group","group_exercise",
-               "key","kind","load_factor","member","provisional","reps","session_id","set_id","sort_at_ms","voided","weight_kg"])
-     and .sort_at_ms == .achieved_at_ms and .certified == false and .certification == null and (.group_exercise | keys) == ["group_exercise_id","load_input_mode","name"]'
-check "record_voided item shape" \
-  '[.items[] | select(.kind == "record_voided")][0]
-   | keys == ["group","group_exercise","key","kind","leaders","member","reason","record","record_key","sort_at_ms"]'
-check "link item shape" \
-  '[.items[] | select(.kind == "link")][0]
-   | keys == ["effects","event","exercises","group","group_exercise","key","kind","member","sort_at_ms"]'
-all_items
-check_args "a link item names the member's exercise, read live" --arg x "${GX5}" --arg d "${DA5}" \
-  '[.[] | select(.kind == "link" and .event == "link" and .group_exercise.group_exercise_id == $x)][0].exercises
-   == [{exercise_definition_id: $d, name: ("Lift " + $d)}]'
-check "no lead_change item across every page" 'all(.[]; .kind != "lead_change")'
+stream_items "${ATHLETE_TOKEN}"
+check "only the three item kinds; lead and rules changes are never stream events" \
+  'all(.[]; .kind as $k | ["competition","membership","session"] | index($k))
+   and all(.[] | select(.kind == "competition"); .event.kind as $k | ["link","record","record_voided","unlink"] | index($k))'
+check "the board event kinds are present" \
+  '([.[] | select(.kind == "competition") | .event.kind] | unique) == ["link","record","record_voided","unlink"]'
+S1A_AT="$(run_psql "select started_at from app_public.sessions where owner_user_id = '${ATHLETE_UID}' and id = '${T}-s1a';")"
+R1_FIRST="$(run_psql "select id from app_public.group_events where group_exercise_id = '${GX1}' and kind = 'record'
+                       and set_id = '${T}-r1a1';")"
+check_args "a record sorts at its session start" --arg k "${R1_FIRST}" \
+  "[.[] | select(.kind == \"competition\" and .key == \$k)][0].sort_at_ms == ${S1A_AT}"
 
 # walk <limit>: every key of the athlete's G stream, paging by next_cursor.
 walk() {
   local cursor=null keys=""
   while :; do
-    rpc "${ATHLETE_TOKEN}" group_stream \
+    rpc "${ATHLETE_TOKEN}" group_competition_stream \
       "$(jq -nc --arg g "${GID}" --argjson b "${cursor}" --argjson l "$1" '{p_group_id: $g, p_before: $b, p_limit: $l}')"
     expect_ok "stream walk ($1)"
-    keys+="$(jq -r '[.items[] | .kind + ":" + .key] | join("\n")' <<<"${BODY}")"$'\n'
+    keys+="$(jq -r '[.items[] | .kind + ":" + (if .kind == "competition" then .event.kind + ":" else "" end) + .key]
+                    | join("\n")' <<<"${BODY}")"$'\n'
     [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
     cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
   done
@@ -1294,8 +1264,8 @@ WALK7="$(walk 7)"
 WALK13="$(walk 13)"
 [[ "${WALK7}" == "${WALK13}" ]] || fail "stream paging must not depend on the page size"
 [[ "$(sort <<<"${WALK7}" | uniq -d)" == "" ]] || fail "stream paging must not repeat an item"
-grep -q '^record:' <<<"${WALK7}" || fail "the walk must reach record items"
-pass "group_stream: new kinds, shapes, cursor paging across all kinds"
+grep -q '^competition:record:' <<<"${WALK7}" || fail "the walk must reach record events"
+pass "group_competition_stream: board event kinds, record sort, cursor paging across all kinds"
 
 # =============================================================================
 echo "[${LANE_LABEL}] R8 — a member leaves; a removed member loses access"
@@ -1308,18 +1278,18 @@ set_edit "${RIVAL_TOKEN}" "${T}-s1r" r1r1 0 200 3
 drain "R8 after leaving"
 expect_sql "R8 leaving writes no board event" \
   "select count(*) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" "0"
-expect_entry "${GX1}" R weight "110@r1r1" "R8 a former member's entries stay"
-board "${ATHLETE_TOKEN}" "${GX1}" weight false
+expect_entry "${GX1}" R volume "550@r1r1" "R8 a former member's entries stay"
+board "${ATHLETE_TOKEN}" "${GX1}" volume false
 check_args "R8 a former member stays ranked, marked former" --arg r "${RIVAL_UID}" \
-  '.rows[0].member.user_id == $r and .rows[0].former == true and .rows[1].former == false'
-rpc "${RIVAL_TOKEN}" group_board_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
+  '.entries[0].member.user_id == $r and .entries[0].former == true and .entries[1].former == false'
+rpc "${RIVAL_TOKEN}" group_competition_podiums "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
 expect_error NOT_FOUND "a former member cannot read the boards"
 
 rpc "${OWNER_TOKEN}" group_remove_member "$(jq -nc --arg g "${GID}" --arg u "${AWAY_UID}" '{p_group_id: $g, p_user_id: $u}')"
 expect_ok "owner removes M"
-board "${AWAY_TOKEN}" "${GX1}" weight false
+board "${AWAY_TOKEN}" "${GX1}" volume false
 expect_error NOT_FOUND "a removed member cannot read a board"
-history "${AWAY_TOKEN}" "${GX1}" weight false
+history "${AWAY_TOKEN}" "${GX1}" volume false
 expect_error NOT_FOUND "a removed member cannot read history"
 pass "R8: leaving freezes entries (former, still ranked); removed and former members get NOT_FOUND"
 

@@ -3,7 +3,7 @@ import { Text, Alert, ScrollView } from 'react-native';
 
 import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, uiSpace } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
-import { describeCompetitionRules as describeGroupRules,formatCompetitionValue as formatGroupMetricValue,formatCompetitionPerformance as formatGroupRawPerformance,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
+import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
 import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import {
   buildMetricRecordSheetModel,
@@ -45,19 +45,15 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
       <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.performance.achieved_at_ms)}</Text>
-      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules(exercise)}</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>Certification attests this logged performance. Rule changes preserve it; corrections can invalidate it.</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>{row.metric === 'e1rm' ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</Text>
+      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">{formatSetFigure(row.performance)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{model.statusText}</Text>
-      <MutedLine text={model.observedRulesNote} />
       <MutedLine text={model.readOnlyNote} />
       <MutedLine text={model.offlineNote} />
       <MutedLine text={model.ownPerformanceNote} />
       {notice ? <GroupWriteNotice {...notice} testID="group-metric-record-notice" /> : null}
       {model.showRefresh ? <ActionButton label="Refresh and review" disabled={pending || online === false}
         onPress={refresh} variant="outline" testID="group-metric-record-refresh" /> : null}
-      {model.canCertify ? <ActionButton label={`Certify ${GROUP_METRIC_LABELS[row.metric]}`} disabled={model.blocked}
+      {model.canCertify ? <ActionButton label="Certify set" disabled={model.blocked}
         onPress={() => void perform('certify', guard)} variant="primary" testID="group-metric-record-certify" /> : null}
       {model.canWithdraw ? <ListRow label="Withdraw certification" disabled={model.blocked}
         onPress={() => confirmEnd('withdraw')} tone="danger" testID="group-metric-record-withdraw" /> : null}

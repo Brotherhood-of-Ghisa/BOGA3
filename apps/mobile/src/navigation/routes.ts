@@ -1,5 +1,7 @@
 import type { Href } from 'expo-router';
 
+import type { ProgressMetric } from '@/src/preferences/model';
+
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
 // The Gyms screen, from the session view's gym sheet (`Manage gyms`). More
@@ -11,3 +13,41 @@ export const BODY_WEIGHT_ROUTE = '/body-weight';
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
 export const THEME_COLOUR_ROUTE = '/theme-colour';
+
+/** One muscle's or one exercise's effort history, pushed from Progress. */
+export const PROGRESS_HISTORY_ROUTE = '/progress-history';
+
+/** `?metric=` on the history page: Progress's Sets / Volume choice, carried over. */
+export const PROGRESS_HISTORY_METRIC_PARAMS: Record<ProgressMetric, string> = {
+  totalVolume: 'volume',
+  workingSetCount: 'sets',
+};
+
+export const progressHistoryHref = (
+  subject: { muscleGroupId: string } | { exerciseDefinitionId: string },
+  metric?: ProgressMetric
+): Href => {
+  const id = 'muscleGroupId' in subject
+    ? `muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
+    : `exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`;
+  const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
+  return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}` as Href;
+};
+
+/** One completed session's view. */
+export const completedSessionHref = (sessionId: string): Href =>
+  `/completed-session/${encodeURIComponent(sessionId)}` as Href;
+
+/** Sessions, opened at the local week that holds `dateKey` (`YYYY-MM-DD`). */
+export const sessionsWeekHref = (dateKey: string): Href =>
+  `/sessions?week=${encodeURIComponent(dateKey)}` as Href;
+
+/** Sessions, opened at the local day `dateKey` (`YYYY-MM-DD`). */
+export const sessionsDayHref = (dateKey: string): Href =>
+  `/sessions?day=${encodeURIComponent(dateKey)}` as Href;
+
+/** Where a history day leads; null for a day without a session. */
+export const historyDayHref = (dateKey: string, sessionIds: readonly string[]): Href | null => {
+  if (sessionIds.length === 0) return null;
+  return sessionIds.length === 1 ? completedSessionHref(sessionIds[0]) : sessionsDayHref(dateKey);
+};

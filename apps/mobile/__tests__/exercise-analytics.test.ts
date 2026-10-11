@@ -116,7 +116,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
   it('keeps the 5th week of a month (no layout clipping)', () => {
     // June 2026: weeks start 2026-06-01, 2026-06-08, 2026-06-15, 2026-06-22, 2026-06-29 → 5 Mon-start weeks.
     // 2026-06-29's monthKey = '2026-06' → weekOfMonth = 5. It must still be returned so the
-    // weekly bar and the WeekSelectionBanner agree on that week.
+    // weekly bar and the Daily Week tile agree on that week.
     const sessions = [
       makeSession('2026-06-01T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
       makeSession('2026-06-08T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
@@ -255,6 +255,22 @@ describe('aggregateExerciseDailyEffort', () => {
     expect(day.workingSetCount).toBe(2);
     expect(day.highestWeight).toBe(120);
     expect(day.estimatedRM1).toBeCloseTo(Math.max(estimateOneRepMax(100, 5) as number, estimateOneRepMax(120, 3) as number));
+  });
+
+  it('names each session behind a day once, leaving out one that added nothing', () => {
+    const sessions = [
+      { ...makeSession('2026-05-18T08:00:00Z', [{ setType: 'rir_1', weight: 100, reps: 5 }]), id: 'morning' },
+      // The same exercise twice in one session.
+      { ...makeSession('2026-05-18T08:00:00Z', [{ setType: 'rir_1', weight: 90, reps: 5 }]), id: 'morning' },
+      { ...makeSession('2026-05-18T18:00:00Z', [{ setType: null, weight: 80, reps: 5 }]), id: 'evening' },
+      { ...makeSession('2026-05-18T20:00:00Z', [{ setType: 'warm_up', weight: 60, reps: 10 }]), id: 'warm-up-only' },
+      { ...makeSession('2026-05-19T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]), id: 'tuesday' },
+    ];
+
+    expect(aggregateExerciseDailyEffort(sessions, TZ).map((day) => day.sessionIds)).toEqual([
+      ['morning', 'evening'],
+      ['tuesday'],
+    ]);
   });
 
   it('makes no cell for a warm-up-only day', () => {

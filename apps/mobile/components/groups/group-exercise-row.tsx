@@ -6,7 +6,6 @@ import type { GroupExerciseRowViewModel } from '@/src/groups';
 
 type GroupExerciseRowProps = {
   row: GroupExerciseRowViewModel;
-  standard?: string;
   /** Set only for the owner and admins: the row then opens the exercise action sheet. */
   onPress?: () => void;
   /**
@@ -28,9 +27,9 @@ type GroupExerciseRowProps = {
  * exercise actions, then `Unlink…` (danger text) or `Link your exercise`
  * (outline) under it.
  */
-export function GroupExerciseRow({ row, standard, onPress, onLink, onUnlink, unlinkPending, focusRef, divider = false }: GroupExerciseRowProps) {
+export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending, focusRef, divider = false }: GroupExerciseRowProps) {
   const id = row.groupExerciseId;
-  const label = [row.name, row.loadInputModeLabel, standard, row.archived ? 'archived' : null, row.linkStatus]
+  const label = [row.name, row.loadInputModeLabel, row.archived ? 'archived' : null, row.linkStatus]
     .filter(Boolean)
     .join(', ');
   return (
@@ -60,7 +59,6 @@ export function GroupExerciseRow({ row, standard, onPress, onLink, onUnlink, unl
           <Text allowFontScaling={false} style={styles.meta} testID={`group-exercise-load-mode-${id}`}>
             {row.loadInputModeLabel}
           </Text>
-          {standard ? <Text allowFontScaling={false} style={styles.meta} testID={`group-exercise-standard-${id}`}>{standard}</Text> : null}
           {row.linkStatus ? (
             <Text allowFontScaling={false} style={styles.meta} testID={`group-exercise-link-status-${id}`}>
               {row.linkStatus}
