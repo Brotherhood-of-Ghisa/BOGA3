@@ -102,6 +102,15 @@ Live OAuth grant validation, non-member/nonexistent equivalence, read-only route
 direct-table denial and existing MCP tools remain enforced. Full response
 semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
+The base OAuth grant stays read-only. A coaching client may read the upcoming
+plan queue and create new plans/programmes only while an app-owned,
+default-denied `public.agent_plan_permissions` row matches the live grant
+timestamp; a missing, false or grant-mismatched row returns `403
+PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. Agent
+writes go through service-role-only atomic RPCs and can never touch performed
+sessions, exercises or sets. Details in
+[`session-planning-contract.md`](tech/session-planning-contract.md) §6.
+
 ## Practical guidance for API consumers (mobile/app)
 
 - Use client-safe Supabase credentials only (`anon` key), plus the authenticated user session token.

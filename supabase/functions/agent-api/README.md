@@ -7,11 +7,12 @@ Coach. Public deployment prefix:
 https://<project>.supabase.co/functions/v1/agent-api
 ```
 
-Every route below accepts `GET` only, validates the bearer token live with
-Supabase Auth, requires its OAuth `client_id` and an active matching grant,
-derives the owner from the validated subject, and performs an explicit
-owner-filtered read. Request bodies and caller identity fields (`user_id`,
-`userId`, `owner_user_id`) are rejected.
+Every route below validates the bearer token live with Supabase Auth, requires
+its OAuth `client_id` and an active matching grant, derives the owner from the
+validated subject, and performs an explicit owner-filtered read. The read routes
+accept `GET` only; the two plan-write routes accept `POST` and require a
+current-grant plan permission. Request bodies and caller identity fields
+(`user_id`, `userId`, `owner_user_id`) are rejected.
 
 Success envelope:
 
@@ -316,13 +317,61 @@ batched with no per-set query or timeline response. Preference, contribution,
 reading value/date/delete/restore and session-start changes affect the next API
 read; no derived value is persisted.
 
+## Plan permission and write routes
+
+The base OAuth grant is read-only. Reading the upcoming plan queue and creating
+plans/programmes additionally require a current-grant row in
+`public.agent_plan_permissions` (`plan_access_enabled = true` and `granted_at`
+equal to the live OAuth grant timestamp). A missing, false or grant-mismatched
+row returns `403 PLAN_PERMISSION_REQUIRED` before any referenced exercise or gym
+is resolved. The person enables it per client on the app's Connected Agents
+screen; the base OAuth consent is never described as write access.
+
+### `GET /v1/agent/session-plans`
+
+`limit` is optional integer `1..50`, default `20`; `cursor` is opaque;
+`include_unscheduled` is optional `true`/`false` (default `false`). Only the
+owner's non-deleted plans are returned, ordered by scheduled time then ID, with
+null-scheduled plans last. Each plan carries its provenance, derived `progress`
+(`planned | in_progress | completed`), `next_block_id`, and bounded exercise/set
+snapshots.
+
+### `POST /v1/agent/session-plans` and `POST /v1/agent/programmes`
+
+Both require an `Idempotency-Key` header (1..128 characters) and a strict JSON
+body. A plan body is `{title, gym_id?, scheduled_for?, exercises:[{exercise_definition_id?,
+name, sets:[{target_reps, target_weight_value?, target_set_type?}]}]}`; a
+programme body is `{name, description?, plans:[<plan>...]}` with 2..50 plans,
+1..30 blocks per plan and 1..30 sets per block. Referenced exercise and gym IDs
+must be owned; a foreign or nonexistent ID returns `400
+FOREIGN_RESOURCE_REFERENCE`.
+
+Each call creates the whole graph in one transaction with `provenance = 'agent'`
+and `pending` blocks. A child failure rolls back every row, including the
+receipt. Replaying the same key and payload returns the original IDs
+(`idempotent_replay: true`); the same key with a different payload returns `409
+IDEMPOTENCY_CONFLICT`. No performed session, exercise or set row is ever
+created, and the agent cannot attach, complete, skip or edit a plan.
+
+```json
+{
+  "plan_id": "uuid",
+  "programme_id": null,
+  "exercise_ids": ["uuid"],
+  "set_ids": ["uuid"],
+  "idempotent_replay": false
+}
+```
+
 ## Status contract
 
-- `400` invalid/unknown argument, identity input, or cursor.
+- `400` invalid/unknown argument, identity input, cursor, or foreign/nonexistent resource reference.
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
+- `403` plan permission missing, disabled or bound to a stale grant.
 - `404` unknown route or inaccessible/nonexistent exercise.
-- `405` non-GET method.
-- `413` the generated response exceeds its 256 KiB safety bound.
+- `405` unsupported method for the route.
+- `409` idempotency conflict (same key, different payload).
+- `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
 - `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth could not

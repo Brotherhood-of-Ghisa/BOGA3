@@ -233,6 +233,67 @@ agent_get() {
   request GET "${AGENT_API_BASE}/${route}" "${token}" ""
 }
 
+agent_post() {
+  local route="$1"
+  local body="$2"
+  local idempotency_key="${3:-}"
+  local token="${4:-${AGENT_ACCESS_TOKEN}}"
+  local response_file
+  response_file="$(mktemp)"
+  local -a request_args=(
+    --silent
+    --show-error
+    -X POST
+    -H "Accept: application/json"
+    -H "Authorization: Bearer ${token}"
+    -H "Content-Type: application/json"
+    -o "${response_file}"
+    -w "%{http_code}"
+  )
+  [[ -n "${idempotency_key}" ]] && request_args+=(-H "Idempotency-Key: ${idempotency_key}")
+  request_args+=(--data "${body}")
+  RESPONSE_STATUS="$(curl "${request_args[@]}" "${AGENT_API_BASE}/${route}")"
+  RESPONSE_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
+# PostgREST against the default `public` schema (permission/receipt tables).
+public_request() {
+  local method="$1"
+  local route="$2"
+  local bearer="$3"
+  local body="${4:-}"
+  local response_file
+  response_file="$(mktemp)"
+  local -a request_args=(
+    --silent
+    --show-error
+    -X "${method}"
+    -H "Accept: application/json"
+    -H "Accept-Profile: public"
+    -H "Content-Profile: public"
+    -H "Authorization: Bearer ${bearer}"
+    -H "apikey: ${ANON_KEY}"
+    -o "${response_file}"
+    -w "%{http_code}"
+  )
+  if [[ -n "${body}" ]]; then
+    request_args+=(-H "Content-Type: application/json" --data "${body}")
+  fi
+  RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
+  RESPONSE_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
+fetch_grant_granted_at() {
+  request GET "${API_URL}/auth/v1/user/oauth/grants" "${APP_ACCESS_TOKEN}" "${ANON_KEY}"
+  assert_status "200" "oauth grants for the plan permission"
+  printf '%s' "${RESPONSE_BODY}" |
+    jq -er --arg cid "${AGENT_CLIENT_ID}" \
+      '(if type == "array" then . else .grants end)[]
+       | select((.client_id // .client.id) == $cid) | .granted_at'
+}
+
 # A failed run must not leave this slot's stack without Auth.
 start_auth_container() {
   [[ "${AUTH_STOPPED:-0}" == "1" ]] || return 0
@@ -258,6 +319,18 @@ cleanup() {
       delete from public.agent_access_audit
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and request_id like 'agent-api-${RUN_TAG}-%';
+      delete from public.agent_plan_write_receipts
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from public.agent_plan_permissions
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.session_plan_sets
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.session_plan_exercises
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.session_plans
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.training_programmes
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -643,6 +716,234 @@ assert_training_payload '(.data.exercise | has("bodyweight_contribution") | not)
   and .data.recent_performances[0].sets[0].calculated_load.value == 20
 ' 'disabled preference returns ordinary Weight math without reading context'
 echo "[agent-api-test] PASS: bodyweight projection parity and completeness"
+
+
+echo "[agent-api-test] verifying the plan permission is default-denied"
+PLAN_KEY="agent-api-${RUN_TAG}-plan-key"
+PROG_KEY="agent-api-${RUN_TAG}-prog-key"
+PLAN_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {title:"Agent upcoming plan",gym_id:$gym,scheduled_for:($now + 86400000),
+   exercises:[{exercise_definition_id:$ex,name:"Bench press",
+     sets:[{target_reps:5,target_weight_value:"100",target_set_type:"rir_2"},
+           {target_reps:8,target_weight_value:null}]}]}')"
+UNSCHEDULED_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
+  {title:"Agent unscheduled plan",
+   exercises:[{exercise_definition_id:$ex,name:"Bench press",sets:[{target_reps:10}]}]}')"
+PROG_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
+  {name:"Agent programme",description:"Two-week wave",
+   plans:[
+     {title:"Week 1",exercises:[{exercise_definition_id:$ex,name:"Bench press",sets:[{target_reps:5}]}]},
+     {title:"Week 2",exercises:[{exercise_definition_id:$ex,name:"Bench press",sets:[{target_reps:6}]}]}]}')"
+
+agent_get "session-plans"
+assert_status "403" "default-denied plan read"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied plan read did not return PLAN_PERMISSION_REQUIRED"
+agent_post "session-plans" "${PLAN_BODY}" "${PLAN_KEY}"
+assert_status "403" "default-denied plan create"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied plan create did not return PLAN_PERMISSION_REQUIRED"
+agent_post "programmes" "${PROG_BODY}" "${PROG_KEY}"
+assert_status "403" "default-denied programme create"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied programme create did not return PLAN_PERMISSION_REQUIRED"
+
+echo "[agent-api-test] verifying the permission table is app-only and owner-scoped"
+GRANTED_AT="$(fetch_grant_granted_at)"
+PERMISSION_ROW="$(jq -nc --arg owner "${USER_A_UUID}" --arg cid "${AGENT_CLIENT_ID}" --arg at "${GRANTED_AT}" '
+  {owner_user_id:$owner,client_id:$cid,plan_access_enabled:true,granted_at:$at}')"
+public_request POST "agent_plan_permissions" "${APP_ACCESS_TOKEN}" "${PERMISSION_ROW}"
+[[ "${RESPONSE_STATUS}" =~ ^2 ]] || fail "app owner could not insert a permission row (${RESPONSE_STATUS})"
+public_request GET "agent_plan_permissions?select=client_id,plan_access_enabled" "${APP_ACCESS_TOKEN}"
+assert_status "200" "app owner permission read"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "1" ]] ||
+  fail "app owner did not see exactly its own permission row"
+public_request GET "agent_plan_permissions?select=client_id" "${AGENT_ACCESS_TOKEN}"
+assert_status "200" "oauth permission read"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
+  fail "an OAuth agent token read the permission table"
+public_request POST "agent_plan_permissions" "${AGENT_ACCESS_TOKEN}" "${PERMISSION_ROW}"
+assert_non_2xx "oauth permission insert"
+CROSS_ROW="$(jq -nc --arg owner "${USER_B_UUID}" --arg cid "${AGENT_CLIENT_ID}" --arg at "${GRANTED_AT}" '
+  {owner_user_id:$owner,client_id:$cid,plan_access_enabled:true,granted_at:$at}')"
+public_request POST "agent_plan_permissions" "${APP_ACCESS_TOKEN}" "${CROSS_ROW}"
+assert_non_2xx "cross-owner permission insert"
+request POST "${API_URL}/rest/v1/agent_plan_permissions" "${ANON_KEY}" "${ANON_KEY}" "${PERMISSION_ROW}"
+assert_non_2xx "anon permission insert"
+
+echo "[agent-api-test] verifying authorized reads and atomic plan/programme writes"
+SESSIONS_BEFORE="$(run_psql "
+  select count(*) from app_public.sessions where owner_user_id = '${USER_A_UUID}'::uuid;
+")"
+PERFORMED_BEFORE="$(run_psql "
+  select count(*) from app_public.session_exercises
+  where owner_user_id = '${USER_A_UUID}'::uuid and id not like 'agent-api-%';
+")"
+agent_get "session-plans?include_unscheduled=true"
+assert_status "200" "authorized plan read"
+agent_post "session-plans" "${PLAN_BODY}" "${PLAN_KEY}"
+assert_status "200" "create session plan"
+PLAN_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plan_id')"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.idempotent_replay')" == "false" ]] ||
+  fail "first plan create was marked as a replay"
+agent_post "session-plans" "${UNSCHEDULED_BODY}" "agent-api-${RUN_TAG}-plan-key-2"
+assert_status "200" "create unscheduled session plan"
+UNSCHEDULED_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plan_id')"
+agent_post "programmes" "${PROG_BODY}" "${PROG_KEY}"
+assert_status "200" "create training programme"
+PROGRAMME_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.programme_id')"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.plan_ids | length')" == "2" ]] ||
+  fail "programme create did not emit two child plans"
+
+agent_get "session-plans"
+assert_status "200" "upcoming plan read"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg plan "${PLAN_ID}" --arg unscheduled "${UNSCHEDULED_ID}" '
+    (.data.plans | map(.id) | index($plan)) != null
+    and (.data.plans | map(.id) | index($unscheduled)) == null
+    and (.data.plans[] | select(.id == $plan) | .provenance) == "agent"
+    and (.data.plans[] | select(.id == $plan) | .progress) == "planned"
+    and (.data.plans[] | select(.id == $plan) | .next_block_id) != null
+    and (.data.plans[] | select(.id == $plan) | .exercises[0].sets | length) == 2
+  ' >/dev/null || fail "upcoming plan read is missing provenance, progress or snapshots"
+agent_get "session-plans?include_unscheduled=true"
+assert_status "200" "unscheduled plan read"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg unscheduled "${UNSCHEDULED_ID}" '(.data.plans | map(.id) | index($unscheduled)) != null' \
+  >/dev/null || fail "include_unscheduled did not return the unscheduled plan"
+
+echo "[agent-api-test] verifying live session card attached to block derives in_progress and excludes next_block_id"
+BLOCK_ID="$(run_psql "
+  select id from app_public.session_plan_exercises
+  where owner_user_id = '${USER_A_UUID}'::uuid and session_plan_id = '${PLAN_ID}'
+  limit 1;
+")"
+ATTACH_SESSION_ID="agent-api-${RUN_TAG}-attach-sess"
+ATTACH_CARD_ID="agent-api-${RUN_TAG}-attach-card"
+run_psql "
+  insert into app_public.sessions (id, owner_user_id, status, started_at, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_SESSION_ID}', '${USER_A_UUID}'::uuid, 'active', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_exercises (id, owner_user_id, session_id, exercise_definition_id, order_index, name, source_plan_exercise_id, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_CARD_ID}', '${USER_A_UUID}'::uuid, '${ATTACH_SESSION_ID}', '${EXERCISE_A}', 0, 'Bench press', '${BLOCK_ID}', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+agent_get "session-plans"
+assert_status "200" "plan read with attached block"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg plan "${PLAN_ID}" '
+    (.data.plans[] | select(.id == $plan) | .progress) == "in_progress"
+    and (.data.plans[] | select(.id == $plan) | .next_block_id) == null
+  ' >/dev/null || fail "attached live session did not derive in_progress or clear next_block_id"
+run_psql "
+  delete from app_public.session_exercises where id = '${ATTACH_CARD_ID}';
+  delete from app_public.sessions where id = '${ATTACH_SESSION_ID}';
+" >/dev/null
+
+echo "[agent-api-test] verifying the write graph is pending-only and performed-free"
+PLAN_STATE="$(run_psql "
+  select p.provenance || '|' ||
+    (select count(*) from app_public.session_plan_exercises e
+      where e.owner_user_id = p.owner_user_id and e.session_plan_id = p.id and e.progress_status = 'pending') || '|' ||
+    (select count(*) from app_public.session_plan_exercises e
+      where e.owner_user_id = p.owner_user_id and e.session_plan_id = p.id)
+  from app_public.session_plans p
+  where p.owner_user_id = '${USER_A_UUID}'::uuid and p.id = '${PLAN_ID}';
+")"
+[[ "${PLAN_STATE}" == "agent|1|1" ]] || fail "created plan is not a single pending agent block (${PLAN_STATE})"
+PROG_STATE="$(run_psql "
+  select
+    (select count(*) from app_public.session_plans
+      where owner_user_id = '${USER_A_UUID}'::uuid and programme_id = '${PROGRAMME_ID}') || '|' ||
+    (select count(*) from app_public.session_plan_exercises
+      where owner_user_id = '${USER_A_UUID}'::uuid
+        and session_plan_id in (select id from app_public.session_plans
+          where owner_user_id = '${USER_A_UUID}'::uuid and programme_id = '${PROGRAMME_ID}'));
+")"
+[[ "${PROG_STATE}" == "2|2" ]] || fail "programme graph is incomplete (${PROG_STATE})"
+PERFORMED_EXERCISES="$(run_psql "
+  select count(*) from app_public.session_exercises
+  where owner_user_id = '${USER_A_UUID}'::uuid and id not like 'agent-api-%';
+")"
+[[ "${PERFORMED_EXERCISES}" == "${PERFORMED_BEFORE}" ]] || fail "agent plan writes created performed exercise rows"
+PERFORMED_SESSIONS="$(run_psql "
+  select count(*) from app_public.sessions where owner_user_id = '${USER_A_UUID}'::uuid;
+")"
+[[ "${PERFORMED_SESSIONS}" == "${SESSIONS_BEFORE}" ]] || fail "agent plan writes changed the performed session count"
+
+echo "[agent-api-test] verifying idempotency replay, conflict and rejection"
+agent_post "session-plans" "${PLAN_BODY}" "${PLAN_KEY}"
+assert_status "200" "idempotent replay"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.plan_id')" == "${PLAN_ID}" ]] ||
+  fail "idempotent replay returned a different plan id"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.idempotent_replay')" == "true" ]] ||
+  fail "idempotent replay was not flagged"
+CONFLICT_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {title:"Agent conflicting plan",gym_id:$gym,scheduled_for:($now + 172800000),
+   exercises:[{exercise_definition_id:$ex,name:"Bench press",sets:[{target_reps:3}]}]}')"
+agent_post "session-plans" "${CONFLICT_BODY}" "${PLAN_KEY}"
+assert_status "409" "idempotency conflict"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "idempotency conflict did not return IDEMPOTENCY_CONFLICT"
+agent_post "session-plans" "${PLAN_BODY}" ""
+assert_status "400" "missing idempotency key"
+FOREIGN_BODY="$(jq -nc '{title:"Foreign ref",exercises:[{exercise_definition_id:"agent-api-missing",name:"X",sets:[{target_reps:5}]}]}')"
+agent_post "session-plans" "${FOREIGN_BODY}" "agent-api-${RUN_TAG}-foreign"
+assert_status "400" "foreign exercise reference"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
+  fail "foreign exercise did not return FOREIGN_RESOURCE_REFERENCE"
+CROSS_BODY="$(jq -nc --arg ex "${EXERCISE_B}" '{title:"Cross ref",exercises:[{exercise_definition_id:$ex,name:"X",sets:[{target_reps:5}]}]}')"
+agent_post "session-plans" "${CROSS_BODY}" "agent-api-${RUN_TAG}-cross"
+assert_status "400" "cross-owner exercise reference"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
+  fail "cross-owner exercise did not match the foreign-reference error"
+IDENTITY_BODY="$(jq -nc --arg owner "${USER_B_UUID}" '
+  {title:"Identity",owner_user_id:$owner,exercises:[{name:"X",sets:[{target_reps:5}]}]}')"
+agent_post "session-plans" "${IDENTITY_BODY}" "agent-api-${RUN_TAG}-identity"
+assert_status "400" "identity-shaped request field"
+OVERSIZED_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
+  {title:"Too many",exercises:[range(31) | {exercise_definition_id:$ex,name:"X",sets:[{target_reps:5}]}]}')"
+agent_post "session-plans" "${OVERSIZED_BODY}" "agent-api-${RUN_TAG}-oversized"
+assert_status "400" "oversized plan graph"
+INVALID_SET_TYPE_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
+  {title:"Bad set type",exercises:[{exercise_definition_id:$ex,name:"X",sets:[{target_reps:5,target_set_type:"invalid_type"}]}]}')"
+agent_post "session-plans" "${INVALID_SET_TYPE_BODY}" "agent-api-${RUN_TAG}-bad-set-type"
+assert_status "400" "invalid target set type"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_ARGUMENT" ]] ||
+  fail "invalid target set type did not return INVALID_ARGUMENT"
+PARTIAL_ROWS="$(run_psql "
+  select
+    (select count(*) from app_public.session_plans
+      where owner_user_id = '${USER_A_UUID}'::uuid and title in ('Foreign ref','Cross ref','Identity','Too many'))
+    + (select count(*) from public.agent_plan_write_receipts
+      where owner_user_id = '${USER_A_UUID}'::uuid
+        and idempotency_key in ('agent-api-${RUN_TAG}-foreign','agent-api-${RUN_TAG}-cross',
+          'agent-api-${RUN_TAG}-identity','agent-api-${RUN_TAG}-oversized'));
+")"
+[[ "${PARTIAL_ROWS}" == "0" ]] || fail "a rejected write left a partial plan row or receipt"
+
+echo "[agent-api-test] verifying stale grants, disable and re-enable"
+run_psql "update public.agent_plan_permissions
+  set granted_at = granted_at - interval '1 hour'
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+agent_get "session-plans"
+assert_status "403" "stale grant timestamp"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "stale grant did not return PLAN_PERMISSION_REQUIRED"
+run_psql "update public.agent_plan_permissions
+  set granted_at = '${GRANTED_AT}', plan_access_enabled = false
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+agent_get "session-plans"
+assert_status "403" "disabled permission"
+run_psql "update public.agent_plan_permissions
+  set plan_access_enabled = true
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+agent_get "session-plans"
+assert_status "200" "re-enabled permission"
+
+echo "[agent-api-test] verifying plan tables stay closed to direct OAuth access"
+app_public_request GET "session_plans?select=id" "${AGENT_ACCESS_TOKEN}"
+assert_status "200" "agent direct plan-table read denial"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
+  fail "agent credential bypassed the plan-table boundary"
 
 
 echo "[agent-api-test] verifying invalid and expired credentials"

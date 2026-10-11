@@ -357,6 +357,17 @@ the base read-only grant.
   `(session_completed_at, session_id, exercise_order, set_order)` with an opaque
   continuation cursor, filtering database-side so no row is silently omitted.
 
+**As-built.** The three plan routes are live in `supabase/functions/agent-api/`.
+(The exercise-history and workout-detail routes remain pending.)
+The plan routes require a current-grant `public.agent_plan_permissions` row and
+`Idempotency-Key` on both `POST`s. Writes land through the service-role-only
+`app_public.agent_create_session_plan` / `agent_create_training_programme` RPCs,
+which claim the key in `public.agent_plan_write_receipts`, insert the whole graph
+with `provenance = 'agent'` and `pending` blocks in one transaction, and never
+touch the performed graph. `GET /v1/agent/session-plans` returns bounded
+upcoming/unscheduled plans with derived progress and `next_block_id`. The
+Connected Agents screen owns the per-client toggle.
+
 ### 6.2 MCP Tool Surface (`services/boga-mcp/`)
 
 Nine tools. Seven read-only: `get_training_profile`, `search_exercises`

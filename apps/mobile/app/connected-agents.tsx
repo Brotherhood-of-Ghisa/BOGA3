@@ -7,6 +7,7 @@ import {
   ListRow,
   ScreenScroll,
   StatePanel,
+  SwitchRow,
   Tag,
   uiFonts,
   uiRoles,
@@ -17,6 +18,7 @@ import { useAuth } from '@/src/auth';
 import {
   listConnectedAgents,
   revokeConnectedAgent,
+  setAgentPlanPermission,
   type ConnectedAgent,
 } from '@/src/auth/connected-agents';
 
@@ -30,12 +32,103 @@ const formatTimestamp = (value: string | null): string => {
   });
 };
 
+type ConnectedAgentCardProps = {
+  agent: ConnectedAgent;
+  onRevoke: (agent: ConnectedAgent) => void;
+  onTogglePlanAccess: (agent: ConnectedAgent, next: boolean) => void;
+  revokeDisabled: boolean;
+  revoking: boolean;
+  saving: boolean;
+};
+
+function ConnectedAgentCard({
+  agent,
+  onRevoke,
+  onTogglePlanAccess,
+  revokeDisabled,
+  revoking,
+  saving,
+}: ConnectedAgentCardProps) {
+  const isUnavailable = agent.planAccessEnabled === 'unavailable';
+  const isSwitchDisabled = saving || isUnavailable;
+  const switchValue = agent.planAccessEnabled === true;
+
+  return (
+    <Card testID={`connected-agent-${agent.clientId}`}>
+      <View style={styles.agentHeader}>
+        <View style={styles.agentTitle}>
+          <Text allowFontScaling={false} style={styles.agentName}>{agent.name}</Text>
+          <Text allowFontScaling={false} style={styles.agentScope}>Read training data</Text>
+        </View>
+        <Tag label="AI" />
+      </View>
+      <ListRow
+        density="list"
+        meta={
+          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
+            {formatTimestamp(agent.grantedAt)}
+          </Text>
+        }>
+        <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
+      </ListRow>
+      <ListRow
+        density="list"
+        meta={
+          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
+            {formatTimestamp(agent.lastAccessAt)}
+          </Text>
+        }>
+        <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>
+      </ListRow>
+      {/* A separate, opt-in authorization: the base OAuth grant stays read-only. */}
+      <View style={styles.permission}>
+        <SwitchRow
+          disabled={isSwitchDisabled}
+          label="Allow this coach to create plans"
+          onValueChange={(value) => {
+            onTogglePlanAccess(agent, value);
+          }}
+          testID={`connected-agent-plan-access-${agent.clientId}`}
+          value={switchValue}
+        />
+        {isUnavailable ? (
+          <Text
+            allowFontScaling={false}
+            style={styles.permissionUnavailable}
+            testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
+            Plan access settings are temporarily unavailable for this coach.
+          </Text>
+        ) : null}
+        <Text
+          allowFontScaling={false}
+          style={styles.permissionDisclosure}
+          testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
+          {`Lets ${agent.name} read your upcoming and unscheduled plans and create new plans and programmes. It can never edit or delete plans, start a workout, or change your workout history.`}
+        </Text>
+      </View>
+      {/* An outline in `danger`, behind the unchanged Alert confirm. */}
+      <View style={styles.agentActions}>
+        <ActionButton
+          accessibilityLabel={`Revoke access for ${agent.name}`}
+          disabled={revokeDisabled}
+          label={revoking ? 'Revoking…' : 'Revoke access'}
+          onPress={() => onRevoke(agent)}
+          testID={`connected-agent-revoke-${agent.clientId}`}
+          tone="danger"
+          variant="outline"
+        />
+      </View>
+    </Card>
+  );
+}
+
 export default function ConnectedAgentsScreen() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<ConnectedAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
+  const [savingClientIds, setSavingClientIds] = useState<ReadonlySet<string>>(new Set());
 
   // Fetches and applies the agents; the caller has already shown loading.
   const fetchAgents = () =>
@@ -112,6 +205,45 @@ export default function ConnectedAgentsScreen() {
     );
   };
 
+  // Optimistic only because a failed write reverts to the server value and
+  // surfaces a retryable error. Plan access stays off until the server agrees.
+  // Writes are serialized per client ID so concurrent toggles across distinct
+  // coaches settle independently without clobbering each other.
+  const togglePlanAccess = async (agent: ConnectedAgent, next: boolean) => {
+    if (savingClientIds.has(agent.clientId)) return;
+    setSavingClientIds((current) => new Set([...current, agent.clientId]));
+    setError(null);
+    setAgents((current) =>
+      current.map((candidate) =>
+        candidate.clientId === agent.clientId
+          ? { ...candidate, planAccessEnabled: next }
+          : candidate
+      )
+    );
+    try {
+      await setAgentPlanPermission(agent.clientId, next, agent.grantedAt);
+    } catch (toggleError) {
+      setAgents((current) =>
+        current.map((candidate) =>
+          candidate.clientId === agent.clientId
+            ? { ...candidate, planAccessEnabled: agent.planAccessEnabled }
+            : candidate
+        )
+      );
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : 'Unable to update plan access right now.',
+      );
+    } finally {
+      setSavingClientIds((current) => {
+        const nextSet = new Set(current);
+        nextSet.delete(agent.clientId);
+        return nextSet;
+      });
+    }
+  };
+
   // The native header carries the title (G4).
   return (
     <ScreenScroll contentInsetAdjustmentBehavior="automatic" testID="connected-agents-screen">
@@ -149,45 +281,15 @@ export default function ConnectedAgentsScreen() {
       ) : null}
 
       {agents.map((agent) => (
-        <Card key={agent.clientId} testID={`connected-agent-${agent.clientId}`}>
-          <View style={styles.agentHeader}>
-            <View style={styles.agentTitle}>
-              <Text allowFontScaling={false} style={styles.agentName}>{agent.name}</Text>
-              <Text allowFontScaling={false} style={styles.agentScope}>Read training data</Text>
-            </View>
-            <Tag label="AI" />
-          </View>
-          <ListRow
-            density="list"
-            meta={
-              <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
-                {formatTimestamp(agent.grantedAt)}
-              </Text>
-            }>
-            <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
-          </ListRow>
-          <ListRow
-            density="list"
-            meta={
-              <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
-                {formatTimestamp(agent.lastAccessAt)}
-              </Text>
-            }>
-            <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>
-          </ListRow>
-          {/* An outline in `danger`, behind the unchanged Alert confirm. */}
-          <View style={styles.agentActions}>
-            <ActionButton
-              accessibilityLabel={`Revoke access for ${agent.name}`}
-              disabled={revokingClientId !== null}
-              label={revokingClientId === agent.clientId ? 'Revoking…' : 'Revoke access'}
-              onPress={() => confirmRevoke(agent)}
-              testID={`connected-agent-revoke-${agent.clientId}`}
-              tone="danger"
-              variant="outline"
-            />
-          </View>
-        </Card>
+        <ConnectedAgentCard
+          agent={agent}
+          key={agent.clientId}
+          onRevoke={confirmRevoke}
+          onTogglePlanAccess={togglePlanAccess}
+          revokeDisabled={revokingClientId !== null}
+          revoking={revokingClientId === agent.clientId}
+          saving={savingClientIds.has(agent.clientId)}
+        />
       ))}
 
       {error ? (
@@ -249,6 +351,26 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
+  },
+  permission: {
+    paddingBottom: uiSpace.sm,
+  },
+  permissionUnavailable: {
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.xs,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.danger,
+  },
+  permissionDisclosure: {
+    paddingHorizontal: uiSpace.lg,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
   agentActions: {
     padding: uiSpace.lg,

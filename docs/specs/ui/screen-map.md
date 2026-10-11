@@ -63,7 +63,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/profile` | Auth-aware account route: signed-out credentials, signed-in username / email / password management, sign-out | `profile.tsx` |
-| `/connected-agents` | Signed-in review and revocation of OAuth grants held by external coaching agents | `connected-agents.tsx` |
+| `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to create plans** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |

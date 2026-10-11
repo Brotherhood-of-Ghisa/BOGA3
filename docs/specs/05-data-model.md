@@ -55,7 +55,7 @@ round-trip and the drift checker ignores it.
 | `smoke_records` | out — test scaffolding | `apps/mobile/src/data/schema/smoke.ts` |
 | `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the sixteen-table mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
-| `public.agent_access_audit` | out — security metadata only; service-side insert only; an app session reads only its own rows and an OAuth token cannot read it at all | `supabase/migrations/` |
+| `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permission is a default-denied per-client plan grant the app owns; receipts are hash-only and service-role only | `supabase/migrations/` |
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
 No group table carries `owner_user_id` or an FK into a Sync v2 table, so the

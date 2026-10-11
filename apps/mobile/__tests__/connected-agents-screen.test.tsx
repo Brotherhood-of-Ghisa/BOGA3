@@ -3,6 +3,7 @@
 const mockUseAuth = jest.fn();
 const mockListConnectedAgents = jest.fn();
 const mockRevokeConnectedAgent = jest.fn();
+const mockSetAgentPlanPermission = jest.fn();
 const mockAlert = jest.fn();
 
 jest.mock('@/src/auth', () => ({
@@ -12,6 +13,7 @@ jest.mock('@/src/auth', () => ({
 jest.mock('@/src/auth/connected-agents', () => ({
   listConnectedAgents: (...args: unknown[]) => mockListConnectedAgents(...args),
   revokeConnectedAgent: (...args: unknown[]) => mockRevokeConnectedAgent(...args),
+  setAgentPlanPermission: (...args: unknown[]) => mockSetAgentPlanPermission(...args),
 }));
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -24,6 +26,7 @@ const agent = {
   grantedAt: '2026-07-24T12:00:00.000Z',
   lastAccessAt: '2026-07-25T13:00:00.000Z',
   name: 'Coach Agent',
+  planAccessEnabled: false,
   scopes: ['openid', 'profile'],
 };
 
@@ -33,6 +36,7 @@ describe('Connected agents screen', () => {
     mockUseAuth.mockReturnValue({ user: { id: 'user-a' } });
     mockListConnectedAgents.mockResolvedValue([agent]);
     mockRevokeConnectedAgent.mockResolvedValue(undefined);
+    mockSetAgentPlanPermission.mockResolvedValue(undefined);
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
   });
 
@@ -84,5 +88,154 @@ describe('Connected agents screen', () => {
     expect(await screen.findByTestId('connected-agents-error')).toBeTruthy();
     expect(screen.getByText('Connection list unavailable.')).toBeTruthy();
     expect(screen.getByText('Retry')).toBeTruthy();
+  });
+
+  it('shows plan creation off by default with the client named in the disclosure', async () => {
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    expect(
+      screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+    ).toEqual({ checked: false });
+    const disclosure = screen.getByTestId('connected-agent-plan-disclosure-client-a');
+    expect(String(disclosure.props.children)).toContain('Coach Agent');
+    expect(String(disclosure.props.children)).toMatch(/upcoming and unscheduled plans/);
+    expect(String(disclosure.props.children)).toMatch(/create new plans and programmes/);
+  });
+
+  it('enables plan access optimistically and persists it for the live grant', async () => {
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-access-client-a'));
+    });
+
+    expect(mockSetAgentPlanPermission).toHaveBeenCalledWith(
+      'client-a',
+      true,
+      '2026-07-24T12:00:00.000Z',
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+      ).toEqual({ checked: true });
+    });
+  });
+
+  it('reverts the toggle and shows a retryable error when the write fails', async () => {
+    mockSetAgentPlanPermission.mockRejectedValue(
+      new Error('Unable to update plan access right now.'),
+    );
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-access-client-a'));
+    });
+
+    expect(await screen.findByTestId('connected-agents-error')).toBeTruthy();
+    expect(screen.getByText('Unable to update plan access right now.')).toBeTruthy();
+    expect(
+      screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+    ).toEqual({ checked: false });
+  });
+
+  it('renders switch disabled and shows a warning when plan permission is unavailable', async () => {
+    mockListConnectedAgents.mockResolvedValue([
+      { ...agent, planAccessEnabled: 'unavailable' },
+    ]);
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    const switchComponent = screen.getByTestId('connected-agent-plan-access-client-a');
+    expect(switchComponent.props.accessibilityState).toEqual({ checked: false, disabled: true });
+    expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toBeTruthy();
+    expect(
+      screen.getByText('Plan access settings are temporarily unavailable for this coach.'),
+    ).toBeTruthy();
+
+    // Pressing it does not invoke setAgentPlanPermission
+    await act(async () => {
+      fireEvent.press(switchComponent);
+    });
+    expect(mockSetAgentPlanPermission).not.toHaveBeenCalled();
+  });
+
+  it('serializes toggles per client so concurrent writes across distinct clients settle independently', async () => {
+    const agentB = {
+      clientId: 'client-b',
+      grantedAt: '2026-07-25T12:00:00.000Z',
+      lastAccessAt: null,
+      name: 'Coach B',
+      planAccessEnabled: false,
+      scopes: ['openid'],
+    };
+    mockListConnectedAgents.mockResolvedValue([agent, agentB]);
+
+    let resolveA: () => void = () => {};
+    let resolveB: () => void = () => {};
+    const promiseA = new Promise<void>((resolve) => {
+      resolveA = resolve;
+    });
+    const promiseB = new Promise<void>((resolve) => {
+      resolveB = resolve;
+    });
+
+    mockSetAgentPlanPermission.mockImplementation((clientId: string) => {
+      if (clientId === 'client-a') return promiseA;
+      if (clientId === 'client-b') return promiseB;
+      return Promise.resolve();
+    });
+
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+    await screen.findByTestId('connected-agent-client-b');
+
+    // Toggle client A then client B concurrently
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-access-client-a'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-access-client-b'));
+    });
+
+    // Both writes have been initiated
+    expect(mockSetAgentPlanPermission).toHaveBeenCalledWith('client-a', true, agent.grantedAt);
+    expect(mockSetAgentPlanPermission).toHaveBeenCalledWith('client-b', true, agentB.grantedAt);
+
+    // Both switches show disabled while in flight
+    expect(
+      screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+    ).toEqual({ checked: true, disabled: true });
+    expect(
+      screen.getByTestId('connected-agent-plan-access-client-b').props.accessibilityState,
+    ).toEqual({ checked: true, disabled: true });
+
+    // Client B completes first
+    await act(async () => {
+      resolveB();
+    });
+
+    await waitFor(() => {
+      // Client B is no longer disabled, Client A is still disabled
+      expect(
+        screen.getByTestId('connected-agent-plan-access-client-b').props.accessibilityState,
+      ).toEqual({ checked: true });
+      expect(
+        screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+      ).toEqual({ checked: true, disabled: true });
+    });
+
+    // Client A completes second
+    await act(async () => {
+      resolveA();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+      ).toEqual({ checked: true });
+    });
   });
 });
