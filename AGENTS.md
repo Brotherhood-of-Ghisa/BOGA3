@@ -200,6 +200,13 @@ brainstorm.** Source-of-truth lives in `docs/specs/**`, `AGENTS.md`, and
 
 ## Pull requests
 
+AI-assisted commits carry truthful authorship metadata from the client or
+harness, covering shell commits too. Use its supported attribution format
+and record the actual model when known; all providers and harnesses are
+welcome. Before opening a PR, verify attribution on new commits and preserve
+it through squash/merge. Never invent identities or attribute human-only work
+to AI.
+
 Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md`:
 **Objective / Tests / Review hard / Deviations**, using data and `file:line`
 pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
