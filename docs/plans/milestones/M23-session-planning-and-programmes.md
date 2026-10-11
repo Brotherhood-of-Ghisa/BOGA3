@@ -635,8 +635,6 @@ Each card is intended to be one reviewable PR.
    (`completed`).
 2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
    add the four synced entities, performed session/block/set provenance, and
-2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
-   add the four synced entities, performed session/block/set provenance, and
    full Sync v2 expansion (`completed`; card archived).
 3. `docs/plans/tasks/M23-T03-Mobile_plan_repository_and_session_materialization.md`
    — local repositories, validation, deterministic whole-plan/block
@@ -655,7 +653,7 @@ Each card is intended to be one reviewable PR.
 7. `docs/plans/tasks/M23-T07-MCP_planning_tools_and_cross_stack_verification.md` —
    exact-history API upgrades, two pageable history tools, three planning tools,
    protocol smoke, server-to-mobile seam coverage, and the planning Maestro
-   lane (`planned`).
+   lane (`completed`; card archived).
 8. `docs/plans/tasks/M23-T08-Milestone_closeout.md` — full gates, acceptance matrix,
    as-built docs, hosted-smoke accounting, and archive (`planned`).
 
