@@ -67,12 +67,10 @@ function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSessio
   }
   return (
     <TodayGroupCard
-      groups={state.groups}
       myUserId={state.myUserId}
       nowMs={nowMs}
       onOpenGroup={onOpenGroup}
       onOpenSession={onOpenSession}
-      onSelectGroup={state.selectGroup}
       selectedGroupId={state.selectedGroupId}
       summary={state.summary}
     />

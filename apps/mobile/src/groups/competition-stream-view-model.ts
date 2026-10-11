@@ -8,13 +8,29 @@ import type { CompetitionEventWire, CompetitionStreamItemWire,CompetitionHistory
 import { formatMemberName, formatMetricFigure, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
   formatExerciseCount, formatStreamStartedAt, type RecordCertificationStatus, type StreamMembershipViewModel } from './stream-view-model';
 
+/** A group record taken in a session, drawn inside that session's card. */
+export type CompetitionSessionRecordLine = {
+  key: string; exercise: string; value: string; certified: boolean; accessibilityLabel: string;
+};
 export type CompetitionSessionCard = {
   kind: 'session'; key: string; groupId: string; memberUserId: string; sessionId: string;
   memberName: string; isTrainingNow: boolean; statusLabel: string; startedAtLabel: string;
   gymName: string | null; groupNames: string[]; setsLabel: string; exercisesLabel: string;
+  /** The session's own group records; a card with none shows no record block. */
+  records: CompetitionSessionRecordLine[];
 };
 export type CompetitionStreamModel = CompetitionSessionCard | StreamMembershipViewModel |
   { kind: 'competition'; key: string; event: CompetitionEventWire; record?: CompetitionStreamRecordWire };
+
+/** Every competition event kind the stream can carry, each able to be hidden. */
+export const STREAM_EVENT_KINDS = ['record','record_voided','lead_change','link','unlink','rules_change'] as const;
+export type StreamEventKind = typeof STREAM_EVENT_KINDS[number];
+export const STREAM_EVENT_KIND_LABELS: Record<StreamEventKind,string> = {
+  record: 'Records', record_voided: 'Voided records', lead_change: 'Lead changes',
+  link: 'Exercise links', unlink: 'Exercise unlinks', rules_change: 'Rules changes',
+};
+/** Linking says nothing about training, so the stream leaves it out until the debug drawer asks for it. */
+export const DEFAULT_HIDDEN_STREAM_EVENT_KINDS: readonly StreamEventKind[] = ['link','unlink'];
 
 /** Counts come only from permitted set context; absolute totals are never reconstructed. */
 export function buildCompetitionStreamItem(item: CompetitionStreamItemWire): CompetitionStreamModel {
@@ -23,7 +39,7 @@ export function buildCompetitionStreamItem(item: CompetitionStreamItemWire): Com
     groupName: item.group.name,sentence: formatMembershipSentence(item.event,item.member.username) };
   const { session } = item;
   const counts = buildCompetitionSession(session);
-  return { kind: 'session',key: item.key,groupId: item.groups[0].group_id,
+  return { kind: 'session',records: [],key: item.key,groupId: item.groups[0].group_id,
     memberUserId: session.member.user_id,sessionId: session.session_id,
     memberName: formatMemberName(session.member.username),isTrainingNow: session.status === 'active',
     statusLabel: session.status === 'draft' ? 'Draft' : formatSessionStatusLabel({ ...session,status: session.status }),
@@ -95,4 +111,38 @@ export function buildStreamRecordSheet(event: CompetitionEventWire,record: Compe
     holder: nameOf(entry.value.member),set: entry.performance ? formatSetFigure(entry.performance) : null })).sort(e1rmFirst);
   return { who: `${nameOf(event.member)} · ${formatBoardDate(event.sort_at_ms,nowMs)}`,set: streamRecordSet(event,record),
     certification: event.voided ? null : setCertification(event),metrics,previous };
+}
+
+/** A record's one line inside its session card: `Deadlift · 1RM 213.3 kg`. */
+function sessionRecordLine(key: string,event: CompetitionEventWire): CompetitionSessionRecordLine {
+  const values = event.values.filter(value => value.role === 'record');
+  const value = values.map(formatCompetitionHistoricalValue).join(' · ') || describeCompetitionEvent(event);
+  const certified = (event.record_context?.metrics ?? [])
+    .some(entry => entry.certification !== null && entry.certification.ended_at_ms === null);
+  return { key,exercise: event.group_exercise.name,value,certified,
+    accessibilityLabel: [event.group_exercise.name,value,certified ? 'certified' : null].filter(Boolean).join(', ') };
+}
+
+/**
+ * The stream as drawn: a session carries the group records it took, so one
+ * session is one card, and the hidden event kinds are dropped. Only a record
+ * tied to a session in the same page nests; anything else keeps its own card.
+ */
+export function buildCompetitionStreamModels(items: CompetitionStreamItemWire[],
+  hiddenKinds: readonly StreamEventKind[] = DEFAULT_HIDDEN_STREAM_EVENT_KINDS): CompetitionStreamModel[] {
+  const models = items.map(buildCompetitionStreamItem);
+  const sessions = new Map<string,CompetitionSessionCard>();
+  for (const model of models) if (model.kind === 'session') sessions.set(model.sessionId,model);
+  const drawn: CompetitionStreamModel[] = [];
+  for (const model of models) {
+    if (model.kind !== 'competition') { drawn.push(model); continue; }
+    if (hiddenKinds.includes(model.event.kind as StreamEventKind)) continue;
+    const host = model.event.session_id === null ? undefined : sessions.get(model.event.session_id);
+    if (host && model.event.kind === 'record' && !model.event.voided) {
+      host.records.push(sessionRecordLine(model.key,model.event));
+      continue;
+    }
+    drawn.push(model);
+  }
+  return drawn;
 }

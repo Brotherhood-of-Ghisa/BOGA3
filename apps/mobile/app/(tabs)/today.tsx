@@ -2,6 +2,7 @@ import { useIsFocused, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
+  TodayGroupHeader,
   TodayGroupSection,
   TodayProgressCard,
   useTodayGroup,
@@ -55,9 +56,10 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
       </View>
 
       <View style={styles.section} testID="today-group-section">
-        <SectionHeader
-          action={{ label: 'View groups', onPress: () => router.push(groupsPath), testID: 'today-view-groups-button' }}
-          title="Group activity"
+        <GroupSectionHeading
+          onOpenHome={(groupId) => router.push(`${groupsStreamPath(groupId)}&section=glance`)}
+          onViewGroups={() => router.push(groupsPath)}
+          state={groupState}
         />
         <TodayGroupSection
           nowMs={now().getTime()}
@@ -69,6 +71,44 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
         />
       </View>
     </ScreenScroll>
+  );
+}
+
+/**
+ * The group section is named after the primary group — the one Today shows,
+ * remembered across visits. The name opens that group's home page and the
+ * switch beside it changes which group is primary; with no group to name
+ * (signed out, no groups, nothing cached) the section keeps its own title.
+ */
+function GroupSectionHeading({
+  state,
+  onOpenHome,
+  onViewGroups,
+}: {
+  state: TodayGroupState;
+  onOpenHome: (groupId: string) => void;
+  onViewGroups: () => void;
+}) {
+  const group =
+    state.status === 'available' && state.groups && state.selectedGroupId !== null
+      ? state.groups.find((candidate) => candidate.group_id === state.selectedGroupId)
+      : undefined;
+  if (state.status !== 'available' || !group || state.selectedGroupId === null) {
+    return (
+      <SectionHeader
+        action={{ label: 'View groups', onPress: onViewGroups, testID: 'today-view-groups-button' }}
+        title="Group activity"
+      />
+    );
+  }
+  return (
+    <TodayGroupHeader
+      groupName={group.name}
+      groups={state.groups?.map((candidate) => ({ groupId: candidate.group_id, name: candidate.name })) ?? []}
+      onOpenHome={() => onOpenHome(group.group_id)}
+      onSelectGroup={state.selectGroup}
+      selectedGroupId={state.selectedGroupId}
+    />
   );
 }
 
