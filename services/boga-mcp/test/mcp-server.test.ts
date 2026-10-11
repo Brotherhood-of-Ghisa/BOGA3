@@ -70,6 +70,28 @@ const responses: Record<string, Record<string, unknown>> = {
     metric_revision: 'working_sets_v4',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
+  '/functions/v1/agent-api/v1/agent/exercises/exercise-a/history': {
+    exercise: { id: 'exercise-a', name: 'Bench Press' },
+    metric_revision: 'working_sets_v4',
+    next_cursor: null,
+    sets: [{ id: 'set-1', reps: 8, load: { value: 100, unit: 'kg' } }],
+  },
+  '/functions/v1/agent-api/v1/agent/workouts/workout-a': {
+    metric_revision: 'working_sets_v4',
+    workout: {
+      id: 'workout-a',
+      exercises: [{ id: 'block-1', name: 'Bench Press' }],
+      sets: [{ id: 'set-1', reps: 8, load: { value: 100, unit: 'kg' } }],
+    },
+  },
+  '/functions/v1/agent-api/v1/agent/session-plans': {
+    next_cursor: null,
+    plans: [{ id: 'plan-a', progress: 'planned', title: 'Chest day' }],
+  },
+  '/functions/v1/agent-api/v1/agent/programmes': {
+    id: 'prog-a',
+    plan_ids: ['plan-1', 'plan-2'],
+  },
 };
 
 const envelopeResponse = (data: Record<string, unknown>): Response =>
@@ -102,12 +124,14 @@ const initializeRequest = {
 };
 
 const startMcp = async () => {
-  const requests: URL[] = [];
+  const requests: Array<{ method: string; url: URL; headers: Headers; body?: string }> = [];
   const fetchImplementation: typeof fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    requests.push(url);
-    expect(init?.method).toBe('GET');
-    expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer ${token}`);
+    const method = init?.method ?? 'GET';
+    const headers = new Headers(init?.headers);
+    const body = init?.body ? String(init.body) : undefined;
+    requests.push({ body, headers, method, url });
+    expect(headers.get('authorization')).toBe(`Bearer ${token}`);
     const response = responses[url.pathname];
     if (!response) {
       return Response.json(
@@ -165,26 +189,51 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly the four read-only tools', async () => {
+  it('discovers exactly nine tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
 
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      'create_session_plan',
+      'create_training_programme',
       'get_exercise_context',
+      'get_exercise_history',
       'get_recent_workouts',
       'get_training_profile',
+      'get_upcoming_session_plans',
+      'get_workout_detail',
+      'search_exercises',
+    ]);
+    const readOnlyNames = new Set([
+      'get_exercise_context',
+      'get_exercise_history',
+      'get_recent_workouts',
+      'get_training_profile',
+      'get_upcoming_session_plans',
+      'get_workout_detail',
       'search_exercises',
     ]);
     for (const tool of result.tools) {
-      expect(tool.annotations).toMatchObject({
-        destructiveHint: false,
-        readOnlyHint: true,
-      });
+      if (readOnlyNames.has(tool.name)) {
+        expect(tool.annotations).toMatchObject({
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          readOnlyHint: true,
+        });
+      } else {
+        expect(tool.annotations).toMatchObject({
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          readOnlyHint: false,
+        });
+      }
     }
   });
 
-  it('translates all four tools into the dedicated API routes', async () => {
+  it('translates all tools into the dedicated API routes', async () => {
     const running = await startMcp();
     active.push(running);
 
@@ -204,6 +253,41 @@ describe('BoGa MCP server', () => {
       arguments: { limit: 4 },
       name: 'get_recent_workouts',
     });
+    const history = await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', limit: 10 },
+      name: 'get_exercise_history',
+    });
+    const workoutDetail = await running.client.callTool({
+      arguments: { limit: 10, session_id: 'workout-a' },
+      name: 'get_workout_detail',
+    });
+    const plans = await running.client.callTool({
+      arguments: { include_unscheduled: true, limit: 5 },
+      name: 'get_upcoming_session_plans',
+    });
+    const createPlan = await running.client.callTool({
+      arguments: {
+        idempotency_key: 'plan-key-1',
+        plan: {
+          exercises: [{ name: 'Bench', sets: [{ target_reps: 5 }] }],
+          title: 'Chest day',
+        },
+      },
+      name: 'create_session_plan',
+    });
+    const createProg = await running.client.callTool({
+      arguments: {
+        idempotency_key: 'prog-key-1',
+        programme: {
+          name: 'Wave',
+          plans: [
+            { exercises: [{ name: 'Bench', sets: [{ target_reps: 5 }] }], title: 'W1' },
+            { exercises: [{ name: 'Bench', sets: [{ target_reps: 6 }] }], title: 'W2' },
+          ],
+        },
+      },
+      name: 'create_training_programme',
+    });
 
     expect(profile.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/profile'
@@ -217,21 +301,46 @@ describe('BoGa MCP server', () => {
     expect(workouts.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/workouts/recent'
     ]);
+    expect(history.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/exercises/exercise-a/history'
+    ]);
+    expect(workoutDetail.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/workouts/workout-a'
+    ]);
+    expect(plans.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/session-plans'
+    ]);
+    expect(createPlan.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/session-plans'
+    ]);
+    expect(createProg.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/programmes'
+    ]);
 
-    const contextText = (context.content as Array<{ type: string; text?: string }>).find(row => row.type === 'text')?.text;
-    expect(JSON.parse(contextText!)).toEqual(context.structuredContent);
-    const workoutText = (workouts.content as Array<{ type: string; text?: string }>).find(row => row.type === 'text')?.text;
-    expect(JSON.parse(workoutText!)).toEqual(workouts.structuredContent);
-
-    const called = running.requests.map((url) => `${url.pathname}${url.search}`);
+    const called = running.requests.map((r) => `${r.method} ${r.url.pathname}${r.url.search}`);
     expect(called).toContain(
-      '/functions/v1/agent-api/v1/agent/exercises?limit=7&query=bench',
+      'GET /functions/v1/agent-api/v1/agent/exercises?limit=7&query=bench',
     );
     expect(called).toContain(
-      '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context?recent_sessions=3',
+      'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/context?recent_sessions=3',
     );
     expect(called).toContain(
-      '/functions/v1/agent-api/v1/agent/workouts/recent?limit=4',
+      'GET /functions/v1/agent-api/v1/agent/workouts/recent?limit=4',
+    );
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/history?limit=10',
+    );
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/workouts/workout-a?limit=10',
+    );
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/session-plans?include_unscheduled=true&limit=5',
+    );
+    expect(called).toContain(
+      'POST /functions/v1/agent-api/v1/agent/session-plans',
+    );
+    expect(called).toContain(
+      'POST /functions/v1/agent-api/v1/agent/programmes',
     );
   });
 
@@ -247,7 +356,7 @@ describe('BoGa MCP server', () => {
 
     expect(result.isError).toBe(true);
     expect(
-      running.requests.slice(before).filter((url) => url.pathname.endsWith('/exercises')),
+      running.requests.slice(before).filter((r) => r.url.pathname.endsWith('/exercises')),
     ).toHaveLength(0);
   });
 

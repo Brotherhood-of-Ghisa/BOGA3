@@ -60,6 +60,7 @@ export type MaestroHarnessTeleportTarget =
   // or a completed session to edit it (e.g. `maestro_m24_completion_one_pr`
   // from the `exercise-block-history` fixture).
   | 'session-view'
+  | 'session-plan-new'
   | 'today';
 
 export const coerceMaestroHarnessQueryParam = (value: string | string[] | undefined): string | null => {
@@ -114,6 +115,7 @@ export const resolveMaestroHarnessTeleportTarget = (
     case 'completed-session':
     case 'exercise-page':
     case 'session-view':
+    case 'session-plan-new':
     case 'today':
       return value;
     default:
@@ -179,6 +181,8 @@ export const resolveMaestroHarnessTeleportHref = ({
         : null;
     case 'session-view':
       return sessionId ? sessionViewHref(sessionId) : null;
+    case 'session-plan-new':
+      return '/session-plan/new' as Href;
     case 'today':
       return '/today' as Href;
     default:

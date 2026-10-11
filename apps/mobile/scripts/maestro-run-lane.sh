@@ -109,21 +109,23 @@ case "$lane" in
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
       --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
-      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
+      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
+      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml"
     ;;
 
-  # The Android data smoke shares the data-runtime-smoke and exercise-catalogue
-  # flows but omits session-completion-states-fixture.yaml: its assertions are
+  # The Android data smoke shares the data-runtime-smoke, exercise-catalogue
+  # and session-plan flows but omits session-completion-states-fixture.yaml: its assertions are
   # the iOS native share sheet (a "Copy" destination and a page-sheet drag),
-  # which the Android Sharesheet does not reproduce. The other two flows are
-  # platform-neutral. One provisioned emulator + Metro for both.
+  # which the Android Sharesheet does not reproduce. The other three flows are
+  # platform-neutral. One provisioned emulator + Metro for all three.
   android-data-smoke)
     use_android
     MAESTRO_RESET_STRATEGY=data \
     "$RUN_FLOWS" \
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
-      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
+      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
+      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml"
     ;;
 
   # The exercise page: its own fixture, seeded and reset in-flow through the

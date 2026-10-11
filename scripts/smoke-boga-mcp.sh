@@ -39,9 +39,23 @@ cleanup() {
     run_psql "
       begin;
         set constraints all deferred;
+        delete from public.agent_plan_permissions
+          where owner_user_id = '${USER_UUID}'::uuid
+            and client_id = '${AGENT_CLIENT_ID}';
+        delete from public.agent_plan_write_receipts
+          where owner_user_id = '${USER_UUID}'::uuid
+            and client_id = '${AGENT_CLIENT_ID}';
         delete from public.agent_access_audit
           where owner_user_id = '${USER_UUID}'::uuid
             and oauth_client_id = '${AGENT_CLIENT_ID}';
+        delete from app_public.session_plan_sets
+          where owner_user_id = '${USER_UUID}'::uuid;
+        delete from app_public.session_plan_exercises
+          where owner_user_id = '${USER_UUID}'::uuid;
+        delete from app_public.session_plans
+          where owner_user_id = '${USER_UUID}'::uuid;
+        delete from app_public.training_programmes
+          where owner_user_id = '${USER_UUID}'::uuid;
         delete from app_public.exercise_sets
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_exercises
@@ -205,11 +219,84 @@ if [[ -n "${USER_UUID}" ]]; then
     fail "local Auth does not advertise offline_access; check the Supabase CLI pin (./boga doctor)"
 fi
 
-echo "[boga-mcp-smoke] discovering and calling all four tools"
+echo "[boga-mcp-smoke] phase 1: discovering tools and calling read tools with planning denied by default"
 BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
 BOGA_MCP_SMOKE_URL="${MCP_URL}" \
 BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
 BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
 BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
 BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
+BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
+
+if [[ -n "${USER_UUID}" ]]; then
+  echo "[boga-mcp-smoke] enabling plan permission for client ${AGENT_CLIENT_ID}"
+  GRANTED_AT="$(run_psql "
+    select granted_at from auth.oauth_consents
+    where user_id = '${USER_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';
+  ")"
+  [[ -n "${GRANTED_AT}" ]] || fail "could not find granted_at timestamp in oauth_consents"
+
+  run_psql "
+    insert into public.agent_plan_permissions
+      (owner_user_id, client_id, plan_access_enabled, granted_at)
+    values
+      ('${USER_UUID}'::uuid, '${AGENT_CLIENT_ID}', true, '${GRANTED_AT}')
+    on conflict (owner_user_id, client_id) do update set
+      plan_access_enabled = true,
+      granted_at = excluded.granted_at,
+      updated_at = now();
+  "
+
+  echo "[boga-mcp-smoke] phase 2: calling planning tools with plan permission enabled"
+  BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
+  BOGA_MCP_SMOKE_URL="${MCP_URL}" \
+  BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
+  BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
+  BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
+  BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
+  BOGA_MCP_SMOKE_PLAN_ENABLED="1" \
+    npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
+
+  echo "[boga-mcp-smoke] verifying database integrity: pending-only blocks, agent provenance, zero performed rows"
+  PLAN_COUNT="$(run_psql "
+    select count(*) from app_public.session_plans
+    where owner_user_id = '${USER_UUID}'::uuid and provenance = 'agent';
+  ")"
+  [[ "${PLAN_COUNT}" -ge 3 ]] || fail "expected at least 3 agent plans (1 standalone + 2 in programme), found ${PLAN_COUNT}"
+
+  NON_PENDING_BLOCKS="$(run_psql "
+    select count(*) from app_public.session_plan_exercises
+    where owner_user_id = '${USER_UUID}'::uuid and progress_status != 'pending';
+  ")"
+  [[ "${NON_PENDING_BLOCKS}" == "0" ]] || fail "agent created non-pending blocks: ${NON_PENDING_BLOCKS}"
+
+  PERFORMED_WITH_PROVENANCE="$(run_psql "
+    select count(*) from app_public.sessions
+    where owner_user_id = '${USER_UUID}'::uuid and source_plan_id is not null;
+  ")"
+  [[ "${PERFORMED_WITH_PROVENANCE}" == "0" ]] || fail "agent plan creation wrote performed source_plan_id rows"
+
+  echo "[boga-mcp-smoke] verifying metadata-only audit records"
+  AUDIT_COUNT="$(run_psql "
+    select count(*) from public.agent_access_audit
+    where owner_user_id = '${USER_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}';
+  ")"
+  [[ "${AUDIT_COUNT}" -ge 5 ]] || fail "expected audit rows for tool calls, found ${AUDIT_COUNT}"
+
+  echo "[boga-mcp-smoke] phase 3: verifying disable and revoke denial"
+  run_psql "
+    update public.agent_plan_permissions
+    set plan_access_enabled = false
+    where owner_user_id = '${USER_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';
+  "
+
+  BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
+  BOGA_MCP_SMOKE_URL="${MCP_URL}" \
+  BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
+  BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
+  BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
+  BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
+  BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
+    npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
+fi

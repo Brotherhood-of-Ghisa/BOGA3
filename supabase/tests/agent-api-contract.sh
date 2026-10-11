@@ -552,6 +552,70 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and (.data.workouts[0].completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
   ' >/dev/null || fail "recent workout response is not compact and explicit"
 
+echo "[agent-api-test] verifying exact keyset-paginated exercise history"
+agent_get "exercises/${EXERCISE_A}/history?limit=1"
+assert_status "200" "first exercise history page"
+HISTORY_FIRST_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+HISTORY_NEXT_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ -n "${HISTORY_NEXT_CURSOR}" && "${HISTORY_NEXT_CURSOR}" != "null" ]] ||
+  fail "first exercise history page did not return a cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg session "${SESSION_A}" \
+  --arg set "${SET_A1}" '
+    .data.sets[0].id == $set
+    and .data.sets[0].session_id == $session
+    and .data.sets[0].load.value == 100
+    and .data.sets[0].reps == 8
+    and .data.sets[0].set_type == "rir_2"
+    and .data.sets[0].volume.unit == "kg_reps"
+    and (.data.sets[0].session_completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
+  ' >/dev/null || fail "first exercise history set payload is invalid"
+
+agent_get "exercises/${EXERCISE_A}/history?limit=1&cursor=${HISTORY_NEXT_CURSOR}"
+assert_status "200" "second exercise history page"
+HISTORY_SECOND_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.sets[0].id')"
+[[ "${HISTORY_FIRST_SET_ID}" != "${HISTORY_SECOND_SET_ID}" ]] ||
+  fail "exercise history cursor repeated the first page"
+[[ "${HISTORY_SECOND_SET_ID}" == "${SET_A2}" ]] ||
+  fail "second exercise history page was not SET_A2"
+
+# Cross-owner and missing exercise history
+agent_get "exercises/${EXERCISE_B}/history"
+assert_status "404" "cross-owner exercise history"
+agent_get "exercises/agent-api-${RUN_TAG}-missing/history"
+assert_status "404" "missing exercise history"
+
+echo "[agent-api-test] verifying exact completed workout detail"
+agent_get "workouts/${SESSION_A}?limit=1"
+assert_status "200" "workout detail first page"
+WORKOUT_FIRST_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+WORKOUT_NEXT_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.next_cursor')"
+[[ -n "${WORKOUT_NEXT_CURSOR}" && "${WORKOUT_NEXT_CURSOR}" != "null" ]] ||
+  fail "workout detail first page did not return a cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg session "${SESSION_A}" \
+  --arg gym "Agent A Gym" \
+  --arg set "${SET_A1}" '
+    .data.workout.id == $session
+    and .data.workout.gym.name == $gym
+    and .data.workout.total_volume.unit == "kg_reps"
+    and (.data.workout.completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
+    and (.data.workout.exercises | length) == 2
+    and .data.workout.sets[0].id == $set
+  ' >/dev/null || fail "workout detail payload is invalid"
+
+agent_get "workouts/${SESSION_A}?limit=1&cursor=${WORKOUT_NEXT_CURSOR}"
+assert_status "200" "workout detail second page"
+WORKOUT_SECOND_SET_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.workout.sets[0].id')"
+[[ "${WORKOUT_FIRST_SET_ID}" != "${WORKOUT_SECOND_SET_ID}" ]] ||
+  fail "workout detail cursor repeated the first page"
+[[ "${WORKOUT_SECOND_SET_ID}" == "${SET_A2}" ]] ||
+  fail "second workout detail page was not SET_A2"
+
+# Missing workout detail
+agent_get "workouts/agent-api-${RUN_TAG}-missing"
+assert_status "404" "missing workout detail"
+
 echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"

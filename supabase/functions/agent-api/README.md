@@ -176,6 +176,75 @@ calculation module and read [working sets only](#working-sets-only)
 canonical user-authored note field or failed-set meaning, so this API reports
 those fields unavailable instead of inventing semantics.
 
+## Exercise history
+
+`GET /v1/agent/exercises/:exerciseId/history`
+
+Keyset-paginated performed set history for one exercise owned by the user,
+ordered in reverse chronological completed-session order by
+`(session_completed_at, session_id, exercise_order, set_order)`. Query
+parameters: `limit` (`1..100`, default `20`) and opaque `cursor`. Drains to
+exhaustion when analyzing complete training history.
+
+```json
+{
+  "sets": [{
+    "id": "set-id",
+    "session_id": "session-id",
+    "session_completed_at": "2026-07-25T18:00:00.000Z",
+    "exercise_id": "exercise-id",
+    "exercise_name": "Bench press",
+    "order_index": 0,
+    "load": { "value": 80, "unit": "kg" },
+    "calculated_load": { "value": 80, "unit": "kg" },
+    "reps": 8,
+    "set_type": "rir_2",
+    "volume": { "value": 640, "unit": "kg_reps" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" }
+  }],
+  "next_cursor": null
+}
+```
+
+## Workout detail
+
+`GET /v1/agent/workouts/:sessionId`
+
+Exact completed workout detail including session header, total volume, compact
+exercise list, and keyset-paginated sets ordered by `(exercise_order, set_order)`.
+Query parameters: `limit` (`1..100`, default `50`) and opaque `cursor`. An
+inaccessible or nonexistent session produces a `404` envelope.
+
+```json
+{
+  "workout": {
+    "id": "session-id",
+    "started_at": "2026-07-25T17:00:00.000Z",
+    "completed_at": "2026-07-25T18:00:00.000Z",
+    "duration_seconds": 3600,
+    "gym": { "id": "gym-id", "name": "Gym name" },
+    "exercise_count": 1,
+    "completed_set_count": 2,
+    "total_volume": { "value": 1440, "unit": "kg_reps" },
+    "exercises": [{ "id": "block-id", "exercise_id": "exercise-id", "name": "Bench press" }],
+    "sets": [{
+      "id": "set-id",
+      "session_id": "session-id",
+      "session_exercise_id": "block-id",
+      "exercise_id": "exercise-id",
+      "exercise_name": "Bench press",
+      "order_index": 0,
+      "load": { "value": 80, "unit": "kg" },
+      "calculated_load": { "value": 80, "unit": "kg" },
+      "reps": 8,
+      "set_type": "rir_2",
+      "volume": { "value": 640, "unit": "kg_reps" }
+    }],
+    "next_cursor": null
+  }
+}
+```
+
 ## Recent workouts
 
 `GET /v1/agent/workouts/recent`

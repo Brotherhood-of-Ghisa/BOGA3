@@ -199,6 +199,10 @@ describe('maestro harness helpers', () => {
     expect(
       resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'maestro_m24_completion_one_pr' })
     ).toBe('/session/maestro_m24_completion_one_pr');
+    expect(resolveMaestroHarnessTeleportTarget('session-plan-new')).toBe('session-plan-new');
+    expect(
+      resolveMaestroHarnessTeleportHref({ target: 'session-plan-new' })
+    ).toBe('/session-plan/new');
   });
 
   it('runs a data reset only when requested', async () => {

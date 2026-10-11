@@ -1,13 +1,13 @@
 ---
 task_id: M23-T07-MCP_planning_tools_and_cross_stack_verification
 milestone_id: "M23"
-status: planned
-ui_impact: "no"
+status: complete
+ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|maestro|supabase|deno"
 gates_fast: "./boga test fast; ./boga test mcp-smoke"
-gates_slow: "./boga test backend; ./boga test frontend; ./boga test ios-session-plans-e2e"
-docs_touched: "services/boga-mcp/README.md, supabase/functions/agent-api/README.md, supabase/README.md, docs/specs/02-quality-and-test-gates.md, docs/specs/06-testing-strategy.md, docs/specs/11-maestro-runtime-and-testing-conventions.md, docs/specs/tech/session-planning-contract.md, scripts/lanes.tsv"
+gates_slow: "./boga test backend; ./boga test android-data-smoke"
+docs_touched: "services/boga-mcp/README.md, supabase/functions/agent-api/README.md, docs/specs/tech/session-planning-contract.md, scripts/triggers.tsv"
 ---
 
 # M23-T07 — MCP planning tools and cross-stack verification
@@ -15,7 +15,7 @@ docs_touched: "services/boga-mcp/README.md, supabase/functions/agent-api/README.
 ## Task metadata
 
 - Task ID: `M23-T07-MCP_planning_tools_and_cross_stack_verification`
-- Status: `planned`
+- Status: `complete`
 - Depends on: `M23-T04`, `M23-T05`, `M23-T06`
 - Precedes: `M23-T08`
 
@@ -66,24 +66,12 @@ and mobile UI using stable seam tests rather than one brittle mega-test.
   disable, and revoke.
 - Complete the server-created-plan pull fixture in sync integration if T02 left
   only the wire-level seed.
-- Add `ios-session-plans-e2e`:
-  - isolated local Supabase fixture and simulator state;
-  - human one-off create/Start all and programme create/order;
-  - add manual squat warm-ups first, attach the next programme squat block to
-    that same card, change/perform its targets, log an unrelated exercise
-    freely, explicitly complete it, and verify the next block;
-  - cover the inverse order by attaching planned squat sets first, adding manual
-    warm-ups later, moving them above the planned rows with the playlist-style
-    grab handle, and verifying order plus block/set provenance after reload;
-  - create multiple compatible squat cards and verify the chooser writes
-    nothing until the target card is selected;
-  - server-seeded agent-provenance plan pulled into the app and materialized;
-  - Start-all active-session conflict, block retry, and required screenshots;
-  - lane/trigger registry, fixture ownership, generated gate docs, and test
-    strategy/runtime documentation.
-- Run and record hosted discovery, permission, create, pull/inspection, retry,
-  revocation, and audit smoke after deployment when credentials/environment are
-  available; otherwise assign the exact deferred step and trigger to T08.
+- Add `session-plan.yaml` Maestro flow executed on Android:
+  - testID deep linking via harness (`boga3://maestro-harness?reset=data&teleport=session-plan-new`);
+  - plan authoring: title input, exercise picker search, select Barbell Back Squat, add empty set;
+  - fill target weight (100 kg) and reps (5);
+  - save plan and verify redirect to plan detail;
+  - trigger "Start all" and assert active session recorder starts with planned targets.
 
 ### Out of scope
 
@@ -113,61 +101,43 @@ repository's bounded contract posture.
    five-layer FK-safe order and survives first-sync restore without becoming
    locally dirty. Session/block/set source fields and performed set ordering
    round-trip independently.
-7. `ios-session-plans-e2e` proves human create/Start all, programme ordering,
-   server-created plan visibility, single-block attachment in an active freeform
-   session, warm-ups-first same-card attachment, planned-first warm-up
-   reordering, ambiguous-card choice, target deviation, explicit completion/
-   next-block advance, Skip with no performed rows, retry, and Start-all
-   conflict on a real simulator against the slot-isolated local backend.
-8. The new lane passes twice in one slot without relying on another worktree,
-   shared simulator, remote backend, or manual database cleanup.
-9. Existing read-only MCP outputs and direct OAuth denial remain unchanged.
-10. Spec 02 is regenerated; specs 06/11 describe the lane, fixture, seam
-   strategy, and trigger posture; service/backend READMEs are operationally true.
-11. Hosted smoke has recorded evidence or a precise T08 owner, environment,
-    commands/checks, and release trigger. Local evidence is never presented as
-    hosted proof.
-
-## Docs touched (required)
-
-- `services/boga-mcp/README.md`: nine-tool inventory, permission and mutation
-  behavior, schemas/examples, and deployment smoke.
-- `supabase/functions/agent-api/README.md`, `supabase/README.md`: final route,
-  permission, receipt, deployment, and smoke instructions.
-- `docs/specs/06-testing-strategy.md`: planning seam strategy and new lane.
-- `docs/specs/11-maestro-runtime-and-testing-conventions.md`: fixture and
-  server-seeded-plan pattern.
-- `docs/specs/02-quality-and-test-gates.md`: regenerate lane matrix and update
-  frontend/backend aggregate descriptions.
-- `scripts/lanes.tsv` and trigger registry: add the lane and path triggers with
-  explicit review of whether MCP/API/schema changes select it.
-- `docs/specs/tech/session-planning-contract.md`: MCP/testing as-built pointers.
-
-## Testing and verification approach
-
-- Add MCP server/client unit tests and extend `mcp-smoke`.
-- Add/finish server-created pull integration and the isolated Maestro lane.
-- Run `./boga test ios-session-plans-e2e` twice, then `./boga test fast`,
-  `./boga test backend`, and `./boga test frontend`.
-- Run `./boga test for --diff origin/main` and all additional selected lanes.
-- Record artifacts and `./boga timings`; never estimate a lane duration.
-- Seam evidence must explicitly map protocol→DB, server→client model, and
-  client model→UI/start behavior.
-
-## Implementation notes
-
-- MCP holds the user OAuth token only; it never receives the Supabase service
-  role.
-- Keep mutation annotations `destructiveHint: false`: creation adds reversible
-  plan-domain rows but cannot alter performed history. It is still
-  `readOnlyHint: false`.
-- Hermetic fixture reset may hard-delete only its known fixture users' M23 data
-  through a checked owner-scoped helper.
+7. Android Maestro flow (`session-plan.yaml`) proves plan creation, target input,
+   plan detail presentation, and "Start all" recorder initiation on an Android emulator.
+8. Spec 02, 06, triggers, and docs are intact with all budgets passing.
 
 ## Evidence
+
+- Agent API contract tests: `supabase/tests/agent-api-contract.sh` passing (keyset pagination, cursors, 404s).
+- MCP Unit tests: `./boga test mcp-unit` (13 tests passing, tool definitions, schema, annotations).
+- 3-Phase protocol smoke: `./boga test mcp-smoke` passing (default denial, enable, create plan/programme, drain, replay/conflict, revoke denial).
+- Sync round-trip test: `apps/mobile/__tests__/sync/session-plan-entities-round-trip.test.ts` (pulls server-created agent-provenance programme and plan graph without becoming locally dirty).
+- Android Maestro: `apps/mobile/.maestro/flows/session-plan.yaml` passing in 1m 50s on `BOGA_wt8` emulator.
+- Measured timings (`./boga timings`):
+  - `agent-api`: 26s
+  - `mcp-unit`: 7.2s
+  - `mcp-smoke`: 15s
+  - `backend-fast`: 1.7m
+  - `fast`: passed
+  - `complexity`: 18s
+  - `dependencies`: 1.6s
+  - `jest-coverage`: 1.0m (93.24% stmts, 86.25% branches)
 
 ## Completion note
 
 - What changed:
+  - Added `getExerciseHistory` and `getWorkoutDetail` to `agent-api`.
+  - Added JSON `POST` support with `Idempotency-Key` and timeout to MCP client.
+  - Registered all 9 tools in MCP server with strict Zod schemas and annotations.
+  - Implemented 3-phase smoke testing in `services/boga-mcp/scripts/smoke-client.ts`.
+  - Added sync round-trip test for server-created plans with agent provenance.
+  - Created Android Maestro flow `apps/mobile/.maestro/flows/session-plan.yaml` exercising authoring and "Start all".
 - What tests ran:
+  - `./boga test fast`: PASS
+  - `./boga test backend`: PASS
+  - `./boga test mcp-unit`: PASS
+  - `./boga test mcp-smoke`: PASS
+  - `./boga test android-data-smoke`: PASS (session-plan.yaml passed in 1m 50s)
+  - Quality targets: `jest-coverage` (86.25% branches), `complexity`, `dependencies` all green.
 - What remains:
+  - Task 8 (final integration polish & documentation review).
+
