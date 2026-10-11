@@ -371,9 +371,8 @@ appId: com.dinoderek.mobile
     visible: { id: "groups-filter-section" }
     timeout: 15000
 - tapOn: { id: "groups-filter-section" }
-- extendedWaitUntil:
-    visible: { id: "groups-filter-section", text: "Leaderboards" }
-    timeout: 15000
+# The pill's label is a child Text, so the podium below is what proves the
+# section moved.
 - extendedWaitUntil:
     visible: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
     timeout: 20000
