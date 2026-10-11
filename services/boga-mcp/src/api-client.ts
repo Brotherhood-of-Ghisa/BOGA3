@@ -237,7 +237,10 @@ export class BogaAgentApi {
     idempotencyKey: string,
     body: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const value = await this.#post(relativePath, accessToken, idempotencyKey, body);
+    const value = await this.#request('POST', relativePath, accessToken, {
+      body,
+      idempotencyKey,
+    });
     if (!isObject(value)) {
       throw new BogaAgentApiError(
         502,
@@ -249,138 +252,88 @@ export class BogaAgentApi {
     return value;
   }
 
-  async #post(
-    relativePath: string,
-    accessToken: string,
-    idempotencyKey: string,
-    body: Record<string, unknown>,
-  ): Promise<unknown> {
-    if (!accessToken.trim()) {
-      throw new BogaAgentApiError(401, 'UNAUTHORIZED', 'Authentication required.', null);
-    }
-    if (!idempotencyKey.trim()) {
-      throw new BogaAgentApiError(400, 'INVALID_ARGUMENT', 'Idempotency key is required.', null);
-    }
-    const url = new URL(relativePath, this.#baseUrl);
-    const requestId = randomUUID();
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), this.#timeoutMs);
-
-    let response: Response;
-    try {
-      response = await this.#fetch(url, {
-        body: JSON.stringify(body),
-        headers: {
-          accept: 'application/json',
-          authorization: `Bearer ${accessToken}`,
-          'content-type': 'application/json',
-          'idempotency-key': idempotencyKey,
-          'x-request-id': requestId,
-        },
-        method: 'POST',
-        redirect: 'error',
-        signal: abortController.signal,
-      });
-    } catch (error) {
-      const message = error instanceof Error && error.name === 'AbortError'
-        ? 'BoGa agent API timed out.'
-        : 'BoGa agent API is unavailable.';
-      throw new BogaAgentApiError(502, 'UPSTREAM_UNAVAILABLE', message, requestId);
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new BogaAgentApiError(
-        502,
-        'INVALID_UPSTREAM_RESPONSE',
-        'BoGa returned an invalid response.',
-        response.headers.get('x-request-id') ?? requestId,
-      );
-    }
-
-    if (!response.ok) {
-      const errorPayload = isObject(payload) ? payload as ApiErrorEnvelope : {};
-      const details = isObject(errorPayload.error) ? errorPayload.error : {};
-      throw new BogaAgentApiError(
-        response.status,
-        typeof details.code === 'string' ? details.code : 'UPSTREAM_ERROR',
-        typeof details.message === 'string'
-          ? details.message
-          : 'The BoGa agent request failed.',
-        typeof details.request_id === 'string'
-          ? details.request_id
-          : response.headers.get('x-request-id') ?? requestId,
-      );
-    }
-
-    if (
-      !isObject(payload) ||
-      !('data' in payload) ||
-      !isObject(payload.meta) ||
-      typeof payload.meta.api_version !== 'string' ||
-      typeof payload.meta.request_id !== 'string'
-    ) {
-      throw new BogaAgentApiError(
-        502,
-        'INVALID_UPSTREAM_RESPONSE',
-        'BoGa returned an invalid response.',
-        response.headers.get('x-request-id') ?? requestId,
-      );
-    }
-    return (payload as ApiEnvelope).data;
-  }
-
   async #get(
     relativePath: string,
     accessToken: string,
     query: Record<string, string | number | boolean | undefined> = {},
   ): Promise<unknown> {
+    return this.#request('GET', relativePath, accessToken, { query });
+  }
+
+  async #request(
+    method: 'GET' | 'POST',
+    relativePath: string,
+    accessToken: string,
+    options: {
+      body?: Record<string, unknown>;
+      idempotencyKey?: string;
+      query?: Record<string, string | number | boolean | undefined>;
+    } = {},
+  ): Promise<unknown> {
     if (!accessToken.trim()) {
       throw new BogaAgentApiError(401, 'UNAUTHORIZED', 'Authentication required.', null);
     }
+    if (method === 'POST' && (!options.idempotencyKey || !options.idempotencyKey.trim())) {
+      throw new BogaAgentApiError(400, 'INVALID_ARGUMENT', 'Idempotency key is required.', null);
+    }
     const url = new URL(relativePath, this.#baseUrl);
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) url.searchParams.set(key, String(value));
+    if (options.query) {
+      for (const [key, value] of Object.entries(options.query)) {
+        if (value !== undefined) url.searchParams.set(key, String(value));
+      }
     }
     const requestId = randomUUID();
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), this.#timeoutMs);
 
     let response: Response;
+    let payload: unknown;
     try {
+      const headers: Record<string, string> = {
+        accept: 'application/json',
+        authorization: `Bearer ${accessToken}`,
+        'x-request-id': requestId,
+      };
+      let requestBody: string | undefined;
+      if (method === 'POST') {
+        headers['content-type'] = 'application/json';
+        headers['idempotency-key'] = options.idempotencyKey!;
+        requestBody = JSON.stringify(options.body ?? {});
+      }
+
       response = await this.#fetch(url, {
-        headers: {
-          accept: 'application/json',
-          authorization: `Bearer ${accessToken}`,
-          'x-request-id': requestId,
-        },
-        method: 'GET',
+        body: requestBody,
+        headers,
+        method,
         redirect: 'error',
         signal: abortController.signal,
       });
+
+      try {
+        payload = await response.json();
+      } catch (bodyError) {
+        if (abortController.signal.aborted) {
+          throw bodyError;
+        }
+        throw new BogaAgentApiError(
+          502,
+          'INVALID_UPSTREAM_RESPONSE',
+          'BoGa returned an invalid response.',
+          response.headers.get('x-request-id') ?? requestId,
+        );
+      }
     } catch (error) {
-      const message = error instanceof Error && error.name === 'AbortError'
+      if (error instanceof BogaAgentApiError) {
+        throw error;
+      }
+      const isAbort = abortController.signal.aborted ||
+        (error instanceof Error && error.name === 'AbortError');
+      const message = isAbort
         ? 'BoGa agent API timed out.'
         : 'BoGa agent API is unavailable.';
       throw new BogaAgentApiError(502, 'UPSTREAM_UNAVAILABLE', message, requestId);
     } finally {
       clearTimeout(timeout);
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new BogaAgentApiError(
-        502,
-        'INVALID_UPSTREAM_RESPONSE',
-        'BoGa returned an invalid response.',
-        response.headers.get('x-request-id') ?? requestId,
-      );
     }
 
     if (!response.ok) {

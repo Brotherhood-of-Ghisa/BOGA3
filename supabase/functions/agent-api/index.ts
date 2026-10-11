@@ -896,6 +896,40 @@ const loadSetsByBlock = async (
   return { rows, truncated };
 };
 
+const loadAllSetsForBlocks = async (
+  client: SupabaseClient,
+  userId: string,
+  blockIds: string[],
+): Promise<SetRow[]> => {
+  const rows: SetRow[] = [];
+  for (const ids of chunk(blockIds, 80)) {
+    let offset = 0;
+    const batchLimit = 1000;
+    while (true) {
+      const { data, error } = await client
+        .schema('app_public')
+        .from('exercise_sets')
+        .select(
+          'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status',
+        )
+        .eq('owner_user_id', userId)
+        .is('deleted_at', null)
+        .is('performance_status', null)
+        .in('session_exercise_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(offset, offset + batchLimit - 1)
+        .returns<SetRow[]>();
+      throwDatabaseError(error);
+      const batch = data ?? [];
+      rows.push(...batch);
+      if (batch.length < batchLimit) break;
+      offset += batchLimit;
+    }
+  }
+  return rows;
+};
+
 const loadDefinitionsById = async (
   client: SupabaseClient, userId: string, exerciseIds: string[],
 ): Promise<Map<string, ExerciseDefinitionRow>> => {
@@ -1296,7 +1330,9 @@ const getExerciseHistory = async (
   const blockById = new Map(qualifyingBlocks.map((b) => [b.id, b]));
   const qualifyingBlockIds = qualifyingBlocks.map((b) => b.id);
 
-  const { rows: setRows } = await loadSetsByBlock(client, userId, qualifyingBlockIds);
+  const { rows: setRows } = await loadAllSetsForBlocks(client, userId, qualifyingBlockIds).then(
+    (rows) => ({ rows }),
+  );
 
   type HistorySortableItem = {
     set: SetRow;
@@ -1322,7 +1358,10 @@ const getExerciseHistory = async (
     if (a.block.order_index !== b.block.order_index) {
       return a.block.order_index - b.block.order_index;
     }
-    return a.set.order_index - b.set.order_index;
+    if (a.set.order_index !== b.set.order_index) {
+      return a.set.order_index - b.set.order_index;
+    }
+    return a.set.id.localeCompare(b.set.id);
   });
 
   let filteredItems = allItems;
@@ -1332,7 +1371,8 @@ const getExerciseHistory = async (
       !Number.isSafeInteger(cursor.session_completed_at) ||
       typeof cursor.session_id !== 'string' ||
       typeof cursor.exercise_order !== 'number' ||
-      typeof cursor.set_order !== 'number'
+      typeof cursor.set_order !== 'number' ||
+      typeof cursor.set_id !== 'string'
     ) {
       throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
     }
@@ -1344,7 +1384,9 @@ const getExerciseHistory = async (
       if (cmpS < 0) return false;
       if (item.block.order_index > cursor.exercise_order) return true;
       if (item.block.order_index < cursor.exercise_order) return false;
-      return item.set.order_index > cursor.set_order;
+      if (item.set.order_index > cursor.set_order) return true;
+      if (item.set.order_index < cursor.set_order) return false;
+      return item.set.id.localeCompare(cursor.set_id) > 0;
     });
   }
 
@@ -1397,6 +1439,7 @@ const getExerciseHistory = async (
         session_id: lastItem.session.id,
         exercise_order: lastItem.block.order_index,
         set_order: lastItem.set.order_index,
+        set_id: lastItem.set.id,
       })
       : null,
   };
@@ -1519,21 +1562,27 @@ const getWorkoutDetail = async (
     if (a.block.order_index !== b.block.order_index) {
       return a.block.order_index - b.block.order_index;
     }
-    return a.setOrder - b.setOrder;
+    if (a.setOrder !== b.setOrder) {
+      return a.setOrder - b.setOrder;
+    }
+    return a.setPayload.id.localeCompare(b.setPayload.id);
   });
 
   let filteredDetailSets = allDetailSets;
   if (cursor) {
     if (
       typeof cursor.exercise_order !== 'number' ||
-      typeof cursor.set_order !== 'number'
+      typeof cursor.set_order !== 'number' ||
+      typeof cursor.set_id !== 'string'
     ) {
       throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
     }
     filteredDetailSets = allDetailSets.filter((item) => {
       if (item.block.order_index > cursor.exercise_order) return true;
       if (item.block.order_index < cursor.exercise_order) return false;
-      return item.setOrder > cursor.set_order;
+      if (item.setOrder > cursor.set_order) return true;
+      if (item.setOrder < cursor.set_order) return false;
+      return item.setPayload.id.localeCompare(cursor.set_id) > 0;
     });
   }
 
@@ -1581,6 +1630,7 @@ const getWorkoutDetail = async (
           kind: 'workout_detail',
           exercise_order: lastDetailSet.block.order_index,
           set_order: lastDetailSet.setOrder,
+          set_id: lastDetailSet.setPayload.id,
         })
         : null,
       truncated: setResult.truncated,

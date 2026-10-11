@@ -39,6 +39,91 @@ cleanup() {
     run_psql "
       begin;
         set constraints all deferred;
+        -- Delete plans/programmes referenced in write receipts for this client run
+        with client_receipts as (
+          select result_ids
+            from public.agent_plan_write_receipts
+           where owner_user_id = '${USER_UUID}'::uuid
+             and client_id = '${AGENT_CLIENT_ID}'
+        ),
+        receipt_plans as (
+          select distinct jsonb_array_elements_text(
+            case
+              when result_ids ? 'plan_id' then jsonb_build_array(result_ids->>'plan_id')
+              when result_ids ? 'plan_ids' then result_ids->'plan_ids'
+              else '[]'::jsonb
+            end
+          ) as plan_id
+          from client_receipts
+        ),
+        receipt_progs as (
+          select distinct result_ids->>'programme_id' as prog_id
+          from client_receipts
+          where result_ids ? 'programme_id' and result_ids->>'programme_id' is not null
+        )
+        delete from app_public.session_plan_sets
+          where owner_user_id = '${USER_UUID}'::uuid
+            and session_plan_exercise_id in (
+              select id from app_public.session_plan_exercises
+              where owner_user_id = '${USER_UUID}'::uuid
+                and session_plan_id in (select plan_id from receipt_plans)
+            );
+
+        with client_receipts as (
+          select result_ids
+            from public.agent_plan_write_receipts
+           where owner_user_id = '${USER_UUID}'::uuid
+             and client_id = '${AGENT_CLIENT_ID}'
+        ),
+        receipt_plans as (
+          select distinct jsonb_array_elements_text(
+            case
+              when result_ids ? 'plan_id' then jsonb_build_array(result_ids->>'plan_id')
+              when result_ids ? 'plan_ids' then result_ids->'plan_ids'
+              else '[]'::jsonb
+            end
+          ) as plan_id
+          from client_receipts
+        )
+        delete from app_public.session_plan_exercises
+          where owner_user_id = '${USER_UUID}'::uuid
+            and session_plan_id in (select plan_id from receipt_plans);
+
+        with client_receipts as (
+          select result_ids
+            from public.agent_plan_write_receipts
+           where owner_user_id = '${USER_UUID}'::uuid
+             and client_id = '${AGENT_CLIENT_ID}'
+        ),
+        receipt_plans as (
+          select distinct jsonb_array_elements_text(
+            case
+              when result_ids ? 'plan_id' then jsonb_build_array(result_ids->>'plan_id')
+              when result_ids ? 'plan_ids' then result_ids->'plan_ids'
+              else '[]'::jsonb
+            end
+          ) as plan_id
+          from client_receipts
+        )
+        delete from app_public.session_plans
+          where owner_user_id = '${USER_UUID}'::uuid
+            and id in (select plan_id from receipt_plans);
+
+        with client_receipts as (
+          select result_ids
+            from public.agent_plan_write_receipts
+           where owner_user_id = '${USER_UUID}'::uuid
+             and client_id = '${AGENT_CLIENT_ID}'
+        ),
+        receipt_progs as (
+          select distinct result_ids->>'programme_id' as prog_id
+          from client_receipts
+          where result_ids ? 'programme_id' and result_ids->>'programme_id' is not null
+        )
+        delete from app_public.training_programmes
+          where owner_user_id = '${USER_UUID}'::uuid
+            and id in (select prog_id from receipt_progs);
+
         delete from public.agent_plan_permissions
           where owner_user_id = '${USER_UUID}'::uuid
             and client_id = '${AGENT_CLIENT_ID}';
@@ -48,14 +133,6 @@ cleanup() {
         delete from public.agent_access_audit
           where owner_user_id = '${USER_UUID}'::uuid
             and oauth_client_id = '${AGENT_CLIENT_ID}';
-        delete from app_public.session_plan_sets
-          where owner_user_id = '${USER_UUID}'::uuid;
-        delete from app_public.session_plan_exercises
-          where owner_user_id = '${USER_UUID}'::uuid;
-        delete from app_public.session_plans
-          where owner_user_id = '${USER_UUID}'::uuid;
-        delete from app_public.training_programmes
-          where owner_user_id = '${USER_UUID}'::uuid;
         delete from app_public.exercise_sets
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_exercises
@@ -68,6 +145,8 @@ cleanup() {
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.gyms
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
+        delete from app_public.session_plans
+          where owner_user_id = '${USER_UUID}'::uuid and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
       commit;
     " >/dev/null 2>&1 || true
   fi
@@ -166,6 +245,12 @@ else
         ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',null,
          ${NOW_MS},${NOW_MS},${NOW_MS}),
         ('${USER_UUID}'::uuid,'${SET_ID}-warm-up','${BLOCK_ID}',1,'60','5','warm_up',
+         ${NOW_MS},${NOW_MS},${NOW_MS});
+      -- Pre-existing sentinel plan to prove smoke cleanup does not delete unrelated user plans
+      insert into app_public.session_plans
+        (owner_user_id,id,title,provenance,created_at,updated_at,client_updated_at_ms)
+      values
+        ('${USER_UUID}'::uuid,'mcp-smoke-${RUN_TAG}-sentinel-plan','Pre-existing Plan','user',
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null
@@ -299,4 +384,19 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
+
+  echo "[boga-mcp-smoke] verifying pre-existing plan sentinel survived all test phases"
+  SENTINEL_EXISTS="$(run_psql "
+    select count(*) from app_public.session_plans
+    where owner_user_id = '${USER_UUID}'::uuid
+      and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
+  ")"
+  [[ "${SENTINEL_EXISTS}" == "1" ]] || fail "pre-existing plan sentinel was unexpectedly deleted during test execution"
+
+  # Clean up our own test sentinel now that test phases are complete
+  run_psql "
+    delete from app_public.session_plans
+    where owner_user_id = '${USER_UUID}'::uuid
+      and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
+  " >/dev/null
 fi

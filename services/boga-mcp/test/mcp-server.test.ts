@@ -493,6 +493,42 @@ describe('BoGa MCP server', () => {
     expect(response.headers['www-authenticate']).toBeUndefined();
   });
 
+  it('aborts and classifies a stalled response body as an upstream timeout', async () => {
+    let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const stalledStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controllerRef = controller;
+      },
+      pull() {
+        return new Promise(() => {});
+      },
+    });
+
+    const apiClient = new BogaAgentApi({
+      baseUrl: new URL('http://127.0.0.1:55531/functions/v1/agent-api/'),
+      fetchImplementation: async (_url, init) => {
+        init?.signal?.addEventListener('abort', () => {
+          controllerRef?.error(new DOMException('The operation was aborted', 'AbortError'));
+        });
+        return new Response(stalledStream, {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        });
+      },
+      timeoutMs: 50,
+    });
+
+    await expect(
+      apiClient.createSessionPlan('valid-token', {
+        idempotency_key: 'test-key',
+        plan: {
+          exercises: [{ name: 'Bench Press', sets: [{ target_reps: 5 }] }],
+          title: 'Chest',
+        },
+      }),
+    ).rejects.toThrow('BoGa agent API timed out.');
+  });
+
   it('has no database, SQL, or Supabase runtime dependency', async () => {
     const packagePath = fileURLToPath(new URL('../package.json', import.meta.url));
     const packageJson = JSON.parse(await readFile(packagePath, 'utf8')) as {
