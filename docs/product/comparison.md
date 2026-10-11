@@ -6,15 +6,20 @@ How a change between two periods is shown.
 
 | Figure | Shown as | Examples |
 | --- | --- | --- |
-| A set or session count (Progress tables, Today's month pace) | the signed absolute difference, never a percentage | `+4`, `−3`, `±0` |
+| A set or session count (Progress, Today's month pace) | the signed difference, never a percentage | `+4`, `−3`, `±0` |
 | Volume (Progress tables) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `±0%`; `new` when the earlier period is 0; `—` when both are 0 |
+| A 1RM estimate (Progress's exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `±0`; `new` without an earlier estimate, `—` without a current one |
 
-Today's week figures show none: each fills a bar in laps of last week's total
-(up to it, twice, three times).
+Direction is also carried in colour, the same two everywhere; more is the
+improvement for all three. The sign stays too, so colour is never the only cue.
+
+Today's week figures show none: each fills a bar in laps of last week's total.
 
 Why: a count is small and whole, so its difference reads directly; a Volume's
-size depends on the lifter, so only a ratio compares.
-Code: `formatCountDelta`, `formatVolumeDelta` in `apps/mobile/components/stats/comparison-format.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/month-pace.tsx`.
+size depends on the lifter, so only a ratio compares; a 1RM is a weight, so
+its difference reads in the unit trained in. Which way a figure moved is the
+first thing a comparison is read for.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/month-pace.tsx`.
 
 ### comparison.window · definition · accepted
 

@@ -30,6 +30,8 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim'> = {
   recordWash: '#FBF3E2',
   recordRule: '#EEDFBE',
   danger: '#A4262C',
+  gain: '#15703F',
+  loss: '#C01048',
   viz0: '#F0ECE7',
   viz1: '#E7D7CA',
   viz2: '#D3BDAB',

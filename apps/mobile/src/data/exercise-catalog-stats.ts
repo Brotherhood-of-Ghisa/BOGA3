@@ -19,13 +19,17 @@ import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSett
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 
-export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays | { weeks: number };
+/** An explicit half-open window, for a period the week and day forms cannot name. */
+export type ExerciseCatalogStatsWindow = { start: Date; end: Date };
+export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays | { weeks: number } | ExerciseCatalogStatsWindow;
 
 export type ExerciseAggregate = {
   exerciseDefinitionId: string;
   sessionCount: number;
   workingSetCount: number;
   totalVolume: number | null;
+  /** Sets the Volume figure includes, so a genuine 0 is told from no data. */
+  volumeSetCount: number;
   estimatedOneRepMax: number | null;
 };
 
@@ -161,9 +165,11 @@ const resolvePeriodWindow = (
   now: Date
 ): PeriodWindow => {
   if (period === 'all') return { start: null, end: null };
-  const bounds = typeof period === 'object' ? calendarWeekBounds(period.weeks, now) : computePeriodBounds(period, now);
-  return { start: bounds.start, end: bounds.end };
+  if (typeof period !== 'object') return pick(computePeriodBounds(period, now));
+  return pick('weeks' in period ? calendarWeekBounds(period.weeks, now) : period);
 };
+
+const pick = ({ start, end }: { start: Date; end: Date }): PeriodWindow => ({ start, end });
 
 const isInWindow = (completedAt: Date, window: PeriodWindow): boolean => {
   if (window.start && completedAt < window.start) return false;
@@ -181,6 +187,7 @@ const emptyAggregate = (exerciseDefinitionId: string): ExerciseAggregate => ({
   sessionCount: 0,
   workingSetCount: 0,
   totalVolume: 0,
+  volumeSetCount: 0,
   estimatedOneRepMax: null,
 });
 
@@ -251,10 +258,6 @@ export const aggregateExerciseCatalogStats = (
     const working = isWorkingSet(values, raw.effortPolicy);
     const volumeIncluded = isVolumeSet(values, raw.effortPolicy);
     if (!working && !volumeIncluded) continue;
-    const metric = calculateAnalyticsSetMetrics({
-      ...set,
-      ...personalLoadContext(raw.bodyweightCalculationsEnabled ?? false, definitionById.get(defId), session, raw.effortPolicy),
-    });
     const { completedAt } = session;
 
     if (working) {
@@ -268,10 +271,18 @@ export const aggregateExerciseCatalogStats = (
     }
 
     if (!isInWindow(completedAt, window)) continue;
+    // Only now: the load calculation is the expensive part of the pass, and
+    // nothing outside the window reads it. Progress reads two windows out of
+    // one history, so a set each pass skips is a set each pass need not weigh.
+    const metric = calculateAnalyticsSetMetrics({
+      ...set,
+      ...personalLoadContext(raw.bodyweightCalculationsEnabled ?? false, definitionById.get(defId), session, raw.effortPolicy),
+    });
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
     if (volumeIncluded) {
       // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
+      aggregate.volumeSetCount += 1;
       aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps ?? 0);
     }
     if (!working) continue;

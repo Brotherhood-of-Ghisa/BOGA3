@@ -4,10 +4,15 @@ export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
 export type HeatmapView = 'daily' | 'weekly' | 'timeline';
-// The two Progress filters remembered across launches. The period is not one
-// of them: every visit opens on Settings' Progress period ([[comparison.window]]).
+// The Progress filters remembered across launches: the breakdown, and each
+// breakdown's metric. The period is not one of them: every visit opens on
+// Settings' Progress period ([[comparison.window]]).
 export type ProgressBreakdown = 'exercise' | 'muscle';
 export type ProgressMetric = 'workingSetCount' | 'totalVolume';
+// The Exercise breakdown offers one more: a 1RM estimate is a figure only an
+// exercise has, so the Muscle table never shows it. Each breakdown remembers
+// its own metric, so switching back finds the figure you left on.
+export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
 export type AccountLocalPreferences = {
   sort: ExerciseListSort;
@@ -23,6 +28,7 @@ export type AccountLocalPreferences = {
   heatmapView: HeatmapView;
   progressBreakdown: ProgressBreakdown;
   progressMetric: ProgressMetric;
+  progressExerciseMetric: ProgressExerciseMetric;
 };
 export type ExerciseListPreferences = Pick<AccountLocalPreferences, 'sort' | 'showNeverDone' | 'dateFormat' | 'pastRecordsGymScope'>;
 
@@ -44,13 +50,14 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   heatmapView: 'daily',
   progressBreakdown: 'muscle',
   progressMetric: 'workingSetCount',
+  progressExerciseMetric: 'workingSetCount',
 };
 
 export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFERENCES) as (keyof ExerciseListPreferences)[];
 // Stored as their own text, not JSON: every other non-boolean field is written
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
-  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMetric',
+  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMetric', 'progressExerciseMetric',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
 export const isNonNegativeSafeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -70,6 +77,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   heatmapView: 'Choose Grid, Weekly or Timeline for history.',
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
+  progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
 };
 
 export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
@@ -89,6 +97,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
+    case 'progressExerciseMetric':
+      return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
   }
   return false;
 }

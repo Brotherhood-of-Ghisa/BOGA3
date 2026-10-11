@@ -180,7 +180,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-period-chip')).toHaveProp('accessibilityState', { disabled: true });
     act(() => updatePreferences({ targetWindowWeeks: 4 }));
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
-    await waitFor(() => expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent('11'));
+    await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('11'));
   });
 
   it('shows the empty state on an empty database', async () => {
@@ -189,21 +189,27 @@ describe('Stats over real data', () => {
     expect(await screen.findByTestId('stats-exercise-list-empty')).toBeTruthy();
   });
 
-  it('lists the seeded exercises with the 7-day working-set card', async () => {
+  it('lists the seeded exercises with the 7-day comparison, one metric at a time', async () => {
     await renderSeededStats();
 
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
-    // One figure, the working sets (the squat warm-up is no set), against the
-    // adjacent previous 7 days of the same fixture.
-    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toBeTruthy();
-    // A row's own figures, from the same week.
+    // The period in force against the adjacent previous 7 days of the same
+    // fixture, ordered by Now ([[comparison.window]]).
+    expect(screen.getByTestId('stats-exercise-sort-now-indicator')).toBeTruthy();
+    // A row's own figures, from the same week. The squat warm-up is no working
+    // set, so it feeds none of the three metrics.
     expect(screen.getByTestId(`stats-exercise-name-${SQUAT}`)).toHaveTextContent('Barbell Back Squat');
-    expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent(/^7$/);
-    // Sets and Volume read the 7 working sets; the warm-up adds to neither.
-    expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent('7100');
-    expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('320.6');
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     expect(screen.queryByTestId(`stats-exercise-sessions-${SQUAT}`)).toBeNull();
-    expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).toContain('7 sets. Volume');
+    // The earlier week of the same fixture is the baseline, read from the one
+    // loaded history: the row's three figures always come from one read.
+    expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel)
+      .toContain('Now 7, previous 2, change +5. working sets.');
+
+    chooseFilter('metric', 'Volume');
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('7100');
+    chooseFilter('metric', '1RM');
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('320.6');
   });
 
   it('lists only exercises with a performed set in the period', async () => {
@@ -303,7 +309,7 @@ describe('Stats over real data', () => {
 
   it('pushes an exercise row’s history page and keeps its own search and sort behind it', async () => {
     await renderSeededStats();
-    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-change'));
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
 
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
@@ -316,7 +322,7 @@ describe('Stats over real data', () => {
     mockIsFocused = true;
     screen.rerender(<StatsRoute />);
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
-    expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-exercise-sort-change')).toHaveProp('accessibilityState', { selected: true });
   });
 
   const renderMuscles = async () => {
@@ -335,17 +341,17 @@ describe('Stats over real data', () => {
       const controls = within(screen.getByTestId('stats-controls'));
       const scroll = within(screen.getByTestId(scrollId));
       const muscle = scrollId === 'stats-scroll';
-      // One row: breakdown and period always, the metric only where a table
-      // has one figure to pick; exercise search is its own pinned row.
+      // One row of three chips in either breakdown — breakdown, period and the
+      // table's metric; exercise search is its own pinned row below it.
       expect(within(screen.getByTestId('stats-view-switch')).getAllByRole('button'))
-        .toHaveLength(muscle ? 3 : 2);
-      const ids = ['stats-view-mode-chip', 'stats-period-chip',
-        muscle ? 'stats-metric-chip' : 'stats-search-input'];
+        .toHaveLength(3);
+      const ids = ['stats-view-mode-chip', 'stats-period-chip', 'stats-metric-chip',
+        ...(muscle ? [] : ['stats-search-input'])];
       for (const id of ids) {
         expect(controls.getByTestId(id)).toBeTruthy();
         expect(scroll.queryByTestId(id)).toBeNull();
       }
-      expect(controls.queryByTestId(muscle ? 'stats-search-input' : 'stats-metric-chip')).toBeNull();
+      if (muscle) expect(controls.queryByTestId('stats-search-input')).toBeNull();
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(
         /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
@@ -653,12 +659,12 @@ describe('Stats over real data', () => {
 
   it('retains exercise search and sort through muscle browsing', async () => {
     await renderSeededStats();
-    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-change'));
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
     chooseFilter('view-mode', 'Muscle');
     chooseFilter('view-mode', 'Exercise');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
-    expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-exercise-sort-change')).toHaveProp('accessibilityState', { selected: true });
   });
 
   it('leaves sets whose load cannot be calculated out of Volume, with no coverage note', async () => {
@@ -680,6 +686,25 @@ describe('Stats over real data', () => {
     for (const prefix of ['stats-muscle-row-quads', `stats-contribution-${SQUAT}`]) {
       expect(screen.queryByTestId(`${prefix}-coverage`)).toBeNull();
     }
+  });
+
+  // A Volume sum that overflows is unavailable, not zero: the exercise table
+  // reads its figures from the same aggregates as the muscle table, so a `—`
+  // must survive the mapping into a row ([[copy.no-inline-explanation]]).
+  it('keeps an overflowed Volume unavailable in the exercise table', async () => {
+    await renderMuscles();
+    const db = localDataClient();
+    // The largest Weight the one parser accepts is a plain decimal (no
+    // exponent) under `Number.MAX_VALUE`. Each set's own Volume stays finite
+    // at one rep; their sum does not, which is what `—` is for.
+    const huge = `1${'0'.repeat(308)}`;
+    db.prepare("UPDATE exercise_sets SET weight_value = ?, reps_value = '1' WHERE session_exercise_id IN "
+      + '(SELECT id FROM session_exercises WHERE exercise_definition_id = ?)').run(huge, SQUAT);
+    await replayFocus();
+    chooseFilter('view-mode', 'Exercise');
+    chooseFilter('metric', 'Volume');
+    await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('—'));
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-change`)).toHaveTextContent('—');
   });
 
 });

@@ -91,7 +91,9 @@ known prior comparable sessions, genuine zeros included; the seventh reading is
 the session itself. Those priors are Settings' History look-back over
 [[comparison.history-window]], anchored to the session's End, or now while
 active. Set eligibility is unchanged and record baselines stay all-time. Below
-the minimum nothing is drawn: no comparison is ever shown as an empty plot.
+the minimum nothing is drawn: no comparison is ever shown as an empty plot. The
+median delta carries its direction in colour like every other change figure
+(`ui/design-language.md` §6), above the median being the improvement.
 History and quartiles derive in
 `apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
 the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.

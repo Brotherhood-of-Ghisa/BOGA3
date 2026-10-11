@@ -1,8 +1,8 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
-// "Derivation"). The palette follows these seeds; danger, surface and
-// filter selection retain fixed colours in every theme.
+// "Derivation"). The palette follows these seeds; danger, the two change
+// directions, surface and filter selection retain fixed colours in every theme.
 export type ThemeSeeds = {
   // A mid neutral. Its hue and chroma tint every neutral role, from `ink` to
   // `paper`, so the whole ground reads as one warm (or cool) family.
@@ -28,6 +28,14 @@ export const defaultThemeSeeds: ThemeSeeds = {
 
 // Destructive actions only — red means "this deletes" in every theme.
 const DANGER = '#A4262C';
+
+// A change's direction (`design-language.md` §6): an improvement and a
+// decrease. Fixed in every theme, like `danger`, so "better" and "worse" never
+// follow the picked accent's hue. One L* (≈41), two hues: the pair reads as
+// equals that differ only in direction, and `loss` is a crimson rather than
+// `danger`'s brick, so a decreasing figure does not read as a delete.
+const GAIN = '#15703F';
+const LOSS = '#C01048';
 
 type SeedName = keyof ThemeSeeds;
 
@@ -94,6 +102,11 @@ export type UiRoles = {
   recordRule: string;
   // Destructive actions only.
   danger: string;
+  // A change against an earlier period: `gain` an improvement, `loss` a
+  // decrease (`changeToneColour` in `change-tone.ts` is the only caller). The
+  // sign is always drawn too — colour is never the only channel.
+  gain: string;
+  loss: string;
   // Data visualisation: one sequential ramp, one meaning ("more"). `viz0` is
   // empty / rest. Text on a `viz` ground is `ink`.
   viz0: string;
@@ -135,6 +148,8 @@ export function generateRoles(seeds: ThemeSeeds): UiRoles {
     recordWash: at(STEPS.recordWash),
     recordRule: at(STEPS.recordRule),
     danger: DANGER,
+    gain: GAIN,
+    loss: LOSS,
     viz0: at(STEPS.viz0),
     viz1: at(STEPS.viz1),
     viz2: at(STEPS.viz2),

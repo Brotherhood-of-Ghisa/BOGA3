@@ -57,6 +57,9 @@ it.each(['app', 'share'] as const)('shows quartiles after six observations in th
   expect(median).toHaveStyle({ opacity: 1, transform: [{ translateX: 120 }] });
   expect(p75).toHaveStyle({ opacity: 1, transform: [{ translateX: 250 }] });
   expect(screen.getByText('25% above median')).toBeTruthy();
+  // Above the median is an improvement, below it a decrease: the same two
+  // colours Progress's Change column uses (`design-language.md` §6).
+  expect(screen.getByText('25% above median')).toHaveStyle({ color: uiRoles.gain });
   expect(screen.queryByText('Building history')).toBeNull();
   expect(screen.getByTestId('card-heading')).toHaveTextContent(/Bench Press.*2 sets/);
   expect(screen.getByTestId('card-median', { includeHiddenElements: true })).toHaveStyle({ left: '50%' });
@@ -95,6 +98,8 @@ it.each([0, 400])('collapses an equal historical range at %i without a false int
   render(<ExerciseVolumeCard comparison={{ ...distribution, currentVolume: medianVolume, medianVolume,
     percentile25Volume: medianVolume, percentile75Volume: medianVolume, state: 'constant-baseline' }} testID="card" />);
   expect(screen.getByText('At median')).toBeTruthy();
+  // No direction, so no hue: level stays ink.
+  expect(screen.getByText('At median')).toHaveStyle({ color: uiRoles.ink });
   for (const marker of ['p25', 'median', 'p75', 'current']) {
     expect(screen.getByTestId(`card-${marker}`, { includeHiddenElements: true })).toHaveStyle({ left: '50%' });
   }
@@ -102,6 +107,11 @@ it.each([0, 400])('collapses an equal historical range at %i without a false int
   expect(screen.getByTestId('card-median-annotation', { includeHiddenElements: true })).toHaveStyle({ opacity: 1 });
   expect(screen.getByTestId('card-p25-annotation', { includeHiddenElements: true })).toHaveStyle({ opacity: 0 });
   expect(screen.getByTestId('card-p75-annotation', { includeHiddenElements: true })).toHaveStyle({ opacity: 0 });
+});
+
+it('colours a session below its median as a decrease', () => {
+  render(<ExerciseVolumeCard comparison={{ ...distribution, currentVolume: 200 }} testID="card" />);
+  expect(screen.getByText('50% below median')).toHaveStyle({ color: uiRoles.loss });
 });
 
 it('keeps the linear positions finite at large complete volumes', () => {

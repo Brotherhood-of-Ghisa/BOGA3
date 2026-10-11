@@ -120,14 +120,27 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
   return { days: current.days, start, end };
 };
 
+/**
+ * The two windows a weekly Progress comparison sets side by side
+ * ([[comparison.window]]): the last `weeks` calendar weeks until now, against
+ * the `weeks` full calendar weeks before them. The one source for both
+ * breakdowns — the muscle tables read it through `comparisonPeriods`, the
+ * exercise table through the catalogue stats cache.
+ */
+export const progressComparisonWindows = (weeks: number, now: Date) => {
+  const current = calendarWeekBounds(weeks, now);
+  return { current, previous: { start: shiftCalendarWeeks(current.start, -weeks), end: current.start } };
+};
+
 const comparisonPeriods = (options: ComputeStatsSummaryOptions) => {
   const now = options.now ?? new Date();
-  const current = options.periodWeeks === undefined ? computePeriodBounds(options.periodDays, now)
-    : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
-  const previous = options.periodWeeks === undefined ? computePreviousPeriodBounds(current)
-    : { days: current.days, start: shiftCalendarWeeks(current.start, -options.periodWeeks),
-      end: current.start };
-  return { current, previous };
+  if (options.periodWeeks === undefined) {
+    const current = computePeriodBounds(options.periodDays, now);
+    return { current, previous: computePreviousPeriodBounds(current) };
+  }
+  const days = options.periodWeeks * 7;
+  const windows = progressComparisonWindows(options.periodWeeks, now);
+  return { current: { days, ...windows.current }, previous: { days, ...windows.previous } };
 };
 
 const inputInPeriod = (input: StatsAggregationInput, period: StatsPeriodBounds): StatsAggregationInput => ({

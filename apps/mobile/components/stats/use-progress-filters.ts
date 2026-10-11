@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { ProgressBreakdown, ProgressMetric } from '@/src/preferences/model';
+import type { ProgressBreakdown, ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
 
 // Settings' Progress period, or its one-week alternative. Not a preference:
 // every visit opens on the configured window ([[comparison.window]]) unless
@@ -17,9 +17,12 @@ export type ProgressFilters = {
   breakdown: ProgressBreakdown;
   period: ProgressPeriod;
   metric: ProgressMetric;
+  /** The Exercise table's metric, which may be one the Muscle table cannot show. */
+  exerciseMetric: ProgressExerciseMetric;
   selectBreakdown: (next: ProgressBreakdown) => void;
   selectPeriod: (next: ProgressPeriod) => void;
   selectMetric: (next: ProgressMetric) => void;
+  selectExerciseMetric: (next: ProgressExerciseMetric) => void;
 };
 
 const firstParam = (value: string | string[] | undefined): string | undefined =>
@@ -36,8 +39,8 @@ export const periodParam = (value: string | string[] | undefined): ProgressPerio
 };
 
 // Progress's filter row: what this visit has chosen wins, then the deep link it
-// was entered by, then — for the breakdown and the metric — what the last visit
-// stored. The period has no stored value and falls back to Settings' window.
+// was entered by, then — for the breakdown and each table's metric — what the
+// last visit stored. The period has no stored value and falls back to Settings' window.
 // A choice is held here as well as written to the store, so a chip still
 // answers its tap where no preference profile is writable (signed out of a
 // configured build).
@@ -50,6 +53,7 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
   const [entered, setEntered] = useState(link);
   const [chosen, setChosen] = useState<{
     breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
+    exerciseMetric?: ProgressExerciseMetric;
   }>({});
   const choose = (patch: typeof chosen) => setChosen(current => ({ ...current, ...patch }));
   if (link.breakdown !== entered.breakdown || link.period !== entered.period) {
@@ -66,6 +70,7 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
     breakdown: chosen.breakdown ?? entry.breakdown ?? values.progressBreakdown,
     period: chosen.period ?? entry.period ?? 'window',
     metric: chosen.metric ?? values.progressMetric,
+    exerciseMetric: chosen.exerciseMetric ?? values.progressExerciseMetric,
     selectBreakdown: breakdown => {
       choose({ breakdown });
       updatePreferences({ progressBreakdown: breakdown });
@@ -74,6 +79,10 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
     selectMetric: metric => {
       choose({ metric });
       updatePreferences({ progressMetric: metric });
+    },
+    selectExerciseMetric: exerciseMetric => {
+      choose({ exerciseMetric });
+      updatePreferences({ progressExerciseMetric: exerciseMetric });
     },
   };
 }

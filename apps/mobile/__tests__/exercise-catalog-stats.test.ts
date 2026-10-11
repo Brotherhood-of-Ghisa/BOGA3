@@ -2,6 +2,7 @@ import {
   aggregateExerciseCatalogStats,
   type ExerciseCatalogStatsRawHistory,
 } from '@/src/data/exercise-catalog-stats';
+import { progressComparisonWindows } from '@/src/data/stats';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 
 const NOW = new Date('2026-05-22T10:00:00.000Z');
@@ -64,7 +65,32 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
     // Unclassified and RIR sets are working sets; the warm-up is not.
     expect(bench?.workingSetCount).toBe(2);
+    // The sets the Volume figure includes, so Progress can tell a genuine 0
+    // from an exercise with no volume data at all.
+    expect(bench?.volumeSetCount).toBe(2);
     expect(bench).not.toHaveProperty('setCount');
+  });
+
+  // Progress's exercise breakdown reads both of its periods out of one loaded
+  // history, so it asks for an explicit window rather than a week count.
+  it('aggregates an explicit window, so a caller can read an earlier period', () => {
+    const windows = progressComparisonWindows(1, NOW);
+    const current = aggregateExerciseCatalogStats(buildRawHistory(), windows.current, NOW);
+    const previous = aggregateExerciseCatalogStats(buildRawHistory(), windows.previous, NOW);
+    // NOW is a Friday: this calendar week holds the 3-day-old session, and the
+    // previous one holds neither the 20-day nor the 200-day session.
+    expect(current.aggregatesById.get('ex-bench')?.workingSetCount).toBe(2);
+    expect(previous.aggregatesById.has('ex-bench')).toBe(false);
+    // The window moves, but what is "ever done" does not.
+    expect(previous.everDoneIds).toEqual(current.everDoneIds);
+    expect(previous.lastCompletedAtById).toEqual(current.lastCompletedAtById);
+
+    // A wider window reaches the 20-day session, exactly as the day-based
+    // periods do: only the bounds differ.
+    const fourWeeks = progressComparisonWindows(4, NOW);
+    expect(aggregateExerciseCatalogStats(buildRawHistory(), fourWeeks.current, NOW)
+      .aggregatesById.get('ex-bench')?.sessionCount).toBe(2);
+    expect(current.aggregatesById.get('ex-bench')?.sessionCount).toBe(1);
   });
 
   it('counts the valid performed working sets only', () => {

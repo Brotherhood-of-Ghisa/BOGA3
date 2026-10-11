@@ -6,6 +6,7 @@ import type { LocalWindow } from '@/src/utils/local-calendar';
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import type { RecordKind } from '@/src/exercise-calculations/records';
+import type { ChangeTone } from '@/components/ui';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import {
   buildSessionRecordLine,
@@ -51,6 +52,10 @@ export const formatSignedCount = (difference: number): string => {
   if (difference < 0) return `−${Math.abs(difference)}`;
   return '±0';
 };
+
+/** Which way the pace went, for the colour every change figure takes. */
+export const paceTone = (difference: number): ChangeTone =>
+  difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
 export const paceDifference = (month: TodayProgressMonth): number =>
   month.toDate.workingSets - month.previous.toSameDay.workingSets;
