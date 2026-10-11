@@ -20,6 +20,8 @@ export {
 export {
   buildTimelineSeries,
   timelineGeometry,
+  weekLabel,
+  type FocusedTimelineWeek,
   type TimelineSeries,
   type TimelineWeek,
 } from './timeline';

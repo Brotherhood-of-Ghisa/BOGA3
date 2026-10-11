@@ -1,5 +1,7 @@
 import type { Href } from 'expo-router';
 
+import type { ProgressMetric } from '@/src/preferences/model';
+
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
 // The Gyms screen, from the session view's gym sheet (`Manage gyms`). More
@@ -14,12 +16,23 @@ export const THEME_COLOUR_ROUTE = '/theme-colour';
 
 /** One muscle's or one exercise's effort history, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
+
+/** `?metric=` on the history page: Progress's Sets / Volume choice, carried over. */
+export const PROGRESS_HISTORY_METRIC_PARAMS: Record<ProgressMetric, string> = {
+  totalVolume: 'volume',
+  workingSetCount: 'sets',
+};
+
 export const progressHistoryHref = (
-  subject: { muscleGroupId: string } | { exerciseDefinitionId: string }
-): Href =>
-  ('muscleGroupId' in subject
-    ? `${PROGRESS_HISTORY_ROUTE}?muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
-    : `${PROGRESS_HISTORY_ROUTE}?exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`) as Href;
+  subject: { muscleGroupId: string } | { exerciseDefinitionId: string },
+  metric?: ProgressMetric
+): Href => {
+  const id = 'muscleGroupId' in subject
+    ? `muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
+    : `exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`;
+  const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
+  return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}` as Href;
+};
 
 /** One completed session's view. */
 export const completedSessionHref = (sessionId: string): Href =>

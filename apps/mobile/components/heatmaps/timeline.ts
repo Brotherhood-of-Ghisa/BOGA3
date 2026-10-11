@@ -53,11 +53,26 @@ const toTimelineWeek = (week: WeekCell): TimelineWeek => {
   };
 };
 
+/** The focused week, as the readout and the page title name it. */
+export interface FocusedTimelineWeek {
+  weekStartDateKey: string;
+  /** `weekLabel` of the week: what the readout and the page title show. */
+  label: string;
+  /** False for a rest week, which has no sessions to open. */
+  hasTraining: boolean;
+}
+
 /** A Monday–Sunday week as `29 Sep – 5 Oct`, or `6 – 12 Oct` within one month. */
 export const weekRangeLabel = (monday: Date): string => {
   const end = new Date(monday.getTime() + 6 * 86400000);
   const first = `${monday.getUTCDate()}${monday.getUTCMonth() === end.getUTCMonth() ? '' : ` ${MONTHS[monday.getUTCMonth()]}`}`;
   return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
+};
+
+/** A week's name on screen: its range, plus the year when it is not the current one. */
+export const weekLabel = (monday: Date, currentYear: number): string => {
+  const year = monday.getUTCFullYear();
+  return `${weekRangeLabel(monday)}${year === currentYear ? '' : ` ${year}`}`;
 };
 
 // The first week starting in a month carries its label: its Monday is one of
@@ -102,13 +117,24 @@ export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapM
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 
-/** Narrowest week column before the plot scrolls sideways. */
-export const MIN_TIMELINE_COLUMN_WIDTH = 6;
+/**
+ * Narrowest week column before the plot scrolls sideways. A column is the whole
+ * tap target for its week, so a long window shows fewer, hittable weeks and
+ * scrolls rather than slicing the width into unhittable slivers: this holds a
+ * `MAX_BAR_WIDTH` bar with its gap, and leaves a 52-week window about a dozen
+ * weeks on a phone.
+ */
+export const MIN_TIMELINE_COLUMN_WIDTH = 32;
 const MAX_BAR_WIDTH = 24;
 const BAR_GAP = 2;
 /** The data end of a column is rounded; its baseline end stays square. */
 export const BAR_RADIUS = 4;
-/** Room a month label needs (`SEP`, `2026`) before the next one starts. */
+/**
+ * Room a month label needs (`SEP`, `2026`). A month is labelled at most every
+ * fourth column, so the column floor keeps four times this much between any
+ * two labels: none is ever dropped for a collision, and the last one fits
+ * inside the drawn width because its column is the width's final one.
+ */
 export const MONTH_LABEL_WIDTH = 30;
 
 export type TimelineBar = { weekStartDateKey: string; index: number; x: number; y: number; width: number; height: number };
@@ -120,21 +146,9 @@ export interface TimelineGeometry {
   height: number;
   bars: TimelineBar[];
   ticks: { value: number; y: number }[];
-  /** The month labels that fit: none overlaps another or runs off the end. */
+  /** Every month that starts in the window, at its column. */
   months: (TimelineMonth & { x: number })[];
 }
-
-// January and the first label carry the year, so they win a collision; the
-// rest fill in oldest first wherever they still fit.
-const fittingMonths = (months: (TimelineMonth & { x: number })[], width: number) => {
-  const fits = (month: { x: number }, kept: { x: number }[]) => month.x + MONTH_LABEL_WIDTH <= width
-    && kept.every(other => Math.abs(other.x - month.x) >= MONTH_LABEL_WIDTH);
-  const kept: (TimelineMonth & { x: number })[] = [];
-  for (const month of [...months.filter(m => m.year !== undefined), ...months.filter(m => m.year === undefined)]) {
-    if (fits(month, kept)) kept.push(month);
-  }
-  return kept.sort((a, b) => a.index - b.index);
-};
 
 const columnBars = (series: TimelineSeries, columnWidth: number, height: number): TimelineBar[] => {
   const top = series.ticks[series.ticks.length - 1] || 1;
@@ -156,7 +170,7 @@ export function timelineGeometry(series: TimelineSeries, plotWidth: number, heig
     height,
     bars: columnBars(series, columnWidth, height),
     ticks: series.ticks.map(value => ({ value, y: height - (value / top) * height })),
-    months: fittingMonths(series.months.map(month => ({ ...month, x: month.index * columnWidth })), columnWidth * count),
+    months: series.months.map(month => ({ ...month, x: month.index * columnWidth })),
   };
 }
 

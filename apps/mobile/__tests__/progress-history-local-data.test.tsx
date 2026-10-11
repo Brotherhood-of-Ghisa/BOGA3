@@ -22,15 +22,22 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
-let mockScreenOptions: { title?: string } = {};
+let mockScreenOptions: {
+  title?: string;
+  headerTitle?: (props: { children: string }) => mockReact.ReactNode;
+  headerRight?: () => mockReact.ReactNode;
+} = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
+  // The native header, as the route declares it: its rendered title and items
+  // are mounted in place, so the page's week and its ⋮ are reachable.
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
       mockScreenOptions = options;
-      return null;
+      return mockReact.createElement(mockReact.Fragment, null,
+        options.headerTitle?.({ children: options.title ?? '' }), options.headerRight?.());
     },
   },
   useLocalSearchParams: () => mockSearchParams,
@@ -184,7 +191,7 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
-  it('opens the saved Timeline with the selected week\'s sets, whose cards and View sessions navigate', async () => {
+  it('opens the saved Timeline with the focused week\'s sets, whose cards and the ⋮\'s View sessions navigate', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));
     await openHistory({ exerciseDefinitionId: SQUAT });
@@ -196,30 +203,38 @@ describe('The history page over real data', () => {
     expect(cards.length).toBeGreaterThan(0);
     fireEvent.press(cards[0]);
     expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
-    fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-view-sessions'));
-    // View sessions opens Sessions at the readout's week, as a Weekly row does.
+    // The header carries the focused week, and its ⋮ opens that week's
+    // sessions — as a Weekly row does.
+    expect(screen.getByTestId('progress-history-title-week')).toBeTruthy();
+    expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-history-options-button'));
+    fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
     expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${localDateKey(calendarWeekBounds(1).start)}`);
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
   });
 
-  it('keeps listing the readout\'s week when the selection is cleared', async () => {
+  it('focuses the newest week from the start, and the arrows move the list with it', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));
     await openHistory({ exerciseDefinitionId: SQUAT });
+    const cards = () => screen.queryAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/);
     const before = (await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).length;
 
-    // Nothing starts selected, so the readout and list show the newest week. A double tap selects
-    // that announced week, a second clears it; the list stays on the same week throughout.
-    const plot = () => screen.getByTestId('stats-exercise-history-timeline-plot');
-    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
-    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    // Nothing is selected yet, so the newest week is the focused one: marked in
+    // the chart, named in the title, and listed below.
     expect(screen.getByTestId('stats-exercise-history-timeline-selected')).toBeTruthy();
-    expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before);
-    fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
-    expect(screen.queryByTestId('stats-exercise-history-timeline-selected')).toBeNull();
-    await waitFor(() => expect(screen.getAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).toHaveLength(before));
+    expect(screen.getByTestId('stats-exercise-history-timeline-next-week')).toBeDisabled();
+    const newest = screen.getByTestId('progress-history-title-week').props.children;
+
+    // One week back is a different week, and the list follows it; forward again
+    // returns to the newest, with the same sets.
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-previous-week')); });
+    expect(screen.getByTestId('progress-history-title-week').props.children).not.toBe(newest);
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-next-week')); });
+    expect(screen.getByTestId('progress-history-title-week').props.children).toBe(newest);
+    await waitFor(() => expect(cards()).toHaveLength(before));
     expect(screen.queryByTestId('stats-exercise-history-week-sets-empty')).toBeNull();
   });
 
