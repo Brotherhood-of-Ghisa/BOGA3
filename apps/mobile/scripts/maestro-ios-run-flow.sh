@@ -108,7 +108,7 @@ maestro_write_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 # explicitly via -e.
 maestro_env_flags=()
 for _var in \
-  MAESTRO_IOS_DEV_CLIENT_URL \
+  MAESTRO_DEV_CLIENT_URL \
   MAESTRO_AUTH_PROFILE_EMAIL \
   MAESTRO_AUTH_PROFILE_PASSWORD \
   MAESTRO_AUTH_PROFILE_USERNAME \

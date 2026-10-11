@@ -9,6 +9,7 @@
 #
 #   boga test fast|backend|frontend|slow|all   # gate aggregates
 #   boga test frontend-ui                      # frontend minus the Supabase-backed e2e lanes
+#   boga test frontend-android                 # the android-* Maestro lanes (infra: android)
 #   boga test <lane>                           # one lane by registry name
 #   boga test --list                           # what exists, where it runs
 #   boga test <lane> --dry-run                 # print the command, don't run
@@ -144,7 +145,7 @@ cmd_test() {
 
   case "${target}" in
     --list)
-      echo "Lanes (scripts/lanes.tsv). Gates: fast | backend | frontend | frontend-ui | slow | all."
+      echo "Lanes (scripts/lanes.tsv). Gates: fast | backend | frontend | frontend-ui | frontend-android | slow | all."
       echo "Durations: ./boga timings   Capability: ./boga doctor"
       echo
       printf '%-20s %-15s %-13s %-4s %-12s %s\n' "LANE" "GATE" "INFRA" "CI" "CWD" "COMMAND"
@@ -157,6 +158,7 @@ cmd_test() {
     backend)       run_gate "${dry}" slow-backend ;;
     frontend)      run_gate "${dry}" slow-frontend ;;
     frontend-ui)   run_gate "${dry}" slow-frontend:ios ;;
+    frontend-android) run_gate "${dry}" slow-frontend-android ;;
     slow)          run_gate "${dry}" slow-frontend slow-backend ;;
     all)           run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend slow-backend ;;
     *)
@@ -300,6 +302,9 @@ cmd_doctor() {
   check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
   check "maestro CLI (Maestro lanes)" maestro --version
   check "xcodebuild >= ${BOGA_XCODE_MIN_VERSION} (dev-client build; the Expo SDK's minimum)" boga_xcode_at_least_min
+  check "android sdk (android-* Maestro lanes)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
+  check "adb (android-* Maestro lanes)" adb version
+  check "emulator (android-* Maestro lanes)" emulator -version
   check "node" node --version
   check "jq (worktree tooling)" jq --version
   if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then

@@ -140,7 +140,11 @@ export default ({ config }: { config: ExpoConfig }) => ({
             }
         ],
         "expo-background-task",
-        ["expo-font", embeddedFontsPluginProps()]
+        ["expo-font", embeddedFontsPluginProps()],
+        // Android-only: bakes expo-dev-menu's "no launch menu / no FAB" meta-data
+        // into the manifest so the dev menu never covers the RN root in the
+        // android-* Maestro lanes (iOS seeds the same prefs at runtime).
+        "./plugins/with-android-dev-menu-preferences"
     ],
 
     experiments: {

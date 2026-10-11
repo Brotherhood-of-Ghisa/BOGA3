@@ -14,6 +14,10 @@ if [[ -f "$REPO_ROOT/scripts/java-env.sh" ]]; then
   # shellcheck disable=SC1091
   source "$REPO_ROOT/scripts/java-env.sh"
 fi
+if [[ -f "$REPO_ROOT/scripts/android-env.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/scripts/android-env.sh"
+fi
 
 maestro_fail() {
   echo "$*" >&2
@@ -88,6 +92,41 @@ maestro_source_env() {
   : "${MAESTRO_RESET_STRATEGY:=data}"
   : "${MAESTRO_KEEP_SIMULATOR_BOOTED:=0}"
 
+  # Android emulator runtime (the android-* Maestro lanes). ANDROID_AVD is the
+  # slot-named AVD `./boga worktree start` writes; ANDROID_SERIAL overrides it
+  # with an already-connected device/emulator. The APK build cache is SHARED
+  # across worktrees for the same reason the iOS .app cache is: the artifact is
+  # host-local and byte-identical, so a fresh worktree reuses it instead of
+  # rebuilding. Like the iOS root, a legacy per-slot root collapses back onto the
+  # shared one.
+  : "${ANDROID_AVD:=}"
+  : "${ANDROID_SERIAL:=}"
+  : "${ANDROID_EMULATOR_AUTO_CREATE:=1}"
+  : "${ANDROID_AVD_TEMPLATE:=}"
+  : "${MAESTRO_KEEP_EMULATOR_BOOTED:=0}"
+  : "${MAESTRO_ANDROID_SHARED_BUILD_ROOT:=$HOME/.cache/boga/maestro/android-dev-client}"
+
+  # A worktree generated before the Android keys existed has no ANDROID_AVD in its
+  # env; derive the same slot-named value `./boga worktree start` writes now, so an
+  # existing worktree runs the android-* lanes without regenerating its env. The
+  # lease is already validated above, so the slot is trustworthy.
+  if [[ -z "${ANDROID_AVD:-}" ]]; then
+    local _android_slot
+    if _android_slot="$(boga_read_slot_file "$REPO_ROOT" 2>/dev/null)"; then
+      ANDROID_AVD="$(boga_android_avd_name_for_slot "$_android_slot")"
+    fi
+  fi
+
+  case "$MAESTRO_ANDROID_SHARED_BUILD_ROOT" in
+    */android-dev-client/wt[0-9]*)
+      MAESTRO_ANDROID_SHARED_BUILD_ROOT="${MAESTRO_ANDROID_SHARED_BUILD_ROOT%/wt[0-9]*}"
+      ;;
+  esac
+
+  # Always derive the APK path from the single shared root so the build-write and
+  # cache-lookup paths can never diverge (same rule as the iOS .app path).
+  MAESTRO_ANDROID_APK_PATH="$MAESTRO_ANDROID_SHARED_BUILD_ROOT/mobile-dev-client.apk"
+
   export TASK_ID
   export MAESTRO_IOS_SHARED_BUILD_ROOT
   export MAESTRO_IOS_DEV_CLIENT_APP_PATH
@@ -98,6 +137,13 @@ maestro_source_env() {
   export EXPO_START_WAIT_SECONDS
   export MAESTRO_RESET_STRATEGY
   export MAESTRO_KEEP_SIMULATOR_BOOTED
+  export ANDROID_AVD
+  export ANDROID_SERIAL
+  export ANDROID_EMULATOR_AUTO_CREATE
+  export ANDROID_AVD_TEMPLATE
+  export MAESTRO_KEEP_EMULATOR_BOOTED
+  export MAESTRO_ANDROID_SHARED_BUILD_ROOT
+  export MAESTRO_ANDROID_APK_PATH
 
   [[ -n "$EXPO_DEV_SERVER_PORT" ]] || maestro_fail "Missing EXPO_DEV_SERVER_PORT. Run './boga worktree start' from the repo root or set it in $MAESTRO_LOCAL_ENV_FILE."
 }

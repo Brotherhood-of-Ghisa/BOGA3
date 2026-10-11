@@ -37,7 +37,7 @@ appId: com.dinoderek.mobile
 # in react/react-native#58138; 0.88.0-rc.4 and main still crash. Remove this
 # stopApp once a react-native release fixes #58601.
 - stopApp
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
       id: "today-screen"

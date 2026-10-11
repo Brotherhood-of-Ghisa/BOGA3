@@ -24,13 +24,13 @@ maestro_require_command xcrun "Install Xcode and the iOS simulator runtime."
 [[ -n "${MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID:-}" ]] || maestro_fail "Missing dev-client bundle id in runtime env."
 [[ -n "${EXPO_DEV_SERVER_PORT:-}" ]] || maestro_fail "Missing EXPO_DEV_SERVER_PORT in runtime env."
 
-MAESTRO_IOS_DEV_CLIENT_URL="$(maestro_development_client_url "$EXPO_DEV_SERVER_PORT")"
+MAESTRO_DEV_CLIENT_URL="$(maestro_development_client_url "$EXPO_DEV_SERVER_PORT")"
 SCHEME="$(maestro_current_app_scheme)"
 
 echo "[maestro-ios-launch] Runtime env: $RUNTIME_ENV_FILE"
 echo "[maestro-ios-launch] Starting Expo on port $EXPO_DEV_SERVER_PORT"
 echo "[maestro-ios-launch] Launch scheme: $SCHEME"
-echo "[maestro-ios-launch] Dev client URL: $MAESTRO_IOS_DEV_CLIENT_URL"
+echo "[maestro-ios-launch] Dev client URL: $MAESTRO_DEV_CLIENT_URL"
 
 cd "$APP_DIR"
 # Pin this lane's Supabase config into apps/mobile/.env.local before starting the
@@ -102,7 +102,7 @@ maestro_seed_dev_menu_preferences "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDL
 
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
-xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_URL"
+xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_DEV_CLIENT_URL"
 
 # Block until Metro has built + served the app-entry bundle (the openurl above
 # made the dev client request it). This drives the cold JS bundle hot HERE,

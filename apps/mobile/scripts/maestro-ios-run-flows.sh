@@ -156,8 +156,8 @@ run_one_flow() {
 
   echo "[maestro-ios-run-flows] >>> ${scenario} (${slug})"
   maestro_env_flags=()
-  if [[ -n "${MAESTRO_IOS_DEV_CLIENT_URL+set}" ]]; then
-    maestro_env_flags+=(-e "MAESTRO_IOS_DEV_CLIENT_URL=${MAESTRO_IOS_DEV_CLIENT_URL}")
+  if [[ -n "${MAESTRO_DEV_CLIENT_URL+set}" ]]; then
+    maestro_env_flags+=(-e "MAESTRO_DEV_CLIENT_URL=${MAESTRO_DEV_CLIENT_URL}")
   fi
 
   set +e

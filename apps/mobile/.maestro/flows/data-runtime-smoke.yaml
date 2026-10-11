@@ -241,8 +241,17 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "sessions-screen"
 - takeScreenshot: "06b-history-week-opens-sessions"
-- tapOn:
-    id: "BackButton"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-history-heatmap-panel-weekly"
@@ -265,10 +274,19 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-history-view-chip-row"
 - takeScreenshot: "07-history-chart-scrolled"
-# Native back returns to Progress with the exercise list as it was left. The
-# chevron's hidden label varies by iOS runtime, so tap UIKit's own id.
-- tapOn:
-    id: "BackButton"
+# Native back returns to Progress with the exercise list as it was left. On
+# iOS, UIKit's own id is tapped; on Android, the system back command is used.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
 - extendedWaitUntil:
     notVisible:
       id: "stats-exercise-history-view-chip-row"

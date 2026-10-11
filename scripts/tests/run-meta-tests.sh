@@ -6,7 +6,8 @@
 # the Maestro fixture-user and
 # flow-has-a-lane rules, and
 # the worktree lifecycle (temp git repos + stub gh/docker), Android
-# launchers (stub adb/Expo/JDK), the iOS simulator boot-wait (stub xcrun), the
+# launchers (stub adb/Expo/JDK), the Android Maestro runtime (stub
+# adb/emulator), the iOS simulator boot-wait (stub xcrun), the
 # Maestro runners' dev-client crash-report collection (fixture reports), and
 # the edge function server stop (stub npx process tree), and the dev stack's
 # generated config (function entrypoints) and main-checkout-only rule (temp
@@ -34,6 +35,7 @@ TESTS=(
   "supabase-container-resolver.test.sh"
   "worktree-lifecycle.test.sh"
   "android-launcher.test.sh"
+  "maestro-android-runtime.test.sh"
   "ios-sim-boot.test.sh"
   "maestro-crash-reports.test.sh"
   "functions-serve-stop.test.sh"

@@ -469,6 +469,20 @@ boga_is_lane_sim_name() {
   [[ "${1:-}" =~ ^BOGA\ wt[0-9]+$ ]]
 }
 
+# The lane Android emulator AVD `./boga worktree start` writes into the
+# worktree's Maestro env, and the only name shape maestro-android-provision.sh
+# may create/delete/recreate. Mirrors boga_ios_sim_name_for_slot, but an AVD name
+# allows only [A-Za-z0-9_.-] — a space is invalid — so it uses an underscore. A
+# hand-made AVD ("Pixel_10_Pro") does not match, so it is used as a template
+# only, never deleted.
+boga_android_avd_name_for_slot() {
+  printf 'BOGA_wt%s\n' "$1"
+}
+
+boga_is_lane_avd_name() {
+  [[ "${1:-}" =~ ^BOGA_wt[0-9]+$ ]]
+}
+
 # The pinned runtime's simctl identifier; fails (printing nothing) when that
 # runtime is not installed or not available.
 boga_ios_sim_runtime_id() {

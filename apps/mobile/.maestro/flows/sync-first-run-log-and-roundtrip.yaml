@@ -50,7 +50,7 @@ appId: com.dinoderek.mobile
 # load-bearing after clearState.
 - launchApp:
     clearState: true
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
     commands:
@@ -149,7 +149,7 @@ appId: com.dinoderek.mobile
 # Same dev-menu dismissal as step 1.
 - launchApp:
     clearState: true
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
     commands:

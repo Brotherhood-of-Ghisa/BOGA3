@@ -55,16 +55,17 @@ apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the gr
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native iOS dep change ⇒ also rebuild dev client + frontend, see spec 02)
 apps/mobile/*.ts	fast	mobile config (iOS native field change ⇒ rebuild dev client + frontend; Android-only fields exempt, see spec 02)
+apps/mobile/plugins/**	fast,android-smoke,android-data-smoke	Android native config plugin (rebuild the APK: ./scripts/maestro-android-dev-client-build.sh --force, then the android lanes)
 apps/agent-auth-web/scripts/**	fast,mcp-smoke	agent OAuth local smoke helper
 apps/agent-auth-web/**	fast	agent OAuth consent web
 services/boga-mcp/**	fast,mcp-smoke	MCP protocol/API translation
 apps/mobile/scripts/maestro*	frontend,meta-tests	Maestro runtime / lane scripts (+ fixture-user rule)
 apps/mobile/scripts/ios-sim-boot.sh	frontend,meta-tests	simulator boot-wait (+ ios-sim-boot meta-test)
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
-apps/mobile/.maestro/flows/smoke-launch.yaml	-frontend,ios-smoke	single flow → the lane that runs it
-apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
-apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
-apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
+apps/mobile/.maestro/flows/smoke-launch.yaml	-frontend,ios-smoke,android-smoke	single flow → the lanes that run it
+apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
+apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: asserts the iOS share sheet)
+apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
 apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it

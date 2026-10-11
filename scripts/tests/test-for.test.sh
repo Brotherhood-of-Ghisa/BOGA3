@@ -88,8 +88,15 @@ requires frontend      apps/mobile/scripts/maestro-run-lane.sh
 requires meta-tests    apps/mobile/scripts/maestro-run-lane.sh
 requires frontend      apps/mobile/.maestro/maestro.env.sample
 requires ios-smoke     apps/mobile/.maestro/flows/smoke-launch.yaml
+requires android-smoke apps/mobile/.maestro/flows/smoke-launch.yaml
 requires meta-tests    apps/mobile/.maestro/flows/smoke-launch.yaml
 not_requires frontend  apps/mobile/.maestro/flows/smoke-launch.yaml
+# a flow shared by both platforms names both lanes; the iOS-only share-sheet
+# flow names only its iOS lane
+requires ios-data-smoke     apps/mobile/.maestro/flows/data-runtime-smoke.yaml
+requires android-data-smoke apps/mobile/.maestro/flows/data-runtime-smoke.yaml
+requires ios-data-smoke     apps/mobile/.maestro/flows/session-completion-states-fixture.yaml
+not_requires android-data-smoke apps/mobile/.maestro/flows/session-completion-states-fixture.yaml
 # an unlisted (new) flow falls back to the full gate
 requires frontend      apps/mobile/.maestro/flows/brand-new-flow.yaml
 
@@ -136,7 +143,7 @@ arm_lane = {}
 for name, r in lanes.items():
     m = re.search(r"maestro-run-lane\.sh (\S+)$", r[5])
     if m:
-        arm_lane[m.group(1)] = name
+        arm_lane.setdefault(m.group(1), set()).add(name)
 flow_lane, arm = {}, None
 for line in open(os.path.join(root, "apps/mobile/scripts/maestro-run-lane.sh")):
     m = re.match(r"^  ([a-z0-9-]+)\)\s*$", line)
@@ -144,7 +151,7 @@ for line in open(os.path.join(root, "apps/mobile/scripts/maestro-run-lane.sh")):
         arm = m.group(1)
     for flow in re.findall(r"([A-Za-z0-9_-]+\.yaml)", line):
         if arm in arm_lane:
-            flow_lane[flow] = arm_lane[arm]
+            flow_lane.setdefault(flow, set()).update(arm_lane[arm])
 flows_dir = os.path.join(root, "apps/mobile/.maestro/flows")
 for flow in sorted(os.listdir(flows_dir)):
     if not flow.endswith(".yaml"):
@@ -155,8 +162,8 @@ for flow in sorted(os.listdir(flows_dir)):
     out = subprocess.run([os.environ["TF"], "--tsv", f"apps/mobile/.maestro/flows/{flow}"],
                          capture_output=True, text=True, check=True).stdout
     got = {l.split("\t")[0] for l in out.splitlines() if l}
-    if got != {want, "meta-tests"}:
-        sys.exit(f"  ASSERT FAILED: {flow} should require exactly {{{want}, meta-tests}} "
+    if got != want | {"meta-tests"}:
+        sys.exit(f"  ASSERT FAILED: {flow} should require exactly {sorted(want | {'meta-tests'})} "
                  f"(add/fix its row in scripts/triggers.tsv); got {sorted(got)}")
 print(f"  test-for: registry names only real lanes; {len(flow_lane)} flow rows match their runner arms")
 PYCHECK

@@ -64,7 +64,7 @@ appId: com.dinoderek.mobile
 # for the iOS-26 accessibility-churn rationale behind waits and retries.
 - launchApp:
     clearState: true
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
       text: "Continue"
