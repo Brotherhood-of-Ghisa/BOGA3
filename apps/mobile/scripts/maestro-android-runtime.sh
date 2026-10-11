@@ -206,6 +206,35 @@ maestro_android_force_stop() {
   adb -s "$serial" shell am force-stop "$package" >/dev/null 2>&1 || true
 }
 
+# Stop the emulator process owned by this run. If ANDROID_SERIAL is set, attempts
+# a clean `emu kill` via adb first; falls back to SIGTERM and SIGKILL on EMULATOR_PID.
+maestro_android_teardown_emulator() {
+  local pid="${1:-}"
+  local serial="${2:-}"
+  local keep_booted="${3:-0}"
+
+  [[ -n "$pid" ]] || return 0
+
+  if [[ -n "$serial" && "$keep_booted" == "1" ]]; then
+    echo "[maestro-android-teardown] Keeping emulator booted: $serial (pid $pid)"
+    return 0
+  fi
+
+  if [[ -n "$serial" ]]; then
+    echo "[maestro-android-teardown] Shutting down emulator $serial"
+    adb -s "$serial" emu kill >/dev/null 2>&1 || true
+  fi
+
+  if ! maestro_wait_for_process_exit "$pid" 10; then
+    echo "[maestro-android-teardown] Emulator process did not exit; sending SIGTERM"
+    kill "$pid" >/dev/null 2>&1 || true
+    if ! maestro_wait_for_process_exit "$pid" 5; then
+      echo "[maestro-android-teardown] Emulator process still running; sending SIGKILL"
+      kill -9 "$pid" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 # Pre-grant the runtime permissions the dev client requests so the native
 # "nearby devices" dialog (`ACCESS_LOCAL_NETWORK`, Android 16) and the location
 # dialogs never render over the RN root on a cold install — the Android analogue

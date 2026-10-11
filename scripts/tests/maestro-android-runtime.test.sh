@@ -126,13 +126,7 @@ assert 'grep -qxF "adb -s emulator-5554 shell pm grant com.phano.boga3.dev andro
 # 10. Teardown shuts down EMULATOR_PID even when ANDROID_SERIAL is unset.
 sleep 10 &
 DUMMY_PID=$!
-TEARDOWN_ENV="$WORK/teardown-early-failure.env"
-cat > "$TEARDOWN_ENV" <<EOF
-TASK_ID=ad-hoc
-MAESTRO_ARTIFACT_ROOT=$WORK/artifacts
-EMULATOR_PID=$DUMMY_PID
-EOF
-bash "$SRC_ROOT/apps/mobile/scripts/maestro-android-teardown.sh" "$TEARDOWN_ENV" >/dev/null 2>&1
+maestro_android_teardown_emulator "$DUMMY_PID" "" 0
 assert '! kill -0 "$DUMMY_PID" 2>/dev/null' "teardown kills EMULATOR_PID when ANDROID_SERIAL is empty"
 
 echo "[maestro-android-runtime.test] $PASS assertions passed"
