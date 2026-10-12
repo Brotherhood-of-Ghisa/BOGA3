@@ -196,9 +196,9 @@ selected private reading or an explicit `missing` sentinel; off/zero digests do
 not query or include reading facts. The digest never crosses the group boundary.
 Scoring fingerprints fence stale results, separately from immutable observed-set
 and private-reading pins. Rule-only changes preserve an unchanged performance
-witness; a changed applicable private-reading dependency ends the dependent 1RM
-projection while raw Weight remains active. The groups contract §11.3 owns the
-complete current lifecycle. Certification RPCs identify the
+witness. Source-mode and applicable reading corrections follow
+[[groups.certification]] and the competition contract's lifecycle.
+Certification RPCs identify the
 record/revision and re-read dependencies server-side; the client never supplies
 or receives private reading facts.
 

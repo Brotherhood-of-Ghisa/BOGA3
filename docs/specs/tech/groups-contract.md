@@ -268,8 +268,8 @@ exercise, stored as a row per current score under one public id. Certify takes
 any score's token and checks every score's live fingerprint (`CONFLICT`); a
 repeat returns it (`created: false`). Ending any row ends them all. Only the
 certifier withdraws; owners and admins cancel; both are idempotent. Ended rows
-never reopen, and undelete revives nothing. Writers: the RPCs and the apply,
-never a Sync v2 trigger.
+never reopen, and undelete revives nothing. RPCs and apply write certificates;
+the failure-isolated source-mode trigger implements [[groups.certification]].
 
 ## Comparisons (bodyweight-aware)
 
@@ -285,8 +285,8 @@ never a Sync v2 trigger.
   publishing rechecks them, the revision and the source hash under group,
   advisory, queue and projection locks. A stale result writes nothing; readers
   see `rebuilding`, never mixed revisions.
-- Rule-only changes keep a witness; set edits and deletes void it; a
-  private-reading correction ends only the dependent projection.
+- Witness corrections follow [[groups.certification]] and the competition
+  contract's generation/reading checks.
 - `competition-wire-guards.ts` rejects private fields, mixed revisions and
   wrong units before the cache.
 
@@ -333,7 +333,7 @@ proposals, disputes, push notifications.
 | P3, D9, D13 | Group exercises only in picker search, the Link screen and the group page |
 | P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's At a glance · Stream · Leaderboards |
 | P6–P9, D11, D12 | Volume/1RM × Certified/All boards; one row per member; podiums on Certified · 1RM; history is lead changes |
-| P10–P13, D3–D5 | Another current member certifies a record set; one suffices; certifier withdraws, admin cancels; edits void it |
+| P10–P13, D3–D5 | Certification lifecycle: [[groups.certification]] |
 | P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |
 | P18 | Certify and admin actions need a connection |
 | D6 | Ordinary 1RM converts across load modes; Volume stays total (competition contract §1) |

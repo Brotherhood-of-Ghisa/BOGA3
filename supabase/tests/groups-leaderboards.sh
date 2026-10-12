@@ -626,7 +626,9 @@ pass "lease expiry"
 
 # Two statements: one statement's snapshot cannot see what its own volatile
 # function inserted.
-expect_sql "a future rules version requeues evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
+run_psql "update app_public.group_set_facts set rules_version=6
+  where member_user_id='${ATHLETE_UID}' and session_id='${S1}';" >/dev/null
+expect_sql "current rules requeue older evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
 [[ "$(queue_of)" == "session:${S1}:rules" ]] || fail "a rules bump must requeue S1 with cause rules: got '$(queue_of)'"
 drain_ok "rules"
 expect_mine "a rules requeue re-normalizes the session" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"

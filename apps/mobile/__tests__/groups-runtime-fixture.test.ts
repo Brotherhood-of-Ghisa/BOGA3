@@ -12,7 +12,7 @@ it('the scripted counterparty links and polls protocol-4 single-set Volume',()=>
     http: { post: (url: string,options: { headers: Record<string,string>;body: string })=>{
       const name=url.split('/').at(-1)!;calls.push({ name,args: JSON.parse(options.body),headers: options.headers });
       const body=name==='group_competition_exercise_list'?{ exercises: [{ name: 'Sled Push',archived_at_ms: null,group_exercise_id: 'comparison' }] }
-        :name==='sync_push'?{ ok: true }:{ entries: [{ member: { user_id: 'athlete' },value: 256.25,unit: 'kg_reps',
+        :name==='sync_push'?{ ok: true }:{ entries: [{ member: { user_id: 'athlete' },value: 512.5,unit: 'kg_reps',
           performance: { reps: 5,weight_value: '102.5',source_load_input_mode: 'total_load' },certification: null }] };
       return { status: 200,body: JSON.stringify(body) };
     } } };

@@ -253,8 +253,7 @@ var steps = {
   // active custom group exercise, Sled Push (per side), with a sync_push like
   // its own app would. Its completed sets from before the link then count as a
   // link effect (contract). Waits until the evaluator has written the
-  // board, so the device's reads are deterministic: single-set Volume 256.25 kg·reps (102.5 total kg → 51.25 per-side kg × 5), uncertified.
-  // Both ordinary scores convert from source distribution to the group target.
+  // board, so the device reads the completed 102.5 × 5 set as 512.5 kg·reps, uncertified.
   'link-board': function () {
     var list = rpcOk(output.groupsToken, 'group_competition_exercise_list', { p_group_id: output.groupsGroupId });
     var targets = (list.exercises || []).filter(function (exercise) {
@@ -305,11 +304,11 @@ var steps = {
     var boardValue = Number(row.value);
     var boardReps = Number(row.performance.reps);
     var boardWeightValue = Number(row.performance.weight_value);
-    
+
     if (
       board.entries.length !== 1 ||
       row.member.user_id !== output.groupsCounterpartyUserId ||
-      boardValue !== 256.25 ||
+      boardValue !== 512.5 ||
       row.unit !== 'kg_reps' ||
       boardReps !== 5 ||
       boardWeightValue !== 102.5 ||
