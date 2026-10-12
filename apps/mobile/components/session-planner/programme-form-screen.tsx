@@ -16,6 +16,7 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
+import { EffortChoices } from '@/components/exercise-page/exercise-sheets';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanGymSheet, type SaveOutcome } from '@/components/session-planner/plan-form-screen';
 import {
@@ -87,6 +88,15 @@ const childPlanBlockEdits = (
   };
 };
 
+type ProgrammeSessionEditSheetProps = {
+  plan: ProgrammeChildPlanForm | null;
+  planIndex: number | null;
+  visible: boolean;
+  errors: Map<string, string>;
+  onDismiss: () => void;
+  onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void;
+};
+
 /**
  * Child session editor sheet: isolates the full block/target set editor
  * to one child session at a time, avoiding an unbounded mega-form on mobile.
@@ -98,18 +108,12 @@ function ProgrammeSessionEditSheet({
   errors,
   onDismiss,
   onUpdatePlan,
-}: {
-  plan: ProgrammeChildPlanForm | null;
-  planIndex: number | null;
-  visible: boolean;
-  errors: Map<string, string>;
-  onDismiss: () => void;
-  onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void;
-}) {
+}: ProgrammeSessionEditSheetProps) {
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
   const [pickBlockId, setPickBlockId] = useState<string | null>(null);
   const [isPickingNew, setIsPickingNew] = useState(false);
+  const [effortRequest, setEffortRequest] = useState<{ blockId: string; setId: string } | null>(null);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
 
   if (!plan || planIndex === null) {
@@ -117,6 +121,12 @@ function ProgrammeSessionEditSheet({
   }
 
   const prefix = `plans.${planIndex}`;
+  const effortSet = plan.blocks.find((block) => block.id === effortRequest?.blockId)
+    ?.sets.find((set) => set.id === effortRequest?.setId);
+  const dismiss = () => {
+    setEffortRequest(null);
+    onDismiss();
+  };
 
   const openGymPicker = async () => {
     setGymSheetVisible(true);
@@ -162,16 +172,35 @@ function ProgrammeSessionEditSheet({
   return (
     <PageSheet
       closeLabel="Close session editor"
+      headerLeading={effortSet ? (
+        <IconButton
+          accessibilityLabel="Back to session"
+          name="chevron-left"
+          onPress={() => setEffortRequest(null)}
+          testID="programme-child-plan-effort-back"
+        />
+      ) : undefined}
       keyboardAvoiding
-      onDismiss={onDismiss}
+      onDismiss={dismiss}
       testID="programme-child-plan-editor-sheet"
-      title={`Edit ${plan.title || 'Session'}`}
+      title={effortSet ? 'Effort' : `Edit ${plan.title || 'Session'}`}
       visible={visible}>
+      {effortRequest && effortSet ? (
+        <View style={styles.childEditorBody}>
+          <EffortChoices
+            selected={effortSet.targetSetType}
+            onSelect={(targetSetType) => {
+              updateSet(effortRequest.blockId, effortSet.id, { targetSetType });
+              setEffortRequest(null);
+            }}
+          />
+        </View>
+      ) : null}
       <ScrollView
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        style={styles.childEditorScroll}
+        style={[styles.childEditorScroll, effortSet ? styles.hidden : null]}
         testID="programme-child-plan-editor-scroll">
         <View style={styles.childEditorBody} testID="programme-child-plan-editor-body">
           <FormField
@@ -240,6 +269,7 @@ function ProgrammeSessionEditSheet({
                 onChangeSet={updateSet}
                 onMoveBlock={moveBlock}
                 onPickExercise={(id) => setPickBlockId(id)}
+                onOpenEffort={(blockId, setId) => setEffortRequest({ blockId, setId })}
                 onRemoveBlock={removeBlock}
                 onRemoveSet={removeSet}
               />
@@ -254,7 +284,7 @@ function ProgrammeSessionEditSheet({
           <ActionButton
             accessibilityLabel="Done editing session"
             label="Done"
-            onPress={onDismiss}
+            onPress={dismiss}
             testID="programme-child-plan-done-button"
             variant="primary"
           />
@@ -659,6 +689,9 @@ const styles = StyleSheet.create({
   },
   childEditorScroll: {
     flex: 1,
+  },
+  hidden: {
+    display: 'none',
   },
   childEditorBody: {
     gap: uiSpace.md,

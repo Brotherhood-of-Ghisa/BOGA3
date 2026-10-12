@@ -8,7 +8,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Keyboard, Modal } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -173,15 +173,42 @@ describe('programme screens', () => {
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '0');
       expect(screen.getByTestId('plan-form-block-1-set-1-reps-error')).toHaveTextContent('Reps must be a whole number from 1 to 999.');
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '8');
+      const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {
+        expect(screen.queryByTestId('exercise-effort-option-rir_2')).toBeNull();
+      });
       fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
-      const picker = within(await screen.findByTestId('exercise-effort-sheet'));
+      expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+      dismissKeyboard.mockRestore();
+      expect(screen.getByTestId('programme-child-plan-editor-sheet-title')).toHaveTextContent('Effort');
+      expect(screen.queryByTestId('programme-child-plan-title-input')).toBeNull();
+      expect(screen.queryByTestId('exercise-effort-sheet', { includeHiddenElements: true })).toBeNull();
+      expect(screen.UNSAFE_getAllByType(Modal).filter((modal) => modal.props.visible)).toHaveLength(1);
+      const picker = within(screen.getByTestId('programme-child-plan-editor-sheet'));
       expect(picker.queryByTestId('exercise-effort-option-warm_up')).toBeNull();
-      fireEvent.press(picker.getByTestId('exercise-effort-option-rir_2'));
+      expect(picker.getByTestId('exercise-effort-option-rir_4')).toHaveProp('accessibilityState', { selected: true, disabled: false });
+      fireEvent.press(screen.getByTestId('programme-child-plan-effort-back'));
+      expect(screen.getByTestId('plan-form-block-1-set-1-effort')).toHaveTextContent('EffortRIR 4');
+      expect(screen.getByTestId('plan-form-block-1-set-1-weight')).toHaveProp('value', '40');
+      expect(screen.getByTestId('plan-form-block-1-set-1-reps')).toHaveProp('value', '8');
+      fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
+      fireEvent.press(screen.getByTestId('exercise-effort-option-rir_2'));
       fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
       expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40');
       expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '8');
       expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 2');
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-2-weight'), '45');
+      fireEvent(screen.getByTestId('plan-form-block-1-set-2-effort'), 'longPress');
+      fireEvent.press(screen.getByTestId('programme-child-plan-editor-sheet-close'));
+      fireEvent.press(screen.getByTestId('programme-form-plan-2-edit'));
+      expect(screen.getByTestId('programme-child-plan-editor-sheet-title')).toHaveTextContent('Edit Session 2');
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      expect(screen.getByTestId('programme-child-plan-editor-sheet-title')).toHaveTextContent('Edit Session 1');
+      expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '45');
+      fireEvent(screen.getByTestId('plan-form-block-1-set-2-effort'), 'longPress');
+      fireEvent.press(screen.getByTestId('exercise-effort-option-rir_4'));
+      expect(screen.getByTestId('plan-form-block-1-set-1-effort')).toHaveTextContent('EffortRIR 2');
+      expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 4');
       fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
       fireEvent.press(screen.getByTestId('programme-form-plan-2-remove'));
       fireEvent.press(screen.getByTestId('programme-form-plan-1-duplicate'));
@@ -193,7 +220,7 @@ describe('programme screens', () => {
         const child = await planQueries.loadPlanDetail(plan.id);
         expect(child?.blocks[0].targets.map(({ targetWeightValue, targetReps, targetSetType }) =>
           [targetWeightValue, targetReps, targetSetType])).toEqual([
-          ['40', 8, 'rir_2'], ['45', 8, 'rir_2'],
+          ['40', 8, 'rir_2'], ['45', 8, 'rir_4'],
         ]);
       }
     });
