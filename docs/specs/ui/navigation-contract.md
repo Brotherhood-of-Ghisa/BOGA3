@@ -163,6 +163,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise, each carrying the filter row's `metric` (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week, and the header ⋮'s `View sessions` for the Timeline's focused week (`historyDayHref`, `sessionsWeekHref`, `push`) |
+| `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | the header ⋮'s muscle rows, carrying the metric if a muscle has it (`progressHistoryHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
@@ -216,9 +217,6 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
 
 - A static title is declared in the root stack. Dynamic titles are set in the
   route's `Stack.Screen`, falling back to the placeholder until resolved.
-  `progress-history` renders a two-line title (subject over the Timeline's
-  focused week), so it names its own face: `headerTitleStyle` does not reach a
-  rendered title.
 - `headerShown: false` for `(tabs)` routes (visible shell is `MainTabBar`) and
   screens drawing their own top bar or needing none (`session/[sessionId]/index`,
   the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,

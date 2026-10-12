@@ -134,7 +134,7 @@ function HistoryHeatmap({
   const retryWeekSets = useCallback(() => setWeekSetsRevision(revision => revision + 1), []);
   const weekSets = useWeekSets(view === 'timeline' ? timeline.weekSetsTarget : null, focusedWeekKey, weekSetsRevision);
   const { onOpenSession } = timeline;
-  // The page draws the focused week in its title and offers its sessions, so
+  // The page offers the focused week's sessions from its ⋮, so
   // it is told which week that is — and told it is gone when the chart is.
   const focusedWeek = useMemo<FocusedTimelineWeek | null>(() => {
     const week = view === 'timeline' ? data.weekly.find(candidate => candidate.weekStartDateKey === focusedWeekKey) : undefined;
@@ -263,7 +263,7 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   onRetry?: () => void;
   todayDateKey?: string;
   timeline: TimelineLinks;
-  // The Timeline's focused week, for the page's title and its ⋮; `null` while
+  // The Timeline's focused week, for the page's ⋮; `null` while
   // another view shows, or when no chart does.
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
 };

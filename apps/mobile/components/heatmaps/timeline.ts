@@ -53,10 +53,10 @@ const toTimelineWeek = (week: WeekCell): TimelineWeek => {
   };
 };
 
-/** The focused week, as the readout and the page title name it. */
+/** The focused week, as the readout names it and the page's ⋮ opens it. */
 export interface FocusedTimelineWeek {
   weekStartDateKey: string;
-  /** `weekLabel` of the week: what the readout and the page title show. */
+  /** `weekLabel` of the week: what the readout shows. */
   label: string;
   /** False for a rest week, which has no sessions to open. */
   hasTraining: boolean;

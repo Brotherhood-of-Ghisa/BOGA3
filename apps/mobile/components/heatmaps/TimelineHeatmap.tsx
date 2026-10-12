@@ -94,7 +94,6 @@ function Readout({ week, figure, currentYear, onStep, hasPrevious, hasNext, test
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
         <Text allowFontScaling={false} numberOfLines={1} style={styles.readoutWeek}
           testID={`${testID}-readout-week`}>{weekLabel(week.monday, currentYear)}</Text>
-        {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
@@ -214,7 +213,6 @@ const styles = StyleSheet.create({
   weekNav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: -uiSpace.md, flexShrink: 1 },
   weekColumn: { alignItems: 'flex-start', flexShrink: 1 },
   readoutWeek: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg, color: uiRoles.ink },
-  note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
   readoutValue: { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },
   chartRow: { flexDirection: 'row', gap: uiSpace.sm },
   axis: { height: PLOT_HEIGHT },
