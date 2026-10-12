@@ -28,7 +28,7 @@ witness/aggregation window; personal session Volume records keep their contract.
 
 | Metric key | Ordinary unit / value | Normalized unit / value |
 | --- | --- | --- |
-| `volume` | `kg_reps`: source entered kg converted to group target mode × reps | `percent_bw_reps`: 100 × effective physical total-load set volume / B |
+| `volume` | `kg_reps`: physical total external load × reps, independent of target mode | `percent_bw_reps`: 100 × effective physical total-load set volume / B |
 | `e1rm` (default) | `kg`: ordinary source 1RM converted to group target mode | `percent_bw`: 100 × effective physical total-load estimated 1RM / B |
 
 New comparisons default to 1RM. The cutover turned a legacy Weight default
@@ -42,12 +42,12 @@ The normalized numerator uses `estimatedTotalOneRepMaxKg`, not the personal
 added-load display `estimatedOneRepMaxKg` after subtracting the bodyweight part.
 
 `scoreCompetitionPerformance` uses the existing parser/load/Wathan kernel.
-For normalized scoring, source per-side external kg is doubled once before
-adding c×B. Both metrics divide by the same valid as-of B used in that addition.
+For every score, source per-side external kg is doubled once; normalized
+scoring then adds c×B. Both metrics divide by the same valid as-of B used in that addition.
 The physical total-load representation makes target distribution cancel: an
 alternative target-per-side numerator and B/2 would give the same percentage.
 Changing source mode can change physical load; changing only the target mode
-changes ordinary scores but not normalized percentages. Never divide a per-side
+changes ordinary 1RM units, never total Volume or normalized percentages. Never divide a per-side
 numerator by whole-body B. Missing/invalid applicable B omits both normalized
 metrics, with no zero or kg fallback. Unweighted performed sets with positive
 contribution can rank; zero ordinary projections do not.
@@ -57,7 +57,7 @@ for Volume/1RM and Certified/All. Qualifying means live shared/linked/performed,
 valid parsed Weight/reps, working under the shared group effort rule, eligible
 under that scope and positive finite score. The pure scorer also computes
 nonworking performed projections for audit validation; the publisher applies
-working/counting. A Volume witness covers that set's logged kg×reps, never
+working/counting. A Volume witness covers that set's performance, never
 other sets or a session total.
 
 Keep finite unrounded kernel values through publication/ranking. Display
@@ -172,7 +172,9 @@ snapshot, reading schema or stored achievement belongs to it.
 The worker evaluates protocol-4 graphs with the shared competition scorer
 (`competition-evaluation.ts`). SQL checks the evaluation contract,
 claim/generation, revision and complete source token before publishing
-unrounded scores in one transaction. Readers take shared group locks so a
+unrounded scores in one transaction. Previous ordinary winners are rescored
+by the same kernel using current source modes, as comparison baselines only;
+their raw snapshots and immutable audits stay intact. Readers take shared group locks so a
 policy change cannot split authorization and disclosure. Random score tokens
 change on replacement; certify also refreshes the live source fingerprint.
 
@@ -184,6 +186,15 @@ exercises retain reps and conservatively omit kg in an enabled positive group.
 Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
+
+Kernel upgrades rescore live comparisons silently, preserving immutable record
+and certification audits and advancing private record baselines. Personal facts,
+evaluator rules and coaching revisions must advance; device cache generation 6
+evicts old projections. When deploying the total-load upgrade, follow the
+[rule-upgrade procedure](../../procedures/rule-upgrade.md): apply rule-refresh SQL,
+deploy the updated evaluator and coaching functions, kick the evaluator once,
+then apply recompute-only SQL before the app release. Live comparisons reject
+that migration until evaluator rules 7 have run.
 
 First binding requires a valid selected reading. Volume aliases carry null
 observed Volume audit and an explicit witness reference; original audit stays

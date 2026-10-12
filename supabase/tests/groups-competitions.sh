@@ -795,5 +795,107 @@ expect_sql 'withdrawing a legacy ID closes its root and every projection' "selec
   (select bool_and(ended_at is not null) from app_public.group_metric_certifications where legacy_certification_id='${R1}');" t
 pass 'stored legacy/protocol-3 revisions, legacy witnesses and aliases, frozen former/archived scores read through protocol 4'
 
+# Ordinary total/per-side entries share one physical Volume. Seed the old
+# target-per-side projections to exercise a real rules upgrade, not a raw edit.
+rpc "${OWNER_TOKEN}" group_create '{"p_name":"Total load fixture","p_description":null}'; expect_ok 'total-load group'
+GID="$(jq -er .group_id <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_invite_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok 'total-load invite'
+INVITE="$(jq -er .code <<<"${BODY}")"
+for token in "${ATHLETE_TOKEN}" "${RIVAL_TOKEN}"; do
+  rpc "${token}" group_join "$(jq -nc --arg c "${INVITE}" '{p_code:$c}')"; expect_ok 'total-load join'
+done
+GX="$(comparison 'Total load' 0 volume)"; update_rules 0 per_side_load
+START=$(($(now_ms)+1000)); T="total-${RUN_TAG}"
+for prefix in ATHLETE RIVAL; do
+  token="${prefix}_TOKEN"; mode=total_load; weight=20
+  if [[ "${prefix}" == RIVAL ]]; then mode=per_side_load; weight=10; fi
+  next_cuam
+  push "${!token}" 'equivalent external load' \
+    "$(e_def "${T}-${prefix}-def" 'Total load' "${CUAM}" "${mode}")" \
+    "$(e_link "${T}-${prefix}-def" "${GID}" "${GX}" "${CUAM}")" \
+    "$(e_session "${T}-${prefix}" "${START}" completed "$((START+30000))" 30 null "${CUAM}")" \
+    "$(e_se "${T}-${prefix}-se" "${T}-${prefix}" "${T}-${prefix}-def" 0 'Total load' "${CUAM}")" \
+    "$(e_set "${T}-${prefix}-set" "${T}-${prefix}-se" 0 "${weight}" 8 '' "${CUAM}" null rir_0)"
+done
+drain 'total-load comparison'
+board volume; check 'both source modes have total Volume in per-side target' '.entry_count==2 and all(.entries[];.value==160 and .unit=="kg_reps")'
+board e1rm; check 'per-side target 1RM remains per-side external kg' '.entry_count==2 and all(.entries[];.value>12.76 and .value<12.78)'
+TOTAL_CERT="$(certify "${ATHLETE_UID}" "${T}-ATHLETE-set" volume)"; drain 'total-load certificate'
+run_psql "
+  update app_public.group_metric_set_scores set value=80 where group_exercise_id='${GX}' and metric='volume';
+  update app_public.group_metric_board_entries set value=80 where group_exercise_id='${GX}' and metric='volume';
+  update app_public.group_metric_certifications set observed_value=80 where group_exercise_id='${GX}' and metric='volume';
+  update app_public.group_events e set payload=jsonb_set(payload,'{boards}',(
+    select jsonb_agg(case when b->>'metric'='volume' then jsonb_set(b,'{value}','80') else b end)
+    from jsonb_array_elements(e.payload->'boards') b))
+    where group_exercise_id='${GX}' and kind='record';
+  update app_public.group_events set rule_rescore_baseline=null where group_exercise_id='${GX}' and kind='record';" >/dev/null
+TOTAL_AUDIT="$(audit "${TOTAL_CERT}")"
+RECORD_AUDIT_SQL="select coalesce(jsonb_agg(to_jsonb(e)-'rule_rescore_baseline' order by id),'[]'::jsonb)::text
+  from app_public.group_events e where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}';"
+TOTAL_RECORD_AUDIT="$(run_psql "${RECORD_AUDIT_SQL}")"
+TOTAL_RAW="$(run_psql "select jsonb_agg(to_jsonb(s) order by id)::text from app_public.exercise_sets s where id='${T}-ATHLETE-set';")"
+RECOMPUTE_SQL="$(cat "${SUPABASE_DIR}/migrations/20261011224403_total_load_recompute.sql")"
+expect_sql 'an old evaluator cannot consume the recompute migration' "begin;
+  update app_public.group_eval_rules_state set rules_version=6;
+  do \$guard\$ begin
+    begin
+      execute \$recompute_sql\$${RECOMPUTE_SQL}\$recompute_sql\$;
+      raise exception 'old evaluator guard did not reject recompute';
+    exception when raise_exception then
+      if sqlerrm not like 'total load recompute: deploy and kick%' then raise; end if;
+    end;
+  end \$guard\$;
+  rollback; select 'guarded';" guarded
+run_psql "${RECOMPUTE_SQL}" >/dev/null
+run_psql "select app_public.group_metric_enqueue_isolated('${GID}','${GX}','session',null);" >/dev/null
+next_cuam
+push "${RIVAL_TOKEN}" 'real decrease coalesced with kernel upgrade' \
+  "$(e_set "${T}-RIVAL-set" "${T}-RIVAL-se" 0 9 8 '' "${CUAM}" null rir_0)"
+drain 'total-load rules upgrade coalesced with a real decrease'
+board volume true; check 'Certified Volume refreshes without changing the witness' \
+  'any(.entries[];.value==160 and .certification.certification_id==$id)' --arg id "${TOTAL_CERT}"
+expect_sql 'historical certification keeps its exact audit' "select observed_value from app_public.group_metric_certifications where id='${TOTAL_CERT}';" 80
+[[ "$(audit "${TOTAL_CERT}")" == "${TOTAL_AUDIT}" ]] || fail 'total-load certification audit changed'
+[[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'total-load record audit changed'
+expect_sql 'record baseline advances to current total Volume' "select bool_and((rule_rescore_baseline->'volume'->>'value')::numeric=160)
+  from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and kind='record';" t
+expect_sql 'genuine decrease voids the old record without creating an improvement' "select
+  count(*) filter(where kind='record')=1 and count(*) filter(where kind='record_voided')=1
+  from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${RIVAL_UID}';" t
+run_psql "select app_public.group_metric_enqueue_isolated('${GID}','${GX}','session',null);" >/dev/null
+drain 'activity after total-load rules upgrade'
+[[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'later activity voided a historical total-load record'
+[[ "$(run_psql "select jsonb_agg(to_jsonb(s) order by id)::text from app_public.exercise_sets s where id='${T}-ATHLETE-set';")" == "${TOTAL_RAW}" ]] || fail 'total-load recompute rewrote raw sets'
+# Catch-up needs no rules cause: frozen audit survives the first new-kernel read.
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_exercise_id:$x,p_archived:true}')"; expect_ok 'archive total load'
+run_psql "update app_public.group_metric_set_scores set value=80 where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and metric='volume';
+  update app_public.group_metric_board_entries set value=80 where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and metric='volume';
+  update app_public.group_events set rule_rescore_baseline=null where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and kind='record';" >/dev/null
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_exercise_id:$x,p_archived:false}')"; expect_ok 'unarchive total load'
+drain 'deferred total-load catch-up'
+[[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'unarchive rewrote historical record audit'
+[[ "$(audit "${TOTAL_CERT}")" == "${TOTAL_AUDIT}" ]] || fail 'unarchive rewrote historical certification audit'
+next_cuam
+push "${RIVAL_TOKEN}" 'restore equivalent load' \
+  "$(e_set "${T}-RIVAL-set" "${T}-RIVAL-se" 0 10 8 '' "${CUAM}" null rir_0)"
+drain 'restore equivalent total load'
+update_rules 0 total_load; drain 'total target'
+board volume; check 'target-mode change preserves total Volume' '.entry_count==2 and all(.entries[];.value==160)'
+board e1rm; check 'total target converts 1RM exactly once' '.entry_count==2 and all(.entries[];.value>25.53 and .value<25.54)'
+next_cuam
+push "${RIVAL_TOKEN}" 'source mode change coalesced with a genuine new lift' \
+  "$(e_def "${T}-RIVAL-def" 'Total load' "${CUAM}" total_load)" \
+  "$(e_set "${T}-RIVAL-new" "${T}-RIVAL-se" 1 11 8 '' "${CUAM}" null rir_0)"
+drain 'source mode and new lift'
+board volume; check 'new total-entry lift beats the reinterpreted prior raw Weight' \
+  'any(.entries[];.member.user_id==$u and .performance.set_id==$s and .value==88)' --arg u "${RIVAL_UID}" --arg s "${T}-RIVAL-new"
+expect_sql 'the real improvement takes both metrics after source-mode change' "select
+  count(*)=1 and bool_and(jsonb_array_length(payload->'boards')=2)
+  from app_public.group_events where group_exercise_id='${GX}' and set_id='${T}-RIVAL-new' and kind='record';" t
+pass 'equivalent total load, current scores, unchanged logged kg and immutable historical audits'
+
 COMPLETED=1
 pass "group competition vectors passed (run ${RUN_TAG})"

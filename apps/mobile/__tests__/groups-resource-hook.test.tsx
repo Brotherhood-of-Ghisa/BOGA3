@@ -360,7 +360,7 @@ describe('useGroupResource', () => {
     await flush();
 
     expect(result.current.lostAccess).toBe(true);
-    expect(cachedKeys()).toEqual(['session:v5:g2:u3:s2']);
+    expect(cachedKeys()).toEqual(['session:v6:g2:u3:s2']);
   });
 
   it('never throws into render: unexpected failures and a corrupt cache become INTERNAL error states', async () => {

@@ -310,7 +310,9 @@ governs.
 tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v4"` marks this meaning, with 1RM per
+`metric_revision: "working_sets_v5"` applies the source entry factor to total
+Volume for every exercise, retaining entered Weight and displayed 1RM units.
+`"working_sets_v4"` omitted the factor from ordinary exercise Volume. 1RM follows
 [[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v3"` estimated a
 single's 1RM; `"working_sets_v2"`
 counted technique and cooldown sets as working sets; `"working_sets_v1"`
@@ -322,7 +324,7 @@ let a zero 1RM, Weight or Volume stand as a record; the earlier
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v4"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v5"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

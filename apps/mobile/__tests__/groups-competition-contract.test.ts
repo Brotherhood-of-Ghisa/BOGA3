@@ -4,6 +4,7 @@ import { scoreCompetitionPerformance, type CompetitionPerformanceInput } from '@
 import { isCompetitionBoardWire, isCompetitionCertificationWire,
   isCompetitionPerformanceWire, isCompetitionRulesWire } from '@/src/groups/competition-wire-guards';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
+import { groupEnteredWeightFactor } from '@/src/groups/link-compatibility';
 
 const rules: CompetitionRules = { name: 'Pull-up', loadInputMode: 'total_load', defaultMetric: 'e1rm',
   bodyweightCalculationsEnabled: true, bodyweightContribution: 1 };
@@ -60,14 +61,37 @@ it('uses physical total load when normalized; target distribution cancels with t
   expect(scoreCompetitionPerformance(performance,{ ...rules, loadInputMode: 'per_side_load' })).toEqual(total);
   expect(scoreCompetitionPerformance(performance,{ ...rules, bodyweightContribution: 0.5 })[0].value).toBe(375);
 });
-it('ordinary Volume/1RM convert to the group target and never inspect readings Off or at zero', () => {
+it('ordinary Volume is total load and only 1RM converts to the target, without reading private context', () => {
   const input = { ...performance };
   Object.defineProperty(input,'bodyWeightKg',{ get: () => { throw new Error('private read'); } });
   for (const patch of [{ bodyweightCalculationsEnabled: false },{ bodyweightContribution: 0 }]) {
     expect(scoreCompetitionPerformance(input,{ ...rules, ...patch })).toEqual([
       { metric: 'volume', value: 100, unit: 'kg_reps' }, { metric: 'e1rm', value: estimateOneRepMax(20,5)!, unit: 'kg' }]);
-    expect(scoreCompetitionPerformance(input,{ ...rules, ...patch, loadInputMode: 'per_side_load' })[0].value).toBe(50);
+    expect(scoreCompetitionPerformance(input,{ ...rules, ...patch, loadInputMode: 'per_side_load' })).toEqual([
+      { metric: 'volume', value: 100, unit: 'kg_reps' }, { metric: 'e1rm', value: estimateOneRepMax(10,5)!, unit: 'kg' }]);
   }
+});
+it.each([
+  ['total_load', 'total_load', '20', 20],
+  ['total_load', 'per_side_load', '20', 10],
+  ['per_side_load', 'total_load', '10', 20],
+  ['per_side_load', 'per_side_load', '10', 10],
+] as const)('equivalent performance %s → %s keeps total Volume', (source, target, weightValue, targetWeight) => {
+  expect(Number(weightValue) * groupEnteredWeightFactor(source, target)).toBe(targetWeight);
+  const input = { ...performance, weightValue, repsValue: '8', source: { loadInputMode: source } };
+  for (const [enabled, contribution, volume] of [[false, 1, 160], [true, 0, 160], [true, 0.25, 320], [true, 1, 800]] as const) {
+    const values = scoreCompetitionPerformance(input, { ...rules, loadInputMode: target,
+      bodyweightCalculationsEnabled: enabled, bodyweightContribution: contribution });
+    expect(values[0]).toEqual({ metric: 'volume', value: enabled && contribution > 0 ? volume / 80 * 100 : volume,
+      unit: enabled && contribution > 0 ? 'percent_bw_reps' : 'kg_reps' });
+    if (enabled && contribution > 0) {
+      expect(values[1]).toEqual({ metric: 'e1rm', value: estimateOneRepMax(contribution * 80 + 20, 8)! / 80 * 100,
+        unit: 'percent_bw' });
+    } else {
+      expect(values[1]).toEqual({ metric: 'e1rm', value: estimateOneRepMax(targetWeight, 8)!, unit: 'kg' });
+    }
+  }
+  expect(input.weightValue).toBe(weightValue);
 });
 it.each([{ bodyWeightKg: null }, { bodyWeightKg: 0 }, { bodyWeightKg: Infinity },
   { bodyWeightMeasurementId: null }, { bodyWeightMeasuredAt: new Date(NaN) }, { live: false },

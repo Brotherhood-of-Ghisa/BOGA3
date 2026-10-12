@@ -110,20 +110,9 @@ export const resolveCalculatedLoad = (input: LoadContext & {
   if (enteredWeightKg === null) return invalid('weight_invalid');
 
   const contribution = input.policy === 'ordinary' ? 0 : input.bodyweightContribution;
-  if (contribution === 0) {
-    return {
-      status: 'known',
-      enteredWeightKg,
-      bodyweightPartKg: 0,
-      calculatedLoadKg: enteredWeightKg,
-      perSideCalculatedLoadKg: input.loadInputMode === 'total_load'
-        ? enteredWeightKg / 2
-        : enteredWeightKg,
-    };
-  }
-
-  if (input.bodyWeightKg == null && input.policy === 'group') return missing();
-  const bodyWeightKg = input.bodyWeightKg ?? 0;
+  const bodyWeightKg = contribution === 0 ? 0
+    : input.bodyWeightKg ?? (input.policy === 'personal' ? 0 : null);
+  if (bodyWeightKg === null) return missing();
   if (!Number.isFinite(bodyWeightKg) || bodyWeightKg < 0) return invalid('body_weight_invalid');
 
   const enteredWeightFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
@@ -154,13 +143,18 @@ export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
     return { eligible: false, reps: null, load: null, ...unavailableMetrics };
   }
 
-  const load = resolveCalculatedLoad({ ...input, weightValue: weight });
+  const load = resolveCalculatedLoad({
+    policy: input.policy,
+    bodyweightContribution: input.bodyweightContribution,
+    loadInputMode: input.loadInputMode,
+    weightValue: weight,
+    bodyWeightKg: input.policy === 'ordinary' || input.bodyweightContribution === 0 ? null : input.bodyWeightKg,
+  });
   if (load.status !== 'known') return { eligible: true, reps, load, ...unavailableMetrics };
 
   const volumeKgReps = load.calculatedLoadKg * reps;
   const estimatedTotalOneRepMaxKg = estimateOneRepMax(load.calculatedLoadKg, reps);
-  const contribution = input.policy === 'ordinary' ? 0 : input.bodyweightContribution;
-  const enteredWeightFactor = contribution > 0 && input.loadInputMode === 'per_side_load' ? 2 : 1;
+  const enteredWeightFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
   const estimatedOneRepMaxKg = estimatedTotalOneRepMaxKg === null ? null
     : (estimatedTotalOneRepMaxKg - load.bodyweightPartKg) / enteredWeightFactor;
   if (![volumeKgReps, estimatedOneRepMaxKg, estimatedTotalOneRepMaxKg].every(

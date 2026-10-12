@@ -17,7 +17,7 @@ const summary = (v: unknown) => exact(v,['group_id','name','description','member
 /** Disk data crosses the same closed public boundary as an RPC response. */
 export function isCompetitionCachePayload(key: string, value: unknown): boolean {
   const [kind,version,...scope] = key.split(':');
-  if (version !== 'v5') return false;
+  if (version !== 'v6') return false;
   if (kind === 'groups') return scope.join(':') === 'mine' && exact(value,['groups']) &&
     Array.isArray(value.groups) && value.groups.every(summary);
   const groupId = scope[0];

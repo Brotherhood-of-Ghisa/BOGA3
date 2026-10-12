@@ -219,28 +219,21 @@ and every figure call it.
 
 The bodyweight policy (`tech/bodyweight-load-contract.md`) decides `c` and `B`.
 
-Ordinary policy, a disabled preference, or `c = 0`:
-
-```text
-calculated load = E
-Volume          = E × reps
-displayed 1RM   = estimateOneRepMax(E, reps)
-```
-
-`loadInputMode` does not rescale ordinary Volume or 1RM.
-
-The enabled preference with `c > 0`:
+Every exercise uses the member's entry factor, including ordinary policy,
+a disabled preference, or `c = 0`. Effective `c` is zero when bodyweight
+calculations do not apply; those cases never access a reading.
 
 ```text
 calculated load = c × B + F × E
 Volume          = calculated load × reps
+per-side load   = calculated load / 2
 total 1RM       = estimateOneRepMax(calculated load, reps)
 displayed 1RM   = (total 1RM - c × B) / F
 ```
 
-Bodyweight is counted once. Per-side entry doubles only the external Weight in
-the positive-contribution branch. Screens show Weight, 1RM and Volume, never
-the calculated-load breakdown.
+Bodyweight contributes once. Ordinary per-side exercise Volume counts both
+sides; displayed 1RM stays in entered external-Weight units. Screens show Weight,
+1RM and Volume, never the calculated-load breakdown.
 
 **1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
 
@@ -270,12 +263,10 @@ choices may change which recorded set qualifies.
 
 **Muscle volume.**
 
-- It is per side.
+- It is calculated total load / 2 × reps, then the mapping role factor
+  (primary `1`, secondary `0.5`).
 - Ordinary total input contributes `E / 2` per side, and per-side input
-  contributes `E`.
-- With a positive contribution, it first resolves the total `c × B + F × E`,
-  then halves it.
-- The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
+  contributes `E`, retaining the same muscle Volume.
 
 **A muscle's set count** is [[muscle.set-count]]. One shared counter derives
 it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
@@ -331,7 +322,8 @@ kernel rather than copying it; the group load-mode factor is
 [The competition contract](group-competition-contract.md) specifies best
 **single-set** Volume rankings, distinct from personal session-total Volume
 records in §3. It uses this kernel's effective total-load Volume/estimated 1RM
-and the same private dated B for public percentages; ordinary group scores
-convert source entered units to the declared group target. Display rounding does
-not determine competitive rank. Personal/coaching calculations,
-raw kg storage and existing records retain their current semantics.
+and the same private dated B for public percentages; ordinary group 1RM
+converts source entered units to the declared group target, while Volume is
+total kg·reps independent of target mode. Display rounding does
+not determine competitive rank. Raw kg storage and historical group audits retain their original values and
+revisions; personal facts rebuild under the new calculation rules.

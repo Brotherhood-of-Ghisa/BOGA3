@@ -35,7 +35,7 @@ export function scoreCompetitionPerformance(performance: CompetitionPerformanceI
     { metric: 'volume', value: (metrics.volumeKgReps ?? 0) / bodyweight! * 100, unit: 'percent_bw_reps' },
     { metric: 'e1rm', value: (metrics.estimatedTotalOneRepMaxKg ?? 0) / bodyweight! * 100, unit: 'percent_bw' },
   ] : [
-    { metric: 'volume', value: (metrics.volumeKgReps ?? 0) * compatibility.enteredWeightFactor, unit: 'kg_reps' },
+    { metric: 'volume', value: metrics.volumeKgReps ?? 0, unit: 'kg_reps' },
     { metric: 'e1rm', value: (metrics.estimatedOneRepMaxKg ?? 0) * compatibility.enteredWeightFactor, unit: 'kg' },
   ];
   return candidates.filter(value => isCompetitionValue(value, normalized));

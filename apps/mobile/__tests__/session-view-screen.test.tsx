@@ -257,8 +257,8 @@ describe('Session view', () => {
     expect(screen.getByLabelText('Exercises 3')).toBeTruthy();
     expect(screen.getByText('Ex')).toBeTruthy();
     expect(screen.getByLabelText(`Sets ${SESSION_VIEW_FIXTURE.workingSetCount}`)).toBeTruthy();
-    // Working sets only: the bench's 100 × 10 warm-up adds no volume.
-    expect(screen.getByLabelText('Volume 3200')).toBeTruthy();
+    // Bench 2255 + both sides of the dumbbell press 1890; warm-up excluded.
+    expect(screen.getByLabelText('Volume 4145')).toBeTruthy();
     expect(screen.getByTestId(`session-view-exercise-${BENCH}-record`)).toBeTruthy();
     // Incline has no history, so no record; Cable Flys has nothing done.
     expect(screen.getByLabelText('Incline Dumbbell Press, 3 of 3 sets done')).toBeTruthy();

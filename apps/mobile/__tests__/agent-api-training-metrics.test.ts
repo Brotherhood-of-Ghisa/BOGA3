@@ -3,6 +3,7 @@ import {
   type EnteredSetRow, type SessionWeightRow,
 } from '../../../supabase/functions/agent-api/training-metrics.ts';
 import { GROUP_COACHING_ELIGIBILITY } from './helpers/set-eligibility';
+import { estimateOneRepMax } from '@/src/exercise-calculations';
 
 const noReading: SessionWeightRow = {
   body_weight_kg: null, body_weight_source: null, body_weight_measurement_id: null, body_weight_measured_at: null,
@@ -21,7 +22,7 @@ const set = (id: string, weight: string, reps: string, setType: string | null,
 
 describe('agent-api training projection', () => {
   it('labels the working-set meaning of its figures', () => {
-    expect(METRIC_REVISION).toBe('working_sets_v4');
+    expect(METRIC_REVISION).toBe('working_sets_v5');
   });
 
   it.each(GROUP_COACHING_ELIGIBILITY)("applies set.eligibility's fixed coaching rule to %s", (_label, setType, counts) => {
@@ -125,6 +126,22 @@ describe('agent-api training projection', () => {
       totalVolumeKgReps: 160, knownVolumeKgReps: 160, eligibleSetCount: 1, knownSetCount: 1, complete: true,
     });
     expect(projection.estimatedOneRepMax).not.toBeNull();
+  });
+
+  it.each([[false, 1], [true, 0]] as const)('uses total external load without a private read, enabled=%s c=%s', (enabled, contribution) => {
+    const unreadable = { ...reading80 };
+    for (const key of Object.keys(unreadable)) {
+      Object.defineProperty(unreadable, key, { get: () => { throw new Error('private read'); } });
+    }
+    const row = set('s0', '10', '8', null);
+    const projection = projectTrainingSets([row], { ...perSide, bodyweight_contribution: contribution }, unreadable, enabled);
+    expect(projection.usesBodyweightContext).toBe(false);
+    expect(projection.volumeCoverage.totalVolumeKgReps).toBe(160);
+    expect(projection.topWeightSet).toEqual({ weight: 10, reps: 8 });
+    expect(projection.estimatedOneRepMax).toBe(estimateOneRepMax(10, 8));
+    expect(projection.sets[0]).toMatchObject({ load: { value: 10, unit: 'kg' },
+      calculated_load: { value: 20 }, volume: { value: 160, unit: 'kg_reps' } });
+    expect(row).toEqual(set('s0', '10', '8', null));
   });
 });
 

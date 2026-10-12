@@ -215,6 +215,28 @@ describe('exercise session facts — rows and reads', () => {
     expect(allFacts()).toHaveLength(1);
   });
 
+  it('refreshes old ordinary per-side Volume once, retaining raw Weight and 1RM', async () => {
+    db().update(exerciseDefinitions).set({ loadInputMode: 'per_side_load' }).where(eq(exerciseDefinitions.id, BENCH)).run();
+    insertSession('s1', 1, [{ definitionId: BENCH, sets: [['10', '8']] }]);
+    insertSession('s2', 2, [{ definitionId: BENCH, sets: [['10', '9']] }]);
+    fullRebuild();
+    const before = allFacts();
+    const raw = db().select().from(exerciseSets).all();
+    // Simulate version 7's persisted figures without a raw write or stale queue.
+    for (const fact of before) {
+      db().update(exerciseSessionFacts).set({ volumeKg: fact.volumeKg! / 2 })
+        .where(eq(exerciseSessionFacts.sessionId, fact.sessionId)).run();
+    }
+    db().update(exerciseSessionFactsState).set({ rulesVersion: 7 }).run();
+    expect(queued()).toEqual([]);
+    expect(await loadExerciseSessionFacts(BENCH)).toEqual(before);
+    expect(before.map(row => row.volumeKg)).toEqual([160, 180]);
+    expect(before.map(row => row.topWeightKg)).toEqual([10, 10]);
+    expect(before.map(row => row.prVolume)).toEqual([false, true]);
+    expect(db().select().from(exerciseSets).all()).toEqual(raw);
+    expect(drainExerciseSessionFacts(asLocal())).toEqual({ kind: 'fresh' });
+  });
+
   it('reads one definition in history order and flagged rows inside a half-open window', async () => {
     insertSession('s1', 1, [{ definitionId: BENCH, sets: [['100', '5']] }, { definitionId: SQUAT, sets: [['100', '5']] }]);
     insertSession('s2', 2, [{ definitionId: BENCH, sets: [['105', '5']] }, { definitionId: SQUAT, sets: [['90', '5']] }]);
