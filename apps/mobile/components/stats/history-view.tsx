@@ -192,6 +192,7 @@ function HistoryHeatmap({
     () => (
       <WeeklyHeatmap
         data={data}
+        metric={metric}
         onOpenWeek={onOpenWeek}
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}

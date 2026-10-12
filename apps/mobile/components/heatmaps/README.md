@@ -78,6 +78,7 @@ and routes; a rest day or week stays text.
 
 <WeeklyHeatmap
   data={data}
+  metric="workingSetCount"             // explicit metric identity selects the scale
   onOpenWeek={onOpenWeek}               // (weekStartDateKey) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
   formatValue={formatValue}             // rows, axis and accessible values
@@ -130,6 +131,12 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
+- Weekly numeric annotations centre on their ticks using measured text and plot
+  widths; edge labels stay inside the plot. On overlap the centre label wins,
+  then the minimum, then the maximum. A label wider than the plot is ellipsized;
+  full formatted values stay on accessible ticks. Strength's centre annotation
+  is the median; Sets/Volume use the scale midpoint. Labels remeasure on metric
+  changes; ticks and references retain exact coordinates even if text is hidden.
 - Weekly references use discrete vertical dashes on the same scale
   as the bars ([[comparison.weekly-reference]]). Accessible values use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
