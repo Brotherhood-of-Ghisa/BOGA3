@@ -2,32 +2,65 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { computeProgressComparisons, type ProgressComparisons } from '@/src/data';
 
-/** Refocus may keep the same snapshot; another window or policy may not. */
-export function useStatsSummary(weeks: number, revision: number, reloadExercises: () => void) {
-  const context = `${weeks}:${revision}`;
-  const [loaded, setLoaded] = useState<{ context: string; summary: ProgressComparisons } | null>(null);
-  const [isLoading, setLoading] = useState(true);
-  const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
+type PeriodReads = {
+  summaries: ReadonlyMap<string, ProgressComparisons>;
+  failures: ReadonlyMap<string, string>;
+  pending: ReadonlySet<string>;
+};
+
+const NO_READS: PeriodReads = { summaries: new Map(), failures: new Map(), pending: new Set() };
+
+const contextKey = (weeks: number, revision: number) => `${weeks}:${revision}`;
+
+const withEntry = <V,>(map: ReadonlyMap<string, V>, key: string, value: V) => new Map(map).set(key, value);
+const withoutKey = <V,>(map: ReadonlyMap<string, V>, key: string) => {
+  const next = new Map(map);
+  next.delete(key);
+  return next;
+};
+const withoutPending = (pending: ReadonlySet<string>, key: string) => {
+  const next = new Set(pending);
+  next.delete(key);
+  return next;
+};
+
+/**
+ * Both periods the chip offers, read together on focus, so switching between
+ * them draws the other one at once instead of re-reading. Refocus keeps each
+ * period's last snapshot until its new read lands; another window size or
+ * policy revision hides it.
+ */
+export function useStatsSummary(weeks: number, targetWindowWeeks: number, revision: number, reloadExercises: () => void) {
+  const [reads, setReads] = useState<PeriodReads>(NO_READS);
   const [retryRevision, setRetryRevision] = useState(0);
-  const [refreshRevision, setRefreshRevision] = useState(0);
   useFocusEffect(useCallback(() => {
     let active = true;
-    setLoading(true);
-    setFailure(null);
-    setRefreshRevision(value => value + 1);
+    const periods = targetWindowWeeks === 1 ? [1] : [targetWindowWeeks, 1];
+    const keys = periods.map(period => contextKey(period, revision));
+    setReads(current => ({
+      // Only this revision's periods survive, so an older policy never shows.
+      summaries: new Map([...current.summaries].filter(([key]) => keys.includes(key))),
+      failures: new Map(),
+      pending: new Set(keys),
+    }));
     reloadExercises();
-    void computeProgressComparisons({ periodWeeks: weeks }).then(summary => {
-      if (active) setLoaded({ context, summary });
-    }).catch((cause: unknown) => {
-      if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
-    }).finally(() => {
-      if (active) setLoading(false);
+    periods.forEach((period, index) => {
+      const key = keys[index];
+      void computeProgressComparisons({ periodWeeks: period }).then(summary => {
+        if (active) setReads(current => ({ ...current, summaries: withEntry(current.summaries, key, summary),
+          failures: withoutKey(current.failures, key), pending: withoutPending(current.pending, key) }));
+      }).catch((cause: unknown) => {
+        const message = cause instanceof Error ? cause.message : 'Unknown error';
+        if (active) setReads(current => ({ ...current, failures: withEntry(current.failures, key, message),
+          pending: withoutPending(current.pending, key) }));
+      });
     });
     return () => { active = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read.
-  }, [weeks, context, reloadExercises, retryRevision]));
-  const summary = loaded?.context === context ? loaded.summary : null;
-  return { summary, isLoading: isLoading || (!summary && failure?.context !== context),
-    errorMessage: failure?.context === context ? failure.message : null,
-    onRetry: () => setRetryRevision(value => value + 1), refreshRevision };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same reads.
+  }, [targetWindowWeeks, revision, reloadExercises, retryRevision]));
+  const key = contextKey(weeks, revision);
+  const summary = reads.summaries.get(key) ?? null;
+  const errorMessage = reads.failures.get(key) ?? null;
+  return { summary, isLoading: reads.pending.has(key) || (!summary && errorMessage === null),
+    errorMessage, onRetry: () => setRetryRevision(value => value + 1) };
 }
