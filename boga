@@ -95,6 +95,12 @@ run_lane_row() {
     return 0
   fi
 
+  local infra
+  infra="$(printf '%s' "${row}" | cut -f3)"
+  if [[ "$(uname -s)" != "Darwin" && ("${infra}" == "ios" || "${infra}" == "ios+supabase") ]]; then
+    fail "lane '${name}' requires iOS infrastructure (macOS / Darwin only)"
+  fi
+
   [[ "${cwd}" == "apps/mobile" ]] && ensure_mobile_deps
 
   echo "[boga] lane: ${name}  (cd ${cwd} && ${cmd})"
@@ -159,8 +165,20 @@ cmd_test() {
     frontend)      run_gate "${dry}" slow-frontend ;;
     frontend-ui)   run_gate "${dry}" slow-frontend:ios ;;
     frontend-android) run_gate "${dry}" slow-frontend-android ;;
-    slow)          run_gate "${dry}" slow-frontend slow-backend ;;
-    all)           run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend slow-backend ;;
+    slow)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        run_gate "${dry}" slow-frontend slow-backend
+      else
+        run_gate "${dry}" slow-frontend-android slow-backend
+      fi
+      ;;
+    all)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend slow-backend
+      else
+        run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend-android slow-backend
+      fi
+      ;;
     *)
       local row
       row="$(lane_lookup "${target}")" || fail "unknown lane or gate: '${target}' (see: boga test --list)"
@@ -299,12 +317,14 @@ cmd_doctor() {
   }
   check "docker daemon answers within 10s (local Supabase lanes)" boga_run_with_timeout 10 docker info
   check "gh authenticated (worktree release / pr wait)" gh auth status
-  check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
-  check "maestro CLI (Maestro lanes)" maestro --version
-  check "xcodebuild >= ${BOGA_XCODE_MIN_VERSION} (dev-client build; the Expo SDK's minimum)" boga_xcode_at_least_min
-  check "android sdk (android-* Maestro lanes)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
-  check "adb (android-* Maestro lanes)" adb version
-  check "emulator (android-* Maestro lanes)" emulator -version
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
+    check "maestro CLI (Maestro lanes)" maestro --version
+    check "xcodebuild >= ${BOGA_XCODE_MIN_VERSION} (dev-client build; the Expo SDK's minimum)" boga_xcode_at_least_min
+  else
+    (cmd_android_doctor) || ok=1
+    check "maestro CLI (Maestro lanes)" maestro --version
+  fi
   check "node" node --version
   check "jq (worktree tooling)" jq --version
   if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then
