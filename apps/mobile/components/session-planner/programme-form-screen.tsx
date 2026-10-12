@@ -20,7 +20,7 @@ import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components
 import { PlanGymSheet, type SaveOutcome } from '@/components/session-planner/plan-form-screen';
 import {
   emptyProgrammeChildPlan,
-  emptyPlanFormSet,
+  createPlanFormSet,
   programmeFormErrors,
   type ProgrammeChildPlanForm,
   type ProgrammeFormState,
@@ -32,6 +32,7 @@ import {
   type PlanFormSet,
 } from '@/src/session-planner/plan-form-model';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
+import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 export type ProgrammeFormScreenProps = {
@@ -48,7 +49,8 @@ export type ProgrammeFormScreenProps = {
 const childPlanBlockEdits = (
   plan: ProgrammeChildPlanForm,
   planIndex: number,
-  onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void
+  onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void,
+  displayEfforts: readonly EffortChoice[],
 ) => {
   const patchBlocks = (blocks: PlanFormBlock[]) => onUpdatePlan(planIndex, { blocks });
   const mapBlock = (blockId: string, map: (block: PlanFormBlock) => PlanFormBlock) =>
@@ -63,7 +65,7 @@ const childPlanBlockEdits = (
         sets: block.sets.map((set) => (set.id === setId ? { ...set, ...patch } : set)),
       })),
     addSet: (blockId: string) =>
-      mapBlock(blockId, (block) => ({ ...block, sets: [...block.sets, emptyPlanFormSet()] })),
+      mapBlock(blockId, (block) => ({ ...block, sets: [...block.sets, createPlanFormSet(block.sets.at(-1), displayEfforts)] })),
     // The last set stays: a block always keeps at least one target.
     removeSet: (blockId: string, setId: string) =>
       mapBlock(blockId, (block) =>
@@ -131,21 +133,21 @@ function ProgrammeSessionEditSheet({
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
 
   const { updateBlock, updateSet, addSet, removeSet, appendBlock, removeBlock, moveBlock } =
-    childPlanBlockEdits(plan, planIndex, onUpdatePlan);
+    childPlanBlockEdits(plan, planIndex, onUpdatePlan, trainingPreferences.displayEfforts);
 
   const onPickExercise = (blockId: string | null, result: PlanExercisePickResult) => {
     const { exercise, suggestion } = result;
     if (blockId === null) {
       const newBlock =
         suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets)
-          : planFormBlockFromEmptySet(exercise);
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts)
+          : planFormBlockFromEmptySet(exercise, trainingPreferences.displayEfforts);
       appendBlock(newBlock);
     } else {
       const newSets =
         suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets).sets
-          : [emptyPlanFormSet()];
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts).sets
+          : [createPlanFormSet(undefined, trainingPreferences.displayEfforts)];
       updateBlock(blockId, {
         exerciseDefinitionId: exercise.id,
         name: exercise.name,
@@ -185,7 +187,9 @@ function ProgrammeSessionEditSheet({
           <FormField
             accessibilityLabel="Schedule date and time"
             error={errors.get(`${prefix}.scheduledFor`)}
-            hint="Leave blank for an unscheduled session."
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="numbers-and-punctuation"
             label="Schedule (optional)"
             onChangeText={(text) => onUpdatePlan(planIndex, { scheduleText: text })}
             placeholder="YYYY-MM-DD HH:mm"
@@ -233,7 +237,6 @@ function ProgrammeSessionEditSheet({
                 index={blockIdx}
                 key={block.id}
                 onAddSet={addSet}
-                onChangeBlock={updateBlock}
                 onChangeSet={updateSet}
                 onMoveBlock={moveBlock}
                 onPickExercise={(id) => setPickBlockId(id)}

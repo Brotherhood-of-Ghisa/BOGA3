@@ -5,7 +5,7 @@ import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFo
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import {
-  emptyPlanFormSet,
+  createPlanFormSet,
   planFormBlockFromEmptySet,
   planFormBlockFromSuggestion,
   planFormErrors,
@@ -121,7 +121,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
     setForm((current) => ({
       ...current,
       blocks: current.blocks.map((block) =>
-        block.id === blockId ? { ...block, sets: [...block.sets, emptyPlanFormSet()] } : block,
+        block.id === blockId ? { ...block, sets: [...block.sets, createPlanFormSet(block.sets.at(-1), trainingPreferences.displayEfforts)] } : block,
       ),
     }));
   const removeSet = (blockId: string, setId: string) =>
@@ -147,14 +147,14 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
     if (blockId === null) {
       const newBlock =
         suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets)
-          : planFormBlockFromEmptySet(exercise);
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts)
+          : planFormBlockFromEmptySet(exercise, trainingPreferences.displayEfforts);
       setForm((current) => ({ ...current, blocks: [...current.blocks, newBlock] }));
     } else {
       const newSets =
         suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets).sets
-          : [emptyPlanFormSet()];
+          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts).sets
+          : [createPlanFormSet(undefined, trainingPreferences.displayEfforts)];
       patchBlock(blockId, {
         exerciseDefinitionId: exercise.id,
         name: exercise.name,
@@ -237,7 +237,6 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
             index={index}
             key={block.id}
             onAddSet={addSet}
-            onChangeBlock={patchBlock}
             onChangeSet={patchSet}
             onMoveBlock={moveBlock}
             displayEfforts={trainingPreferences.displayEfforts}
@@ -300,7 +299,6 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: uiSpace.md,
-    padding: uiSpace.lg,
   },
   hint: {
     fontFamily: uiFonts.body.family,

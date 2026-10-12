@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanTargetView } from '@/src/session-planner';
 
 export type NextProgrammeBlockCardProps = {
@@ -30,7 +31,8 @@ const formatTargetLine = (targets: PlanTargetView[]): string => {
   const setsStr = `${targets.length} ${targets.length === 1 ? 'target set' : 'target sets'}`;
   const first = targets[0];
   const weightStr = first.targetWeightValue ? ` @ ${first.targetWeightValue} kg` : '';
-  const firstPreview = `${first.targetReps} reps${weightStr}`;
+  const effort = formatSessionSetType(first.targetSetType);
+  const firstPreview = `${first.targetReps} reps${weightStr}${effort ? ` (${effort})` : ''}`;
   return targets.length === 1 ? firstPreview : `${setsStr} · starts at ${firstPreview}`;
 };
 

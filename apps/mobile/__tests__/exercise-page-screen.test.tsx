@@ -53,6 +53,7 @@ import { uiIconSize, uiRoles } from '@/components/ui/tokens';
 import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { sessions } from '@/src/data/schema';
+import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import {
@@ -192,6 +193,37 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-4-values')).toHaveTextContent('82.5 × 6');
     // Only the logger carries the unit label; the other set rows stay quiet.
     expect(screen.getAllByText('Weight · kg')).toHaveLength(1);
+  });
+
+  it('labels per-side load in the recorder as it does in target entry', async () => {
+    await seedPage();
+    await saveExerciseCatalogExercise({ id: BENCH_DEF, name: EXERCISE_PAGE_FIXTURE.benchExerciseName,
+      loadInputMode: 'per_side_load', bodyweightContribution: 0,
+      mappings: [{ muscleGroupId: 'chest', role: 'primary', weight: 1 }] });
+    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    expect(await screen.findByText('Weight per side · kg')).toBeTruthy();
+    expect(screen.getByLabelText('Set 3 weight per side in kilograms')).toBeTruthy();
+  });
+
+  it('edits the full target weight/rep range and still rejects invalid input', async () => {
+    await openPage();
+    const weight = screen.getByTestId('exercise-set-logger-weight');
+    fireEvent.changeText(weight, '9999.99');
+    expect(weight).toHaveProp('value', '9999.99');
+    for (const invalid of ['-1', '1e3', '1.2.3']) {
+      fireEvent.changeText(weight, invalid);
+      expect(weight).toHaveProp('value', '9999.99');
+    }
+    const reps = screen.getByTestId('exercise-set-logger-reps');
+    fireEvent.changeText(reps, '999');
+    expect(reps).toHaveProp('value', '999');
+    for (const invalid of ['1000', '-1', '1.5', 'abc']) {
+      fireEvent.changeText(reps, invalid);
+      expect(reps).toHaveProp('value', '999');
+    }
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    expect(screen.getByTestId('exercise-set-3-values')).toHaveTextContent('9999.99 × 999');
+    await waitFor(async () => expect((await benchSets())[2]).toMatchObject({ weightValue: '9999.99', repsValue: '999' }));
   });
 
   it('scrolls Complete exercise with the page, after the set list, instead of pinning it', async () => {

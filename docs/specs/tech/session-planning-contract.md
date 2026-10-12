@@ -76,7 +76,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
 - `target_weight_value` — nullable non-negative numeric text in kg; null means
   "choose during workout"
 - `target_reps` — required positive integer, `CHECK (target_reps > 0)`
-- `target_set_type` — nullable standard set type (`'work'`, `'warm_up'`,
+- `target_set_type` — nullable standard set type (`'warm_up'`,
   `'rir_1'`, …)
 
 ### 2.2 Performed-Domain Provenance Fields

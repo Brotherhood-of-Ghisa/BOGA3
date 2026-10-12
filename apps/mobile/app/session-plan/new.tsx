@@ -89,7 +89,11 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
   };
 
   return (
-    <ScreenScroll keyboardShouldPersistTaps="handled" testID="plan-form-scroll">
+    <ScreenScroll
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      testID="plan-form-scroll">
       {/* The route's own title: the loaded plan's when editing. */}
       <Stack.Screen
         options={{ title: isEdit && initialForm !== 'loading' && initialForm !== 'unavailable' ? initialForm.title : 'New session plan' }}

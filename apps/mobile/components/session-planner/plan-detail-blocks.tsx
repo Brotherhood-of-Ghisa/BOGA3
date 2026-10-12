@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Card, ListRow, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanDetailView } from '@/src/session-planner';
 
 export type PlanDetailBlocksProps = {
@@ -22,7 +23,8 @@ const blockStateWord = (block: PlanBlockView): string => {
 const blockTargetsLine = (block: PlanBlockView): string => {
   const parts = block.targets.map((target) => {
     const weight = target.targetWeightValue !== null ? `${target.targetWeightValue} kg` : '—';
-    return `${weight} × ${target.targetReps}`;
+    const effort = formatSessionSetType(target.targetSetType);
+    return `${weight} × ${target.targetReps}${effort ? ` (${effort})` : ''}`;
   });
   return parts.join(' · ');
 };

@@ -13,7 +13,7 @@
  * reached by really consuming the block first.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -58,6 +58,7 @@ import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-scr
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetLocalData } from './helpers/local-data';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { waitForGone } from './helpers/wait-for-gone';
 
 let alertSpy: jest.SpyInstance;
@@ -168,6 +169,8 @@ describe('plan form: create', () => {
   it('saves a valid plan offline; it lands in the Unscheduled queue immediately', async () => {
     await seedCatalog();
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    expect(screen.getByTestId('plan-form-scroll')).toHaveProp('automaticallyAdjustKeyboardInsets', true);
+    expect(screen.getByTestId('plan-form-scroll')).toHaveProp('keyboardDismissMode', 'on-drag');
 
     fillTitle('Heavy Day');
     await addExerciseBlock('Barbell Squat');
@@ -178,6 +181,68 @@ describe('plan form: create', () => {
     const unscheduled = await planQueries.listUnscheduledPlans();
     expect(unscheduled).toHaveLength(1);
     expect(unscheduled[0]).toMatchObject({ title: 'Heavy Day', progress: 'planned' });
+  });
+
+  it('uses recorder effort entry and copies the last target without changing earlier rows', async () => {
+    await seedCatalog();
+    const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    fillTitle('Copy targets');
+    await addExerciseBlock('Bench Press');
+    const first = 'plan-form-block-1-set-1';
+    expect(screen.getByTestId(`${first}-effort`)).toHaveTextContent('EffortW-Up');
+    expect(screen.queryByText('Work')).toBeNull();
+    expect(screen.getByText('Weight per side · kg')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 weight per side in kilograms')).toBeTruthy();
+    expect(screen.getByTestId(`${first}-weight`)).toHaveProp('selectTextOnFocus', true);
+    expect(screen.getByTestId(`${first}-reps`)).toHaveProp('selectTextOnFocus', true);
+    fillSet(1, 1, '40.5', '100');
+    fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('Effort—');
+    expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40.5');
+    expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '100');
+
+    fireEvent(screen.getByTestId('plan-form-block-1-set-2-effort'), 'longPress');
+    fireEvent.press(within(await screen.findByTestId('exercise-effort-sheet')).getByTestId('exercise-effort-option-rir_3'));
+    // Hiding a stored effort preserves it; a new row uses the same fallback as the recorder.
+    act(() => updatePreferences({ displayEfforts: ['unspecified', 'rir_4', 'rir_2'] }));
+    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 3');
+    fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    expect(screen.getByTestId('plan-form-block-1-set-3-effort')).toHaveTextContent('EffortRIR 2');
+    fillSet(1, 3, '45', '101');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const [plan] = await planQueries.listUnscheduledPlans();
+    const detail = await planQueries.loadPlanDetail(plan.id);
+    expect(detail?.blocks[0].targets.map(({ targetWeightValue, targetReps, targetSetType }) =>
+      [targetWeightValue, targetReps, targetSetType])).toEqual([
+      ['40.5', 100, 'warm_up'], ['40.5', 100, 'rir_3'], ['45', 101, 'rir_2'],
+    ]);
+    unmount();
+    mockParams = { planId: plan.id };
+    render(<SessionPlanDetailRoute />);
+    expect(await screen.findByTestId('plan-detail-block-1-targets')).toHaveTextContent(
+      '40.5 kg × 100 (W-Up) · 40.5 kg × 100 (RIR 3) · 45 kg × 101 (RIR 2)'
+    );
+  });
+
+  it('starts a new target at the first displayed effort and keeps the picker choices current', async () => {
+    await seedCatalog();
+    updatePreferences({ displayEfforts: ['rir_2', 'technique', 'cooldown'] });
+    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    await addExerciseBlock('Barbell Squat');
+    const effort = 'plan-form-block-1-set-1-effort';
+    expect(screen.getByTestId(effort)).toHaveTextContent('EffortRIR 2');
+    fireEvent.press(screen.getByTestId(effort));
+    expect(screen.getByTestId(effort)).toHaveTextContent('EffortTech');
+    expect(screen.getByLabelText('Change effort, currently Technique')).toBeTruthy();
+    fireEvent(screen.getByTestId(effort), 'longPress');
+    expect(screen.queryByTestId('exercise-effort-option-warm_up')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-effort-option-cooldown'));
+    expect(screen.getByTestId(effort)).toHaveTextContent('EffortCD');
+    fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortCD');
+    fireEvent.press(screen.getByTestId('plan-form-block-1-set-2-remove'));
+    expect(screen.getByTestId('plan-form-block-1-set-1-remove')).toBeDisabled();
   });
 
   it('keeps invalid fields in place with accessible messages and writes nothing', async () => {
@@ -963,5 +1028,3 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     expect(await screen.findByText(/Last:.*·.*session/)).toBeTruthy();
   });
 });
-
-

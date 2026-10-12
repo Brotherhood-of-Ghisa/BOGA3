@@ -1,4 +1,5 @@
-import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { parseSessionDateTime } from '@/src/utils/local-time';
 import { validatePlanDraft } from './plan-validation';
 import type { PlanDetailView } from './plan-queries';
@@ -41,27 +42,30 @@ export type PlanFormState = {
 let formKey = 0;
 const nextKey = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${formKey++}`;
 
-export const emptyPlanFormSet = (): PlanFormSet => ({
+/** Add set follows the recorder: copy values, then apply visible effort defaults. */
+export const createPlanFormSet = (previous?: PlanFormSet, displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
   id: nextKey('set'),
-  targetWeightText: '',
-  targetRepsText: '',
-  targetSetType: null,
+  targetWeightText: previous?.targetWeightText ?? '',
+  targetRepsText: previous?.targetRepsText ?? '',
+  targetSetType: defaultSessionSetType(previous?.targetSetType, displayEfforts),
 });
 
 export const planFormBlockFromEmptySet = (
-  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null }
+  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
+  displayEfforts?: readonly EffortChoice[],
 ): PlanFormBlock => ({
   id: nextKey('block'),
   sourceBlockId: null,
   exerciseDefinitionId: exercise.id,
   name: exercise.name,
   loadInputMode: exercise.loadInputMode ?? null,
-  sets: [emptyPlanFormSet()],
+  sets: [createPlanFormSet(undefined, displayEfforts)],
 });
 
 export const planFormBlockFromSuggestion = (
   exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
-  suggestedSets: { weightValue: string; repsValue: string; setType: string | null }[]
+  suggestedSets: { weightValue: string; repsValue: string; setType: string | null }[],
+  displayEfforts?: readonly EffortChoice[],
 ): PlanFormBlock => ({
   id: nextKey('block'),
   sourceBlockId: null,
@@ -74,9 +78,9 @@ export const planFormBlockFromSuggestion = (
           id: nextKey('set'),
           targetWeightText: s.weightValue,
           targetRepsText: s.repsValue,
-          targetSetType: s.setType as SessionSetTypeValue,
+          targetSetType: normalizeSessionSetType(s.setType),
         }))
-      : [emptyPlanFormSet()],
+      : [createPlanFormSet(undefined, displayEfforts)],
 });
 
 export const emptyPlanForm = (): PlanFormState => ({
@@ -196,4 +200,3 @@ export const errorMap = (errors: PlanFieldError[]): Map<string, string> => {
   }
   return map;
 };
-
