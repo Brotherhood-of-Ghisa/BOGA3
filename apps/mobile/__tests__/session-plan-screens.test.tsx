@@ -14,7 +14,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Keyboard } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -201,8 +201,13 @@ describe('plan form: create', () => {
     expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40.5');
     expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '100');
 
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {
+      expect(screen.queryByTestId('exercise-effort-sheet')).toBeNull();
+    });
     fireEvent(screen.getByTestId('plan-form-block-1-set-2-effort'), 'longPress');
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
     fireEvent.press(within(await screen.findByTestId('exercise-effort-sheet')).getByTestId('exercise-effort-option-rir_3'));
+    dismissKeyboard.mockRestore();
     // Hiding a stored effort preserves it; a new row uses the same fallback as the recorder.
     act(() => updatePreferences({ displayEfforts: ['unspecified', 'rir_4', 'rir_2'] }));
     expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 3');

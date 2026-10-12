@@ -18,9 +18,6 @@ type EffortSheetProps = {
 
 // Long-press alternative to cycling, including an explicit blank effort.
 export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSheetProps) {
-  const { height } = useWindowDimensions();
-  const { values } = useAccountLocalPreferenceState();
-  const options = getSessionSetTypeCycle(values.displayEfforts);
   return (
     <Sheet
       dismissLabel="Dismiss effort picker"
@@ -28,22 +25,31 @@ export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSh
       testID="exercise-effort-sheet"
       title="Effort"
       visible={visible}>
-      <ScrollView style={{ maxHeight: height * 0.65, flexGrow: 0 }}>
-        {options.map((option) => {
-          const isSelected = option === selected;
-          return (
-            <ListRow
-              key={option ?? 'none'}
-              label={EFFORT_CHOICES.find(choice => choice.id === (option ?? 'unspecified'))?.label ?? formatEffort(option)}
-              onPress={() => onSelect(option)}
-              selected={isSelected}
-              testID={`exercise-effort-option-${option ?? 'none'}`}
-              trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
-            />
-          );
-        })}
-      </ScrollView>
+      <EffortChoices selected={selected} onSelect={onSelect} />
     </Sheet>
+  );
+}
+
+export function EffortChoices({ selected, onSelect }: Pick<EffortSheetProps, 'selected' | 'onSelect'>) {
+  const { height } = useWindowDimensions();
+  const { values } = useAccountLocalPreferenceState();
+  const options = getSessionSetTypeCycle(values.displayEfforts);
+  return (
+    <ScrollView style={{ maxHeight: height * 0.65, flexGrow: 0 }}>
+      {options.map((option) => {
+        const isSelected = option === selected;
+        return (
+          <ListRow
+            key={option ?? 'none'}
+            label={EFFORT_CHOICES.find(choice => choice.id === (option ?? 'unspecified'))?.label ?? formatEffort(option)}
+            onPress={() => onSelect(option)}
+            selected={isSelected}
+            testID={`exercise-effort-option-${option ?? 'none'}`}
+            trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+          />
+        );
+      })}
+    </ScrollView>
   );
 }
 
