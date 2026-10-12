@@ -53,6 +53,7 @@ import {
 import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
 import { progressHistoryHref } from '@/src/navigation/routes';
 import { useStatsSummary } from '@/components/stats/use-summary';
+import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 
@@ -307,6 +308,7 @@ export function StatsScreenShell({
   }, []);
 
   const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
+  const showLoading = useDelayedFlag(isLoading && !summary && !errorMessage, LOADING_PANEL_DELAY_MS);
 
   return (
     <Screen testID="stats-history-screen">
@@ -332,7 +334,7 @@ export function StatsScreenShell({
       <ScreenScroll contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
-        {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
+        {showLoading ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
         {viewMode === 'exercise' ? (
           <ExerciseListView items={filteredExerciseListItems} metric={exerciseMetric}
@@ -550,7 +552,7 @@ function StatsContent() {
   const catalog = useExerciseCatalog();
   const { current: thisPeriod, previous: lastPeriod, reload } = useExerciseCatalogComparison(weeks);
   const revision = useBodyWeightContextRevision();
-  const summary = useStatsSummary(weeks, revision, reload);
+  const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload);
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
@@ -583,6 +585,10 @@ const periodFigures = (aggregate: ExerciseAggregate | undefined): ComparisonPeri
     ? { workingSetCount: aggregate.workingSetCount, totalVolume: aggregate.totalVolume,
       volumeSetCount: aggregate.volumeSetCount, estimatedOneRepMax: aggregate.estimatedOneRepMax }
     : { workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, estimatedOneRepMax: null };
+
+// A read that lands sooner than this never draws the loading panel, so a fast
+// switch does not push the table down and back up.
+const LOADING_PANEL_DELAY_MS = 100;
 
 // The width the Exercise header reserves for its `Recent` + arrow indicator,
 // visible or not, so the label never moves when the sort changes.

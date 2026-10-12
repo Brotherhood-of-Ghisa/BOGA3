@@ -66,6 +66,7 @@ import StatsRoute from '../app/(tabs)/stats-history';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import * as statsRepository from '@/src/data/stats';
+import * as exerciseCatalogStats from '@/src/data/exercise-catalog-stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { closeLocalData, loadMaestroFixture, resetLocalData, localDataClient } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -106,6 +107,18 @@ const deferred = <T,>() => {
   let reject!: (error: Error) => void;
   const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
   return { promise, resolve, reject };
+};
+
+type ProgressRead = () => ReturnType<typeof statsRepository.computeProgressComparisons>;
+// A focus reads both periods the chip offers. This stands in for each period's
+// next reads, in order; any other read goes to the database. One call a test.
+const interceptReads = (reads: Record<number, ProgressRead[]>) => {
+  const real = statsRepository.computeProgressComparisons;
+  return jest.spyOn(statsRepository, 'computeProgressComparisons').mockImplementation(options => {
+    const weeks = options?.periodWeeks;
+    const next = weeks === undefined ? undefined : reads[weeks]?.shift();
+    return next ? next() : real(options);
+  });
 };
 
 // Each filter is one chip showing the value in force; a tap swaps it for the
@@ -263,7 +276,7 @@ describe('Stats over real data', () => {
   });
 
   it('shows an error panel when the summary read fails (a failed read)', async () => {
-    jest.spyOn(statsRepository, 'computeProgressComparisons').mockRejectedValueOnce(new Error('Summary boom'));
+    interceptReads({ 1: [() => Promise.reject(new Error('Summary boom'))] });
     await loadMaestroFixture('exercise-block-history');
     await renderStats();
 
@@ -273,6 +286,10 @@ describe('Stats over real data', () => {
     expect(error).toHaveTextContent(/Could not load progress/);
     expect(error).not.toHaveTextContent(/Summary boom/);
     expect(screen.getByTestId('stats-retry')).toBeTruthy();
+    // The other period's read is its own: it still draws.
+    chooseFilter('period', '4 weeks');
+    expect(screen.queryByTestId('stats-error-state')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
   });
 
   it('keeps populated and empty muscle rows neutral while preserving contribution selection', async () => {
@@ -595,33 +612,72 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId(`stats-contribution-${SQUAT}`)).toBeNull();
   });
 
-  it('keeps selection during Retry, hides another period, and ignores older reads', async () => {
+  it('draws the other period from the focus read, with no loading state and no second read', async () => {
+    await renderMuscles();
+    select('quads');
+    const window = await statsRepository.computeProgressComparisons({ periodWeeks: 4 });
+    const windowNow = String(window.muscles.find(row => row.muscleGroupId === 'quads')!.current.workingSetCount);
+    const summaryReads = jest.spyOn(statsRepository, 'computeProgressComparisons');
+    const historyReads = jest.spyOn(exerciseCatalogStats, 'loadExerciseCatalogStatsRawHistory');
+    chooseFilter('period', '4 weeks');
+    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+    expect(contribution('now')).toHaveTextContent(windowNow);
+    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
+    chooseFilter('period', 'This week');
+    expect(contribution('now')).toHaveTextContent('7');
+    // A period switch reads nothing: not the summary, not the exercise history.
+    await act(async () => {});
+    expect(summaryReads).not.toHaveBeenCalled();
+    expect(historyReads).not.toHaveBeenCalled();
+  });
+
+  it('holds the loading panel back briefly and shows no figures until the read lands', async () => {
+    mockSearchParams = { period: '7' };
+    await loadMaestroFixture('exercise-block-history');
+    const week = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
+    const oneWeek = deferred<typeof week>();
+    const window = deferred<typeof week>();
+    interceptReads({ 1: [() => oneWeek.promise], 4: [() => window.promise] });
+    await renderStats();
+    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
+    expect(await screen.findByTestId('stats-loading-state')).toBeTruthy();
+    await act(async () => oneWeek.resolve(week));
+    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+    expect(value('quads', 'now')).toHaveTextContent('7');
+    // The window's read is still out, so its period waits behind the panel.
+    chooseFilter('period', '4 weeks');
+    expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
+    expect(await screen.findByTestId('stats-loading-state')).toBeTruthy();
+    await act(async () => window.reject(Error('Window failed')));
+    expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
+    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+  });
+
+  it('keeps selection during Retry and ignores a superseded focus read', async () => {
     await renderMuscles();
     select('quads');
     const old = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
-    const next = await statsRepository.computeProgressComparisons({ periodWeeks: 4 });
-    const oldRead = deferred<typeof old>();
-    const nextRead = deferred<typeof next>();
-    jest.spyOn(statsRepository, 'computeProgressComparisons').mockReturnValueOnce(oldRead.promise).mockReturnValueOnce(nextRead.promise);
+    const superseded = deferred<typeof old>();
+    interceptReads({ 1: [() => superseded.promise, () => Promise.reject(Error('Refresh failed'))] });
     await replayFocus();
+    await replayFocus();
+    expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
     expect(contribution('now')).toHaveTextContent('7');
-    chooseFilter('period', '4 weeks');
-    expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    expect(screen.queryByTestId('stats-contributions-empty')).toBeNull();
-    expect(screen.getByTestId('stats-loading-state')).toBeTruthy();
-    await act(async () => nextRead.reject(Error('New window failed')));
-    expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
-    await act(async () => oldRead.resolve(old));
-    expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
+    // The first focus's read lands last, with figures the newer focus never saw.
+    await act(async () => superseded.resolve({ ...old, muscles: old.muscles.map(row => row.muscleGroupId === 'quads'
+      ? { ...row, current: { ...row.current, workingSetCount: 99 } } : row) }));
+    expect(value('quads', 'now')).toHaveTextContent('7');
     fireEvent.press(screen.getByTestId('stats-retry'));
-    await waitFor(() => expect(contribution('now')).toHaveTextContent(String(next.muscles.find(row => row.muscleGroupId === 'quads')!.current.workingSetCount)));
+    await waitForGone(() => screen.queryByTestId('stats-error-state'));
+    expect(value('quads', 'now')).toHaveTextContent('7');
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
   });
 
   it('retains a same-context snapshot alongside a failed refocus, with an inline Retry', async () => {
     await renderMuscles();
     select('quads');
-    jest.spyOn(statsRepository, 'computeProgressComparisons').mockRejectedValueOnce(Error('Refresh failed'));
+    interceptReads({ 1: [() => Promise.reject(Error('Refresh failed'))] });
     await replayFocus();
     expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
     expect(contribution('now')).toHaveTextContent('7');
@@ -645,14 +701,15 @@ describe('Stats over real data', () => {
     select('quads');
     const old = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
     const pending = deferred<typeof old>();
-    jest.spyOn(statsRepository, 'computeProgressComparisons').mockReturnValueOnce(pending.promise);
+    const pendingWindow = deferred<typeof old>();
+    interceptReads({ 1: [() => pending.promise], 4: [() => pendingWindow.promise] });
     await act(async () => updatePreferences({ workingSetEfforts: [] }));
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
     await act(async () => { mockUserId = 'B'; setAccountLocalPreferenceAccount('B', true); await ensureAccountLocalPreferencesLoaded(); invalidateBodyWeightContext(); });
     screen.rerender(<StatsRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-table')).toBeTruthy());
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
-    await act(async () => pending.resolve(old));
+    await act(async () => { pending.resolve(old); pendingWindow.resolve(old); });
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
     expect(value('quads', 'now')).toHaveTextContent('7');
   });
