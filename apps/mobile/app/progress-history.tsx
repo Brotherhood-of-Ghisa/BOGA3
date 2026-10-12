@@ -67,8 +67,9 @@ export const resolveHistoryMetric = (value: string | string[] | undefined): Prog
   return entry ? entry[0] : null;
 };
 
-const isMuscleHistoryMetric = (metric: CalendarHeatmapMetric): metric is MuscleHistoryMetric =>
-  MUSCLE_HISTORY_METRIC_OPTIONS.some(option => option.value === metric);
+// The metrics a history link can carry: a muscle's, which an exercise shares.
+const isProgressMetric = (metric: CalendarHeatmapMetric): metric is ProgressMetric =>
+  metric in PROGRESS_HISTORY_METRIC_PARAMS;
 
 /** A muscle the exercise counts towards, as the ⋮ offers its history. */
 type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondary' };
@@ -201,7 +202,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
   // (Volume or Sets); 1RM and top weight are exercise-only, so it opens on Volume.
   const openMuscle = (muscleGroupId: string) => router.push(progressHistoryHref(
     { muscleGroupId },
-    isMuscleHistoryMetric(exerciseMetric) ? exerciseMetric : undefined
+    isProgressMetric(exerciseMetric) ? exerciseMetric : undefined
   ));
 
   if (unavailable) {
