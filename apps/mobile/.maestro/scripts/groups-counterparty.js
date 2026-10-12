@@ -302,12 +302,18 @@ var steps = {
       pause(POLL_INTERVAL_MS);
     }
     var row = board.entries[0];
+    var boardValue = Number(row.value);
+    var boardReps = Number(row.performance.reps);
+    var boardWeightValue = Number(row.performance.weight_value);
+    
     if (
       board.entries.length !== 1 ||
       row.member.user_id !== output.groupsCounterpartyUserId ||
-      Number(row.value) !== 256.25 || row.unit !== 'kg_reps' ||
-      Number(row.performance.reps) !== 5 ||
-      Number(row.performance.weight_value) !== 102.5 || row.performance.source_load_input_mode !== 'total_load' ||
+      boardValue !== 256.25 ||
+      row.unit !== 'kg_reps' ||
+      boardReps !== 5 ||
+      boardWeightValue !== 102.5 ||
+      row.performance.source_load_input_mode !== 'total_load' ||
       row.certification !== null
     ) {
       fail('unexpected Volume · All board: ' + JSON.stringify(board.entries));
