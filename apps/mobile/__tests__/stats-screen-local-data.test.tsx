@@ -631,7 +631,7 @@ describe('Stats over real data', () => {
     expect(historyReads).not.toHaveBeenCalled();
   });
 
-  it('holds the loading panel back briefly and shows no figures until the read lands', async () => {
+  it('shows the loading panel and no figures until the read lands', async () => {
     mockSearchParams = { period: '7' };
     await loadMaestroFixture('exercise-block-history');
     const week = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
@@ -639,7 +639,8 @@ describe('Stats over real data', () => {
     const window = deferred<typeof week>();
     interceptReads({ 1: [() => oneWeek.promise], 4: [() => window.promise] });
     await renderStats();
-    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+    // The delay itself is timed in use-delayed-flag.test.ts; here, on real
+    // timers, only that the panel comes and no table is drawn meanwhile.
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
     expect(await screen.findByTestId('stats-loading-state')).toBeTruthy();
     await act(async () => oneWeek.resolve(week));
