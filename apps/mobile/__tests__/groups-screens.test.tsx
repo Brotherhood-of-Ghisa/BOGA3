@@ -577,11 +577,22 @@ describe('Groups tab', () => {
     expect(cached(groupCacheKeys.glance('group-a', 'week', 0))?.payload).toEqual(periodTotals('group-a', windows));
 
     // A step back is its own read: the same six-window span, one week earlier.
+    // Until it lands this week's figures stay in place, held: no loading state.
+    const earlierRead = deferred<CompetitionPeriodTotalsWire>();
+    api.getCompetitionPeriodTotals.mockReturnValueOnce(earlierRead.promise);
     fireEvent.press(screen.getByTestId('group-home-period-earlier'));
     await waitFor(() => expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(2));
     const [, earlier] = api.getCompetitionPeriodTotals.mock.calls[1]!;
     expect(earlier[5]).toEqual(windows[4]);
-    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
+    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
+    expect(screen.queryByTestId('group-glance-loading')).toBeNull();
+    expect(screen.getByTestId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
+    expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
+
+    await act(async () => earlierRead.resolve(periodTotals('group-a', earlier)));
+    await waitFor(() => {
+      if (screen.getByTestId('group-glance-figures').props.accessibilityState.busy) throw new Error('still held');
+    });
     expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
   });
 

@@ -205,6 +205,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
         {header}
         <GroupGlancePage
           error={inlineError}
+          held={glance.held}
           metric={metric}
           myUserId={userId}
           now={new Date()}
