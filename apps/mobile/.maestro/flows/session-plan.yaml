@@ -36,19 +36,16 @@ appId: com.dinoderek.mobile
 - inputText: "Barbell Back Squat"
 - hideKeyboard
 
-- extendedWaitUntil:
-    visible:
-      text: "Select exercise Barbell Back Squat"
-    timeout: 10000
-
+# iOS keyboard dismissal can already open the matching exercise's preselection.
 - tapOn:
     text: "Select exercise Barbell Back Squat"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "exercise-picker-add-empty-set-button"
     timeout: 10000
 - tapOn:
-    id: "exercise-picker-add-empty-set-button"
+    text: "Add empty set for Barbell Back Squat"
 
 - extendedWaitUntil:
     visible:
@@ -58,13 +55,24 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "plan-form-block-1-set-1-weight"
 - inputText: "100"
-- hideKeyboard
 
 - tapOn:
     id: "plan-form-block-1-set-1-reps"
 - inputText: "5"
+# The title's Return key dismisses the keyboard; the numeric pad has no such key.
+- tapOn:
+    id: "plan-form-title"
 - hideKeyboard
 
+# Save ends the scroll content and is clear of fixed chrome once the keyboard closes.
+- scrollUntilVisible:
+    element:
+      id: "plan-form-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 10000
+- assertVisible:
+    id: "plan-form-save"
 - takeScreenshot: "01-plan-form-filled"
 
 - tapOn:
