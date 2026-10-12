@@ -45,9 +45,15 @@ set_sweep_active() {
 
 WIRE_PID=""
 WIRE_DIR="$(mktemp -d)"
+MODE_RACE_DIR=""
+MODE_WRITER_PID=""
+MODE_CERT_PID=""
 cleanup() {
   run_psql "set client_min_messages = warning;
-            alter table app_public.group_metric_board_entries drop constraint if exists ${FAULT_CONSTRAINT};" >/dev/null
+            alter table app_public.group_metric_board_entries drop constraint if exists ${FAULT_CONSTRAINT};
+            alter table app_public.group_metric_certifications drop constraint if exists cp_source_mode_fault;
+            alter table app_public.group_certifications drop constraint if exists cp_legacy_mode_fault;
+            alter table app_public.group_source_mode_generations drop constraint if exists cp_mode_marker_fault;" >/dev/null
   set_kick_url "${ORIGINAL_KICK_URL}"
   if [[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" ]]; then set_sweep_active true; else set_sweep_active false; fi
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
@@ -72,6 +78,14 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  if [[ -n "${MODE_RACE_DIR}" ]]; then
+    exec 9>&-
+    run_psql_once "select pg_terminate_backend(pid) from pg_stat_activity
+      where application_name in ('mode-cert-${RUN_TAG}','mode-write-${RUN_TAG}');" >/dev/null 2>&1 || true
+    [[ -z "${MODE_CERT_PID}" ]] || wait "${MODE_CERT_PID}" 2>/dev/null || true
+    [[ -z "${MODE_WRITER_PID}" ]] || wait "${MODE_WRITER_PID}" 2>/dev/null || true
+    rm -rf "${MODE_RACE_DIR}"
+  fi
   if [[ -n "${WIRE_PID}" ]]; then exec 5>&- 6<&-; kill "${WIRE_PID}" 2>/dev/null || true; fi
   rm -rf "${WIRE_DIR}"
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
@@ -359,12 +373,13 @@ update_rules() {
   expect_ok 'competition rule update'; assert_wire isCompetitionExerciseWriteWire
 }
 pair() {
-  V_PUBLIC="$(certify "${ATHLETE_UID}" "${T}-ATHLETE-set" volume)"
-  R_PUBLIC="$(certify "${ATHLETE_UID}" "${T}-ATHLETE-set" e1rm)"
+  local set="${1:-${T}-ATHLETE-set}"
+  V_PUBLIC="$(certify "${ATHLETE_UID}" "${set}" volume)"
+  R_PUBLIC="$(certify "${ATHLETE_UID}" "${set}" e1rm)"
   V_ID="$(run_psql "select id from app_public.group_metric_certifications where group_exercise_id='${GX}'
-    and member_user_id='${ATHLETE_UID}' and set_id='${T}-ATHLETE-set' and metric='volume' and ended_at is null;")"
+    and member_user_id='${ATHLETE_UID}' and set_id='${set}' and metric='volume' and ended_at is null;")"
   R_ID="$(run_psql "select id from app_public.group_metric_certifications where group_exercise_id='${GX}'
-    and member_user_id='${ATHLETE_UID}' and set_id='${T}-ATHLETE-set' and metric='e1rm' and ended_at is null;")"
+    and member_user_id='${ATHLETE_UID}' and set_id='${set}' and metric='e1rm' and ended_at is null;")"
   V_AUDIT="$(audit "${V_ID}")"; R_AUDIT="$(audit "${R_ID}")"
   drain 'publish paired certification'
 }
@@ -399,10 +414,23 @@ pair
 for enabled in false true; do policy "${enabled}"; drain 'rule-only switch'; retained "switch ${enabled}"; done
 for c in 0 0.5 1; do update_rules "${c}"; drain contribution; retained "contribution ${c}"; done
 for mode in per_side_load total_load; do update_rules 1 "${mode}"; drain 'target distribution'; retained "target ${mode}"; done
+next_cuam; push "${ATHLETE_TOKEN}" 'private contribution and a no-op source mode preserve the witness' \
+  "$(e_def "${T}-ATHLETE-def" 'Pull-up' "${CUAM}" total_load | jq '.fields.bodyweight_contribution=0.25')"
+drain 'private contribution'; retained 'private contribution/no-op mode'
 for mode in per_side_load total_load; do
-  next_cuam; push "${ATHLETE_TOKEN}" 'source distribution, private personal contribution is irrelevant' \
+  board e1rm; MODE_TOKEN="$(jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.write_token' <<<"${BODY}")"
+  MODE_REV="$(jq -er .rules.rules_revision <<<"${BODY}")"
+  next_cuam; push "${ATHLETE_TOKEN}" 'source distribution corrects the witnessed interpretation' \
     "$(e_def "${T}-ATHLETE-def" 'Pull-up' "${CUAM}" "${mode}" | jq '.fields.bodyweight_contribution=0.25')"
-  drain 'source distribution'; retained "source ${mode}"
+  ended "immediate source ${mode}"
+  rpc "${OWNER_TOKEN}" group_competition_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \
+    --arg s "${T}-ATHLETE-set" --arg t "${MODE_TOKEN}" --argjson r "${MODE_REV}" \
+    '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_write_token:$t}')"
+  expect_error CONFLICT 'the previous-mode token cannot certify'
+  drain 'source distribution'
+  OLD_WITNESS="${V_PUBLIC}"; pair
+  [[ "${V_PUBLIC}" != "${OLD_WITNESS}" ]] || fail 'a source correction revived its previous witness'
+  retained "fresh witness for source ${mode}"
 done
 for metric in volume e1rm; do
   board "${metric}"; check 'source restored to normalized units' 'all(.entries[];.unit=="percent_bw_reps" or .unit=="percent_bw")'
@@ -795,6 +823,33 @@ expect_sql 'withdrawing a legacy ID closes its root and every projection' "selec
   (select bool_and(ended_at is not null) from app_public.group_metric_certifications where legacy_certification_id='${R1}');" t
 pass 'stored legacy/protocol-3 revisions, legacy witnesses and aliases, frozen former/archived scores read through protocol 4'
 
+# An archived legacy root has no metric alias yet. Its live private source still
+# participates in the correction boundary and safe fallback detail reader.
+next_cuam
+push "${ATHLETE_TOKEN}" 'private source behind an unimported legacy root' \
+  "$(e_def "${H}-a-def" 'Legacy source' "${CUAM}")" \
+  "$(e_session "${H}-a" "${H_AT}" completed "$((H_AT+30000))" 30 null "${CUAM}")" \
+  "$(e_se "${H}-a-se" "${H}-a" "${H}-a-def" 0 'Legacy source' "${CUAM}")" \
+  "$(e_set "${H}-a-set" "${H}-a-se" 0 35 5 '' "${CUAM}" null rir_0)"
+run_psql "update app_public.group_certifications set pinned_fingerprint=(
+  select app_public.group_legacy_set_fingerprint(es) from app_public.exercise_sets es
+  where es.owner_user_id='${ATHLETE_UID}' and es.id='${H}-a-set') where id='${R2}';
+  alter table app_public.group_certifications add constraint cp_legacy_mode_fault
+    check(id<>'${R2}'::uuid or ended_at is null) not valid;" >/dev/null
+LEGACY_MODE_AUDIT="$(run_psql "select (to_jsonb(c)-array['ended_at','end_reason','ended_by','source_exercise_definition_id'])::text from app_public.group_certifications c where id='${R2}';")"
+next_cuam; push "${ATHLETE_TOKEN}" 'archived legacy correction under eager fault' "$(e_def "${H}-a-def" 'Legacy source' "${CUAM}" per_side_load)"
+rpc "${OWNER_TOKEN}" group_competition_certification_get "$(jq -nc --arg g "${HG}" --arg c "${R2}" \
+  '{p_group_id:$g,p_certification_id:$c,p_metric:"volume"}')"
+expect_ok 'unimported legacy effective state'; assert_wire isCompetitionCertificationResultWire
+check 'unimported legacy state is generically terminal' '.certification.end_reason=="voided" and .certification.ended_at_ms!=null'
+run_psql "alter table app_public.group_certifications drop constraint cp_legacy_mode_fault;" >/dev/null
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${HG}" --arg x "${HA}" \
+  '{p_group_id:$g,p_exercise_id:$x,p_archived:false}')"; expect_ok 'legacy source unarchive'
+drain 'legacy source recovery'
+expect_sql 'a corrected legacy root never imports an active projection' "select count(*) from app_public.group_metric_certifications
+  where legacy_certification_id='${R2}' and ended_at is null;" 0
+[[ "$(run_psql "select (to_jsonb(c)-array['ended_at','end_reason','ended_by','source_exercise_definition_id'])::text from app_public.group_certifications c where id='${R2}';")" == "${LEGACY_MODE_AUDIT}" ]] || fail 'legacy mode correction rewrote its audit'
+
 # Ordinary total/per-side entries share one physical Volume. Seed the old
 # target-per-side projections to exercise a real rules upgrade, not a raw edit.
 rpc "${OWNER_TOKEN}" group_create '{"p_name":"Total load fixture","p_description":null}'; expect_ok 'total-load group'
@@ -810,9 +865,16 @@ for prefix in ATHLETE RIVAL; do
   token="${prefix}_TOKEN"; mode=total_load; weight=20
   if [[ "${prefix}" == RIVAL ]]; then mode=per_side_load; weight=10; fi
   next_cuam
-  push "${!token}" 'equivalent external load' \
+  push "${!token}" 'equivalent source link' \
     "$(e_def "${T}-${prefix}-def" 'Total load' "${CUAM}" "${mode}")" \
-    "$(e_link "${T}-${prefix}-def" "${GID}" "${GX}" "${CUAM}")" \
+    "$(e_link "${T}-${prefix}-def" "${GID}" "${GX}" "${CUAM}")"
+done
+drain 'total-load links before performed records'
+for prefix in ATHLETE RIVAL; do
+  token="${prefix}_TOKEN"; weight=20
+  if [[ "${prefix}" == RIVAL ]]; then weight=10; fi
+  next_cuam
+  push "${!token}" 'equivalent external load' \
     "$(e_session "${T}-${prefix}" "${START}" completed "$((START+30000))" 30 null "${CUAM}")" \
     "$(e_se "${T}-${prefix}-se" "${T}-${prefix}" "${T}-${prefix}-def" 0 'Total load' "${CUAM}")" \
     "$(e_set "${T}-${prefix}-set" "${T}-${prefix}-se" 0 "${weight}" 8 '' "${CUAM}" null rir_0)"
@@ -831,8 +893,11 @@ run_psql "
     where group_exercise_id='${GX}' and kind='record';
   update app_public.group_events set rule_rescore_baseline=null where group_exercise_id='${GX}' and kind='record';" >/dev/null
 TOTAL_AUDIT="$(audit "${TOTAL_CERT}")"
+TOTAL_EVENT_IDS="$(run_psql "select string_agg(quote_literal(id::text),',') from app_public.group_events
+  where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}';")"
+[[ -n "${TOTAL_EVENT_IDS}" ]] || fail 'total-load fixture has no historical events'
 RECORD_AUDIT_SQL="select coalesce(jsonb_agg(to_jsonb(e)-'rule_rescore_baseline' order by id),'[]'::jsonb)::text
-  from app_public.group_events e where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}';"
+  from app_public.group_events e where id in (${TOTAL_EVENT_IDS});"
 TOTAL_RECORD_AUDIT="$(run_psql "${RECORD_AUDIT_SQL}")"
 TOTAL_RAW="$(run_psql "select jsonb_agg(to_jsonb(s) order by id)::text from app_public.exercise_sets s where id='${T}-ATHLETE-set';")"
 RECOMPUTE_SQL="$(cat "${SUPABASE_DIR}/migrations/20261011224403_total_load_recompute.sql")"
@@ -860,6 +925,8 @@ expect_sql 'historical certification keeps its exact audit' "select observed_val
 [[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'total-load record audit changed'
 expect_sql 'record baseline advances to current total Volume' "select bool_and((rule_rescore_baseline->'volume'->>'value')::numeric=160)
   from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and kind='record';" t
+expect_sql 'kernel refresh creates no performed record or correction for the unchanged source' "select count(*)=1
+  from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and kind in ('record','record_voided');" t
 expect_sql 'genuine decrease voids the old record without creating an improvement' "select
   count(*) filter(where kind='record')=1 and count(*) filter(where kind='record_voided')=1
   from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${RIVAL_UID}';" t
@@ -877,6 +944,8 @@ rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GID
   '{p_group_id:$g,p_exercise_id:$x,p_archived:false}')"; expect_ok 'unarchive total load'
 drain 'deferred total-load catch-up'
 [[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'unarchive rewrote historical record audit'
+expect_sql 'unarchive creates no performed record or correction for the unchanged source' "select count(*)=1
+  from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and kind in ('record','record_voided');" t
 [[ "$(audit "${TOTAL_CERT}")" == "${TOTAL_AUDIT}" ]] || fail 'unarchive rewrote historical certification audit'
 next_cuam
 push "${RIVAL_TOKEN}" 'restore equivalent load' \
@@ -896,6 +965,209 @@ expect_sql 'the real improvement takes both metrics after source-mode change' "s
   count(*)=1 and bool_and(jsonb_array_length(payload->'boards')=2)
   from app_public.group_events where group_exercise_id='${GX}' and set_id='${T}-RIVAL-new' and kind='record';" t
 pass 'equivalent total load, current scores, unchanged logged kg and immutable historical audits'
+
+# The same source is certified in two groups, including a normalized zero-added
+# set whose score cannot change when the source distribution changes.
+MODE_G1="${GID}"; MODE_X1="${GX}"; MODE_T="${T}"; MODE_INVITE1="${INVITE}"
+MODE_OTHER="$(certify "${RIVAL_UID}" "${MODE_T}-RIVAL-new" e1rm)"; drain 'unrelated member witness'
+rpc "${OWNER_TOKEN}" group_create '{"p_name":"Source mode witness fixture","p_description":null}'; expect_ok 'mode group'
+GID="$(jq -er .group_id <<<"${BODY}")"; MODE_G2="${GID}"
+rpc "${OWNER_TOKEN}" group_invite_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok 'mode invite'
+MODE_INVITE2="$(jq -er .code <<<"${BODY}")"
+rpc "${ATHLETE_TOKEN}" group_join "$(jq -nc --arg c "${MODE_INVITE2}" '{p_code:$c}')"; expect_ok 'mode join'
+GX="$(comparison 'Zero added' 1 volume)"; MODE_X2="${GX}"; policy true
+START=$(($(now_ms)+1000)); next_cuam
+push "${ATHLETE_TOKEN}" 'one source shared into two groups' \
+  "$(e_def "${MODE_T}-unrelated" 'Unrelated' "${CUAM}")" \
+  "$(e_link "${MODE_T}-ATHLETE-def" "${MODE_G2}" "${MODE_X2}" "${CUAM}")" \
+  "$(e_session "${MODE_T}-mode" "${START}" completed "$((START+30000))" 30 null "${CUAM}")" \
+  "$(e_se "${MODE_T}-mode-se" "${MODE_T}-mode" "${MODE_T}-ATHLETE-def" 0 'Source mode' "${CUAM}")" \
+  "$(e_set "${MODE_T}-mode-set" "${MODE_T}-mode-se" 0 '' 5 '' "${CUAM}" null rir_0)"
+drain 'two-group source'; pair "${MODE_T}-mode-set"
+MODE_C2="${V_PUBLIC}"; MODE_AUDIT2="${V_AUDIT}"
+board volume; MODE_VALUE="$(jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.value' <<<"${BODY}")"
+MODE_TOKEN="$(jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.write_token' <<<"${BODY}")"
+MODE_REV="$(jq -er .rules.rules_revision <<<"${BODY}")"
+GID="${MODE_G1}"; GX="${MODE_X1}"; MODE_C1="${TOTAL_CERT}"
+MODE_AUDIT1="$(audit "${MODE_C1}")"; MODE_RAW="$(run_psql "select weight_value from app_public.exercise_sets where owner_user_id='${ATHLETE_UID}' and id='${MODE_T}-ATHLETE-set';")"
+expect_sql 'generation-zero witnesses preserve even a historical source-mode mismatch' "begin;
+  set local request.jwt.claims='{\"sub\":\"${ATHLETE_UID}\",\"role\":\"authenticated\"}';
+  alter table app_public.exercise_definitions disable trigger exercise_definitions_group_eval_enqueue;
+  update app_public.exercise_definitions set load_input_mode='per_side_load' where owner_user_id='${ATHLETE_UID}' and id='${MODE_T}-ATHLETE-def';
+  select source_mode_generation=0 and ended_at is null and app_public.group_metric_certification_mode_matches(c)
+    from app_public.group_metric_certifications c where id='${MODE_C1}';
+  rollback;" t
+expect_sql 'mode markers and helpers have no client privileges' "select
+  (select relrowsecurity from pg_class where oid='app_public.group_source_mode_generations'::regclass)
+  and not has_table_privilege('authenticated','app_public.group_source_mode_generations','SELECT')
+  and not has_table_privilege('anon','app_public.group_source_mode_generations','SELECT')
+  and not has_function_privilege('authenticated','app_public.group_source_mode_generation(uuid,text)','EXECUTE');" t
+next_cuam; push "${ATHLETE_TOKEN}" 'unrelated source edit' "$(e_def "${MODE_T}-unrelated" 'Unrelated' "${CUAM}" per_side_load)"
+[[ "$(audit "${MODE_C1}")" == "${MODE_AUDIT1}" ]] || fail 'unrelated source changed audit'
+expect_sql 'unrelated source preserves the witness' "select ended_at is null from app_public.group_metric_certifications where id='${MODE_C1}';" t
+
+# Fail eager ending while retaining the independently committed generation.
+# Public readers must already treat it as terminal before any worker runs.
+run_psql "alter table app_public.group_metric_certifications add constraint cp_source_mode_fault
+  check(member_user_id<>'${ATHLETE_UID}'::uuid or ended_at is null) not valid;" >/dev/null
+next_cuam; push "${ATHLETE_TOKEN}" 'source mode commits despite eager termination fault' \
+  "$(e_def "${MODE_T}-ATHLETE-def" 'Total load' "${CUAM}" per_side_load)"
+next_cuam; push "${ATHLETE_TOKEN}" 'source mode switches back before evaluation' \
+  "$(e_def "${MODE_T}-ATHLETE-def" 'Total load' "${CUAM}" total_load)"
+expect_sql 'both committed transitions remain remembered' "select generation from app_public.group_source_mode_generations
+  where member_user_id='${ATHLETE_UID}' and exercise_definition_id='${MODE_T}-ATHLETE-def';" 2
+for group in "${MODE_G1}" "${MODE_G2}"; do
+  GID="${group}"; GX="${MODE_X1}"; certificate="${MODE_C1}"
+  if [[ "${group}" == "${MODE_G2}" ]]; then GX="${MODE_X2}"; certificate="${MODE_C2}"; fi
+  for metric in volume e1rm; do
+    board "${metric}" true; check 'failed eager ending never leaves a Certified entry' 'all(.entries[];.member.user_id!=$u)' --arg u "${ATHLETE_UID}"
+    rpc "${OWNER_TOKEN}" group_competition_certification_get "$(jq -nc --arg g "${GID}" --arg c "${certificate}" --arg m "${metric}" \
+      '{p_group_id:$g,p_certification_id:$c,p_metric:$m}')"; expect_ok 'effective terminal state'; assert_wire isCompetitionCertificationResultWire
+    check 'effective state stays generic with its original ID' '.certification.certification_id==$c and .certification.end_reason=="voided" and .certification.ended_at_ms!=null' --arg c "${certificate}"
+  done
+done
+rpc "${OWNER_TOKEN}" group_competition_certify "$(jq -nc --arg g "${MODE_G2}" --arg x "${MODE_X2}" --arg u "${ATHLETE_UID}" \
+  --arg s "${MODE_T}-mode-set" --arg t "${MODE_TOKEN}" --argjson r "${MODE_REV}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"volume",p_expected_revision:$r,p_write_token:$t}')"
+expect_error CONFLICT 'a token from before a toggle back cannot create a new witness'
+[[ "$(audit "${MODE_C1}")" == "${MODE_AUDIT1}" && "$(audit "${MODE_C2}")" == "${MODE_AUDIT2}" ]] || fail 'mode fault rewrote observed audit'
+expect_sql 'only sanitized invalidation diagnostics are stored' "select bool_and(
+  (select array_agg(k order by k) from jsonb_object_keys(context) k)=array['row_id','sqlstate','table'])
+  from public.app_logs where event='group.source_mode_invalidation_failed' and user_id='${ATHLETE_UID}';" t
+run_psql "alter table app_public.group_metric_certifications drop constraint cp_source_mode_fault;" >/dev/null
+rpc "${OWNER_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${MODE_G2}" --arg c "${MODE_C2}" \
+  '{p_group_id:$g,p_certification_id:$c,p_metric:"volume",p_action:"withdraw"}')"
+expect_ok 'manual action after source correction'; assert_wire isCompetitionCertificationResultWire
+check 'manual action keeps the prior source correction terminal reason' '.certification.end_reason=="voided"'
+drain 'source generation recovery'
+GID="${MODE_G2}"; GX="${MODE_X2}"
+board volume; check 'zero-added normalized score is unchanged' '.entries[0].value==$v' --argjson v "${MODE_VALUE}"
+pair "${MODE_T}-mode-set"; [[ "${V_PUBLIC}" != "${MODE_C2}" ]] || fail 'fresh generation reused the ended witness'
+expect_sql 'every new metric alias binds the current generation' "select count(*)=2 and bool_and(source_mode_generation=2 and ended_at is null)
+  from app_public.group_metric_certifications where group_exercise_id='${MODE_X2}' and member_user_id='${ATHLETE_UID}' and set_id='${MODE_T}-mode-set' and ended_at is null;" t
+
+# Archived comparisons and departed members are corrected while inactive.
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_exercise_id:$x,p_archived:true}')"; expect_ok 'archive mode comparison'
+rpc "${ATHLETE_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok 'leave mode group'
+next_cuam; push "${ATHLETE_TOKEN}" 'inactive source-mode correction' "$(e_def "${MODE_T}-ATHLETE-def" 'Total load' "${CUAM}" per_side_load)"
+ended 'archived/former witness ends immediately'
+rpc "${ATHLETE_TOKEN}" group_join "$(jq -nc --arg c "${MODE_INVITE2}" '{p_code:$c}')"; expect_ok 'rejoin mode group'
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_exercise_id:$x,p_archived:false}')"; expect_ok 'unarchive mode comparison'
+drain 'rejoin/unarchive'; ended 'reactivation cannot restore the old witness'
+GID="${MODE_G1}"; GX="${MODE_X1}"
+expect_sql 'another member witness remains active' "select ended_at is null from app_public.group_metric_certifications where id='${MODE_OTHER}';" t
+expect_sql 'source-mode corrections keep logged weights' "select weight_value from app_public.exercise_sets
+  where owner_user_id='${ATHLETE_UID}' and id='${MODE_T}-ATHLETE-set';" "${MODE_RAW}"
+[[ "$(audit "${MODE_C1}")" == "${MODE_AUDIT1}" && "$(audit "${MODE_C2}")" == "${MODE_AUDIT2}" ]] || fail 'mode recovery rewrote observed audit'
+pass 'prospective source-mode termination, durable toggle-back fence, both groups/metrics, zero-added equivalence, inactive recovery and immutable audits'
+
+# The marker and eager ending are independent safety paths.
+GID="${MODE_G2}"; GX="${MODE_X2}"; pair "${MODE_T}-mode-set"
+run_psql "alter table app_public.group_source_mode_generations add constraint cp_mode_marker_fault
+  check(exercise_definition_id<>'${MODE_T}-ATHLETE-def' or generation<=3) not valid;" >/dev/null
+board volume; MODE_TOKEN="$(jq -er '.entries[0].write_token' <<<"${BODY}")"; MODE_REV="$(jq -er .rules.rules_revision <<<"${BODY}")"
+next_cuam; push "${ATHLETE_TOKEN}" 'eager termination survives marker failure' "$(e_def "${MODE_T}-ATHLETE-def" 'Total load' "${CUAM}" total_load)"
+ended 'marker failure still ends both projections'
+next_cuam; push "${ATHLETE_TOKEN}" 'marker failure and source toggle back' "$(e_def "${MODE_T}-ATHLETE-def" 'Total load' "${CUAM}" per_side_load)"
+rpc "${OWNER_TOKEN}" group_competition_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \
+  --arg s "${MODE_T}-mode-set" --arg t "${MODE_TOKEN}" --argjson r "${MODE_REV}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"volume",p_expected_revision:$r,p_write_token:$t}')"
+expect_error CONFLICT 'token rotation survives marker failure and toggle back'
+run_psql "alter table app_public.group_source_mode_generations drop constraint cp_mode_marker_fault;" >/dev/null
+drain 'marker fault recovery'; ended 'marker fault cannot restore a witness'
+
+# Keep a real certification transaction open after its RPC returns. The source
+# writer must wait for its row lock, then end the newly committed witness.
+board volume; MODE_TOKEN="$(jq -er '.entries[0].write_token' <<<"${BODY}")"; MODE_REV="$(jq -er .rules.rules_revision <<<"${BODY}")"
+MODE_RACE_AT="$(run_psql "select clock_timestamp();")"
+MODE_RACE_DIR="$(mktemp -d)"; mkfifo "${MODE_RACE_DIR}/in"
+docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
+  <"${MODE_RACE_DIR}/in" >"${MODE_RACE_DIR}/cert.log" 2>&1 &
+MODE_CERT_PID=$!; exec 9>"${MODE_RACE_DIR}/in"
+printf '%s\n' "set application_name='mode-cert-${RUN_TAG}'; begin; set local role authenticated;
+  select set_config('request.jwt.claims','{\"sub\":\"${OWNER_UID}\",\"role\":\"authenticated\"}',true);
+  select set_config('request.headers','{\"x-boga-group-contract\":\"4\"}',true);
+  do \$\$ begin perform app_public.group_competition_certify('${GID}','${GX}','${ATHLETE_UID}',
+    '${MODE_T}-mode-set','volume',${MODE_REV},'${MODE_TOKEN}'); end; \$\$;
+  select 'mode-cert-ready';" >&9
+mode_race_deadline=$((SECONDS+10)); mode_race_ready=f
+while [[ ${SECONDS} -lt ${mode_race_deadline} ]]; do
+  mode_race_ready="$(run_psql "select exists(select 1 from pg_stat_activity where application_name='mode-cert-${RUN_TAG}'
+    and state='idle in transaction' and query like '%mode-cert-ready%');")"
+  [[ "${mode_race_ready}" != t ]] || break
+  kill -0 "${MODE_CERT_PID}" 2>/dev/null || { cat "${MODE_RACE_DIR}/cert.log" >&2; fail 'certification race RPC failed'; }
+  sleep 0.05
+done
+[[ "${mode_race_ready}" == t ]] || fail 'certification transaction did not become ready'
+run_psql_once "set application_name='mode-write-${RUN_TAG}';
+  set request.jwt.claims='{\"sub\":\"${ATHLETE_UID}\",\"role\":\"authenticated\"}';
+  update app_public.exercise_definitions set load_input_mode='total_load'
+  where owner_user_id='${ATHLETE_UID}' and id='${MODE_T}-ATHLETE-def';" >"${MODE_RACE_DIR}/writer.log" 2>&1 &
+MODE_WRITER_PID=$!; mode_race_deadline=$((SECONDS+10)); mode_race_waiting=f
+while [[ ${SECONDS} -lt ${mode_race_deadline} ]]; do
+  mode_race_waiting="$(run_psql "select exists(select 1 from pg_stat_activity where application_name='mode-write-${RUN_TAG}' and wait_event_type='Lock');")"
+  [[ "${mode_race_waiting}" != t ]] || break
+  sleep 0.05
+done
+[[ "${mode_race_waiting}" == t ]] || fail 'source edit did not wait for the certification source lock'
+printf '%s\n' 'commit;' '\q' >&9; exec 9>&-
+wait "${MODE_CERT_PID}" || { cat "${MODE_RACE_DIR}/cert.log" >&2; fail 'certification race commit failed'; }
+wait "${MODE_WRITER_PID}" || { cat "${MODE_RACE_DIR}/writer.log" >&2; fail 'source edit after certification failed'; }
+MODE_CERT_PID=""; MODE_WRITER_PID=""; rm -rf "${MODE_RACE_DIR}"; MODE_RACE_DIR=""
+expect_sql 'the waiting mode writer ends both newly committed projections' "select count(*)=2 and bool_and(ended_at is not null and end_reason='voided')
+  from app_public.group_metric_certifications where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}'
+    and set_id='${MODE_T}-mode-set' and certified_at>='${MODE_RACE_AT}'::timestamptz;" t
+drain 'concurrent source/certification'
+
+# Exercise the actual data-changing statements against populated old
+# table shapes, comparing every existing field rather than selected audit pins.
+MODE_ALTERS=""
+while IFS= read -r line; do
+  if [[ "${line}" == 'alter table app_public.group_'*' add column source_'* ]]; then
+    MODE_ALTERS+="${line//app_public./pg_temp.}"$'\n'
+  fi
+done <"${SUPABASE_DIR}/migrations/20261012085818_group_certification_source_entry_mode.sql"
+[[ -n "${MODE_ALTERS}" ]] || fail 'mode migration ALTER statements missing'
+expect_sql 'populated migration preserves every old score/certification field' "begin;
+  create temp table group_metric_set_scores (like app_public.group_metric_set_scores including all);
+  create temp table group_metric_certifications (like app_public.group_metric_certifications including all);
+  create temp table group_certifications (like app_public.group_certifications including all);
+  insert into pg_temp.group_metric_set_scores select * from app_public.group_metric_set_scores;
+  insert into pg_temp.group_metric_certifications select * from app_public.group_metric_certifications;
+  insert into pg_temp.group_certifications select * from app_public.group_certifications;
+  alter table pg_temp.group_metric_set_scores drop column source_mode_generation;
+  alter table pg_temp.group_metric_certifications drop column source_mode_generation;
+  alter table pg_temp.group_certifications drop column source_mode_generation;
+  alter table pg_temp.group_certifications drop column source_exercise_definition_id;
+  -- The earlier kernel refresh can remove active members' unlinked scores;
+  -- use the former member's retained score for the old frozen-source row.
+  update pg_temp.group_certifications set member_user_id='${FROZEN_UID}',set_id='${H}-f-set',session_id='${H}-f'
+    where id='${R1}';
+  create temp table mode_migration_audit as select jsonb_build_array(
+    (select jsonb_agg(to_jsonb(c) order by to_jsonb(c)::text) from pg_temp.group_metric_set_scores c),
+    (select jsonb_agg(to_jsonb(c) order by to_jsonb(c)::text) from pg_temp.group_metric_certifications c),
+    (select jsonb_agg(to_jsonb(c) order by to_jsonb(c)::text) from pg_temp.group_certifications c)) as snapshot;
+  ${MODE_ALTERS}
+  update pg_temp.group_certifications c set source_exercise_definition_id=app_public.group_legacy_certification_definition(
+    jsonb_populate_record(null::app_public.group_certifications,to_jsonb(c))) where c.source_exercise_definition_id is null;
+  select snapshot=jsonb_build_array(
+    (select jsonb_agg(to_jsonb(c)-'source_mode_generation' order by (to_jsonb(c)-'source_mode_generation')::text) from pg_temp.group_metric_set_scores c),
+    (select jsonb_agg(to_jsonb(c)-'source_mode_generation' order by (to_jsonb(c)-'source_mode_generation')::text) from pg_temp.group_metric_certifications c),
+    (select jsonb_agg(to_jsonb(c)-array['source_mode_generation','source_exercise_definition_id']
+      order by (to_jsonb(c)-array['source_mode_generation','source_exercise_definition_id'])::text) from pg_temp.group_certifications c))
+    and (select bool_and(source_mode_generation=0) from pg_temp.group_metric_set_scores)
+    and (select bool_and(source_mode_generation=0) from pg_temp.group_metric_certifications)
+    and (select bool_and(source_mode_generation=0) from pg_temp.group_certifications)
+    and exists(select 1 from app_public.exercise_sets where owner_user_id='${ATHLETE_UID}' and id='${H}-a-set')
+    and (select source_exercise_definition_id='${H}-a-def' from pg_temp.group_certifications where id='${R2}')
+    and not exists(select 1 from app_public.exercise_sets where owner_user_id='${FROZEN_UID}' and id='${H}-f-set')
+    and exists(select 1 from app_public.group_metric_set_scores where group_exercise_id='${HX}'
+      and member_user_id='${FROZEN_UID}' and set_id='${H}-f-set' and exercise_definition_id='${H}-f-def')
+    and (select source_exercise_definition_id='${H}-f-def' from pg_temp.group_certifications where id='${R1}')
+  from mode_migration_audit; rollback;" t
+pass 'marker-write isolation, legacy fallback/import safety and populated generation-zero migration'
 
 COMPLETED=1
 pass "group competition vectors passed (run ${RUN_TAG})"

@@ -9,7 +9,7 @@
 #     comparison never queues, rebuilds or changes across toggles;
 #   - the SQL as-of bodyweight resolver matches the device's;
 #   - witnesses keep their certification and audit at the current score across
-#     rule and source changes; a retry returns the original; the forward data
+#     group rules and private contribution changes; a retry returns the original; the forward data
 #     migration re-pins under the observed rules and keeps a pending reading
 #     correction; a reading-free witness survives temporary ineligibility;
 #   - the personal preference never changes a group score or queues evaluation;
@@ -19,8 +19,8 @@
 #   - zero-contribution rule metadata canonicalizes without touching clocks and
 #     the history reports effective zero use; an equal-score raw edit voids its
 #     witness;
-#   - a source-mode rescore keeps a historic record and its witness through
-#     later certification and performance jobs.
+#   - a source-mode rescore ends its witness while keeping a historic record
+#     through later certification and performance jobs.
 #
 # Contract: docs/specs/tech/group-competition-contract.md. Board, certify and
 # stream payloads go through the app's
@@ -364,12 +364,12 @@ for contribution in 0.5 1; do
   update_comparison "${contribution}" total_load; drain 'contribution rule change'
 done
 SOURCE_EVENT_COUNT="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');")"
-for mode in per_side_load total_load; do
+for contribution in 0.25 0.5; do
   next_cuam
-  push "${ATHLETE_TOKEN}" 'source distribution rule change' \
-    "$(e_def "${DA}" 'Pull-up' "${CUAM}" "${mode}" | jq '.fields.bodyweight_contribution=0.25')"
-  drain 'source distribution rule change'
-  expect_sql 'source rules are not a newly performed record or correction' \
+  push "${ATHLETE_TOKEN}" 'private contribution change' \
+    "$(e_def "${DA}" 'Pull-up' "${CUAM}" total_load | jq --argjson c "${contribution}" '.fields.bodyweight_contribution=$c')"
+  drain 'private contribution change'
+  expect_sql 'private contribution is not a newly performed record or correction' \
     "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${SOURCE_EVENT_COUNT}"
 done
 expect_sql 'record baseline reconstruction matches current ordinary and private-dependent scoring pins' \
@@ -599,8 +599,8 @@ expect_sql 'raw spelling edit voids the observed set despite equal score' \
   "select end_reason from app_public.group_metric_certifications where id='${NEW_CERT}';" voided
 pass 'zero rule metadata canonicalizes; a raw observation edit voids its witness despite an equal score'
 
-# A silent source-mode rescore also preserves the original record's witness
-# annotation, even though that historic event keeps its original score pin.
+# A source-mode correction ends the witness while the historic record keeps
+# its original score pin and audit.
 GX="$(create_comparison "${OWNER_TOKEN}" "${GID}" 0)"
 next_cuam
 push "${ATHLETE_TOKEN}" 'stream witness link' "$(e_link "${WITNESS_DEF}" "${GID}" "${GX}" "${CUAM}")"
@@ -615,17 +615,20 @@ push "${ATHLETE_TOKEN}" 'stream source-mode edit' "$(e_def "${WITNESS_DEF}" 'Wit
 drain 'stream source-rule rescore'
 expect_sql 'coalesced certification and source rules emit no performed record or correction' \
   "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${STREAM_EVENT_COUNT}"
-expect_sql 'coalesced source rules still publish the certification lead change' \
-  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='lead_change' and certified and reason='certification' and payload->>'certification_id'='${STREAM_CERT}';" 1
+expect_sql 'coalesced source correction cannot publish the ended certification' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='lead_change' and certified and reason='certification' and payload->>'certification_id'='${STREAM_CERT}';" 0
+expect_sql 'source correction ends both witness projections' \
+  "select count(*)=2 and bool_and(ended_at is not null and end_reason='voided') from app_public.group_metric_certifications
+    where coalesce(witness_certification_id,id)='${STREAM_CERT}';" t
 stream_record "${T}-stream-set"
-jq -e --arg id "${STREAM_CERT}" '[.record_context.metrics[]|select(.metric=="e1rm" and .certification.certification_id==$id)]|length==1' \
-  <<<"${RECORD}" >/dev/null || fail 'old record context keeps its unchanged performance witness'
+jq -e '[.record_context.metrics[]|select(.metric=="e1rm" and .eligible and .certification==null)]|length==1' \
+  <<<"${RECORD}" >/dev/null || fail 'old record context offers a fresh witness after source correction'
 expect_sql 'source rescore keeps original record audit and a private current baseline' \
   "select payload::text='${STREAM_AUDIT}' and rule_rescore_baseline->'e1rm'->>'fingerprint' is not null from app_public.group_events where group_exercise_id='${GX}' and kind='record' and set_id='${T}-stream-set';" t
 rpc "${OWNER_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${GID}" --arg id "${STREAM_CERT}" '
   {p_group_id:$g,p_certification_id:$id,p_metric:"e1rm",p_action:"withdraw"}')"
 expect_ok 'withdraw after source rules'; assert_wire isCompetitionCertificationResultWire
-check 'withdrawal ends the same witness' '.certification.certification_id==$id and .certification.end_reason=="withdrawn"' --arg id "${STREAM_CERT}"
+check 'manual withdrawal preserves the source correction reason' '.certification.certification_id==$id and .certification.end_reason=="voided"' --arg id "${STREAM_CERT}"
 drain 'certification-only publication after source rules'
 expect_sql 'later certification job cannot defer a false record correction' \
   "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${STREAM_EVENT_COUNT}"
@@ -658,7 +661,7 @@ expect_sql 'real performance correction still voids its historic record' \
   "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='record_voided';" 1
 expect_sql 'real performance correction still voids the new witness' \
   "select end_reason from app_public.group_metric_certifications where id='${STREAM_CERT_2}';" voided
-pass 'source-rule rescore preserves records and witnesses across later certification/performance jobs'
+pass 'source correction ends the witness and preserves records across later certification/performance jobs'
 
 COMPLETED=1
 pass 'optional bodyweight backend vectors passed'

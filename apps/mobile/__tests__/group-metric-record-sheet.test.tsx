@@ -139,6 +139,25 @@ describe('what the sheet shows', () => {
     expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', 'e1rm');
   });
 
+  it.each(['volume', 'e1rm'] as const)('refreshes a cached %s witness ended by a source-mode correction', async metric => {
+    const ended = certification({ metric, ended_at_ms: NOW, end_reason: 'voided' });
+    mockRead.mockResolvedValue({ contract_version: 4, certification: ended });
+    const row = certifiedRow(metric === 'volume'
+      ? { metric: 'volume', unit: 'percent_bw_reps' } : { metric: 'e1rm', unit: 'percent_bw' });
+    const { rerenderWith } = renderSheet({ row });
+    await waitFor(() => expect(status()).toHaveTextContent('Certification ended'));
+    expect(screen.getByTestId('group-metric-record-certify')).not.toBeDisabled();
+    expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', metric);
+    const fresh = certification({ metric, certification_id: 'cert-2', certified_by: { user_id: ME, username: 'me' } });
+    rerenderWith({ row: { ...row, write_token: 'pin-2', certification: ended } });
+    mockCertify.mockResolvedValue({ contract_version: 4, certification: fresh });
+    mockRead.mockResolvedValue({ contract_version: 4, certification: fresh });
+    await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
+    expect(mockCertify).toHaveBeenCalledWith(expect.objectContaining({ metric, token: 'pin-2' }));
+    expect(status()).toHaveTextContent('Certified by me · 11 Sep');
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
   it.each<[string, CompetitionCertificationWire, string]>([
     ['the certifier and date', certification(), 'Certified by Kim · 11 Sep'],
     ['"a group member" for an unknown certifier', certification({ certified_by: null }), 'Certified by a group member · 11 Sep'],

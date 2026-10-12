@@ -2,15 +2,18 @@
 
 ### groups.certification · definition · accepted
 
-Certification attests a **set**, not a score. Another current member of the
-group, never the lifter, certifies a record set (one that holds a board entry
+Certification attests a **set**, not a score. Another current group member,
+never the lifter, certifies a record set (one that holds a board entry
 or set a record) on a live group exercise. One certification per set:
 
 | Case | Decision |
 | --- | --- |
 | What it covers | The set: it counts on every Certified board of that exercise (1RM and Volume) |
-| A second member certifies the same set | No new certification; the first stands |
+| Repeat certification of the same set | The first witness stands |
 | Withdraw, cancel, or an edit or deletion of the set | Ends the whole certification, on every board |
+| Member exercise's per-side/total entry mode changes after rollout | Ends affected certifications; switching back restores none |
+| Certifications existing at rollout | Preserved with their original audits |
+| Group target-mode, formula or private bodyweight preference/contribution changes | Preserve unchanged witnesses |
 | After it ends | Only a new certification re-certifies the set |
 
 Why: a witness watched a set being lifted, and every figure from that set is

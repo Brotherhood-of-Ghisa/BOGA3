@@ -6,7 +6,7 @@
 # Contract: docs/specs/tech/group-competition-contract.md (boards, events,
 # readers) and docs/specs/tech/groups-contract.md (the change table).
 # Proves, against the real local stack (sync_push, group-eval, PostgREST), on
-# protocol-4 comparisons that rank Volume (kg × reps × D6 factor) and 1RM:
+# protocol-4 comparisons that rank total Volume (kg × reps) and 1RM:
 #
 #   - posture of the board tables (old and comparison) and of the
 #     group_competition_* reads;
@@ -663,7 +663,7 @@ check_args "R6 Certified podiums are empty, each on its comparison's default met
 pass "R6: uncertified sets make no Certified entries; Certified podiums empty"
 
 # =============================================================================
-echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 converts Volume and 1RM; a rescore, not a lift)"
+echo "[${LANE_LABEL}] R7 — source mode rescales total Volume and presented 1RM"
 # =============================================================================
 
 GX7="$(gx "R7 curl (per side)" per_side_load)"
@@ -678,7 +678,7 @@ sess "${ATHLETE_TOKEN}" "${T}-s7" completed "${DA7}" "r7a1:100:5"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s7b" completed "${DA7B}" "r7b1:40:8"
 drain "R7 setup"
-expect_entry "${GX7}" A volume "250@r7a1" "D6 total → per side: Volume ÷2"
+expect_entry "${GX7}" A volume "500@r7a1" "total Volume ignores the per-side target"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "D6 e1RM ÷2"
 expect_entry "${GX7B}" A volume "640@r7b1" "D6 per side → total: Volume ×2"
 expect_entry "${GX7B}" A e1rm "$(e1rm 40 8 2)@r7b1" "D6 e1RM ×2"
@@ -694,16 +694,16 @@ mark
 def "${ATHLETE_TOKEN}" "${DA7}" per_side_load
 drain "R7 mode up"
 expect_since "${GX7}" "" "R7 rescale up writes no event"
-expect_entry "${GX7}" A volume "500@r7a1" "R7 rescale up"
+expect_entry "${GX7}" A volume "1000@r7a1" "R7 source per side doubles total Volume"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5)@r7a1" "R7 rescale up"
-[[ "$(rescore_baseline)" == "e1rm,volume:500" ]] || fail "R7 rescale up: the record's rescore baseline: $(rescore_baseline)"
+[[ "$(rescore_baseline)" == "e1rm,volume:1000" ]] || fail "R7 rescale up: the record's rescore baseline: $(rescore_baseline)"
 mark
 def "${ATHLETE_TOKEN}" "${DA7}" total_load
 drain "R7 mode down"
 expect_since "${GX7}" "" "R7 rescale down writes no event"
-expect_entry "${GX7}" A volume "250@r7a1" "R7 rescale down"
+expect_entry "${GX7}" A volume "500@r7a1" "R7 source total restores total Volume"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "R7 rescale down"
-[[ "$(rescore_baseline)" == "e1rm,volume:250" ]] || fail "R7 rescale down: the record's rescore baseline: $(rescore_baseline)"
+[[ "$(rescore_baseline)" == "e1rm,volume:500" ]] || fail "R7 rescale down: the record's rescore baseline: $(rescore_baseline)"
 expect_sql "R7 the record stands" \
   "select count(*) from app_public.group_events where group_exercise_id = '${GX7}' and kind = 'record_voided';" "0"
 pass "R7: a load-mode change rescales Volume and 1RM silently; D6 in both directions"
@@ -872,7 +872,7 @@ next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-sz2" completed "${DAZ}" "z3:20:5"
 drain "Z a loaded set"
 expect_since "${GXZ}" "record@A,lead_change:record:volume@A,lead_change:record:e1rm@A" "Z the first loaded set is the first record"
-expect_entry "${GXZ}" A volume "50@z3" "Z the loaded set ranks"
+expect_entry "${GXZ}" A volume "100@z3" "Z the loaded set ranks in total Volume"
 pass "zero kg: no entry, no record, no failed apply"
 
 # =============================================================================

@@ -111,6 +111,14 @@ Rule changes, including metric/unit migration, preserve unchanged-set IDs,
 witness/time and immutable original audit. Temporary rules-only ineligibility
 keeps an active witness without a Certified entry; eligibility restores it.
 
+For the source-entry boundary in [[groups.certification]], existing witnesses
+start at private generation zero. Accepted source-mode writes advance a private
+generation and eagerly end affected witnesses, including inactive comparisons.
+Readers and reconciliation enforce that binding if eager termination fails.
+Score publication binds the trusted graph generation; certify locks the source
+row and rejects a score from an older generation. These markers never enter
+public payloads or alter arithmetic, record fingerprints or original audits.
+
 The executing agent retained the existing reading-correction boundary under
 standing delegated authority. Compare the selected valid reading's ID, exact
 instant and kg, not a rounded score or bookkeeping clock. An authoritative

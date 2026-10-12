@@ -444,10 +444,13 @@ for TABLE in group_certifications group_metric_certifications; do
         and exists (select 1 from information_schema.columns col
                      where col.table_schema = 'app_public' and col.table_name = t.relname
                        and col.column_name = 'owner_user_id');" "0"
-  expect_sql "${TABLE}: no trigger on a Sync v2 table touches certifications" \
+  expect_sql "${TABLE}: only the source-mode correction trigger touches certifications" \
     "select count(*) from pg_trigger tg join pg_proc p on p.oid = tg.tgfoid
       where not tg.tgisinternal
         and (p.proname like 'group\\_certif%' or p.prosrc like '%group_certif%' or p.prosrc like '%${TABLE}%')
+        and not (tg.tgrelid='app_public.exercise_definitions'::regclass
+          and tg.tgfoid='app_public.group_eval_on_exercise_definition()'::regprocedure
+          and tg.tgname='exercise_definitions_group_eval_enqueue')
         and exists (select 1 from information_schema.columns col join pg_class c on c.oid = tg.tgrelid
                      where col.table_schema = 'app_public' and col.table_name = c.relname
                        and col.column_name = 'owner_user_id');" "0"
@@ -463,6 +466,11 @@ for TABLE in group_certifications group_metric_certifications; do
   [[ ! "${STATUS}" =~ ^2 ]] || fail "direct insert into ${TABLE} must be denied"
   check "direct insert into ${TABLE} must be a 42501 denial (HTTP ${STATUS})" '.code == "42501"'
 done
+expect_sql "source-mode correction trigger stays private and pins search_path" \
+  "select p.prosecdef and p.proconfig @> array['search_path=app_public, pg_temp']
+    and not has_function_privilege('authenticated',p.oid,'execute')
+    and not has_function_privilege('anon',p.oid,'execute')
+    from pg_proc p where p.oid='app_public.group_eval_on_exercise_definition()'::regprocedure;" "t"
 
 CERT_FNS="p.proname like 'group\\_certif%' or p.proname like 'group\\_competition\\_certif%'"
 CERT_RPCS="'group_competition_certification_end', 'group_competition_certification_get', 'group_competition_certify'"
@@ -494,7 +502,7 @@ expect_sql "service_role executes neither an apply nor a Certified compute" \
 expect_sql "both queues accept the certification cause" \
   "select count(*) || ':' || bool_and(pg_get_constraintdef(oid) like '%certification%') from pg_constraint
     where conname in ('group_eval_queue_causes_valid', 'group_metric_eval_queue_causes_check');" "2:true"
-pass "tables, grants, direct-access denial, no Sync v2 trigger, RPC posture"
+pass "tables, grants, direct-access denial, private source-mode correction trigger, RPC posture"
 
 # =============================================================================
 echo "[${LANE_LABEL}] rejections: membership, input, target, record set, token"
@@ -844,7 +852,9 @@ drain "relink"
 expect_centry R volume "97@r3" "relinking restores the certified entry"
 expect_csince "link:volume@R,link:e1rm@R" "relink moves #1 with reason link"
 
-expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
+run_psql "update app_public.group_set_facts set rules_version=6
+  where member_user_id='${RIVAL_UID}' and session_id like '${T}-%';" >/dev/null
+expect_sql "a rules bump requeues older evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
 drain "rules"
 [[ "$(active_certs r3)" == "1:1" ]] || fail "a rules requeue voids nothing that still matches"
 expect_centry R volume "97@r3" "a rules requeue keeps the Certified entry"

@@ -21,7 +21,8 @@ const graph: CompetitionEvaluationGraph = {
 const evaluate = (change: Partial<CompetitionSourceSet>) => evaluateCompetitionGraph({ ...graph, sets: [{ ...source, ...change }] });
 
 it('publishes the complete versioned service evaluation with unrounded shared-kernel scores', () => {
-  const result = evaluateCompetitionGraph(graph);
+  const result = evaluateCompetitionGraph({ ...graph,
+    sets: [Object.assign({}, source, { source_mode_generation: 3 })] });
   expect(result).toMatchObject({ contract_version: 4, group_id: 'group', group_exercise_id: 'comparison',
     rules_revision: 7, source_token: 'source-hash' });
   const expected = scoreCompetitionPerformance({ weightValue: '20', repsValue: '5', performanceStatus: null,
@@ -39,7 +40,7 @@ it('publishes the complete versioned service evaluation with unrounded shared-ke
     achieved_at_ms: 2000, exercise_order_index: 1, set_order_index: 2, set_created_at_ms: 3000,
     performance: { weight_value: '20', reps_value: '5', reps: 5 } });
   // Raw kg is service-only audit, not a public projection; reading/pin facts never copy into it.
-  expect(JSON.stringify(result)).not.toMatch(/private-observation|private-reading|observed_set_pin|reading_pin|body_weight/);
+  expect(JSON.stringify(result)).not.toMatch(/private-observation|private-reading|observed_set_pin|reading_pin|body_weight|source_mode_generation/);
 });
 
 it('compares two members by relative physical load, independently of source/target distribution', () => {
