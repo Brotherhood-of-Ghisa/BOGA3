@@ -203,9 +203,7 @@ describe('The history page over real data', () => {
     expect(cards.length).toBeGreaterThan(0);
     fireEvent.press(cards[0]);
     expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
-    // The header carries the focused week, and its ⋮ opens that week's
-    // sessions — as a Weekly row does.
-    expect(screen.getByTestId('progress-history-title-week')).toBeTruthy();
+    // The header's ⋮ opens the focused week's sessions — as a Weekly row does.
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
@@ -223,17 +221,18 @@ describe('The history page over real data', () => {
     const before = (await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/)).length;
 
     // Nothing is selected yet, so the newest week is the focused one: marked in
-    // the chart, named in the title, and listed below.
+    // the chart, named in the readout, and listed below.
+    const readout = () => screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true }).props.children;
     expect(screen.getByTestId('stats-exercise-history-timeline-selected')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-timeline-next-week')).toBeDisabled();
-    const newest = screen.getByTestId('progress-history-title-week').props.children;
+    const newest = readout();
 
     // One week back is a different week, and the list follows it; forward again
     // returns to the newest, with the same sets.
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-previous-week')); });
-    expect(screen.getByTestId('progress-history-title-week').props.children).not.toBe(newest);
+    expect(readout()).not.toBe(newest);
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-next-week')); });
-    expect(screen.getByTestId('progress-history-title-week').props.children).toBe(newest);
+    expect(readout()).toBe(newest);
     await waitFor(() => expect(cards()).toHaveLength(before));
     expect(screen.queryByTestId('stats-exercise-history-week-sets-empty')).toBeNull();
   });

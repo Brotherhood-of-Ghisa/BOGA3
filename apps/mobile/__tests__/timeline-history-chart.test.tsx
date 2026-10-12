@@ -68,7 +68,8 @@ it('marks the week it reads out, selected or not, so the two never disagree', ()
   const { rerender } = render(chart());
   expect(hidden(`${ID}-readout-week`)).toHaveTextContent('5 – 11 Oct');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 volume');
-  expect(screen.getByText('Current week', { includeHiddenElements: true })).toBeTruthy();
+  // The readout names the week alone: the current week takes no note.
+  expect(screen.queryByText('Current week', { includeHiddenElements: true })).toBeNull();
   // The newest of the five 60pt columns, with nothing selected.
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 240);
 
