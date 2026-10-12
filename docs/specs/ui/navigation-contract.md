@@ -161,8 +161,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's own names |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise, each carrying the filter row's `metric` (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
-| `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week, and the header ⋮'s `View sessions` for the Timeline's focused week (`historyDayHref`, `sessionsWeekHref`, `push`) |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the header ⋮'s `View sessions` (`push`); a muscle page card's progress button opens its catalogued exercise, with the metric |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
@@ -196,7 +195,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
 Progress’s frozen controls change content in-route;
-Sessions is the final scrolling link in both views. A muscle chevron toggles
+Sessions is the final scrolling link (`/sessions`, `push`) in both views. A muscle chevron toggles
 its contribution block directly below that row. `/progress-history` is a
 route, not a sheet.
 

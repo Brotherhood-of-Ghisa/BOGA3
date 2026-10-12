@@ -9,6 +9,7 @@ import {
   MUSCLE_HISTORY_METRIC_OPTIONS,
   type MuscleHistoryMetric,
 } from '@/components/stats/history-view';
+import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel,
@@ -18,7 +19,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, historyDayHref, sessionsWeekHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, historyDayHref, progressHistoryHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -180,6 +181,12 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
   }, [router]);
   const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
   const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
+  // A muscle's week list links each card's exercise to its own history, on
+  // the metric shown here; one the catalogue no longer holds has no page.
+  const exerciseLink = useMemo<WeekSetExerciseLink | undefined>(() => subject?.kind === 'muscle' ? {
+    canOpen: id => catalog.exercises.some(exercise => exercise.id === id),
+    open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id }, muscleMetric)),
+  } : undefined, [catalog, muscleMetric, router, subject]);
 
   if (unavailable) {
     return (
@@ -216,6 +223,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     timeline: {
       weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
       onOpenSession: openSession,
+      exerciseLink,
     },
   };
 

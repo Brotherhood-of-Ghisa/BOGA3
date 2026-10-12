@@ -7,7 +7,7 @@ import {
   DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData, weekLabel,
   type BuildHeatmapDataOptions, type DayCell, type FocusedTimelineWeek,
 } from '@/components/heatmaps';
-import { WeekSetList } from '@/components/stats/week-set-list';
+import { WeekSetList, type WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
 import {
   SegmentedControl,
@@ -75,11 +75,13 @@ const UNIT_LABELS: Record<CalendarHeatmapMetric, (value: number) => string> = {
 };
 
 // What the Timeline needs beyond the heatmaps: the subject whose week it
-// lists, and where its cards go. The page's ⋮ opens the focused week's
-// sessions, through the `onOpenWeek` the other views share.
+// lists, and where its cards go — a card to its session and, on a muscle's
+// list, its button to the exercise's history. The page's ⋮ opens the focused
+// week's sessions, through the `onOpenWeek` the other views share.
 export type TimelineLinks = {
   weekSetsTarget: WeekSetsTarget;
   onOpenSession: (sessionId: string) => void;
+  exerciseLink?: WeekSetExerciseLink;
 };
 
 const VIEWS: readonly HeatmapView[] = ['timeline', 'daily', 'weekly'];
@@ -133,7 +135,7 @@ function HistoryHeatmap({
   const [weekSetsRevision, setWeekSetsRevision] = useState(0);
   const retryWeekSets = useCallback(() => setWeekSetsRevision(revision => revision + 1), []);
   const weekSets = useWeekSets(view === 'timeline' ? timeline.weekSetsTarget : null, focusedWeekKey, weekSetsRevision);
-  const { onOpenSession } = timeline;
+  const { onOpenSession, exerciseLink } = timeline;
   // The page draws the focused week in its title and offers its sessions, so
   // it is told which week that is — and told it is gone when the chart is.
   const focusedWeek = useMemo<FocusedTimelineWeek | null>(() => {
@@ -168,10 +170,11 @@ function HistoryHeatmap({
         metricLabel={metricLabel}
         unitLabel={UNIT_LABELS[metric]}
         header={status}>
-        <WeekSetList {...weekSets} onOpenSession={onOpenSession} onRetry={retryWeekSets} testID={`${testIDPrefix}-week-sets`} />
+        <WeekSetList {...weekSets} exerciseLink={exerciseLink} onOpenSession={onOpenSession} onRetry={retryWeekSets}
+          testID={`${testIDPrefix}-week-sets`} />
       </TimelineHeatmap>
     ),
-    [data, metric, selectedWeekKey, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession, retryWeekSets]
+    [data, metric, selectedWeekKey, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession, exerciseLink, retryWeekSets]
   );
   const dailyHeatmap = useMemo(
     () => (

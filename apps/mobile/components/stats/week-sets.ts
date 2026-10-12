@@ -23,10 +23,19 @@ export type WeekSetGroup = {
   workingSetCount: number;
   rows: SessionViewSetRow[];
   record: RecordLine[];
+  // The block's exercise, on a muscle's list only: the card links to its progress.
+  exerciseDefinitionId: string | null;
 };
 
 /** One session block to list: its card's title, or the card's exercise name when absent. */
-export type WeekBlock = { sessionId: string; sessionExerciseId: string; completedAt: Date; title?: string; detail: string };
+export type WeekBlock = {
+  sessionId: string;
+  sessionExerciseId: string;
+  completedAt: Date;
+  title?: string;
+  detail: string;
+  exerciseDefinitionId?: string;
+};
 
 export type WeekSetsTarget = { exerciseDefinitionId: string } | { muscleGroupIds: string[] };
 
@@ -57,6 +66,7 @@ export const muscleWeekBlocks = (contributions: MuscleSetContribution[]): WeekBl
       sessionExerciseId: contribution.sessionExerciseId,
       completedAt: contribution.sessionCompletedAt,
       detail: formatWeekDay(contribution.sessionCompletedAt),
+      exerciseDefinitionId: contribution.exerciseDefinitionId,
     });
   }
   return [...blocks.values()];
@@ -79,6 +89,7 @@ export const weekSetGroups = (
         workingSetCount: card.setCount,
         rows: card.rows,
         record: card.record,
+        exerciseDefinitionId: block.exerciseDefinitionId ?? null,
       }] : [];
     });
 

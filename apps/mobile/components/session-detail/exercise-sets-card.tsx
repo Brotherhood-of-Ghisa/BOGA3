@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -34,11 +34,17 @@ type ExerciseSetsCardBaseProps = {
   rowTestID?: (row: SessionViewSetRow, index: number) => string;
 };
 
-// A card that is a link must say where it goes (`Card`).
+// A card that is a link must say where it goes (`Card`), and offers a control
+// in its `accessory` to VoiceOver as one of its actions.
 type ExerciseSetsCardProps = ExerciseSetsCardBaseProps &
   (
-    | { onPress?: undefined; accessibilityLabel?: string }
-    | { onPress: () => void; accessibilityLabel: string }
+    | { onPress?: undefined; accessibilityLabel?: string; accessibilityActions?: undefined; onAccessibilityAction?: undefined }
+    | {
+        onPress: () => void;
+        accessibilityLabel: string;
+        accessibilityActions?: readonly AccessibilityActionInfo[];
+        onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+      }
   );
 
 // One exercise's sets as a card: name · count · accessory, the set
@@ -58,6 +64,8 @@ export function ExerciseSetsCard({
   rowTestID,
   onPress,
   accessibilityLabel,
+  accessibilityActions,
+  onAccessibilityAction,
 }: ExerciseSetsCardProps) {
   const content = (
     <>
@@ -88,7 +96,12 @@ export function ExerciseSetsCard({
   );
 
   return onPress ? (
-    <Card accessibilityLabel={accessibilityLabel} onPress={onPress} testID={testID}>
+    <Card
+      accessibilityActions={accessibilityActions}
+      accessibilityLabel={accessibilityLabel}
+      onAccessibilityAction={onAccessibilityAction}
+      onPress={onPress}
+      testID={testID}>
       {content}
     </Card>
   ) : (

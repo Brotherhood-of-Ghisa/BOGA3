@@ -44,9 +44,9 @@ describe('week blocks and groups', () => {
     ]);
     const band = [{ key: 'volume', label: 'New volume record · 1500', set: null, spoken: 'new volume record 1500' }];
     const groups = weekSetGroups(blocks, new Map([['s1', [card('se1', 'Bench Press', band)]], ['s0', [card('se0', 'Incline Press')]]]));
-    expect(groups.map(group => [group.key, group.title, group.detail, group.record])).toEqual([
-      ['se0', 'Incline Press', 'Mon 5 Oct', []],
-      ['se1', 'Bench Press', 'Wed 7 Oct', band],
+    expect(groups.map(group => [group.key, group.title, group.detail, group.record, group.exerciseDefinitionId])).toEqual([
+      ['se0', 'Incline Press', 'Mon 5 Oct', [], 'bench'],
+      ['se1', 'Bench Press', 'Wed 7 Oct', band, 'bench'],
     ]);
   });
 
@@ -55,9 +55,10 @@ describe('week blocks and groups', () => {
       ({ sessionId: `s-${sessionExerciseId}`, sessionExerciseId, completedAt, gymName }) as unknown as ExerciseHistorySessionEntry;
     const blocks = exerciseWeekBlocks([entry('late', local(9), ' '), entry('early', local(6), 'Canal Street'), entry('empty', local(8), null)]);
     const groups = weekSetGroups(blocks, new Map([['s-late', [card('late', 'Bench')]], ['s-early', [card('early', 'Bench')]], ['s-empty', []]]));
-    expect(groups.map(group => [group.title, group.detail, group.workingSetCount])).toEqual([
-      ['Tue 6 Oct', 'Canal Street', 2],
-      ['Fri 9 Oct', 'No gym', 2],
+    // An exercise's own list links to no exercise: the page is that exercise's.
+    expect(groups.map(group => [group.title, group.detail, group.workingSetCount, group.exerciseDefinitionId])).toEqual([
+      ['Tue 6 Oct', 'Canal Street', 2, null],
+      ['Fri 9 Oct', 'No gym', 2, null],
     ]);
     expect(formatWeekDay(local(11))).toBe('Sun 11 Oct');
   });
@@ -112,7 +113,7 @@ describe('useWeekSets over local data', () => {
 });
 
 describe('WeekSetList', () => {
-  const group = { key: 'se1', sessionId: 's1', title: 'Mon 5 Oct', detail: 'Canal Street Gym', workingSetCount: 1,
+  const group = { key: 'se1', sessionId: 's1', title: 'Mon 5 Oct', detail: 'Canal Street Gym', workingSetCount: 1, exerciseDefinitionId: null,
     record: [{ key: 'r1', label: 'New top weight', set: '80.0 × 5', spoken: 'new top weight 80.0 × 5' }],
     rows: [{ id: 'r1', typeLabel: 'RIR 2', weightReps: '80.0 × 5', oneRepMax: '93.3', volume: '400', done: true, oneRepMaxRecord: false, weightRecord: false }] };
 
@@ -123,6 +124,48 @@ describe('WeekSetList', () => {
     expect(screen.getByText('New top weight')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Open session from Mon 5 Oct, Canal Street Gym'));
     expect(onOpenSession).toHaveBeenCalledWith('s1');
+    // Without an exercise link the card offers nothing else.
+    expect(screen.queryByTestId('week-card-se1-exercise')).toBeNull();
+    expect(screen.getByTestId('week-card-se1').props.accessibilityActions).toBeUndefined();
+  });
+
+  describe('on a muscle\'s list', () => {
+    const muscleGroup = { ...group, title: 'Bench Press', detail: 'Mon 5 Oct', exerciseDefinitionId: 'bench' };
+    const link = (canOpen: boolean) => ({ canOpen: jest.fn(() => canOpen), open: jest.fn() });
+
+    it('opens the card\'s exercise from its progress button, and its session from the rest of the card', () => {
+      const onOpenSession = jest.fn();
+      const exerciseLink = link(true);
+      render(<WeekSetList groups={[muscleGroup]} loading={false} error={null} exerciseLink={exerciseLink}
+        onOpenSession={onOpenSession} testID="week" />);
+      expect(exerciseLink.canOpen).toHaveBeenCalledWith('bench');
+      fireEvent.press(screen.getByLabelText('Open Bench Press progress'));
+      expect(exerciseLink.open).toHaveBeenCalledWith('bench');
+      expect(onOpenSession).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByLabelText('Open session from Bench Press, Mon 5 Oct'));
+      expect(onOpenSession).toHaveBeenCalledWith('s1');
+      expect(exerciseLink.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers VoiceOver the button as the card\'s action, since the card reads as one element', () => {
+      const exerciseLink = link(true);
+      render(<WeekSetList groups={[muscleGroup]} loading={false} error={null} exerciseLink={exerciseLink}
+        onOpenSession={jest.fn()} testID="week" />);
+      const card = screen.getByTestId('week-card-se1');
+      expect(card).toHaveProp('accessibilityActions', [{ name: 'openExercise', label: 'Open Bench Press progress' }]);
+      fireEvent(card, 'accessibilityAction', { nativeEvent: { actionName: 'magicTap' } });
+      expect(exerciseLink.open).not.toHaveBeenCalled();
+      fireEvent(card, 'accessibilityAction', { nativeEvent: { actionName: 'openExercise' } });
+      expect(exerciseLink.open).toHaveBeenCalledWith('bench');
+    });
+
+    it('offers no button for an exercise the catalogue no longer holds, or a block without one', () => {
+      render(<WeekSetList groups={[muscleGroup, { ...group, key: 'se2', exerciseDefinitionId: null }]} loading={false}
+        error={null} exerciseLink={link(false)} onOpenSession={jest.fn()} testID="week" />);
+      expect(screen.queryByTestId('week-card-se1-exercise')).toBeNull();
+      expect(screen.getByTestId('week-card-se1').props.accessibilityActions).toBeUndefined();
+      expect(screen.queryByTestId('week-card-se2-exercise')).toBeNull();
+    });
   });
 
   it('shows loading, an error with retry, and an empty week', () => {

@@ -54,6 +54,7 @@ import { loadExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import * as statsRepository from '@/src/data/stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import { progressHistoryHref } from '@/src/navigation/routes';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -201,6 +202,8 @@ describe('The history page over real data', () => {
     // The selection starts on the current week, where the fixture's squat sessions are.
     const cards = await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/);
     expect(cards.length).toBeGreaterThan(0);
+    // An exercise's own cards link to no other exercise.
+    expect(screen.queryAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+-exercise$/)).toEqual([]);
     fireEvent.press(cards[0]);
     expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
     // The header carries the focused week, and its ⋮ opens that week's
@@ -257,6 +260,24 @@ describe('The history page over real data', () => {
     const cards = await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/);
     expect(cards.length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Squat/).length).toBeGreaterThan(0);
+  });
+
+  it('opens a muscle card\'s exercise history on the metric shown, and its session from the card', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ muscleGroupId: 'quads' });
+
+    const squat = { exerciseDefinitionId: SQUAT };
+    const buttons = await screen.findAllByLabelText(/^Open .*Squat.* progress$/);
+    fireEvent.press(buttons[0]);
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'totalVolume'));
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
+    fireEvent.press((await screen.findAllByLabelText(/^Open .*Squat.* progress$/))[0]);
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'workingSetCount'));
+
+    fireEvent.press(screen.getAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)[0]);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
   });
 
   it('opens in the saved Weekly view without a banner, and again on the next visit', async () => {
