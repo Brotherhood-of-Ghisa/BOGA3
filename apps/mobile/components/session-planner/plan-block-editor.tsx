@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton, ListRow, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
@@ -19,6 +19,8 @@ export type PlanBlockEditorProps = {
   onRemoveBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, step: -1 | 1) => void;
   onPickExercise: (blockId: string) => void;
+  /** A sheet host presents choices in its own body rather than stacking a picker. */
+  onOpenEffort?: (blockId: string, setId: string) => void;
   /** Custom error path prefix, e.g. 'plans.0.exercises'. Defaults to 'exercises'. */
   errorPrefix?: string;
   /** The account's displayed efforts, cycling like the recorder. */
@@ -42,6 +44,7 @@ export function PlanBlockEditor({
   onRemoveBlock,
   onMoveBlock,
   onPickExercise,
+  onOpenEffort,
   errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
@@ -109,7 +112,11 @@ export function PlanBlockEditor({
               onCycleEffort={() => onChangeSet(block.id, set.id, {
                 targetSetType: nextSessionSetType(set.targetSetType, displayEfforts),
               })}
-              onOpenEffort={() => setEffortSetId(set.id)}
+              onOpenEffort={() => {
+                Keyboard.dismiss();
+                if (onOpenEffort) onOpenEffort(block.id, set.id);
+                else setEffortSetId(set.id);
+              }}
               testID={`plan-form-block-${index + 1}-set-${setIndex + 1}`}>
               <View style={styles.setRemove}>
                 <IconButton
@@ -145,15 +152,17 @@ export function PlanBlockEditor({
       {errors.get(`${blockPath}.sets`) ? (
         <Text allowFontScaling={false} style={styles.error}>{errors.get(`${blockPath}.sets`)}</Text>
       ) : null}
-      <EffortSheet
-        visible={effortSet !== undefined}
-        selected={effortSet?.targetSetType ?? null}
-        onSelect={(targetSetType) => {
-          if (effortSet) onChangeSet(block.id, effortSet.id, { targetSetType });
-          setEffortSetId(null);
-        }}
-        onDismiss={() => setEffortSetId(null)}
-      />
+      {onOpenEffort ? null : (
+        <EffortSheet
+          visible={effortSet !== undefined}
+          selected={effortSet?.targetSetType ?? null}
+          onSelect={(targetSetType) => {
+            if (effortSet) onChangeSet(block.id, effortSet.id, { targetSetType });
+            setEffortSetId(null);
+          }}
+          onDismiss={() => setEffortSetId(null)}
+        />
+      )}
       <ListRow
         accessibilityLabel={`Add target set to ${block.name || 'exercise'}`}
         density="list"
