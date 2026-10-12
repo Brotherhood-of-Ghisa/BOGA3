@@ -52,19 +52,21 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 ### comparison.weekly-reference · calculation · accepted
 
-Known training weeks in [[comparison.history-window]] supply references,
-including genuine zeros; exclude rest, future and unavailable weeks. Require
-six observations and a positive window maximum.
+Known training weeks in [[comparison.history-window]] supply references, zeros
+included; exclude rest/future/unavailable weeks. Require six observations and a
+positive maximum.
 
-| Metric | Reference lines |
-| --- | --- |
-| Sets | Median |
-| Volume, 1RM, Top weight | 25th percentile, median, 75th percentile |
+| Metric | Scale | Reference lines |
+| --- | --- | --- |
+| Sets | Zero to window maximum | Median |
+| Volume | Zero to window maximum | P25, median, P75 |
+| 1RM, Top weight | Symmetric linear range around median | P25, median, P75 |
 
-Percentiles interpolate sorted values. Bars and lines use training min and
-window max (at least 1): positive `12+88×(value−min)/(max−min)%`, collapsed
-`100%`, zero `0%`. Axis: min/mid/max; collapsed one label, empty/all-zero `0`.
-Coincident positions and accessible values remain; no visible reference labels.
+For strength minimum `a`, median `m` and maximum `b`, radius is
+`max(m − 0.9a, b − m)`; position is `50 + 50 × (value − m) / radius` percent.
+Compute the median even below six observations. Percentiles interpolate sorted
+values; coincident positions and accessible values remain. Empty/all-zero
+windows show `0`, without fill or references. Genuine zeros stay unfilled.
 
-Why: a consistent middle-half reference for selected history.
+Why: strength remains readable around typical readings; counts and Volume retain proportional lengths.
 Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.

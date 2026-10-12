@@ -1,7 +1,9 @@
 // Newest-first weekly rows. Length follows [[comparison.weekly-reference]]; colour retains
 // the adapter's independent intensity/target meaning. Reference calculations
 // follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
-import React, { useMemo, type ReactNode } from 'react';
+// Numeric labels use measured widths, centre on their ticks within the plot,
+// and yield to the centre label on overlap; all ticks and spoken values remain.
+import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
@@ -9,7 +11,7 @@ import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
 
-import { HEAT_RAMP } from './heatmap-metric';
+import { HEAT_RAMP, type CalendarHeatmapMetric } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
@@ -19,6 +21,7 @@ const DATE_WIDTH = 96;
 
 interface Props {
   data: HeatmapData;
+  metric: CalendarHeatmapMetric;
   /** Opens a week's sessions. */
   onOpenWeek?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
@@ -37,6 +40,57 @@ const isKnownTraining = (week: WeekCell) => !week.unavailable && (week.hasTraini
 
 const weekValue = (week: WeekCell, formatValue: Props['formatValue']) =>
   isKnownTraining(week) ? formatValue(week.value) : '';
+
+// Axis observations and bar/reference endpoints share this mapping.
+function weeklyScale(values: number[], metric: CalendarHeatmapMetric) {
+  const min = values[0] ?? 0;
+  const max = values[values.length - 1] ?? 0;
+  if (max <= 0) return { axisValues: [0], position: () => 0 };
+  if (metric === 'workingSetCount' || metric === 'totalVolume') {
+    return { axisValues: [0, max / 2, max], position: (value: number) => value / max * 100 };
+  }
+  const median = calculateLinearPercentile(values, .5);
+  const radius = Math.max(median - .9 * min, max - median);
+  // Never form median + radius: the upper boundary can exceed finite JS numbers.
+  return { axisValues: [min, median, max],
+    position: (value: number) => radius === 0 ? 50 : 50 + (value - median) / radius * 50 };
+}
+
+function WeeklyAxis({ values, position, formatValue, testID, children }: {
+  values: number[]; position: (value: number) => number; formatValue: Props['formatValue']; testID: string; children: ReactNode;
+}) {
+  const [plotWidth, setPlotWidth] = useState(0);
+  const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
+  // Measure every label first; prefer the centre, then minimum, then maximum.
+  const annotations = [...new Set([values[Math.floor(values.length / 2)], ...values])].map(value => {
+    const text = formatValue(value);
+    const width = labelWidths[text] ?? 0;
+    const coordinate = position(value) / 100 * plotWidth;
+    return { value, text, width, left: Math.max(0, Math.min(plotWidth - width, coordinate - width / 2)) };
+  });
+  const measured = plotWidth > 0 && annotations.every(annotation => annotation.width > 0);
+  const visible: typeof annotations = [];
+  for (const annotation of annotations) {
+    if (measured && visible.every(other => annotation.left >= other.left + other.width + uiSpace.xs
+      || other.left >= annotation.left + annotation.width + uiSpace.xs)) visible.push(annotation);
+  }
+  return <View style={styles.axis} onLayout={event => setPlotWidth(event.nativeEvent.layout.width)} testID={`${testID}-axis`}>
+    {annotations.map(annotation => <React.Fragment key={annotation.value}>
+      <View accessible accessibilityRole="text" accessibilityLabel={`Axis ${annotation.text}`}
+        testID={`${testID}-axis-tick-${annotation.value}`}
+        style={[styles.axisReference, { left: `${position(annotation.value)}%` }]} />
+      <Text allowFontScaling={false} numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+        testID={`${testID}-axis-value-${annotation.value}`}
+        onLayout={event => {
+          const width = event.nativeEvent.layout.width;
+          setLabelWidths(previous => previous[annotation.text] === width ? previous : { ...previous, [annotation.text]: width });
+        }}
+        style={[styles.axisLabel, { maxWidth: plotWidth || undefined,
+          transform: [{ translateX: annotation.left }], opacity: visible.includes(annotation) ? 1 : 0 }]}>{annotation.text}</Text>
+    </React.Fragment>)}
+    {children}
+  </View>;
+}
 
 // Discrete vertical dashes render consistently on iOS, including at zero.
 function ReferenceRule({ position, testID }: { position: number; testID?: string }) {
@@ -68,7 +122,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
     <View style={styles.plot}>
       <View style={styles.track}>
         <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
-          { width: `${week.unavailable ? 0 : position(week.value)}%`,
+          { width: `${isKnownTraining(week) && week.value > 0 ? position(week.value) : 0}%`,
             backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
       </View>
       {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
@@ -82,21 +136,17 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 
-export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
+export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatValue,
   formatReferenceValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
   // The adapter is chronological; reverse only the displayed copy.
-  const weeks = useMemo(() => [...data.weekly].reverse(), [data.weekly]);
-  const max = data.weekly.reduce((largest, week) => week.unavailable ? largest : Math.max(largest, week.value), 0);
+  const weeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey).reverse(), [data.weekly, data.todayDateKey]);
   const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
-  const min = values[0] ?? 0;
-  const scaleMax = Math.max(1, max);
-  const span = scaleMax - min;
-  const position = (value: number) => value <= 0 ? 0 : span > 0 ? 12 + (value - min) / span * 88 : 100;
-  const axisValues = max <= 0 ? [0] : span > 0 ? [min, min + span / 2, scaleMax] : [min];
+  const max = values[values.length - 1] ?? 0;
+  const { axisValues, position } = weeklyScale(values, metric);
   // Reference eligibility follows [[comparison.weekly-reference]].
   const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
-    ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
+    ? REFERENCE_PERCENTILES.filter(([id]) => metric !== 'workingSetCount' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);
       return { id, label, value: formatReferenceValue(value), position: position(value) };
     }) : [];
@@ -111,15 +161,12 @@ export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
       {/* No view title: the page's selectors say which view and metric this is. */}
       <View style={styles.axisRow}>
         <View style={styles.date} />
-        <View style={styles.axis} testID={`${testID}-axis`}>
-          {axisValues.map(value => <Text key={value} allowFontScaling={false}
-            testID={`${testID}-axis-value-${value}`} style={[styles.axisLabel,
-              position(value) === 100 ? { right: 0, textAlign: 'right' } : { left: `${position(value)}%` }]}>{formatValue(value)}</Text>)}
+        <WeeklyAxis key={metric} values={axisValues} position={position} formatValue={formatValue} testID={testID}>
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
-            accessibilityLabel={`${data.weekly.length}-week ${reference.label} ${reference.value}`}
+            accessibilityLabel={`${weeks.length}-week ${reference.label} ${reference.value}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
-        </View>
+        </WeeklyAxis>
         <View style={{ width: valueWidth }} />
       </View>
     </></View>}
@@ -154,7 +201,7 @@ const styles = StyleSheet.create({
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axis: { flex: 1, height: uiTypography.lineHeight.xxs + uiSpace.sm },
-  axisLabel: { ...heatmapStyles.legendText, position: 'absolute', maxWidth: '44%' },
+  axisLabel: { ...heatmapStyles.legendText, position: 'absolute', left: 0 },
   footer: { gap: uiSpace.xs, paddingTop: uiSpace.lg },
 });
 
