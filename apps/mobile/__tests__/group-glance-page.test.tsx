@@ -1,13 +1,14 @@
 /**
- * The Groups screen's At a glance section: the period board by the chosen
- * metric, the stepper back through earlier periods, and the position chart
- * with the selected period's table. The read, the metric, the period and the
+ * The Groups screen's At a glance section: the stepper on its own card, the
+ * period board by the chosen metric, and the position chart with the selected
+ * period's table; a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
  * offset are the screen's (groups-screens.test.tsx), so they arrive as props;
  * here a fixed six-week series pins every figure.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
-import { GroupGlancePage } from '@/components/groups/group-glance-page';
+import { GROUP_GLANCE_HOLD_FADE_DELAY_MS, GroupGlancePage } from '@/components/groups/group-glance-page';
 import { GroupApiError } from '@/src/groups/api';
 import {
   GROUP_HOME_BOARD_SIZE,
@@ -18,6 +19,7 @@ import {
   type GroupHomePeriod,
   type GroupHomeWindow,
 } from '@/src/groups/home-periods';
+import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
 
 // Wed 14 Oct 2026, 18:30 local: the week is Mon 12 – Sun 18 Oct.
 const NOW = new Date(2026, 9, 14, 18, 30);
@@ -55,6 +57,7 @@ const renderPage = ({
   period = 'week',
   offset = 0,
   series = seriesFor(period, offset),
+  held = null,
   onOffsetChange = jest.fn(),
   error = null,
   offline = false,
@@ -63,6 +66,7 @@ const renderPage = ({
   period?: GroupHomePeriod;
   offset?: number;
   series?: GroupHomeWindow[] | null;
+  held?: GroupGlanceHeld | null;
   onOffsetChange?: (next: number) => void;
   error?: GroupApiError | null;
   offline?: boolean;
@@ -70,6 +74,7 @@ const renderPage = ({
   render(
     <GroupGlancePage
       error={error}
+      held={held}
       metric={metric}
       myUserId={ME}
       now={NOW}
@@ -87,6 +92,16 @@ const boardValues = (): string[] =>
   screen.getAllByTestId(/^group-home-board-row-.*-value$/).map((node) => String(node.props.children));
 
 describe('At a glance: the board', () => {
+  it('sets the period on a card of its own, above the board and the position cards', () => {
+    renderPage();
+
+    expect(within(byId('group-glance-period-card')).getByTestId('group-home-period-stepper')).toBeTruthy();
+    expect(within(byId('group-home-board-card')).queryByTestId('group-home-period-stepper')).toBeNull();
+    expect(within(byId('group-home-board-card')).getByTestId('group-home-board')).toBeTruthy();
+    expect(within(byId('group-glance-figures')).getByTestId('group-position-card')).toBeTruthy();
+    expect(within(byId('group-glance-figures')).getByText('Rankings')).toBeTruthy();
+  });
+
   it('opens on this week by sets: the top five, and my place on its own line', () => {
     renderPage();
 
@@ -155,6 +170,59 @@ describe('At a glance: before the read lands', () => {
     renderPage({ series: null, error: new GroupApiError('INTERNAL', 'Boom') });
     expect(byId('group-glance-error-state')).toBeTruthy();
     expect(byId('group-glance-error-state-retry')).toBeTruthy();
+  });
+});
+
+describe('At a glance: a held read while the next one lands', () => {
+  const opacity = () => StyleSheet.flatten(byId('group-glance-figures').props.style).opacity;
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('keeps the figures in place under the new period, fading them only if the read is slow', () => {
+    jest.useFakeTimers();
+    // Stepped back to last week; this week's read is still on screen.
+    renderPage({ offset: -1, series: seriesFor('week', 0), held: { period: 'week', offset: 0 } });
+
+    expect(byId('group-home-period-title')).toHaveTextContent('Last week');
+    expect(screen.queryByTestId('group-glance-loading')).toBeNull();
+    expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
+    // Drawn as the week it was read for: still "so far".
+    expect(byId('group-position-selected')).toHaveTextContent('Mon 12 – Sun 18 · so far');
+    expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
+    expect(opacity()).toBeUndefined();
+
+    act(() => jest.advanceTimersByTime(GROUP_GLANCE_HOLD_FADE_DELAY_MS));
+    expect(opacity()).toBe(0.5);
+
+    // Last week lands: full strength at once, nothing busy.
+    screen.rerender(
+      <GroupGlancePage
+        error={null}
+        held={null}
+        metric="sets"
+        myUserId={ME}
+        now={NOW}
+        offline={false}
+        offset={-1}
+        onOffsetChange={jest.fn()}
+        onRetry={jest.fn()}
+        period="week"
+        series={seriesFor('week', -1)}
+      />,
+    );
+    expect(opacity()).toBeUndefined();
+    expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: false });
+    expect(byId('group-position-selected')).toHaveTextContent('Mon 5 – Sun 11');
+  });
+
+  it('labels a held week read in weeks after a switch to months', () => {
+    renderPage({ period: 'month', series: seriesFor('week'), held: { period: 'week', offset: 0 } });
+
+    expect(byId('group-home-period-title')).toHaveTextContent('This month');
+    expect(within(byId('group-position-card')).getByText('Last 6 weeks · sets')).toBeTruthy();
+    expect(byId('group-position-selected')).toHaveTextContent('Mon 12 – Sun 18 · so far');
   });
 });
 
