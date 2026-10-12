@@ -4,7 +4,7 @@ import { validateExerciseCore, type ExerciseCore } from '../exercise-core/index.
 import { validateBodyweightContribution } from '../exercise-core/bodyweight-contribution.ts';
 
 export const GROUP_COMPETITION_VERSION = 4;
-export const GROUP_COMPETITION_CACHE_VERSION = 5;
+export const GROUP_COMPETITION_CACHE_VERSION = 6;
 export const GROUP_COMPETITION_METRICS = ['volume', 'e1rm'] as const;
 export type CompetitionMetric = typeof GROUP_COMPETITION_METRICS[number];
 /** Rules revision is server-owned; a client may send its expected revision for concurrency. */

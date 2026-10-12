@@ -168,11 +168,11 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 // ---- Reads --------------------------------------------------------------------
 
 export const listMyGroups = async (): Promise<GroupListMineResult> =>
-  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v5:mine',r));
+  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v6:mine',r));
 
 export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   expectShape('group_get', await callGroupRpc('group_get', { p_group_id: groupId }), (r) =>
-    isCompetitionCachePayload(`group:v5:${groupId}`,r),
+    isCompetitionCachePayload(`group:v6:${groupId}`,r),
   );
 
 export const previewGroupInvite = async (code: string): Promise<GroupInvitePreviewResult> =>

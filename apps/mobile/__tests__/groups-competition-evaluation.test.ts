@@ -51,6 +51,45 @@ it('compares two members by relative physical load, independently of source/targ
     .scores.map(score => score.value)).toEqual(evaluateCompetitionGraph(graph).scores.map(score => score.value));
 });
 
+it.each([['total_load', '20'], ['per_side_load', '10']] as const)(
+  'rescores an old %s winner separately before comparing a genuine decrease', (source_load_input_mode, weight_value) => {
+    const previous = { member_user_id: source.member_user_id, set_id: source.set_id, fingerprint: 'old-winner', metric: 'volume' as const,
+      performance: { ...source, source_load_input_mode, weight_value, reps_value: '8', reps: 8 } };
+    const result = evaluateCompetitionGraph({ ...graph,
+      rules: { ...graph.rules, bodyweight_calculations_enabled: false, load_input_mode: 'per_side_load' },
+      sets: [{ ...source, source_load_input_mode, weight_value: source_load_input_mode === 'total_load' ? '18' : '9', reps_value: '8' }], ordinary_baselines: [previous],
+    });
+    expect(result.baseline_scores).toEqual([{ metric: 'volume', value: 160, unit: 'kg_reps',
+      member_user_id: source.member_user_id, set_id: source.set_id, fingerprint: 'old-winner' }]);
+    expect(result.scores[0]).toMatchObject({ metric: 'volume', value: 144, fingerprint: 'volume-pin' });
+    expect(previous.performance.weight_value).toBe(weight_value);
+  });
+
+it('does not inspect ordinary baseline snapshots during normalized evaluation', () => {
+  const previous = { member_user_id: source.member_user_id, set_id: source.set_id, fingerprint: 'old-winner', metric: 'volume' as const,
+    get performance(): never { throw new Error('absolute snapshot read'); } };
+  expect(evaluateCompetitionGraph({ ...graph, ordinary_baselines: [previous] }).baseline_scores).toEqual([]);
+});
+
+it('calibrates previous Volume and 1RM to the current member source mode before a new lift', () => {
+  const performance = { ...source, weight_value: '10', reps_value: '8', reps: 8,
+    source_load_input_mode: 'per_side_load' as const };
+  const result = evaluateCompetitionGraph({ ...graph,
+    rules: { ...graph.rules, bodyweight_calculations_enabled: false },
+    sets: [{ ...source, member_user_id: 'other', source_load_input_mode: 'per_side_load' },
+      { ...source, weight_value: '10', reps_value: '8' },
+      { ...source, set_id: 'new', weight_value: '11', reps_value: '8' }],
+    ordinary_baselines: (['volume', 'e1rm'] as const).map(metric => ({
+      member_user_id: source.member_user_id, set_id: source.set_id, metric, fingerprint: `old-${metric}`, performance,
+    })),
+  });
+  expect(result.baseline_scores[0]).toMatchObject({ metric: 'volume', value: 80 });
+  const improved = result.scores.filter(score => score.member_user_id === source.member_user_id && score.set_id === 'new');
+  expect(improved[0]).toMatchObject({ metric: 'volume', value: 88 });
+  expect(improved[1].value).toBeGreaterThan(result.baseline_scores[1].value);
+  expect(performance.source_load_input_mode).toBe('per_side_load');
+});
+
 it.each([{ bodyweight_calculations_enabled: false }, { bodyweight_contribution: 0 }])(
   'never touches private source fields under ordinary rules %p', change => {
     const row = { ...source };
@@ -58,7 +97,7 @@ it.each([{ bodyweight_calculations_enabled: false }, { bodyweight_contribution: 
       Object.defineProperty(row, key, { get: () => { throw new Error('private lookup'); } });
     }
     const result = evaluateCompetitionGraph({ ...graph, rules: { ...graph.rules, ...change, load_input_mode: 'per_side_load' }, sets: [row] });
-    expect(result.scores[0]).toMatchObject({ metric: 'volume', value: 50, unit: 'kg_reps' });
+    expect(result.scores[0]).toMatchObject({ metric: 'volume', value: 100, unit: 'kg_reps' });
     expect(result.scores[1].unit).toBe('kg');
   });
 

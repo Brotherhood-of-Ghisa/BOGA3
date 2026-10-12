@@ -74,7 +74,7 @@
     "repsValue": "8",
     "calculatedLoadKg": 20,
     "volumeKgReps": 160,
-    "estimatedOneRepMaxKg": 25.534283816090746,
+    "estimatedOneRepMaxKg": 25.534283816090745,
     "perSideCalculatedLoadKg": 10
   },
   {
@@ -89,5 +89,57 @@
     "volumeKgReps": 0,
     "estimatedOneRepMaxKg": 0,
     "perSideCalculatedLoadKg": 0
+  },
+  {
+    "name": "ordinary per-side exercise",
+    "policy": "ordinary",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": null,
+    "loadInputMode": "per_side_load",
+    "weightValue": "10",
+    "repsValue": "8",
+    "calculatedLoadKg": 20,
+    "volumeKgReps": 160,
+    "estimatedOneRepMaxKg": 12.767141908045373,
+    "perSideCalculatedLoadKg": 10
+  },
+  {
+    "name": "personal zero-contribution per-side exercise",
+    "policy": "personal",
+    "bodyweightContribution": 0,
+    "bodyWeightKg": null,
+    "loadInputMode": "per_side_load",
+    "weightValue": "10",
+    "repsValue": "8",
+    "calculatedLoadKg": 20,
+    "volumeKgReps": 160,
+    "estimatedOneRepMaxKg": 12.767141908045373,
+    "perSideCalculatedLoadKg": 10
+  },
+  {
+    "name": "group zero-contribution per-side exercise",
+    "policy": "group",
+    "bodyweightContribution": 0,
+    "bodyWeightKg": null,
+    "loadInputMode": "per_side_load",
+    "weightValue": "10",
+    "repsValue": "8",
+    "calculatedLoadKg": 20,
+    "volumeKgReps": 160,
+    "estimatedOneRepMaxKg": 12.767141908045373,
+    "perSideCalculatedLoadKg": 10
+  },
+  {
+    "name": "personal per-side missing reading uses zero",
+    "policy": "personal",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": null,
+    "loadInputMode": "per_side_load",
+    "weightValue": "10",
+    "repsValue": "8",
+    "calculatedLoadKg": 20,
+    "volumeKgReps": 160,
+    "estimatedOneRepMaxKg": 12.767141908045373,
+    "perSideCalculatedLoadKg": 10
   }
 ]

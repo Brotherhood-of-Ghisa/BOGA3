@@ -26,7 +26,8 @@ export const personalLoadContext = (
   policy: enabled ? 'personal' : 'ordinary',
   bodyweightContribution: enabled ? definition?.bodyweightContribution ?? 0 : 0,
   loadInputMode: definition?.loadInputMode ?? 'total_load',
-  bodyWeightKg: enabled ? sessionBodyWeightForCalculation(session) : null,
+  bodyWeightKg: enabled && (definition?.bodyweightContribution ?? 0) > 0
+    ? sessionBodyWeightForCalculation(session) : null,
 });
 
 /** Group policy keeps positive-contribution scores absent without a reading. */

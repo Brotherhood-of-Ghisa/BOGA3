@@ -7,6 +7,7 @@ import {
   type SetMetricInput,
 } from '@/src/exercise-calculations/load-metrics';
 import vectors from '@/src/exercise-calculations/load-metrics-vectors.json';
+import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 
 const pullUp: SetMetricInput = {
   policy: 'group',
@@ -57,12 +58,40 @@ describe('shared load metrics', () => {
       .toEqual({ status: 'invalid', reason: 'weight_invalid' });
   });
 
-  it('uses ordinary Weight unchanged and ignores bodyweight inputs', () => {
+  it('ignores ordinary bodyweight inputs', () => {
     for (const bodyWeightKg of [null, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(resolveCalculatedLoad({ ...pullUp, policy: 'ordinary', bodyWeightKg })).toMatchObject({
         status: 'known', calculatedLoadKg: 20, bodyweightPartKg: 0,
       });
     }
+  });
+
+  it.each([
+    ['ordinary', 1], ['personal', 0], ['group', 0],
+  ] as const)('does not access a private reading for %s contribution %s', (policy, bodyweightContribution) => {
+    const input: SetMetricInput = { ...pullUp, policy, bodyweightContribution, loadInputMode: 'per_side_load' };
+    Object.defineProperty(input, 'bodyWeightKg', { get: () => { throw new Error('private read'); } });
+    expect(resolveCalculatedLoad(input)).toMatchObject({ calculatedLoadKg: 40, perSideCalculatedLoadKg: 20 });
+    expect(calculateSetMetrics(input)).toMatchObject({ volumeKgReps: 320,
+      estimatedOneRepMaxKg: estimateOneRepMax(20, 8), estimatedTotalOneRepMaxKg: estimateOneRepMax(40, 8) });
+    const session = { get bodyWeightKg(): number { throw new Error('private read'); } };
+    expect(personalLoadContext(policy !== 'ordinary', { bodyweightContribution, loadInputMode: 'per_side_load' }, session))
+      .toMatchObject({ bodyWeightKg: null, loadInputMode: 'per_side_load' });
+  });
+
+  it.each([0, 0.25, 1])('projects a per-side single back to entered units at contribution %s', bodyweightContribution => {
+    expect(calculateSetMetrics({ ...pullUp, bodyweightContribution, loadInputMode: 'per_side_load',
+      weightValue: '10', repsValue: '1' })).toMatchObject({
+      volumeKgReps: bodyweightContribution * 80 + 20, estimatedOneRepMaxKg: 10,
+    });
+  });
+
+  it('rejects external-factor overflow even without bodyweight', () => {
+    const input = { ...pullUp, policy: 'ordinary' as const, loadInputMode: 'per_side_load' as const,
+      weightValue: `1${'0'.repeat(308)}`, repsValue: '1' };
+    expect(resolveCalculatedLoad(input)).toEqual({ status: 'invalid', reason: 'numeric_overflow' });
+    expect(calculateSetMetrics(input)).toMatchObject({ load: { status: 'invalid', reason: 'numeric_overflow' },
+      volumeKgReps: null, estimatedOneRepMaxKg: null });
   });
 
   it('keeps planned and unperformed rows out of metrics', () => {

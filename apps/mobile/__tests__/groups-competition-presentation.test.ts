@@ -44,6 +44,18 @@ test('normalized full sessions keep permitted reps and effort without derived lo
   expect(JSON.stringify(model)).not.toMatch(/body_weight|reading|fingerprint/);
 });
 
+test.each([['total_load', '20', '25.5'], ['per_side_load', '10', '12.8']] as const)(
+  'ordinary %s sessions keep raw rows and sum total Volume', (load_input_mode, weight_value, oneRepMax) => {
+    const exercise = competitionSession.session.exercises[0];
+    const input = { ...competitionSession.session, exercises: [{ ...exercise,
+      load_input_mode, visibility: 'ordinary' as const,
+      sets: [{ ...exercise.sets[0], weight_value, reps_value: '8' }],
+    }] };
+    expect(buildCompetitionSession(input)).toMatchObject({ setCount: 1, exerciseCount: 1, volume: '160',
+      cards: [{ hideDerivedMetrics: false, rows: [{ weightReps: `${weight_value}.0 × 8`, oneRepMax, volume: '160' }] }] });
+    expect(input.exercises[0].sets[0].weight_value).toBe(weight_value);
+  });
+
 
 test.each(['bad', '-1', '1e3'])('ordinary full-session invalid Weight %s is not performed or counted', weight => {
   const exercise=competitionSession.session.exercises[0];

@@ -137,7 +137,7 @@ expect_sql() {
 drain_ok() {
   eval_drain
   expect_ok "group-eval drain: $1"
-  check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 6'
+  check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 7'
 }
 
 # mine: the athlete's jobs in the last drain, keyed by session id or group exercise id.
@@ -414,7 +414,7 @@ expect_fact bc "false:true:-:-:-"
 expect_fact d1 "true:true:30:10:$(e1rm 30 10)"
 expect_fact g1 "true:false:50:5:$(e1rm 50 5)"
 expect_sql "every S1 fact: position, session start, rules version, SQL fingerprint of the raw row" \
-  "select count(*) || ':' || bool_and(f.achieved_at_ms = ${START} and f.rules_version = 6
+  "select count(*) || ':' || bool_and(f.achieved_at_ms = ${START} and f.rules_version = 7
             and f.session_id = '${S1}' and f.session_exercise_id = es.session_exercise_id
             and f.set_order_index = es.order_index
             and f.fingerprint = app_public.group_set_fingerprint(es.weight_value, es.reps_value,
@@ -632,7 +632,7 @@ drain_ok "rules"
 expect_mine "a rules requeue re-normalizes the session" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"
 pass "rules requeue"
 expect_sql "a drain records the rules version it runs with" \
-  "select rules_version from app_public.group_eval_rules_state;" "6"
+  "select rules_version from app_public.group_eval_rules_state;" "7"
 
 # More stale sessions than one run requeues (RULES_REQUEUE_LIMIT, 50). After a
 # bump the first run is the only one a member write would kick; the rest must
@@ -649,7 +649,7 @@ push "${ATHLETE_TOKEN}" "${BULK} shared sessions" "${BULK_ROWS[@]}"
 drain_ok "bulk sessions"
 bulk_stale() {
   run_psql "select count(distinct session_id) from app_public.group_set_facts
-             where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%' and rules_version < 6;"
+             where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%' and rules_version < 7;"
 }
 expect_sql "every bulk session is normalized" \
   "select count(distinct session_id) from app_public.group_set_facts

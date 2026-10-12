@@ -51,6 +51,14 @@ export type CompetitionEvaluationGraph = {
   rules: CompetitionRulesWire;
   source_token: string;
   sets: CompetitionSourceSet[];
+  /** Previous ordinary winners, fenced by the source token; baseline-only. */
+  ordinary_baselines?: {
+    member_user_id: string;
+    set_id: string;
+    fingerprint: string;
+    metric: CompetitionMetric;
+    performance: CompetitionPerformanceSnapshot;
+  }[];
 };
 export type EvaluatedCompetitionSet = CompetitionValue & {
   member_user_id: string;
@@ -77,6 +85,7 @@ export type CompetitionEvaluation = {
   rules_revision: number;
   source_token: string;
   scores: EvaluatedCompetitionSet[];
+  baseline_scores: (CompetitionValue & { member_user_id: string; set_id: string; fingerprint: string })[];
 };
 
 function privateContext(row: CompetitionSourceSet, normalized: boolean) {
@@ -125,6 +134,16 @@ export function evaluateCompetitionGraph(graph: CompetitionEvaluationGraph): Com
         working: isWorkingSetType(row.set_type), performance: performanceSnapshot(row) });
     }
   }
+  const baseline_scores = isNormalizedCompetition(checked.value) ? [] : (graph.ordinary_baselines ?? []).flatMap(previous => {
+    const row = previous.performance;
+    const mode = graph.sets.find(current => current.member_user_id === previous.member_user_id &&
+      current.exercise_definition_id === row.exercise_definition_id)?.source_load_input_mode ?? row.source_load_input_mode;
+    return scoreCompetitionPerformance({ live: true, performanceStatus: row.performance_status,
+      weightValue: row.weight_value, repsValue: row.reps_value, source: { loadInputMode: mode },
+      bodyWeightKg: null, bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
+    }, checked.value).filter(value => value.metric === previous.metric)
+      .map(value => ({ ...value, member_user_id: previous.member_user_id, set_id: previous.set_id, fingerprint: previous.fingerprint }));
+  });
   return { contract_version: 4, group_id: graph.group_id, group_exercise_id: graph.group_exercise_id,
-    rules_revision: wire.rules_revision, source_token: graph.source_token, scores };
+    rules_revision: wire.rules_revision, source_token: graph.source_token, scores, baseline_scores };
 }

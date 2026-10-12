@@ -34,12 +34,10 @@ The stream is one persistent table, `group_events`. All access goes through
 a disposable cache; there is no Realtime. The `group-eval` Edge Function
 normalizes shared sets with the app's TS and materializes the boards.
 
-Rejected: per-group copies of sessions (every autosave re-pushes the graph:
-diffing and N copies); a client-pushed group projection (a second write path
-that risks personal sync); querying sessions by membership window (no owned
-record, no stable stream index); group rows as Sync v2 entities (per-owner LWW
-cannot hold multi-reader server rows); an Edge Function group API
-(authorization in app code instead of the database).
+Rejected: per-group session copies and client-pushed projections (duplicated
+state); membership-window reads (no durable share record); synced group rows
+(per-owner LWW cannot serve multiple readers); an Edge API (authorization
+belongs in the database).
 
 ## Server rules
 
@@ -125,14 +123,14 @@ retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
   its `started_at`; a record sorts at its session's start, just above the card.
   The All stream (`p_group_id` null) is server-only; the app reads one group.
 
-One RPC generation: the membership and settings RPCs, and protocol 4
+Membership and settings RPCs, and protocol 4
 (`group_competition_*`, owned by the competition contract) for everything
 competitive. Every group RPC requires the `x-boga-group-contract: 4` header
 (`UPDATE_REQUIRED` otherwise). The legacy kg and protocol-3 RPCs are gone; their
 stored rows remain history.
 
-**Week summary and period totals.** The client sends local windows; the
-server never guesses a time zone. Both count, over completed, untombstoned
+**Week summary and period totals.** The client supplies local windows; the server never guesses a time zone.
+Both count, over completed, untombstoned
 sessions shared to the group by current members and started in a window,
 their performed, live, working facts whose rows still exist (trailing the
 evaluator; [[set.eligibility]]) and non-voided group records, one per board
@@ -166,7 +164,8 @@ only ordinary exercises' volume-included sets ([[set.eligibility]],
 [[copy.no-inline-explanation]]): hidden kg never enters it, so nothing is
 recovered by subtraction; `—` with none. Nothing is mirrored in SQL: SQL mirrors once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted
-live set. Ordinary rows use ordinary kg and never read a personal preference,
+live set. Ordinary rows retain logged kg; Volume uses the source entry factor for total
+load, independently of target mode. They never read a personal preference,
 contribution or reading.
 
 ## Evaluator
@@ -206,7 +205,8 @@ set is excluded like a warm-up. A set-rule or kernel change bumps
 older facts has no queued job, so once the new function has run once, a bump
 finishes without member activity. Comparisons are not stamped with it: the
 same change ships a migration enqueuing a `rules` evaluation of every live
-comparison.
+comparison, applied after the new worker is live. Kernel rescores advance only
+private record baselines; immutable historical values and revisions stay intact.
 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.
@@ -314,7 +314,7 @@ never a Sync v2 trigger.
 disposable copy of server data, out of sync scope. Rows carry `user_id`; a read
 for another user returns null. Streams cache the first page only. A group
 `NOT_FOUND` evicts the group's and session entries, never synced links. A
-payload shape change bumps the versioned keys (`cache.ts`).
+payload or calculation change bumps the versioned keys (`cache.ts`).
 
 ## Not built
 
@@ -325,7 +325,6 @@ proposals, disputes, push notifications.
 
 ## Rule IDs
 
-Code and tests cite these.
 
 | ID | Rule |
 | --- | --- |
@@ -337,7 +336,7 @@ Code and tests cite these.
 | P10–P13, D3–D5 | Another current member certifies a record set; one suffices; certifier withdraws, admin cancels; edits void it |
 | P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |
 | P18 | Certify and admin actions need a connection |
-| D6 | Scores convert across load modes (competition contract §1) |
+| D6 | Ordinary 1RM converts across load modes; Volume stays total (competition contract §1) |
 | E0–E0.4 | Linking: picker search, pick sheet, Link screen, group-page link/unlink |
 | E1–E1.3 | Podiums, full board with toggles, history |
 | E2, E3 | Row detail sheet; stream record card (`GroupMetricStreamCard`) |

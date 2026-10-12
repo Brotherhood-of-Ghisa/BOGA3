@@ -158,7 +158,7 @@ reading never creates an unavailable state.
 `groups-competition-evaluation.test.ts` must cover independent group preference and
 contribution, strict 1RM/Volume, kg total/per-side input, missing or
 invalid reading omission, performed eligibility and zero ranking exclusion.
-Ordinary single-set Volume/1RM convert to the target (the load-factor vectors in
+Ordinary single-set Volume is total load; only 1RM converts to the target (the load-factor vectors in
 `groups-link-compatibility.test.ts`) and normalized percentages use physical
 total load; mode changes rebuild. Off/zero vectors must prove no private-reading lookup or invalidation;
 positive+missing must rebuild when a first applicable reading arrives. Personal
@@ -184,7 +184,7 @@ single-set Volume, effective total-load 1RM normalization with the same dated B,
 physical source distribution, ordinary target conversion, missing/invalid/zero
 omission, full-precision scores and exact public allowlists. Nested kg/private
 fields, dependency digests and unsupported units/versions must fail decoding.
-`groups-cache.test.ts` proves group-scoped version-5 session keys and account-only
+`groups-cache.test.ts` proves group-scoped version-6 session keys and account-only
 whole-group-cache eviction across generations. The backend competition fixture
 runs the actual negotiation response through the mobile decoder and proves
 anonymous/OAuth/outsider/unsupported-protocol denial.

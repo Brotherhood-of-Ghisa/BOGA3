@@ -55,10 +55,15 @@ it.each([
   [80, 1, '20', 'total_load', true, 800, 400],
   [80, 0.7, '20', 'total_load', true, 608, 304],
   [80, 1, '20', 'per_side_load', true, 960, 480],
-  [null, 0, '20', 'per_side_load', true, 160, 160],
+  [null, 0, '20', 'per_side_load', true, 320, 160],
   [null, 0, '20', 'total_load', true, 160, 80],
   [null, 1, '20', 'total_load', true, 160, 80],
   [80, 1, '20', 'total_load', false, 160, 80],
+  [80, 1, '10', 'per_side_load', false, 160, 80],
+  [80, 1, '10', 'per_side_load', true, 800, 400],
+  [80, 0.7, '10', 'per_side_load', true, 608, 304],
+  [null, 1, '10', 'per_side_load', true, 160, 80],
+  [null, 0, '0', 'per_side_load', true, 0, 0],
   [80, 1, '100', 'total_load', true, 1440, 720],
 ] as const)('agrees across surfaces for B=%s c=%s Weight=%s mode=%s enabled=%s', (B, c, amount, loadMode, enabled, volume, muscleVolume) => {
   const f = fixture(B, c, amount, loadMode, enabled);
@@ -82,6 +87,13 @@ it.each([
   expect(daily.estimatedRM1).toBe(entry.estimatedOneRepMax);
   expect(blocks.blocks[0].estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
   expect(catalog.estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
+  expect(entry.topWeightSet?.weight).toBe(Number(amount || 0));
+  expect(f.set.weightValue).toBe(amount);
+  const primary = collectMuscleSetContributions(f.muscle)[0];
+  const secondary = collectMuscleSetContributions({ ...f.muscle, muscleMappings: [
+    { ...f.muscle.muscleMappings[0], role: 'secondary' },
+  ] })[0];
+  equalMetric(secondary.weightedVolume, primary.weightedVolume! / 2);
   expect(entry.workingSetCount).toBe(1); expect(catalog.workingSetCount).toBe(1); expect(daily.workingSetCount).toBe(1);
   const shown = volume === null ? '—' : String(Math.round(volume));
   expect(buildSessionViewModel(f.session, new Map()).volume).toBe(shown);

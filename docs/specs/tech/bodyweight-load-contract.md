@@ -63,7 +63,8 @@ cannot accidentally enter strict group scoring:
   A positive contribution with no applicable valid member reading returns no
   bodyweight-dependent score. When disabled, behave as `ordinary`.
 
-The policy above decides the contribution `c` and the bodyweight `B`. The
+The policy above decides effective contribution `c` and bodyweight `B`; the
+source entry factor applies even when `c` is zero. The
 calculation that uses them, for calculated load, Volume, 1RM, top weight and
 muscle volume, is `training-metrics-contract.md` §4. Malformed reading rows are
 not applicable readings: selection skips them and may use an older valid row.
@@ -223,7 +224,8 @@ per-side input; exact kg conversion; blank/zero; missing, malformed and changed
 readings; invalid/overflow values; Wathan projection; and zero record exclusion.
 Retained protocol-3 mismatch vectors keep raw Weight unchanged, derive 1RM in
 source mode before converting it to target mode, and keep legacy aggregate Volume
-target-unconverted. Protocol-4 competition vectors use ordinary target conversion and normalized physical total-load representation;
+target-unconverted. Protocol-4 vectors keep ordinary Volume in total kg·reps, convert only ordinary
+1RM to target units, and normalize physical total load;
 both mode changes rebuild coherently. Privacy vectors prove off/zero group
 evaluation performs no reading lookup or reading-change invalidation, while a
 positive missing dependency is rebuilt when its first reading arrives.
