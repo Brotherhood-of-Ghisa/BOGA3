@@ -1,24 +1,23 @@
 import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { forwardRef } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
+import { Pressable, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { Icon } from '@/components/ui/icon';
 import {
   uiBorder,
-  uiFonts,
   uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
 } from '@/components/ui/tokens';
-import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import type { SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canCommitLogger,
-  formatEffort,
   previewMetrics,
 } from '@/src/session-recorder/exercise-page-model';
+
+import { SetEntryFields } from './set-entry-fields';
 
 import { pageText } from './text-styles';
 
@@ -42,9 +41,9 @@ type SetLoggerProps = {
   onDrop?: () => void;
 };
 
-// Up to 5 digits and a point; the logger rejects anything else as it is typed.
-const isWeightInput = (text: string) => /^\d*\.?\d*$/.test(text) && text.replace('.', '').length <= 5;
-const REPS_PATTERN = /^\d{0,2}$/;
+// Permit partial decimal entry; the shared parser validates finite load on commit.
+const isWeightInput = (text: string) => /^\d*\.?\d*$/.test(text);
+const REPS_PATTERN = /^\d{0,3}$/;
 
 const DASH = '—';
 
@@ -70,10 +69,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, loadContext);
   const canCommit = canCommitLogger({ weightValue, repsValue });
-  const effort = formatEffort(setType);
-  const effortText = setType === 'technique' || setType === 'cooldown'
-    ? formatSessionSetType(setType, 'compact')
-    : effort;
 
   return (
     <View style={styles.logger} testID="exercise-set-logger">
@@ -96,54 +91,18 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
           {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
         </Text>
       </View>
-      <View style={styles.fields}>
-        <Pressable
-          accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
-          accessibilityRole="button"
-          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
-          onPress={onCycleEffort}
-          onLongPress={onOpenEffort}
-          style={[styles.field, styles.effortField]}
-          testID="exercise-set-logger-effort">
-          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
-          <View style={styles.effortValue}>
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
-              {effortText}
-            </Text>
-            <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
-          </View>
-        </Pressable>
-        <View style={[styles.field, styles.weightField]}>
-          <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
-          <TextInput
-            allowFontScaling={false}
-            accessibilityLabel={`Set ${number} weight in kilograms`}
-            keyboardType="decimal-pad"
-            onChangeText={(text) => {
-              if (isWeightInput(text)) onChangeWeight(text);
-            }}
-            ref={weightInputRef}
-            selectTextOnFocus
-            style={styles.input}
-            testID="exercise-set-logger-weight"
-            value={weightValue}
-          />
-        </View>
-        <View style={[styles.field, styles.repsField]}>
-          <Text allowFontScaling={false} style={pageText.microLabel}>Reps</Text>
-          <TextInput
-            allowFontScaling={false}
-            accessibilityLabel={`Set ${number} reps`}
-            keyboardType="number-pad"
-            onChangeText={(text) => {
-              if (REPS_PATTERN.test(text)) onChangeReps(text);
-            }}
-            selectTextOnFocus
-            style={styles.input}
-            testID="exercise-set-logger-reps"
-            value={repsValue}
-          />
-        </View>
+      <SetEntryFields
+        number={number}
+        weightValue={weightValue}
+        repsValue={repsValue}
+        setType={setType}
+        loadInputMode={loadContext.loadInputMode}
+        onChangeWeight={(text) => { if (isWeightInput(text)) onChangeWeight(text); }}
+        onChangeReps={(text) => { if (REPS_PATTERN.test(text)) onChangeReps(text); }}
+        onCycleEffort={onCycleEffort}
+        onOpenEffort={onOpenEffort}
+        ref={weightInputRef}
+        testID="exercise-set-logger">
         <View style={styles.control}>
           <Pressable
             accessibilityLabel={`Log set ${number} as performed`}
@@ -156,7 +115,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
             <Icon color={uiRoles.surface} name="check" />
           </Pressable>
         </View>
-      </View>
+      </SetEntryFields>
     </View>
   );
 });
@@ -186,57 +145,6 @@ const styles = StyleSheet.create({
   setLabel: {
     fontWeight: '800',
     color: uiRoles.accent,
-  },
-  fields: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  field: {
-    height: uiGeometry.fieldHeight,
-    paddingHorizontal: uiSpace.sm,
-    paddingTop: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-  },
-  // The leading column, aligned to the set viewer's effort column: two tap
-  // targets hold the compact label and its caret.
-  effortField: {
-    width: uiGeometry.tapTarget * 2,
-  },
-  // Narrowed to leave the effort control its room; still wide enough for a
-  // five-digit weight. Shrinks below the cap on small viewports.
-  weightField: {
-    flex: 1,
-    maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl,
-  },
-  // Two digits of reps; `W-Up` and its caret.
-  repsField: {
-    width: uiGeometry.fieldHeight,
-  },
-  input: {
-    flex: 1,
-    padding: 0,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxl,
-    color: uiRoles.ink,
-  },
-  effortValue: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  effortText: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
   // Pinned to the trailing edge so the tick keeps the list's control axis.
   control: {

@@ -26,8 +26,7 @@ export const parseSetWeight = (value: string | null | undefined): number | null 
 
 /**
  * The most reps a performed set can have ([[set.performed]]). The exercise
- * page's reps input (`components/exercise-page/set-logger.tsx`) stops at two
- * digits; imported, synced and agent-written sets stop here.
+ * page's reps input, imported, synced and agent-written sets share this cap.
  */
 export const MAX_SET_REPS = 999;
 

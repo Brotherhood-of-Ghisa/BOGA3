@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FormField, IconButton, ListRow, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { IconButton, ListRow, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
-import { Icon } from '@/components/ui/icon';
-import { formatSessionSetType, nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import { SetEntryFields } from '@/components/exercise-page/set-entry-fields';
+import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { nextSessionSetType } from '@/src/data/set-types';
 import type { PlanFormBlock, PlanFormSet } from '@/src/session-planner/plan-form-model';
 
 export type PlanBlockEditorProps = {
@@ -11,7 +13,6 @@ export type PlanBlockEditorProps = {
   index: number;
   count: number;
   errors: Map<string, string>;
-  onChangeBlock: (blockId: string, patch: Partial<PlanFormBlock>) => void;
   onChangeSet: (blockId: string, setId: string, patch: Partial<PlanFormSet>) => void;
   onAddSet: (blockId: string) => void;
   onRemoveSet: (blockId: string, setId: string) => void;
@@ -20,45 +21,13 @@ export type PlanBlockEditorProps = {
   onPickExercise: (blockId: string) => void;
   /** Custom error path prefix, e.g. 'plans.0.exercises'. Defaults to 'exercises'. */
   errorPrefix?: string;
-  /** The account's displayed efforts, cycling the type field like the recorder. */
+  /** The account's displayed efforts, cycling like the recorder. */
   displayEfforts?: readonly EffortChoice[];
 };
 
-const typeWord = (setType: SessionSetTypeValue) =>
-  setType === null ? 'Work' : formatSessionSetType(setType, 'full') ?? 'Work';
-
-/** The effort field's shape (the logger's): a pressable that cycles the type. */
-function TypeField({
-  blockIndex,
-  setIndex,
-  setType,
-  onCycle,
-}: {
-  blockIndex: number;
-  setIndex: number;
-  setType: SessionSetTypeValue;
-  onCycle: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityHint="Double tap to cycle the set type"
-      accessibilityLabel={`Set ${setIndex + 1} type, currently ${typeWord(setType)}`}
-      accessibilityRole="button"
-      onPress={onCycle}
-      style={styles.typeField}
-      testID={`plan-form-block-${blockIndex + 1}-set-${setIndex + 1}-type`}>
-      <Text allowFontScaling={false} style={styles.typeLabel}>Type</Text>
-      <View style={styles.typeValue}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.typeText}>{typeWord(setType)}</Text>
-        <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
-      </View>
-    </Pressable>
-  );
-}
-
 /**
  * One block's editor in the plan form: the picked exercise (its name row
- * opens the pick sheet) and the ordered target sets — type, weight, reps per
+ * opens the pick sheet) and the ordered target sets — effort, weight, reps per
  * set. The weight field's label follows the exercise's load input mode
  * (`per side · kg` when loaded per side).
  */
@@ -67,7 +36,6 @@ export function PlanBlockEditor({
   index,
   count,
   errors,
-  onChangeBlock,
   onChangeSet,
   onAddSet,
   onRemoveSet,
@@ -77,7 +45,8 @@ export function PlanBlockEditor({
   errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
-  const weightLabel = block.loadInputMode === 'per_side_load' ? 'Weight per side · kg' : 'Weight · kg';
+  const [effortSetId, setEffortSetId] = useState<string | null>(null);
+  const effortSet = block.sets.find((set) => set.id === effortSetId);
   const prefix = errorPrefix ?? 'exercises';
   const blockPath = `${prefix}.${index}`;
 
@@ -127,39 +96,21 @@ export function PlanBlockEditor({
         const repsError = errors.get(`${blockPath}.sets.${setIndex}.targetReps`);
         return (
           <View key={set.id} style={styles.setBlock}>
-            <View style={styles.setRow}>
-              <TypeField
-                blockIndex={index}
-                setIndex={setIndex}
-                onCycle={() =>
-                  onChangeSet(block.id, set.id, {
-                    targetSetType: nextSessionSetType(set.targetSetType as SessionSetTypeValue, displayEfforts),
-                  })
-                }
-                setType={set.targetSetType as SessionSetTypeValue}
-              />
-              <FormField
-                accessibilityLabel={`Set ${setIndex + 1} target weight in kilograms`}
-                containerStyle={styles.weightField}
-                error={weightError}
-                keyboardType="decimal-pad"
-                label={weightLabel}
-                onChangeText={(text) => onChangeSet(block.id, set.id, { targetWeightText: text })}
-                showErrorText={false}
-                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-weight`}
-                value={set.targetWeightText}
-              />
-              <FormField
-                accessibilityLabel={`Set ${setIndex + 1} target reps`}
-                containerStyle={styles.repsField}
-                error={repsError}
-                keyboardType="number-pad"
-                label="Reps"
-                onChangeText={(text) => onChangeSet(block.id, set.id, { targetRepsText: text })}
-                showErrorText={false}
-                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-reps`}
-                value={set.targetRepsText}
-              />
+            <SetEntryFields
+              number={setIndex + 1}
+              weightValue={set.targetWeightText}
+              repsValue={set.targetRepsText}
+              setType={set.targetSetType}
+              loadInputMode={block.loadInputMode ?? 'total_load'}
+              weightError={weightError}
+              repsError={repsError}
+              onChangeWeight={(targetWeightText) => onChangeSet(block.id, set.id, { targetWeightText })}
+              onChangeReps={(targetRepsText) => onChangeSet(block.id, set.id, { targetRepsText })}
+              onCycleEffort={() => onChangeSet(block.id, set.id, {
+                targetSetType: nextSessionSetType(set.targetSetType, displayEfforts),
+              })}
+              onOpenEffort={() => setEffortSetId(set.id)}
+              testID={`plan-form-block-${index + 1}-set-${setIndex + 1}`}>
               <View style={styles.setRemove}>
                 <IconButton
                   accessibilityLabel={`Remove set ${setIndex + 1}`}
@@ -169,7 +120,7 @@ export function PlanBlockEditor({
                   testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-remove`}
                 />
               </View>
-            </View>
+            </SetEntryFields>
             {weightError ? (
               <Text
                 allowFontScaling={false}
@@ -194,6 +145,15 @@ export function PlanBlockEditor({
       {errors.get(`${blockPath}.sets`) ? (
         <Text allowFontScaling={false} style={styles.error}>{errors.get(`${blockPath}.sets`)}</Text>
       ) : null}
+      <EffortSheet
+        visible={effortSet !== undefined}
+        selected={effortSet?.targetSetType ?? null}
+        onSelect={(targetSetType) => {
+          if (effortSet) onChangeSet(block.id, effortSet.id, { targetSetType });
+          setEffortSetId(null);
+        }}
+        onDismiss={() => setEffortSetId(null)}
+      />
       <ListRow
         accessibilityLabel={`Add target set to ${block.name || 'exercise'}`}
         density="list"
@@ -241,52 +201,8 @@ const styles = StyleSheet.create({
   setBlock: {
     gap: uiSpace.xs,
   },
-  setRow: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-    alignItems: 'flex-start',
-  },
-  typeField: {
-    width: 96,
-    height: uiGeometry.fieldHeight,
-    paddingHorizontal: uiSpace.sm,
-    paddingTop: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-  },
-  typeLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  typeValue: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  typeText: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  weightField: {
-    flex: 1,
-  },
-  repsField: {
-    width: 72,
-  },
   setRemove: {
-    width: 44,
+    width: uiGeometry.tapTarget,
     height: uiGeometry.fieldHeight,
     alignItems: 'center',
     justifyContent: 'center',

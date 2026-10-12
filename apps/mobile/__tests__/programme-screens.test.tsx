@@ -7,7 +7,7 @@
  * Over the migrated in-memory SQLite database (helpers/local-data.ts).
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -38,6 +38,7 @@ jest.mock('expo-router', () => {
   };
 });
 
+import { updatePreferences } from '@/src/preferences/hooks';
 import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
@@ -158,6 +159,43 @@ describe('programme screens', () => {
 
       const programmes = await planQueries.listProgrammeSummaries();
       expect(programmes).toHaveLength(0);
+    });
+
+    it('shares target effort defaults, picker, copying and validation with standalone plans', async () => {
+      updatePreferences({ displayEfforts: ['rir_4', 'rir_2'] });
+      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Copy wave');
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      expect(screen.getByTestId('programme-child-plan-schedule-input')).toHaveProp('keyboardType', 'numbers-and-punctuation');
+      await pickExercise('Bench Press');
+      expect(screen.getByTestId('plan-form-block-1-set-1-effort')).toHaveTextContent('EffortRIR 4');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '40');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '0');
+      expect(screen.getByTestId('plan-form-block-1-set-1-reps-error')).toHaveTextContent('Reps must be a whole number from 1 to 999.');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '8');
+      fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
+      const picker = within(await screen.findByTestId('exercise-effort-sheet'));
+      expect(picker.queryByTestId('exercise-effort-option-warm_up')).toBeNull();
+      fireEvent.press(picker.getByTestId('exercise-effort-option-rir_2'));
+      fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+      expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40');
+      expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '8');
+      expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 2');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-2-weight'), '45');
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+      fireEvent.press(screen.getByTestId('programme-form-plan-2-remove'));
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-duplicate'));
+      fireEvent.press(screen.getByTestId('programme-form-save'));
+      await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+      const [programme] = await planQueries.listProgrammeSummaries();
+      const detail = await planQueries.loadProgrammeDetail(programme.id);
+      for (const plan of detail!.plans) {
+        const child = await planQueries.loadPlanDetail(plan.id);
+        expect(child?.blocks[0].targets.map(({ targetWeightValue, targetReps, targetSetType }) =>
+          [targetWeightValue, targetReps, targetSetType])).toEqual([
+          ['40', 8, 'rir_2'], ['45', 8, 'rir_2'],
+        ]);
+      }
     });
 
     it('refuses save when sessions count drops below 2', async () => {
@@ -357,7 +395,7 @@ describe('programme screens', () => {
                 exerciseDefinitionId: 'ex-squat',
                 name: 'Barbell Squat',
                 sets: [
-                  { targetWeightText: '140', targetRepsText: '5', targetSetType: null },
+                  { targetWeightText: '140', targetRepsText: '5', targetSetType: 'rir_2' },
                 ],
               },
             ],
@@ -394,7 +432,7 @@ describe('programme screens', () => {
 
       // Next block card highlights the Barbell Squat block
       expect(screen.getByTestId('programme-next-block-name')).toHaveTextContent('Barbell Squat');
-      expect(screen.getByTestId('programme-next-block-targets')).toHaveTextContent('5 reps @ 140 kg');
+      expect(screen.getByTestId('programme-next-block-targets')).toHaveTextContent('5 reps @ 140 kg (RIR 2)');
 
       // Sessions list renders both sessions
       expect(screen.getByText('Lower A')).toBeTruthy();
