@@ -9,6 +9,7 @@ import {
   MUSCLE_HISTORY_METRIC_OPTIONS,
   type MuscleHistoryMetric,
 } from '@/components/stats/history-view';
+import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
@@ -198,6 +199,16 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
   }, [router]);
   const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
   const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
+  // A muscle's week list links each card's exercise to its own history, on
+  // the metric shown here; one the catalogue no longer holds has no page.
+  const exerciseLink = useMemo<WeekSetExerciseLink | undefined>(() => {
+    if (subject?.kind !== 'muscle') return undefined;
+    const catalogued = new Set(catalog.exercises.map(exercise => exercise.id));
+    return {
+      canOpen: id => catalogued.has(id),
+      open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id }, muscleMetric)),
+    };
+  }, [catalog, muscleMetric, router, subject]);
   // A muscle's page opens on the exercise's metric when a muscle has it too
   // (Volume or Sets); 1RM and top weight are exercise-only, so it opens on Volume.
   const openMuscle = (muscleGroupId: string) => router.push(progressHistoryHref(
@@ -240,6 +251,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     timeline: {
       weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
       onOpenSession: openSession,
+      exerciseLink,
     },
   };
 

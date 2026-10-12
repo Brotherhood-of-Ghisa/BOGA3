@@ -6,9 +6,8 @@ you do. What lives here is what the code can violate and still compile.
 
 Routes themselves are the Expo Router file tree under `apps/mobile/app/`
 (`/group/[groupId]/edit` is `app/group/[groupId]/edit.tsx`), and a screen's
-params are its own `useLocalSearchParams` typing. There is no route inventory
-here: if you need which routes exist, what each is for, or which file backs it,
-load `docs/specs/ui/screen-map.md` instead.
+params are its own `useLocalSearchParams` typing. For which routes exist, what
+each is for, or which file backs it, load `docs/specs/ui/screen-map.md`.
 
 ## Router baseline
 
@@ -159,10 +158,10 @@ Nothing outside this table navigates. A route not listed as a source
 | `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
 | `/session/<id>/exercise/<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the records panel's `History` (`push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
-| `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's own names |
+| `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's names |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise, each carrying the filter row's `metric` (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week, and the header ⋮'s `View sessions` for the Timeline's focused week (`historyDayHref`, `sessionsWeekHref`, `push`) |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle's card progress button opens its catalogued exercise, metric carried |
 | `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | the header ⋮'s muscle rows, carrying the metric if a muscle has it (`progressHistoryHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
