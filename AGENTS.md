@@ -7,10 +7,12 @@ place each under `docs/specs/**`, routed from here.
 
 ## Non-negotiables (read these even if you read nothing else)
 
-1. **This machine runs EVERY local gate** — including iOS Maestro lanes
-   (simulator + Metro) and local-Supabase backend lanes (Docker). "Not in CI"
-   means *you* run it locally, never "can't run". Before claiming a gate is
-   unavailable, run `./boga doctor` — a FAIL is a bootstrap gap to fix, not a skip.
+1. **This machine runs EVERY local gate for its platform** — local Supabase
+   Docker lanes on all hosts; iOS Maestro on macOS, Android Maestro on
+   Linux. Mobile lanes are required only on their relevant platform. "Not in CI"
+   means *you* run your platform's gates locally, never "can't run". Before
+   claiming a gate is unavailable, run `./boga doctor` — a FAIL is a bootstrap
+   gap to fix, not a skip.
 
 2. **Never state a test duration you didn't measure.** Run `./boga timings` —
    it aggregates the measured per-run records every `./boga test` lane run
@@ -36,16 +38,16 @@ place each under `docs/specs/**`, routed from here.
    | You changed… | Default |
    | --- | --- |
    | Any `apps/mobile` TS/JS logic | `boga test fast` |
-   | UI screens / components / navigation | `boga test fast` + `boga test frontend-ui` (+ the area e2e lane `boga test for` prints) |
-   | Root layout / root stack / route access (`app/_layout.tsx`, `components/navigation/root-stack.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` |
-   | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
+   | UI screens / components / navigation | `boga test fast` + `boga test frontend-ui` (macOS) / `frontend-android` (Linux) |
+   | Root layout / root stack / route access (`app/_layout.tsx`, `components/navigation/root-stack.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` (macOS) / `frontend-android` (Linux) |
+   | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` (+ `boga test ios-sync-e2e` on macOS) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
-   | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test groups-api-live` (client ↔ live server) + `boga test ios-groups-e2e` (two-user e2e) |
+   | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test groups-api-live` (+ `boga test ios-groups-e2e` on macOS) |
    | Group competitions (`src/groups/competition-*`, `supabase/migrations/*competition*`) | the Groups row + `boga test groups-competitions` |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
-   | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
-   | Native Android dependency / config-plugin change | `./scripts/maestro-android-dev-client-build.sh --force` first, then `boga test frontend-android` (see `02`) |
+   | Native iOS dependency / config-plugin change | macOS: `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
+   | Native Android dependency / config-plugin change | Linux/Android: `./scripts/maestro-android-dev-client-build.sh --force` first, then `boga test frontend-android` (see `02`) |
 
    - **Jest is never optional:** every code change adds or updates Jest
      coverage for the behaviour it changes and passes `boga test fast`.
@@ -64,7 +66,7 @@ place each under `docs/specs/**`, routed from here.
      `./boga test dependencies`, get all three green, and list them in the PR's
      Tests table.
      - Coverage floor (whole suite, `app`/`components`/`src`): **80% branches,
-       80% lines**. Branches is the tight one (82% when the floor landed).
+       80% lines**.
      - Per function: cognitive complexity **≤ 25**, **≤ 200** lines,
        nesting depth **≤ 4**, **≤ 5** params.
        Functions already over a limit are grandfathered in
@@ -90,8 +92,8 @@ place each under `docs/specs/**`, routed from here.
    the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client
    rebuild rule: `docs/specs/02-quality-and-test-gates.md`.
 
-4. **The sync-infra and sync-e2e lanes run locally — do not defer them.** Each
-   worktree has its own slot-isolated local Supabase; the wrappers export
+4. **Sync lanes run locally — do not defer them.** Each worktree has its own
+   slot-isolated local Supabase; wrappers export
    `SYNC_TEST_SUPABASE_URL`/`SYNC_TEST_SUPABASE_ANON_KEY` themselves. There is
    no remote-only test lane in this repo.
 

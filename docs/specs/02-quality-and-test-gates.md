@@ -36,11 +36,9 @@ are labels that track that one axis; when they seem to disagree, infra wins.
 
 - **No infra (pure Node/jest)** → CI-safe. The only lanes CI runs today.
 - **Local Supabase + Docker** → CI-*able*, kept local **by choice** (Docker boot
-  cost). A regression here lands on `main` green until a human runs the backend
-  gate; the cheap way to close that is to run this gate in CI, not to rewrite the
-  tests as infra-free.
+  cost). A regression here lands on `main` green until a human runs the backend gate.
 - **iOS simulator / Android emulator + Metro** → can **never** run on CI's Linux
-  runners.
+  runners. Local-only by necessity; each runs on its host platform (iOS on macOS, Android on Linux).
 
 "Fast" does not imply "in CI": the backend fast smoke needs Docker.
 
@@ -144,10 +142,11 @@ Docker lanes are the expensive part of the ladder.
    Raise the default when the change carries risk its paths do not show (a
    shared hook, a boot-time effect, a native call). The operator's answer is
    final; the dev-client rebuild below is not a lane choice and is never lowered.
-4. **Run the smallest Maestro set** — the lanes whose flows exercise the changed
-   behaviour, not every lane a path matches. Some areas have no Maestro lane at
-   all (bodyweight: Jest over real data plus `ios-sync-e2e` covers it); adding a
-   flow needs the operator's approval first (spec `06`, "Maestro scope policy").
+4. **Run the smallest Maestro set** for your platform (iOS on macOS, Android on
+   Linux; required only on their relevant platform) — lanes whose flows exercise
+   the change. Some areas have no Maestro lane at all (bodyweight: Jest over
+   real data plus `ios-sync-e2e` covers it); adding a flow needs the operator's
+   approval first (spec `06`, "Maestro scope policy").
 5. **Run the agreed lanes to green before opening the PR**, and record each one
    there with its result, its evidence (command output or Maestro artifact path)
    and that the set was agreed. No checker validates this; reviewers read it.
@@ -176,9 +175,10 @@ spec `11`.
 For production releases, load `docs/runbook-hosted-operations.md` for the required
 hosted migration and verification gate alongside the sweep.
 
-`./boga sweep [--ref <ref>]` (`scripts/full-sweep.sh`) runs every gate lane on
-`origin/main` or a pushed branch in its own long-lived worktree and slot, writing
-a summary under `~/.config/boga/sweep/latest/`. It is never scheduled.
+`./boga sweep [--ref <ref>]` (`scripts/full-sweep.sh`) runs every gate lane for
+the host platform (iOS on macOS, Android on Linux) on `origin/main` or a pushed
+branch in its own long-lived worktree and slot, writing a summary under
+`~/.config/boga/sweep/latest/`. It is never scheduled.
 
 - **Required** on the `main` commit you ship as a release build
   (TestFlight / App Store), before building

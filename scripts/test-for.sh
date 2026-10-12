@@ -26,11 +26,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DIFF_RANGE=""
 TSV=0
+PLATFORM=""
 PATHS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --diff) DIFF_RANGE="$2"; shift ;;
     --tsv) TSV=1 ;;
+    --platform) PLATFORM="$2"; shift ;;
+    --platform=*) PLATFORM="${1#--platform=}" ;;
+    --all-platforms) PLATFORM="all" ;;
     --help|-h) sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) PATHS+=("$1") ;;
   esac
@@ -68,11 +72,33 @@ PATHS_FILE="$(mktemp)"
 trap 'rm -f "${PATHS_FILE}"' EXIT
 printf '%s\n' "${PATHS[@]}" > "${PATHS_FILE}"
 
-REPO_ROOT="${REPO_ROOT}" TSV="${TSV}" PATHS_FILE="${PATHS_FILE}" python3 - <<'PY'
+REPO_ROOT="${REPO_ROOT}" TSV="${TSV}" PLATFORM="${PLATFORM}" PATHS_FILE="${PATHS_FILE}" python3 - <<'PY'
 import os, re, sys
 
 root = os.environ["REPO_ROOT"]
 tsv_mode = os.environ["TSV"] == "1"
+platform_arg = os.environ.get("PLATFORM", "")
+if not platform_arg:
+    if tsv_mode:
+        target_platform = "all"
+    else:
+        import platform as py_platform
+        target_platform = "ios" if py_platform.system() == "Darwin" else "android"
+else:
+    target_platform = platform_arg.lower()
+    if target_platform == "host":
+        import platform as py_platform
+        target_platform = "ios" if py_platform.system() == "Darwin" else "android"
+
+lanes_infra = {}
+with open(os.path.join(root, "scripts/lanes.tsv")) as f:
+    for line in f:
+        line = line.strip()
+        if line and not line.startswith("#"):
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                lanes_infra[parts[0]] = parts[2]
+
 with open(os.environ["PATHS_FILE"]) as f:
     paths = [l.strip() for l in f if l.strip()]
 
@@ -127,7 +153,26 @@ for p in paths:
 if "frontend" in required and "frontend-ui" in required:
     required["frontend"] |= required.pop("frontend-ui")
 
-GATE_ORDER = ["fast", "backend", "frontend", "frontend-ui"]
+skipped_lanes = {}
+if target_platform == "android":
+    # On Android hosts, mobile UI/layout changes run frontend-android (not frontend-ui/frontend)
+    if "frontend-ui" in required:
+        required.setdefault("frontend-android", set()).update(required.pop("frontend-ui"))
+    if "frontend" in required:
+        required.setdefault("frontend-android", set()).update(required.pop("frontend"))
+    for req in list(required.keys()):
+        infra = lanes_infra.get(req)
+        if infra in ("ios", "ios+supabase"):
+            skipped_lanes[req] = required.pop(req)
+elif target_platform == "ios":
+    if "frontend-android" in required:
+        skipped_lanes["frontend-android"] = required.pop("frontend-android")
+    for req in list(required.keys()):
+        infra = lanes_infra.get(req)
+        if infra == "android":
+            skipped_lanes[req] = required.pop(req)
+
+GATE_ORDER = ["fast", "backend", "frontend", "frontend-ui", "frontend-android"]
 ordered = [g for g in GATE_ORDER if g in required] + sorted(r for r in required if r not in GATE_ORDER)
 
 if tsv_mode:
@@ -144,9 +189,18 @@ for p, hits in per_path:
 if unmatched:
     print(f"  (no trigger matched: {', '.join(unmatched)} — fast gate is still the default for any code change)")
 print()
-print("DEFAULT (union) — propose to the operator; agree the final set before running slow lanes:")
+plat_suffix = ""
+if target_platform == "android":
+    plat_suffix = " [Linux/Android host]"
+elif target_platform == "ios":
+    plat_suffix = " [macOS/iOS host]"
+print(f"DEFAULT (union){plat_suffix} — propose to the operator; agree the final set before running slow lanes:")
 for r in ordered:
     print(f"  ./boga test {r:<14} — {'; '.join(sorted(required[r]))}")
+if skipped_lanes:
+    other_plat = "iOS-only host" if target_platform == "android" else "Android-only host"
+    for s in sorted(skipped_lanes):
+        print(f"  ({s} skipped: {other_plat})")
 if not ordered:
     print("  none — but run ./boga test fast if any code changed.")
 

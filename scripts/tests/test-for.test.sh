@@ -100,6 +100,19 @@ not_requires android-data-smoke apps/mobile/.maestro/flows/session-completion-st
 # an unlisted (new) flow falls back to the full gate
 requires frontend      apps/mobile/.maestro/flows/brand-new-flow.yaml
 
+# Platform filtering:
+# Android platform resolves UI to frontend-android and drops iOS-only lanes
+requires frontend-android --platform android apps/mobile/components/Button.tsx
+not_requires frontend-ui --platform android apps/mobile/components/Button.tsx
+requires android-smoke --platform android apps/mobile/.maestro/flows/smoke-launch.yaml
+not_requires ios-smoke --platform android apps/mobile/.maestro/flows/smoke-launch.yaml
+
+# iOS platform retains frontend-ui and drops Android-only lanes
+requires frontend-ui --platform ios apps/mobile/components/Button.tsx
+not_requires frontend-android --platform ios apps/mobile/components/Button.tsx
+requires ios-smoke --platform ios apps/mobile/.maestro/flows/smoke-launch.yaml
+not_requires android-smoke --platform ios apps/mobile/.maestro/flows/smoke-launch.yaml
+
 # union across files
 requires backend       apps/mobile/components/Button.tsx supabase/tests/x.sh
 requires frontend-ui   apps/mobile/components/Button.tsx supabase/tests/x.sh

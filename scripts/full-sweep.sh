@@ -53,15 +53,17 @@ say() { echo "[sweep] $*"; }
 die() { echo "[sweep] $*" >&2; exit 2; }
 
 # The lanes a sweep runs, in order: every fast lane, then backend, then the
-# frontend lanes (iOS, then Android). Backend before frontend: the iOS lanes
-# leave server rows that the backend contract lanes don't expect.
+# host platform's frontend lanes (iOS on Darwin, Android on Linux). Backend before
+# frontend: frontend lanes leave server rows that backend contract lanes don't expect.
 sweep_lanes() {
+  local platform
+  platform="$(uname -s)"
   grep -v '^[[:space:]]*#' "$1/scripts/lanes.tsv" | grep -v '^[[:space:]]*$' \
-    | awk -F'\t' '
+    | awk -F'\t' -v plat="${platform}" '
         $2 ~ /^fast-/                  { fast = fast $1 "\n" }
         $2 == "slow-backend"           { be = be $1 "\n" }
-        $2 == "slow-frontend"          { fe = fe $1 "\n" }
-        $2 == "slow-frontend-android"  { fa = fa $1 "\n" }
+        $2 == "slow-frontend"          { if (plat == "Darwin") fe = fe $1 "\n" }
+        $2 == "slow-frontend-android"  { if (plat != "Darwin") fa = fa $1 "\n" }
         END { printf "%s%s%s%s", fast, be, fe, fa }'
 }
 
