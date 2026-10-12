@@ -183,10 +183,14 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
   const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
   // A muscle's week list links each card's exercise to its own history, on
   // the metric shown here; one the catalogue no longer holds has no page.
-  const exerciseLink = useMemo<WeekSetExerciseLink | undefined>(() => subject?.kind === 'muscle' ? {
-    canOpen: id => catalog.exercises.some(exercise => exercise.id === id),
-    open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id }, muscleMetric)),
-  } : undefined, [catalog, muscleMetric, router, subject]);
+  const exerciseLink = useMemo<WeekSetExerciseLink | undefined>(() => {
+    if (subject?.kind !== 'muscle') return undefined;
+    const catalogued = new Set(catalog.exercises.map(exercise => exercise.id));
+    return {
+      canOpen: id => catalogued.has(id),
+      open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id }, muscleMetric)),
+    };
+  }, [catalog, muscleMetric, router, subject]);
 
   if (unavailable) {
     return (
