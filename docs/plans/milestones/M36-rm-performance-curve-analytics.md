@@ -39,6 +39,37 @@ T05 follows `docs/specs/08-ux-delivery-standard.md` and `docs/specs/ui/ai-design
 
 T06–T08 build and review transformations and chart/page content without a new production `app/` route, root-stack registration or user-facing entry. Use isolated developer preview/rendering for review. Only T09 wires the approved selected-exercise entry, typed route and existing Back/context behavior. After that, only validation, required fixes and closeout remain; no deferred feature is silently added.
 
+### D6. Reuse one weekly wave scenario across the tasks
+
+The user requests a shared representative weekly wave programme followed by one individual, simplified to RIR 0 and one gym, with analytical progress inspectable week by week. Each task proves its own part against the same scenario; it does not create a separate history or repeat earlier assertions. The approved fixed historical reference is unchanged. Additional weekly fitted curves and exact programme parameters remain clarification questions, not production features or prescriptions.
+
+## Shared weekly wave validation scenario — parameters provisional
+
+Use one canonical synthetic history/ground-truth definition, labelled synthetic and derived through the adopted calculation kernel. Choose its exercise/load context, rep sequence, weeks, sessions per week, prior baseline span, progression/noise parameters and fixture location during research, after human clarification. RIR 0, one individual and one gym simplify comparison; they do not remove estimator or within-session uncertainty. No particular rep prescription or new weekly-curve UI is approved here.
+
+The shared scenario needs these variants and prefix views:
+
+- **Stable-strength control:** vary weekly rep targets and corresponding loads while keeping the latent RM level fixed. Heavier loads in lower-rep weeks must not be classified or presented as strength gain. In a noiseless algebraic control, qualifying points remain on the same RM curve; noise sensitivity is separate.
+- **Gradual improvement:** use a known progressive RM trajectory with the same wave targets. Show how observed sets/residuals move relative to the fixed prior reference; smooth progress must not become an established structural-break claim.
+- **Weekly prefixes:** inspect only history available through each week. Keep evaluation start and its independent historical baseline fixed across prefixes, excluding evaluated/future sessions from that baseline. Earlier prefix outputs must be invariant to adding later workout rows; changing a dated source input is a separate retroactive-metadata test.
+- **Insufficient baseline:** truncate prior support below the approved six qualifying sessions. Observed points may remain, but no reference curve or reference residual is fabricated and the cohort does not widen automatically.
+
+T02 specifies the model/validation contract; T03 audits provenance and reconciles inputs; T04 creates/freezes the canonical fixture and expected numerical progression. T06 reuses its raw data in transformations, T05/T07 use its same prefix outputs as design/render inputs, and T08/T09 reuse them for integrated acceptance and navigation. Reuse the fixture through existing test-helper conventions; no exploratory regression tooling enters production imports. The synthetic story supplements authorized historical validation, never replaces it or establishes statistical significance.
+
+| Task | Proof using the shared scenario |
+| --- | --- |
+| T01 | Completed algebraic reconstruction and illustrative weekly-prefix progression against a fixed prior reference; synthetic parity/control evidence, not empirical formula validation. |
+| T02 | Predefine stable/gradual model expectations, session dependence, rep-wave confounding and prefix/cutoff checks; no production detector. |
+| T03 | Reconcile weekly counts, identities, RIR/gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
+| T04 | Verify known stable/gradual trajectories and weekly numerical oracles; measure method reliability separately with seeded simulations. |
+| T05 | Human-review week-by-week scatter/reference/readout and sparse-state targets; weekly fitted-curve feature remains subject to clarification. |
+| T06 | Prove filtered prefix points, fixed reference, residual/projection values and no future leakage over the reused data. |
+| T07 | Prove geometry, recency, point access and state rendering against the existing oracle, without redoing reference arithmetic. |
+| T08 | Reconcile the running integrated view and accessible readouts with that oracle after human design approval; reuse numerical evidence. |
+| T09 | Reach the correct selected-exercise scenario and return safely; verify navigation/context, not another chart-fit experiment. |
+
+Pending clarification: whether the user wants additional per-week fitted curves rather than only week-by-week progress against the approved reference, and which synthetic rep wave/programme parameters are suitable. Until resolved, keep weekly fitting exploratory and all exact programme parameters provisional. Research evidence may illustrate prefixes without approving a new production control or overlay.
+
 ## Task breakdown
 
 One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727, awaiting merge; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. Later execution starts only after the completing PR merges and dependencies and required approvals are satisfied. No later task has started.
@@ -95,6 +126,8 @@ Existing Progress exploration and Timeline provide integration precedents. Verif
 
 Read test-directory READMEs before edits. One canonical assertion per claim; reuse histories and chart evidence, run focused checks during iteration, then mandatory finished-PR checks once. Do not repeat the full backend or unrelated feature suite after every task; rerun affected checks after fixes or material changes. This plan grants no gate exemption. Lanes beyond `fast`, new Maestro scenarios, threshold/baseline changes and releases/sweeps follow operator agreement under AGENTS.md and spec 02. No durations are estimated. Evidence stays in PRs; approve device-only scenarios before authoring them. If a gate fails to bootstrap, use `./boga doctor` and fix it.
 
+The shared wave adds task-specific evidence, not another aggregate lane. Record canonical fixture version, prefix boundary and the task's new proof; reuse unchanged earlier oracles/screenshots, running each stage's appropriate tests once. Test baselines and prefixes with Jest/numerical checks; approve any device-only scenario separately.
+
 ## Risks / dependencies and unresolved decisions
 
 1. Effort comparability: the approved initial RIR/cohort choice is [[1rm.curve-population]]; subjective labels and possibly enriched fixture provenance still need empirical validation. No automatic RIR correction to the adopted formula.
@@ -111,6 +144,7 @@ Read test-directory READMEs before edits. One canonical assertion per claim; reu
 - Human analytical/product approval precedes design; a pinned human-approved design precedes UI acceptance tests; implemented chart and final entry/return flow have human acceptance.
 - Interactive chart shows qualifying observed sets against the adopted reference, recency, exact details and approved exercise/time/effort filters; missing effort, overlap, empty/insufficient/error and accessible phone states meet the approved target.
 - Existing RM/effort/load semantics and raw history remain intact; focused unit, real-data integration and regression tests plus all agreed local lanes and quality targets are green with PR evidence.
+- The shared weekly wave scenario demonstrates stable strength despite rep/load changes, gradual progress, future-free weekly prefixes and insufficient baseline support across each task's own proof; one fixture/oracle is reused and synthetic limits are explicit.
 - Structural break work remains exploratory and absent from production UI/runtime; no unapproved product fact or loading change ships.
 - T09 is the final implementation step and exposes the view for a selected exercise without disrupting logging, history or analytics context.
 - Durable decisions live with their owning product/spec/code/tests; final shipping PR deletes ephemeral cards/spec and completes worktree/stack cleanup after merge. No implementation begins from this planning session.

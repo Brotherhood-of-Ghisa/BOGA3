@@ -18,7 +18,7 @@ As the milestone’s final implementation step, expose the validated analytics p
 
 ## Decided
 
-Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
 ## Open — resolve with the user at session start
 
@@ -33,6 +33,8 @@ Confirm T05’s approved entry against current main and related exercise-present
 5. Obtain human review of the exposed entry/return flow before UI acceptance tests; renew approval for material UI changes. Run `./boga test for` both for this diff and the milestone’s cumulative changed paths, agree the minimum lanes, and complete all agreed checks to green.
 6. If root-stack/root access/harness changes occur, propose `fast` + `frontend`; otherwise default UI proposal is `fast` + `frontend-ui` and area lanes, narrowed by agreement. Add backend/ios-sync-e2e only if actual scope introduces corresponding risk. No sweep unless a release or operator request.
 7. Meet milestone DoD, graduate durable decisions to their owners, delete this last card and the milestone spec in the shipping PR, link evidence and complete the repository planning lifecycle after merge. Shut down/release the worktree per AGENTS.md; do not merge without user authorization.
+
+8. Reuse the shared wave history to prove the final selected-exercise entry opens the approved chart for the correct exercise/prefix/filter context, and Back preserves the prior workflow/draft. Reuse T08’s unchanged stable/gradual/sparse chart evidence; only navigation/context or newly changed device behaviour needs new assertions.
 
 ## UX contract (proposed; T05 pins the approved target)
 
@@ -49,5 +51,7 @@ Confirm T05’s approved entry against current main and related exercise-present
 ## Gates
 
 Navigation Jest, existing native exercise/history/logging flows as relevant, approved final changed-path lanes and three quality targets. All new Maestro coverage needs prior approval. No repeated full backend/feature suites for unchanged chart code.
+
+The shared wave adds the newly exposed navigation/return proof only; unchanged chart/model checks are reused from T08.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.

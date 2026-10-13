@@ -18,7 +18,7 @@ Validate the complete chart content over representative workout histories before
 
 ## Decided
 
-Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
 ## Open — resolve with the user at session start
 
@@ -32,6 +32,8 @@ Operator-approved device acceptance lane set and preview method; need for any ge
 4. Verify touch/overlap selection, accessibility, legend meaning and small/large-phone states in the running app, comparing fresh screenshots with T05’s target. No structural-break markers or significance claims may be present.
 5. Agree the minimal device lane/scenario set after `./boga test for`; an added Maestro scenario requires explicit operator approval and a device-only justification. Plan device checks together with T09 and repeat only for changed device behavior.
 6. Record acceptance and evidence in the PR, resolve failures to green and renew human review after material UI changes. No production entry, app route or root-stack registration is introduced here.
+
+7. After the required human design gate, review the integrated shared wave histories week by week against T04/T06’s oracle: stable-strength control, gradual progression, eligible prefixes and insufficient baseline. Test running-view/readout/interaction agreement and accessibility; reuse unchanged model/arithmetic evidence instead of rerunning research fits.
 
 ## UX contract (proposed; T05 pins the approved target)
 
@@ -47,5 +49,7 @@ Approved behavior belongs in component headers/tests and product facts; update s
 ## Gates
 
 Focused real-data integration/regression Jest plus approved chart-only device checks after human design and hands-on acceptance. Run mandatory PR fast/quality checks once on the finished diff; UI exposure gets its distinct navigation check in T09.
+
+The shared wave adds integrated view/accessibility and approved device proof; retain earlier numerical evidence and do not recreate its fixture.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.

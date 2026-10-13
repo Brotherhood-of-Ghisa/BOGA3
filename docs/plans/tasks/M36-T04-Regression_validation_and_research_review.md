@@ -18,7 +18,7 @@ Validate the exploratory framework against known synthetic behaviours and availa
 
 ## Decided
 
-Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
 ## Open — resolve with the user at session start
 
@@ -33,6 +33,8 @@ Reliability thresholds, usable sample sizes and scope of supported claims; wheth
 5. Record failures, adjustments and evidence. Human analytical/product review approves the reference, effort and load-coordinate contract and honest first-release limitations before T05 starts; no unsupported statistical claim becomes UI copy.
 6. Identify the minimal representative histories and regression cases to reuse in production tests; archive reproducibility instructions/evidence with the PR and keep statistical tooling out of mobile imports/build/dependencies.
 
+7. Create/freeze the one canonical shared weekly wave fixture and numerical oracle after programme clarification. Verify unchanged latent RM under changing rep/load targets, known gradual improvement, every future-free weekly prefix and insufficient-baseline outputs against the fixed historical reference. Reuse the fixture’s seeded variants for method checks; additional weekly fitting stays exploratory unless separately approved.
+
 ## Specs to update
 
 Approved durable assumptions/limitations in the owning metrics contract; newly approved chart product rules in `docs/product/`. Statistical experiment evidence remains in the research PR.
@@ -40,5 +42,7 @@ Approved durable assumptions/limitations in the owning metrics contract; newly a
 ## Gates
 
 Repeatable seeded simulations with measured error/power/coverage and sensitivity results, plus real-history checks where defensible. Numerical expectations use justified tolerances.
+
+The shared wave owns one canonical fixture/oracle with stable/gradual/prefix/sparse assertions; later tasks reuse it, and this single history does not establish statistical reliability.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.

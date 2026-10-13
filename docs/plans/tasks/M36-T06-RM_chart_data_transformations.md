@@ -18,7 +18,7 @@ Implement the approved observation/reference read model using the current local 
 
 ## Decided
 
-Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
 ## Open — resolve with the user at session start
 
@@ -33,6 +33,8 @@ Smallest repository seam preserving raw effort/set identity; batching and bounde
 5. Batch reads and refresh after history, definition, preference and reading changes using existing invalidation patterns. Retain previous valid data on failed refresh with a retry state, and prevent stale results after exercise/filter switches.
 6. Add focused Jest unit/regression and real migrated SQLite integration coverage; reuse T03/T04 representative histories. No source graph imports exploratory statistical tooling and no derived value is synced.
 
+7. Reuse T04’s canonical shared wave raw rows/oracle in pure and migrated-SQLite tests: stable rep/load waves must not invent strength gain, gradual progress matches expected values, prefix outputs ignore later workout rows, and insufficient prior support yields no curve/residual. Keep evaluation start/reference fixed across prefixes; do not author another equivalent fixture or import exploratory fit code.
+
 ## Specs to update
 
 `docs/specs/tech/training-metrics-contract.md` for the approved new projection; `docs/specs/09-project-structure.md` only if a new canonical subsystem is needed. No schema/sync change is expected.
@@ -40,5 +42,7 @@ Smallest repository seam preserving raw effort/set identity; batching and bounde
 ## Gates
 
 Jest formula-parity/filter/cutoff/load-context cases and real-data query/refresh cases, including duplicate blocks, zero/invalid/planned/deleted rows, legacy efforts, missing dates and dense histories. Proposed `fast` + three quality lanes; add device/backend lanes only for actual changed contracts.
+
+The shared wave adds focused extraction/reference/projection and future-leakage assertions over the existing fixture, not a new aggregate lane.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.

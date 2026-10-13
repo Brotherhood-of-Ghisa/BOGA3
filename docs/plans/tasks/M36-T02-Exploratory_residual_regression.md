@@ -18,7 +18,7 @@ Develop a research-only regression framework for residuals over time. Compare pr
 
 ## Decided
 
-Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
 ## Open — resolve with the user at session start
 
@@ -33,6 +33,8 @@ Continuous hinge versus level shift, number/search bounds of breakpoints, minimu
 5. Predefine validation scenarios, false-positive/power/coverage reporting and an insufficient-evidence outcome. A visible shift is not proof of a statistically significant break.
 6. Provide reproducible research-only model specifications/experiments and assumptions/limitations, isolated from mobile runtime, sync and production dependencies. Human analytical review approves the validation plan, without treating exploratory results as a release feature.
 
+7. Specify the milestone’s shared weekly wave validation: one individual/gym and RIR 0; stable-strength control with changing rep/load targets, gradual improvement, session dependence, weekly prefixes without later-data leakage and insufficient baseline support. Predefine what the models should distinguish; exact programme parameters and extra weekly fitted-curve UI remain pending clarification.
+
 ## Specs to update
 
 Retain findings with the research PR and milestone; graduate only approved durable analytical assumptions to their owning technical contract. Do not add a production statistical contract.
@@ -40,5 +42,7 @@ Retain findings with the research PR and milestone; graduate only approved durab
 ## Gates
 
 Seeded method checks, sensitivity plan and session-aware resampling examples; empirical and synthetic reliability evidence is completed by T04.
+
+The shared wave proof is a validation specification/session-aware method check; reuse existing formula parity rather than repeat it.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.
