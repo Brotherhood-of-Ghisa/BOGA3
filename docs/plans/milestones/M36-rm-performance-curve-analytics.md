@@ -47,6 +47,8 @@ The user requests a shared representative weekly wave programme followed by one 
 
 Use one canonical synthetic history/ground-truth definition, labelled synthetic and derived through the adopted calculation kernel. Choose its exercise/load context, rep sequence, weeks, sessions per week, prior baseline span, progression/noise parameters and fixture location during research, after human clarification. RIR 0, one individual and one gym simplify comparison; they do not remove estimator or within-session uncertainty. No particular rep prescription or new weekly-curve UI is approved here.
 
+The [provisional starter dataset](../research/M36-weekly-wave-example.json) preserves the illustrative inputs in the repository: 18 sets across six prior sessions with best total RM100, then two 36-set scenarios across 12 weeks repeating 8/5/3 reps. Each ordinary total-load session has three sets with synthetic capacity multipliers 1/.99/.98; stable capacity is 100 and gradual capacity is 101–112. Raw Weight/reps/effort and synthetic/provisional flags are retained. These labels and trajectories are generative assumptions, not a prescribed programme, empirically validated history or approved production fixture. T03 reconciles these actual rows; T04 still validates/freezes the canonical fixture. The approved fixed historical reference is unchanged.
+
 The shared scenario needs these variants and prefix views:
 
 - **Stable-strength control:** vary weekly rep targets and corresponding loads while keeping the latent RM level fixed. Heavier loads in lower-rep weeks must not be classified or presented as strength gain. In a noiseless algebraic control, qualifying points remain on the same RM curve; noise sensitivity is separate.
@@ -60,7 +62,7 @@ T02 specifies the model/validation contract; T03 audits provenance and reconcile
 | --- | --- |
 | T01 | Completed algebraic reconstruction and illustrative weekly-prefix progression against a fixed prior reference; synthetic parity/control evidence, not empirical formula validation. |
 | T02 | Predefine stable/gradual model expectations, session dependence, rep-wave confounding and prefix/cutoff checks; no production detector. |
-| T03 | Reconcile weekly counts, identities, RIR/gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
+| T03 | Reconcile actual starter rows, weekly counts, identities, RIR/gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
 | T04 | Verify known stable/gradual trajectories and weekly numerical oracles; measure method reliability separately with seeded simulations. |
 | T05 | Human-review week-by-week scatter/reference/readout and sparse-state targets; weekly fitted-curve feature remains subject to clarification. |
 | T06 | Prove filtered prefix points, fixed reference, residual/projection values and no future leakage over the reused data. |

@@ -33,7 +33,7 @@ Which historical datasets and effort labels have verified provenance; availabili
 5. Audit repeated blocks/overlaps, invalid/planned/deleted sets and current retroactive metadata. Report how sparse cohorts and missing effort alter conclusions; reference provenance and cutoff must accompany each result.
 6. Produce reproducible summaries, diagnostics and findings/adjustment recommendations. Any change to T01’s approved contract returns to analytical/product review before design starts.
 
-7. Audit the shared weekly wave fixture specification and reconcile its planned baseline/weekly-prefix populations, set/session identities, rep targets, RIR 0, one-gym scope and known synthetic provenance. Keep its stable/gradual controls separate from real-history findings; preserve one fixture inventory for T04–T09 rather than creating per-task histories.
+7. Audit the [provisional shared weekly wave starter data](../research/M36-weekly-wave-example.json): reconcile its 18 prior sets and both 36-set scenarios, baseline/weekly-prefix populations, set/session identities, raw Weight/reps/effort, RIR 0, one-gym scope and synthetic/provisional flags. Keep stable/gradual controls separate from real-history findings; preserve one fixture inventory for T04–T09 rather than creating per-task histories. Programme assumptions remain provisional; T04 still validates/freezes the canonical test fixture.
 
 ## Specs to update
 
