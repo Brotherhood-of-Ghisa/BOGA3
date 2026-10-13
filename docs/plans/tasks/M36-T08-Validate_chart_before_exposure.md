@@ -33,7 +33,7 @@ Operator-approved device acceptance lane set and preview method; need for any ge
 5. Agree the minimal device lane/scenario set after `./boga test for`; an added Maestro scenario requires explicit operator approval and a device-only justification. Plan device checks together with T09 and repeat only for changed device behavior.
 6. Record acceptance and evidence in the PR, resolve failures to green and renew human review after material UI changes. No production entry, app route or root-stack registration is introduced here.
 
-7. After the required human design gate, review the integrated shared wave histories week by week against T04/T06’s oracle: stable-strength control, gradual progression, eligible prefixes and insufficient baseline. Test running-view/readout/interaction agreement and accessibility; reuse unchanged model/arithmetic evidence instead of rerunning research fits.
+7. After the required human design gate, review the integrated shared wave histories week by week against T04/T06’s oracle: primary held-load plateaus/RIR progression/load steps, separately labelled stable/smooth controls, eligible prefixes and insufficient baseline. Test running-view/readout/interaction agreement and accessibility; reuse unchanged model/arithmetic evidence instead of rerunning research fits.
 
 ## UX contract (proposed; T05 pins the approved target)
 

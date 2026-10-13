@@ -33,7 +33,7 @@ Reliability thresholds, usable sample sizes and scope of supported claims; wheth
 5. Record failures, adjustments and evidence. Human analytical/product review approves the reference, effort and load-coordinate contract and honest first-release limitations before T05 starts; no unsupported statistical claim becomes UI copy.
 6. Identify the minimal representative histories and regression cases to reuse in production tests; archive reproducibility instructions/evidence with the PR and keep statistical tooling out of mobile imports/build/dependencies.
 
-7. Create/freeze the one canonical shared weekly wave fixture and numerical oracle after programme clarification. Verify unchanged latent RM under changing performed reps/recorded RIR/load targets, known gradual improvement, every future-free weekly prefix and insufficient-baseline outputs against the fixed historical reference. Reuse the fixture’s seeded variants for method checks; additional weekly fitting stays exploratory unless separately approved.
+7. Create/freeze the one canonical shared weekly wave fixture and numerical oracle after programme clarification. Verify primary held-load plateaus, same-load RIR progress and higher-load/RIR1 equivalence outputs; separately verify unchanged latent RM and smooth progression in the known controls, every future-free weekly prefix and insufficient-baseline outputs against the fixed historical reference. Reuse the fixture’s seeded variants for method checks; additional weekly fitting stays exploratory unless separately approved.
 
 ## Specs to update
 
@@ -43,6 +43,6 @@ Approved durable assumptions/limitations in the owning metrics contract; newly a
 
 Repeatable seeded simulations with measured error/power/coverage and sensitivity results, plus real-history checks where defensible. Numerical expectations use justified tolerances.
 
-The shared wave owns one canonical fixture/oracle with stable/gradual/prefix/sparse assertions; later tasks reuse it, and this single history does not establish statistical reliability.
+The shared wave owns one input family with plateau/repeated-exposure outputs and separate stable/smooth/prefix/sparse assertions; statistical error/power claims use known controls, not assumed ground truth in the primary history; later tasks reuse it, and this single history does not establish statistical reliability.
 
 Expected gates are proposals, not approval. Run `./boga test for` on the actual diff and agree every lane beyond `fast` with the operator. Every code PR adds/updates focused Jest coverage and passes `./boga test fast`; run `jest-coverage`, `complexity` and `dependencies` once on the finished PR. Read the owning test directory README first. Docs-only work proposes `docs-check`; any exemption from the normal gates needs explicit operator agreement. Record results and artifacts in the PR, not this card. Run `./boga doctor` before claiming a lane cannot run.

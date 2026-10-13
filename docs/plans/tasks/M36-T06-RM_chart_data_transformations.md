@@ -33,7 +33,7 @@ Smallest repository seam preserving raw effort/set identity; batching and bounde
 5. Batch reads and refresh after history, definition, preference and reading changes using existing invalidation patterns. Retain previous valid data on failed refresh with a retry state, and prevent stale results after exercise/filter switches.
 6. Add focused Jest unit/regression and real migrated SQLite integration coverage; reuse T03/T04 representative histories. No source graph imports exploratory statistical tooling and no derived value is synced.
 
-7. Reuse T04’s canonical shared wave raw rows/oracle in pure and migrated-SQLite tests: stable rep/load waves must not invent strength gain, gradual progress matches expected values, prefix outputs ignore later workout rows, and insufficient prior support yields no curve/residual. Keep evaluation start/reference fixed across prefixes; do not author another equivalent fixture or import exploratory fit code.
+7. Reuse T04’s canonical shared wave raw rows/oracle in pure and migrated-SQLite tests: identical m/load/RIR repeats preserve values, rising RIR at fixed m/load changes only the analytical estimate, and higher load at RIR1 can match the preceding RIR3 estimate; stable/smooth controls retain their oracle values, prefix outputs ignore later workout rows, and insufficient prior support yields no curve/residual. Keep evaluation start/reference fixed across prefixes; do not author another equivalent fixture or import exploratory fit code.
 
 ## Specs to update
 

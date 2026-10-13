@@ -33,7 +33,7 @@ Continuous hinge versus level shift, number/search bounds of breakpoints, minimu
 5. Predefine validation scenarios, false-positive/power/coverage reporting and an insufficient-evidence outcome. A visible shift is not proof of a statistically significant break.
 6. Provide reproducible research-only model specifications/experiments and assumptions/limitations, isolated from mobile runtime, sync and production dependencies. Human analytical review approves the validation plan, without treating exploratory results as a release feature.
 
-7. Specify the milestone’s shared weekly wave validation: one individual/gym and known recorded RIR varying by phase; stable-strength control with changing performed reps/recorded RIR/load targets, gradual improvement, session dependence, weekly prefixes without later-data leakage and insufficient baseline support. Predefine what the models should distinguish; exact programme parameters and extra weekly fitted-curve UI remain pending clarification.
+7. Specify the milestone’s shared weekly wave validation: one individual/gym and known recorded RIR varying by phase; primary plateau/repeated-exposure inputs (same load/reps, RIR1→2→3, then higher load returning to RIR1), separate stable/smooth methodological controls, session dependence, weekly prefixes without later-data leakage and insufficient baseline support. Predefine what the models should distinguish; exact programme parameters and extra weekly fitted-curve UI remain pending clarification.
 
 ## Specs to update
 

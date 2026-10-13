@@ -33,7 +33,7 @@ Figma frames versus a repo-native target; entry from selected exercise/history; 
 5. Use Figma where useful and link exact frames/version if selected; keep external artifacts in Figma and target/screenshots beside the UX contract or PR, not persistent specs. Report conflicts with existing contracts.
 6. Record explicit human design approval for the chart, edge states, filter semantics and proposed final entry. T07 cannot begin UI implementation and T08 cannot run UI acceptance tests before this approval; a material design revision renews approval.
 
-7. Use the same shared wave prefix/oracle to human-review weekly scatter/reference/readout, stable-strength versus gradual-progress interpretation and insufficient-baseline states. Keep the approved fixed reference; any request for additional weekly fitted curves must be clarified and approved before entering the visual target. Do not prescribe exact programme parameters here.
+7. Use the same shared wave prefix/oracle to human-review weekly scatter/reference/readout, primary plateaus and same-load/RIR progress, with stable/smooth controls shown as methodological comparisons and insufficient-baseline states. Keep the approved fixed reference; any request for additional weekly fitted curves must be clarified and approved before entering the visual target. Do not prescribe exact programme parameters here.
 
 ## UX contract (proposed; T05 pins the approved target)
 

@@ -33,7 +33,7 @@ Final component seam and development preview for human review without committing
 5. Add component interaction/state/geometry coverage, with success and failure/offline cases as applicable. Render via an isolated developer preview for fresh screenshots against the target; do not add a file under `app/`, root-stack registration or a user-facing entry.
 6. Present the implemented states for human review and incorporate feedback. Material design changes renew T05 approval before UI acceptance testing; keep research statistics out of the production component.
 
-7. Render the shared weekly wave prefix outputs from the existing oracle and verify point positions, recency/readouts, overlap access and insufficient-baseline presentation. Stable lower-rep/heavier-load weeks must not be styled or described as strength gain. Reuse T06’s numerical evidence; this task proves rendering/interactions, not another model fit or reference calculation.
+7. Render the shared weekly wave prefix outputs from the existing oracle and verify plateau/repeated-exposure point positions and actual m/load/RIR versus analytical readouts, recency, overlap access and insufficient-baseline presentation. Stable lower-rep/heavier-load weeks must not be styled or described as strength gain. Reuse T06’s numerical evidence; this task proves rendering/interactions, not another model fit or reference calculation.
 
 ## UX contract (proposed; T05 pins the approved target)
 

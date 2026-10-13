@@ -34,7 +34,7 @@ Confirm T05’s approved entry against current main and related exercise-present
 6. If root-stack/root access/harness changes occur, propose `fast` + `frontend`; otherwise default UI proposal is `fast` + `frontend-ui` and area lanes, narrowed by agreement. Add backend/ios-sync-e2e only if actual scope introduces corresponding risk. No sweep unless a release or operator request.
 7. Meet milestone DoD, graduate durable decisions to their owners, delete this last card and the milestone spec in the shipping PR, link evidence and complete the repository planning lifecycle after merge. Shut down/release the worktree per AGENTS.md; do not merge without user authorization.
 
-8. Reuse the shared wave history to prove the final selected-exercise entry opens the approved chart for the correct exercise/prefix/filter context, and Back preserves the prior workflow/draft. Reuse T08’s unchanged stable/gradual/sparse chart evidence; only navigation/context or newly changed device behaviour needs new assertions.
+8. Reuse the shared wave history to prove the final selected-exercise entry opens the approved chart for the correct exercise/prefix/filter context, and Back preserves the prior workflow/draft. Reuse T08’s unchanged plateau/stable/smooth/sparse chart evidence; only navigation/context or newly changed device behaviour needs new assertions.
 
 ## UX contract (proposed; T05 pins the approved target)
 
