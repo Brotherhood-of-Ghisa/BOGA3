@@ -2,7 +2,7 @@
 
 - Status: `planned`
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
-- GitHub milestone: https://github.com/Brotherhood-of-Ghisa/BOGA3/milestone/1
+- Tracking: repository milestone and task cards only.
 - Planning only: no milestone implementation or analytical/design decision is approved by this plan.
 
 ## Objective
@@ -42,27 +42,27 @@ T06–T08 build and review transformations and chart/page content without a new 
 
 One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. Land this plan as a docs-only PR before T01 starts. No task is executing. The completing PR deletes its card and marks it completed here; execution starts only when dependencies are completed and required approvals recorded.
 
-| Task | Summary | Depends on | Status | GitHub issue |
-| --- | --- | --- | --- | --- |
-| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | planned | [#714](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/714) |
-| [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned | [#715](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/715) |
-| [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned | [#716](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/716) |
-| [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned | [#717](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/717) |
-| [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | planned | [#718](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/718) |
-| [M36-T06](../tasks/M36-T06-RM_chart_data_transformations.md) | Implement RM chart data transformations and real-data tests | T05 | planned | [#719](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/719) |
-| [M36-T07](../tasks/M36-T07-Implement_approved_RM_chart.md) | Implement the approved interactive chart without UI exposure | T06 | planned | [#720](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/720) |
-| [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | planned | [#721](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/721) |
-| [M36-T09](../tasks/M36-T09-Expose_RM_analytics_and_closeout.md) | Expose exercise RM analytics through existing navigation — final implementation step | T08 | planned | [#722](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/722) |
+| Task | Summary | Depends on | Status |
+| --- | --- | --- | --- |
+| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | planned |
+| [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned |
+| [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
+| [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
+| [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | planned |
+| [M36-T06](../tasks/M36-T06-RM_chart_data_transformations.md) | Implement RM chart data transformations and real-data tests | T05 | planned |
+| [M36-T07](../tasks/M36-T07-Implement_approved_RM_chart.md) | Implement the approved interactive chart without UI exposure | T06 | planned |
+| [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | planned |
+| [M36-T09](../tasks/M36-T09-Expose_RM_analytics_and_closeout.md) | Expose exercise RM analytics through existing navigation — final implementation step | T08 | planned |
 
 ## Ordered workstreams
 
-| Workstream | Tasks | Depends on | Tracking issue |
-| --- | --- | --- | --- |
-| 1. Analytical research and modelling | T01, T02 | none | [#709](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/709) |
-| 2. Empirical testing against data | T03, T04 | WS1 | [#710](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/710) |
-| 3. Graphics and design | T05 | WS2 | [#711](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/711) |
-| 4. Implementation and validation | T06, T07, T08 | WS3 | [#712](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/712) |
-| 5. Final UI exposure | T09 | WS4 | [#713](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/713) |
+| Workstream | Tasks | Depends on |
+| --- | --- | --- |
+| 1. Analytical research and modelling | T01, T02 | none |
+| 2. Empirical testing against data | T03, T04 | WS1 |
+| 3. Graphics and design | T05 | WS2 |
+| 4. Implementation and validation | T06, T07, T08 | WS3 |
+| 5. Final UI exposure | T09 | WS4 |
 
 The dependency chain is T01 → T02 → T03 → T04 → T05 → T06 → T07 → T08 → T09. Workstreams are intentionally ordered; no production design/implementation runs ahead of empirical review.
 
@@ -80,7 +80,7 @@ Verified at the planning baseline; recheck current main at task start. Existing 
 | Historical candidate | `apps/mobile/scripts/import/fixtures/dev-rich-history.boga-import.json`: 221 sessions, 886 blocks, 2,910 sets, 116 exercise decisions, completed dates 2024-12-23–2026-06-04. Metadata names GymBook; verify original/enriched effort provenance before statistical use. Observed labels: warm-up 886, unspecified 720, RIR 2/1/0 620/346/338. Original XML was not found in tracked repository files. |
 | Existing validation assets | `load-metrics-vectors.json`; calculation/load/effort tests, exercise history repository tests, `__tests__/helpers/local-data.ts`, timeline/history tests and import-contract fixtures. These support regression correctness, not population-level statistical claims. |
 
-Related work: [#404](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/404) / M31 Progress exploration and [#639](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/639) Timeline are integration precedents, not duplicate curve work. [#681](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/681) tracks working-set RM eligibility: verify current behavior and avoid duplicating its fix. [#654](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/654) tracks shared set/record presentation: reuse the resulting presentation where relevant. [#677](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/677) leaves absolute versus %BW personal-record meaning open: this milestone does not choose it. [#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707) and [#499](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/499) cover gym splitting; research gym sensitivity without implementing that feature. [#708](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/708) concerns heatmap label alignment, outside this feature. No existing GitHub milestone or issue covers the RM-curve/research scope. M36 follows the highest M35 in full main history; no open PR reserved a later ID at planning time.
+Existing Progress exploration and Timeline provide integration precedents. Verify working-set RM eligibility and reuse shared set/record presentation at execution; this milestone does not replace those rules. Absolute versus %BW personal-record meaning remains an open product question outside this milestone. Gym splitting and heatmap label alignment are separate work; investigate gym sensitivity without implementing either feature here. The repository discovery found no duplicate RM-curve/research scope. M36 follows the highest M35 in full main history at planning time.
 
 ## Testing proposals and execution constraints
 
@@ -98,7 +98,7 @@ Read test-directory READMEs before edits. One canonical assertion per claim; reu
 
 1. Effort comparability: strict RIR values/ranges, missing/unknown effort and high legacy RIR; RIR labels are subjective and fixture provenance may be enriched. No automatic RIR correction to the adopted formula.
 2. Reference: historical baseline versus current/rolling/all-time estimate, robust estimator, window/cutoff and minimum support. Per-point self-references make residuals tautological; later data must not leak into historical evaluation.
-3. Load coordinate: entered/displayed versus internal calculated load and a coherent overlay across changing bodyweight contexts; do not decide #677 or double ordinary per-side loads. Gym/equipment changes can confound a trend.
+3. Load coordinate: entered/displayed versus internal calculated load and a coherent overlay across changing bodyweight contexts; leave absolute versus %BW personal-record meaning unchanged and do not double ordinary per-side loads. Gym/equipment changes can confound a trend.
 4. Residual definition and valid domains: signed/percentage normalization, zero denominator, extreme reps/extrapolation, no-reference and insufficient-data presentation.
 5. Break modelling: level/slope alternatives, breakpoint search, minimum independent sessions, cluster/autocorrelation treatment, selection penalties and uncertainty. Sparse histories and changing rep ranges can mimic breaks; visual shifts never establish significance.
 6. Design: Figma or repo-native target, recency/overlap selection, approved filter defaults/ranges, accessible legend and exact selected-exercise entry. Human review resolves these in T05, not this plan.
@@ -112,4 +112,4 @@ Read test-directory READMEs before edits. One canonical assertion per claim; reu
 - Existing RM/effort/load semantics and raw history remain intact; focused unit, real-data integration and regression tests plus all agreed local lanes and quality targets are green with PR evidence.
 - Structural break work remains exploratory and absent from production UI/runtime; no unapproved product fact or loading change ships.
 - T09 is the final implementation step and exposes the view for a selected exercise without disrupting logging, history or analytics context.
-- Durable decisions live with their owning product/spec/code/tests; final shipping PR deletes ephemeral cards/spec, closes linked GitHub issues/milestone after merge and completes worktree/stack cleanup. No implementation begins from this planning session.
+- Durable decisions live with their owning product/spec/code/tests; final shipping PR deletes ephemeral cards/spec and completes worktree/stack cleanup after merge. No implementation begins from this planning session.
