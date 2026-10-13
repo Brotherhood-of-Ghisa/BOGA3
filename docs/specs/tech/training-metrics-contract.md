@@ -233,7 +233,8 @@ displayed 1RM   = (total 1RM - c × B) / F
 
 Bodyweight contributes once. Ordinary per-side exercise Volume counts both
 sides; displayed 1RM stays in entered external-Weight units. Screens show Weight,
-1RM and Volume, never the calculated-load breakdown.
+1RM and Volume; only the RM chart's approved coordinate ([[1rm.curve-load]], §6)
+exposes calculated load.
 
 **1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
 
@@ -327,3 +328,41 @@ converts source entered units to the declared group target, while Volume is
 total kg·reps independent of target mode. Display rounding does
 not determine competitive rank. Raw kg storage and historical group audits retain their original values and
 revisions; personal facts rebuild under the new calculation rules.
+
+## 6. RM curve analytics — approved contract, implementation pending
+
+[[1rm.curve-population]], [[1rm.curve-reference]] and [[1rm.curve-load]] govern
+the initial analytical deliverable. Approval establishes product choices, not
+empirical accuracy; design, integrated UI acceptance and production exposure
+remain separate gates. Structural-break detection and regression remain research.
+
+Use `f(r) = estimateOneRepMax(1, r)` and inverse total prediction `P = M / f(r)`
+for independent reference total RM `M` ([[1rm.formula]]). The unit-load call
+preserves the single-rep branch without copied constants. Use full precision,
+parsed integer reps and finite metrics from `calculateSetMetrics`; connect
+integer predictions only as drawing interpolation. High-rep boundedness is
+mathematical behaviour, not validated endurance. The reference's rep restriction
+does not change valid set entry or individual displayed estimates.
+
+Research residuals on total calculated load `L` are `L − P` kg and
+`100 × (L − P) / P` percent. A zero prediction retains finite signed residual
+but has no percentage; absent/invalid reference or nonfinite arithmetic gives
+no corresponding residual. Division by entry factor rescales kg but preserves
+percentage. Never normalise by entered Weight after subtracting bodyweight.
+
+Adapters must retain raw effort before `buildSessionEntry` normalizes unknown
+labels, canonical IDs/order, session start/end, gym, current metadata/policy key
+and dated-reading provenance. Use one coherent account snapshot for both
+populations; current source changes reinterpret history, not a stored past
+snapshot. Daily/weekly aggregates and displayed all-time RM maxima cannot
+replace per-set total-RM inputs.
+
+Session maxima retain attempt-selection bias; a median gives equal session
+weight but is not an unbiased capacity estimate. A maximum fit to evaluated
+points forces all residuals nonpositive; each point's own reference forces zero.
+Empirical work must test effort/provenance, rep-range bias, sparse support,
+bodyweight/gym sensitivity and session dependence. Rolling/current and prior
+all-time references are research comparators, not fallback production features.
+
+When projecting bodyweight-aware chart loads, load
+`bodyweight-load-contract.md` §11.

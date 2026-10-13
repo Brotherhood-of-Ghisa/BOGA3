@@ -1,6 +1,6 @@
-# RM curve reconstruction and proposed analytical contract
+# RM curve reconstruction and approved initial analytical contract
 
-Research prepared against `7b6dc3fd` on 2026-10-13. **All observation/default/reference/axis choices below are proposals awaiting product-owner approval.** This note does not change product facts, global eligibility, records, input semantics or production calculations. T01 remains in progress; T02 has not started.
+Research prepared against `7b6dc3fd` on 2026-10-13. **The product owner accepted the initial default recommendations on 2026-10-13: “All accepted as a first deloverable”.** Their durable authority is now [[1rm.curve-population]], [[1rm.curve-reference]] and [[1rm.curve-load]], with technical guidance in `docs/specs/tech/training-metrics-contract.md` §6 and `docs/specs/tech/bodyweight-load-contract.md` §11. This approves the first analytical deliverable, not empirical reliability or visual design/UI acceptance. Alternatives below remain research comparisons. No global eligibility, record, input or production calculation changes have shipped. T01 is completed on this branch; T02 has not started.
 
 ## Existing authority and integration seams
 
@@ -43,21 +43,21 @@ It uses all 11 current load vectors, real kernel calls, exact dated resolution a
 | 50 | 50.065255 |
 | 999 | 48.800000 |
 
-The inverse approaches a positive load fraction at high reps; mathematical boundedness is **not** validation of unlimited endurance or of a 999-rep RM estimate. The parser accepts at most 999; `estimateOneRepMax` alone has no upper rep cap. Use parsed set values for observations, and propose a narrower inference domain below. The bare estimator can overflow for extreme finite loads; `calculateSetMetrics` rejects nonfinite results. Research must not let a direct helper's infinity become a reference.
+The inverse approaches a positive load fraction at high reps; mathematical boundedness is **not** validation of unlimited endurance or of a 999-rep RM estimate. The parser accepts at most 999; `estimateOneRepMax` alone has no upper rep cap. Use parsed set values for observations, and use the initial inference domain below. The bare estimator can overflow for extreme finite loads; `calculateSetMetrics` rejects nonfinite results. Research must not let a direct helper's infinity become a reference.
 
 - `M = 0` gives prediction zero for valid reps. A zero load is a valid observed set; it supplies no positive reference support. With positive bodyweight contribution, entered zero can still have positive calculated load and RM.
 - Negative/nonfinite reference, invalid reps, unperformed/planned/skipped or invalid text values yield no analytical point/reference. Blank Weight with valid reps is zero through `calculateSetMetrics`; calling `resolveCalculatedLoad` on raw blank text directly would instead be invalid.
 - Rounding is presentation only. References, inverses and residuals use full precision; point displayed RM uses the existing formatter later.
 
-**Proposed rep policy:** retain all valid observed points. Estimate a reference using 1–10 reps initially; sensitivity bands 1–5, 6–10, 11–20 and above 20 stay separately reported in empirical work. Draw the first curve only over the approved supported integer rep interval, without using high-rep observations to invent confidence. The cutoff is a conservative proposal, not an adopted BoGa estimator restriction. [Reynolds et al. (2006)](https://www.unm.edu/~rrobergs/478RMStrengthPrediction.pdf) tested chest/leg press at 1/5/10/20RM with controlled cadence and found their 5RM regressions most accurate. Their linear-equation recommendation does not validate Wathan across every exercise or set the app's rep cap; it motivates sensitivity checks.
+**Approved initial rep policy:** retain all valid observed points. Estimate a reference using 1–10 reps initially; sensitivity bands 1–5, 6–10, 11–20 and above 20 stay separately reported in empirical work. Draw the first curve only over the supported integer rep interval pinned during design, without using high-rep observations to invent confidence. The cutoff is an initial analytical choice, not a change to BoGa's estimator or entry domain. [Reynolds et al. (2006)](https://www.unm.edu/~rrobergs/478RMStrengthPrediction.pdf) tested chest/leg press at 1/5/10/20RM with controlled cadence and found their 5RM regressions most accurate. Their linear-equation recommendation does not validate Wathan across every exercise or set the app's rep cap; it motivates sensitivity checks.
 
-## Comparable effort proposals
+## Comparable effort choices and research sensitivities
 
-Apply the account's `isWorkingSet` first. Intersect it with an explicit raw-RIR cohort; do not alter policy preferences or stored labels. A user who excludes an effort from working sets still excludes it from this proposed analytical population. Policy-selected warm-up/technique/cooldown can appear in the broad working population but are never silently promoted to an exact-RIR cohort.
+Apply the account's `isWorkingSet` first. Intersect it with an explicit raw-RIR cohort; do not alter policy preferences or stored labels. A user who excludes an effort from working sets still excludes it from this approved initial analytical population. Policy-selected warm-up/technique/cooldown can appear in the broad working population but are never silently promoted to an exact-RIR cohort.
 
 | Candidate cohort | Role and tradeoff |
 | --- | --- |
-| Exactly RIR 0 | Proposed initial chart/reference cohort: closest recorded endpoint to the RM curve, often sparse and still subjective. |
+| Exactly RIR 0 | Approved initial chart/reference cohort: closest recorded endpoint to the RM curve, often sparse and still subjective. |
 | Exactly RIR 1 or exactly RIR 2 | Separate within-grade analyses distinguish curve shape from differing effort. |
 | RIR 0–1 and 0–2 | Sensitivity/explicit alternative filters: more observations, mixed effort. Never substitute reps + RIR. |
 | RIR 3–4, canonical historical RIR above four | Separate effort strata; keep numerical RIR 7 as 7 even though working eligibility follows RIR-4. |
@@ -67,11 +67,11 @@ Apply the account's `isWorkingSet` first. Intersect it with an explicit raw-RIR 
 
 The script's illustrative label population contains 10 default-working rows, versus 1/2/3 rows in RIR 0/0–1/0–2. It verifies equal per-set RM for equal load/reps across every label; cohort differences come from selection only. These counts are synthetic parser examples, not dataset coverage or effect-size estimates.
 
-**Recommendation for approval:** begin with RIR 0 and explicit optional broadening; exclude missing/unknown from reference estimation while retaining their separate research comparisons. No automatic widening when data are sparse. Report count of sets **and independent sessions**, rep coverage, label provenance and excluded populations. [Armes et al. (2020)](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2020.565416/full) found trained participants' predicted failure endpoints imperfect in knee-extension experiments. This supports treating RIR as uncertain self-report, not a measured correction; it is not a universal error calibration for BoGa users.
+**Approved initial default:** begin with RIR 0 and explicit optional broadening; exclude missing/unknown from reference estimation while retaining their separate research comparisons. No automatic widening when data are sparse. Report count of sets **and independent sessions**, rep coverage, label provenance and excluded populations. [Armes et al. (2020)](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2020.565416/full) found trained participants' predicted failure endpoints imperfect in knee-extension experiments. This supports treating RIR as uncertain self-report, not a measured correction; it is not a universal error calibration for BoGa users.
 
-## Reference comparison and proposed cutoff contract
+## Reference comparison and approved initial cutoff contract
 
-Estimate reference on the same definition, effort cohort, current policy/metadata and comparable load coordinate as observations. Proposed estimator: take each qualifying completed session's maximum finite positive **total** RM, then median those session maxima. Session weighting limits domination by a session containing many sets; max selection can still favour sessions with more attempts or favourable rep ranges, and the median estimates typical best performance rather than a maximal capacity. Compare median of all sets and prior maximum as sensitivities in empirical validation.
+Estimate reference on the same definition, effort cohort, current policy/metadata and comparable load coordinate as observations. Approved initial estimator: take each qualifying completed session's maximum finite positive **total** RM, then median those session maxima. Session weighting limits domination by a session containing many sets; max selection can still favour sessions with more attempts or favourable rep ranges, and the median estimates typical best performance rather than a maximal capacity. Compare median of all sets and prior maximum as sensitivities in empirical validation.
 
 | Reference | Population and refresh | Analytical interpretation |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ Estimate reference on the same definition, effort cohort, current policy/metadat
 | Prior all-time maximum | All qualifying sessions strictly before each evaluation session | Record-like ceiling; sensitive to old/outlier estimates and upward selection. |
 | Existing all-time displayed estimate | Current facts across all working sessions, current personal context | Existing production record context only. Includes displayed observations and is not the total/effort-filtered historical reference. Recompute a prior raw cohort for valid analytical comparisons. |
 
-**Concrete proposal awaiting approval:** anchor a fixed baseline to the selected evaluation range start; use the existing History look-back setting's calendar start computed at `t0`, truncate its end to `t0`, and take up to the six most recent qualifying sessions in that prior interval. Require six distinct qualifying sessions for a curve; fewer means points without a reference, with no silent all-time/current fallback. Six is a proposed conservative reuse of an existing history support convention, not statistical reliability or adequate breakpoint support. Empirical work should compare 3/6/10 sessions and alternative windows before final analytical approval.
+**Approved first-deliverable reference:** anchor a fixed baseline to the selected evaluation range start; use the existing History look-back setting's calendar start computed at `t0`, truncate its end to `t0`, and take up to the six most recent qualifying sessions in that prior interval. Require six distinct qualifying sessions for a curve; fewer means points without a reference, with no silent all-time/current fallback. Six is a conservative initial reuse of an existing history support convention, not statistical reliability or adequate breakpoint support. Empirical work should compare 3/6/10 sessions and alternative windows before final analytical approval.
 
 A reference fit never uses any session displayed as an evaluated point. Cutoff uses exact `completedAt < t0`; tie timestamps are excluded as a whole session group, even though record folds have their own ID tie ordering. A rolling comparison uses `completedAt < evaluationSession.completedAt`. No later workout or later-as-of bodyweight reading enters an old evaluation. Source metadata/preferences/readings remain current reinterpretations under BoGa's existing contract; after an edit or policy/account change, recompute both populations atomically. A fixed numerical reference is fixed during one evaluation, not a permanently stored historical snapshot. Archive the research input snapshot/policy separately to reproduce results; no new synced derivation.
 
@@ -107,7 +107,7 @@ percentage residual = 100 × (L_i − P_i) / P_i
 
 Positive means above the reference prediction, negative below. Normalise by predicted **load**, not entered Weight, observed load or a displayed RM with bodyweight removed. For constant `M_ref`, percentage residual also equals `100 × (M_i / M_ref − 1)`; changing rep mix can therefore change residuals through estimator bias. Rep-range strata remain necessary. Dividing both observed/predicted load by fixed `F` rescales kg residual by `1/F` and leaves percentage unchanged; subtracting bodyweight does not preserve the denominator.
 
-With prediction zero, retain a finite signed residual but percentage is undefined, even `0/0`. Without a valid independent reference or finite observation, both residuals are unavailable. A nonfinite subtraction/ratio is unavailable too. Do not equate undefined percentage with zero. The proposed chart may retain points without residuals; actual missing-state copy/layout is design work.
+With prediction zero, retain a finite signed residual but percentage is undefined, even `0/0`. Without a valid independent reference or finite observation, both residuals are unavailable. A nonfinite subtraction/ratio is unavailable too. Do not equate undefined percentage with zero. The approved chart retains points without residuals; actual missing-state copy/layout is design work.
 
 Prediction error combines model mismatch, effort/reporting error, day-to-day readiness, fatigue/order, equipment/technique and metadata/reading changes. It is neither a measurement error estimate nor proof of changed strength. Many points from one session are dependent. This note specifies no regression, uncertainty interval, significance threshold or break date; T02 owns those methods.
 
@@ -131,29 +131,29 @@ The script selects B80 just before timestamp 10, B90 at 10, and skips a later ma
 
 **Research recommendation:** use total calculated kg and total RM as the canonical comparable scale; preserve per-entry and raw fields alongside it. Recompute from raw rows rather than aggregate displayed maxima.
 
-**Production coordinate alternatives for human approval:**
+**Approved chart coordinate and research alternatives:**
 
 | Candidate | One coherent overlay across B changes? | Tradeoff |
 | --- | --- | --- |
 | Entered Weight, restrict to identical effective `b` contexts | Yes within each context | Preserves current Weight axis; fragments histories and often prevents useful BW comparison. Never silently round B into bins. |
-| Calculated load per entry factor `Y=L/F`, reference `M_ref/F` | Yes: `Y_pred=(M_ref/F)/f(r)` | Recommended proposal for a mixed-context chart: ordinary/per-side axis remains entered kg; BW points include `b/F`. Requires explicit approval of a new chart coordinate/label. Point raw Weight and displayed RM remain unchanged. |
+| Calculated load per entry factor `Y=L/F`, reference `M_ref/F` | Yes: `Y_pred=(M_ref/F)/f(r)` | Approved choice for a mixed-context chart: ordinary/per-side axis remains entered kg; BW points include `b/F`. The coordinate exception is approved; exact labels still require visual design approval. Point raw Weight and displayed RM remain unchanged. |
 | Calculated total load `Y=L` | Yes | Clearest research scale; ordinary per-side points become twice entered Weight and need an approved explicit label. |
 | Entered Weight with one latest-B curve | No | Not recommended as an analytical overlay; systematically misprojects earlier contexts. |
 
-Current bodyweight UI contract hides calculated-load breakdown and shows entered Weight/displayed RM. **No new calculated axis is approved here.** If the owner selects the recommended coordinate, its chart-specific presentation exception must be approved and recorded with the owning rules before implementation. Otherwise retain entered Weight and explicitly select a homogeneous context. Neither option changes logging, records, contribution/reading selection or the global meaning of Weight. This is the outstanding load-design decision, not permission to ship misleading BW plots.
+The existing bodyweight UI hides calculated-load breakdown and shows entered Weight/displayed RM. **The chart-only exception is now approved in [[1rm.curve-load]]:** use calculated load per entry factor for the scatter and total reference RM per entry factor for its curve. Exact axis labels and visuals remain subject to the later design gate. This changes neither logging nor records, contribution/reading selection or the global meaning of Weight. Homogeneous entered-Weight and total-load alternatives remain analytical comparisons, not additional approved chart modes.
 
-Gym/equipment comparison is also provisional: propose matching the reference's gym to the evaluated cohort, keeping missing-gym separate, then testing pooled histories as a sensitivity. A gym ID is only a proxy; apparatus, range of motion, tempo and technique changes are not fully recorded. No new gym feature is implemented.
+The initial same-gym cohort is approved: match the reference's gym to the evaluated cohort, keeping missing-gym separate, then test pooled histories as a research sensitivity. A gym ID is only a proxy; apparatus, range of motion, tempo and technique changes are not fully recorded. No new gym feature is implemented.
 
-## Acceptance and human decision gate
+## Acceptance and recorded approval
 
 | T01 acceptance | Reviewable evidence | Remaining condition |
 | --- | --- | --- |
-| 1. Trace existing authority | First section, current function/policy/data seams | Human review |
-| 2. Reconstruct and parity | Shared unit-load inverse; 11 vectors and single/zero/invalid/overflow checks; focused Jest identities | Human review |
-| 3. Effort sensitivity | Cohort table, raw-label checks and subjective-effort limitation | Approve initial cohort/missing/high-RIR treatment |
-| 4. Reference alternatives | Population/estimator/cutoff/refresh/fallback proposal and synthetic comparison | Approve estimator/window/support; empirical testing can later revise |
-| 5. Residuals | Signed/percentage definitions, denominator and unavailable cases | Approve analytical contract; no production residual UI promised |
-| 6. Loading and projection | Current F once, dated reading examples, BW curve family and coordinate alternatives | Approve BW chart coordinate/exception or homogeneous-context alternative |
-| 7. Assumptions and approval | Limitations and concrete recommendations above | **Pending product-owner approval; no new fact or persistent extension written** |
+| 1. Trace existing authority | First section, current function/policy/data seams | Reviewed |
+| 2. Reconstruct and parity | Shared unit-load inverse; 11 vectors and single/zero/invalid/overflow checks; focused Jest identities | Reviewed |
+| 3. Effort sensitivity | Cohort table, raw-label checks and subjective-effort limitation | Approved as the initial contract |
+| 4. Reference alternatives | Approved initial population/estimator/cutoff/refresh/fallback and synthetic comparison | Empirical revisions require review |
+| 5. Residuals | Signed/percentage definitions, denominator and unavailable cases | Analytical definition approved; no production residual UI promised |
+| 6. Loading and projection | Current F once, dated reading examples, BW curve family and coordinate alternatives | Per-entry calculated coordinate and chart exception approved |
+| 7. Assumptions and approval | Limitations and concrete recommendations above | **Product-owner approval recorded; accepted facts and durable extensions written** |
 
-Other pending choices are the rep-domain policy and same-gym default. T03/T04 still need to verify actual dataset/effort provenance, estimator bias, sensitivity and empirical reliability; no real historical residual distribution has been analysed in T01. Keep the research note/checks ephemeral until decisions graduate into their existing owners. Do not delete the task card or unblock T02 as completed before the required approval.
+The rep-domain and same-gym defaults are approved initially. T03/T04 still need to verify actual dataset/effort provenance, estimator bias, sensitivity and empirical reliability; no real historical residual distribution has been analysed in T01. Detailed research/checks remain ephemeral; approved durable rules have graduated to their owners. The completing PR deletes the task card and marks T01 completed. T02 may start only after this draft PR merges; no later task has started. Analytical approval fulfills neither empirical review nor human visual-design/UI acceptance.

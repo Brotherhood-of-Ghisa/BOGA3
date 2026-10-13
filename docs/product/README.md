@@ -17,7 +17,7 @@ purpose, in its own PR.
 | Subject | File | Covers |
 | --- | --- | --- |
 | `set` | `set.md` | A performed set, which sets feed which figure, set counts and rows |
-| `1rm` | `1rm.md` | The 1RM estimate and its display |
+| `1rm` | `1rm.md` | The 1RM estimate, display and RM curve analytics |
 | `muscle` | `muscle.md` | How sets and work are attributed to muscles |
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
 | `comparison` | `comparison.md` | Which periods are compared, and how a change is shown |

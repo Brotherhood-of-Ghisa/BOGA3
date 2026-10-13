@@ -1,10 +1,10 @@
 # M36 — RM Performance Curve Analytics
 
 - Status: `in_progress`
-- Approval: T01 analytical proposals await product-owner approval.
+- Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. Empirical reliability, human design approval and UI acceptance remain pending.
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
-- Planning only: no milestone implementation or analytical/design decision is approved by this plan.
+- Research only so far: the initial analytical contract is approved; production implementation and visual design have not started.
 
 ## Objective
 
@@ -25,7 +25,7 @@ Reuse [[1rm.formula]], [[set.performed]] and [[set.eligibility]], the existing c
 
 ### D2. Research precedes empirical review and product design
 
-Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01 proposes effort/reference/load-coordinate rules; T04 closes empirical review with explicit human analytical/product approval before T05 begins. Unsupported real-data evidence must be reported honestly and its limitations accepted.
+Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01's first-deliverable effort/reference/load-coordinate rules are approved in [[1rm.curve-population]], [[1rm.curve-reference]] and [[1rm.curve-load]]; T04 still closes empirical review with explicit human analytical/product approval before T05 begins. Unsupported real-data evidence must be reported honestly and its limitations accepted.
 
 ### D3. First release is the observed-set scatter and reference overlay
 
@@ -41,11 +41,11 @@ T06–T08 build and review transformations and chart/page content without a new 
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01 research is in progress; its analytical proposals await product-owner approval. The completing PR deletes its card and marks it completed here; later execution starts only when dependencies are completed and required approvals recorded.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727, awaiting merge; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. Later execution starts only after the completing PR merges and dependencies and required approvals are satisfied. No later task has started.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | in_progress |
+| M36-T01 | Reconstruct the RM curve and agree effort/reference contracts | none | completed |
 | [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned |
 | [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
@@ -97,10 +97,10 @@ Read test-directory READMEs before edits. One canonical assertion per claim; reu
 
 ## Risks / dependencies and unresolved decisions
 
-1. Effort comparability: strict RIR values/ranges, missing/unknown effort and high legacy RIR; RIR labels are subjective and fixture provenance may be enriched. No automatic RIR correction to the adopted formula.
-2. Reference: historical baseline versus current/rolling/all-time estimate, robust estimator, window/cutoff and minimum support. Per-point self-references make residuals tautological; later data must not leak into historical evaluation.
-3. Load coordinate: entered/displayed versus internal calculated load and a coherent overlay across changing bodyweight contexts; leave absolute versus %BW personal-record meaning unchanged. Current kernel applies the entry factor once, including ordinary per-side loads; avoid an additional conversion in analytics. Gym/equipment changes can confound a trend.
-4. Residual definition and valid domains: signed/percentage normalization, zero denominator, extreme reps/extrapolation, no-reference and insufficient-data presentation.
+1. Effort comparability: the approved initial RIR/cohort choice is [[1rm.curve-population]]; subjective labels and possibly enriched fixture provenance still need empirical validation. No automatic RIR correction to the adopted formula.
+2. Reference: [[1rm.curve-reference]] fixes the initial historical estimator/window/support; rolling/current/all-time comparisons remain research sensitivities. The approved support minimum is not statistically established reliability.
+3. Load coordinate: [[1rm.curve-load]] approves a coherent chart coordinate across dated bodyweight contexts; absolute versus %BW personal records remain unchanged. Current kernel applies the entry factor once, including ordinary per-side loads; avoid an additional conversion. Same-gym cohorts still cannot exclude equipment/technique confounding.
+4. Residual definitions: signed/percentage normalization and zero/undefined handling are approved in `docs/specs/tech/training-metrics-contract.md` §6. Empirical/domain sensitivity and no-reference/insufficient-data presentation remain to validate and design.
 5. Break modelling: level/slope alternatives, breakpoint search, minimum independent sessions, cluster/autocorrelation treatment, selection penalties and uncertainty. Sparse histories and changing rep ranges can mimic breaks; visual shifts never establish significance.
 6. Design: Figma or repo-native target, recency/overlap selection, approved filter defaults/ranges, accessible legend and exact selected-exercise entry. Human review resolves these in T05, not this plan.
 7. Concurrent Progress, effort and presentation work may change integration seams; recheck current main without loading unrelated plans as authority. No first-release backend/schema/sync change is expected; any proposed expansion requires human scope review and corresponding local gates.
