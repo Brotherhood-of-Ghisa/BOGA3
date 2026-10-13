@@ -5,8 +5,7 @@
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: no
 
-- GitHub issue: [719](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/719)
-- Workstream: [#712](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/712)
+- Workstream: 4 — Implementation and validation
 
 ## Objective
 

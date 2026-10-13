@@ -5,8 +5,7 @@
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: yes
 
-- GitHub issue: [722](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/722)
-- Workstream: [#713](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/713)
+- Workstream: 5 — Final UI exposure
 
 ## Objective
 
@@ -33,7 +32,7 @@ Confirm T05’s approved entry against current main and related exercise-present
 4. Add focused route/entry/return regression tests over real data and native navigation checks. Reuse T08’s chart evidence on unchanged behavior; test the newly wired path and any affected logging/history transitions.
 5. Obtain human review of the exposed entry/return flow before UI acceptance tests; renew approval for material UI changes. Run `./boga test for` both for this diff and the milestone’s cumulative changed paths, agree the minimum lanes, and complete all agreed checks to green.
 6. If root-stack/root access/harness changes occur, propose `fast` + `frontend`; otherwise default UI proposal is `fast` + `frontend-ui` and area lanes, narrowed by agreement. Add backend/ios-sync-e2e only if actual scope introduces corresponding risk. No sweep unless a release or operator request.
-7. Meet milestone DoD, graduate durable decisions to their owners, delete this last card and the milestone spec in the shipping PR, link evidence, then close task/workstream issues and GitHub milestone after merge. Shut down/release the worktree per AGENTS.md; do not merge without user authorization.
+7. Meet milestone DoD, graduate durable decisions to their owners, delete this last card and the milestone spec in the shipping PR, link evidence and complete the repository planning lifecycle after merge. Shut down/release the worktree per AGENTS.md; do not merge without user authorization.
 
 ## UX contract (proposed; T05 pins the approved target)
 

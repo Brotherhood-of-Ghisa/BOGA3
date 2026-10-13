@@ -5,8 +5,7 @@
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
 
-- GitHub issue: [715](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/715)
-- Workstream: [#709](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/709)
+- Workstream: 1 — Analytical research and modelling
 
 ## Objective
 
