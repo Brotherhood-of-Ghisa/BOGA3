@@ -323,9 +323,9 @@ path is defined so the permitted operation can never block sync.
 | Route | Contract |
 | :--- | :--- |
 | `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
-| `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target loads show the load input mode (`per_side_load` vs `total_load`). |
+| `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target entry follows the recorder through shared fields ([[copy.set-entry]]). |
 | `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
-| `/programme/new` | Author an ordered programme; minimum 2 child plans. |
+| `/programme/new` | Author an ordered programme; minimum 2 child plans; target entry uses the recorder's shared fields ([[copy.set-entry]]). |
 | `/programme/[programmeId]` | Overall progress, next unresolved block in sequence, child plan summaries. |
 
 - **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.

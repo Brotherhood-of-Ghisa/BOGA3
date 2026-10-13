@@ -96,7 +96,6 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         weightValue={weightValue}
         repsValue={repsValue}
         setType={setType}
-        loadInputMode={loadContext.loadInputMode}
         onChangeWeight={(text) => { if (isWeightInput(text)) onChangeWeight(text); }}
         onChangeReps={(text) => { if (REPS_PATTERN.test(text)) onChangeReps(text); }}
         onCycleEffort={onCycleEffort}

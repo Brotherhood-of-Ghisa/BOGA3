@@ -30,8 +30,7 @@ export type PlanBlockEditorProps = {
 /**
  * One block's editor in the plan form: the picked exercise (its name row
  * opens the pick sheet) and the ordered target sets — effort, weight, reps per
- * set. The weight field's label follows the exercise's load input mode
- * (`per side · kg` when loaded per side).
+ * set. Target entry follows the recorder's shared fields ([[copy.set-entry]]).
  */
 export function PlanBlockEditor({
   block,
@@ -104,7 +103,6 @@ export function PlanBlockEditor({
               weightValue={set.targetWeightText}
               repsValue={set.targetRepsText}
               setType={set.targetSetType}
-              loadInputMode={block.loadInputMode ?? 'total_load'}
               weightError={weightError}
               repsError={repsError}
               onChangeWeight={(targetWeightText) => onChangeSet(block.id, set.id, { targetWeightText })}

@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } 
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
-import type { LoadInputMode } from '@/src/exercise-calculations/load-metrics';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 
 import { pageText } from './text-styles';
@@ -14,7 +13,6 @@ type SetEntryFieldsProps = {
   weightValue: string;
   repsValue: string;
   setType: SessionSetTypeValue;
-  loadInputMode: LoadInputMode;
   weightError?: string;
   repsError?: string;
   onChangeWeight: (value: string) => void;
@@ -25,9 +23,9 @@ type SetEntryFieldsProps = {
   children: ReactNode;
 };
 
-/** The same entry fields for performed sets, one-off targets and programme targets. */
+/** Recorder entry fields reused by plan/programme targets; copy follows [[copy.set-entry]]. */
 export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>(function SetEntryFields(
-  { number, weightValue, repsValue, setType, loadInputMode, weightError, repsError,
+  { number, weightValue, repsValue, setType, weightError, repsError,
     onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, testID, children },
   weightInputRef,
 ) {
@@ -35,7 +33,6 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
   const effortText = setType === 'technique' || setType === 'cooldown'
     ? formatSessionSetType(setType, 'compact')
     : effort;
-  const perSide = loadInputMode === 'per_side_load';
 
   return (
     <View style={styles.fields}>
@@ -54,10 +51,10 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
         </View>
       </Pressable>
       <View style={[styles.field, styles.weightField, weightError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={pageText.microLabel}>{perSide ? 'Weight per side · kg' : 'Weight · kg'}</Text>
+        <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
         <TextInput
           allowFontScaling={false}
-          accessibilityLabel={`Set ${number} weight${perSide ? ' per side' : ''} in kilograms`}
+          accessibilityLabel={`Set ${number} weight in kilograms`}
           keyboardType="decimal-pad"
           onChangeText={onChangeWeight}
           ref={weightInputRef}
