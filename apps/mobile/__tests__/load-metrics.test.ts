@@ -33,6 +33,30 @@ describe('shared load metrics', () => {
     expect(result.estimatedOneRepMaxKg).toBeCloseTo(vector.estimatedOneRepMaxKg, 9);
   });
 
+  it.each(vectors)('round-trips $name through the shared unit-load estimator and external projection', vector => {
+    const result = calculateSetMetrics(vector as SetMetricInput);
+    if (!result.eligible || result.load.status !== 'known') throw new Error('invalid vector');
+    const multiplier = estimateOneRepMax(1, result.reps)!;
+    const predictedTotal = result.estimatedTotalOneRepMaxKg! / multiplier;
+    const factor = vector.loadInputMode === 'per_side_load' ? 2 : 1;
+    expect((predictedTotal - result.load.bodyweightPartKg) / factor)
+      .toBeCloseTo(result.load.enteredWeightKg, 10);
+  });
+
+  it('keeps a bodyweight reference projection dependent on the selected dated load context', () => {
+    const multiplier = estimateOneRepMax(1, 8)!;
+    const projected = [80, 90].map(bodyWeightKg => {
+      const referenceTotal = 30 + bodyWeightKg;
+      const weight = referenceTotal / multiplier - bodyWeightKg;
+      const metric = calculateSetMetrics({ ...pullUp, policy: 'personal', bodyWeightKg, weightValue: String(weight) });
+      expect(metric.estimatedOneRepMaxKg).toBeCloseTo(30, 10);
+      return weight;
+    });
+    expect(projected[0]).toBeCloseTo(6.158672624, 8);
+    expect(projected[1]).toBeCloseTo(3.991279226, 8);
+    expect(projected[0]).not.toBe(projected[1]);
+  });
+
   it('keeps the personal missing-reading fallback distinct from strict group scoring', () => {
     expect(resolveCalculatedLoad({ ...pullUp, policy: 'personal', bodyWeightKg: null })).toMatchObject({
       status: 'known', calculatedLoadKg: 20, bodyweightPartKg: 0,

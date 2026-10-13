@@ -1,6 +1,6 @@
 # M36-T01-RM_curve_and_effort_contract — Reconstruct the RM curve and agree effort/reference contracts
 
-- Status: `planned`
+- Status: `in progress — research prepared; product-owner approval pending`
 - Depends on: none
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
@@ -20,9 +20,11 @@ Reconstruct the reps–load relationship from BoGa’s existing estimator and lo
 
 Milestone D1–D5 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
-## Open — resolve with the user at session start
+## Open — concrete research proposal for product-owner review
 
 Effort defaults and missing/unknown/high historical RIR treatment; fixed historical baseline versus current estimate; reference estimator/window/cutoff; minimum support and rep domain; bodyweight-aware axis/cohort/reference projection; gym comparability.
+
+The findings and proposed choices are in [the research note](../research/M36-T01-rm-curve-contract.md), with [reproducible numerical checks](../research/M36-T01-rm-curve-checks.ts). No candidate chart rule or new product fact is approved. Acceptance 1–6 have reviewable research evidence; acceptance 7 remains pending human approval. Keep this card until that approval and graduation of any approved durable rules.
 
 ## Deliverables and acceptance
 

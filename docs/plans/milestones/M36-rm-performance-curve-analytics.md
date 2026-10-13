@@ -1,6 +1,6 @@
 # M36 — RM Performance Curve Analytics
 
-- Status: `planned`
+- Status: `in progress — T01 research; approval pending`
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
 - Planning only: no milestone implementation or analytical/design decision is approved by this plan.
@@ -40,11 +40,11 @@ T06–T08 build and review transformations and chart/page content without a new 
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. Land this plan as a docs-only PR before T01 starts. No task is executing. The completing PR deletes its card and marks it completed here; execution starts only when dependencies are completed and required approvals recorded.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01 research is in progress; its analytical proposals await product-owner approval. The completing PR deletes its card and marks it completed here; later execution starts only when dependencies are completed and required approvals recorded.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | planned |
+| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | in progress; approval pending |
 | [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned |
 | [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
@@ -98,7 +98,7 @@ Read test-directory READMEs before edits. One canonical assertion per claim; reu
 
 1. Effort comparability: strict RIR values/ranges, missing/unknown effort and high legacy RIR; RIR labels are subjective and fixture provenance may be enriched. No automatic RIR correction to the adopted formula.
 2. Reference: historical baseline versus current/rolling/all-time estimate, robust estimator, window/cutoff and minimum support. Per-point self-references make residuals tautological; later data must not leak into historical evaluation.
-3. Load coordinate: entered/displayed versus internal calculated load and a coherent overlay across changing bodyweight contexts; leave absolute versus %BW personal-record meaning unchanged and do not double ordinary per-side loads. Gym/equipment changes can confound a trend.
+3. Load coordinate: entered/displayed versus internal calculated load and a coherent overlay across changing bodyweight contexts; leave absolute versus %BW personal-record meaning unchanged. Current kernel applies the entry factor once, including ordinary per-side loads; avoid an additional conversion in analytics. Gym/equipment changes can confound a trend.
 4. Residual definition and valid domains: signed/percentage normalization, zero denominator, extreme reps/extrapolation, no-reference and insufficient-data presentation.
 5. Break modelling: level/slope alternatives, breakpoint search, minimum independent sessions, cluster/autocorrelation treatment, selection penalties and uncertainty. Sparse histories and changing rep ranges can mimic breaks; visual shifts never establish significance.
 6. Design: Figma or repo-native target, recency/overlap selection, approved filter defaults/ranges, accessible legend and exact selected-exercise entry. Human review resolves these in T05, not this plan.
