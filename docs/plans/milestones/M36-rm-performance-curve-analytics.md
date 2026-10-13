@@ -4,6 +4,7 @@
 - Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. The owner subsequently authorized all-known-RIR normalization u=m+n for the analytical view. Empirical reliability, human design approval and UI acceptance remain pending.
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
+- Experimental workflow: on 2026-10-13 the owner authorized continuing on branches while usefulness is uncertain. T02 starts from reviewed T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`, without merging T01 into main; its future draft PR targets `m36-t01-rm-curve-contract`. Further integration requires explicit owner direction. Analytical, empirical, design and test gates remain in force.
 - Research only so far: the initial analytical contract is approved; production implementation and visual design have not started.
 
 ## Objective
@@ -75,12 +76,12 @@ Pending clarification: whether the user wants additional per-week fitted curves 
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727, awaiting merge; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. Later execution starts only after the completing PR merges and dependencies and required approvals are satisfied. No later task has started.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits T02 research from reviewed T01 before its merge. T02's research specification and method checks are delivered for review; [validation plan](../research/M36-T02-residual-regression-method.md), repository gates and human analytical approval remain required before completion. Required analytical, empirical and design approvals are unchanged.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | M36-T01 | Reconstruct the RM curve and agree effort/reference contracts | none | completed |
-| [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned |
+| [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | in_progress |
 | [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
 | [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | planned |

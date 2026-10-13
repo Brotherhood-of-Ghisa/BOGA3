@@ -1,6 +1,6 @@
 # M36-T02-Exploratory_residual_regression — Specify exploratory residual regression and break reliability
 
-- Status: `planned`
+- Status: `in_progress` — research delivered for review; gates and human analytical approval pending
 - Depends on: M36-T01
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
@@ -20,9 +20,11 @@ Develop a research-only regression framework for residuals over time. Compare pr
 
 Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
+On 2026-10-13 the owner authorized experimental branch continuation without first merging T01 into main. This task's worktree/branch `m36-t02-residual-regression` starts at reviewed T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`; a future draft PR targets `m36-t01-rm-curve-contract`. The research specification and checks preserve the full acceptance scope and propose a feasibility checkpoint; neither the delivered work nor a finished agent declares task completion. Preserve human analytical review and agree gates before running them; no main integration is authorized by this exception.
+
 ## Open — resolve with the user at session start
 
-Continuous hinge versus level shift, number/search bounds of breakpoints, minimum independent sessions per segment, cluster treatment, uncertainty method and model-selection criteria.
+Candidate choices and their limitations are documented in [the research specification and validation plan](../research/M36-T02-residual-regression-method.md): session-median response, constant/linear/smooth versus separate one-hinge/one-jump models, minimum segment8 with6/10 sensitivities, complete-search calibration and model-specific uncertainty validation. The owner requested both configurable assumed RIR measurement SD (initial1rep) and joint RM/SD estimation candidates. Human analytical review approves the final validation plan; these remain research choices, with no production default or calibrated error claim.
 
 ## Deliverables and acceptance
 
