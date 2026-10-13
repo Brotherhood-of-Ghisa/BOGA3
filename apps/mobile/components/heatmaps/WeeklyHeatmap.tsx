@@ -1,7 +1,8 @@
 // Newest-first weekly rows. Length follows [[comparison.weekly-reference]]; colour retains
 // the adapter's independent intensity/target meaning. Reference calculations
 // follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
-// Numeric labels use measured widths, centre on their ticks within the plot,
+// Numeric labels follow the reference values when available, otherwise the scale.
+// They use measured widths, centre on their ticks within the plot,
 // and yield to the centre label on overlap; all ticks and spoken values remain.
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -33,7 +34,7 @@ interface Props {
   header?: ReactNode;
 }
 
-type Reference = { id: string; label: string; value: string; position: number };
+type Reference = { id: string; label: string; value: number; text: string; position: number };
 const REFERENCE_PERCENTILES = [['p25', '25th percentile', .25], ['median', 'median', .5], ['p75', '75th percentile', .75]] as const;
 
 const isKnownTraining = (week: WeekCell) => !week.unavailable && (week.hasTraining ?? week.value > 0);
@@ -61,7 +62,7 @@ function WeeklyAxis({ values, position, formatValue, testID, children }: {
 }) {
   const [plotWidth, setPlotWidth] = useState(0);
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
-  // Measure every label first; prefer the centre, then minimum, then maximum.
+  // Measure every label first; prefer the middle, then lower, then upper.
   const annotations = [...new Set([values[Math.floor(values.length / 2)], ...values])].map(value => {
     const text = formatValue(value);
     const width = labelWidths[text] ?? 0;
@@ -148,7 +149,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metric !== 'workingSetCount' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);
-      return { id, label, value: formatReferenceValue(value), position: position(value) };
+      return { id, label, value, text: formatReferenceValue(value), position: position(value) };
     }) : [];
   const valueWidth = Math.min(96, Math.max(36, ...weeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));
   const testID = `${testIDPrefix}-heatmap`;
@@ -161,10 +162,11 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
       {/* No view title: the page's selectors say which view and metric this is. */}
       <View style={styles.axisRow}>
         <View style={styles.date} />
-        <WeeklyAxis key={metric} values={axisValues} position={position} formatValue={formatValue} testID={testID}>
+        <WeeklyAxis key={metric} values={references.length ? references.map(reference => reference.value) : axisValues}
+          position={position} formatValue={references.length ? formatReferenceValue : formatValue} testID={testID}>
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
-            accessibilityLabel={`${weeks.length}-week ${reference.label} ${reference.value}`}
+            accessibilityLabel={`${weeks.length}-week ${reference.label} ${reference.text}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
         </WeeklyAxis>
         <View style={{ width: valueWidth }} />

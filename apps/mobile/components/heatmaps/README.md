@@ -131,12 +131,13 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- Weekly numeric annotations centre on their ticks using measured text and plot
-  widths; edge labels stay inside the plot. On overlap the centre label wins,
-  then the minimum, then the maximum. A label wider than the plot is ellipsized;
-  full formatted values stay on accessible ticks. Strength's centre annotation
-  is the median; Sets/Volume use the scale midpoint. Labels remeasure on metric
-  changes; ticks and references retain exact coordinates even if text is hidden.
+- Weekly numeric annotations label the references of [[comparison.weekly-reference]]
+  when present, using `formatReferenceValue`; otherwise they label the scale.
+  They centre on their ticks using measured text and plot widths; edge labels
+  stay inside the plot. On overlap the middle label wins, then the lower, then
+  the upper. A label wider than the plot is ellipsized; full formatted values
+  stay on accessible ticks. Labels remeasure on metric changes; ticks and
+  references retain exact coordinates even if text is hidden.
 - Weekly references use discrete vertical dashes on the same scale
   as the bars ([[comparison.weekly-reference]]). Accessible values use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
@@ -144,5 +145,5 @@ short windows have no implicit 52-week minimum.
   reference and value accessibly, including coincident references; no visible
   label stack is drawn. References and displayed weeks use the same look-back.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
-  subtitles and visible reference labels are omitted. Selected metric controls
+  subtitles and reference-name captions are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.

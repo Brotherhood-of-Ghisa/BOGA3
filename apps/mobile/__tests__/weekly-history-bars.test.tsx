@@ -48,9 +48,10 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
     for (const [index, date] of [DATES[0], DATES[2], TODAY].entries()) {
       expect(percentage(`bars-heatmap-bar-${date}`, 'width')).toBeCloseTo(expected[index]);
     }
-    const axis = strength ? [100, 105, 110] : [0, 55, 110];
+    const axis = metric === 'workingSetCount' ? [105] : [101.25, 105, 108.75];
     for (const [index, value] of axis.entries()) {
-      expect(percentage(`bars-heatmap-axis-tick-${value}`, 'left')).toBeCloseTo(strength ? expected[index] : index * 50);
+      const coordinate = strength ? 37.5 + index * 12.5 : value / 110 * 100;
+      expect(percentage(`bars-heatmap-axis-tick-${value}`, 'left')).toBeCloseTo(coordinate);
     }
     const median = strength ? 50 : 105 / 110 * 100;
     expect(percentage('bars-heatmap-median', 'left')).toBeCloseTo(median);
@@ -166,7 +167,7 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
       if (positive && values.length >= 6) expect(style('bars-heatmap-median').left).toBe(strength ? '50%' : '100%');
       else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
       const ticks = screen.getAllByTestId(/^bars-heatmap-axis-tick-/);
-      expect(ticks).toHaveLength(!positive || strength ? 1 : 3);
+      expect(ticks).toHaveLength(!positive || strength || values.length >= 6 ? 1 : 3);
       if (!positive) expect(style('bars-heatmap-axis-tick-0').left).toBe('0%');
       else if (strength) expect(style(`bars-heatmap-axis-tick-${values[0]}`).left).toBe('50%');
       unmount();
@@ -408,6 +409,39 @@ const layoutAxis = (plotWidth: number, labels: [number, number][]) => {
     fireEvent(screen.getByTestId(`bars-heatmap-axis-value-${value}`, { includeHiddenElements: true }), 'layout', layout(width));
   }
 };
+
+it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
+  'labels %s reference lines with their own formatted values, instead of scale bounds', metric => {
+    const values = [10, 20, 30, 40, 50, 60];
+    render(<WeeklyHeatmap
+      data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
+      metric={metric} testIDPrefix={PREFIX} formatValue={value => `row ${value}`}
+      formatReferenceValue={value => value.toFixed(1)} />);
+    const references = metric === 'workingSetCount' ? [['median', 35] as const]
+      : [['p25', 22.5], ['median', 35], ['p75', 47.5]] as const;
+    layoutAxis(240, references.map(([, value]) => [value, 24]));
+    expect(screen.getAllByTestId(/^bars-heatmap-axis-value-/, { includeHiddenElements: true })).toHaveLength(references.length);
+    for (const [id, value] of references) {
+      const labelID = `bars-heatmap-axis-value-${value}`;
+      const coordinate = percentage(`bars-heatmap-reference-${id}-${TODAY}`, 'left');
+      expect(screen.getByTestId(labelID, { includeHiddenElements: true })).toHaveTextContent(value.toFixed(1));
+      expect(style(labelID).opacity).toBe(1);
+      expect(style(labelID).transform[0].translateX + 12).toBeCloseTo(coordinate / 100 * 240);
+      expect(percentage(`bars-heatmap-axis-tick-${value}`, 'left')).toBeCloseTo(coordinate);
+    }
+    expect(screen.getByTestId(`bars-heatmap-value-${TODAY}`)).toHaveTextContent('row 60');
+  });
+
+it('keeps the median number when quartile labels overlap, preserving every reference line', () => {
+  renderValues([10, 20, 30, 40, 50, 60], 'estimatedRM1');
+  layoutAxis(60, [[22.5, 24], [35, 24], [47.5, 24]]);
+  expect(style('bars-heatmap-axis-value-35').opacity).toBe(1);
+  for (const [id, value] of [['p25', 22.5], ['p75', 47.5]] as const) {
+    expect(style(`bars-heatmap-axis-value-${value}`).opacity).toBe(0);
+    expect(screen.getByTestId(`bars-heatmap-reference-${id}-${TODAY}`)).toBeTruthy();
+    expect(screen.getByTestId(`bars-heatmap-${id}`).props.accessibilityLabel).toContain(String(value));
+  }
+});
 
 it.each([100, 200])('uses measured text bounds and leaves marks fixed at a %i-point plot width', plotWidth => {
   renderValues([100, 110, 120], 'estimatedRM1');
