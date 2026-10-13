@@ -28,12 +28,12 @@ Reliability thresholds, usable sample sizes and scope of supported claims; wheth
 
 1. Generate seeded independent scenarios for stable strength, gradual improvement, slope change, abrupt level change, no break with changing rep/effort mix, sparse sessions, long gaps, noise/outliers and within-session dependence.
 2. Measure false positives under no-break/progressive scenarios, sensitivity/power across effect sizes and independent-session counts, breakpoint localization and uncertainty coverage across repeated simulations. Keep known ground truth separate from fitted output.
-3. Evaluate model comparison, searched-break selection bias and session-aware resampling against T02’s plan. Include unreliable/inconclusive examples and sensitivity to reference window, effort filtering and rep distribution.
+3. Evaluate model comparison, searched-break selection bias and session-aware resampling against T02’s plan. Include unreliable/inconclusive examples and sensitivity to reference window, recorded-RIR error/strata and actual/effective rep distribution.
 4. On suitable historical observations, compare gradual-change and segmented explanations; label findings exploratory. Report effect sizes, uncertainty and sample limitations instead of inferring significance from a plot.
 5. Record failures, adjustments and evidence. Human analytical/product review approves the reference, effort and load-coordinate contract and honest first-release limitations before T05 starts; no unsupported statistical claim becomes UI copy.
 6. Identify the minimal representative histories and regression cases to reuse in production tests; archive reproducibility instructions/evidence with the PR and keep statistical tooling out of mobile imports/build/dependencies.
 
-7. Create/freeze the one canonical shared weekly wave fixture and numerical oracle after programme clarification. Verify unchanged latent RM under changing rep/load targets, known gradual improvement, every future-free weekly prefix and insufficient-baseline outputs against the fixed historical reference. Reuse the fixture’s seeded variants for method checks; additional weekly fitting stays exploratory unless separately approved.
+7. Create/freeze the one canonical shared weekly wave fixture and numerical oracle after programme clarification. Verify unchanged latent RM under changing performed reps/recorded RIR/load targets, known gradual improvement, every future-free weekly prefix and insufficient-baseline outputs against the fixed historical reference. Reuse the fixture’s seeded variants for method checks; additional weekly fitting stays exploratory unless separately approved.
 
 ## Specs to update
 

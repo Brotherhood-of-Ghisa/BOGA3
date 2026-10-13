@@ -256,13 +256,14 @@ server-side; this changes no personal missing-reading fallback.
 ## 11. RM chart projection — approved contract, implementation pending
 
 [[1rm.curve-load]] authorizes one analytical coordinate, without changing
-entered Weight or displayed 1RM. With kernel total load `L`, total reference RM
-`M`, entry factor `F` and `f(r) = estimateOneRepMax(1, r)`, project the chart
-point as `L/F` and its overlay as `M/[F × f(r)]`. The existing kernel resolves
-dated bodyweight and applies F once; the chart adds no second entry conversion.
+entered Weight or displayed 1RM. With actual-reps kernel load `L`, analytical total reference RM
+`M`, entry factor `F` and `f(u) = estimateOneRepMax(1, u)`, project the chart
+point as `L/F` and its overlay as `M/[F × f(u)]`. The existing kernel resolves
+dated bodyweight and applies F once; u comes from [[1rm.curve-effort]]. The
+chart adds no second entry conversion.
 
-For internal checks, entered-Weight prediction is `(M/f(r) − cB)/F`; it depends
-on each session's resolved context. A fixed displayed RM q instead requires
+For internal checks, entered-Weight prediction is `(M/f(u) − cB)/F`; it depends
+on each session's resolved context. An entered-unit analytical RM q requires
 total reference `Fq + cB`, so changing dated B yields a family of entered curves.
 Never apply one latest-reading raw-Weight curve backwards or clamp a negative
 external prediction into a supported weight. Missing personal readings keep

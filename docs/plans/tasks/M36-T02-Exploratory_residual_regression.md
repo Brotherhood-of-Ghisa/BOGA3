@@ -29,11 +29,11 @@ Continuous hinge versus level shift, number/search bounds of breakpoints, minimu
 1. Specify null/no-trend, smooth/linear trend and segmented alternatives; distinguish slope changes from level shifts. State time scale, rep-range terms/interactions, effort covariates and baseline coupling.
 2. Investigate breakpoint search and boundary/minimum-segment constraints, model comparison and penalties, breakpoint intervals, effect-size uncertainty and multiple-search bias; justify methods with primary statistical sources.
 3. Account for correlated sets within a session using session-level aggregation, clustered/hierarchical inference or session-level resampling; prevent pseudoreplication by counting sets as independent sessions.
-4. Address sparse/irregular histories, gaps, heteroskedasticity, outliers, autocorrelation, changing rep/effort composition, progressive trends and high-rep estimator limitations.
+4. Address sparse/irregular histories, gaps, heteroskedasticity, outliers, autocorrelation, changing actual/equivalent rep composition, RIR reporting error, progressive trends and high-rep estimator limitations.
 5. Predefine validation scenarios, false-positive/power/coverage reporting and an insufficient-evidence outcome. A visible shift is not proof of a statistically significant break.
 6. Provide reproducible research-only model specifications/experiments and assumptions/limitations, isolated from mobile runtime, sync and production dependencies. Human analytical review approves the validation plan, without treating exploratory results as a release feature.
 
-7. Specify the milestone’s shared weekly wave validation: one individual/gym and RIR 0; stable-strength control with changing rep/load targets, gradual improvement, session dependence, weekly prefixes without later-data leakage and insufficient baseline support. Predefine what the models should distinguish; exact programme parameters and extra weekly fitted-curve UI remain pending clarification.
+7. Specify the milestone’s shared weekly wave validation: one individual/gym and known recorded RIR varying by phase; stable-strength control with changing performed reps/recorded RIR/load targets, gradual improvement, session dependence, weekly prefixes without later-data leakage and insufficient baseline support. Predefine what the models should distinguish; exact programme parameters and extra weekly fitted-curve UI remain pending clarification.
 
 ## Specs to update
 

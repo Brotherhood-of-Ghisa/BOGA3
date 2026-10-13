@@ -26,8 +26,8 @@ Final component seam and development preview for human review without committing
 
 ## Deliverables and acceptance
 
-1. Implement T05’s accepted UX target with existing UI tokens/primitives and SVG conventions, using reps on X and approved load on Y. Show observed qualifying sets and the reference curve with the approved recency encoding.
-2. Implement exact point details, exercise/time/effort filters, deterministic coincident-point access and selection clearing/preservation per the approved contract.
+1. Implement T05’s accepted UX target with existing UI tokens/primitives and SVG conventions, using explicitly RIR0-equivalent reps on X and approved load on Y. Show observed qualifying sets and the reference curve with the approved recency encoding.
+2. Implement actual reps, recorded RIR and equivalent-reps point details without relabelling global displayed 1RM; exercise/time/effort filters, deterministic coincident-point access and selection clearing/preservation per the approved contract.
 3. Handle missing effort, no observations, insufficient/no reference, read error/retry, unavailable exercise and large histories without misleading values or fabricated curves.
 4. Provide non-colour selection/recency cues, accessible observation values and usable small/large phone layouts. Keep existing numeric/date formats and screen copy facts.
 5. Add component interaction/state/geometry coverage, with success and failure/offline cases as applicable. Render via an isolated developer preview for fresh screenshots against the target; do not add a file under `app/`, root-stack registration or a user-facing entry.

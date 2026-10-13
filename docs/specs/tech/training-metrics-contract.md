@@ -331,38 +331,37 @@ revisions; personal facts rebuild under the new calculation rules.
 
 ## 6. RM curve analytics — approved contract, implementation pending
 
-[[1rm.curve-population]], [[1rm.curve-reference]] and [[1rm.curve-load]] govern
-the initial analytical deliverable. Approval establishes product choices, not
-empirical accuracy; design, integrated UI acceptance and production exposure
-remain separate gates. Structural-break detection and regression remain research.
+[[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and
+[[1rm.curve-load]] govern the revised first deliverable. Equivalence is a modelling
+assumption; empirical, human design and UI acceptance gates remain separate.
+Regression and structural-break detection stay research-only.
 
-Use `f(r) = estimateOneRepMax(1, r)` and inverse total prediction `P = M / f(r)`
-for independent reference total RM `M` ([[1rm.formula]]). The unit-load call
-preserves the single-rep branch without copied constants. Use full precision,
-parsed integer reps and finite metrics from `calculateSetMetrics`; connect
-integer predictions only as drawing interpolation. High-rep boundedness is
-mathematical behaviour, not validated endurance. The reference's rep restriction
-does not change valid set entry or individual displayed estimates.
+Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
+then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
+Under [[1rm.curve-effort]], validate `Number.isSafeInteger(m+n)` before passing
+u to the shared estimator; its positive-integer domain has no parser rep cap.
+Use finite analytical total RM only; actual metrics can be finite while this
+second estimate overflows. Zero calculated load remains zero but supplies no
+positive reference support. Missing/unknown RIR cannot be inferred from targets.
 
-Research residuals on total calculated load `L` are `L − P` kg and
-`100 × (L − P) / P` percent. A zero prediction retains finite signed residual
-but has no percentage; absent/invalid reference or nonfinite arithmetic gives
-no corresponding residual. Division by entry factor rescales kg but preserves
-percentage. Never normalise by entered Weight after subtracting bodyweight.
+Let `f(u) = estimateOneRepMax(1,u)`, analytical RM `A = estimateOneRepMax(L,u)`
+and inverse prediction `P = M/f(u)` for independent reference M. This preserves
+[[1rm.formula]] unchanged. Its single branch applies when u is one; a performed
+single with positive RIR has a different analytical estimate. Full precision
+and integer predictions precede drawing interpolation; high-rep boundedness
+is not empirical validity. Reference support is [[1rm.curve-reference]], not an
+entry restriction.
 
-Adapters must retain raw effort before `buildSessionEntry` normalizes unknown
-labels, canonical IDs/order, session start/end, gym, current metadata/policy key
-and dated-reading provenance. Use one coherent account snapshot for both
-populations; current source changes reinterpret history, not a stored past
-snapshot. Daily/weekly aggregates and displayed all-time RM maxima cannot
-replace per-set total-RM inputs.
+Research residuals are `L−P` kg and `100×(L−P)/P` percent. Zero prediction has no
+percentage; absent reference or nonfinite arithmetic has no corresponding
+residual. Dividing both loads by entry factor preserves percentage; subtracting
+bodyweight does not. Never fit a point to its own A: residual is then zero;
+a maximum of evaluated A forces nonpositive residuals. Session maxima/medians
+retain selection bias and dependent sets are not independent sessions.
 
-Session maxima retain attempt-selection bias; a median gives equal session
-weight but is not an unbiased capacity estimate. A maximum fit to evaluated
-points forces all residuals nonpositive; each point's own reference forces zero.
-Empirical work must test effort/provenance, rep-range bias, sparse support,
-bodyweight/gym sensitivity and session dependence. Rolling/current and prior
-all-time references are research comparators, not fallback production features.
-
-When projecting bodyweight-aware chart loads, load
-`bodyweight-load-contract.md` §11.
+Retain raw effort, actual/equivalent reps, both metric types, IDs/order,
+start/end, gym, policy/metadata and dated-reading provenance before lossy history
+normalization. Recompute both populations from one current snapshot. Test
+RIR ±1 sensitivity, phase/rep composition, high effective reps, missing effort,
+sparse baseline and bodyweight/gym confounding; no assumed RIR accuracy is a
+confidence interval. For chart projection, load `bodyweight-load-contract.md` §11.

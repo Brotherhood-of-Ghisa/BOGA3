@@ -1,7 +1,7 @@
 // Ephemeral research checks. Node 24 strips types; no production imports this file.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { estimateOneRepMax, parseSetReps } from '../../../apps/mobile/src/exercise-calculations/index.ts';
+import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import { calculateSetMetrics, type SetMetricInput } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { DEFAULT_PERSONAL_EFFORT_POLICY, getSessionSetRir } from '../../../apps/mobile/src/exercise-calculations/effort-policy.ts';
 import { isWorkingSet } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
@@ -14,7 +14,7 @@ const close = (actual: number, expected: number) =>
 // Homogeneity in load yields the exact inverse, including the kernel's single.
 const predictedLoad = (reference: number, reps: number): number | null => {
   const multiplier = estimateOneRepMax(1, reps);
-  if (!Number.isFinite(reference) || reference < 0 || parseSetReps(String(reps)) === null || multiplier === null) return null;
+  if (!Number.isFinite(reference) || reference < 0 || !Number.isSafeInteger(reps) || reps <= 0 || multiplier === null) return null;
   const load = reference / multiplier;
   return Number.isFinite(load) ? load : null;
 };
@@ -35,7 +35,8 @@ for (const reps of [1, 2, 8, 10, 30, 999]) {
     close(estimateOneRepMax(predictedLoad(reference, reps)!, reps)!, reference);
   }
 }
-for (const reps of [0, -1, 1.5, 1000, NaN, Infinity]) assert.equal(predictedLoad(100, reps), null);
+for (const reps of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity]) assert.equal(predictedLoad(100, reps), null);
+close(predictedLoad(100, 1000)!, 48.8);
 for (const reference of [-1, NaN, Infinity]) assert.equal(predictedLoad(reference, 8), null);
 assert.equal(predictedLoad(0, 8), 0);
 assert.equal(predictedLoad(100, 1), 100);
@@ -61,11 +62,61 @@ for (const raw of labels) {
     calculateSetMetrics(vectors[0]).estimatedOneRepMaxKg!);
 }
 
+// Separate analytical coordinate; actual metrics and logged effort stay intact.
+const normalized = (input: SetMetricInput) => {
+  const actual = calculateSetMetrics(input);
+  const n = getSessionSetRir(input.setType);
+  if (!actual.eligible || actual.load.status !== 'known' || n === null || !isWorkingSet({
+    weight: input.weightValue ?? '', reps: input.repsValue ?? '', setType: input.setType,
+    performanceStatus: input.performanceStatus,
+  }, input.effortPolicy)) return null;
+  const u = actual.reps + n;
+  if (!Number.isSafeInteger(u) || u <= 0) return null;
+  const analyticalRm = estimateOneRepMax(actual.load.calculatedLoadKg, u);
+  if (analyticalRm === null || !Number.isFinite(analyticalRm)) return null;
+  return { actual, n, u, analyticalRm };
+};
+for (const vector of vectors) {
+  const result = normalized({ ...vector, setType: 'rir_2' })!;
+  assert.ok(result.actual.eligible && result.actual.load.status === 'known');
+  close(predictedLoad(result.analyticalRm, result.u)!, result.actual.load.calculatedLoadKg);
+}
+const example = { ...vectors[0], weightValue: '100', repsValue: '8', setType: 'rir_2' };
+const rawSingle = normalized({ ...example, repsValue: '1' })!;
+close(rawSingle.actual.estimatedOneRepMaxKg!, 100);
+assert.equal(rawSingle.u, 3);
+assert.ok(rawSingle.analyticalRm > 100);
+close(normalized({ ...example, repsValue: '1', setType: 'rir_0' })!.analyticalRm, 100);
+assert.equal(normalized({ ...example, setType: 'rir_7' })!.u, 15);
+assert.equal(normalized({ ...example, repsValue: '999', setType: 'rir_1' })!.u, 1000);
+assert.equal(normalized({ ...example, repsValue: '1', setType: `rir_${Number.MAX_SAFE_INTEGER}` }), null);
+for (const setType of [null, 'unknown', 'rir_01', 'warm_up', 'technique']) assert.equal(normalized({ ...example, setType }), null);
+assert.equal(normalized({ ...example, weightValue: '' })!.analyticalRm, 0);
+assert.equal(normalized({ ...example, performanceStatus: 'planned' }), null);
+assert.equal(normalized({ ...example, repsValue: '1000' }), null);
+assert.equal(normalized({ ...example, repsValue: '1', weightValue: `1${'0'.repeat(307)}` }), null);
+assert.equal(normalized({ ...example, effortPolicy: { workingSetEfforts: ['rir_0'], volumeEfforts: [] } }), null);
+const sensitivity = [1, 2, 3].map(n => {
+  const result = normalized({ ...example, setType: `rir_${n}` })!;
+  return { n, u: result.u, actualRm: result.actual.estimatedOneRepMaxKg, analyticalRm: result.analyticalRm };
+});
+assert.ok(sensitivity[0].analyticalRm < sensitivity[1].analyticalRm && sensitivity[1].analyticalRm < sensitivity[2].analyticalRm);
+assert.ok(sensitivity.every(row => row.actualRm === sensitivity[0].actualRm));
+assert.deepEqual(sensitivity.map(row => row.u <= 10), [true, true, false]);
+const phaseChecks = [[8, 2], [8, 3], [6, 2], [4, 2], [8, 4]].map(([m, n]) => {
+  const result = normalized({ ...example, repsValue: String(m), setType: `rir_${n}`,
+    weightValue: String(predictedLoad(100, m + n)) })!;
+  close(result.analyticalRm, 100);
+  return { m, n, u: result.u, analyticalRm: result.analyticalRm,
+    actualRm: result.actual.estimatedOneRepMaxKg, referenceSupported: result.u <= 10 };
+});
+assert.deepEqual(phaseChecks.map(row => row.referenceSupported), [true, false, true, true, false]);
+
 // Synthetic session-level estimates illustrate cutoff choices, not reliability.
 const sessions = [100, 102, 104, 106, 108, 110, 115, 125, 140].map((rm, index) => {
-  const metric = calculateSetMetrics({ ...vectors[0], weightValue: String(predictedLoad(rm, 8)), repsValue: '8' });
-  close(metric.estimatedTotalOneRepMaxKg!, rm);
-  return { id: `s${index + 1}`, completedAt: index + 1, rm: metric.estimatedTotalOneRepMaxKg! };
+  const result = normalized({ ...vectors[0], weightValue: String(predictedLoad(rm, 8)), repsValue: '8', setType: 'rir_0' })!;
+  close(result.analyticalRm, rm);
+  return { id: `s${index + 1}`, completedAt: index + 1, rm: result.analyticalRm };
 });
 const median = (values: number[]) => {
   const sorted = values.slice().sort((a, b) => a - b);
@@ -134,5 +185,6 @@ close(scaleProof.percent!, perEntry.percent!);
 close(scaleProof.kg!, 2 * perEntry.kg!);
 
 console.log(JSON.stringify({ vectorCount: vectors.length, maxVectorError, inverseTable, efforts,
+  sensitivity, phaseChecks, rawSingle: { actualRm: rawSingle.actual.estimatedOneRepMaxKg, u: rawSingle.u, analyticalRm: rawSingle.analyticalRm },
   baseline: baseline.map(row => row.id), comparisons, bodyweight, family,
   negativeEnteredPrediction: negative }, null, 2));

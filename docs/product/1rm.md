@@ -28,20 +28,34 @@ Signature: `48.8`, `53.8`, `0.075`
 
 ### 1rm.curve-population · definition · accepted
 
-The exercise RM curve chart starts with confirmed personal working sets
-([[set.performed]], [[set.eligibility]]) recorded as RIR 0. Other RIR cohorts,
-ranges or all current working sets require explicit filter selection; sparse
-data never widens the cohort automatically. Missing/Unspecified and unknown
-effort stay distinct and never imply RIR 0; neither supplies the reference.
-Canonical historical RIR keeps its recorded numerical value. Observed points
-retain all valid rep counts. Reference and observation cohorts match exercise
-definition, effort and gym; missing gym is separate. Existing global set,
-record and loading rules remain unchanged.
+The RM curve chart includes confirmed personal working sets
+([[set.performed]], [[set.eligibility]]) with any canonical known RIR by default.
+Effort filters may narrow this population; sparse data never widens it.
+Missing/Unspecified and unknown labels remain distinct and supply neither an
+RIR-normalized point nor the reference. Preserve canonical high RIR numerically.
+Observation and reference cohorts match exercise definition, effort and gym;
+missing gym is separate. A programme phase called Technique/reset recorded as
+RIR 4 remains working under the existing policy; it does not become a Technique
+or warm-up effort label.
 
-Why: compare recorded effort without inventing effort or pooling different gyms.
-Approved 2026-10-13 as the first analytical deliverable; empirical reliability
-remains to be tested.
-Pending: the chart and its filters are not implemented.
+Why: compare all recorded efforts under the revised analytical assumption.
+Revised with product-owner authorization on 2026-10-13; empirical reliability
+remains unproven.
+Pending: the chart and filters are not implemented.
+
+### 1rm.curve-effort · calculation · accepted
+
+For RM curve analysis only, assume performed m reps at recorded RIR n equal
+u = m + n reps at RIR 0. Require u to be a positive safe integer. Resolve load L
+and existing metrics using actual m; analytical total RM is
+`estimateOneRepMax(L, u)`. Never substitute u into logged sets, global 1RM or
+records. X is explicitly RIR0-equivalent reps; details preserve m, n and the
+existing displayed 1RM. A raw single with positive RIR uses u above one
+analytically while its global single-rep figure remains unchanged.
+
+Why: the product owner requested effort normalization on 2026-10-13 as a
+modelling assumption, not empirical proof. RIR uncertainty must be tested.
+Pending: analytical transformations and chart labels are not implemented.
 
 ### 1rm.curve-reference · calculation · accepted
 
@@ -49,7 +63,7 @@ The initial reference is fixed before the selected evaluation range starts.
 Its prior interval starts at History look-back's calendar start computed at
 that instant and ends strictly before it. Take the six most recent qualifying
 completed sessions in that interval. Each supplies its maximum finite positive
-total estimated RM from 1–10 reps; their median is the reference. Fewer than six
+analytical total RM from 1–10 RIR0-equivalent reps; their median is the reference. Fewer than six
 sessions means observed points without a curve, with no automatic fallback.
 Evaluated sessions, tied cutoff timestamps and later workouts cannot enter the
 fit. Keep the reference fixed during evaluation; source edits, account policy
@@ -63,8 +77,8 @@ Pending: reference transformations and the chart are not implemented.
 ### 1rm.curve-load · presentation · accepted
 
 The RM curve chart plots calculated load divided by the exercise's entry
-factor: one for total-load entry, two for per-side entry. Its reference is total
-estimated RM divided by that same factor. Ordinary points coincide with entered
+factor: one for total-load entry, two for per-side entry. Its reference is analytical total
+RM divided by that same factor. Ordinary points coincide with entered
 Weight; when bodyweight contributes, the chart coordinate includes its applicable
 dated contribution. This is a chart-only exception to hiding calculated load:
 the axis must distinguish its coordinate from Weight. Point details keep raw

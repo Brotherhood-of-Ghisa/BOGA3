@@ -27,8 +27,8 @@ Figma frames versus a repo-native target; entry from selected exercise/history; 
 ## Deliverables and acceptance
 
 1. Follow `docs/specs/ui/ai-design-policy.md` and spec 08. Reuse `uiRoles`, `uiFonts`, primitives and existing chart/readout/selection conventions; assess `react-native-svg` before proposing another renderer.
-2. Design X = repetitions and Y = the approved load coordinate, qualifying-set scatter and estimated reference overlay. Differentiate by date/recency using existing roles and additional text/accessible cues; recency must not imply a PR or significance.
-3. Show point date, reps, load, effort (including missing effort) and existing estimated 1RM. Design appropriate exercise, time-range and effort filters with visible applied state and deterministic selection after changes.
+2. Design X = RIR0-equivalent repetitions u=m+n and Y = the approved load coordinate, qualifying-set scatter and estimated reference overlay. Differentiate by date/recency using existing roles and additional text/accessible cues; recency must not imply a PR or significance.
+3. Show date, actual reps m, recorded RIR n, equivalent reps u, load and unchanged displayed 1RM. Missing/unknown RIR is excluded from normalized points, not inferred as zero; design its no-normalizable-data state. Design appropriate exercise, time-range and effort filters with visible applied state and deterministic selection after changes.
 4. Cover coincident points, small/dense histories, empty/insufficient/no-reference states, errors/retry, deleted/unavailable exercise, small and large phones, all appearance presets, touch ergonomics and VoiceOver access to values.
 5. Use Figma where useful and link exact frames/version if selected; keep external artifacts in Figma and target/screenshots beside the UX contract or PR, not persistent specs. Report conflicts with existing contracts.
 6. Record explicit human design approval for the chart, edge states, filter semantics and proposed final entry. T07 cannot begin UI implementation and T08 cannot run UI acceptance tests before this approval; a material design revision renews approval.

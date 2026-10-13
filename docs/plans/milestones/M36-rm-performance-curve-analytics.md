@@ -1,19 +1,19 @@
 # M36 — RM Performance Curve Analytics
 
 - Status: `in_progress`
-- Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. Empirical reliability, human design approval and UI acceptance remain pending.
+- Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. The owner subsequently authorized all-known-RIR normalization u=m+n for the analytical view. Empirical reliability, human design approval and UI acceptance remain pending.
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
 - Research only so far: the initial analytical contract is approved; production implementation and visual design have not started.
 
 ## Objective
 
-Build an analytical framework to compare actual exercise sets with BoGa’s estimated RM curve, investigate systematic deviations and strength changes over time. The first production release is an interactive repetitions-versus-load chart of qualifying observed sets with an estimated reference curve. Structural break detection is research and validation only.
+Build an analytical framework to compare actual exercise sets with BoGa’s estimated RM curve, investigate systematic deviations and strength changes over time. The first production release is an interactive RIR0-equivalent-repetitions-versus-load chart of qualifying observed sets with an estimated reference curve. Structural break detection is research and validation only.
 
 ## Scope
 
 - In: reconstruct the adopted RM curve; comparable-effort and RIR cohort research; historical/current reference selection; signed and percentage-normalised residuals; exploratory trend/segmented regression and statistical reliability; dataset provenance and empirical/synthetic validation; approved scatter/curve design; read-only transformations, focused tests and final selected-exercise navigation exposure.
-- Out: competing RM formulas; reps + RIR estimation; changed global working-set/record/load conventions; production structural-break detection, dates, markers, alerts or significance claims; regression dashboard/residual timeline; cross-exercise rankings, group/coaching changes, new sync/schema or analytics-platform rewrite. Research reliability need not establish a production detector to ship the chart.
+- Out: competing RM formulas; changing logged reps, global 1RM or record calculations; changed global working-set/record/load conventions; production structural-break detection, dates, markers, alerts or significance claims; regression dashboard/residual timeline; cross-exercise rankings, group/coaching changes, new sync/schema or analytics-platform rewrite. Research reliability need not establish a production detector to ship the chart.
 
 ## Agreed design direction
 
@@ -21,15 +21,15 @@ These D entries record constraints from the brief and repository; the visual tar
 
 ### D1. Preserve the single calculation and loading authority
 
-Reuse [[1rm.formula]], [[set.performed]] and [[set.eligibility]], the existing calculation kernel and current definition-ID identity. Source behavior is Wathan with a single-rep special case; effort governs eligibility, not the reps passed to the formula. Do not introduce a second formula or reinterpret ordinary total/per-side entry, personal bodyweight settings, dated readings or retroactive metadata. Formula reconstruction must be checked against existing functions/vectors.
+Reuse [[1rm.formula]], [[set.performed]] and [[set.eligibility]], the kernel and definition-ID identity. Global metrics still use actual performed reps; RIR affects eligibility without rewriting them. The owner authorized a separate analytical assumption ([[1rm.curve-effort]]): u=m+n for known recorded RIR, analytical total RM from the existing estimator at u, and explicitly equivalent-reps X. Retain actual m/n, displayed 1RM, current working policy and load semantics. Unknown RIR is not zero; reject unsafe sums/nonfinite results. No competing formula or loading reinterpretation.
 
 ### D2. Research precedes empirical review and product design
 
-Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01's first-deliverable effort/reference/load-coordinate rules are approved in [[1rm.curve-population]], [[1rm.curve-reference]] and [[1rm.curve-load]]; T04 still closes empirical review with explicit human analytical/product approval before T05 begins. Unsupported real-data evidence must be reported honestly and its limitations accepted.
+Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01's first-deliverable effort/reference/load-coordinate rules are approved in [[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and [[1rm.curve-load]]; T04 still closes empirical review with explicit human analytical/product approval before T05 begins. Unsupported real-data evidence must be reported honestly and its limitations accepted.
 
 ### D3. First release is the observed-set scatter and reference overlay
 
-X-axis is repetitions; Y-axis is the approved load coordinate under existing semantics. Include observed qualifying sets, estimated reference curve, date/recency differentiation, exact point date/reps/load/effort/estimated RM details and exercise/time-range/effort filters. Missing effort, overlap, insufficient data, failures and accessibility are required states. Statistical experiments stay isolated from production imports, dependencies and sync.
+X-axis is explicitly RIR0-equivalent reps u=m+n; Y-axis is the approved load coordinate under existing semantics. Include observed qualifying sets, estimated reference curve, date/recency differentiation, exact date/actual reps/recorded RIR/equivalent reps/load/existing 1RM details and exercise/time-range/effort filters. Missing effort, overlap, insufficient data, failures and accessibility are required states. Statistical experiments stay isolated from production imports, dependencies and sync.
 
 ### D4. Human approval gates control design and UI acceptance
 
@@ -41,18 +41,18 @@ T06–T08 build and review transformations and chart/page content without a new 
 
 ### D6. Reuse one weekly wave scenario across the tasks
 
-The user requests a shared representative weekly wave programme followed by one individual, simplified to RIR 0 and one gym, with analytical progress inspectable week by week. Each task proves its own part against the same scenario; it does not create a separate history or repeat earlier assertions. The approved fixed historical reference is unchanged. Additional weekly fitted curves and exact programme parameters remain clarification questions, not production features or prescriptions.
+The user requests a shared representative weekly wave programme followed by one individual, using all known recorded RIRs that vary by phase, and one gym, with analytical progress inspectable week by week. Each task proves its own part against the same scenario; it does not create a separate history or repeat earlier assertions. The approved fixed historical reference is unchanged. Additional weekly fitted curves and exact programme parameters remain clarification questions, not production features or prescriptions.
 
 ## Shared weekly wave validation scenario — parameters provisional
 
-Use one canonical synthetic history/ground-truth definition, labelled synthetic and derived through the adopted calculation kernel. Choose its exercise/load context, rep sequence, weeks, sessions per week, prior baseline span, progression/noise parameters and fixture location during research, after human clarification. RIR 0, one individual and one gym simplify comparison; they do not remove estimator or within-session uncertainty. No particular rep prescription or new weekly-curve UI is approved here.
+Use one canonical synthetic history/ground-truth definition, labelled synthetic and derived through the adopted calculation kernel. Choose its exercise/load context, rep sequence, weeks, sessions per week, prior baseline span, progression/noise parameters and fixture location during research, after human clarification. One individual/gym and known phase-dependent recorded RIR simplify comparison; they do not remove estimator or within-session uncertainty. No particular rep prescription or new weekly-curve UI is approved here.
 
-The [provisional starter dataset](../research/M36-weekly-wave-example.json) preserves the illustrative inputs in the repository: 18 sets across six prior sessions with best total RM100, then two 36-set scenarios across 12 weeks repeating 8/5/3 reps. Each ordinary total-load session has three sets with synthetic capacity multipliers 1/.99/.98; stable capacity is 100 and gradual capacity is 101–112. Raw Weight/reps/effort and synthetic/provisional flags are retained. These labels and trajectories are generative assumptions, not a prescribed programme, empirically validated history or approved production fixture. T03 reconciles these actual rows; T04 still validates/freezes the canonical fixture. The approved fixed historical reference is unchanged.
+The [provisional starter dataset](../research/M36-weekly-wave-example.json) retains raw inputs and synthetic/provisional flags: 24 prior sets in eight sessions (six qualify at u1–10), then 72 sets in each stable/gradual scenario across 24 synthetic weekly sessions. Actual set 1RM is separate from analytical RM. Stable analytical session best is 100; gradual capacity is 101–124. Programme inspiration is a generic 24-session roadmap from [the programme reference](https://app.notion.com/p/3b3a4905c27481e580a1d9ca744d5bbf), last edited 2026-10-13: repeat Volume 3×8 target RIR2–3, Strength 3×6 target2, Heavy 3×4 target2 (later Heavy may target3–4), and Technique/reset 3×8 target4. The source fixes no calendar: weekly spacing, actual logged RIRs, loads and trajectories in our example are synthetic assumptions, not an approved prescription or verified personal history. Targets/annotations and uncertain imported effort cannot serve as measured RIR. Only this generic pattern is retained; no personal health/location/history is copied. A reset phase logged rir_4 remains working under existing policy, not a relabelled Technique/warm-up set. T03 reconciles actual starter rows; T04 validates/freezes the canonical fixture. Fixed six-prior-session reference remains, with support measured over u=1–10. For example 8@RIR3 (u11) and reset 8@RIR4 (u12) are observations outside reference support; never silently widen it.
 
 The shared scenario needs these variants and prefix views:
 
-- **Stable-strength control:** vary weekly rep targets and corresponding loads while keeping the latent RM level fixed. Heavier loads in lower-rep weeks must not be classified or presented as strength gain. In a noiseless algebraic control, qualifying points remain on the same RM curve; noise sensitivity is separate.
-- **Gradual improvement:** use a known progressive RM trajectory with the same wave targets. Show how observed sets/residuals move relative to the fixed prior reference; smooth progress must not become an established structural-break claim.
+- **Stable-strength control:** vary weekly performed rep/RIR targets and corresponding loads while keeping the latent RM level fixed. Heavier loads in lower-rep weeks must not be classified or presented as strength gain. In a noiseless algebraic control, qualifying points at u=m+n remain on the same analytical RM curve; noise sensitivity is separate.
+- **Gradual improvement:** use a known progressive RM trajectory with the same wave reps/RIRs. Show how observed sets/residuals move relative to the fixed prior reference; smooth progress must not become an established structural-break claim.
 - **Weekly prefixes:** inspect only history available through each week. Keep evaluation start and its independent historical baseline fixed across prefixes, excluding evaluated/future sessions from that baseline. Earlier prefix outputs must be invariant to adding later workout rows; changing a dated source input is a separate retroactive-metadata test.
 - **Insufficient baseline:** truncate prior support below the approved six qualifying sessions. Observed points may remain, but no reference curve or reference residual is fabricated and the cohort does not widen automatically.
 
@@ -62,7 +62,7 @@ T02 specifies the model/validation contract; T03 audits provenance and reconcile
 | --- | --- |
 | T01 | Completed algebraic reconstruction and illustrative weekly-prefix progression against a fixed prior reference; synthetic parity/control evidence, not empirical formula validation. |
 | T02 | Predefine stable/gradual model expectations, session dependence, rep-wave confounding and prefix/cutoff checks; no production detector. |
-| T03 | Reconcile actual starter rows, weekly counts, identities, RIR/gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
+| T03 | Reconcile actual starter rows, weekly counts, identities, recorded-RIR/target distinction and gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
 | T04 | Verify known stable/gradual trajectories and weekly numerical oracles; measure method reliability separately with seeded simulations. |
 | T05 | Human-review week-by-week scatter/reference/readout and sparse-state targets; weekly fitted-curve feature remains subject to clarification. |
 | T06 | Prove filtered prefix points, fixed reference, residual/projection values and no future leakage over the reused data. |
@@ -70,7 +70,7 @@ T02 specifies the model/validation contract; T03 audits provenance and reconcile
 | T08 | Reconcile the running integrated view and accessible readouts with that oracle after human design approval; reuse numerical evidence. |
 | T09 | Reach the correct selected-exercise scenario and return safely; verify navigation/context, not another chart-fit experiment. |
 
-Pending clarification: whether the user wants additional per-week fitted curves rather than only week-by-week progress against the approved reference, and which synthetic rep wave/programme parameters are suitable. Until resolved, keep weekly fitting exploratory and all exact programme parameters provisional. Research evidence may illustrate prefixes without approving a new production control or overlay.
+Pending clarification: whether the user wants additional per-week fitted curves rather than only week-by-week progress against the approved reference, and which remaining synthetic timing/load/progression parameters are suitable. Until resolved, keep weekly fitting exploratory and all exact programme parameters provisional. Research evidence may illustrate prefixes without approving a new production control or overlay.
 
 ## Task breakdown
 
@@ -132,7 +132,7 @@ The shared wave adds task-specific evidence, not another aggregate lane. Record 
 
 ## Risks / dependencies and unresolved decisions
 
-1. Effort comparability: the approved initial RIR/cohort choice is [[1rm.curve-population]]; subjective labels and possibly enriched fixture provenance still need empirical validation. No automatic RIR correction to the adopted formula.
+1. Effort comparability: the approved initial RIR/cohort choice is [[1rm.curve-population]]; subjective labels and possibly enriched fixture provenance still need empirical validation. Normalized analytical effort is the approved assumption [[1rm.curve-effort]], not a change to global metrics or established RIR accuracy.
 2. Reference: [[1rm.curve-reference]] fixes the initial historical estimator/window/support; rolling/current/all-time comparisons remain research sensitivities. The approved support minimum is not statistically established reliability.
 3. Load coordinate: [[1rm.curve-load]] approves a coherent chart coordinate across dated bodyweight contexts; absolute versus %BW personal records remain unchanged. Current kernel applies the entry factor once, including ordinary per-side loads; avoid an additional conversion. Same-gym cohorts still cannot exclude equipment/technique confounding.
 4. Residual definitions: signed/percentage normalization and zero/undefined handling are approved in `docs/specs/tech/training-metrics-contract.md` §6. Empirical/domain sensitivity and no-reference/insufficient-data presentation remain to validate and design.
