@@ -1,6 +1,7 @@
 # M36-T01-RM_curve_and_effort_contract — Reconstruct the RM curve and agree effort/reference contracts
 
-- Status: `in progress — research prepared; product-owner approval pending`
+- Status: `in_progress`
+- Approval: research prepared; product-owner approval pending.
 - Depends on: none
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no

@@ -1,6 +1,7 @@
 # M36 — RM Performance Curve Analytics
 
-- Status: `in progress — T01 research; approval pending`
+- Status: `in_progress`
+- Approval: T01 analytical proposals await product-owner approval.
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
 - Planning only: no milestone implementation or analytical/design decision is approved by this plan.
@@ -44,7 +45,7 @@ One card = one session = one local worktree = one PR under `docs/plans/README.md
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | in progress; approval pending |
+| [M36-T01](../tasks/M36-T01-RM_curve_and_effort_contract.md) | Reconstruct the RM curve and agree effort/reference contracts | none | in_progress |
 | [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | planned |
 | [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
