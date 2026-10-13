@@ -110,6 +110,8 @@ describe('programme screens', () => {
 
       // Pick exercise for block 1
       await pickExercise('Barbell Squat');
+      expect(screen.getByText('Weight · kg')).toBeTruthy();
+      expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
 
       // Target sets
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '140');
@@ -120,6 +122,10 @@ describe('programme screens', () => {
       fireEvent.press(screen.getByTestId('programme-form-plan-2-edit'));
       fireEvent.changeText(screen.getByTestId('programme-child-plan-title-input'), 'Day 2: Heavy Bench');
       await pickExercise('Bench Press');
+      expect(screen.getByText('Weight · kg')).toBeTruthy();
+      expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+      expect(screen.queryByText('Weight per side · kg')).toBeNull();
+      expect(screen.queryByLabelText('Set 1 weight per side in kilograms')).toBeNull();
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '100');
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '5');
       fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));

@@ -45,3 +45,12 @@ unavailable and known zero.
 
 Why: an absent training figure should not look like a measurement or an error marker.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
+
+### copy.set-entry · presentation · accepted
+
+Workout, session-plan and programme set entry follow the recorder's copy:
+`Effort`, `Weight · kg`, `Reps`. Weight entry uses the same label for total-load
+and per-side exercises; its accessible name is `Set N weight in kilograms`.
+
+Why: the recorder is the standard for entering sets, and planning follows it.
+Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`.

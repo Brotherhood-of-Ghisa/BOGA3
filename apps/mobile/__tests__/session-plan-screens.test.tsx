@@ -174,6 +174,8 @@ describe('plan form: create', () => {
 
     fillTitle('Heavy Day');
     await addExerciseBlock('Barbell Squat');
+    expect(screen.getByText('Weight · kg')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
     fillSet(1, 1, '100', '5');
     fireEvent.press(screen.getByTestId('plan-form-save'));
 
@@ -191,8 +193,10 @@ describe('plan form: create', () => {
     const first = 'plan-form-block-1-set-1';
     expect(screen.getByTestId(`${first}-effort`)).toHaveTextContent('EffortW-Up');
     expect(screen.queryByText('Work')).toBeNull();
-    expect(screen.getByText('Weight per side · kg')).toBeTruthy();
-    expect(screen.getByLabelText('Set 1 weight per side in kilograms')).toBeTruthy();
+    expect(screen.getByText('Weight · kg')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+    expect(screen.queryByText('Weight per side · kg')).toBeNull();
+    expect(screen.queryByLabelText('Set 1 weight per side in kilograms')).toBeNull();
     expect(screen.getByTestId(`${first}-weight`)).toHaveProp('selectTextOnFocus', true);
     expect(screen.getByTestId(`${first}-reps`)).toHaveProp('selectTextOnFocus', true);
     fillSet(1, 1, '40.5', '100');
