@@ -100,7 +100,7 @@ Condition on observed M when comparing trend shape on a fixed cohort; M is a sha
 
 ## Reproduction and observed method checks
 
-Research script: `M36-T02-residual-regression-checks.ts`; test-only numerical helper: `apps/mobile/__tests__/helpers/residual-regression-research.ts`; focused suite: `apps/mobile/__tests__/residual-regression-research.test.ts`. Only the research script imports the provisional plan fixture; no production import/dependency is introduced. The helper contains no domain rule or copied RM constants. Root will apply/review the staged files and run repository gates.
+Research script: `M36-T02-residual-regression-checks.ts`; test-only numerical helper: `apps/mobile/__tests__/helpers/residual-regression-research.ts`; focused suite: `apps/mobile/__tests__/residual-regression-research.test.ts`. Only the research script imports the provisional plan fixture; no production import/dependency is introduced. The helper contains no domain rule or copied RM constants. The files are applied and reviewed; repository gates pass. Evidence is recorded with the experimental research draft PR.
 
 ```sh
 node docs/plans/research/M36-T02-residual-regression-checks.ts

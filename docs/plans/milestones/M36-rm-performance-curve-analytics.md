@@ -76,7 +76,7 @@ Pending clarification: whether the user wants additional per-week fitted curves 
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits T02 research from reviewed T01 before its merge. T02's research specification and method checks are delivered for review; [validation plan](../research/M36-T02-residual-regression-method.md), repository gates and human analytical approval remain required before completion. Required analytical, empirical and design approvals are unchanged.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits T02 research from reviewed T01 before its merge. T02's research specification, method checks and repository gates are complete; the reviewed [validation plan](../research/M36-T02-residual-regression-method.md) awaits human analytical approval before task completion. Required analytical, empirical and design approvals are unchanged.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |

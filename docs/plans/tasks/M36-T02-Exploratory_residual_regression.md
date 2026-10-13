@@ -1,6 +1,6 @@
 # M36-T02-Exploratory_residual_regression — Specify exploratory residual regression and break reliability
 
-- Status: `in_progress` — research delivered for review; gates and human analytical approval pending
+- Status: `in_progress` — research and gates complete; human analytical approval pending
 - Depends on: M36-T01
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
