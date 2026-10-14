@@ -23,7 +23,15 @@ cleanup() {
   [[ -z "${RACE_DIR}" ]] || rm -rf "${RACE_DIR}"
   psql_session_stop
 }
-trap cleanup EXIT
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then status=1; fi
+  if ! cleanup; then status=1; fi
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # Runtime-native tests require no DB, network permission or provider credentials.
 npx -y deno@2.9.6 test "${SUPABASE_DIR}/functions/notification-worker/handler.test.ts"
@@ -156,8 +164,14 @@ RACE_DIR="$(mktemp -d)"
 RACE_CLAIM="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 run_psql "update app_public.notification_deliveries set state='leased',claim_id='${RACE_CLAIM}',lease_until=now()+interval '60 seconds' where id=${CD};" >/dev/null
 run_psql_once "begin; select 1 from app_public.notification_installations where id='${INSTALL_ID}' for update;
-  select pg_sleep(0.3); commit;" >"${RACE_DIR}/lock" &
+\\echo locked
+  select pg_sleep(1); commit;" >"${RACE_DIR}/lock" &
 LOCK_PID=$!
+for attempt in {1..100}; do
+  rg -q '^locked$' "${RACE_DIR}/lock" && break
+  sleep 0.01
+done
+rg -q '^locked$' "${RACE_DIR}/lock" || fail 'concurrency barrier was not acquired'
 curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
   -H 'Content-Profile: app_public' -H 'Content-Type: application/json' \
   --data "{\"p_delivery_id\":${CD},\"p_claim_id\":\"${RACE_CLAIM}\",\"p_generation\":1}" \
@@ -191,4 +205,5 @@ run_psql "update app_public.notification_installations set active=false,updated_
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'
+COMPLETED=1
 pass 'registration, role matrix, prefs, binding rotation, generation fencing, order, recovery, encrypted sink tickets and receipts'
