@@ -264,7 +264,7 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_result "{\"p_delivery_id\":${CD},
 expect_ok 'old receipt applied'
 [[ "$(run_psql "select active from app_public.notification_installations where id='${INSTALL_ID}';")" == t ]] || fail 'old receipt disabled new binding'
 # The share ledger survives a lifter's departure; current recipients retain authorized projection.
-run_psql "update app_public.group_memberships set ended_at=now() where group_id='${GROUP_ID}' and user_id='${B_UID}' and ended_at is null;" >/dev/null
+run_psql "update app_public.group_memberships set ended_at=now(),end_reason='left',ended_by='${B_UID}' where group_id='${GROUP_ID}' and user_id='${B_UID}' and ended_at is null;" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"
 expect_ok 'departed lifter projection'
 check 'durable share remains visible to live recipient' '.route.groupId==$g and (.identity|type)=="string"' --arg g "${GROUP_ID}"
