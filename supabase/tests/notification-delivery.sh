@@ -46,7 +46,7 @@ rpc "${A_TOKEN}" group_create '{"p_name":"Notification contract","p_description"
 expect_ok 'create group'
 GROUP_ID="$(jq -r '.group_id' <<<"${BODY}")"
 # Seed memberships/source graph directly: intake is owned by the producer task.
-run_psql "insert into app_public.group_memberships(group_id,user_id,role,joined_at)
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; insert into app_public.group_memberships(group_id,user_id,role,joined_at)
   values('${GROUP_ID}','${B_UID}','member',now()-interval '1 hour');
   insert into app_public.notification_config(environment,project_id,bundle_id,sending_enabled,provider)
   values('local','3c00cd23-0946-4eb6-bbf0-4542879cd314','com.phano.boga3.dev',false,'local');
@@ -136,13 +136,13 @@ rpc "${SERVICE_ROLE_KEY}" notification_begin_send "{\"p_delivery_id\":${DELIVERY
 expect_ok 'authorized begin'
 check 'public projection allowlist and zero start counts' '.projection.bestCount==0 and .projection.rankCount==0 and
   (.projection|keys|sort)==["bestCount","bindingId","expiresAt","heading","identity","kind","notificationId","rankCount","recipientUserId","route","v"]'
-run_psql "update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 enqueue completion
 COMPLETION="${BODY}"
-run_psql "update app_public.sessions set status='active',completed_at=null where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='active',completed_at=null where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"; expect_ok 'reopened completion projection'
 [[ "${BODY}" == null ]] || fail 'reopened workout projected a completed alert'
-run_psql "update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_claim '{}'
 CD="$(jq -r '.jobs[0].id' <<<"${BODY}")"; CC="$(jq -r '.jobs[0].claim_id' <<<"${BODY}")"
 rpc "${SERVICE_ROLE_KEY}" notification_begin_send "{\"p_delivery_id\":${CD},\"p_claim_id\":\"${CC}\",\"p_generation\":1}"
@@ -191,7 +191,7 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
 run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null
 # Enqueue and handoff take the workout lock before the installation FK/row lock.
 QUEUE_SESSION="enqueue-race-${RUN_TAG}"
-run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
   values('${B_UID}','${QUEUE_SESSION}','active',floor(extract(epoch from now())*1000),1,1,1);
   select app_public.notification_enqueue('${A_UID}','${B_UID}','${QUEUE_SESSION}','start','${EVENT_AT}',1,'${CONTRIBUTIONS}'::jsonb);" >/dev/null
 QID="$(run_psql "select d.id from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id where n.session_id='${QUEUE_SESSION}';")"
