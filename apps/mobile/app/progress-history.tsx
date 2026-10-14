@@ -107,6 +107,7 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenC
           // the key out would keep the last button on screen.
           headerRight: hasOptions ? () => (
             <IconButton
+              nativeHeader
               accessibilityLabel="Options"
               name="more-vertical"
               onPress={() => setOptionsVisible(true)}

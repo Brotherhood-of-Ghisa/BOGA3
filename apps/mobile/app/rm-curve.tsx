@@ -13,7 +13,7 @@ export default function RmCurveRoute() {
   const [now, setNow] = useState(() => new Date());
   useFocusEffect(useCallback(() => { setNow(new Date()); }, []));
   return <>
-    <Stack.Screen options={{ headerLeft: () => <IconButton name="chevron-left" accessibilityLabel="Back"
+    <Stack.Screen options={{ headerLeft: () => <IconButton nativeHeader name="chevron-left" accessibilityLabel="Back"
       testID="rm-curve-back" onPress={() => router.canGoBack() ? router.back() : router.replace(mainTabHref('progress'))} /> }} />
     {exerciseId ? <RmCurveScreen key={exerciseId} exerciseDefinitionId={exerciseId} now={now} />
       : <Screen><StatePanel title="This exercise isn’t available" body="Return to History and choose an exercise." /></Screen>}

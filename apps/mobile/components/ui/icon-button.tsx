@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet } from 'react-native';
+import { Touchable } from 'react-native-gesture-handler';
 
 import { Icon, type IconName } from '@/components/ui/icon';
 import { uiGeometry, uiRoles, type UiIconSizeToken } from '@/components/ui/tokens';
@@ -20,6 +21,8 @@ export type IconButtonProps = {
   hitSlop?: number;
   accessibilityHint?: string;
   testID?: string;
+  /** Use a native control inside UIKit headers, which otherwise also scroll on tap. */
+  nativeHeader?: boolean;
 };
 
 const GLYPH_COLOR: Record<IconButtonTone, string> = {
@@ -42,7 +45,20 @@ export function IconButton({
   hitSlop,
   accessibilityHint,
   testID,
+  nativeHeader = false,
 }: IconButtonProps) {
+  const glyph = <Icon color={disabled && tone !== 'accent' ? uiRoles.inkGhost : GLYPH_COLOR[tone]} name={name} size={size} />;
+  if (nativeHeader) return (
+    <Touchable
+      accessible accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel} accessibilityRole="button"
+      accessibilityState={disabled ? { disabled } : undefined} disabled={disabled} hitSlop={hitSlop} onPress={onPress}
+      activeOpacity={tone === 'accent' ? 0.85 : 0.7} activeUnderlayOpacity={tone === 'accent' ? 0 : 1}
+      underlayColor={uiRoles.paper}
+      style={[styles.control, tone === 'accent' ? (disabled ? styles.accentDisabled : styles.accent) : null]}
+      testID={testID}>
+      {glyph}
+    </Touchable>
+  );
   return (
     <Pressable
       accessibilityHint={accessibilityHint}
@@ -58,11 +74,7 @@ export function IconButton({
         pressed && !disabled ? (tone === 'accent' ? styles.accentPressed : styles.pressed) : null,
       ]}
       testID={testID}>
-      <Icon
-        color={disabled && tone !== 'accent' ? uiRoles.inkGhost : GLYPH_COLOR[tone]}
-        name={name}
-        size={size}
-      />
+      {glyph}
     </Pressable>
   );
 }

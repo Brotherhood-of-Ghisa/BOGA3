@@ -544,9 +544,9 @@ describe('ActionButton', () => {
 });
 
 describe('IconButton', () => {
-  it('is one labelled 44pt button whose glyph is decoration', () => {
+  it.each([false, true])('is one labelled 44pt button whose glyph is decoration (native header: %s)', (nativeHeader) => {
     const onPress = jest.fn();
-    render(<IconButton accessibilityLabel="Session options" name="more-vertical" onPress={onPress} testID="more" />);
+    render(<IconButton nativeHeader={nativeHeader} accessibilityLabel="Session options" name="more-vertical" onPress={onPress} testID="more" />);
 
     const button = screen.getByRole('button', { name: 'Session options' });
     expect(flatStyle(button)).toMatchObject({ width: uiGeometry.tapTarget, height: uiGeometry.tapTarget });
@@ -555,14 +555,14 @@ describe('IconButton', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('draws the accent tone as the one primary, and ignores presses when disabled', () => {
+  it.each([false, true])('draws the accent tone and ignores disabled presses (native header: %s)', (nativeHeader) => {
     const onPress = jest.fn();
     const { rerender } = render(
-      <IconButton accessibilityLabel="New exercise" name="plus" onPress={onPress} testID="add" tone="accent" />,
+      <IconButton nativeHeader={nativeHeader} accessibilityLabel="New exercise" name="plus" onPress={onPress} testID="add" tone="accent" />,
     );
     expect(flatStyle(screen.getByTestId('add')).backgroundColor).toBe(uiRoles.accent);
 
-    rerender(<IconButton accessibilityLabel="New exercise" disabled name="plus" onPress={onPress} testID="add" tone="accent" />);
+    rerender(<IconButton nativeHeader={nativeHeader} accessibilityLabel="New exercise" disabled name="plus" onPress={onPress} testID="add" tone="accent" />);
     fireEvent.press(screen.getByTestId('add'));
     expect(onPress).not.toHaveBeenCalled();
     expect(screen.getByTestId('add').props.accessibilityState).toMatchObject({ disabled: true });

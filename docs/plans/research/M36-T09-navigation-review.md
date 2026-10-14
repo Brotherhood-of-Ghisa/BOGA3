@@ -1,38 +1,47 @@
 # Final RM chart entry — review handoff
 
-Status: production entry implemented and independently source-reviewed in [draft PR #742](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/742), based on T08 commit `7c21d18b` and draft PR #741. T09 remains in_progress. Its native lane/scenario agreement and final human entry/return review are pending; no T09 acceptance scenario has been written or run. Main is untouched, and no merge/ready transition is authorized.
+Status: experimental T09 implementation and acceptance completed on 2026-10-15. Human UI approval, independent review and all agreed gates are green. [Draft PR #742](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/742) remains stacked on T08 commit `7c21d18b` / draft PR #741. Main is untouched; no merge or ready transition is authorized.
 
-## Target and scope
+## Approval and scope
 
-The operator directed “Approved, start t09” on 2026-10-14. The [approved native r1 target](../designs/M36-T05-rm-chart-review.md) governs: live selected-exercise History → Options → RM curve, then Back to the prior History. The operator’s branch-only instruction overrides the template’s merge-first sequence. T08’s chart acceptance and native gesture proof are retained; no chart, formula, effort/load semantics, data transformation or research runtime changed.
+The operator approved T08 and directed starting T09 on 2026-10-14, then accepted the exposed entry/return with “ok T09 approved - proceed”. This accepts the proposed focused native set after the concrete native/gallery preview, before its acceptance scenario was written/run. The [native r1 target](../designs/M36-T05-rm-chart-review.md) governs: live selected-exercise History → Options → RM curve → Back. The branch-only instruction overrides merge-first planning. No chart, formula, effort/load semantics, transformation or research runtime changes.
 
-The delta adds `app/rm-curve.tsx`, the encoded `rmCurveHref` builder, its existing app-protected root-stack declaration and one row in History’s existing Sheet. The action remains available for a live exercise with no muscle mappings or training, disappears on deletion, and is never offered by muscle History. Back uses the existing shared arrow, popping the retained History or replacing to Progress for a cold link. The required ID follows the existing trimmed-first-value convention; changed params remount chart scope. The chart’s window anchors on focus. No new navigation model, dependency, production harness or write path was added.
+The production delta adds the protected route, encoded canonical-ID builder and one row in History’s existing Sheet. A live exercise with no mappings/training still has the action; deletion removes it; muscle History does not offer it. Back pops retained History, or replaces to Progress for a cold link. Trimmed first ID, changed-ID scope reset and focus-anchored chart window follow existing conventions. No write path, dependency or native configuration was added.
 
-## Proof and boundaries
+## Native finding and fix
 
-| Claim | Evidence |
+The approved native scenario exposed a real scroll reset when History Options opened, before pushing the chart. UIKit also handled the header Pressable’s tap as scroll-to-top, consistent with [the upstream React Native report](https://github.com/react/react-native/issues/56061) and the installed screens library’s iOS27 guard source. Memoizing the header callback did not fix it and was reverted. Its temporary component-style test mock was also reverted because Router actually invokes a render callback.
+
+`IconButton.nativeHeader` selects the installed gesture library’s native UIControl-backed `Touchable`, retaining the house glyph, 44pt target, tones, press feedback, disabled state and accessibility props. Only History Options and RM Back opt in. Ordinary controls keep their Pressable path. Two existing primitive tests now run for both hosts; the existing native-boundary stub covers shared actions/props, while the actual device scenario proves scroll preservation. Approved layout and labels are retained.
+
+Earlier probes also corrected two test assumptions: a harness-teleported exercise had no parent session, so the scenario now enters from the owning session card; the existing History window contains a partial extra plotted week, so the scenario asserts metric and session identity rather than an invented exact plotted-week count. No calculation was changed. The failing restoration assertion was retained.
+
+## Evidence
+
+| Claim | Proof |
 | --- | --- |
-| Entry, correct exercise and bounded wave | Real Expo Router plus migrated SQLite: canonical frozen plateau at week22, default12-window counts, no future week24 row, exact dated selection. No duplicate fixture/oracle. |
-| Context and draft preservation | Change chart range to4 weeks, then Back: History’s carried Sets metric and previously focused week survive; the raw active draft row remains unchanged. Physical scroll position remains a native check. |
-| Safe entry | Absent/blank/unknown/deleted IDs remain in route with Back; cold-entry Back reaches Progress. Repeated/encoded IDs and an updated link on a mounted route are covered. |
-| Live action removal | Catalogue deletion while History Options is open removes the chart action without navigating. |
-| Protected access | The actual RootStack suite proves signed-out and first-sync denial, and bootstrapped app access. Its chart stub isolates route access; it is not chart evidence. |
-| Native rendering | Existing exercise-page fixture over on-device SQLite: History, protected chart host and missing-ID state render in slot59. This does not establish native menu push/Back or gesture acceptance. |
+| Canonical exercise, bounded wave and details | Real Router/migrated SQLite with the shared frozen plateau at week22; future observations excluded; selected set, range change and History metric/week retained. No duplicate numerical oracle. |
+| Draft data and safe route/access | Real draft row unchanged; absent/blank/unknown/deleted IDs, encoded/repeated params, mounted-link change, live deletion, signed-out and first-sync denial covered by existing route suites. |
+| Physical entry/return and Grid scroll | Final native scenario: July remains at the same position before Options, behind its Sheet and after chart Back; chart disappears. Captures01/02/04. |
+| Timeline and local chart scope | Exact prior-session card and Top-weight plot remain after changing chart range and Back; captures05/06. |
+| Workout preservation | Existing Train/session navigation resumes edited 87.5 kg × 5 with Set 3 still in progress; capture07. |
 
-The new suite preserves the repository’s Reanimated stubs when Expo Router’s testing setup replaces them. The Timeline’s visual week is intentionally hidden from VoiceOver because its plot supplies the accessible value; only that visual assertion includes hidden elements. Route-path and visible-page assertions separately establish the returned screen.
+Native chart scenario PASS1/0: `apps/mobile/artifacts/maestro/rm-curve-navigation/20261014-235115-85577/`. Its generated flow copy, JUnit, commands and seven screenshots are retained. It runs the ordinary production Router/RootStack with on-device SQLite on `BOGA wt59`, iOS27, viewport402×874. Existing Bench fixture: seven qualifying completed sets, two sessions, unsupported prior reference; no fallback line. The ad hoc source is deleted after review, per test policy; no new permanent lane/harness is introduced.
 
-## Native review
+## Gates and boundaries
 
-The isolated `BOGA wt59` simulator uses pinned iOS27, viewport402×874. Production Expo Router/RootStack and actual native SQLite run in the ordinary infra-free preview; no custom chart host or production route mutation is used. The existing fixture supplies Barbell Bench Press, seven qualifying observations from two sessions and no supported prior reference. No fallback curve is invented. Native page and missing-ID captures match the approved host/header/state patterns; actual History Options/Back interaction is still pending.
+Agreed set: fast; jest-coverage; complexity; dependencies; docs-check; ios-exercise-page; ios-session-view; one focused chart navigation scenario. Root-stack default full frontend is narrowed by agreement: no auth/sync/groups behavior changed, protected route access is covered by Jest. Cumulative backend/groups defaults retain prior T06 narrowing for unchanged calculations/read models. No release/sweep requested.
 
-Ignored evidence: `apps/mobile/artifacts/review/rm-curve-navigation/`, including native captures/hierarchies, live-preview log and source gate logs. The [local gallery](http://127.0.0.1:8759/review-gallery.html) presents captures and their boundaries. The current native preview opens at exercise History; for hands-on review use its Options → RM curve and Back while retaining the metric/week and workout draft. Do not infer native or auditory VoiceOver success from screenshots or Jest. T08’s disclosed VoiceOver limitation remains.
+Finished-source fast PASS: 286 suites / 3928 tests plus aggregate checks. Coverage PASS: 86.56% branches / 94.41% lines; complexity PASS; dependencies PASS: 525 modules / 2637 edges, 13 known unchanged. Docs-check PASS; rechecked after final evidence metadata. The existing two native lanes were rerun to green after the shared-button fix. Logs, review and gallery live in ignored `apps/mobile/artifacts/review/rm-curve-navigation/`; Maestro run folders carry device evidence. No duration is estimated.
 
-## Gates and review
+Source review is clean, including the native control and accurate Jest boundary. Independent final evidence review is clean: JUnit, run copy, commands and all seven native captures checked. The ad hoc source has been deleted; its self-contained generated run copy remains. Actual auditory VoiceOver activation/announcements and interaction on other device sizes remain unverified; screenshots and mocks do not establish them. T08’s accepted research/chart evidence is reused; no detector, calibrated statistical claim or two-curve production feature is added.
 
-Retained agreed five checks: fast PASS (286 suites / 3,926 tests plus aggregate checks); coverage PASS (86.55% branches / 94.41% lines); complexity PASS; dependencies PASS (525 modules / 2,636 dependencies, 13 known unchanged); docs-check PASS. Eleven tests are added and existing entry expectations updated. No duration is asserted.
+Final native evidence (each PASS 1 scenario / 0 failures):
 
-Fast initially failed while starting the isolated Supabase analytics/vector services; restarting only this task’s stack recovered it without a configuration change or skipped check, then the whole fast gate passed. Source test construction also needed the existing animation mock and the explicitly hidden visual-week assertion; no production workaround was introduced.
+| Check | Artifact root |
+| --- | --- |
+| ios-exercise-page | `apps/mobile/artifacts/maestro/ad-hoc/20261014-235351-99254` |
+| ios-session-view | `apps/mobile/artifacts/maestro/ad-hoc/20261014-235504-4805` |
+| chart navigation | `apps/mobile/artifacts/maestro/rm-curve-navigation/20261014-235115-85577` |
 
-Changed-path defaults are fast/frontend/docs/Jest; cumulative milestone defaults additionally select backend/groups-leaderboards. Prior approved T06 data/calculation narrowing remains applicable to unchanged source; no server/schema/sync or group-consumed calculation changed. The pending T09 proposal retains five checks plus ios-exercise-page, ios-session-view and one chart-entry native scenario, narrowing full frontend by judgment. The operator may choose full frontend instead. No sweep was requested; there is no release build.
-
-Independent source/product review is clean. Its two documentation findings are resolved: component inventory names the new host, and entry/return are in the exhaustive navigation table. Durable route/param/return owners and completed product Pending metadata are updated without changing accepted statements. Final native/human evidence remains required before acceptance, a completed T09 PR, planning deletion or milestone closeout. All task PRs remain drafts/unmerged by operator choice.
+All PRs stay draft/unmerged by owner choice. The branch deliverable is complete; milestone shipping DoD still requires authorized merges, ephemeral planning deletion and worktree release. Retain this evidence and the last card/milestone until that shipping step.

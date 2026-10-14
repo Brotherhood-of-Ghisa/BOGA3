@@ -1,7 +1,7 @@
 # M36-T09-Expose_RM_analytics_and_closeout — Expose exercise RM analytics through existing navigation — final implementation step
 
-- Status: `in_progress`
-- Review: production source and five checks green; native set agreement and final human entry/return acceptance pending
+- Status: `completed`
+- Review: human entry/return approval recorded on 2026-10-14; independent source/product/native review and all agreed gates green; experimental deliverable completed on 2026-10-15; unmerged shipping closeout deferred
 - Depends on: M36-T08
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: yes
@@ -21,11 +21,11 @@ As the milestone’s final implementation step, expose the validated analytics p
 
 Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
-## Open — resolve with the user at session start
+## Execution and approvals
 
 The operator approved T08 and directed starting T09 on 2026-10-14. Base: `7c21d18b`, the reviewed experimental T08 branch; the existing branch-only authorization overrides the template’s merge-first sequence. Main remains untouched. Target: [native r1](../designs/M36-T05-rm-chart-review.md), specifically selected-exercise History → Options → RM curve, with no muscle entry. Reuse the existing options Sheet, protected root stack, common header Back and current connected chart. A pushed page leaves History’s metric/focused week/scroll mounted; cold-link Back falls back to Progress. No chart, model or loading-convention change is proposed.
 
-The [navigation review handoff](../research/M36-T09-navigation-review.md) records the implemented entry, real-Router/SQLite proof and native page captures. The five existing checks remain agreed. The proposed additional set is ios-exercise-page, ios-session-view and one focused native navigation scenario; permission is pending before writing it or running these lanes. The actual diff and cumulative defaults will be recorded. Present the integrated entry/return preview for human review before final navigation acceptance.
+The operator approved the exposed entry/return and directed proceeding on 2026-10-14 (“ok T09 approved - proceed”), accepting the proposed focused native set after review of the concrete preview. The [navigation review handoff](../research/M36-T09-navigation-review.md) records the real-Router/SQLite proof, native scroll/header fix, final lane evidence and limits. The five source checks plus ios-exercise-page, ios-session-view and one native navigation scenario are agreed; full frontend is narrowed because protected access remains covered by Jest and no auth/sync/groups behavior changes. The approved design is retained. Completion here means the experimental branch deliverable; merge, shipping DoD, planning deletion and worktree release remain deferred under the owner’s branch-only instruction.
 
 ## Deliverables and acceptance
 

@@ -54,7 +54,7 @@ jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock
 // are not needed in unit tests; provide lightweight stubs.
 jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
-  const { View } = require('react-native');
+  const { Pressable, View } = require('react-native');
 
   const chainable = () => {
     const obj: Record<string, unknown> = {};
@@ -70,6 +70,9 @@ jest.mock('react-native-gesture-handler', () => {
   };
 
   return {
+    // Native header touch handling is verified on-device; preserve unit actions/a11y.
+    Touchable: ({ children, ...props }: { children?: unknown }) =>
+      React.createElement(Pressable, props, children),
     GestureHandlerRootView: ({ children, ...props }: { children?: unknown }) =>
       React.createElement(View, props, children),
     GestureDetector: ({ children }: { children?: unknown }) => children ?? null,

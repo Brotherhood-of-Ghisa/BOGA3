@@ -35,7 +35,7 @@ Two standing rules:
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
-| An icon-only control | `IconButton` (`icon-button.tsx`) |
+| An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
 | One choice from a few: a filter, a breakdown, a view | `SegmentedControl` (`segmented-control.tsx`) — `fill` / `fit` / `inline`, `density="compact"` and icon segments for two controls sharing a row |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
