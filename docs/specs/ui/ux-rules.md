@@ -196,18 +196,16 @@ exercise history filters by them.
 
 ### Swipes on the exercise page
 
-Decided 2026-10-01, revised 2026-10-09. Every row answers the dropping
+Decided 2026-10-01, revised 2026-10-14. Every row answers the dropping
 swipe-left; only the open row, the logger, answers swipe-right, which the
 other rows carry as their glyph. Right confirms the row exactly like the tick
 and moves on; confirming the last set adds one, opened with the copied values.
-Left drops the row: an ad-hoc row is removed, confirmed or not; a planned row
-loses its typed values and effort and reads as its plan again, planned and in
-its place (a swipe never deletes a plan). A side is offered only when its move
-would change the row: no left swipe on an untouched planned row, no right
-swipe without a valid set; a side not offered neither drags nor shows its
-symbol. Both swipes dismiss the keyboard, and neither navigates. The
-`Confirm set` / `Drop set` accessibility actions are the non-gesture path,
-under the same conditions.
+Left drops the row: it is removed, planned or ad-hoc, confirmed or not. A side
+is offered only when its move would change the row: every row drops, so
+swipe-left is always offered, but no right swipe without a valid set; a side
+not offered neither drags nor shows its symbol. Both swipes dismiss the
+keyboard, and neither navigates. The `Confirm set` / `Drop set` accessibility
+actions are the non-gesture path, under the same conditions.
 
 The gesture states its own threshold: the row follows the finger to the
 trigger, then resists to a hard stop, and the side goes from its wash to its

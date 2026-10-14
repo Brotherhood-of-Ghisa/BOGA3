@@ -299,11 +299,11 @@ describe('ExercisePageScreen', () => {
       (screen.getByTestId('exercise-set-logger-header').props.accessibilityActions as { name: string }[])
         .map((action) => action.name);
 
-    // Untouched planned set: its plan confirms, but there is nothing to drop,
-    // so that side is not even mounted.
+    // Untouched planned set: its plan confirms, and the row can be dropped, so
+    // both sides are mounted.
     expect(swipeSymbols(3, 'right')).toEqual(['check', 'check']);
-    expect(screen.queryByTestId('exercise-set-swipe-3-left')).toBeNull();
-    expect(actions()).toEqual(['confirm']);
+    expect(swipeSymbols(3, 'left')).toEqual(['x', 'x']);
+    expect(actions()).toEqual(['confirm', 'discard']);
 
     // Invalid reps: droppable, not confirmable.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '0');
@@ -366,7 +366,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-swipe-6')).toBeTruthy();
   });
 
-  it('drops a planned set back to its plan, dismissing the keyboard and navigating nowhere', async () => {
+  it('drops a planned set by removing it, dismissing the keyboard and navigating nowhere', async () => {
     await openPage();
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
 
@@ -375,16 +375,13 @@ describe('ExercisePageScreen', () => {
       nativeEvent: { actionName: 'discard' },
     });
 
-    // The typed entry is gone from the draft; the logger reads the set's plan
-    // again, the shell stays on the same set, and nothing navigated — dropping
-    // never goes to the previous set or screen.
+    // The planned row is gone from the draft, the typed entry with it; the
+    // logger falls back to the next planned row and nothing navigated.
     expect(dismiss).toHaveBeenCalled();
-    await waitFor(async () => expect((await benchSets())[2]?.weightValue).toBe(''));
+    await waitFor(async () => expect(await benchSets()).toHaveLength(4));
     await waitFor(() =>
       expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('82.5')
     );
-    expect(await benchSets()).toHaveLength(5);
-    expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
@@ -416,13 +413,13 @@ describe('ExercisePageScreen', () => {
       expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 4')).toBeTruthy()
     );
     expect(swipeSymbols(4, 'right')).toEqual(['check', 'check']);
-    // Only the open row confirms by swipe. The confirmed Set 1 now drops from
-    // its own row; the untouched planned Set 3 still offers nothing to drop.
+    // Only the open row confirms by swipe. Every row drops from its own row,
+    // the confirmed Set 1 and the planned Set 3 alike.
     expect(screen.queryByTestId('exercise-set-swipe-3-right')).toBeNull();
     expect(swipeSymbols(1, 'left')).toEqual(['x', 'x']);
     expect(rowActionNames(1)).toEqual(['discard']);
-    expect(screen.queryByTestId('exercise-set-swipe-3-left')).toBeNull();
-    expect(rowActionNames(3)).toEqual([]);
+    expect(swipeSymbols(3, 'left')).toEqual(['x', 'x']);
+    expect(rowActionNames(3)).toEqual(['discard']);
 
     // Confirming the open row commits Set 4, leaving Set 3 as it was.
     fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {

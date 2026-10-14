@@ -342,29 +342,17 @@ describe('exercise page model', () => {
     expect(toggleSetPerformed([plannedSet('p', '', '', null)], 'p')).toBeNull();
   });
 
-  it('drops a touched planned row back to its plan, keeping it in place', () => {
+  it('drops a planned row by removing it, whatever it holds', () => {
     const sets = quietSets();
     const typed = updateLoggerValues(sets, 's3', { weightValue: '90', repsValue: '4' });
 
     const dropped = dropSet(typed, 's3');
-    // The planned row is pristine again: values blank, actual effort blank —
-    // it reads as its plan (prescribed 82.5 × 6, RIR 1) through the fallback.
-    expect(dropped).toHaveLength(5);
-    expect(dropped[2]).toMatchObject({
-      id: 's3',
-      weightValue: '',
-      repsValue: '',
-      setType: null,
-      performanceStatus: 'planned',
-      plannedWeightValue: '82.5',
-      plannedRepsValue: '6',
-    });
-    expect(displayedValues(dropped[2])).toEqual({ weightValue: '82.5', repsValue: '6', setType: 'rir_1' });
+    expect(dropped.map((set) => set.id)).toEqual(['s1', 's2', 's4', 's5']);
     expect(findCursorIndex(dropped)).toBe(2);
 
-    // A planned row whose only entry is a chosen effort returns to blank.
+    // A planned row whose only entry is a chosen effort goes the same way.
     const cycled = updateLoggerValues(sets, 's3', { setType: 'rir_0' });
-    expect(dropSet(cycled, 's3')[2]).toMatchObject({ setType: null });
+    expect(dropSet(cycled, 's3').map((set) => set.id)).toEqual(['s1', 's2', 's4', 's5']);
   });
 
   it('drops an ad-hoc row by removing it, with or without values', () => {
@@ -378,9 +366,9 @@ describe('exercise page model', () => {
     expect(dropSet([adHoc('only', '60', '8')], 'only')).toEqual([]);
   });
 
-  it('leaves an untouched planned row and an unknown id alone', () => {
+  it('removes an untouched planned row too, and leaves an unknown id alone', () => {
     const sets = quietSets();
-    expect(dropSet(sets, 's3')).toBe(sets);
+    expect(dropSet(sets, 's3').map((set) => set.id)).toEqual(['s1', 's2', 's4', 's5']);
     expect(dropSet(sets, 'missing')).toBe(sets);
   });
 
@@ -391,29 +379,20 @@ describe('exercise page model', () => {
     expect(canDropSet(sets, 's1')).toBe(true);
   });
 
-  it('drops a confirmed planned row back to its plan instead of deleting it', () => {
+  it('drops a confirmed planned row by removing it', () => {
     const sets = quietSets();
     const performed = commitSet(sets, 's3', displayedValues(sets[2]));
     expect(isPerformed(performed[2])).toBe(true);
 
     const dropped = dropSet(performed, 's3');
-    expect(dropped).toHaveLength(5);
-    expect(dropped[2]).toMatchObject({
-      id: 's3',
-      weightValue: '',
-      repsValue: '',
-      setType: null,
-      performanceStatus: 'planned',
-      plannedWeightValue: '82.5',
-      plannedRepsValue: '6',
-    });
+    expect(dropped.map((set) => set.id)).toEqual(['s1', 's2', 's4', 's5']);
     expect(findCursorIndex(dropped)).toBe(2);
   });
 
-  it('offers a swipe side only when its move would change the row', () => {
+  it('offers the drop for any row it holds, and confirms only a valid set', () => {
     const sets = quietSets();
-    // Untouched planned row: nothing to drop, but its plan is a valid set.
-    expect(canDropSet(sets, 's3')).toBe(false);
+    // An untouched planned row drops now too; its plan is also a valid set.
+    expect(canDropSet(sets, 's3')).toBe(true);
     expect(canConfirmSet(sets, 's3')).toBe(true);
     // Touched with invalid values: droppable, not confirmable.
     const invalid = updateLoggerValues(sets, 's3', { repsValue: '0' });
