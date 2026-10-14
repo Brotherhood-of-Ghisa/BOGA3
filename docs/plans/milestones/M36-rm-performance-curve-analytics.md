@@ -76,12 +76,12 @@ Pending clarification: whether the user wants additional per-week fitted curves 
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits T02 research from reviewed T01 before its merge. T02's research specification, method checks and repository gates are complete; the reviewed [validation plan](../research/M36-T02-residual-regression-method.md) awaits human analytical approval before task completion. Required analytical, empirical and design approvals are unchanged.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits research continuation before parent PRs merge. T02's research specification, method checks and repository gates are complete; on 2026-10-14 the owner approved proceeding to T03 after reviewing the [validation plan](../research/M36-T02-residual-regression-method.md). T03 will use synthetic histories and read-only test-user data in remote BOGA_DEV. Empirical reliability and human design approvals remain separate.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | M36-T01 | Reconstruct the RM curve and agree effort/reference contracts | none | completed |
-| [M36-T02](../tasks/M36-T02-Exploratory_residual_regression.md) | Specify exploratory residual regression and break reliability | T01 | in_progress |
+| M36-T02 | Specify exploratory residual regression and break reliability | T01 | completed |
 | [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | planned |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
 | [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | planned |
