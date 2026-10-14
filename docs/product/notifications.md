@@ -28,7 +28,8 @@ enabled by default. Each category can be disabled and a group muted; app
 preferences never bypass the iOS notification permission.
 
 Why: activity is part of the requested experience alongside achievements.
-Pending: app controls and server preferences are not implemented.
+Code: server category/mute RPCs in `supabase/migrations/20261014115352_notification_delivery.sql`.
+Pending: native app controls and permission registration are not implemented.
 
 ### notifications.workout-delivery · definition · accepted
 
@@ -69,7 +70,8 @@ not restart that window. Retries and provider expiry must retain the event's
 original deadline.
 
 Why: old offline history should not produce a burst of current activity alerts.
-Pending: event-time filtering and delivery expiry are not implemented.
+Code: immutable intent deadline and delivery expiry in `supabase/migrations/20261014115352_notification_delivery.sql`.
+Pending: event-time filtering in workout producers is not implemented.
 
 ### notifications.non-workout-ranks · definition · open
 

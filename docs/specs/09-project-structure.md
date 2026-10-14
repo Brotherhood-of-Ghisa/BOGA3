@@ -128,6 +128,10 @@ Define the canonical repository structure, path ownership, and placement convent
     and filters by the validated OAuth subject.
 - `supabase/functions/group-eval/`
   - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md`). It has no client-facing API.
+- `apps/mobile/src/notifications/` owns portable delivery decisions shared with
+  the Edge worker; native registration and UI adapters remain separate.
+- `supabase/functions/notification-worker/` owns service-only encrypted push
+  handoff, the deterministic local sink and runtime-native adapter tests.
 - `supabase/tests/lib/`
   - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by the `groups-*` lane bodies); files here are never lane bodies themselves.
 - `docs/procedures/`

@@ -1,7 +1,7 @@
 # M34-T02-Workout_notification_events — Starts and completion summaries
 
 - Status: `planned`
-- Depends on: [M34-T01-Backend_push_delivery](M34-T01-Backend_push_delivery.md)
+- Depends on: M34-T01-Backend_push_delivery (completed; backend delivery contract)
 - Milestone: [M34](../milestones/M34-group-workout-notifications.md)
 - Areas: backend, group domain; UI impact: no
 
