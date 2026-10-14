@@ -56,6 +56,7 @@ const styles = StyleSheet.create({
     borderTopColor: uiRoles.recordRule,
   },
   label: {
+    flexShrink: 1,
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
     fontSize: uiTypography.size.xxs,
@@ -66,6 +67,7 @@ const styles = StyleSheet.create({
   },
   // The set a line names, right-aligned in the figure face.
   set: {
+    flexShrink: 0,
     marginLeft: 'auto',
     fontFamily: uiFonts.figure.family,
     fontWeight: '700',

@@ -828,10 +828,12 @@ describe('records, sharing and deleted sessions over real data', () => {
       expect(screen.getByTestId('session-completion-pr-seed_barbell_bench_press')).toBeTruthy();
       expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
       expect(screen.queryByText('Share PR')).toBeNull();
-      // Every record in plain words, without `kg` or "est.".
+      // The same band words and record styling as the exercise cards.
       expect(
-        within(squat).getByLabelText(/^Barbell Back Squat, 2 records: 1RM \d+\.\d and Top weight, \d+\.\d × \d+$/)
+        within(squat).getByLabelText(/^Barbell Back Squat, 2 records: new 1RM \d+\.\d and top weight \d+\.\d × \d+$/)
       ).toBeTruthy();
+      expect(within(squat).getByTestId(`${SQUAT_PR}-record`)).toHaveStyle({ backgroundColor: uiRoles.recordWash });
+      expect(within(squat).getByTestId(`${SQUAT_PR}-record-1`)).toHaveTextContent(/^New 1RM · \d+\.\d \+ top weight\d+\.\d × \d+$/);
 
       fireEvent.press(screen.getByTestId('session-completion-share-session'));
       expect(screen.getByTestId('session-share-preview')).toBeTruthy();
@@ -873,12 +875,11 @@ describe('records, sharing and deleted sessions over real data', () => {
     expect(label('session-completion-records')).toBe('Records 5');
     // Its 185 × 8 is heavier than 180 × 12 but its 1RM 236.2 is below 254.7: a
     // Weight record; its 3515 volume beats 2160 too.
-    expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: Top weight, 185.0 × 8; Volume 3515')).toBeTruthy();
-    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-line-1')).toHaveTextContent('Top weight185.0 × 8');
-    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-line-2')).toHaveTextContent('Volume 3515');
-    // A plain list: no `record` emphasis.
-    expect(within(bench).getByText('185.0 × 8')).toHaveStyle({ color: uiRoles.ink });
-    expect(within(pulldown).getByLabelText(/^Lat Pulldown, 3 records: 1RM \d+\.\d and Top weight, 120\.0 × 12; Volume 1440$/)).toBeTruthy();
+    expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: new top weight 185.0 × 8; new volume record 3515')).toBeTruthy();
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-1')).toHaveTextContent('New top weight185.0 × 8');
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-2')).toHaveTextContent('New volume record · 3515');
+    expect(within(bench).getByText('185.0 × 8')).toHaveStyle({ color: uiRoles.record });
+    expect(within(pulldown).getByLabelText(/^Lat Pulldown, 3 records: new 1RM \d+\.\d and top weight 120\.0 × 12; new volume record 1440$/)).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
     expect(within(screen.getByTestId('session-share-card-personal-records')).getByText('2 new records')).toBeTruthy();
@@ -901,6 +902,37 @@ describe('records, sharing and deleted sessions over real data', () => {
     );
     expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}-record-1`))
       .toHaveTextContent(/^New 1RM · \d+\.\d \+ top weight120\.0 × 12$/);
+  });
+
+  it('keeps different record sets separate and a long-name, six-digit Volume-only card compact', async () => {
+    await seedDesignSession({
+      benchSets: [{ weight: '175', reps: '15', type: 'rir_0' }, { weight: '185', reps: '4', type: 'rir_0' }],
+      pulldownSets: [{ weight: '120', reps: '999', type: null }],
+    });
+    await seedEarlierDesignSession({
+      benchSets: [{ weight: '180', reps: '12', type: 'rir_0' }],
+      pulldownSets: [{ weight: '150', reps: '50', type: null }],
+    });
+    localDatabase().update(exerciseDefinitions).set({ name: 'Dumbbell Bulgarian Split Squat' })
+      .where(eq(exerciseDefinitions.id, DESIGN.pulldownExerciseId)).run();
+    await bootLocalApp();
+    mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
+    render(<CompletedSessionDetailRoute />);
+
+    const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-count')).toHaveTextContent('3 records');
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-1'))
+      .toHaveTextContent(/^New 1RM record · \d+\.\d175\.0 × 15$/);
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-2'))
+      .toHaveTextContent('New top weight185.0 × 4');
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-3'))
+      .toHaveTextContent('New volume record · 3365');
+
+    const volumeOnly = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
+    expect(within(volumeOnly).getByLabelText('Dumbbell Bulgarian Split Squat, 1 record: new volume record 119880')).toBeTruthy();
+    expect(within(volumeOnly).getByText('New volume record · 119880')).toHaveStyle({ color: uiRoles.record });
+    expect(within(volumeOnly).queryByText('120.0 × 999')).toBeNull();
+    expect(within(volumeOnly).getAllByTestId(/-record-\d+$/)).toHaveLength(1);
   });
 
   it('opens a deleted session with its band, in Summary, and restores Edit and comparisons on undelete', async () => {
