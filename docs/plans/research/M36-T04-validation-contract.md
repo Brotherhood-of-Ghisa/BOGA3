@@ -28,4 +28,4 @@ Direct joint latent S(t)/RIR/load-uncertainty segmented likelihood and productio
 
 ## Fixture and human gates
 
-Reuse the existing weekly wave without inventing another programme. Its raw plateau/RIR progression and separate stable/smooth controls, every completed prefix, high-rep/effort selection and insufficient baseline are the shared candidate oracle. Prepare a reproducible numerical oracle and checksum; exact fixture freezing and first-release analytical/product limitations require final human review before T05. No product fact or production overlay is changed by these experiments.
+Reuse the existing weekly wave without inventing another programme. Its raw plateau/RIR progression and separate stable/smooth controls, every completed prefix, high-rep/effort selection and insufficient baseline are the shared oracle. The owner approved exact fixture freezing and the first-release analytical/product limitations on 2026-10-14; the frozen inputs and oracle now live under generic names in `apps/mobile/__tests__/fixtures/`. Human design approval remains separate. No product fact or production overlay is changed by these experiments.

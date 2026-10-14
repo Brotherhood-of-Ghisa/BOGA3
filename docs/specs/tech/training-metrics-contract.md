@@ -336,6 +336,14 @@ revisions; personal facts rebuild under the new calculation rules.
 assumption; empirical, human design and UI acceptance gates remain separate.
 Regression and structural-break detection stay research-only.
 
+Research compares fixed RIR/load uncertainty with jointly fitted noise and
+latent 1RM. Only 1RM changes curve amplitude; noise scales never
+reshape the adopted estimator or replace the independent reference. A Gaussian
+load discrepancy can approximate discrete gym choices while logged weight stays
+exact. Sparse histories, unverified effort and dependent sets do not establish
+noise accuracy, confidence, physiological change or a structural break. The
+descriptive chart carries no inference feature or confidence claim.
+
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
 then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
 Under [[1rm.curve-effort]], validate `Number.isSafeInteger(m+n)` before passing

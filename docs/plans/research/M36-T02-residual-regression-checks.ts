@@ -15,7 +15,7 @@ type WaveSet = {
   reps: number; rir: number; weightValue: string; repsValue: string; setType: string;
   performanceStatus: null; gym: string; loadInputMode: 'total_load'; bodyweightContribution: number;
 };
-const source = readFileSync(new URL('./M36-weekly-wave-example.json', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../../../apps/mobile/__tests__/fixtures/rm-curve-weekly-wave.json', import.meta.url), 'utf8');
 const fixture = JSON.parse(source) as { prior: WaveSet[]; scenarios: Record<string, WaveSet[]> };
 const seed = 20261013;
 const sdArgument = process.argv.slice(2);

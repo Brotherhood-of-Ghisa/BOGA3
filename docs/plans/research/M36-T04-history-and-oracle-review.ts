@@ -12,11 +12,11 @@ import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileSet } from '
 assert.equal(process.env.TZ, 'Europe/London');
 assert.equal(process.argv.length, 2);
 const root = new URL('../../../', import.meta.url);
-const bytes = readFileSync(new URL('docs/plans/research/M36-weekly-wave-example.json', root));
+const bytes = readFileSync(new URL('apps/mobile/__tests__/fixtures/rm-curve-weekly-wave.json', root));
 const fixtureSha256 = createHash('sha256').update(bytes).digest('hex');
-assert.equal(fixtureSha256, '172dae999afb8e2a0a3dcf34ced8c474f17eca76c04a68aa17edc753e144ae26');
+assert.equal(fixtureSha256, '1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce');
 const wave = JSON.parse(bytes.toString());
-assert.equal(wave.synthetic, true); assert.equal(wave.provisional, true);
+assert.equal(wave.synthetic, true); assert.equal(wave.provisional, false);
 const results = JSON.parse(readFileSync(new URL('apps/mobile/artifacts/research/m36-t04/t03-private-results.json', root), 'utf8'));
 const snapshotBytes = readFileSync(new URL('apps/mobile/artifacts/research/m36-t04/remote-private-snapshot.json', root));
 assert.equal(createHash('sha256').update(snapshotBytes).digest('hex'), results.remote.snapshotSha256);
@@ -54,7 +54,7 @@ close(strengthSets[3].analyticalRm, strengthSets[4].analyticalRm);
 assert.ok(strengthSets[4].load > strengthSets[3].load);
 const plateauProgression = strengthSets.map((s: any) => ({ week: s.week, reps: s.reps, rir: s.rir,
   load: s.load, analyticalRm: estimateOneRepMax(s.load, s.reps + s.rir), existingRm: estimateOneRepMax(s.load, s.reps) }));
-const expected = JSON.parse(readFileSync(new URL('docs/plans/research/M36-T04-weekly-wave-oracle.json', root), 'utf8'));
+const expected = JSON.parse(readFileSync(new URL('apps/mobile/__tests__/fixtures/rm-curve-weekly-wave-oracle.json', root), 'utf8'));
 assert.deepEqual({ fixtureSha256, oracle, plateauProgression, referenceOracle }, {
   fixtureSha256: expected.fixtureSha256, oracle: expected.oracle, plateauProgression: expected.plateauProgression,
   referenceOracle: expected.referenceOracle });
@@ -100,6 +100,6 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
 });
 assert.ok(historical.every((h: any) => h.analyticalRegression === null || h.analyticalRegression.searchedCandidates === 0));
 assert.equal(historical.find((h: any) => h.referenceRm !== null).independentSessions, 7);
-console.log(JSON.stringify({ fixtureSha256, freezeStatus: 'candidate oracle; final human approval pending',
+console.log(JSON.stringify({ fixtureSha256, freezeStatus: 'owner-approved and frozen 2026-10-14',
   oracle, plateauProgression, referenceOracle, historical, limits: 'Private snapshot stays local; anonymized cohort labels do not verify effort provenance.' },
   (_, value) => value === -Infinity ? '-Infinity' : value, 2));

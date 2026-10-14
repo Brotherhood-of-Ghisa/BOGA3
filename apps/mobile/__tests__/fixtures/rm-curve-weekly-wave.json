@@ -1,6 +1,6 @@
 {
   "synthetic": true,
-  "provisional": true,
+  "provisional": false,
   "weekCount": 24,
   "referenceRm": 100,
   "priorSessionCount": 8,
@@ -544,7 +544,7 @@
         3,
         2
       ],
-      "targetRir": "2–3"
+      "targetRir": "2\u20133"
     },
     {
       "name": "Strength",
@@ -5467,7 +5467,7 @@
     "week--2",
     "week--1"
   ],
-  "assumptions": "Synthetic one-session-per-week schedule inspired by a four-phase programme; exact RIR values are constructed, not imported targets or observations. Ordinary total-load exercise, one gym; stable/smooth controls use three sets with capacity multipliers 1/.99/.98. Eight prior sessions supply six qualifying sessions at 1–10 equivalent reps. Reference uses analytical RM at performed reps + recorded RIR. Global set 1RM still uses performed reps. No private workout, health, gym location or actual dates/loads reproduced. Primary plateau scenario is illustrative: constructed recorded RIR differs from programme targets; active phase best-set RIR by wave is 1/1/2/3/1/2. Each active phase holds its load for four waves, then raises it; the third set has one less recorded RIR at the same load. Reset uses RIR4 and its load is constructed from the heavy-phase estimate; tempo/pause effects are not simulated. Loads are unrounded mathematical examples, not prescriptions. Equivalent RM differs slightly by rep phase, so this is not a known single latent-capacity oracle. Smooth and stable controls are retained separately.",
+  "assumptions": "Synthetic one-session-per-week schedule inspired by a four-phase programme; exact RIR values are constructed, not imported targets or observations. Ordinary total-load exercise, one gym; stable/smooth controls use three sets with capacity multipliers 1/.99/.98. Eight prior sessions supply six qualifying sessions at 1\u201310 equivalent reps. Reference uses analytical RM at performed reps + recorded RIR. Global set 1RM still uses performed reps. No private workout, health, gym location or actual dates/loads reproduced. Primary plateau scenario is illustrative: constructed recorded RIR differs from programme targets; active phase best-set RIR by wave is 1/1/2/3/1/2. Each active phase holds its load for four waves, then raises it; the third set has one less recorded RIR at the same load. Reset uses RIR4 and its load is constructed from the heavy-phase estimate; tempo/pause effects are not simulated. Loads are unrounded mathematical examples, not prescriptions. Equivalent RM differs slightly by rep phase, so this is not a known single latent-capacity oracle. Smooth and stable controls are retained separately.",
   "plateauWaveRirs": [
     1,
     1,

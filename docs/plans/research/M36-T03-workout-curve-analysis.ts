@@ -19,7 +19,7 @@ const loadJson = (url: URL | string) => {
   const bytes = readFileSync(url), value = JSON.parse(bytes.toString());
   return { value, sha256: createHash('sha256').update(bytes).digest('hex') };
 };
-const waveSource = loadJson(new URL('./M36-weekly-wave-example.json', import.meta.url));
+const waveSource = loadJson(new URL('../../../apps/mobile/__tests__/fixtures/rm-curve-weekly-wave.json', import.meta.url));
 const importSource = loadJson(new URL('../../../apps/mobile/scripts/import/fixtures/dev-rich-history.boga-import.json', import.meta.url));
 const pkg = importSource.value as BogaSessionImportPackage;
 assert.deepEqual(validateBogaSessionImportPackage(pkg), { ok: true, errors: [] });
@@ -129,7 +129,7 @@ for (const s of pkg.sessions) for (const e of s.exercises) {
 }
 assert.equal(rankMatches, richRows.length); assert.equal(sourceRirRows, 0);
 const wave = waveSource.value;
-assert.equal(wave.synthetic, true); assert.equal(wave.provisional, true); assert.equal(wave.prior.length, 24);
+assert.equal(wave.synthetic, true); assert.equal(wave.provisional, false); assert.equal(wave.prior.length, 24);
 const synthetic = Object.entries(wave.scenarios as Record<string, WaveSet[]>).map(([name, sets]) => {
   assert.equal(sets.length, 72); assert.equal(new Set(sets.map(r => r.session)).size, 24);
   const rows = waveRows([...wave.prior, ...sets], `synthetic-${name}`), start = sets[0].startedAt;
@@ -200,6 +200,6 @@ console.log(JSON.stringify({ calendar: 'Europe/London', workingPolicy: 'declared
     originalRankRuleMatches: rankMatches, sourceRirRows, provenance: 'GymBook-labelled history; all efforts match old synthetic rank enrichment; original export not authenticated',
     metadata: 'current dev seed recipe, not a recovered historical exercise snapshot' },
     wave: { sha256: waveSource.sha256, priorSets: 24, priorSessions: 8, qualifyingPriorSessions: 6,
-      scenarios: 3, setsPerScenario: 72, sessionsPerScenario: 24, synthetic: true, provisional: true } },
+      scenarios: 3, setsPerScenario: 72, sessionsPerScenario: 24, synthetic: true, provisional: false } },
   richHistory: analyseHistory(richRows), synthetic, remote,
   limits: 'Set distributions are descriptive; regressions use session medians. RM curves retain the adopted shape. No ground-truth RIR, confidence intervals, statistically significant breaks or production UI. Weekly fitted curves use only completed prefixes and a fixed independent prior reference.' }, null, 2));

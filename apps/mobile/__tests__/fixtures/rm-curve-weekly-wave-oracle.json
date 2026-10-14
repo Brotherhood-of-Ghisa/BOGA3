@@ -1,6 +1,6 @@
 {
-  "fixtureSha256": "172dae999afb8e2a0a3dcf34ced8c474f17eca76c04a68aa17edc753e144ae26",
-  "reviewState": "candidate numerical oracle; awaiting human freeze approval",
+  "fixtureSha256": "1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce",
+  "reviewState": "Owner-approved synthetic validation fixture and oracle, 2026-10-14; not a training prescription",
   "oracle": [
     {
       "name": "gradual",
