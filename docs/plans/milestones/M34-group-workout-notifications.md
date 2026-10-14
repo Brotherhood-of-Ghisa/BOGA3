@@ -85,11 +85,12 @@ task-level target. It is a build input under
 `docs/specs/ui/ai-design-policy.md`, not a specification of shipped pixels.
 
 When implementing T03, inspect the selected
-[completion reference](../../../apps/mobile/artifacts/design/m34-notifications/selected-completion.png)
-and [full family](../../../apps/mobile/artifacts/design/m34-notifications/notification-family.png).
-These gitignored local artifacts must also be preserved as accessible PR
-evidence; another worktree must obtain them before implementation, not infer
-the images from their filenames.
+[completion reference](https://github.com/user-attachments/assets/476a3630-c5a3-4432-94d9-9da663b1bd2b)
+and [full family](https://github.com/user-attachments/assets/a47b6ac2-4df0-401f-ae84-35fb0d79ffcb),
+preserved in [planning PR #734](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/734).
+Download local copies into the gitignored
+`apps/mobile/artifacts/design/m34-notifications/` directory before implementation;
+do not infer the images from their filenames or commit them as runtime assets.
 
 - A flat surface, warm hairline and small card corners compose the existing
   app language; there are no shadows, decorative badges or extra actions.
