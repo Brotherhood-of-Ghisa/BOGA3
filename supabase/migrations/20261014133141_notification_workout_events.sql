@@ -263,7 +263,8 @@ create function app_public.notification_ranks(p_group uuid,p_exercise uuid,p_rev
 language sql stable security definer set search_path=app_public,pg_temp as $$
   with dimensions as (select m as metric,c as certified from unnest(array['volume','e1rm']) m cross join unnest(array[false,true]) c),
   source as materialized(select group_metric_eval_source_graph(p_group,p_exercise) as graph),
-  incompatible as (select 1 from jsonb_array_elements((p_target).baseline_scores) b,source
+  incompatible as (select b->>'metric' as metric,(b->>'certified')::boolean as certified
+    from jsonb_array_elements((p_target).baseline_scores) b,source
     where not coalesce((b->>'projection_known')::boolean,false) or not exists(
       select 1 from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
         and x->>'set_id'=b->>'set_id' and x->>'source_load_input_mode' is not distinct from b->>'source_load_input_mode'
@@ -274,7 +275,8 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
     select d.metric,d.certified,r.member_user_id,(r.row_json->>'value')::numeric as value,
       (r.row_json->'performance'->>'achieved_at_ms')::bigint as achieved_at_ms
     from dimensions d cross join lateral group_competition_board_rows(p_group,p_exercise,p_revision,d.metric,d.certified) r
-    where (p_target).member_user_id is null or r.member_user_id<>(p_target).member_user_id
+    where (p_target).member_user_id is null or r.member_user_id<>(p_target).member_user_id or
+      exists(select 1 from incompatible i where i.metric=d.metric and i.certified=d.certified)
   ), eligible as (
     select s.metric,d.certified,s.value,s.achieved_at_ms,s.exercise_order_index,s.set_order_index,s.set_created_at_ms,s.set_id
     from dimensions d join group_metric_set_scores s on s.metric=d.metric
@@ -307,12 +309,11 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
     from dimensions d cross join lateral (
       select * from eligible s where s.metric=d.metric and s.certified=d.certified and group_active_role(p_group,(p_target).member_user_id) is not null
       order by s.value desc,s.achieved_at_ms,s.exercise_order_index,s.set_order_index,s.set_created_at_ms,s.set_id collate "C" limit 1
-    ) w
+    ) w where not exists(select 1 from incompatible i where i.metric=d.metric and i.certified=d.certified)
   ), ordered as (
     select metric,certified,member_user_id,row_number() over(partition by metric,certified order by value desc,achieved_at_ms,member_user_id)::int as rank
     from (select * from actual union all select * from replacement) rows
-  ) select case when exists(select 1 from incompatible) then notification_ranks(p_group,p_exercise,p_revision)
-    else coalesce(jsonb_agg(to_jsonb(ordered) order by metric,certified,rank),'[]'::jsonb) end from ordered;
+  ) select coalesce(jsonb_agg(to_jsonb(ordered) order by metric,certified,rank),'[]'::jsonb) from ordered;
 $$;
 
 create function app_public.notification_best_evidence(p_member uuid,p_session text,p_exercise uuid,p_revision bigint,

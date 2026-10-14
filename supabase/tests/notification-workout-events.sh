@@ -799,6 +799,59 @@ for end_action in withdraw cancel; do
     and not exists(select 1 from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
     from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';"
 done
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Independent board context",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create independent board context comparison'; INDEP_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+INDEP_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${INDEP_EXERCISE}';")"
+next_cuam
+push "${B_TOKEN}" 'independent Volume and 1RM definitions' \
+  "$(e_def "indep-volume-${RUN_TAG}" Bench "${CUAM}" per_side_load)" \
+  "$(e_link "indep-volume-${RUN_TAG}" "${G2}" "${INDEP_EXERCISE}" "${CUAM}")" \
+  "$(e_def "indep-e1rm-${RUN_TAG}" Bench "${CUAM}" total_load)" \
+  "$(e_link "indep-e1rm-${RUN_TAG}" "${G2}" "${INDEP_EXERCISE}" "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'independent comparison peer definition' "$(e_def "indep-peer-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "indep-peer-${RUN_TAG}" "${G2}" "${INDEP_EXERCISE}" "${CUAM}")"
+INDEP_SESSION="indep-workout-${RUN_TAG}"; INDEP_VOLUME_BLOCK="indep-volume-block-${RUN_TAG}"; INDEP_E1RM_BLOCK="indep-e1rm-block-${RUN_TAG}"
+INDEP_VOLUME_SET="indep-volume-set-${RUN_TAG}"; INDEP_E1RM_SET="indep-e1rm-set-${RUN_TAG}"
+next_cuam; INDEP_CREATED="${CUAM}"
+push "${B_TOKEN}" 'separate published Volume and 1RM winners' "$(e_session "${INDEP_SESSION}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "${INDEP_VOLUME_BLOCK}" "${INDEP_SESSION}" "indep-volume-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "${INDEP_VOLUME_SET}" "${INDEP_VOLUME_BLOCK}" 0 20 10 '' "${CUAM}")" \
+  "$(e_se "${INDEP_E1RM_BLOCK}" "${INDEP_SESSION}" "indep-e1rm-${RUN_TAG}" 1 Bench "${CUAM}")" \
+  "$(e_set "${INDEP_E1RM_SET}" "${INDEP_E1RM_BLOCK}" 0 100 1 '' "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'peer sits between old and final independent outcomes' \
+  "$(e_session "indep-peer-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")" \
+  "$(e_se "indep-peer-block-${RUN_TAG}" "indep-peer-session-${RUN_TAG}" "indep-peer-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "indep-peer-volume-set-${RUN_TAG}" "indep-peer-block-${RUN_TAG}" 0 30 10 '' "${CUAM}")" \
+  "$(e_set "indep-peer-e1rm-set-${RUN_TAG}" "indep-peer-block-${RUN_TAG}" 1 105 1 '' "${CUAM}")"
+drain_eval
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}';
+  select app_public.notification_capture_comparison('${G2}','${INDEP_EXERCISE}',${INDEP_REV},false);" >/dev/null
+assert_sql 'the two metric baselines use independent source contexts' "select jsonb_array_length(baseline_scores)=2
+  and baseline_scores@>jsonb_build_array(jsonb_build_object('metric','volume','certified',false,'set_id','${INDEP_VOLUME_SET}',
+    'source_load_input_mode','per_side_load','value',400))
+  and baseline_scores@>jsonb_build_array(jsonb_build_object('metric','e1rm','certified',false,'set_id','${INDEP_E1RM_SET}',
+    'source_load_input_mode','total_load','value',100)) from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'Volume context changes while independent 1RM improves' \
+  "$(e_def "indep-volume-${RUN_TAG}" Bench "${CUAM}" total_load)" \
+  "$(e_set "${INDEP_E1RM_SET}" "${INDEP_E1RM_BLOCK}" 0 110 1 '' "${CUAM}" | jq --argjson c "${INDEP_CREATED}" '.fields.created_at=$c')" \
+  "$(e_session "${INDEP_SESSION}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "${INDEP_SESSION}" "$(manifest "${B_UID}" "${INDEP_SESSION}")"; check 'independent context graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "${INDEP_SESSION}"
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==2' <<<"${COUNTS}" >/dev/null || fail 'Volume context suppressed independent 1RM movements'
+assert_sql 'fallback is keyed by metric and board scope and remains ready' "select app_public.notification_workout_ready(member_user_id,session_id)
+  and (select jsonb_agg(r order by r->>'rank') from jsonb_array_elements(without_workout) r where r->>'metric'='volume')=
+    (select jsonb_agg(r order by r->>'rank') from jsonb_array_elements(final_ranks) r where r->>'metric'='volume')
+  and (select jsonb_agg(r order by r->>'rank') from jsonb_array_elements(without_workout) r where r->>'metric'='e1rm')=
+    (select jsonb_agg(r order by r->>'rank') from jsonb_array_elements(before_ranks) r where r->>'metric'='e1rm')
+  and before_ranks<>final_ranks from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'public preview after private baseline capture'
 check 'public preview omits private baseline scores' '[..|objects|(has("baseline_scores") or has("baselineScores"))]|any|not'
 assert_sql 'forfeited start remains absent after later recovery and worker preparation' "select not exists(select 1 from app_public.notification_intents

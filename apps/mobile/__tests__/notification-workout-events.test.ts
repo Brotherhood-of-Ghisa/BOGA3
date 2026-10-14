@@ -71,6 +71,17 @@ describe('workout notification final outcomes', () => {
       { group_id: 'group-a', best_count: 2, rank_count: 0 },
     ]);
   });
+  test('an incomparable Volume board preserves valid independent 1RM movements', () => {
+    const volumeBefore = ranks(['lifter', 'peer']).map(row => ({ ...row, metric: 'volume' as const }));
+    const volumeFinal = ranks(['peer', 'lifter']).map(row => ({ ...row, metric: 'volume' as const }));
+    const first = target();
+    first.before = [...volumeBefore, ...ranks(['peer', 'lifter'])];
+    first.final = [...volumeFinal, ...ranks(['lifter', 'peer'])];
+    first.without_workout = [...volumeFinal, ...ranks(['peer', 'lifter'])];
+    expect(workoutContributions([first], 'lifter')).toEqual([
+      { group_id: 'group-a', best_count: 2, rank_count: 2 },
+    ]);
+  });
 });
 
 describe('canonical completion graph', () => {
