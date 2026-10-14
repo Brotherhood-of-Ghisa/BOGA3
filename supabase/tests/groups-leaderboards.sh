@@ -705,8 +705,10 @@ expect_mine "one failing job; the other completes" \
     {key: \"${S2}\", kind: \"session\", outcome: \"failed\", causes: [\"set\"], targets: []}]"
 expect_fact b1 "true:true:115:5:$(e1rm 115 5)"
 expect_sql "the failed job is kept with attempts, backoff, and its sqlstate" \
-  "select attempts || '|' || (available_at > now()) || '|' || last_sqlstate || '|' || (claimed_until is null)
-     from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}' and session_id = '${S2}';" "1|true|23514|true"
+  "select q.attempts || '|' || exists(select 1 from public.app_logs l where l.event='group.eval_failed'
+       and l.user_id=q.member_user_id and l.context->>'job_id'=q.id::text
+       and q.available_at=l.created_at+interval '2 seconds') || '|' || q.last_sqlstate || '|' || (q.claimed_until is null)
+     from app_public.group_eval_queue q where q.member_user_id = '${ATHLETE_UID}' and q.session_id = '${S2}';" "1|true|23514|true"
 expect_sql "exactly one sanitized job failure row" \
   "select count(*) || '|' || min((select string_agg(k, ',' order by k) from jsonb_object_keys(context) k))
           || '|' || min(context ->> 'kind') || '|' || min(context ->> 'sqlstate')
