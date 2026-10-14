@@ -400,7 +400,8 @@ declare jobs jsonb;
 begin
   if p_limit is null or p_limit not between 1 and 20 then raise exception 'VALIDATION: invalid receipt limit'; end if;
   update notification_deliveries set state='failed',error_code='RECEIPT_UNKNOWN',receipt_claim_id=null,receipt_lease_until=null
-    where state='ticket' and (ticket_at+interval '24 hours'<=now() or receipt_attempts>=20);
+    where state='ticket' and (ticket_at+interval '24 hours'<=now() or receipt_attempts>=20)
+      and (receipt_lease_until is null or receipt_lease_until<=now());
   with candidates as (select id from notification_deliveries where state='ticket' and receipt_available_at<=now()
       and (receipt_lease_until is null or receipt_lease_until<=now()) order by receipt_available_at,id for update skip locked limit p_limit),
   claimed as (update notification_deliveries d set receipt_claim_id=gen_random_uuid(),receipt_lease_until=now()+interval '60 seconds',

@@ -159,6 +159,20 @@ run_psql "update app_public.notification_deliveries set receipt_available_at=now
   update app_public.notification_config set sending_enabled=false,provider='disabled';" >/dev/null
 http_call -X POST -H "apikey: ${SERVICE_ROLE_KEY}" --data '{}' "${API_URL}/functions/v1/notification-worker"
 check 'receipt persisted without new send' '.outcomes.receipt_ok==1 and .claimed==0'
+# A competing collector cannot revoke the twentieth in-flight receipt lease.
+run_psql "update app_public.notification_deliveries set state='ticket',receipt_attempts=19,receipt_available_at=now(),
+  receipt_claim_id=null,receipt_lease_until=null where id=${CD};" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'twentieth receipt claim'
+FINAL_RC="$(jq -r '.jobs[0].receipt_claim_id' <<<"${BODY}")"
+rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'competing receipt claim'
+check 'active final lease preserved' '.jobs|length==0'
+[[ "$(run_psql "select state from app_public.notification_deliveries where id=${CD};")" == ticket ]] || fail 'competing worker revoked final lease'
+rpc "${SERVICE_ROLE_KEY}" notification_receipt_result "{\"p_delivery_id\":${CD},\"p_claim_id\":\"${FINAL_RC}\",\"p_outcome\":\"receipt_ok\"}"
+[[ "${BODY}" == true ]] || fail 'twentieth result discarded'
+run_psql "update app_public.notification_deliveries set state='ticket',receipt_attempts=20,receipt_available_at=now(),
+  receipt_lease_until=now()-interval '1 second' where id=${CD};" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted receipt recovery'
+[[ "$(run_psql "select state='failed' and error_code='RECEIPT_UNKNOWN' from app_public.notification_deliveries where id=${CD};")" == t ]] || fail 'exhausted receipt did not park'
 # Configured sweep keeps receipt/prune processing alive with new sending disabled.
 # Rollback prevents pg_net from actually issuing this fixture request.
 [[ "$(run_psql "begin;
