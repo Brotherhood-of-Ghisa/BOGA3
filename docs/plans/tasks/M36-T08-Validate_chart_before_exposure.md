@@ -1,6 +1,7 @@
 # M36-T08-Validate_chart_before_exposure — Validate the integrated chart and obtain human UI acceptance
 
-- Status: `planned`
+- Status: `in_progress`
+- Review: source and native rendering reviewed; scenario approval and hands-on/final device acceptance pending
 - Depends on: M36-T07
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: yes
@@ -22,7 +23,7 @@ Milestone D1–D6 govern this task. This is planning only; no design, analytical
 
 ## Open — resolve with the user at session start
 
-Operator-approved device acceptance lane set and preview method; need for any gesture/VoiceOver scenario that Jest cannot prove.
+The [integrated review handoff](../research/M36-T08-integrated-chart-review.md) records the completed SQLite checks, native rendering matrix and retained evidence. The operator's approval of one focused native interaction scenario remains pending; no flow has been written. Obtain hands-on UI acceptance before the final suite, including touch/overlap access, scrolling/dismissal and accessibility. No production exposure is authorized by this card.
 
 ## Deliverables and acceptance
 

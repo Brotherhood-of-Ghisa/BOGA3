@@ -18,7 +18,7 @@ Build an analytical framework to compare actual exercise sets with BoGa’s esti
 
 ## Agreed design direction
 
-These D entries record constraints from the brief and repository; the visual target and analytical choices are still open.
+These D entries record constraints from the brief and repository. Approved analytical choices live in product facts; later inferential activation remains open.
 
 ### D1. Preserve the single calculation and loading authority
 
@@ -91,7 +91,7 @@ One card = one session = one local worktree = one PR under `docs/plans/README.md
 | M36-T05 | Design and obtain human approval of the RM scatter chart | T04 | completed |
 | M36-T06 | Implement RM chart data transformations and real-data tests | T05 | completed |
 | M36-T07 | Implement the approved interactive chart without UI exposure | T06 | completed |
-| [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | planned |
+| [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | in_progress |
 | [M36-T09](../tasks/M36-T09-Expose_RM_analytics_and_closeout.md) | Expose exercise RM analytics through existing navigation — final implementation step | T08 | planned |
 
 ## Ordered workstreams
