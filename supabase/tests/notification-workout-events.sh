@@ -1287,6 +1287,72 @@ assert_sql 'frozen Certified scalar restores All without adding stored numeric h
     where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
   and not exists(select 1 from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
   from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='symmetry-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+# A same-pin witness voided by a source-mode round trip cannot qualify the subsequently captured All-only baseline.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Mode-invalid original qualification",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create mode-invalid witness comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in original peer; do
+  if [[ "${source}" == original ]]; then QUAL_TOKEN="${B_TOKEN}"; QUAL_WEIGHT=100; else QUAL_TOKEN="${C_TOKEN}"; QUAL_WEIGHT=90; fi
+  next_cuam
+  push "${QUAL_TOKEN}" 'mode-invalid original comparison definitions' "$(e_def "modecert-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "modecert-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  if [[ "${source}" == original ]]; then MODECERT_CREATED="${CUAM}"; fi
+  push "${QUAL_TOKEN}" 'publish original and Certified peer sources' "$(e_session "modecert-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "modecert-${source}-block-${RUN_TAG}" "modecert-${source}-session-${RUN_TAG}" "modecert-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "modecert-${source}-set-${RUN_TAG}" "modecert-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+done
+drain_eval
+qualify_source_set "${B_UID}" "modecert-original-set-${RUN_TAG}"; MODECERT_OLD_CERT="${QUAL_CERT}"
+qualify_source_set "${C_UID}" "modecert-peer-set-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'source mode leaves the witnessed interpretation' "$(e_def "modecert-original-def-${RUN_TAG}" Bench "${CUAM}" per_side_load)"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'source mode returns without a new witness' "$(e_def "modecert-original-def-${RUN_TAG}" Bench "${CUAM}" total_load)"
+drain_eval
+assert_sql 'old same-pin witness is invalid specifically because its source epoch changed' "select count(*)=2 and bool_and(
+  c.end_reason='voided' and c.ended_at is not null and c.observed_set_pin=x->>'observed_set_pin'
+  and (c.pinned_fingerprint=s.fingerprint or c.current_fingerprint=s.fingerprint)
+  and not app_public.group_metric_certification_mode_matches(c) and c.source_mode_generation=0 and s.source_mode_generation=2)
+  from app_public.group_metric_certifications c join app_public.group_metric_set_scores s
+    on s.group_exercise_id=c.group_exercise_id and s.member_user_id=c.member_user_id and s.set_id=c.set_id and s.metric=c.metric
+  cross join lateral jsonb_array_elements(app_public.group_metric_eval_source_graph('${G2}','${QUAL_EXERCISE}')->'sets') x
+  where coalesce(c.legacy_certification_id,c.witness_certification_id,c.id)='${MODECERT_OLD_CERT}'
+    and x->>'set_id'=c.set_id and x->>'member_user_id'=c.member_user_id::text;"
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='modecert-original-session-${RUN_TAG}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='modecert-original-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+assert_sql 'round-trip capture has only the current All100 baseline' "select jsonb_array_length(baseline_scores)=2
+  and not exists(select 1 from jsonb_array_elements(baseline_scores) b where (b->>'certified')::boolean or (b->>'value')::numeric<>100)
+  and not exists(select 1 from jsonb_array_elements(before_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='modecert-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'physical edit and fresh performed source follow the mode-invalid baseline' \
+  "$(e_set "modecert-original-set-${RUN_TAG}" "modecert-original-block-${RUN_TAG}" 0 101 1 '' "${CUAM}" | jq --argjson c "${MODECERT_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "modecert-fresh-set-${RUN_TAG}" "modecert-original-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")" \
+  "$(e_session "modecert-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "modecert-fresh-set-${RUN_TAG}"
+confirm "${B_TOKEN}" "modecert-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "modecert-original-session-${RUN_TAG}")"; check 'mode-invalid current-qualification graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "modecert-original-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 4 ]] || fail 'mode-invalid old witness suppressed a fresh initial Certified crossing'
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==4' <<<"${COUNTS}" >/dev/null || fail 'mode-invalid witness manufactured All movement or lost fresh Certified movement'
+assert_sql 'mode-invalid old witness cannot enter the Certified counterfactual' "select app_public.notification_workout_ready(member_user_id,session_id)
+  and (select count(*)=2 and bool_and(r->>'member_user_id'='${C_UID}' and (r->>'rank')::int=1)
+    from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean)
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=2) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${C_UID}')
+  and (select count(*)=2 and bool_and(c.observed_set_pin=b->>'observed_set_pin'
+      and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint')
+      and not app_public.group_metric_certification_mode_matches(c))
+    from jsonb_array_elements(baseline_scores) b join app_public.group_metric_certifications c on c.metric=b->>'metric'
+    where coalesce(c.legacy_certification_id,c.witness_certification_id,c.id)='${MODECERT_OLD_CERT}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='modecert-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
 # A link admitted while the source is still planned does not establish a performed score threshold.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Planned first admission",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"

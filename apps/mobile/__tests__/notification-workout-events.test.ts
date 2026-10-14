@@ -133,6 +133,15 @@ describe('workout notification final outcomes', () => {
     expect(countWorkoutRankChanges(bothMetrics(ranks(['lifter', 'peer'])), bothMetrics(ranks(['peer', 'lifter'])),
       bothMetrics(ranks(['lifter', 'peer'])), 'lifter')).toBe(4);
   });
+  test('a mode-invalidated old witness cannot invent a Certified contribution after the mode returns', () => {
+    const bothMetrics = (rows: NotificationRank[]): NotificationRank[] => [...rows,
+      ...rows.map(row => ({ ...row, metric: 'volume' as const }))];
+    const before = [...bothMetrics(ranks(['lifter', 'peer'])), ...bothMetrics(ranks(['peer'], true))];
+    const final = [...bothMetrics(ranks(['lifter', 'peer'])), ...bothMetrics(ranks(['lifter', 'peer'], true))];
+    // All100 is an eligible baseline, but its obsolete witness cannot supply a phantom Certified100.
+    const counter = [...bothMetrics(ranks(['lifter', 'peer'])), ...bothMetrics(ranks(['peer'], true))];
+    expect(countWorkoutRankChanges(before, final, counter, 'lifter')).toBe(4);
+  });
 });
 
 describe('canonical completion graph', () => {

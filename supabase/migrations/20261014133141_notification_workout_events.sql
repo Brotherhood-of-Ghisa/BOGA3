@@ -332,6 +332,7 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
       and (not (b->>'certified')::boolean or exists(select 1 from group_metric_certifications c
         where c.group_exercise_id=p_exercise and c.member_user_id=(p_target).member_user_id
           and c.set_id=b->>'set_id' and c.metric=b->>'metric' and c.observed_set_pin=b->>'observed_set_pin'
+          and group_metric_certification_mode_matches(c)
           and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint')
           and (c.ended_at is null or (c.end_reason='voided' and exists(
             select 1 from source,jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
@@ -392,6 +393,7 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
       and (not d.certified or exists(select 1 from group_metric_certifications c
         where c.group_exercise_id=p_exercise and c.member_user_id=(p_target).member_user_id and c.set_id=origin.key and c.metric=d.metric
           and c.observed_set_pin=coalesce(origin.value->>'admission_pin',origin.value->>'performed_pin')
+          and group_metric_certification_mode_matches(c)
           and (c.ended_at is null or (c.end_reason='voided' and
             (not (x->>'live')::boolean or x->>'observed_set_pin' is distinct from c.observed_set_pin)))))
       and not exists(select 1 from compatible_saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified and b->>'set_id'=origin.key)
