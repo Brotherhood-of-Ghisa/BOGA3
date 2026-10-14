@@ -1,6 +1,6 @@
 # T07 implemented chart — review handoff
 
-Status: implementation prepared on the T06 experimental branch; human review and the T07 UI-lane agreement remain pending. Main is untouched. This is not full T07 acceptance, T08 acceptance or production exposure.
+Status: implementation delivered on the T06 experimental branch. After the concrete native/gallery review and remaining task explanation, the operator directed “Ok proceed with the next task” on 2026-10-14. This accepts the current T07 visual reconciliation and moves UI acceptance to T08. Main is untouched; hands-on implemented UI acceptance and production exposure remain separate.
 
 ## Build and review inputs
 
@@ -12,7 +12,7 @@ The implemented scope controls select exercise, gym, bounded History range and k
 
 ## Concrete design reconciliation to review
 
-- The brief says bounds include zero; its HTML screenshots instead zoom ordinary loads to roughly 60–110 kg and reps to 1–13. The implemented axes include zero and the full inherited integer-knot reference through at least 20 reps. This exposes more of the reference but compresses the point cloud. Human review must accept these bounds or request the target's tighter zoom before acceptance testing.
+- The brief says bounds include zero; its HTML screenshots instead zoom ordinary loads to roughly 60–110 kg and reps to 1–13. The implemented axes include zero and the full inherited integer-knot reference through at least 20 reps. This exposes more of the reference but compresses the point cloud. The operator subsequently authorized T08 on the presented zero/full-reference implementation; this visual reconciliation is retained.
 - Existing `formatWeight` preserves entered precision; the prototype shortened synthetic values to two decimals. The implementation preserves repository formats, including long synthetic decimals. Numbers wrap on small screens; recorded values never change.
 - `copy.no-inline-explanation` excludes the prototype's rule footnotes. The implementation puts bodyweight meaning in the Load label and shows exclusion counts only. Existing fixed-font policy remains in force. Control rows, sheet gestures, disabled actions and surfaces use house primitives.
 - The developer toolbar and weekly replay controls are outside the component and remain ignored review tools. No production weekly replay, detector, confidence band, fitted weekly overlay or second curve is added.
@@ -25,10 +25,10 @@ Evidence remains under the ignored `apps/mobile/artifacts/review/rm-curve/` dire
 
 The isolated iOS simulator/client booted with `./boga ios start`. Following the operator's direction to work while the Mac stays locked, existing BoGa URL-scheme/dev-menu preauthorization and a restart of that simulator removed the pending development-client prompt. The ignored entry renders actual components and uses the frozen synthetic fixture, copied unchanged outside Metro's excluded test directory. `simctl` captures verify native main/sparse/no-reference/mixed-effort/missing-effort/empty/loading/error/unavailable/bodyweight/zero/high-RIR states and six plateau prefixes. The local `review-gallery.html` presents these alongside the target and actual browser selected-set capture. VoiceOver, native selection/gesture/focus behavior and UI acceptance remain unverified. `./boga doctor` passed. Temporary package entry changes were restored; no preview route is committed.
 
-Lane defaults for the T07 delta are `fast`, `frontend-ui` and `docs-check`. The previously agreed fast/coverage/complexity/dependencies/docs checks are retained. A T07-specific proposal to defer unreachable Maestro acceptance flows to T08 is pending operator agreement; no new Maestro flow was created. Human approval of the implemented result remains required before acceptance runs.
+Lane defaults for the T07 delta are `fast`, `frontend-ui` and `docs-check`. The previously agreed fast/coverage/complexity/dependencies/docs checks are retained. The operator authorized advancing to T08 after the T07 proposal to defer unreachable Maestro acceptance flows there; no new Maestro flow was created. Human hands-on approval of the integrated result remains required in T08 before its final acceptance runs.
 
 Final local source evidence: fast PASS (284 suites / 3,909 tests plus aggregate checks); jest-coverage PASS (86.48% branches / 94.40% lines); complexity PASS; dependencies PASS (524 modules / 2,631 dependencies, 13 existing known violations unchanged). These runs include the final preference-error fix. No duration is asserted. Final docs-check PASS is recorded separately in `docs-check.log`.
 
 Independent source re-review is clean: all eight source findings were fixed with regressions; the preference Notice fix was re-reviewed; product REVIEW verdict clean. The reviewer inspected representative browser captures and author logs, without duplicate lane execution. The eight fixes covered caret headroom, copy, gym/range labels, coordinate-free activation/focus origin, overlap-list work, empty-filter wording and per-side accessibility units. Browser interaction additionally proved set selection and found/fixed web focus and scroll-coordinate handling. Native rendering review is recorded in the same ignored review artifact.
 
-Human visual review, the T07 UI-lane narrowing agreement and native acceptance remain pending. A proposal, branch commit or passing source review alone does not complete T07.
+The operator authorized T08 after reviewing the concrete T07 result and gate proposal. T07 is delivered; native interaction, VoiceOver and human hands-on acceptance remain T08 work. This does not authorize T09 exposure, merging or statistical features.

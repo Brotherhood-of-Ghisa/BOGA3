@@ -5,7 +5,7 @@
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
 - Experimental workflow: on 2026-10-13 the owner authorized continuing on branches while usefulness is uncertain. T02 starts from reviewed T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`, without merging T01 into main; its future draft PR targets `m36-t01-rm-curve-contract`. Further integration requires explicit owner direction. Analytical, empirical, design and test gates remain in force.
-- Research only so far: the initial analytical contract is approved; production implementation and visual design have not started.
+- Current stage: research/design/read model and chart components are delivered on experimental branches; integrated acceptance and final UI exposure remain.
 
 ## Objective
 
@@ -80,7 +80,7 @@ The owner approved the exact synthetic timing/load/progression inputs and native
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits research continuation before parent PRs merge. T02's research specification, method checks and repository gates are complete; on 2026-10-14 the owner approved proceeding to T03 after reviewing the [validation plan](../research/M36-T02-residual-regression-method.md). T03 used synthetic histories and read-only test-user data in remote BOGA_DEV. The owner accepted T03 descriptive findings and T04 research limitations/frozen fixture on 2026-10-14. Empirical reliability is not established. The owner approved native r1 and c1 visual design on 2026-10-14; future inference/activation and implemented UI acceptance remain separate. T05 is completed, with [[1rm.curve-scope]] recording approved defaults. The owner explicitly authorized T06 on 2026-10-14; its descriptive read model, migrated-SQLite/frozen-history checks and saved authorized-snapshot replay are completed on the T05-based branch. Independent review and the agreed fast/quality/docs gates are green; the T06 deliverable does not expose UI. T07's [implemented handoff](../research/M36-T07-chart-implementation-review.md) is prepared and independently reviewed; human visual approval and its UI-lane agreement remain pending. No production route or entry is implemented.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits research continuation before parent PRs merge. T02's research specification, method checks and repository gates are complete; on 2026-10-14 the owner approved proceeding to T03 after reviewing the [validation plan](../research/M36-T02-residual-regression-method.md). T03 used synthetic histories and read-only test-user data in remote BOGA_DEV. The owner accepted T03 descriptive findings and T04 research limitations/frozen fixture on 2026-10-14. Empirical reliability is not established. The owner approved native r1 and c1 visual design on 2026-10-14; future inference/activation and implemented UI acceptance remain separate. T05 is completed, with [[1rm.curve-scope]] recording approved defaults. The owner explicitly authorized T06 on 2026-10-14; its descriptive read model, migrated-SQLite/frozen-history checks and saved authorized-snapshot replay are completed on the T05-based branch. Independent review and the agreed fast/quality/docs gates are green; the T06 deliverable does not expose UI. T07's [implemented handoff](../research/M36-T07-chart-implementation-review.md) is delivered and independently reviewed. After its native/gallery review and gate proposal, the owner directed proceeding to T08 on 2026-10-14, accepting the current visual reconciliation and deferring native acceptance there. Human hands-on acceptance remains T08 work. No production route or entry is implemented.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
@@ -90,7 +90,7 @@ One card = one session = one local worktree = one PR under `docs/plans/README.md
 | M36-T04 | Validate regression with known behaviours and approve research findings | T03 | completed |
 | M36-T05 | Design and obtain human approval of the RM scatter chart | T04 | completed |
 | M36-T06 | Implement RM chart data transformations and real-data tests | T05 | completed |
-| [M36-T07](../tasks/M36-T07-Implement_approved_RM_chart.md) | Implement the approved interactive chart without UI exposure | T06 | in_progress |
+| M36-T07 | Implement the approved interactive chart without UI exposure | T06 | completed |
 | [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | planned |
 | [M36-T09](../tasks/M36-T09-Expose_RM_analytics_and_closeout.md) | Expose exercise RM analytics through existing navigation — final implementation step | T08 | planned |
 
