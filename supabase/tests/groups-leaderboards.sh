@@ -281,10 +281,10 @@ expect_sql "anon and authenticated execute no evaluator function" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (p.proname like 'group\_eval\_%' or p.proname = 'group_set_fingerprint')
       and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'));" "0"
-expect_sql "sessions group triggers fire share → stream → eval (name order)" \
+expect_sql "sessions group triggers fire share → stream → notification → eval (name order)" \
   "select string_agg(tgname, ',' order by tgname) from pg_trigger
     where tgrelid = 'app_public.sessions'::regclass and not tgisinternal and tgname like 'sessions_group%';" \
-  "sessions_group_share_session,sessions_group_stream_event,sessions_group_z_eval_enqueue"
+  "sessions_group_share_session,sessions_group_stream_event,sessions_group_v_notification_intake,sessions_group_z_eval_enqueue"
 expect_sql "enqueue triggers on the five Sync v2 tables" \
   "select string_agg(tgrelid::regclass::text || '.' || tgname, ',' order by tgname) from pg_trigger
     where not tgisinternal and tgname like '%group%eval_enqueue';" \
