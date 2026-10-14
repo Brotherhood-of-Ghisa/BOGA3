@@ -183,6 +183,7 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
   select app_public.notification_sweep() is not null;
   rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
 # Actual concurrent rotation/handoff uses separate HTTP transactions, under one held installation lock.
+run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null
 RACE_DIR="$(mktemp -d)"
 RACE_CLAIM="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 run_psql "update app_public.notification_deliveries set state='leased',claim_id='${RACE_CLAIM}',lease_until=now()+interval '60 seconds' where id=${CD};" >/dev/null
@@ -207,6 +208,10 @@ curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authoriza
 REGISTER_PID=$!
 wait "${LOCK_PID}"; wait "${SEND_PID}"; wait "${REGISTER_PID}"
 jq -e '.binding_id' "${RACE_DIR}/register" >/dev/null || fail 'concurrent rotation failed'
+jq -e --arg b "${BINDING}" --arg k "${KEY}" '(.==null) or
+  (.binding_id==$b and .encryption_key==$k and .token=="LocalPushToken[ok]" and .provider=="local")' \
+  "${RACE_DIR}/send" >/dev/null || fail 'handoff mixed old/new binding state'
+[[ "$(jq -r '.binding_id' "${RACE_DIR}/register")" != "${BINDING}" ]] || fail 'concurrent rotation preserved old binding'
 [[ "$(run_psql "select token from app_public.notification_installations where id='${INSTALL_ID}';")" == 'LocalPushToken[concurrent]' ]] || fail 'concurrent rotation lost token'
 rm -rf "${RACE_DIR}"; RACE_DIR=""
 # Reassignment requires capability, rotates binding; stale unregister cannot revoke the new user.
