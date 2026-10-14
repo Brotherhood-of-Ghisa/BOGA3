@@ -1,6 +1,6 @@
 # M36-T03-Workout_data_and_curve_validation — Audit workout data and empirically validate the RM curve
 
-- Status: `planned`
+- Status: `in_progress` — research and gates delivered; effort provenance/claims review pending
 - Depends on: M36-T02
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
@@ -20,9 +20,13 @@ Identify usable historical data and test the reconstructed curve without assumin
 
 Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
 
+On 2026-10-14 the owner authorized T03 using synthetic curves and test-user histories in remote BOGA_DEV. Continue the experimental branch stack from reviewed T02, targeting `m36-t02-residual-regression`; no merge or production implementation is authorized. Remote reads require identified test-account scope; raw private exports remain local and gitignored. Reuse the session's agreed fast and three quality gates for research/test-only code.
+
 ## Open — resolve with the user at session start
 
 Which historical datasets and effort labels have verified provenance; availability of a user-authorized local/export history; adequacy of independent sessions and rep ranges.
+
+The owner identified one authorised remote account and selected Zercher Squat plus a second exercise; Dumbbell Bench Presses supplies the longer/per-side case. Read-only extraction, synthetic weekly fitted-curve diagnostics and the [findings](../research/M36-T03-workout-curve-findings.md) are delivered. Clarification of automatically assigned versus recorded effort remains pending; sparse references and unverified labels limit claims. T04 and production work have not started.
 
 ## Deliverables and acceptance
 
