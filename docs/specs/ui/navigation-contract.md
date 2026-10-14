@@ -1,13 +1,7 @@
 # Navigation contract
 
-Load when you are adding or changing a route, a route param, a redirect, a route
-guard, or a screen-to-screen transition — and update it in the same session when
-you do. What lives here is what the code can violate and still compile.
-
-Routes themselves are the Expo Router file tree under `apps/mobile/app/`
-(`/group/[groupId]/edit` is `app/group/[groupId]/edit.tsx`), and a screen's
-params are its own `useLocalSearchParams` typing. For which routes exist, what
-each is for, or which file backs it, load `docs/specs/ui/screen-map.md`.
+Load when changing a route, param, guard or transition; update with the code.
+For the route inventory and owning files, load `screen-map.md`.
 
 ## Router baseline
 
@@ -82,11 +76,9 @@ access level, and `useRootRouteAccess`
 
 ## Param rules
 
-- **A param is an opening selection, not state.** A screen applies it on entry
-  and never rewrites the query (except a leaderboard board, which writes its
-  metric/scope back because Expo may reuse the screen); period, tag, section,
-  grouping, search and sort changes are in-route state. A link changing a
-  mounted tab's param re-enters it; one repeating its value does not.
+- **A param is an opening selection, not state.** Changes stay in-route,
+  except leaderboard metric/scope queries. Changed tab params re-enter;
+  identical params do not.
 - **A missing, unknown, deleted or unauthorised target renders an in-route
   unavailable state.** No route crashes on a bad param and none redirects away:
   an out-of-reach `groupId` shows the lost-access state, a dead session or group
@@ -105,6 +97,7 @@ access level, and `useRootRouteAccess`
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
 | `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one, required; both, neither or a blank id renders the unavailable state, as does an id the exercise catalogue no longer holds. The page reads the subject's name from that cache — never from a param |
 | | `metric=volume\|sets` | Progress's choice, carried over; absent or invalid opens on Volume |
+| `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `7` / `30` / `all`; absent or invalid is `30` |
@@ -162,6 +155,8 @@ Nothing outside this table navigates. A route not listed as a source
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise, each carrying the filter row's `metric` (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle's card progress button opens its catalogued exercise, metric carried |
+| `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
+| `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | the header ⋮'s muscle rows, carrying the metric if a muscle has it (`progressHistoryHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
@@ -225,6 +220,6 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
   background, Archivo 700 `ink` title at `xl`, and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back
   item that ignores display mode.
-- Two screens replace the native back item with the shared `IconButton` arrow
-  (`exercise-history`, `body-weight`) due to an iOS 26.4 event dispatch bug. Both
-  pop the stack or `replace` with their owner (`/progress`, `/settings`).
+- Three screens replace the native back item with the shared `IconButton` arrow
+  (`exercise-history`, `body-weight`, `rm-curve`): the shared arrow avoids an
+  iOS dispatch bug and pops, or replaces to the owner without history.

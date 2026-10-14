@@ -17,6 +17,10 @@ export const THEME_COLOUR_ROUTE = '/theme-colour';
 /** One muscle's or one exercise's effort history, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
 
+/** The selected exercise's descriptive RM chart, pushed from History. */
+export const rmCurveHref = (exerciseDefinitionId: string): Href =>
+  `/rm-curve?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
+
 /** `?metric=` on the history page: Progress's Sets / Volume choice, carried over. */
 export const PROGRESS_HISTORY_METRIC_PARAMS: Record<ProgressMetric, string> = {
   totalVolume: 'volume',

@@ -86,7 +86,7 @@ folder rather than re-implementing its row, card or sheet.
 
 | Folder | What it owns |
 | --- | --- |
-| `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the descriptive reps–load scatter, fixed reference, scope pickers and dated set inspection; reads `src/rm-curve/` without a production route |
+| `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the descriptive reps–load scatter, fixed reference, scope pickers and dated set inspection; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view and exercise history; `MoreHubBackButton` (the `source=more` back action); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
 | `exercise-core/` | `ExerciseCoreFields` — the exercise name and weight-entry controls with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |
 | `exercise-catalog/` | `ExerciseEditorModal` (create/edit, reused by the catalogue, the picker's `Add new`, group `Add as new`, the exercise page and the group exercises page) and `ExerciseListContent` / `ExerciseListPreferenceControls` — the shared list rows, family headers and filter row for every exercise list. The grouping, filtering, sorting, row stats and preference models are `apps/mobile/src/exercise-catalog/` |

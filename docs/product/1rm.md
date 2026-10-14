@@ -42,7 +42,6 @@ Why: compare all recorded efforts under the revised analytical assumption.
 Revised with product-owner authorization on 2026-10-13; empirical reliability
 remains unproven.
 Code: `RmCurveContent` in `apps/mobile/components/rm-curve/content.tsx`.
-Pending: production entry and implemented UI acceptance.
 
 ### 1rm.curve-effort · calculation · accepted
 
@@ -57,7 +56,6 @@ analytically while its global single-rep figure remains unchanged.
 Why: the product owner requested effort normalization on 2026-10-13 as a
 modelling assumption, not empirical proof. RIR uncertainty must be tested.
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
-Pending: production entry and implemented UI acceptance; component labels are implemented.
 
 ### 1rm.curve-reference · calculation · accepted
 
@@ -75,7 +73,6 @@ Why: a prior benchmark avoids self-reference while giving sessions equal weight.
 Approved 2026-10-13 as an initial choice, not a statistically validated estimator
 or reliability threshold.
 Code: `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
-Pending: production entry and implemented UI acceptance; component rendering is implemented.
 
 ### 1rm.curve-load · presentation · accepted
 
@@ -90,9 +87,8 @@ personal missing-reading fallback retain their existing meaning.
 
 Why: one curve can represent observations with different dated bodyweight contexts.
 Approved 2026-10-13 as the first analytical deliverable; visual design approved
-2026-10-14. Implemented UI acceptance remains pending.
+2026-10-14.
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
-Pending: production entry and implemented UI acceptance; chart components are implemented.
 
 ### 1rm.curve-scope · definition · accepted
 
@@ -107,4 +103,3 @@ changes recompute observations and [[1rm.curve-reference]] coherently.
 Why: the product owner approved the chart design and scope defaults on
 2026-10-14.
 Code: `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
-Pending: production entry and implemented UI acceptance; scope controls are implemented.

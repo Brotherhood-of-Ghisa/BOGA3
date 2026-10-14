@@ -342,7 +342,7 @@ exact. Sparse histories, unverified effort and dependent sets do not establish
 noise accuracy, confidence, physiological change or a structural break. The
 descriptive chart carries no inference feature or confidence claim.
 
-`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives the read model and refreshes through existing source signals. Chart/navigation and implemented UI acceptance remain pending.
+`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives the read model and refreshes through existing source signals. `components/rm-curve/` renders it, hosted by `app/rm-curve.tsx`.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
 then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.

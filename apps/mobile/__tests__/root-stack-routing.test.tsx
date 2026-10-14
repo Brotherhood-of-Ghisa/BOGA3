@@ -79,6 +79,7 @@ const render = async (initialUrl: string) =>
       '(tabs)/_layout': () => <Stack screenOptions={{ headerShown: false }} />,
       '(tabs)/today': () => <Text testID="today-stub">Today</Text>,
       profile: () => <Text testID="profile-stub">Profile</Text>,
+      'rm-curve': () => <Text testID="curve-stub">RM curve</Text>,
       'maestro-harness': () => <Text testID="harness-stub">Harness</Text>,
     },
     { initialUrl },
@@ -143,12 +144,30 @@ it('lands a signed-out launch on sign-in', async () => {
   expect(router.getPathname()).toBe('/sign-in');
 });
 
-it('keeps a signed-out deep link to an app route on sign-in', async () => {
-  const router = await render('/profile');
+it.each(['/profile', '/rm-curve?exerciseDefinitionId=curve'])('keeps a signed-out app link %s on sign-in', async href => {
+  const router = await render(href);
 
   expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/sign-in');
   expect(screen.queryByTestId('profile-stub')).toBeNull();
+  expect(screen.queryByTestId('curve-stub')).toBeNull();
+});
+
+it('keeps the RM chart behind first sync until the app is available', async () => {
+  mockAuth = { ...mockAuth, session: SESSION };
+  await setBootstrapped(false);
+  const router = await render('/rm-curve?exerciseDefinitionId=curve');
+  expect(await screen.findByTestId('sync-setup-stub')).toBeTruthy();
+  expect(router.getPathname()).toBe('/sync-setup');
+  expect(screen.queryByTestId('curve-stub')).toBeNull();
+});
+
+it('allows a bootstrapped user to open the RM chart', async () => {
+  mockAuth = { ...mockAuth, session: SESSION };
+  await setBootstrapped(true);
+  const router = await render('/rm-curve?exerciseDefinitionId=curve');
+  expect(await screen.findByTestId('curve-stub')).toBeTruthy();
+  expect(router.getPathname()).toBe('/rm-curve');
 });
 
 it('moves from sign-in to the first-sync block, then to the app once the first sync drains', async () => {
