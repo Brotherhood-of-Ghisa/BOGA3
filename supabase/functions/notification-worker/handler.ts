@@ -1,4 +1,5 @@
 import { type ProviderOutcome, remainingLifetime } from '../../../apps/mobile/src/notifications/delivery-decisions.ts';
+import { type WorkoutTarget, workoutContributions } from '../../../apps/mobile/src/notifications/workout-events.ts';
 import { encryptProjection, fetchReceipt, sendPush } from './provider.ts';
 
 export type Rpc = <T>(name: string, args?: Record<string, unknown>) => Promise<T>;
@@ -8,6 +9,7 @@ type Prepared = {
   token: string; provider: 'local' | 'expo'; expires_at: string; projection: unknown;
 };
 type ReceiptJob = { id: number; receipt_claim_id: string; ticket_id: string; provider: 'local' | 'expo' };
+type WorkoutJob = { member_user_id: string; session_id: string; generation: number; targets: WorkoutTarget[] };
 const json = (status: number, body: unknown): Response => Response.json(body, { status });
 
 const equalSecret = (a: string, b: string): boolean => {
@@ -55,6 +57,18 @@ export const handleNotificationRequest = async (request: Request, dependencies: 
   const outcomes: Record<string, number> = {};
   const record = (outcome: string) => { outcomes[outcome] = (outcomes[outcome] ?? 0) + 1; };
   try {
+    try {
+      const workouts = await dependencies.rpc<{ jobs: WorkoutJob[] }>('notification_workout_prepare', { p_limit: 20 });
+      for (const workout of workouts.jobs) {
+        try {
+          const accepted = await dependencies.rpc<boolean>('notification_workout_enqueue', {
+            p_member: workout.member_user_id, p_session: workout.session_id, p_generation: workout.generation,
+            p_contributions: workoutContributions(workout.targets, workout.member_user_id),
+          });
+          record(accepted ? 'workout_ready' : 'workout_requeued');
+        } catch { record('workout_save_failed'); }
+      }
+    } catch { record('workout_prepare_failed'); }
     let receiptCount = 0;
     let sendCount = 0;
     let disabled = false;

@@ -1,7 +1,7 @@
 # Notifications
 
 Accepted 2026-10-07, with theme and preview decisions approved 2026-10-14;
-runtime implementation is pending.
+native app integration is pending.
 
 ### notifications.platform · definition · accepted
 
@@ -19,7 +19,8 @@ not only the person overtaken on a leaderboard. The lifter never receives their
 own workout alert.
 
 Why: the group follows its members' training and competition together.
-Pending: recipient selection and preference checks are not implemented.
+Code: live recipients and handoff checks in `supabase/migrations/20261014133141_notification_workout_events.sql`
+and `supabase/migrations/20261014115352_notification_delivery.sql`.
 
 ### notifications.defaults · definition · accepted
 
@@ -48,20 +49,24 @@ sent as separate alerts.
 Why: announce training immediately, then collect its results without a series
 of achievement alerts. Logical notification limits do not promise exactly-once
 display by the external push providers.
-Pending: workout notification lifecycle and deduplication are not implemented.
+Code: original-event producers and identity fences in `supabase/migrations/20261014133141_notification_workout_events.sql`.
 
 ### notifications.achievements · definition · accepted
 
 The summary's bests are improvements to a member's own best on a linked group
-exercise under the existing group competition rules. They are not restricted
-to group-wide first place or derived from private personal history/device
-preferences. Leaderboard notification eligibility includes every position
-change, upward or downward, not just a change of leader.
+exercise under existing group competition rules, including below first place;
+private personal history/device preferences never supply them. Count one final
+best per group × group exercise × metric for the workout: Volume and 1RM count
+twice, two groups separately, repeated autosaves once. Count one net
+before-to-final position change per member × group exercise × metric × board
+scope × group, upward or downward. Intermediate hops do not multiply it;
+returning to the original position counts zero.
 
 Why: group achievements and movement should be visible to the whole group.
 Code: current scoring and disclosure are owned by
-`docs/specs/tech/group-competition-contract.md`; notification detection is pending.
-Pending: best and full-rank-change collection for completion summaries.
+`docs/specs/tech/group-competition-contract.md`; final counting in
+`apps/mobile/src/notifications/workout-events.ts`, evidence in
+`supabase/migrations/20261014133141_notification_workout_events.sql`.
 
 ### notifications.freshness · definition · accepted
 
@@ -71,21 +76,27 @@ original deadline.
 
 Why: old offline history should not produce a burst of current activity alerts.
 Code: immutable intent deadline and delivery expiry in `supabase/migrations/20261014115352_notification_delivery.sql`.
-Pending: event-time filtering in workout producers is not implemented.
+Code: original event-time filtering in `supabase/migrations/20261014133141_notification_workout_events.sql`.
 
-### notifications.non-workout-ranks · definition · open
+### notifications.completion-readiness · definition · accepted
 
-Rank movements can also result from certification, corrections, links,
-membership changes or competition-rule changes, without a new workout starting
-or completing. How those movements are delivered and batched under the workout
-notification limit is undecided. A builder adding that path must ask the
-product owner; they must not silently narrow position-change eligibility to
-first place or introduce extra workout alerts.
+A completion summary requires a compatible app to confirm its uploaded workout
+graph and the server to verify matching evaluated results. Older app versions
+without confirmation produce no completion summaries.
 
-Why: the accepted start/completion sequence does not define a notification
-moment for these changes.
-Code: `supabase/functions/group-eval/index.ts` and the group competition
-publication migrations already process these causes.
+Why: a completed session can arrive before its final exercise and set rows.
+Code: authenticated graph confirmation in `supabase/migrations/20261014133141_notification_workout_events.sql`.
+Pending: native client submission is not implemented.
+
+### notifications.non-workout-ranks · definition · accepted
+
+The first release delivers workout-origin rank changes. Standalone changes
+from certification, corrections, links, membership or competition rules are
+deferred to a separately designed board-update notification. This excludes
+those causes, not non-first or downward positions within workout alerts.
+
+Why: standalone board changes need their own batching, expiry and design.
+Pending: [board-update notification proposal #737](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/737).
 
 ### notifications.theme · presentation · accepted
 
@@ -108,4 +119,5 @@ authorized groups contribute.
 
 Why: the notification is a compact summary; detailed figures belong in the
 authorized app view.
-Pending: notification preview composition is not implemented.
+Code: current authorized preview composition in `supabase/migrations/20261014115352_notification_delivery.sql`.
+Pending: native preview rendering is not implemented.
