@@ -137,7 +137,7 @@ before task execution; execute the cards in dependency order.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M34-T01-Backend_push_delivery](../tasks/M34-T01-Backend_push_delivery.md) | Installation/preferences RPCs, durable queue, worker and receipts | none | planned |
+| M34-T01-Backend_push_delivery | Installation/preferences RPCs, durable queue, worker and receipts | none | completed |
 | [M34-T02-Workout_notification_events](../tasks/M34-T02-Workout_notification_events.md) | Start/completion producers, group bests, all rank movement and overlap deduplication | T01 | planned |
 | [M34-T03-iOS_notification_controls](../tasks/M34-T03-iOS_notification_controls.md) | Native registration, themed content, controls, lifecycle, tap navigation and device acceptance | T01, T02 | planned |
 

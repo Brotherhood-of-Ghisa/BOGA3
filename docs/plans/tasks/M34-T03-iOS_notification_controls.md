@@ -1,7 +1,7 @@
 # M34-T03-iOS_notification_controls — iOS opt-in, controls and tap navigation
 
 - Status: `planned`
-- Depends on: [M34-T01-Backend_push_delivery](M34-T01-Backend_push_delivery.md), [M34-T02-Workout_notification_events](M34-T02-Workout_notification_events.md)
+- Depends on: M34-T01-Backend_push_delivery (completed; backend delivery contract), [M34-T02-Workout_notification_events](M34-T02-Workout_notification_events.md)
 - Milestone: [M34](../milestones/M34-group-workout-notifications.md)
 - Areas: frontend, auth lifecycle, cross-stack; UI impact: yes
 

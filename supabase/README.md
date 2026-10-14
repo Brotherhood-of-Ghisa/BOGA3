@@ -389,3 +389,13 @@ It does **not** lock the final sync API surface choice (`Edge Functions` vs `Pos
 - `Supabase-local` integration/contract tests: required for auth/RLS/API tasks
 - hosted smoke validation: manual by default until CI exists
 - cross-stack `E2E`: strategy only; repo-root `e2e/` reserved for later implementation
+
+## Notification worker
+
+When configuring notification delivery, load
+[`notification-delivery-contract.md`](../docs/specs/tech/notification-delivery-contract.md).
+The foundation has no producers and sending defaults off. Local contracts use
+synthetic tokens and the deterministic sink inside `notification-worker`; no
+local test forwards push requests to Expo. The `auth-authz` lane includes the
+notification RPC/worker contracts and Deno runtime-native adapter units.
+Hosted configuration/credentials and sending require explicit rollout authority.

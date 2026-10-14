@@ -198,7 +198,7 @@ the name does not give away.
 | Lane | Exists to prove |
 |---|---|
 | `backend-fast` | Runtime up + reset (migrations + seed) + schema lint + health endpoint + deterministic seed fixtures. The backend half of the fast gate. |
-| `auth-authz` | Real auth context and RLS: owner success, cross-user denial, validation and unauthorized paths. |
+| `auth-authz` | Real auth/RLS and notification installation/delivery contracts, with runtime-native Edge adapter units: owner success, cross-user denial, validation and unauthorized paths. |
 | `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, protocol-4 stream, session detail and group exercises, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. |
 | `groups-leaderboards` | The evaluator on protocol 4: boards, certification, bodyweight, facts, targets, fault isolation and the week summary; direct-drain mode makes Edge assertions deterministic. |
 | `groups-competitions` | `docs/specs/tech/group-competition-contract.md` on protocol 4: authorization, payload privacy, the correction matrix, write tokens, publication fences, and stored pre-protocol-4 history. |
