@@ -263,7 +263,65 @@ assert_sql 'fresh completion reaches the local sink without its expired start' "
   and d.state='ticket' and d.provider='local' and d.ticket_id like 'local:ok:%')
   from app_public.notification_intents n join app_public.notification_deliveries d on d.intent_id=n.id
   where n.recipient_user_id='${A_UID}' and n.lifter_user_id='${B_UID}' and n.session_id='${EXPIRED_START}';"
+EXPIRED_AUTOSAVE="expired-autosave-${RUN_TAG}"
+next_cuam; EXPIRED_AUTOSAVE_CREATED="${CUAM}"
+push "${B_TOKEN}" 'expired original moment before a newer raw autosave' "$(e_session "${EXPIRED_AUTOSAVE}" "${EXPIRED_START_MS}" active null null null "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" 'new raw start cannot renew expired captured timing' \
+  "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null null "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recover newer raw autosave with expired original timing'
+assert_sql 'newer raw timestamp admits recovery without renewing its expired original event' "select w.eligible and w.can_start
+  and s.started_at=${NOW_MS} and w.start_at=to_timestamp(${EXPIRED_START_MS}/1000.0) and m.event_at=w.start_at
+  and w.start_at>=(select started_at from app_public.notification_workout_epoch) and w.start_at+interval '24 hours'<=now()
+  and not app_public.notification_start_ready(w.member_user_id,w.session_id,w.start_at)
+  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
+  from app_public.notification_workouts w join app_public.sessions s on s.owner_user_id=w.member_user_id and s.id=w.session_id
+    join app_public.notification_workout_moments m on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
+  where w.member_user_id='${B_UID}' and w.session_id='${EXPIRED_AUTOSAVE}';"
+next_cuam
+push "${B_TOKEN}" 'delete expired autosave control' \
+  "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
 run_psql "update app_public.notification_workout_epoch set started_at='${EXPIRY_EPOCH}';" >/dev/null
+# Recovery admission follows a fresh captured moment even after a higher-LWW raw timestamp moves outside the window.
+BACKDATED="backdated-recovery-${RUN_TAG}"
+next_cuam; BACKDATED_CREATED="${CUAM}"
+push "${B_TOKEN}" 'capture fresh active start before raw backdating' "$(e_session "${BACKDATED}" "${NOW_MS}" active null null null "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" 'higher-LWW active autosave backdates raw start beyond one day' \
+  "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null null "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
+assert_sql 'backdated active source still has its recent original moment and no ledger' "select s.status='active' and s.started_at=${EXPIRED_START_MS}
+  and s.client_updated_at_ms=${CUAM} and m.event_at=to_timestamp(${NOW_MS}/1000.0)
+  and not exists(select 1 from app_public.notification_workouts w where w.member_user_id=s.owner_user_id and w.session_id=s.id)
+  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=s.owner_user_id and n.session_id=s.id)
+  from app_public.sessions s join app_public.notification_workout_moments m
+    on m.member_user_id=s.owner_user_id and m.session_id=s.id and m.kind='start'
+  where s.owner_user_id='${B_UID}' and s.id='${BACKDATED}';"
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'first recovery admits captured recent start despite backdated raw source'
+assert_sql 'captured timing creates one start with its original deadline across overlapping groups' "select count(*)=1 and bool_and(kind='start'
+  and event_at=to_timestamp(${NOW_MS}/1000.0) and expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours')
+  from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}';"
+drain_worker; check 'actual local sink accepts recovered backdated source' '.outcomes.ticket==1'
+next_cuam
+push "${B_TOKEN}" 'repeat backdated autosave after accepted recovered start' \
+  "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null null "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'repeat recovery uses immutable workout timing'
+drain_worker; check 'backdated autosave and recovery never replay the accepted start' '.claimed==0'
+assert_sql 'backdated source retains one real local ticket and its immutable original clock' "select count(*)=1 and bool_and(n.kind='start'
+  and n.event_at=to_timestamp(${NOW_MS}/1000.0) and n.expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours'
+  and d.state='ticket' and d.provider='local' and d.ticket_id like 'local:ok:%' and d.attempts=1)
+  from app_public.notification_intents n join app_public.notification_deliveries d on d.intent_id=n.id
+  where n.recipient_user_id='${A_UID}' and n.lifter_user_id='${B_UID}' and n.session_id='${BACKDATED}';"
+BACKDATED_INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${BACKDATED}' and kind='start';")"
+BACKDATED_RECOVERY_AT="$(run_psql "select updated_at from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${BACKDATED}';")"
+next_cuam
+push "${B_TOKEN}" 'delete backdated source whose captured moment remains fresh' \
+  "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recovery excludes deleted source despite fresh moment'
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${BACKDATED_INTENT}}"; expect_ok 'deleted captured-start projection'
+[[ "${BODY}" == null ]] || fail 'deleted backdated source projected its captured start'
+assert_sql 'deleted source is excluded from recovery and retains one immutable identity' "select updated_at='${BACKDATED_RECOVERY_AT}'
+  and (select count(*)=1 from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}')
+  from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${BACKDATED}';"
 run_psql 'update app_public.notification_config set sending_enabled=false;' >/dev/null
 SESSION="fresh-${RUN_TAG}"; BLOCK="fresh-block-${RUN_TAG}"; SET="fresh-set-${RUN_TAG}"
 next_cuam
@@ -584,6 +642,12 @@ next_cuam
 push "${B_TOKEN}" 'forfeit missed start on later autosave' "$(e_session "recovery-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")"
 assert_sql 'missed start stays an immutable forfeited moment' "select event_at is null from app_public.notification_workout_moments
   where member_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}' and kind='start';"
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recover explicit null start forfeiture'
+assert_sql 'recent raw fallback cannot admit a null forfeited start as an alert' "select not w.can_start and m.event_at is null
+  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
+  from app_public.notification_workouts w join app_public.notification_workout_moments m
+    on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
+  where w.member_user_id='${B_UID}' and w.session_id='recovery-${RUN_TAG}';"
 next_cuam
 push "${B_TOKEN}" 'reopen workout whose first completion capture failed' \
   "$(e_session "${LOST_COMPLETION}" "$((NOW_MS-90001000))" active null null null "${CUAM}")"
