@@ -1,7 +1,7 @@
 import { providerOutcome, type ProviderOutcome } from '../../../apps/mobile/src/notifications/delivery-decisions.ts';
 
 export type Envelope = { v: 1; bindingId: string; nonce: string; ciphertext: string };
-export type PushMessage = { to: string; title: string; body: string; ttl: number; mutableContent: true; categoryId: string; data: Envelope };
+export type PushMessage = { to: string; title: string; body: string; expiration: number; mutableContent: true; categoryId: string; data: Envelope };
 const base64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
 const unbase64 = (value: string): Uint8Array => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 
@@ -50,6 +50,7 @@ const call = async (provider: 'local' | 'expo', path: 'send' | 'getReceipts', bo
 
 export const sendPush = async (provider: 'local' | 'expo', message: PushMessage, accessToken?: string): Promise<ProviderOutcome> => {
   if (provider !== 'local' && provider !== 'expo') return { outcome: 'failed', code: 'INVALID_CREDENTIALS' };
+  if (!Number.isSafeInteger(message.expiration) || message.expiration * 1000 <= Date.now()) return { outcome: 'failed', code: 'INVALID_PAYLOAD' };
   if (new TextEncoder().encode(JSON.stringify(message)).length > 4096) return { outcome: 'failed', code: 'INVALID_PAYLOAD' };
   if ((provider === 'local' && !message.to.startsWith('LocalPushToken[')) ||
       (provider === 'expo' && !/^(ExpoPushToken|ExponentPushToken)\[/.test(message.to))) return { outcome: 'failed', code: 'INVALID_PAYLOAD' };

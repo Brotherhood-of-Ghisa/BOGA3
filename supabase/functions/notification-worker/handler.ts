@@ -21,14 +21,14 @@ const processSend = async (rpc: Rpc, job: Job, accessToken?: string): Promise<st
     p_delivery_id: job.id, p_claim_id: job.claim_id, p_generation: job.generation,
   });
   if (!prepared) return 'cancelled_or_waiting';
-  const ttl = remainingLifetime(prepared.expires_at, Date.now());
+  const lifetime = remainingLifetime(prepared.expires_at, Date.now());
   let outcome: ProviderOutcome;
   try {
-    if (ttl === 0) outcome = { outcome: 'failed', code: 'INVALID_PAYLOAD' };
+    if (lifetime === 0) outcome = { outcome: 'failed', code: 'INVALID_PAYLOAD' };
     else {
       const data = await encryptProjection(prepared.encryption_key, prepared.binding_id, prepared.projection);
       outcome = await sendPush(prepared.provider, { to: prepared.token, title: 'BoGa',
-        body: 'Open the app to view your notification', ttl, mutableContent: true, categoryId: 'boga-workout', data }, accessToken);
+        body: 'Open the app to view your notification', expiration: Math.floor(Date.parse(prepared.expires_at) / 1000), mutableContent: true, categoryId: 'boga-workout', data }, accessToken);
     }
   } catch { outcome = { outcome: 'failed', code: 'INVALID_PAYLOAD' }; }
   const saved = await rpc<boolean>('notification_send_result', { p_delivery_id: job.id,
@@ -55,18 +55,31 @@ export const handleNotificationRequest = async (request: Request, dependencies: 
   const outcomes: Record<string, number> = {};
   const record = (outcome: string) => { outcomes[outcome] = (outcomes[outcome] ?? 0) + 1; };
   try {
-    const receipts = await dependencies.rpc<{ jobs: ReceiptJob[] }>('notification_receipt_claim', { p_limit: 20 });
-    for (const job of receipts.jobs) {
-      try { record(await processReceipt(dependencies.rpc, job, dependencies.accessToken)); }
-      catch { record('receipt_save_failed'); }
+    let receiptCount = 0;
+    let sendCount = 0;
+    let disabled = false;
+    // Fresh four-job claims start immediately; five bounded rounds cover twenty jobs per phase.
+    for (let round = 0; round < 5; round += 1) {
+      const receipts = await dependencies.rpc<{ jobs: ReceiptJob[] }>('notification_receipt_claim', { p_limit: 4 });
+      receiptCount += receipts.jobs.length;
+      if (receipts.jobs.length === 0) break;
+      await Promise.all(receipts.jobs.map(async (job) => {
+        try { record(await processReceipt(dependencies.rpc, job, dependencies.accessToken)); }
+        catch { record('receipt_save_failed'); }
+      }));
     }
-    const claimed = await dependencies.rpc<{ jobs: Job[]; disabled: boolean }>('notification_claim', { p_limit: 20 });
-    for (const job of claimed.jobs) {
-      try { record(await processSend(dependencies.rpc, job, dependencies.accessToken)); }
-      catch { record('send_save_failed'); }
+    for (let round = 0; round < 5; round += 1) {
+      const claimed = await dependencies.rpc<{ jobs: Job[]; disabled: boolean }>('notification_claim', { p_limit: 4 });
+      sendCount += claimed.jobs.length;
+      disabled = claimed.disabled;
+      if (claimed.jobs.length === 0) break;
+      await Promise.all(claimed.jobs.map(async (job) => {
+        try { record(await processSend(dependencies.rpc, job, dependencies.accessToken)); }
+        catch { record('send_save_failed'); }
+      }));
     }
     await dependencies.rpc('notification_prune');
-    return json(200, { claimed: claimed.jobs.length, receipts: receipts.jobs.length, disabled: claimed.disabled, outcomes });
+    return json(200, { claimed: sendCount, receipts: receiptCount, disabled, outcomes });
   } catch {
     // Provider/DB errors may contain tokens or private row data; retain only a fixed diagnostic.
     console.error('notification-worker: drain failed');

@@ -42,7 +42,7 @@ Deno.test('AES-GCM standard native format authenticates binding and ciphertext',
 Deno.test('local sink exercises provider ticket, rejection and receipt boundary', async () => {
   const data = await encryptProjection(key, binding, { expiresAt: Date.now() + 10000 });
   const message: PushMessage = { to: 'LocalPushToken[ok]', title: 'BoGa', body: 'Open the app to view your notification',
-    ttl: 10, mutableContent: true, categoryId: 'boga-workout', data };
+    expiration: Math.floor(Date.now()/1000)+10, mutableContent: true, categoryId: 'boga-workout', data };
   const accepted = await sendPush('local', message);
   equal(accepted.outcome, 'ticket'); assert(!!accepted.ticketId);
   equal((await fetchReceipt('local', accepted.ticketId!)).outcome, 'ticket');
@@ -60,7 +60,8 @@ Deno.test('worker bounds work, reports only outcomes and persists accepted ticke
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const rpc: Rpc = async <T>(name: string, args?: Record<string, unknown>) => {
     calls.push([name,args]);
-    if (name === 'notification_claim') return { jobs: [{ id: 1, claim_id: 'claim', generation: 1 }], disabled: false } as T;
+    if (name === 'notification_claim') return { jobs: calls.filter(([n])=>n==='notification_claim').length===1
+      ? [{ id: 1, claim_id: 'claim', generation: 1 }] : [], disabled: false } as T;
     if (name === 'notification_receipt_claim') return { jobs: [] } as T;
     if (name === 'notification_begin_send') return { delivery_id: 1,claim_id: 'claim',generation: 1,
       binding_id: binding,encryption_key: key,token: 'LocalPushToken[ok]',provider: 'local',
@@ -73,5 +74,72 @@ Deno.test('worker bounds work, reports only outcomes and persists accepted ticke
   equal(response.status,200);
   const body = await response.text(); assert(!body.includes('SECRET')); assert(!body.includes('LocalPushToken'));
   assert(calls.some(([name,args]) => name === 'notification_send_result' && args?.p_outcome === 'ticket'));
-  equal(calls.filter(([name])=>name==='notification_claim').length,1);
+  equal(calls.filter(([name])=>name==='notification_claim').length,2);
+});
+
+Deno.test('provider handoff preserves the absolute deadline and never uses a renewing TTL', async () => {
+  const originalFetch = globalThis.fetch;
+  const expiration = Math.floor(Date.now()/1000)+60;
+  const data = await encryptProjection(key, binding, { expiresAt: expiration*1000 });
+  const message: PushMessage = { to: 'ExpoPushToken[fixture-only]',title: 'BoGa',
+    body: 'Open the app to view your notification', expiration,mutableContent: true,categoryId: 'boga-workout',data };
+  let calls = 0;
+  globalThis.fetch = async (input) => {
+    calls += 1;
+    const request = input as Request; const body = await request.json();
+    equal(body.expiration,expiration); assert(!('ttl' in body));
+    equal(body.title,'BoGa'); equal(body.body,'Open the app to view your notification');
+    equal(Object.keys(body.data),['v','bindingId','nonce','ciphertext']);
+    return Response.json({ data: { status: 'ok',id: 'fixture-ticket' } });
+  };
+  try {
+    equal((await sendPush('expo',message)).outcome,'ticket');
+    equal((await sendPush('expo',{ ...message,expiration: Math.floor(Date.now()/1000)-1 })).outcome,'failed');
+    equal(calls,1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+Deno.test('fresh bounded claims do not waste send or receipt leases on slow providers', async () => {
+  const realNow = Date.now; const realFetch = globalThis.fetch;
+  let now = realNow(); let sends = 0; let receipts = 0; let accepted = 0; let collected = 0;
+  const leases = new Map<number,number>();
+  Date.now = () => now;
+  globalThis.fetch = async (input) => {
+    const request = input as Request; const body = await request.json();
+    // Advance a fake clock, without sleeping or touching a real provider.
+    now += 9500;
+    return Response.json({ data: body.ids ? Object.fromEntries(body.ids.map((id: string)=>[id,{status:'ok'}]))
+      : {status:'ok',id:'fixture-ticket'} });
+  };
+  const rpc: Rpc = async <T>(name: string,args?: Record<string,unknown>): Promise<T> => {
+    if (name === 'notification_receipt_claim' || name === 'notification_claim') {
+      equal(args?.p_limit,4);
+      const receipt = name === 'notification_receipt_claim'; const start = receipt ? receipts : sends;
+      const size = Math.min(4,20-start);
+      const jobs = Array.from({length:size},(_,index) => {
+        const id = start+index+(receipt ? 100 : 0); leases.set(id,now+60000);
+        return receipt ? {id,receipt_claim_id:'claim',ticket_id:`fixture-${id}`,provider:'expo'} : {id,claim_id:'claim',generation:1};
+      });
+      if (receipt) receipts += size; else sends += size;
+      return {jobs,disabled:false} as T;
+    }
+    const id = args?.p_delivery_id as number;
+    if (name === 'notification_begin_send') {
+      assert(now<leases.get(id)!, 'claim expired before beginning');
+      return {delivery_id:id,claim_id:'claim',generation:1,binding_id:binding,encryption_key:key,
+        token:'ExpoPushToken[fixture-only]',provider:'expo',expires_at:new Date(now+86400000).toISOString(),projection:{v:1}} as T;
+    }
+    if (name === 'notification_send_result' || name === 'notification_receipt_result') {
+      assert(now<leases.get(id)!, 'provider result outran its active lease');
+      if (name === 'notification_send_result') accepted+=1; else collected+=1;
+    }
+    return true as T;
+  };
+  try {
+    const response = await handleNotificationRequest(new Request('https://local/worker',{
+      method:'POST',headers:{apikey:'service-key'},
+    }),{serviceKey:'service-key',rpc});
+    equal(response.status,200); equal(accepted,20); equal(collected,20);
+    const result = await response.json(); equal(result.claimed,20); equal(result.receipts,20);
+  } finally { Date.now=realNow; globalThis.fetch=realFetch; }
 });

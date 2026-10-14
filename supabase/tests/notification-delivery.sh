@@ -182,6 +182,36 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
   end \$\$;
   select app_public.notification_sweep() is not null;
   rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
+# Enqueue and handoff take the workout lock before the installation FK/row lock.
+QUEUE_SESSION="enqueue-race-${RUN_TAG}"
+run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+  values('${B_UID}','${QUEUE_SESSION}','active',floor(extract(epoch from now())*1000),1,1,1);
+  select app_public.notification_enqueue('${A_UID}','${B_UID}','${QUEUE_SESSION}','start','${EVENT_AT}',1,'${CONTRIBUTIONS}'::jsonb);" >/dev/null
+QID="$(run_psql "select d.id from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id where n.session_id='${QUEUE_SESSION}';")"
+QCLAIM="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+run_psql "update app_public.notification_deliveries set state='leased',claim_id='${QCLAIM}',lease_until=now()+interval '60 seconds' where id=${QID};" >/dev/null
+RACE_DIR="$(mktemp -d)"
+run_psql_once "begin;
+  select pg_advisory_xact_lock(hashtextextended('${A_UID}:${B_UID}:${QUEUE_SESSION}',0));
+  \\echo locked
+  select pg_sleep(1);
+  select app_public.notification_enqueue('${A_UID}','${B_UID}','${QUEUE_SESSION}','completion','${EVENT_AT}',1,'${CONTRIBUTIONS}'::jsonb);
+  commit;" >"${RACE_DIR}/enqueue" &
+ENQUEUE_PID=$!
+for attempt in {1..100}; do
+  rg -q '^locked$' "${RACE_DIR}/enqueue" && break
+  sleep 0.01
+done
+rg -q '^locked$' "${RACE_DIR}/enqueue" || fail 'enqueue barrier was not acquired'
+curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+  -H 'Content-Profile: app_public' -H 'Content-Type: application/json' \
+  --data "{\"p_delivery_id\":${QID},\"p_claim_id\":\"${QCLAIM}\",\"p_generation\":1}" \
+  "${API_URL}/rest/v1/rpc/notification_begin_send" >"${RACE_DIR}/handoff" &
+HANDOFF_PID=$!
+wait "${ENQUEUE_PID}"; wait "${HANDOFF_PID}"
+jq -e '.binding_id' "${RACE_DIR}/handoff" >/dev/null || fail 'enqueue/handoff concurrency did not prepare'
+run_psql "delete from app_public.notification_intents where session_id='${QUEUE_SESSION}';" >/dev/null
+rm -rf "${RACE_DIR}"; RACE_DIR=""
 # Actual concurrent rotation/handoff uses separate HTTP transactions, under one held installation lock.
 run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null
 RACE_DIR="$(mktemp -d)"
@@ -226,10 +256,19 @@ RC="$(run_psql "select receipt_claim_id from app_public.notification_deliveries 
 rpc "${SERVICE_ROLE_KEY}" notification_receipt_result "{\"p_delivery_id\":${CD},\"p_claim_id\":\"${RC}\",\"p_outcome\":\"device_unregistered\",\"p_code\":\"DEVICE_NOT_REGISTERED\"}"
 expect_ok 'old receipt applied'
 [[ "$(run_psql "select active from app_public.notification_installations where id='${INSTALL_ID}';")" == t ]] || fail 'old receipt disabled new binding'
+# The share ledger survives a lifter's departure; current recipients retain authorized projection.
+run_psql "update app_public.group_memberships set ended_at=now() where group_id='${GROUP_ID}' and user_id='${B_UID}' and ended_at is null;" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"
+expect_ok 'departed lifter projection'
+check 'durable share remains visible to live recipient' '.route.groupId==$g and .identity|type=="string"' --arg g "${GROUP_ID}"
 # Purging an inactive installation removes its provider token, retaining only the rebind capability digest.
 run_psql "update app_public.notification_installations set active=false,updated_at=now()-interval '31 days' where id='${INSTALL_ID}';
+  update app_public.notification_intents set event_at=now()-interval '32 days',expires_at=now()-interval '31 days' where id=${COMPLETION};
   select app_public.notification_prune();" >/dev/null
 [[ "$(run_psql "select token='retired:'||id::text and encryption_key='' from app_public.notification_installations where id='${INSTALL_ID}';")" == t ]] || fail 'retention preserved token/key'
+PRUNED_XMIN="$(run_psql "select xmin::text from app_public.notification_deliveries where id=${CD};")"
+run_psql "select app_public.notification_prune();" >/dev/null
+[[ "$(run_psql "select xmin::text from app_public.notification_deliveries where id=${CD};")" == "${PRUNED_XMIN}" ]] || fail 'repeat prune rewrote empty tombstone'
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'

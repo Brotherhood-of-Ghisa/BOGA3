@@ -58,7 +58,9 @@ on an update ([[notifications.freshness]]). Only a newer generation replaces
 unsent contributions. Each intent captures eligible installation bindings once;
 re-registration never replays historical deliveries.
 
-Claims are bounded and fenced by random claim UUIDs. A leased job can recover
+Four jobs run concurrently per fresh claim, with at most five claim rounds
+per receipt/send phase; no claimed job waits behind a serial twenty-job batch.
+Claims are fenced by random claim UUIDs. A leased job can recover
 after worker death. Handoff changes it to `sending`; a crashed or timed-out
 handoff becomes `uncertain`, parked for diagnosis rather than blindly resent.
 Completion handoff cancels unsent starts and waits while a start handoff is
@@ -66,7 +68,9 @@ in flight. A provider ticket settles that handoff, but does not prove display.
 Explicit temporary rejection backs off, at most five send attempts; permanent
 payload/credential errors park with an allowlisted code. Sending-disabled jobs
 have an explicit state and are reconsidered only while their original expiry
-permits. Provider TTL is the remaining lifetime.
+permits. Provider `expiration` is the original absolute Unix-second deadline; omit
+relative `ttl`, which takes precedence and could renew expiry after handoff
+delay. The adapter checks expiry immediately before the request.
 
 Preparation rechecks opt-in, permission, binding/session, category/mute state,
 membership, live share/session and expiry. It composes a narrow public preview

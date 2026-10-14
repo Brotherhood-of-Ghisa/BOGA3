@@ -148,7 +148,7 @@ begin
     permission=excluded.permission,opted_in=excluded.opted_in,active=true,updated_at=now();
   update notification_deliveries d set state='cancelled',claim_id=null,lease_until=null
     from notification_installations i where i.id=d.installation_id
-    and (not i.active or i.binding_id<>d.binding_id) and d.state in ('pending','retry','leased','disabled');
+    and i.id=p_installation_id and (not i.active or i.binding_id<>d.binding_id) and d.state in ('pending','retry','leased','disabled');
   insert into notification_preferences(user_id) values(u) on conflict do nothing;
   return jsonb_build_object('binding_id',b,'permission',p_permission,'opted_in',p_opted_in,'payload_version',1);
 end $$;
@@ -291,7 +291,6 @@ begin
     into parts from jsonb_array_elements(n.contributions) x
     join groups g on g.id=(x->>'group_id')::uuid and g.deleted_at is null
     where exists(select 1 from group_memberships m where m.group_id=g.id and m.user_id=n.recipient_user_id and m.ended_at is null)
-      and exists(select 1 from group_memberships m where m.group_id=g.id and m.user_id=n.lifter_user_id and m.ended_at is null)
       and exists(select 1 from group_session_shares sh where sh.group_id=g.id and sh.member_user_id=n.lifter_user_id and sh.session_id=n.session_id)
       and not exists(select 1 from notification_group_preferences p where p.user_id=n.recipient_user_id and p.group_id=g.id and p.muted)
       and (activity or (coalesce(pref.bests,true) and (x->>'best_count')::int>0)
@@ -318,9 +317,9 @@ begin
   select * into d from notification_deliveries where id=p_delivery_id;
   if not found then return null; end if;
   select * into n from notification_intents where id=d.intent_id;
-  -- Installation before delivery everywhere, including registration/receipt rotation.
-  select * into i from notification_installations where id=d.installation_id for update;
+  -- Enqueue's FK check also touches installation: workout, installation, then delivery.
   perform pg_advisory_xact_lock(hashtextextended(n.recipient_user_id::text||':'||n.lifter_user_id::text||':'||n.session_id,0));
+  select * into i from notification_installations where id=d.installation_id for update;
   select * into d from notification_deliveries where id=p_delivery_id for update;
   select * into n from notification_intents where id=d.intent_id;
   if d.state<>'leased' or d.claim_id is distinct from p_claim_id or d.generation<>p_generation or
