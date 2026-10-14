@@ -127,7 +127,8 @@ begin
     raise exception 'VALIDATION: invalid notification registration';
   end if;
   h := extensions.digest(decode(p_capability,'base64'),'sha256');
-  perform pg_advisory_xact_lock(hashtextextended(p_installation_id::text,0));
+  -- Registration is rare; one allocator lock avoids cross-token swap deadlocks.
+  perform pg_advisory_xact_lock(hashtextextended('notification-registration',0));
   select * into old from notification_installations where id=p_installation_id for update;
   if found and old.capability_hash <> h then raise exception 'NOT_FOUND: installation not found'; end if;
   -- A token is a high-entropy provider capability; new-device reassignment retires the old binding.
@@ -437,8 +438,10 @@ create function app_public.notification_prune() returns void
 language plpgsql security definer set search_path=app_public,pg_temp as $$ begin
   update notification_intents set contributions='[]' where expires_at<now()-interval '30 days' and contributions<>'[]';
   update notification_installations set encryption_key='',token='retired:'||id::text
-    where not active and updated_at<now()-interval '30 days';
-  update notification_deliveries set ticket_id=null,error_code=null where intent_id in
+    where not active and updated_at<now()-interval '30 days'
+      and (encryption_key<>'' or token<>'retired:'||id::text);
+  update notification_deliveries set ticket_id=null,error_code=null
+    where (ticket_id is not null or error_code is not null) and intent_id in
     (select id from notification_intents where expires_at<now()-interval '30 days');
 end $$;
 

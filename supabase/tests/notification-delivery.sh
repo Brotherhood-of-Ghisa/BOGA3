@@ -7,6 +7,8 @@ source "${SUPABASE_DIR}/scripts/_common.sh"
 LANE_LABEL=notification-delivery
 FIXTURE_EMAIL_PREFIX=notification
 source "${SUPABASE_DIR}/tests/lib/groups-fixtures.sh"
+# Prepared responses contain installation secrets; failure context/status suffice.
+fail() { echo "[${LANE_LABEL}] FAIL: $* (HTTP ${STATUS})" >&2; exit 1; }
 load_supabase_status_env
 DB_CONTAINER="$(resolve_db_container)"
 RUN_TAG="$(date +%s)-$$-${RANDOM}"
@@ -268,8 +270,54 @@ run_psql "update app_public.notification_installations set active=false,updated_
   select app_public.notification_prune();" >/dev/null
 [[ "$(run_psql "select token='retired:'||id::text and encryption_key='' from app_public.notification_installations where id='${INSTALL_ID}';")" == t ]] || fail 'retention preserved token/key'
 PRUNED_XMIN="$(run_psql "select xmin::text from app_public.notification_deliveries where id=${CD};")"
+PRUNED_INSTALL_XMIN="$(run_psql "select xmin::text from app_public.notification_installations where id='${INSTALL_ID}';")"
 run_psql "select app_public.notification_prune();" >/dev/null
 [[ "$(run_psql "select xmin::text from app_public.notification_deliveries where id=${CD};")" == "${PRUNED_XMIN}" ]] || fail 'repeat prune rewrote empty tombstone'
+[[ "$(run_psql "select xmin::text from app_public.notification_installations where id='${INSTALL_ID}';")" == "${PRUNED_INSTALL_XMIN}" ]] || fail 'repeat prune rewrote cleared installation'
+# Two installations can swap token ownership concurrently without opposite row-lock order.
+SWAP_A="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+SWAP_B="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+SWAP_CAP_A="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+SWAP_CAP_B="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+SWAP_REG_A="$(jq --arg i "${SWAP_A}" --arg c "${SWAP_CAP_A}" '.p_installation_id=$i|.p_capability=$c|.p_token="LocalPushToken[swap-a]"' <<<"${REGISTER}")"
+SWAP_REG_B="$(jq --arg i "${SWAP_B}" --arg c "${SWAP_CAP_B}" '.p_installation_id=$i|.p_capability=$c|.p_token="LocalPushToken[swap-b]"' <<<"${REGISTER}")"
+rpc "${A_TOKEN}" notification_register "${SWAP_REG_A}"; expect_ok 'swap installation A'
+rpc "${C_TOKEN}" notification_register "${SWAP_REG_B}"; expect_ok 'swap installation B'
+RACE_DIR="$(mktemp -d)"
+run_psql_once "begin;
+  select pg_advisory_xact_lock(hashtextextended('notification-registration',0));
+  \\echo locked
+  select pg_sleep(1); commit;" >"${RACE_DIR}/lock" &
+LOCK_PID=$!
+for attempt in {1..100}; do
+  rg -q '^locked$' "${RACE_DIR}/lock" && break
+  sleep 0.01
+done
+rg -q '^locked$' "${RACE_DIR}/lock" || fail 'swap allocator barrier was not acquired'
+curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${A_TOKEN}" \
+  -H 'Content-Profile: app_public' -H 'Content-Type: application/json' \
+  --data "$(jq '.p_token="LocalPushToken[swap-b]"' <<<"${SWAP_REG_A}")" \
+  "${API_URL}/rest/v1/rpc/notification_register" >"${RACE_DIR}/a" &
+SWAP_PID_A=$!
+curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${C_TOKEN}" \
+  -H 'Content-Profile: app_public' -H 'Content-Type: application/json' \
+  --data "$(jq '.p_token="LocalPushToken[swap-a]"' <<<"${SWAP_REG_B}")" \
+  "${API_URL}/rest/v1/rpc/notification_register" >"${RACE_DIR}/b" &
+SWAP_PID_B=$!
+BLOCKED=0
+for attempt in {1..20}; do
+  BLOCKED="$(run_psql "select count(*) from pg_locks where locktype='advisory' and not granted
+    and classid::bigint=((hashtextextended('notification-registration',0)>>32)&4294967295)
+    and objid::bigint=(hashtextextended('notification-registration',0)&4294967295);")"
+  [[ "${BLOCKED}" == 2 ]] && break
+  sleep 0.01
+done
+[[ "${BLOCKED}" == 2 ]] || fail 'concurrent swaps bypassed the registration allocator'
+wait "${LOCK_PID}"; wait "${SWAP_PID_A}"; wait "${SWAP_PID_B}"
+jq -e '.binding_id' "${RACE_DIR}/a" >/dev/null; jq -e '.binding_id' "${RACE_DIR}/b" >/dev/null
+[[ "$(run_psql "select count(*) from app_public.notification_installations where active and
+  ((id='${SWAP_A}' and token='LocalPushToken[swap-b]') or (id='${SWAP_B}' and token='LocalPushToken[swap-a]'));")" == 2 ]] || fail 'concurrent token swap lost an installation'
+rm -rf "${RACE_DIR}"; RACE_DIR=""
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'
