@@ -41,7 +41,7 @@ or warm-up effort label.
 Why: compare all recorded efforts under the revised analytical assumption.
 Revised with product-owner authorization on 2026-10-13; empirical reliability
 remains unproven.
-Pending: the chart and filters are not implemented.
+Pending: chart/filter UI is not implemented; the read model applies this population.
 
 ### 1rm.curve-effort · calculation · accepted
 
@@ -55,7 +55,8 @@ analytically while its global single-rep figure remains unchanged.
 
 Why: the product owner requested effort normalization on 2026-10-13 as a
 modelling assumption, not empirical proof. RIR uncertainty must be tested.
-Pending: analytical transformations and chart labels are not implemented.
+Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
+Pending: chart labels are not implemented.
 
 ### 1rm.curve-reference · calculation · accepted
 
@@ -72,7 +73,8 @@ or filter changes recompute both populations together.
 Why: a prior benchmark avoids self-reference while giving sessions equal weight.
 Approved 2026-10-13 as an initial choice, not a statistically validated estimator
 or reliability threshold.
-Pending: reference transformations and the chart are not implemented.
+Code: `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
+Pending: the chart is not implemented.
 
 ### 1rm.curve-load · presentation · accepted
 
@@ -88,7 +90,8 @@ personal missing-reading fallback retain their existing meaning.
 Why: one curve can represent observations with different dated bodyweight contexts.
 Approved 2026-10-13 as the first analytical deliverable; visual design approved
 2026-10-14. Implemented UI acceptance remains pending.
-Pending: the chart coordinate, labels and page are not implemented.
+Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
+Pending: chart rendering, labels and page are not implemented.
 
 ### 1rm.curve-scope · definition · accepted
 
@@ -102,4 +105,5 @@ changes recompute observations and [[1rm.curve-reference]] coherently.
 
 Why: the product owner approved the chart design and scope defaults on
 2026-10-14.
-Pending: chart scope controls and transformations are not implemented.
+Code: `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
+Pending: chart scope controls are not implemented.

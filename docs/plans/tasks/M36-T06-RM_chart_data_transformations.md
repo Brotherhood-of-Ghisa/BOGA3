@@ -1,6 +1,6 @@
 # M36-T06-RM_chart_data_transformations — Implement RM chart data transformations and real-data tests
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M36-T05
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: no

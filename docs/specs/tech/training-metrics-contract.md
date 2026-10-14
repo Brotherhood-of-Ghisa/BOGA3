@@ -1,9 +1,7 @@
 # Training metrics contract
 
-How the app, the group evaluator and the coaching API implement the product
-facts on sets and 1RM (`docs/product/`), and the rules for sessions, records
-and totals that have no fact yet. A fact is cited as `[[id]]`, never restated
-here; other specs link here for the code.
+Implements the product facts in `docs/product/` for mobile, groups and coaching,
+and owns the remaining session, record and total rules.
 
 | § | Definition | Code |
 | --- | --- | --- |
@@ -329,10 +327,10 @@ total kg·reps independent of target mode. Display rounding does
 not determine competitive rank. Raw kg storage and historical group audits retain their original values and
 revisions; personal facts rebuild under the new calculation rules.
 
-## 6. RM curve analytics — approved contract, implementation pending
+## 6. RM curve analytics — descriptive read model
 
 [[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and
-[[1rm.curve-load]] govern the revised first deliverable. Equivalence is a modelling
+[[1rm.curve-load]] and [[1rm.curve-scope]] govern the first deliverable. Equivalence is a modelling
 assumption; empirical, human design and UI acceptance gates remain separate.
 Regression and structural-break detection stay research-only.
 
@@ -343,6 +341,8 @@ load discrepancy can approximate discrete gym choices while logged weight stays
 exact. Sparse histories, unverified effort and dependent sets do not establish
 noise accuracy, confidence, physiological change or a structural break. The
 descriptive chart carries no inference feature or confidence claim.
+
+`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives the read model and refreshes through existing source signals. Chart/navigation and implemented UI acceptance remain pending.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
 then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
@@ -360,7 +360,7 @@ and integer predictions precede drawing interpolation; high-rep boundedness
 is not empirical validity. Reference support is [[1rm.curve-reference]], not an
 entry restriction.
 
-Research residuals are `L−P` kg and `100×(L−P)/P` percent. Zero prediction has no
+`exercise-calculations/rm-curve.ts` owns projection/inversion and residuals: `L−P` kg and `100×(L−P)/P` percent. Zero prediction has no
 percentage; absent reference or nonfinite arithmetic has no corresponding
 residual. Dividing both loads by entry factor preserves percentage; subtracting
 bodyweight does not. Never fit a point to its own A: residual is then zero;
@@ -369,7 +369,4 @@ retain selection bias and dependent sets are not independent sessions.
 
 Retain raw effort, actual/equivalent reps, both metric types, IDs/order,
 start/end, gym, policy/metadata and dated-reading provenance before lossy history
-normalization. Recompute both populations from one current snapshot. Test
-RIR ±1 sensitivity, phase/rep composition, high effective reps, missing effort,
-sparse baseline and bodyweight/gym confounding; no assumed RIR accuracy is a
-confidence interval. For chart projection, load `bodyweight-load-contract.md` §11.
+normalization. Recompute both populations from one current snapshot. Test sensitivity, high reps, missing effort, sparse support and context confounding; assumed RIR accuracy is no confidence interval. For chart projection, load `bodyweight-load-contract.md` §11.
