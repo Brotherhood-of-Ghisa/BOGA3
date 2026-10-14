@@ -34,6 +34,7 @@ cleanup() {
   run_psql_once "alter table app_public.notification_workout_targets drop constraint if exists notification_test_capture;
     alter table app_public.notification_workout_moments drop constraint if exists notification_test_intake;
     alter table app_public.group_session_shares drop constraint if exists notification_test_share;
+    alter table app_public.group_eval_queue drop constraint if exists notification_test_disclosure;
     update app_public.notification_workout_epoch set started_at='${EPOCH_AT}';
     select app_public.group_eval_set_url('${KICK_URL}');
     select cron.alter_job(jobid,active:=${SWEEP_ACTIVE}) from cron.job where jobname='group-eval-sweep';
@@ -554,6 +555,80 @@ assert_sql 'raced confirmation seals only declared rows and remains unready for 
 confirm "${B_TOKEN}" "${EVIDENCE_SESSION}" "$(manifest "${B_UID}" "${EVIDENCE_SESSION}")"; check 'full graph reconfirmed' '.confirmed==true'
 drain_eval
 assert_sql 'client proof and evaluation of the full added-set graph become ready' "select app_public.notification_workout_ready('${B_UID}','${EVIDENCE_SESSION}');"
+# One publication cannot capture different safe actual boards for two workouts when unrelated normalized-link disclosure moves.
+rpc "${A_TOKEN}" group_update "$(jq -nc --arg g "${G1}" \
+  '{p_group_id:$g,p_name:"Current group name",p_description:null,p_bodyweight_calculations_enabled:true}')"
+expect_ok 'enable bodyweight disclosure fixture'
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G1}" \
+  '{p_group_id:$g,p_name:"Normalized disclosure",p_load_input_mode:"total_load",p_bodyweight_contribution:1,p_default_metric:"e1rm"}')"
+expect_ok 'create normalized disclosure target'; NORMALIZED_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+drain_eval
+assert_sql 'ordinary board initially discloses the peer' "select app_public.notification_ranks('${G1}','${X1}',rules_revision)
+  @>jsonb_build_array(jsonb_build_object('metric','e1rm','certified',false,'member_user_id','${C_UID}'::uuid,'rank',1))
+  from app_public.group_exercises where id='${X1}';"
+COMMON_A="000-common-a-${RUN_TAG}"; COMMON_B="000-common-b-${RUN_TAG}"
+for source in "${COMMON_A}" "${COMMON_B}"; do
+  next_cuam
+  push "${B_TOKEN}" 'two active common-board captures' "$(e_session "${source}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "${source}-block" "${source}" "def-B-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "${source}-set" "${source}-block" 0 80 1 '' "${CUAM}")"
+done
+run_psql "select app_public.notification_recover_workouts(20);
+  update app_public.group_eval_queue set available_at=now()+interval '1 hour'
+    where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}');
+  select app_public.group_metric_eval_enqueue('${G1}','${X1}','set');
+  update app_public.group_metric_eval_queue set available_at=now()+interval '1 hour' where group_exercise_id='${X2}';
+  alter table app_public.group_eval_queue add constraint notification_test_disclosure check(member_user_id<>'${C_UID}'::uuid) not valid;" >/dev/null
+BENCH_DIGEST="$(run_psql "select app_public.notification_comparison_digest('${G1}','${X1}');")"
+rm -rf "${RACE_DIR}"
+RACE_DIR="$(mktemp -d)"
+mkfifo "${RACE_DIR}/in" "${RACE_DIR}/out"
+docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 \
+  <"${RACE_DIR}/in" >"${RACE_DIR}/out" &
+HOLDER_PID=$!
+exec 9>"${RACE_DIR}/in" 10<"${RACE_DIR}/out"
+printf 'begin; set local statement_timeout=\0478s\047; select session_id from app_public.notification_workouts where member_user_id=\047%s\047 and session_id=\047%s\047 for update;\n\\echo held\n' \
+  "${B_UID}" "${COMMON_B}" >&9
+while IFS= read -r line <&10; do [[ "${line}" != held ]] || break; done
+[[ "${line}" == held ]] || fail 'common-board holder did not acknowledge its lock'
+(
+  trap - EXIT
+  http_call --max-time 20 -X POST -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 4' -H 'Content-Type: application/json' \
+    -H "x-group-eval-secret: ${EVAL_SECRET}" --data '{}' "${API_URL}/functions/v1/group-eval"
+  printf '%s\n%s\n' "${STATUS}" "${BODY}" >"${RACE_DIR}/result"
+) &
+HANDOFF_PID=$!
+BARRIER_DEADLINE=$((SECONDS+12))
+while [[ "$(run_psql "select exists(select 1 from pg_stat_activity a join pg_locks l on l.pid=a.pid
+  where a.pid<>pg_backend_pid() and a.state='active' and a.wait_event_type='Lock' and a.query like '%group_metric_eval_publish%'
+    and l.locktype='advisory' and l.granted and l.classid=25005 and l.objid::bigint=(hashtext('${G1}')::bigint & 4294967295));")" != t ]]; do
+  [[ ${SECONDS} -lt ${BARRIER_DEADLINE} ]] || fail 'publication did not reach the second held workout'
+done
+NORMALIZED_LINK="extra-normalized-link-${RUN_TAG}"
+next_cuam
+bounded_rpc "${C_TOKEN}" sync_push "$(e_link "def-C-${RUN_TAG}" "${G1}" "${NORMALIZED_EXERCISE}" "${CUAM}" null "${NORMALIZED_LINK}" | jq '{entities:[.]}')"
+expect_ok 'normalized link commits between common-board captures'; check 'normalized link acknowledged' '.ok==true'
+assert_sql 'normalized link changed disclosure without changing the accepted ordinary graph' "select
+  app_public.notification_comparison_digest('${G1}','${X1}')='${BENCH_DIGEST}'
+  and app_public.group_competition_redacts_exercise(array['${G1}'::uuid],'${C_UID}','def-C-${RUN_TAG}');"
+printf 'rollback;\n\\q\n' >&9
+exec 9>&- 10<&-
+wait "${HOLDER_PID}"; HOLDER_PID=""
+wait "${HANDOFF_PID}"; HANDOFF_PID=""
+IFS= read -r STATUS <"${RACE_DIR}/result"
+BODY="$(tail -n +2 "${RACE_DIR}/result")"
+expect_ok 'disclosure-raced evaluator returns safely'; check 'disclosure race publication fails atomically' '.failed>=1'
+assert_sql 'no divergent ordinary baselines escaped the failed publication' "select not exists(select 1 from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}') and group_exercise_id='${X1}')
+  and exists(select 1 from app_public.group_metric_eval_queue where group_exercise_id='${X1}' and last_sqlstate='P0001');"
+run_psql "alter table app_public.group_eval_queue drop constraint notification_test_disclosure;
+  delete from app_public.exercise_group_links where owner_user_id='${C_UID}' and id='${NORMALIZED_LINK}';
+  update app_public.group_eval_queue set available_at=now() where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}');
+  update app_public.group_metric_eval_queue set available_at=now(),claimed_until=null,claim_id=null where group_exercise_id in('${X1}','${X2}');" >/dev/null
+drain_eval
+assert_sql 'retry captures one coherent actual board for both workouts' "select count(*)=2 and count(distinct before_ranks)=1
+  and count(distinct final_ranks)=1 and bool_and(evaluated) from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}') and group_exercise_id='${X1}';"
 assert_sql 'forfeited start remains absent after later recovery and worker preparation' "select not exists(select 1 from app_public.notification_intents
   where lifter_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}');"
 assert_sql 'diagnostic is sanitized' "select exists(select 1 from public.app_logs where event='notification.intake_failed'

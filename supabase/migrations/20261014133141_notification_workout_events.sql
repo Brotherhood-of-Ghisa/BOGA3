@@ -302,10 +302,11 @@ end $$;
 
 create function app_public.notification_capture_comparison(p_group uuid,p_exercise uuid,p_revision bigint,p_after boolean,p_graph jsonb default null) returns void
 language plpgsql security definer set search_path=app_public,pg_temp as $$
-declare g jsonb; source record; w notification_workouts; t notification_workout_targets; actual jsonb; without_ranks jsonb; bests jsonb; known boolean; evidence jsonb; inputs jsonb; capture jsonb; probe notification_workout_targets; target_exists boolean;
+declare g jsonb; source record; w notification_workouts; t notification_workout_targets; actual jsonb; without_ranks jsonb; bests jsonb; known boolean; evidence jsonb; inputs jsonb; capture jsonb; probe notification_workout_targets; target_exists boolean; common_actual jsonb;
 begin
   g:=coalesce(p_graph,group_metric_eval_source_graph(p_group,p_exercise));
   if g is null then return; end if;
+  common_actual:=notification_ranks(p_group,p_exercise,p_revision);
   for source in select distinct candidates.member,candidates.session collate "C" as session from (
       select (x->>'member_user_id')::uuid as member,x->>'session_id' as session from jsonb_array_elements(g->'sets') x
         join sessions raw on raw.owner_user_id=(x->>'member_user_id')::uuid and raw.id=x->>'session_id'
@@ -332,7 +333,9 @@ begin
     probe.group_id:=p_group; probe.group_exercise_id:=p_exercise; probe.rules_revision:=p_revision;
     capture:=notification_target_capture(probe,g);
     if capture is null then raise exception 'notification capture source moved' using errcode='P0001'; end if;
-    actual:=capture->'actual';
+    if capture->'actual' is distinct from common_actual then
+      raise exception 'notification capture disclosure moved' using errcode='P0001'; end if;
+    actual:=common_actual;
     if not p_after then
       if not target_exists then
         select (published_rules_revision=rules_revision and (not w.cutover_active or (
@@ -538,6 +541,7 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
 $$;
 
 -- Current narrow counts replace operational queue hints; manual foundation fixtures retain their direct service seam.
+alter function app_public.notification_projection(bigint) stable;
 do $$ declare definition text; anchor text; begin
   definition:=pg_get_functiondef('app_public.notification_projection(bigint)'::regprocedure);
   anchor:='jsonb_array_elements(n.contributions)';
@@ -552,18 +556,24 @@ do $$ declare definition text; anchor text; begin
   perform 1 from app_public.groups g where exists(select 1 from app_public.group_session_shares sh
     where sh.group_id=g.id and sh.member_user_id=n.lifter_user_id and sh.session_id=n.session_id) order by g.id for share;
   perform app_public.notification_source_lock(n.lifter_user_id,n.session_id);$new$);
-  anchor:='  if n.kind=''completion'' then';
-  if strpos(definition,anchor)=0 then raise exception 'notification completion readiness anchor changed'; end if;
-  execute replace(definition,anchor,$new$  if n.kind='completion' and n.workout_generation is not null and (
-      not app_public.notification_workout_ready(n.lifter_user_id,n.session_id) or not exists(
-        select 1 from app_public.notification_workouts w where w.member_user_id=n.lifter_user_id and w.session_id=n.session_id
-          and w.generation=n.generation and w.enqueued_generation=w.generation)) then
-    update app_public.notification_deliveries set state=case when exists(
-      select 1 from app_public.notification_deliveries peer where peer.intent_id=n.id and peer.state in ('ticket','receipt_ok','uncertain'))
-      then 'cancelled' else 'retry' end,available_at=clock_timestamp()+interval '10 seconds',claim_id=null,lease_until=null where id=d.id;
-    return null;
-  end if;
-  if n.kind='completion' then$new$);
+  anchor:='p jsonb;';
+  if strpos(definition,anchor)=0 then raise exception 'notification preparation declaration anchor changed'; end if;
+  definition:=replace(definition,anchor,'p jsonb; source_ready boolean;');
+  anchor:='  p:=app_public.notification_projection(n.id);';
+  if strpos(definition,anchor)=0 then raise exception 'notification preparation projection anchor changed'; end if;
+  execute replace(definition,anchor,$new$  if n.kind='completion' and n.workout_generation is not null then
+    -- Exact source proof and projection belong to one snapshot, so a late raw write cannot turn defer into terminal cancellation.
+    with proof as materialized(select app_public.notification_workout_ready(n.lifter_user_id,n.session_id) and exists(
+      select 1 from app_public.notification_workouts w where w.member_user_id=n.lifter_user_id and w.session_id=n.session_id
+        and w.generation=n.generation and w.enqueued_generation=w.generation) as ready)
+    select ready,case when ready then app_public.notification_projection(n.id) else null end into source_ready,p from proof;
+    if not coalesce(source_ready,false) then
+      update app_public.notification_deliveries set state=case when exists(
+        select 1 from app_public.notification_deliveries peer where peer.intent_id=n.id and peer.state in ('ticket','receipt_ok','uncertain'))
+        then 'cancelled' else 'retry' end,available_at=clock_timestamp()+interval '10 seconds',claim_id=null,lease_until=null where id=d.id;
+      return null;
+    end if;
+  else p:=app_public.notification_projection(n.id); end if;$new$);
 end $$;
 
 -- Keep source-row -> registration ordering, rather than taking the foundation allocator first.
