@@ -28,6 +28,18 @@ describe('workout notification final outcomes', () => {
     expect(countWorkoutRankChanges(before, final, without, 'lifter')).toBe(1);
     // The lifter is #4 in both actual snapshots; only C's net downward movement is attributable.
   });
+  test('restoring a published source contribution excludes unchanged cutover and peer-only movement', () => {
+    const before = ranks(['lifter', 'a', 'b']);
+    const final = ranks(['newcomer', 'lifter', 'a', 'b']);
+    // The private producer restores the lifter's original contribution instead of removing it.
+    expect(countWorkoutRankChanges(before, final, final, 'lifter')).toBe(0);
+    // L95→99 and peer100→90 leaves the restored L95 in the same final position.
+    expect(countWorkoutRankChanges(ranks(['a', 'b', 'lifter']), ranks(['a', 'lifter', 'b']),
+      ranks(['a', 'lifter', 'b']), 'lifter')).toBe(0);
+    // L95→105 crosses an unchanged peer100; the restored original contribution remains below it.
+    expect(countWorkoutRankChanges(ranks(['a', 'b', 'lifter']), ranks(['a', 'lifter', 'b']),
+      ranks(['a', 'b', 'lifter']), 'lifter')).toBe(2);
+  });
   test('does not attribute an opposite-direction move or another member initial placement', () => {
     const before = ranks(['a', 'b', 'c', 'lifter']);
     const final = ranks(['new-a', 'new-b', 'a', 'b', 'lifter', 'c']);
@@ -51,6 +63,13 @@ describe('workout notification final outcomes', () => {
     ]);
     expect(() => workoutContributions([first, first], 'lifter')).toThrow('Duplicate');
     expect(() => workoutContributions([{ ...first, best_metrics: ['weight'] }], 'lifter')).toThrow('Invalid');
+  });
+  test('an unprovable rank counterfactual preserves independently verified bests', () => {
+    const result = target();
+    result.without_workout = result.final;
+    expect(workoutContributions([result], 'lifter')).toEqual([
+      { group_id: 'group-a', best_count: 2, rank_count: 0 },
+    ]);
   });
 });
 

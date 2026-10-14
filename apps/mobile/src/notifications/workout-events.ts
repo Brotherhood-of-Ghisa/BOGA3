@@ -59,7 +59,9 @@ export const countWorkoutRankChanges = (
 
 export type WorkoutTarget = {
   group_id: string; group_exercise_id: string; best_metrics: string[];
-  before: NotificationRank[]; final: NotificationRank[]; without_workout: NotificationRank[];
+  before: NotificationRank[]; final: NotificationRank[];
+  /** Current board with this workout restored to its original published source contribution. */
+  without_workout: NotificationRank[];
 };
 export const workoutContributions = (targets: readonly WorkoutTarget[], lifterId: string): {
   group_id: string; best_count: number; rank_count: number;

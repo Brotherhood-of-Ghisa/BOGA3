@@ -51,7 +51,12 @@ The publisher captures a full actual rank baseline before a workout's first
 affected comparison publication, outside its member loop. Baseline capture and
 publication commit atomically; failure retries asynchronous publication without
 failing personal sync. Final net movements are intersected with a same-direction
-causal comparison that excludes only that workout's scores. Initial/lost
+causal comparison that restores its original published contribution while
+keeping other workouts current. Up to four private source best/tie rows also
+cover a workout that was not its member's board winner at baseline. They never
+enter jobs or provider data. An incomparable source mode, dated reading context
+or achieved instant suppresses that board's rank attribution, while current
+activity/bests can still deliver; SQL never reinterprets an old numeric score. Initial/lost
 placement requires that workout's own eligibility transition; another member's
 new placement is not attributed merely because its numeric position shifts.
 This excludes unrelated coalesced causes while preserving
