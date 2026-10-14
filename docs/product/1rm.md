@@ -86,6 +86,20 @@ Weight and the existing displayed 1RM. Logging, records, reading selection and
 personal missing-reading fallback retain their existing meaning.
 
 Why: one curve can represent observations with different dated bodyweight contexts.
-Approved 2026-10-13 as the first analytical deliverable; visual design approval
-is still required.
+Approved 2026-10-13 as the first analytical deliverable; visual design approved
+2026-10-14. Implemented UI acceptance remains pending.
 Pending: the chart coordinate, labels and page are not implemented.
+
+### 1rm.curve-scope · definition · accepted
+
+The first-release chart defaults to the latest 12 weeks ending today, bounded
+by Settings' History look-back. Use the selected exercise's most recently
+trained gym cohort, including Unspecified; stable gym ID resolves ties.
+Range choices are 4, 12, 24 weeks or the configured History look-back, all
+clamped to those bounds. Effort scope follows [[1rm.curve-population]].
+Changing exercise selects its most recent gym. Applied range/gym/effort
+changes recompute observations and [[1rm.curve-reference]] coherently.
+
+Why: the product owner approved the chart design and scope defaults on
+2026-10-14.
+Pending: chart scope controls and transformations are not implemented.

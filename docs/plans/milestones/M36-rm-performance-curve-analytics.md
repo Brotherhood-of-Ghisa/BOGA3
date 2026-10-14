@@ -1,7 +1,7 @@
 # M36 — RM Performance Curve Analytics
 
 - Status: `in_progress`
-- Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. The owner subsequently authorized all-known-RIR normalization u=m+n for the analytical view. Empirical reliability, human design approval and UI acceptance remain pending.
+- Approval: the product owner accepted the initial analytical contract on 2026-10-13: “All accepted as a first deloverable”. The owner subsequently authorized all-known-RIR normalization u=m+n for the analytical view. Native r1 and the separate c1 visual concept were approved on 2026-10-14 (“Design approved”). Empirical reliability, future statistical/activation decisions and implemented UI acceptance remain pending.
 - Created: 2026-10-13, planning baseline `68f6a1c6d1892edb5de176edafd2bf5fbef1eb91` on `origin/main`
 - Tracking: repository milestone and task cards only.
 - Experimental workflow: on 2026-10-13 the owner authorized continuing on branches while usefulness is uncertain. T02 starts from reviewed T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`, without merging T01 into main; its future draft PR targets `m36-t01-rm-curve-contract`. Further integration requires explicit owner direction. Analytical, empirical, design and test gates remain in force.
@@ -70,17 +70,17 @@ T02 specified the model/validation contract; T03 audited provenance and reconcil
 | T02 | Predefine plateau/repeated-exposure interpretation and separate stable/smooth control expectations, session dependence, rep-wave confounding and prefix/cutoff checks; no production detector. |
 | T03 | Reconcile actual starter rows, weekly counts, identities, recorded-RIR/target distinction and gym provenance, baseline support and eligible prefix populations; distinguish synthetic from empirical data. |
 | T04 | Verify illustrative plateau outputs and known stable/smooth control trajectories separately; measure method reliability separately with seeded simulations. |
-| T05 | Human-review week-by-week scatter/reference/readout and sparse-state targets; weekly fitted-curve feature remains subject to clarification. |
+| T05 | Approved week-by-week scatter/reference/readout and sparse-state targets; separate two-regime visual concept approved, statistical activation deferred. |
 | T06 | Prove filtered prefix points, fixed reference, residual/projection values and no future leakage over the reused data. |
 | T07 | Prove geometry, recency, point access and state rendering against the existing oracle, without redoing reference arithmetic. |
 | T08 | Reconcile the running integrated view and accessible readouts with that oracle after human design approval; reuse numerical evidence. |
 | T09 | Reach the correct selected-exercise scenario and return safely; verify navigation/context, not another chart-fit experiment. |
 
-Pending clarification: whether the user wants additional per-week fitted curves alongside week-by-week progress against the approved reference. The owner approved the exact synthetic timing/load/progression inputs on 2026-10-14. Keep additional weekly fitting exploratory. Research evidence may illustrate prefixes without approving a new production control or overlay.
+The owner approved the exact synthetic timing/load/progression inputs and native r1/c1 visual designs on 2026-10-14. The first-release weekly review retains the fixed reference; additional weekly fitted overlays are excluded. The separate c1 concept anticipates future strength-regime curves, contingent on validated inference and explicit activation scope. Prefix illustrations do not approve a new production replay control or statistical overlay.
 
 ## Task breakdown
 
-One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits research continuation before parent PRs merge. T02's research specification, method checks and repository gates are complete; on 2026-10-14 the owner approved proceeding to T03 after reviewing the [validation plan](../research/M36-T02-residual-regression-method.md). T03 used synthetic histories and read-only test-user data in remote BOGA_DEV. The owner accepted T03 descriptive findings and T04 research limitations/frozen fixture on 2026-10-14. Empirical reliability is not established; human design approval remains separate.
+One card = one session = one local worktree = one PR under `docs/plans/README.md` task protocol. The planning PR has landed. T01's research and first analytical approval are delivered in draft PR #727; [detailed research](../research/M36-T01-rm-curve-contract.md) remains reproducible. The owner's experimental-branch exception permits research continuation before parent PRs merge. T02's research specification, method checks and repository gates are complete; on 2026-10-14 the owner approved proceeding to T03 after reviewing the [validation plan](../research/M36-T02-residual-regression-method.md). T03 used synthetic histories and read-only test-user data in remote BOGA_DEV. The owner accepted T03 descriptive findings and T04 research limitations/frozen fixture on 2026-10-14. Empirical reliability is not established. The owner approved native r1 and c1 visual design on 2026-10-14; future inference/activation and implemented UI acceptance remain separate. T05 is completed, with [[1rm.curve-scope]] recording approved defaults; no production code is implemented.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
@@ -88,7 +88,7 @@ One card = one session = one local worktree = one PR under `docs/plans/README.md
 | M36-T02 | Specify exploratory residual regression and break reliability | T01 | completed |
 | M36-T03 | Audit workout data and empirically validate the RM curve | T02 | completed |
 | M36-T04 | Validate regression with known behaviours and approve research findings | T03 | completed |
-| [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | in_progress |
+| M36-T05 | Design and obtain human approval of the RM scatter chart | T04 | completed |
 | [M36-T06](../tasks/M36-T06-RM_chart_data_transformations.md) | Implement RM chart data transformations and real-data tests | T05 | planned |
 | [M36-T07](../tasks/M36-T07-Implement_approved_RM_chart.md) | Implement the approved interactive chart without UI exposure | T06 | planned |
 | [M36-T08](../tasks/M36-T08-Validate_chart_before_exposure.md) | Validate the integrated chart and obtain human UI acceptance | T07 | planned |

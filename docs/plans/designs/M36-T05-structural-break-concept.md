@@ -1,6 +1,6 @@
 # Two strength curves — exploratory design
 
-Status: proposed research/design extension, requested by the owner on 2026-10-14. Structural-break identification is a central purpose of the analytical work. This concept accommodates its eventual outputs without promoting an unvalidated detector into the first release. The descriptive release target remains native r1; this is a separate future concept.
+Status: visual concept c1 approved by the product owner on 2026-10-14 (“Design approved”); inferential choices remain proposed. Structural-break identification is a central purpose of the analytical work. This concept accommodates its eventual outputs without promoting an unvalidated detector into the first release. The descriptive release target remains native r1; this is a separate future concept.
 
 ## Existing task coverage and delivery gap
 
@@ -46,4 +46,4 @@ Review insufficient information, no assertion, tentative 15%/50% support and a h
 
 Prototype c1: manifest SHA256 `ce2b255aefd8aff7bc3975574310738bc08716b6ec64e1f6f31b0552f81a7e7b`, beside the separate prototype. Author checks PASS for unchanged canonical inputs, decision/adequacy states, candidate visibility, monotone opacity, explicit hypothetical assertion gate and 375pt layout. Earlier/recent observations use circles/diamonds as well as colour. Native r1's 42 pinned files and the frozen wave hash remain unchanged. These checks prove the illustrative interface, not statistical reliability.
 
-Independent source/design and product-facts review: clean for this proposal. The serial-error stress count was corrected to 24 sessions against the actual research configuration. Review/check evidence is beside the concept; the agreed docs-check passes on the final planning delta. Fast/coverage/complexity/dependency results in the native brief are reused because no production or test code changed. Device/browser interaction was not independently verified; human design approval and all future statistical/activation decisions remain pending.
+Independent source/design and product-facts review: clean for this proposal. The serial-error stress count was corrected to 24 sessions against the actual research configuration. Review/check evidence is beside the concept; the agreed docs-check passes on the final planning delta. Fast/coverage/complexity/dependency results in the native brief are reused because no production or test code changed. Device/browser interaction was not independently verified; visual design approval is recorded; all future statistical/activation decisions remain pending.
