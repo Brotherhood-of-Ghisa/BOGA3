@@ -14,10 +14,12 @@ sync, group authorization and competition disclosure.
 
 - In: durable server delivery, installation registration, notification
   preferences, group workout producers, full-rank-change detection, native iOS
-  permissions, group muting, authenticated tap navigation and local verification.
+  permissions, themed expanded notification content, group muting,
+  authenticated tap navigation and local verification.
 - Out: Android push, private personal-record derivation, a new notification
-  inbox, followers, digests, quiet-hours scheduling, and automatic hosted
-  deployment or release. No change to scoring or the private sync protocol.
+  inbox, a new workout Achievements section, followers, digests, quiet-hours
+  scheduling, and automatic hosted deployment or release. No change to scoring
+  or the private sync protocol.
 
 ## Agreed design direction
 
@@ -26,8 +28,9 @@ sync, group authorization and competition disclosure.
 The product owner's decisions live in `docs/product/notifications.md`:
 [[notifications.platform]], [[notifications.audience]],
 [[notifications.defaults]], [[notifications.workout-delivery]],
-[[notifications.achievements]] and [[notifications.freshness]]. Task sessions
-do not reopen them. Resolve [[notifications.non-workout-ranks]] with the owner
+[[notifications.achievements]], [[notifications.freshness]],
+[[notifications.theme]] and [[notifications.preview]]. Task sessions do not
+reopen them. Resolve [[notifications.non-workout-ranks]] with the owner
 before implementing rank delivery outside the workout lifecycle.
 
 ### D2. Reuse the server group pipeline
@@ -59,11 +62,8 @@ owning technical contract before implementation review.
 
 Compose per-recipient content only from currently authorized group context,
 with the active competition disclosure. Never copy privileged raw event
-payloads directly into push bodies or routing data. Initial examples are copy
-proposals, not approved visual targets:
-
-- Start: “Alex started a workout.”
-- Summary: “Alex finished a workout · 2 new group bests · 3 leaderboard changes.”
+payloads directly into push bodies or routing data. Preview content follows
+[[notifications.preview]]; D6 holds the accepted visual target.
 
 Keep private reading details, gym coordinates, private personal records and
 disallowed absolute scores out of notification payloads and logs.
@@ -76,6 +76,59 @@ Settings and group-management rows, toggles and inline error states; it is not
 an accepted screenshot. Follow [[copy.no-subtitles]] and
 [[copy.no-inline-explanation]] rather than adding explanatory screen copy.
 
+### D6. Accepted notification visual target
+
+On 2026-10-14 the owner selected **Record band** (the third completion concept)
+and approved its full notification family. This repo-native brief governs
+expanded notification content; the Settings/group controls still need D5's
+task-level target. It is a build input under
+`docs/specs/ui/ai-design-policy.md`, not a specification of shipped pixels.
+
+When implementing T03, inspect the selected
+[completion reference](../../../apps/mobile/artifacts/design/m34-notifications/selected-completion.png)
+and [full family](../../../apps/mobile/artifacts/design/m34-notifications/notification-family.png).
+These gitignored local artifacts must also be preserved as accessible PR
+evidence; another worktree must obtain them before implementation, not infer
+the images from their filenames.
+
+- A flat surface, warm hairline and small card corners compose the existing
+  app language; there are no shadows, decorative badges or extra actions.
+- Identity and event heading precede compact achievement rows. Bests use a
+  full-width record band; leaderboard movement uses a neutral row. Missing
+  rows disappear and short notifications shrink to their content.
+- Use the app's tokens and typography: Archivo headings, Source Sans 3 prose,
+  IBM Plex Mono figures, and existing spacing/type scales. The Warm references
+  illustrate the structure; [[notifications.theme]] governs other themes.
+- The family covers start, plain completion, completion with either/both
+  achievement categories, Activity-off variants and overlapping groups.
+  [[notifications.preview]] owns the permitted preview content.
+
+Reference copy for this build input:
+
+| State | Heading |
+| --- | --- |
+| Start, Activity enabled | Started a workout |
+| Completion, Activity enabled | Finished a workout |
+| Activity off, bests only | Group exercise bests |
+| Activity off, ranks only | Leaderboard changes |
+| Activity off, both | Workout achievements |
+
+The reference rows read `N new group bests` and `N leaderboard changes`, with
+singular wording for one. [[notifications.preview]] governs their visibility.
+
+iOS controls the abbreviated banner; the themed expanded view requires a
+native notification content extension, preserving a readable plain-text
+fallback. T03 must include its build/signing integration, local theme access,
+accessibility and device verification. No server-created image of protected
+workout data is part of this target.
+
+M34 notification taps open the existing authorized shared-session page. Adding
+an Achievements section is explicitly deferred; the current Group records
+section still covers first-place records only. When implementing that separate
+follow-up, [issue #733](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/733)
+holds the proposal and the reminder to point achievement-bearing notification
+cards to the new section. M34 does not depend on that issue being implemented.
+
 ## Task breakdown
 
 One card = one session = one local worktree = one PR. Merge this planning PR
@@ -85,7 +138,7 @@ before task execution; execute the cards in dependency order.
 | --- | --- | --- | --- |
 | [M34-T01-Backend_push_delivery](../tasks/M34-T01-Backend_push_delivery.md) | Installation/preferences RPCs, durable queue, worker and receipts | none | planned |
 | [M34-T02-Workout_notification_events](../tasks/M34-T02-Workout_notification_events.md) | Start/completion producers, group bests, all rank movement and overlap deduplication | T01 | planned |
-| [M34-T03-iOS_notification_controls](../tasks/M34-T03-iOS_notification_controls.md) | Native registration, controls, lifecycle, tap navigation and device acceptance | T01, T02 | planned |
+| [M34-T03-iOS_notification_controls](../tasks/M34-T03-iOS_notification_controls.md) | Native registration, themed content, controls, lifecycle, tap navigation and device acceptance | T01, T02 | planned |
 
 ## Risks and task-start decisions
 
