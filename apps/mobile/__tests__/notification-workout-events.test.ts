@@ -142,6 +142,13 @@ describe('workout notification final outcomes', () => {
     const counter = [...bothMetrics(ranks(['lifter', 'peer'])), ...bothMetrics(ranks(['peer'], true))];
     expect(countWorkoutRankChanges(before, final, counter, 'lifter')).toBe(4);
   });
+  test('a stale Certified label cannot use a lower surviving maximum to prove unknown original performance', () => {
+    const before = ranks(['peer'], true);
+    const final = ranks(['lifter', 'peer'], true);
+    // Current-scope proof cannot bound unknown original110 with surviving Certified100; the producer defers attribution on that board.
+    expect(countWorkoutRankChanges(before, final, final, 'lifter')).toBe(0);
+    expect(countWorkoutRankChanges(before, final, ranks(['peer', 'lifter'], true), 'lifter')).toBe(1);
+  });
 });
 
 describe('canonical completion graph', () => {

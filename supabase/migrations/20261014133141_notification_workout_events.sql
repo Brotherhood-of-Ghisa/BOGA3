@@ -265,8 +265,15 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
           select c.observed_set_pin from group_metric_certifications c where c.id=any(coalesce(certification_ids,'{}'::uuid[]))
             and c.set_id=x->>'set_id' order by c.certified_at,c.id limit 1),
           group_metric_observed_set_pin((p_target).member_user_id,(old).performance,x->>'set_type')) end,
-      'certified_metrics',coalesce((select jsonb_agg(distinct c.metric) from group_metric_certifications c
-        where c.id=any(coalesce(certification_ids,'{}'::uuid[])) and c.set_id=x->>'set_id'),'[]'::jsonb),
+      'certified_metrics',coalesce((select jsonb_agg(s.metric) from group_metric_set_scores s
+        join group_exercises ge on ge.id=s.group_exercise_id join groups g on g.id=ge.group_id
+        cross join lateral group_metric_certification_matching(s.group_exercise_id,s.member_user_id,s.set_id,s.metric,s.fingerprint) c
+        where s.group_exercise_id=(p_target).group_exercise_id and s.rules_revision=(p_target).rules_revision
+          and s.member_user_id=(p_target).member_user_id and s.session_id=(p_target).session_id
+          and s.set_id=x->>'set_id' and s.counting and c.id is not null
+          and s.unit=group_competition_unit(s.metric,g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
+          and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+            not group_competition_redacts_exercise(array[ge.group_id],s.member_user_id,s.exercise_definition_id))),'[]'::jsonb),
       'counted_metrics',coalesce((select jsonb_agg(s.metric) from group_metric_set_scores s
         where s.group_exercise_id=(p_target).group_exercise_id and s.rules_revision=(p_target).rules_revision
           and s.member_user_id=(p_target).member_user_id and s.set_id=x->>'set_id' and s.counting),'[]'::jsonb),

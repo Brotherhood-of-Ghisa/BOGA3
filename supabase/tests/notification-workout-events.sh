@@ -1353,6 +1353,84 @@ assert_sql 'mode-invalid old witness cannot enter the Certified counterfactual' 
     from jsonb_array_elements(baseline_scores) b join app_public.group_metric_certifications c on c.metric=b->>'metric'
     where coalesce(c.legacy_certification_id,c.witness_certification_id,c.id)='${MODECERT_OLD_CERT}')
   from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='modecert-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+# First capture derives the original Certified cohort from current qualification even while the publisher cache is stale.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Stale original witness cohort",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create stale original-cohort comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in stable obsolete high; do
+  case "${source}" in stable) QUAL_WEIGHT=100; SOURCE_ORDER=0;; obsolete) QUAL_WEIGHT=110; SOURCE_ORDER=1;; high) QUAL_WEIGHT=120; SOURCE_ORDER=2;; esac
+  next_cuam
+  push "${B_TOKEN}" 'stale-cohort source definitions' "$(e_def "cohort-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "cohort-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  if [[ "${source}" == obsolete ]]; then COHORT_OBSOLETE_CREATED="${CUAM}"; fi
+  push "${B_TOKEN}" 'publish successive real records before the All winner' \
+    "$(e_session "cohort-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "cohort-${source}-block-${RUN_TAG}" "cohort-session-${RUN_TAG}" "cohort-${source}-def-${RUN_TAG}" "${SOURCE_ORDER}" Bench "${CUAM}")" \
+    "$(e_set "cohort-${source}-set-${RUN_TAG}" "cohort-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+  drain_eval
+done
+next_cuam
+push "${C_TOKEN}" 'publish peer inside the two original Certified thresholds' \
+  "$(e_def "cohort-peer-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "cohort-peer-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")" \
+  "$(e_session "cohort-peer-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "cohort-peer-block-${RUN_TAG}" "cohort-peer-session-${RUN_TAG}" "cohort-peer-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "cohort-peer-set-${RUN_TAG}" "cohort-peer-block-${RUN_TAG}" 0 105 1 '' "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "cohort-stable-set-${RUN_TAG}" "cohort-session-${RUN_TAG}"
+qualify_source_set "${B_UID}" "cohort-obsolete-set-${RUN_TAG}" "cohort-session-${RUN_TAG}"; COHORT_OLD_CERT="${QUAL_CERT}"
+qualify_source_set "${C_UID}" "cohort-peer-set-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'obsolete witness mode changes before the publisher can catch up' "$(e_def "cohort-obsolete-def-${RUN_TAG}" Bench "${CUAM}" per_side_load)"
+next_cuam
+push "${B_TOKEN}" 'obsolete mode returns with the old publication cache retained' "$(e_def "cohort-obsolete-def-${RUN_TAG}" Bench "${CUAM}" total_load)"
+assert_sql 'cached original cohort still names the now mode-invalid witness' "select exists(select 1 from app_public.group_metric_board_state s
+  join app_public.group_metric_certifications c on c.id=any(s.certification_ids)
+  where s.group_exercise_id='${QUAL_EXERCISE}' and s.member_user_id='${B_UID}'
+    and coalesce(c.legacy_certification_id,c.witness_certification_id,c.id)='${COHORT_OLD_CERT}'
+    and not app_public.group_metric_certification_mode_matches(c)) and exists(select 1 from app_public.notification_workouts
+      where member_user_id='${B_UID}' and session_id='cohort-session-${RUN_TAG}' and eligible and not cutover_active);"
+run_psql "delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='cohort-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+assert_sql 'first capture labels only the coherent original Certified source' "select baseline_known and not w.cutover_active
+  and jsonb_array_length(t.baseline_scores)=4
+  and (select count(*)=2 and bool_and((b->>'certified')::boolean and (b->>'value')::numeric=100)
+    from jsonb_array_elements(t.baseline_scores) b where b->>'set_id'='cohort-stable-set-${RUN_TAG}')
+  and (select count(*)=2 and bool_and(not (b->>'certified')::boolean and (b->>'value')::numeric=120)
+    from jsonb_array_elements(t.baseline_scores) b where b->>'set_id'='cohort-high-set-${RUN_TAG}')
+  and t.source_controls->'cohort-obsolete-set-${RUN_TAG}'->'certified_metrics'='[]'::jsonb
+  from app_public.notification_workout_targets t join app_public.notification_workouts w
+    on w.member_user_id=t.member_user_id and w.session_id=t.session_id
+  where t.member_user_id='${B_UID}' and t.session_id='cohort-session-${RUN_TAG}' and t.group_exercise_id='${QUAL_EXERCISE}';"
+drain_eval
+qualify_source_set "${B_UID}" "cohort-obsolete-set-${RUN_TAG}" "cohort-session-${RUN_TAG}"; COHORT_NEW_CERT="${QUAL_CERT}"
+[[ "${COHORT_NEW_CERT}" != "${COHORT_OLD_CERT}" ]] || fail 'obsolete source reused its mode-invalid witness'
+assert_sql 'replacement unchanged witness belongs to the current source epoch' "select count(*)=2 and bool_and(ended_at is null
+  and app_public.group_metric_certification_mode_matches(c)) from app_public.group_metric_certifications c
+  where coalesce(legacy_certification_id,witness_certification_id,id)='${COHORT_NEW_CERT}';"
+next_cuam
+push "${B_TOKEN}" 'edit requalified old source while a fresh qualified crossing arrives' \
+  "$(e_set "cohort-obsolete-set-${RUN_TAG}" "cohort-obsolete-block-${RUN_TAG}" 0 95 1 '' "${CUAM}" | jq --argjson c "${COHORT_OBSOLETE_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "cohort-fresh-set-${RUN_TAG}" "cohort-high-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")" \
+  "$(e_session "cohort-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "cohort-fresh-set-${RUN_TAG}"
+confirm "${B_TOKEN}" "cohort-session-${RUN_TAG}" "$(manifest "${B_UID}" "cohort-session-${RUN_TAG}")"; check 'stale original-cohort graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "cohort-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 0 ]] || fail 'stale original cohort label manufactured a peer Certified crossing'
+assert_sql 'current original cohort keeps Certified attribution scoped and completion ready' "select
+  app_public.notification_workout_ready(member_user_id,session_id)
+  and source_controls->'cohort-obsolete-set-${RUN_TAG}'->'certified_metrics'='[]'::jsonb
+  and (select count(*)=2 and bool_and(end_reason='voided' and ended_at is not null) from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${COHORT_NEW_CERT}')
+  and (select jsonb_agg(r order by r->>'metric',r->>'member_user_id') from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean)=
+    (select jsonb_agg(r order by r->>'metric',r->>'member_user_id') from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean)
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='cohort-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
 # A link admitted while the source is still planned does not establish a performed score threshold.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Planned first admission",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
