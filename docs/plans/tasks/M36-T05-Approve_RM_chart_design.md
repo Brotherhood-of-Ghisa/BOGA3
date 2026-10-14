@@ -1,6 +1,6 @@
 # M36-T05-Approve_RM_chart_design — Design and obtain human approval of the RM scatter chart
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M36-T04
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: yes
@@ -18,11 +18,11 @@ Design the first-release interactive reps-versus-load scatter view using the val
 
 ## Decided
 
-Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+The owner accepted the T04 research limits and exact shared fixture by requesting continuation on 2026-10-14. Work starts from `4a042ab7` on the authorised experimental branch stack; the draft targets `m36-t04-statistical-validation`. Main stays untouched. Repo-native review r1 is the design target after Figma exhausted its Starter tool quota; no production UI or acceptance testing begins before human design approval.
 
-## Open — resolve with the user at session start
+## Proposed — human design review required
 
-Figma frames versus a repo-native target; entry from selected exercise/history; recency legend, overlap selection, range/effort controls and insufficient-data presentation.
+The [review brief](../designs/M36-T05-rm-chart-review.md) pins the target, flows and proposed filter/selection/entry semantics. All design choices remain proposals pending human review; the adopted analytical rules and research limits remain accepted. Additional weekly fitted overlays are excluded from this target and remain open.
 
 ## Deliverables and acceptance
 
