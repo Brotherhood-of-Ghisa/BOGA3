@@ -1,0 +1,49 @@
+# Two strength curves — exploratory design
+
+Status: proposed research/design extension, requested by the owner on 2026-10-14. Structural-break identification is a central purpose of the analytical work. This concept accommodates its eventual outputs without promoting an unvalidated detector into the first release. The descriptive release target remains native r1; this is a separate future concept.
+
+## Existing task coverage and delivery gap
+
+T02 already specifies residual trend/segmented regression, searched jumps/hinges, session dependence and reliability checks. T04 validates amplitude recovery, known-strength break benchmarks and search reliability; its accepted limitations explicitly defer direct joint latent S(t)/RIR/load-noise segmented inference. Its completed research is not a calibrated probability that the latest observations belong to a new strength regime.
+
+T06 implements descriptive observation/reference transformations, T07 the first-release chart, T08 its acceptance and T09 its final exposure. They exclude production inference/breakpoint UI. **There is no remaining card delivering an operational detector or its two-curve UI.** Do not duplicate T02/T04 or silently put that work into T07. Further inferential research/validation and subsequent production delivery need explicitly scoped follow-up cards before that capability can be promised. Their scheduling/IDs are not decided here.
+
+T05 owns the future interaction/appearance concept now; statistical meaning and eventual activation remain research decisions. Production routing remains the final implementation step for the first release.
+
+## Hypothesis and information contract — proposed
+
+Both curves reuse BoGa's adopted shape and existing loading/RIR rules; their only curve parameter is latent total 1RM S. The older fitted regime and candidate newer fitted regime are different estimates of S. Neither is automatically the fixed historical reference M, and logged Weight/global 1RM remain unchanged.
+
+Null: no abrupt regime change, allowing declared gradual strength trends and cycle/task effects. Alternative: a persistent level change in S after an unknown cut, with slope changes investigated separately. A recent curve differing from M alone is not evidence of a structural break. Keep both uncertainty approaches: configurable assumed RIR/load SDs, versus joint estimation of S and both noise scales. They remain nuisance parameters, not extra curve-shape parameters.
+
+Recent means a complete chronological suffix. Candidate cuts fall between completed sessions; do not split dependent sets in a session. Report N recent sessions and the number of qualifying sets separately. N is part of the candidate search, not a cherry-picked count that escapes the test's selection adjustment. Searching cuts/suffix lengths and checking again each week must be covered by the inference/calibration strategy.
+
+“Enough” requires independent-session support on both sides, comparable exercise/gym/effort/loading context, identifiable strength/noise estimates, useful precision and validated power/false-alarm behaviour at meaningful changes. T04's eight-per-side search setting is a research constraint, not a proven universal sufficiency threshold. Its ideal 24-session +5kg jump benchmark detected 11.8%; serial errors produced 16.5% false flags in the 24-session stress with its declared prefix search. Counts alone cannot establish reliability. Imported effort provenance and rep/cycle confounding remain material.
+
+## Score meaning — unresolved research choice
+
+A likelihood or likelihood ratio is not a percentage probability that a break occurred. A p-value is not that probability either, and 1−p is not a substitute. [ASA guidance](https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf).
+
+If the intended display is a percentage of model support, investigate a posterior probability of a change model, conditional on specified competing models and proper parameter/model priors. It requires marginal likelihoods, not normalising two maximised likelihoods. Report sensitivity to priors, smooth/noise alternatives and misspecification; it is not a model-free probability of physiological truth. [Bayesian model comparison, pp184–186](https://sites.stat.columbia.edu/gelman/bayescomputation/bdachapter6.pdf).
+
+Keep candidate visibility separate from a statistical assertion. A proposed 10–15% posterior support could display an explicitly tentative curve; it would be weak evidence for asserting a break when the no-break alternatives retain 85–90%. If the intended number is instead a p-value or likelihood ratio, its direction and units differ. Neither score type, display threshold, assertion rule, practically important RM change nor adequacy threshold is approved by this concept. No arbitrary posterior cutoff is presented as calibrated.
+
+## Future UX contract
+
+**Assess a possible newer regime.** Trigger: a future validated inference result for the current exercise/gym/filter history. Steps: show the older fitted curve and, when eligible under a separately defined visibility rule, the candidate newer curve; identify its considered suffix in chronological text/list access. Success: the user can compare curve amplitudes, recent-session/set counts, possible change-date interval, support metric and strength-estimate precision. Edge: insufficient evidence or unstable/no-fit inference displays the reason and makes no assertion. No automatic fallback from missing M to a fitted regime is implied.
+
+**Inspect support.** Trigger: select the candidate curve/readout. Steps: show what the score means, which sessions are considered and the relevant assumptions; retain actual reps/RIR, normalized reps, chart Load, logged Weight and existing 1RM for each set. Success: model support, uncertainty in S and uncertainty in the cut remain distinct. Edge: low support does not establish that recent points belong to the second curve; membership is conditional/uncertain. A probability of any break is not automatically each point's membership probability.
+
+**Respond to new data.** Trigger: another completed session or a source/filter correction. Steps: reevaluate coherently under a validated repeated-look strategy, showing the current considered window and result. Success: a candidate may gain or lose support. Edge: no unvalidated alert or permanent break label; cycle, rep-range, RIR accuracy and noise-only changes can explain apparent separation.
+
+Appearance: same axes and load factor for both curves; older/candidate labels and line patterns supplement colour. A tentative second line may fade monotonically with the defined support score but keeps a readable minimum contrast; labels remain opaque. Opacity does not encode a 1RM confidence interval. Only a validated decision rule may upgrade the language to a supported newer regime; no “confirmed break” or physiological certainty.
+
+## Design artifact and checks
+
+The separate ignored prototype is `apps/mobile/artifacts/design/rm-curve/structural-break-concept/review.html`. It reuses the frozen wave's 72 point inputs and adopted integer-rep curve knots. Example amplitudes 100/110kg and all support values are explicitly illustrative, not fits or computed probabilities. It highlights the last 8 completed sessions/24 sets without declaring them a known new regime. It does not edit native r1 or its pinned manifest and supplies no new training fixture.
+
+Review insufficient information, no assertion, tentative 15%/50% support and a hypothetical future validated-rule-passes state. A 15% candidate visibility setting and a 95% illustration are interface experiments, not recommended inference thresholds. The supported state assumes the decision rule passed; it is never a result about this wave. Source self-checks and prototype-only screenshots verify rendering and unchanged canonical data; actual inference, production UI, VoiceOver/device acceptance and activation are excluded.
+
+Prototype c1: manifest SHA256 `ce2b255aefd8aff7bc3975574310738bc08716b6ec64e1f6f31b0552f81a7e7b`, beside the separate prototype. Author checks PASS for unchanged canonical inputs, decision/adequacy states, candidate visibility, monotone opacity, explicit hypothetical assertion gate and 375pt layout. Earlier/recent observations use circles/diamonds as well as colour. Native r1's 42 pinned files and the frozen wave hash remain unchanged. These checks prove the illustrative interface, not statistical reliability.
+
+Independent source/design and product-facts review: clean for this proposal. The serial-error stress count was corrected to 24 sessions against the actual research configuration. Review/check evidence is beside the concept; the agreed docs-check passes on the final planning delta. Fast/coverage/complexity/dependency results in the native brief are reused because no production or test code changed. Device/browser interaction was not independently verified; human design approval and all future statistical/activation decisions remain pending.

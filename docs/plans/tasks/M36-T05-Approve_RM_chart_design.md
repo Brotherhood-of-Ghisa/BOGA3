@@ -13,8 +13,8 @@ Design the first-release interactive reps-versus-load scatter view using the val
 
 ## Scope
 
-- In: Chart, filters, point readout, all data states, accessibility and proposed final navigation entry.
-- Out: Production code, UI acceptance test execution, breakpoint UI, new design system or altered metric conventions.
+- In: First-release chart/filters/readout/states/accessibility/entry; separate exploratory two-strength-curve design for eventual validated inference.
+- Out: Production code, UI acceptance test execution, production breakpoint UI, new design system or altered metric conventions.
 
 ## Decided
 
@@ -22,7 +22,7 @@ The owner accepted the T04 research limits and exact shared fixture by requestin
 
 ## Proposed — human design review required
 
-The [review brief](../designs/M36-T05-rm-chart-review.md) pins the target, flows and proposed filter/selection/entry semantics. All design choices remain proposals pending human review; the adopted analytical rules and research limits remain accepted. Additional weekly fitted overlays are excluded from this target and remain open.
+The [review brief](../designs/M36-T05-rm-chart-review.md) pins the target, flows and proposed filter/selection/entry semantics. All design choices remain proposals pending human review; the adopted analytical rules and research limits remain accepted. Additional weekly fitted overlays remain excluded from the release target. The owner requested a separate [two-curve structural-break concept](../designs/M36-T05-structural-break-concept.md); its score and activation require further research/validation, not an implicit scope change.
 
 ## Deliverables and acceptance
 
@@ -34,6 +34,8 @@ The [review brief](../designs/M36-T05-rm-chart-review.md) pins the target, flows
 6. Record explicit human design approval for the chart, edge states, filter semantics and proposed final entry. T07 cannot begin UI implementation and T08 cannot run UI acceptance tests before this approval; a material design revision renews approval.
 
 7. Use the same shared wave prefix/oracle to human-review weekly scatter/reference/readout, primary plateaus and same-load/RIR progress, with stable/smooth controls shown as methodological comparisons and insufficient-baseline states. Keep the approved fixed reference; any request for additional weekly fitted curves must be clarified and approved before entering the visual target. Do not prescribe exact programme parameters here.
+
+8. Accommodate eventual structural-break outputs in a separate exploratory design: old/candidate curves with the same adopted shape and different S; chronological suffix/session dependence, adequacy/no-fit/weak/supported states, explicit score semantics, uncertainty and readable opacity/pattern/text cues. Document existing T02/T04 coverage and the unassigned future inference/delivery gap. Do not add a detector, probability claim or second curve to T06–T09's first-release implementation.
 
 ## UX contract (proposed; T05 pins the approved target)
 

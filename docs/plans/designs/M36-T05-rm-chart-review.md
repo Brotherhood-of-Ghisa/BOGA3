@@ -50,3 +50,7 @@ Pinned native revision: `r1`, manifest SHA256 `7b553e5be8519c3e850710ffec567021e
 Independent design/source and product review: clean for the proposal. Recovery/scope/selection findings were fixed and checked. Browser interaction, VoiceOver, native gestures and actual History restoration were not independently verified; human approval of the exact native r1 remains pending.
 
 Final local gate record: fast PASS (279 suites / 3,859 tests plus aggregate checks); jest-coverage PASS (86.45% branches / 94.35% lines); complexity PASS; dependencies PASS (513 modules / 2,568 dependencies, 13 existing known violations unchanged); docs-check PASS. The same session agreement covers this set. Prototype self-check/visual transitions PASS, independent design/product proposal review clean. No test duration is asserted. This evidence establishes review readiness, not human design approval or app acceptance.
+
+## Separate future concept
+
+The owner's request to accommodate structural breaks is covered by the [two-curve concept](M36-T05-structural-break-concept.md). Its example curves/scores are illustrative, with no fitted result, detector or production activation. T02/T04 cover exploratory research; an operational inference/calibration and delivery follow-up is currently unassigned. This separate prototype does not revise native r1, its hashes, or the first-release boundary. Human approval of r1 and the future statistical/design decisions remain pending.

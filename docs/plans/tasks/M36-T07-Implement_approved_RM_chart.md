@@ -9,7 +9,7 @@
 
 ## Objective
 
-Build the approved chart and page content as reusable components over T06’s read model. Keep it absent from production routes and navigation until the final exposure task.
+Build the approved chart and page content as reusable components over T06’s read model. Keep it absent from production routes and navigation until the final exposure task. Implement only T05's first-release target; its separate exploratory two-curve concept does not expand this card.
 
 ## Scope
 
