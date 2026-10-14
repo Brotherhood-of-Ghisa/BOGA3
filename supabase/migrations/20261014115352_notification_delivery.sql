@@ -285,6 +285,8 @@ begin
   if not found or n.expires_at<=now() then return null; end if;
   if not exists(select 1 from sessions s where s.owner_user_id=n.lifter_user_id and s.id=n.session_id and s.deleted_at is null)
     then return null; end if;
+  if n.kind='completion' and not exists(select 1 from sessions s where s.owner_user_id=n.lifter_user_id
+      and s.id=n.session_id and s.status='completed' and s.completed_at is not null) then return null; end if;
   select * into pref from notification_preferences where user_id=n.recipient_user_id;
   activity:=coalesce(pref.activity,true);
   if n.kind='start' and (not activity or exists(select 1 from sessions s where s.owner_user_id=n.lifter_user_id

@@ -139,6 +139,10 @@ check 'public projection allowlist and zero start counts' '.projection.bestCount
 run_psql "update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 enqueue completion
 COMPLETION="${BODY}"
+run_psql "update app_public.sessions set status='active',completed_at=null where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"; expect_ok 'reopened completion projection'
+[[ "${BODY}" == null ]] || fail 'reopened workout projected a completed alert'
+run_psql "update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_claim '{}'
 CD="$(jq -r '.jobs[0].id' <<<"${BODY}")"; CC="$(jq -r '.jobs[0].claim_id' <<<"${BODY}")"
 rpc "${SERVICE_ROLE_KEY}" notification_begin_send "{\"p_delivery_id\":${CD},\"p_claim_id\":\"${CC}\",\"p_generation\":1}"
