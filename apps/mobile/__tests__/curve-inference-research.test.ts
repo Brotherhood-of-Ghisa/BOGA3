@@ -1,8 +1,40 @@
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { jointLikelihoodGrid, jointLogLikelihood } from './helpers/residual-regression-research';
-import { prefixBreakMaximum, profileContains, profileSet, searchedBreak, upperQuantile } from './helpers/curve-inference-research';
+import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, prefixBreakMaximum, profileContains, profileSet,
+  searchedBreak, upperQuantile } from './helpers/curve-inference-research';
+import { projectCurveHistory, type CurveHistoryRow } from './helpers/curve-history-research';
 
 describe('research amplitude/error comparison', () => {
+  it('scales per-side uncertainty once and preserves bodyweight/loading parity in the joint model', () => {
+    const base: CurveHistoryRow = { owner: 'test', exercise: 'test', gym: 'gym', session: 'session', block: 'block', id: 'total',
+      startedAt: 1, completedAt: 2, status: 'completed', deleted: false, weightValue: '80', repsValue: '6', setType: 'rir_2',
+      performanceStatus: null, loadInputMode: 'total_load', bodyweightContribution: 0.25, bodyweightEnabled: true, bodyWeightKg: 80 };
+    const points = projectCurveHistory([base, { ...base, id: 'side', weightValue: '40', loadInputMode: 'per_side_load' }]).points;
+    expect(points.map(p => p.load)).toEqual([100, 100]);
+    expect(points.map(p => p.factor * DEFAULT_ENTRY_LOAD_SD_KG[p.row.loadInputMode])).toEqual([2.5, 2.5]);
+    expect(DEFAULT_ENTRY_LOAD_SD_KG.per_side_load).toBe(1.25);
+    const inputs = points.map(p => ({ load: p.load, recordedRir: p.rir,
+      multipliers: Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, p.reps + r)!) }));
+    expect(jointUncertaintyProfiles([inputs[0]], [100, 110], [0, 1, 2], [1.25, 2.5, 5]))
+      .toEqual(jointUncertaintyProfiles([inputs[1]], [100, 110], [0, 1, 2], [1.25, 2.5, 5]));
+  });
+
+  it('profiles load uncertainty and RIR uncertainty with the same scalar likelihood, retaining both boundaries', () => {
+    const points = [{ load: 95, recordedRir: 0, multipliers: [1] }, { load: 105, recordedRir: 0, multipliers: [1] }];
+    const strengths = [95, 100, 105], rirs = [0, 1], loads = [1.25, 2.5, 5];
+    const fit = jointUncertaintyProfiles(points, strengths, rirs, loads);
+    loads.forEach((loadSd, k) => rirs.forEach((rirSd, i) => strengths.forEach((s, j) =>
+      expect(fit.cube[k][i][j]).toBeCloseTo(jointLogLikelihood(points, s, rirSd, loadSd), 8))));
+    expect(profileSet(strengths, fit.strengthProfile, 0)!.estimate).toBe(100);
+    expect(profileSet(loads, fit.loadProfile, 0)!.estimate).toBe(5);
+    expect(profileSet(loads, fit.loadProfile, 0)!.upperBoundary).toBe(true);
+    const copies = Array.from({ length: 4 }, () => ({ ...points[0], load: 100 }));
+    const repeated = jointUncertaintyProfiles(copies, strengths, rirs, loads);
+    expect(profileSet(loads, repeated.loadProfile, 0)!.lowerBoundary).toBe(true);
+    expect(() => jointUncertaintyProfiles(points, strengths, rirs, [])).toThrow();
+    expect(() => jointUncertaintyProfiles(points, strengths, rirs, [0])).toThrow();
+  });
+
   it('retains the adopted single-rep amplitude and scores a truncated Gaussian with a known latent RIR', () => {
     expect(estimateOneRepMax(1, 1)).toBe(1);
     const points = [{ load: 2, recordedRir: 0, multipliers: [1] }];

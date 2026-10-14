@@ -6,8 +6,8 @@ import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculation
 import { isWorkingSet } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '../../../apps/mobile/src/exercise-calculations/effort-policy.ts';
 import { priorCurveReference, projectCurveHistory, curveScopeKey, type CurveHistoryRow } from '../../../apps/mobile/__tests__/helpers/curve-history-research.ts';
-import { fitRegression, jointLikelihoodGrid, median, scanBreaks } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
-import { profileSet } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
+import { fitRegression, median, scanBreaks } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
+import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileSet } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
 
 assert.equal(process.env.TZ, 'Europe/London');
 assert.equal(process.argv.length, 2);
@@ -69,6 +69,7 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
   working.sort((a, b) => a.blockOrder - b.blockOrder || a.setOrder - b.setOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   for (const row of working) if (!firstBySession.has(row.session)) firstBySession.set(row.session, row.id);
   const first = projected.filter(p => firstBySession.get(p.row.session) === p.row.id);
+  first.forEach(p => assert.equal(p.factor * DEFAULT_ENTRY_LOAD_SD_KG[p.row.loadInputMode], 2.5));
   const responses = cohort.main.sessionResponses.map((r: { time: number; value: number }) => ({
     time: r.time, value: (1 + r.value / 100) * cohort.reference.rm }));
   const points = first.map(p => ({ load: p.load, recordedRir: p.rir,
@@ -76,6 +77,7 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
   const center = points.length ? median(first.map(p => p.analyticalRm)) : null;
   const strengthAxis = center === null ? [] : Array.from({ length: 101 }, (_, i) => center * (0.5 + i * 0.01));
   const sigmas = [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5];
+  const loadSds = [0.5, 1.25, 2.5, 3.75, 5, 7.5];
   return { cohort: `C${index + 1}`, exercise: index < 3 ? 'Zercher Squat' : 'Dumbbell Bench Press',
     independentSessions: cohort.main.evaluatedSessions, sets: cohort.main.evaluatedSets,
     priorReferenceSupport: cohort.reference.qualifyingSessions, referenceRm: cohort.reference.rm,
@@ -83,16 +85,18 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
     analyticalRegression: responses.length ? { constant: fitRegression(responses, 'constant'),
       linear: fitRegression(responses, 'linear'), quadratic: fitRegression(responses, 'quadratic'),
       searchedCandidates: scanBreaks(responses, 8).length } : null,
-    relativeLikelihood: points.length ? [0.5, 1, 3].map(loadSd => {
-      const grid = jointLikelihoodGrid(points, strengthAxis, sigmas, loadSd);
-      const strengthProfile = strengthAxis.map((_, i) => Math.max(...grid.map(row => row[i])));
-      const sigmaProfile = grid.map(row => Math.max(...row));
-      return { loadSd, strengthAxis, sigmas, fixedSigma1Profile: grid[sigmas.indexOf(1)], strengthProfile, sigmaProfile,
+    relativeLikelihood: points.length ? (() => {
+      const { cube, strengthProfile, sigmaProfile, loadProfile } = jointUncertaintyProfiles(points, strengthAxis, sigmas, loadSds);
+      const grid = cube[loadSds.indexOf(2.5)], loadMaximum = profileSet(loadSds, loadProfile, 0);
+      return { fixedTotalLoadSd: 2.5, enteredLoadSds: DEFAULT_ENTRY_LOAD_SD_KG, strengthAxis, sigmas, loadSds,
+        fixedSigma1Profile: grid[sigmas.indexOf(1)], strengthProfile, sigmaProfile, loadProfile,
         fixedMaximum: profileSet(strengthAxis, grid[sigmas.indexOf(1)], 0)?.estimate ?? null,
         jointMaximum: profileSet(strengthAxis, strengthProfile, 0)?.estimate ?? null,
-        jointSigmaMaximum: profileSet(sigmas, sigmaProfile, 0)?.estimate ?? null };
-    }) : null,
-    limits: 'Observed A regression and likelihood surfaces under assumed RIR prior/tau only; no calibrated intervals or empirical sigma/strength/break claim. Missing first effort does not substitute a later set. No fallback reference.' };
+        jointSigmaMaximum: profileSet(sigmas, sigmaProfile, 0)?.estimate ?? null,
+        jointTotalLoadMaximum: loadMaximum?.estimate ?? null,
+        loadGridBoundary: loadMaximum?.lowerBoundary || loadMaximum?.upperBoundary };
+    })() : null,
+    limits: 'Observed A and relative profiles only; no calibrated interval or empirical noise/strength/break claim. Load-error grid boundaries are unresolved, not zero error. Missing first effort does not substitute a later set. No fallback reference.' };
 });
 assert.ok(historical.every((h: any) => h.analyticalRegression === null || h.analyticalRegression.searchedCandidates === 0));
 assert.equal(historical.find((h: any) => h.referenceRm !== null).independentSessions, 7);

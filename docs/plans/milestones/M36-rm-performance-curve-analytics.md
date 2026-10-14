@@ -28,6 +28,8 @@ Reuse [[1rm.formula]], [[set.performed]] and [[set.eligibility]], the kernel and
 
 Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01's first-deliverable effort/reference/load-coordinate rules are approved in [[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and [[1rm.curve-load]]; T04 still closes empirical review with explicit human analytical/product approval before T05 begins. Unsupported real-data evidence must be reported honestly and its limitations accepted.
 
+The owner's two research approaches account for RIR and discrete-load uncertainty: fixed RIR SD 1 rep/load SD 1.25 kg per-side or 2.50 kg total, versus joint estimation of 1RM and both noise scales. 1RM remains the only curve parameter; noise scales do not alter its shape or logged values. T04's [validation contract](../research/M36-T04-validation-contract.md) records units, assumptions and limits; these experiments authorise no production statistical feature.
+
 ### D3. First release is the observed-set scatter and reference overlay
 
 X-axis is explicitly RIR0-equivalent reps u=m+n; Y-axis is the approved load coordinate under existing semantics. Include observed qualifying sets, estimated reference curve, date/recency differentiation, exact date/actual reps/recorded RIR/equivalent reps/load/existing 1RM details and exercise/time-range/effort filters. Missing effort, overlap, insufficient data, failures and accessibility are required states. Statistical experiments stay isolated from production imports, dependencies and sync.

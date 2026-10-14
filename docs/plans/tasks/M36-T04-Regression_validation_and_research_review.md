@@ -22,7 +22,7 @@ Milestone D1–D6 govern this task. Creating the card alone approved no design, 
 
 On 2026-10-14 the owner authorised T04 on the experimental branch stack after accepting T03's descriptive findings with uncertain effort provenance. Work starts from T03 commit `01ce2409cb54670f38665423aa395580f98af8a9` and a draft PR targets `m36-t03-workout-curve-validation`; main stays untouched. Compare fixed assumed RIR sigma with joint 1RM/sigma estimation. 1RM is the only free curve parameter; sigma is measurement uncertainty, and any trajectory/break model concerns that amplitude over time. Break modelling remains exploratory, with direct latent-trajectory inference deferred if evidence does not support it. Reuse the session's agreed fast and three quality gates; no app UI/production work is authorised.
 
-The [research review](../research/M36-T04-research-review.md) and [candidate oracle](../research/M36-T04-weekly-wave-oracle.json) are ready for human review after local validation. Keep `in_progress`: acceptance 5 and exact fixture freezing in acceptance 7 remain pending; T05 has not started.
+The owner subsequently added load SD 1.25 kg per side / 2.50 kg total. The fixed approach assumes both RIR/load uncertainties; the joint approach estimates 1RM and both noise scales. Existing per-side conversion makes both defaults 2.50 kg physical total SD. The revised [research review](../research/M36-T04-research-review.md) supersedes the earlier tau 1 kg approval proposal; the [candidate oracle](../research/M36-T04-weekly-wave-oracle.json) and logged synthetic programme remain unchanged. Keep `in_progress`: acceptance 5 and exact fixture freezing in acceptance 7 remain pending; T05 has not started.
 
 ## Open — resolve with the user at session start
 

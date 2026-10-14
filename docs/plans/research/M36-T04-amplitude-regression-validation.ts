@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import { fitRegression, predict, scanBreaks, seededRandom, sessionMedians,
   recordedRirFromLatent, type ResearchRow } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
-import { prefixBreakMaximum, searchedBreak, upperQuantile } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
+import { DEFAULT_ENTRY_LOAD_SD_KG, prefixBreakMaximum, searchedBreak, upperQuantile } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
 
 const quick = process.argv.includes('--quick');
 assert.ok(process.argv.slice(2).every(arg => arg === '--quick'));
 const repetitions = quick ? 12 : 400, stressRepetitions = quick ? 12 : 200;
 const prefixes = [12, 16, 24, 48], seedFor = (base: number, r: number) => (base ^ Math.imul(r + 1, 0x9e3779b1)) >>> 0;
+const loadSd = DEFAULT_ENTRY_LOAD_SD_KG.total_load;
 type Scenario = { name: string; n: number; model: 'constant' | 'linear' | 'quadratic' | 'jump' | 'hinge';
   effect?: number; cut?: number; gap?: boolean; serial?: boolean; outlier?: boolean; heteroscedastic?: boolean;
   reportedRirMix?: boolean; dependence?: boolean; minimum?: number };
@@ -23,13 +24,13 @@ function generate(s: Scenario, seed: number) {
     const time = i + (s.gap && i >= s.n / 2 ? 20 : 0);
     serial = 0.8 * serial + 0.6 * random.normal();
     const error = s.serial ? serial : random.normal();
-    let value = valueAt(s, time) + error * (s.heteroscedastic ? 1 + i / s.n * 2 : 1);
+    let value = valueAt(s, time) + loadSd * error * (s.heteroscedastic ? 1 + i / s.n * 2 : 1);
     if (s.outlier && i === Math.floor(s.n / 2)) value += 10;
     if (s.reportedRirMix) {
       const m = i < s.n / 2 ? 4 : 12, r = i < s.n / 2 ? 0 : 4;
       const n = recordedRirFromLatent(r, 1, random.normal());
       const f = estimateOneRepMax(1, m + r)!;
-      value = estimateOneRepMax(valueAt(s, time) / f, m + n)!;
+      value = estimateOneRepMax(valueAt(s, time) / f + loadSd * error, m + n)!;
     } else {
       // A synthetic RIR0 single makes the regression target exactly noisy 1RM amplitude.
       assert.equal(estimateOneRepMax(value, 1), value);
@@ -161,7 +162,7 @@ const bootstrap = [false, true].map(serial => {
 });
 assert.ok(experiments.filter(e => e.scenario.n === 12).every(e => e.noAdmissibleSearch.fraction === 1));
 console.log(JSON.stringify({ design: { quick, repetitions, stressRepetitions, prefixes, minimumSegment: 8,
-  benchmarkTarget: 'S(t) via noisy RIR0 single; reportedRirMix targets A instead', independentErrorSd: 1,
+  benchmarkTarget: 'S(t) via noisy RIR0 single; reportedRirMix targets A instead', independentErrorSd: loadSd,
   nullShapes: noBreak, nominalFamilyError: 0.05, interval: 'separate-seed known-form, worst effect-size 97.5% marginal error radii; not post-selection',
   seedFor: 'base xor imul(replication+1, 0x9e3779b1)' }, cutoff, calibrationMaximums, intervalCalibration,
   intervalEvidence, experiments, bootstrap: { bootstrapRepetitions, bootstrapHistories, results: bootstrap } }, null, 2));

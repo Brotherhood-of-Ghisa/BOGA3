@@ -1,5 +1,17 @@
 // Research-only profile grids and searched regression diagnostics.
-import { fitRegression, scanBreaks, type BreakFit, type ResearchRow } from './residual-regression-research';
+import { fitRegression, jointLikelihoodGrid, scanBreaks, type BreakFit, type JointRirPoint, type ResearchRow } from './residual-regression-research';
+import type { LoadInputMode } from '../../src/exercise-calculations/load-metrics';
+
+export const DEFAULT_ENTRY_LOAD_SD_KG: Record<LoadInputMode, number> = { per_side_load: 1.25, total_load: 2.5 };
+
+export function jointUncertaintyProfiles(points: JointRirPoint[], strengths: number[], rirSds: number[], loadSds: number[]) {
+  if (!loadSds.length) throw new Error('nonempty load uncertainty axis required');
+  const cube = loadSds.map(sd => jointLikelihoodGrid(points, strengths, rirSds, sd));
+  return { cube,
+    strengthProfile: strengths.map((_, i) => Math.max(...cube.flatMap(grid => grid.map(row => row[i])))),
+    sigmaProfile: rirSds.map((_, i) => Math.max(...cube.flatMap(grid => grid[i]))),
+    loadProfile: cube.map(grid => Math.max(...grid.flat())) };
+}
 
 export type ProfileComponent = { lower: number | null; upper: number | null };
 export type ProfileResult = { estimate: number; maximum: number; components: ProfileComponent[];
