@@ -128,6 +128,143 @@ rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${INSTALL_ID}" --arg c
   '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[ok]",p_environment:"local",
     p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
 expect_ok 'register local recipient'
+DELAYED_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+DELAYED_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+DELAYED_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${DELAYED_INSTALL}" --arg c "${DELAYED_CAPABILITY}" --arg k "${DELAYED_KEY}" \
+  '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[delayed-second]",p_environment:"local",
+    p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
+expect_ok 'register temporary delayed-recovery installation'; DELAYED_BINDING="$(jq -er '.binding_id' <<<"${BODY}")"
+# Both uploads commit before any recovery; the immutable active moment must still produce its start.
+DELAYED="delayed-recovery-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'capture active upload without recovering its producer' "$(e_session "${DELAYED}" "${NOW_MS}" active null null null "${CUAM}")"
+assert_sql 'active upload captures its start before any workout ledger exists' "select exists(select 1 from app_public.notification_workout_moments
+  where member_user_id='${B_UID}' and session_id='${DELAYED}' and kind='start' and event_at=to_timestamp(${NOW_MS}/1000.0))
+  and not exists(select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${DELAYED}')
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${DELAYED}');"
+next_cuam
+push "${B_TOKEN}" 'complete before first recovery or evaluation' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+assert_sql 'completed upload still has no producer ledger and retains both original moments' "select
+  not exists(select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${DELAYED}')
+  and (select count(*)=2 from app_public.notification_workout_moments where member_user_id='${B_UID}' and session_id='${DELAYED}');"
+confirm "${B_TOKEN}" "${DELAYED}" "$(manifest "${B_UID}" "${DELAYED}")"; check 'delayed completed graph confirmed' '.confirmed==true'
+drain_eval
+# An already-applied producer could have persisted can_start=false before recovery; the original moment repairs it.
+run_psql "update app_public.notification_workouts set can_start=false where member_user_id='${B_UID}' and session_id='${DELAYED}';" >/dev/null
+prepare_outcome "${B_UID}" "${DELAYED}"; enqueue_outcome "${B_UID}" "${DELAYED}"
+assert_sql 'recovery repairs old admission from the immutable original active moment' "select can_start from app_public.notification_workouts
+  where member_user_id='${B_UID}' and session_id='${DELAYED}';"
+assert_sql 'first recovery produces two overlap-deduplicated logical alerts with original expiry' "select count(*)=2
+  and count(distinct kind)=2 and bool_and(expires_at=event_at+interval '24 hours')
+  and bool_and(event_at=case kind when 'start' then to_timestamp(${NOW_MS}/1000.0) else to_timestamp($((NOW_MS+1000))/1000.0) end)
+  from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${DELAYED}';"
+DELAYED_START="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${DELAYED}' and kind='start';")"
+DELAYED_COMPLETION="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${DELAYED}' and kind='completion';")"
+DELAYED_START_DELIVERY="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_START} and installation_id='${INSTALL_ID}';")"
+DELAYED_COMPLETION_DELIVERY="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_COMPLETION} and installation_id='${INSTALL_ID}';")"
+DELAYED_SECOND_START="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_START} and installation_id='${DELAYED_INSTALL}';")"
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${DELAYED_START}}"; expect_ok 'captured start projects after raw completion'
+check 'delayed start keeps activity copy and overlap projection' '.kind=="start" and .heading=="Started a workout" and .identity=="MemberB · 2 groups" and .bestCount==0 and .rankCount==0'
+run_psql 'update app_public.notification_config set sending_enabled=true;' >/dev/null
+for held_state in pending retry disabled; do
+  run_psql "update app_public.notification_deliveries set state='${held_state}',available_at=now()+interval '1 hour',claim_id=null,lease_until=null
+      where intent_id=${DELAYED_START};
+    update app_public.notification_deliveries set available_at=now()+interval '1 hour' where intent_id=${DELAYED_COMPLETION};
+    update app_public.notification_deliveries set available_at=now() where id=${DELAYED_COMPLETION_DELIVERY};" >/dev/null
+  rpc "${SERVICE_ROLE_KEY}" notification_claim '{}'; expect_ok 'claim completion before its captured start'
+  DELAYED_JOB="$(jq --argjson id "${DELAYED_COMPLETION_DELIVERY}" '.jobs[]|select(.id==$id)' <<<"${BODY}")"
+  [[ -n "${DELAYED_JOB}" ]] || fail 'delayed completion was not claimed'
+  rpc "${SERVICE_ROLE_KEY}" notification_begin_send "$(jq '{p_delivery_id:.id,p_claim_id:.claim_id,p_generation:.generation}' <<<"${DELAYED_JOB}")"
+  expect_ok 'completion waits for captured start'; [[ "${BODY}" == null ]] || fail 'completion overtook its unsent captured start'
+  assert_sql 'completion defers without cancelling its captured start' "select state='${held_state}' from app_public.notification_deliveries
+    where id=${DELAYED_START_DELIVERY};"
+done
+run_psql "update app_public.notification_deliveries set state='pending',available_at=now() where intent_id=${DELAYED_START};
+  update app_public.notification_deliveries set available_at=now() where id=${DELAYED_COMPLETION_DELIVERY};" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_claim '{}'; expect_ok 'claim both delayed alerts concurrently'
+DELAYED_START_JOB="$(jq --argjson id "${DELAYED_START_DELIVERY}" '.jobs[]|select(.id==$id)' <<<"${BODY}")"
+DELAYED_JOB="$(jq --argjson id "${DELAYED_COMPLETION_DELIVERY}" '.jobs[]|select(.id==$id)' <<<"${BODY}")"
+[[ -n "${DELAYED_START_JOB}" && -n "${DELAYED_JOB}" ]] || fail 'both delayed alerts were not leased'
+rpc "${SERVICE_ROLE_KEY}" notification_begin_send "$(jq '{p_delivery_id:.id,p_claim_id:.claim_id,p_generation:.generation}' <<<"${DELAYED_JOB}")"
+expect_ok 'completion waits for already leased start'; [[ "${BODY}" == null ]] || fail 'completion cancelled a concurrently leased start'
+assert_sql 'leased captured start retains its claim' "select state='leased' and claim_id='$(jq -r '.claim_id' <<<"${DELAYED_START_JOB}")'
+  from app_public.notification_deliveries where id=${DELAYED_START_DELIVERY};"
+assert_sql 'both installation starts survive the completion-first leased probe' "select count(*)=2 and bool_and(state='leased')
+  from app_public.notification_deliveries where intent_id=${DELAYED_START};"
+# Release the probe's lease so the actual encrypted worker can send the start to the local sink.
+run_psql "update app_public.notification_deliveries set state='pending',available_at=now()+interval '1 hour',claim_id=null,lease_until=null where intent_id=${DELAYED_START};
+  update app_public.notification_deliveries set available_at=now() where id=${DELAYED_START_DELIVERY};
+  update app_public.notification_deliveries set available_at=now()+interval '1 hour' where intent_id=${DELAYED_COMPLETION};" >/dev/null
+drain_worker
+check 'actual local sink accepts delayed start first' '.outcomes.ticket==1'
+assert_sql 'delayed start has a real local ticket before completion' "select state='ticket' and provider='local' and ticket_id like 'local:ok:%'
+  from app_public.notification_deliveries where id=${DELAYED_START_DELIVERY};"
+run_psql "update app_public.notification_deliveries set available_at=now() where id=${DELAYED_COMPLETION_DELIVERY};" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_claim '{}'; expect_ok 'claim completion after only its own installation start settles'
+DELAYED_JOB="$(jq --argjson id "${DELAYED_COMPLETION_DELIVERY}" '.jobs[]|select(.id==$id)' <<<"${BODY}")"
+[[ -n "${DELAYED_JOB}" ]] || fail 'sibling-start completion probe was not claimed'
+rpc "${SERVICE_ROLE_KEY}" notification_begin_send "$(jq '{p_delivery_id:.id,p_claim_id:.claim_id,p_generation:.generation}' <<<"${DELAYED_JOB}")"
+expect_ok 'completion waits for other live installation start'; [[ "${BODY}" == null ]] || fail 'completion cancelled the sibling installation pending start'
+assert_sql 'sibling pending start survives after the first installation has a ticket' "select state='pending' from app_public.notification_deliveries
+  where id=${DELAYED_SECOND_START};"
+run_psql "update app_public.notification_deliveries set available_at=now()+interval '1 hour' where intent_id=${DELAYED_COMPLETION};
+  update app_public.notification_deliveries set available_at=now() where id=${DELAYED_SECOND_START};" >/dev/null
+drain_worker
+check 'actual local sink accepts sibling start before either completion' '.outcomes.ticket==1'
+assert_sql 'both installation starts settle before any completion handoff' "select count(*)=2 and bool_and(state='ticket')
+  from app_public.notification_deliveries where intent_id=${DELAYED_START};"
+run_psql "update app_public.notification_deliveries set available_at=now() where intent_id=${DELAYED_COMPLETION};" >/dev/null
+drain_worker
+check 'actual local sink accepts both delayed completions after both starts' '.outcomes.ticket==2'
+assert_sql 'both delayed alerts reach each installation once and keep original deadlines' "select count(*)=4 and count(distinct d.installation_id)=2 and bool_and(d.state='ticket'
+  and d.provider='local' and d.ticket_id like 'local:ok:%' and d.attempts=1 and n.expires_at=n.event_at+interval '24 hours')
+  from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id
+  where n.recipient_user_id='${A_UID}' and n.lifter_user_id='${B_UID}' and n.session_id='${DELAYED}';"
+drain_worker; check 'accepted delayed alerts never replay' '.claimed==0'
+rpc "${A_TOKEN}" notification_unregister "$(jq -nc --arg i "${DELAYED_INSTALL}" --arg b "${DELAYED_BINDING}" '{p_installation_id:$i,p_binding_id:$b}')"
+expect_ok 'unregister temporary delayed-recovery installation'
+assert_sql 'downstream fixture retains only its original active installation' "select count(*)=1 from app_public.notification_installations
+  where user_id='${A_UID}' and active and permission and opted_in;"
+next_cuam
+push "${B_TOKEN}" 'delete recovered completed source' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 "${NOW_MS}" "${CUAM}")"
+for intent_id in "${DELAYED_START}" "${DELAYED_COMPLETION}"; do
+  rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${intent_id}}"; expect_ok 'deleted source projection'
+  [[ "${BODY}" == null ]] || fail 'deleted source projected a captured activity alert'
+done
+run_psql "select app_public.notification_start_workout('${B_UID}','${DELAYED}');" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_workout_enqueue "$(jq -nc --arg m "${B_UID}" --arg s "${DELAYED}" --argjson g "${GEN}" \
+  '{p_member:$m,p_session:$s,p_generation:$g,p_contributions:[]}')"; expect_ok 'deleted source producer rejects new completion'
+[[ "${BODY}" == false ]] || fail 'deleted source completion remained ready'
+assert_sql 'deleted source producer retains only the two existing identities' "select count(*)=2 from app_public.notification_intents
+  where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${DELAYED}';"
+# An expired captured start never renews its clock or delays a newly completed source.
+EXPIRED_START="expired-start-${RUN_TAG}"; EXPIRED_START_MS="$((NOW_MS-90000000))"
+EXPIRY_EPOCH="$(run_psql 'select started_at from app_public.notification_workout_epoch;')"
+run_psql "update app_public.notification_workout_epoch set started_at=now()-interval '26 hours';" >/dev/null
+next_cuam
+push "${B_TOKEN}" 'capture already expired active start' "$(e_session "${EXPIRED_START}" "${EXPIRED_START_MS}" active null null null "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" 'fresh completion follows the expired original start' "$(e_session "${EXPIRED_START}" "${EXPIRED_START_MS}" completed "${NOW_MS}" 90000 null "${CUAM}")"
+confirm "${B_TOKEN}" "${EXPIRED_START}" "$(manifest "${B_UID}" "${EXPIRED_START}")"; check 'fresh completion with expired start confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "${EXPIRED_START}"; enqueue_outcome "${B_UID}" "${EXPIRED_START}"
+assert_sql 'expired original start is unchanged and produces no renewed start alert' "select w.start_at=to_timestamp(${EXPIRED_START_MS}/1000.0)
+  and m.event_at=w.start_at and w.start_at>=(select started_at from app_public.notification_workout_epoch)
+  and w.can_start and w.start_at+interval '24 hours'<=now()
+  and not app_public.notification_start_ready(w.member_user_id,w.session_id,w.start_at)
+  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id and n.kind='start')
+  from app_public.notification_workouts w join app_public.notification_workout_moments m
+    on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
+  where w.member_user_id='${B_UID}' and w.session_id='${EXPIRED_START}';"
+drain_worker
+assert_sql 'fresh completion reaches the local sink without its expired start' "select count(*)=1 and bool_and(n.kind='completion'
+  and n.event_at=to_timestamp(${NOW_MS}/1000.0) and n.expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours'
+  and d.state='ticket' and d.provider='local' and d.ticket_id like 'local:ok:%')
+  from app_public.notification_intents n join app_public.notification_deliveries d on d.intent_id=n.id
+  where n.recipient_user_id='${A_UID}' and n.lifter_user_id='${B_UID}' and n.session_id='${EXPIRED_START}';"
+run_psql "update app_public.notification_workout_epoch set started_at='${EXPIRY_EPOCH}';" >/dev/null
+run_psql 'update app_public.notification_config set sending_enabled=false;' >/dev/null
 SESSION="fresh-${RUN_TAG}"; BLOCK="fresh-block-${RUN_TAG}"; SET="fresh-set-${RUN_TAG}"
 next_cuam
 push "${B_TOKEN}" 'active session' "$(e_session "${SESSION}" "${NOW_MS}" active null null null "${CUAM}")"

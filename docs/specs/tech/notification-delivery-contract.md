@@ -20,7 +20,8 @@ Pre-cutover completed history never replays; a pre-cutover active workout can
 complete freshly without replaying its start. Its rank baseline starts at the
 cutover's current coherent board, or the first trustworthy later publication
 if rebuilding; unavailable earlier ranks are never invented.
-Isolated session triggers append immutable activity moments; descendant writes
+Isolated session triggers append immutable activity moments; start admission
+survives completion before recovery. Descendant writes
 kick the worker. Raw intake retains no source/workout/allocator locks. Exact
 current digests reject changed graphs even if intake failed. Recovery admits a
 fair bounded batch, locks all repair groups then all sources before enqueue,
@@ -135,8 +136,9 @@ Claims are fenced by random claim UUIDs. Admission and the sending lease use
 fresh wall-clock time after policy/source lock waits. A leased job can recover
 after worker death. Handoff changes it to `sending`; a crashed or timed-out
 handoff becomes `uncertain`, parked for diagnosis rather than blindly resent.
-Completion handoff cancels unsent starts and waits while a start handoff is
-in flight. A provider ticket settles that handoff, but does not prove display.
+Completion handoff waits for live installations' fresh admitted starts to settle,
+and for an in-flight start handoff; other unsent starts are cancelled. A provider
+ticket settles that handoff, but does not prove display.
 Explicit temporary rejection backs off, at most five send attempts; permanent
 payload/credential errors park with an allowlisted code. Sending-disabled jobs
 have an explicit state and are reconsidered only while their original expiry
