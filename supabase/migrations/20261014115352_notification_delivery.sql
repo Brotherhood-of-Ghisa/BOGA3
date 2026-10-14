@@ -322,8 +322,8 @@ begin
   select * into i from notification_installations where id=d.installation_id for update;
   select * into d from notification_deliveries where id=p_delivery_id for update;
   select * into n from notification_intents where id=d.intent_id;
-  if d.state<>'leased' or d.claim_id is distinct from p_claim_id or d.generation<>p_generation or
-      n.generation<>p_generation or d.lease_until<=now() then return null; end if;
+  if d.state<>'leased' or d.claim_id is distinct from p_claim_id or d.generation is distinct from p_generation or
+      n.generation is distinct from p_generation or d.lease_until<=now() then return null; end if;
   select * into c from notification_config where singleton;
   if not i.active or not i.permission or not i.opted_in or i.binding_id<>d.binding_id or i.user_id<>n.recipient_user_id or
     i.environment is distinct from c.environment or i.project_id is distinct from c.project_id or

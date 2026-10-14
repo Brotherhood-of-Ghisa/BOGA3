@@ -260,7 +260,7 @@ expect_ok 'old receipt applied'
 run_psql "update app_public.group_memberships set ended_at=now() where group_id='${GROUP_ID}' and user_id='${B_UID}' and ended_at is null;" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"
 expect_ok 'departed lifter projection'
-check 'durable share remains visible to live recipient' '.route.groupId==$g and .identity|type=="string"' --arg g "${GROUP_ID}"
+check 'durable share remains visible to live recipient' '.route.groupId==$g and (.identity|type)=="string"' --arg g "${GROUP_ID}"
 # Purging an inactive installation removes its provider token, retaining only the rebind capability digest.
 run_psql "update app_public.notification_installations set active=false,updated_at=now()-interval '31 days' where id='${INSTALL_ID}';
   update app_public.notification_intents set event_at=now()-interval '32 days',expires_at=now()-interval '31 days' where id=${COMPLETION};

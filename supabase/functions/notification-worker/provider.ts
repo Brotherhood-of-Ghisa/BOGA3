@@ -3,7 +3,7 @@ import { providerOutcome, type ProviderOutcome } from '../../../apps/mobile/src/
 export type Envelope = { v: 1; bindingId: string; nonce: string; ciphertext: string };
 export type PushMessage = { to: string; title: string; body: string; expiration: number; mutableContent: true; categoryId: string; data: Envelope };
 const base64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
-const unbase64 = (value: string): Uint8Array => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+const unbase64 = (value: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 
 export const encryptProjection = async (key: string, bindingId: string, projection: unknown): Promise<Envelope> => {
   const raw = unbase64(key);

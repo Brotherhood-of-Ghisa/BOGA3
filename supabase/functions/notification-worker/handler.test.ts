@@ -29,7 +29,7 @@ Deno.test('AES-GCM standard native format authenticates binding and ciphertext',
   const nativeKey = await crypto.subtle.importKey('raw', decode(key), 'AES-GCM', false, ['decrypt']);
   const nonce = decode(envelope.nonce); const combined = decode(envelope.ciphertext);
   equal(nonce.length, 12); assert(combined.length > 16);
-  const decrypt = (bindingId: string, value: Uint8Array) => crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce,
+  const decrypt = (bindingId: string, value: Uint8Array<ArrayBuffer>) => crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce,
     additionalData: new TextEncoder().encode(`boga-notification-v1:${bindingId}`), tagLength: 128 }, nativeKey, value);
   equal(JSON.parse(new TextDecoder().decode(await decrypt(binding, combined))), projection);
   for (const [id, bytes] of [['wrong-binding', combined], [binding, combined.slice(0, -1)]] as const) {
