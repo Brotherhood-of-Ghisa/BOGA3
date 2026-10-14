@@ -756,6 +756,49 @@ ATTR_INTENT="$(run_psql "select id from app_public.notification_intents where re
   and session_id='${ATTR_SESSION}' and kind='completion';")"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${ATTR_INTENT}}"; expect_ok 'project incomparable-source completion'
 check 'completion activity and bests remain available when ranks fail closed' '.kind=="completion" and .heading=="Finished a workout" and .bestCount==2 and .rankCount==0'
+certify_attribution_set() {
+  rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${ATTR_EXERCISE}" \
+    '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"
+  expect_ok 'read real certification write token'
+  CERT_TOKEN="$(jq -er --arg u "${B_UID}" --arg s "${ATTR_SET}" '.entries[]|select(.member.user_id==$u and .performance.set_id==$s)|.write_token' <<<"${BODY}")"
+  CERT_REV="$(jq -er '.rules.rules_revision' <<<"${BODY}")"
+  rpc "${A_TOKEN}" group_competition_certify "$(jq -nc --arg g "${G2}" --arg x "${ATTR_EXERCISE}" --arg u "${B_UID}" \
+    --arg s "${ATTR_SET}" --arg t "${CERT_TOKEN}" --argjson r "${CERT_REV}" \
+    '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_write_token:$t}')"
+  expect_ok 'create real whole-set witness'; ATTR_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+  drain_eval
+}
+certify_attribution_set
+VOID_CERT="${ATTR_CERT}"
+seed_published_workout_baseline
+assert_sql 'published baseline retains both Certified placements' "select (select count(*) from jsonb_array_elements(baseline_scores) b
+  where (b->>'certified')::boolean)=2 and (select count(*) from jsonb_array_elements(before_ranks) r
+  where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')=2 from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'performed input edit voids the original witness' "$(e_attr_set 106)"
+assert_attribution_count 2 'workout source edit did not attribute its own lost Certified placements'
+assert_sql 'publisher voids the real whole-set witness' "select count(*)=2 and bool_and(ended_at is not null and end_reason='voided')
+  from app_public.group_metric_certifications where group_exercise_id='${ATTR_EXERCISE}' and member_user_id='${B_UID}' and set_id='${ATTR_SET}'
+    and coalesce(legacy_certification_id,witness_certification_id,id)='${VOID_CERT}'::uuid;"
+assert_sql 'causal witness restores the voided original Certified contribution' "select
+  (select count(*) from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')=2
+  and not exists(select 1 from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';"
+for end_action in withdraw cancel; do
+  certify_attribution_set
+  seed_published_workout_baseline
+  CERT_INPUTS="$(run_psql "select performance_inputs::text from app_public.notification_workout_targets where member_user_id='${B_UID}'
+    and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';")"
+  rpc "${A_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${G2}" --arg c "${ATTR_CERT}" --arg a "${end_action}" \
+    '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:$a}')"
+  expect_ok 'standalone witness lifecycle change'
+  assert_attribution_count 0 "standalone witness ${end_action} was attributed to an unchanged workout"
+  assert_sql 'standalone witness ending preserves performed inputs and no causal Certified contribution' "select
+    performance_inputs='${CERT_INPUTS}'::jsonb and without_workout=final_ranks
+    and not exists(select 1 from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+    from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';"
+done
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'public preview after private baseline capture'
 check 'public preview omits private baseline scores' '[..|objects|(has("baseline_scores") or has("baselineScores"))]|any|not'
 assert_sql 'forfeited start remains absent after later recovery and worker preparation' "select not exists(select 1 from app_public.notification_intents
