@@ -82,6 +82,33 @@ describe('workout notification final outcomes', () => {
       { group_id: 'group-a', best_count: 2, rank_count: 2 },
     ]);
   });
+  test('metadata promotion and first Certified admission retain the original qualified contribution', () => {
+    // Mode-only promotion of a formerly lower source is held in the producer's counterfactual.
+    expect(countWorkoutRankChanges(ranks(['peer', 'lifter']), ranks(['lifter', 'peer']),
+      ranks(['lifter', 'peer']), 'lifter')).toBe(0);
+    // An unchanged originally counted set gains a witness, so qualification appears in both current boards.
+    expect(countWorkoutRankChanges([], ranks(['lifter'], true), ranks(['lifter'], true), 'lifter')).toBe(0);
+  });
+  test('frozen control admission separates fresh performance from an existing placement', () => {
+    const before = ranks(['peer']);
+    // Retroactive admission puts L below the peer; edits and fresh sets remaining below change no position.
+    expect(countWorkoutRankChanges(before, ranks(['peer', 'lifter']), ranks(['peer', 'lifter']), 'lifter')).toBe(0);
+    // A genuinely fresh improvement crosses the peer; its original control-admitted contribution stays below.
+    expect(countWorkoutRankChanges(before, ranks(['lifter', 'peer']), ranks(['peer', 'lifter']), 'lifter')).toBe(1);
+    // Admission originally put L above the peer: old120→80 plus fresh130 leaves the original position intact.
+    expect(countWorkoutRankChanges(before, ranks(['lifter', 'peer']), ranks(['lifter', 'peer']), 'lifter')).toBe(0);
+  });
+  test('current withdrawal permits a genuinely improved Certified source without retaining the withdrawn score', () => {
+    expect(countWorkoutRankChanges(ranks(['peer', 'lifter'], true), ranks(['lifter', 'peer'], true),
+      ranks(['peer'], true), 'lifter')).toBe(2);
+  });
+  test('an admitted planned set has no numeric contribution before its first performed placement', () => {
+    const bothMetrics = (rows: NotificationRank[]): NotificationRank[] => [...rows,
+      ...rows.map(row => ({ ...row, metric: 'volume' as const }))];
+    const result = { ...target(), best_metrics: [], before: bothMetrics(ranks(['peer'])),
+      final: bothMetrics(ranks(['lifter', 'peer'])), without_workout: bothMetrics(ranks(['peer'])) };
+    expect(workoutContributions([result], 'lifter')).toEqual([{ group_id: 'group-a', best_count: 0, rank_count: 4 }]);
+  });
 });
 
 describe('canonical completion graph', () => {

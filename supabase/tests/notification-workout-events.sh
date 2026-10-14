@@ -70,7 +70,7 @@ drain_worker() {
 }
 prepare_outcome() {
   rpc "${SERVICE_ROLE_KEY}" notification_workout_prepare '{"p_limit":20}'; expect_ok 'prepare source outcomes'
-  check 'worker jobs omit private baseline scores' '[..|objects|(has("baseline_scores") or has("baselineScores"))]|any|not'
+  check 'worker jobs omit private source baselines and controls' '[..|objects|(has("baseline_scores") or has("baselineScores") or has("admission_scores") or has("admissionScores") or has("source_controls") or has("sourceControls"))]|any|not'
   TARGETS="$(jq --arg u "$1" --arg s "$2" '.jobs[]|select(.member_user_id==$u and .session_id==$s)' <<<"${BODY}")"
   [[ -n "${TARGETS}" ]] || fail 'ready workout missing from prepare'
   COUNTS="$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
@@ -768,7 +768,9 @@ certify_attribution_set() {
   expect_ok 'create real whole-set witness'; ATTR_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
   drain_eval
 }
+seed_published_workout_baseline
 certify_attribution_set
+assert_attribution_count 0 'standalone first Certified admission claimed an unchanged performed source'
 VOID_CERT="${ATTR_CERT}"
 seed_published_workout_baseline
 assert_sql 'published baseline retains both Certified placements' "select (select count(*) from jsonb_array_elements(baseline_scores) b
@@ -785,6 +787,12 @@ assert_sql 'causal witness restores the voided original Certified contribution' 
   (select count(*) from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')=2
   and not exists(select 1 from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
   from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${ATTR_SESSION}' and group_exercise_id='${ATTR_EXERCISE}';"
+seed_published_workout_baseline
+next_cuam
+push "${B_TOKEN}" 'genuine improved source precedes its new witness' "$(e_attr_set 107)"
+drain_eval
+certify_attribution_set
+assert_attribution_count 2 'qualifying witness suppressed Certified admission of a genuinely improved source'
 for end_action in withdraw cancel; do
   certify_attribution_set
   seed_published_workout_baseline
@@ -852,8 +860,335 @@ assert_sql 'fallback is keyed by metric and board scope and remains ready' "sele
     (select jsonb_agg(r order by r->>'rank') from jsonb_array_elements(before_ranks) r where r->>'metric'='e1rm')
   and before_ranks<>final_ranks from app_public.notification_workout_targets
   where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+INDEP_PEER_VOLUME_CREATED="$(run_psql "select created_at from app_public.exercise_sets where owner_user_id='${C_UID}' and id='indep-peer-volume-set-${RUN_TAG}';")"
+INDEP_PEER_E1RM_CREATED="$(run_psql "select created_at from app_public.exercise_sets where owner_user_id='${C_UID}' and id='indep-peer-e1rm-set-${RUN_TAG}';")"
+next_cuam
+push "${B_TOKEN}" 'prepare mode-only winner promotion sources' \
+  "$(e_set "${INDEP_VOLUME_SET}" "${INDEP_VOLUME_BLOCK}" 0 60 2 '' "${CUAM}" | jq --argjson c "${INDEP_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "${INDEP_E1RM_SET}" "${INDEP_E1RM_BLOCK}" 0 100 1 '' "${CUAM}" | jq --argjson c "${INDEP_CREATED}" '.fields.created_at=$c')" \
+  "$(e_def "indep-nonwinner-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "indep-nonwinner-${RUN_TAG}" "${G2}" "${INDEP_EXERCISE}" "${CUAM}")"
+next_cuam; NONWINNER_CREATED="${CUAM}"
+NONWINNER_BLOCK="indep-nonwinner-block-${RUN_TAG}"; NONWINNER_SET="indep-nonwinner-set-${RUN_TAG}"
+push "${B_TOKEN}" 'publish a source absent from every original numeric winner' \
+  "$(e_se "${NONWINNER_BLOCK}" "${INDEP_SESSION}" "indep-nonwinner-${RUN_TAG}" 2 Bench "${CUAM}")" \
+  "$(e_set "${NONWINNER_SET}" "${NONWINNER_BLOCK}" 0 60 1 '' "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'one peer threshold for mode-only promotions' \
+  "$(e_set "indep-peer-volume-set-${RUN_TAG}" "indep-peer-block-${RUN_TAG}" 0 30 10 '' "${CUAM}" "${NOW_MS}" | jq --argjson c "${INDEP_PEER_VOLUME_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "indep-peer-e1rm-set-${RUN_TAG}" "indep-peer-block-${RUN_TAG}" 1 110 1 '' "${CUAM}" | jq --argjson c "${INDEP_PEER_E1RM_CREATED}" '.fields.created_at=$c')"
+drain_eval
+seed_independent_baseline() {
+  run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}';
+    delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}';
+    select app_public.notification_capture_comparison('${G2}','${INDEP_EXERCISE}',${INDEP_REV},false);" >/dev/null
+}
+check_independent_origin() {
+  confirm "${B_TOKEN}" "${INDEP_SESSION}" "$(manifest "${B_UID}" "${INDEP_SESSION}")"; check 'origin graph confirmed' '.confirmed==true'
+  drain_eval
+  prepare_outcome "${B_UID}" "${INDEP_SESSION}"
+  jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail "$1"
+}
+seed_independent_baseline
+assert_sql 'original numeric winners differ from the latent promoted source' "select jsonb_array_length(baseline_scores)=2
+  and baseline_scores@>jsonb_build_array(jsonb_build_object('metric','volume','set_id','${INDEP_VOLUME_SET}','value',120),
+    jsonb_build_object('metric','e1rm','set_id','${INDEP_E1RM_SET}','value',100))
+  and not exists(select 1 from jsonb_array_elements(baseline_scores) b where b->>'set_id'='${NONWINNER_SET}')
+  and source_controls?'${NONWINNER_SET}' from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'mode-only Volume source becomes the final 1RM winner' "$(e_def "indep-volume-${RUN_TAG}" Bench "${CUAM}" per_side_load)"
+check_independent_origin 'a changed final winning source manufactured 1RM rank origins'
+assert_sql 'mode promotion really crossed the peer and substituted the 1RM winner' "select before_ranks<>final_ranks
+  and exists(select 1 from app_public.group_metric_board_entries e where e.group_exercise_id=t.group_exercise_id
+    and e.member_user_id=t.member_user_id and e.metric='e1rm' and not e.certified and e.set_id='${INDEP_VOLUME_SET}' and e.value>110)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'restore original Volume interpretation for latent-source baseline' "$(e_def "indep-volume-${RUN_TAG}" Bench "${CUAM}" total_load)"
+drain_eval
+seed_independent_baseline
+next_cuam
+push "${B_TOKEN}" 'mode alone promotes the formerly nonwinning source' "$(e_def "indep-nonwinner-${RUN_TAG}" Bench "${CUAM}" per_side_load)"
+check_independent_origin 'a source absent from the four numeric baselines manufactured rank origins'
+assert_sql 'the formerly nonwinning set is now the final 1RM winner' "select exists(select 1 from app_public.group_metric_board_entries
+  where group_exercise_id='${INDEP_EXERCISE}' and member_user_id='${B_UID}' and metric='e1rm' and not certified
+    and set_id='${NONWINNER_SET}' and value>110);"
+next_cuam; MODE_FRESH_CREATED="${CUAM}"
+push "${B_TOKEN}" 'fresh winner stays above a peer already crossed by metadata' \
+  "$(e_set "mode-fresh-set-${RUN_TAG}" "${INDEP_E1RM_BLOCK}" 1 130 1 '' "${CUAM}")"
+check_independent_origin 'a fresh winner claimed the earlier metadata-only crossing'
+assert_sql 'metadata-promoted source still supports the current counterfactual placement' "select
+  (select jsonb_agg(r order by r->>'member_user_id') from jsonb_array_elements(without_workout) r where r->>'metric'='e1rm')=
+  (select jsonb_agg(r order by r->>'member_user_id') from jsonb_array_elements(final_ranks) r where r->>'metric'='e1rm')
+  and exists(select 1 from app_public.group_metric_board_entries e where e.group_exercise_id=t.group_exercise_id
+    and e.member_user_id=t.member_user_id and e.metric='e1rm' and not e.certified and e.set_id='mode-fresh-set-${RUN_TAG}' and e.value=130)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+next_cuam
+push "${C_TOKEN}" 'peer rises above the unchanged metadata-promoted source' \
+  "$(e_set "indep-peer-e1rm-set-${RUN_TAG}" "indep-peer-block-${RUN_TAG}" 1 135 1 '' "${CUAM}" | jq --argjson c "${INDEP_PEER_E1RM_CREATED}" '.fields.created_at=$c')"
+next_cuam
+push "${B_TOKEN}" 'performed improvement crosses the higher peer threshold' \
+  "$(e_set "mode-fresh-set-${RUN_TAG}" "${INDEP_E1RM_BLOCK}" 1 140 1 '' "${CUAM}" | jq --argjson c "${MODE_FRESH_CREATED}" '.fields.created_at=$c')"
+confirm "${B_TOKEN}" "${INDEP_SESSION}" "$(manifest "${B_UID}" "${INDEP_SESSION}")"; check 'higher peer crossing graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "${INDEP_SESSION}"
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==2' <<<"${COUNTS}" >/dev/null || fail 'metadata-promoted old source suppressed a later performed 1RM crossing'
+# Linking already-performed activity admits a comparison, without inventing a newly performed origin.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"First-link origin",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create first-link comparison'; LINK_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+next_cuam; LINK_OLD_CREATED="${CUAM}"
+push "${B_TOKEN}" 'already performed active source before its first link' \
+  "$(e_def "first-link-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_session "first-link-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "first-link-block-${RUN_TAG}" "first-link-session-${RUN_TAG}" "first-link-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "first-link-old-set-${RUN_TAG}" "first-link-block-${RUN_TAG}" 0 80 1 '' "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'first-link peer publishes before retroactive admission' \
+  "$(e_def "first-link-peer-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "first-link-peer-def-${RUN_TAG}" "${G2}" "${LINK_EXERCISE}" "${CUAM}")" \
+  "$(e_session "first-link-peer-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")" \
+  "$(e_se "first-link-peer-block-${RUN_TAG}" "first-link-peer-session-${RUN_TAG}" "first-link-peer-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "first-link-peer-set-${RUN_TAG}" "first-link-peer-block-${RUN_TAG}" 0 110 1 '' "${CUAM}")"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'retroactive first link of the already-performed source' \
+  "$(e_link "first-link-def-${RUN_TAG}" "${G2}" "${LINK_EXERCISE}" "${CUAM}")" \
+  "$(e_session "first-link-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "first-link-session-${RUN_TAG}" "$(manifest "${B_UID}" "first-link-session-${RUN_TAG}")"; check 'retroactive first-link graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "first-link-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'retroactive first link invented performed rank origins'
+next_cuam
+push "${B_TOKEN}" 'old admitted source improves but stays below the peer' \
+  "$(e_set "first-link-old-set-${RUN_TAG}" "first-link-block-${RUN_TAG}" 0 100 1 '' "${CUAM}" | jq --argjson c "${LINK_OLD_CREATED}" '.fields.created_at=$c')"
+confirm "${B_TOKEN}" "first-link-session-${RUN_TAG}" "$(manifest "${B_UID}" "first-link-session-${RUN_TAG}")"; check 'below-threshold edited graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "first-link-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'admitted source improvement below the peer invented rank movement'
+next_cuam
+push "${B_TOKEN}" 'new performed source remains below the admitted peer threshold' "$(e_set "first-link-below-set-${RUN_TAG}" "first-link-block-${RUN_TAG}" 1 100 1 '' "${CUAM}")"
+confirm "${B_TOKEN}" "first-link-session-${RUN_TAG}" "$(manifest "${B_UID}" "first-link-session-${RUN_TAG}")"; check 'new below-threshold graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "first-link-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'new below-peer source invented rank movement after admission'
+next_cuam
+push "${B_TOKEN}" 'new performed source after its valid link boundary' "$(e_set "first-link-new-set-${RUN_TAG}" "first-link-block-${RUN_TAG}" 2 130 1 '' "${CUAM}")"
+confirm "${B_TOKEN}" "first-link-session-${RUN_TAG}" "$(manifest "${B_UID}" "first-link-session-${RUN_TAG}")"; check 'new linked performed graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "first-link-session-${RUN_TAG}"
+jq -e '[.[]|.rank_count]|add>0' <<<"${COUNTS}" >/dev/null || fail 'genuinely performed linked source lost its valid rank origin'
+assert_sql 'the new performed source satisfies the existing link boundary' "select s.created_at>=l.updated_at from app_public.exercise_sets s
+  join app_public.exercise_group_links l on l.owner_user_id=s.owner_user_id and l.exercise_definition_id='first-link-def-${RUN_TAG}'
+  where s.owner_user_id='${B_UID}' and s.id='first-link-new-set-${RUN_TAG}' and l.group_id='${G2}' and l.deleted_at is null;"
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Admission threshold",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create admitted threshold comparison'; ADMIT_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+next_cuam; ADMIT_CREATED="${CUAM}"
+push "${B_TOKEN}" 'already-performed above-peer source before its control admission' \
+  "$(e_def "admit-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_session "admit-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "admit-block-${RUN_TAG}" "admit-session-${RUN_TAG}" "admit-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "admit-old-set-${RUN_TAG}" "admit-block-${RUN_TAG}" 0 120 1 '' "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'admission peer threshold' "$(e_def "admit-peer-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "admit-peer-def-${RUN_TAG}" "${G2}" "${ADMIT_EXERCISE}" "${CUAM}")" \
+  "$(e_session "admit-peer-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")" \
+  "$(e_se "admit-peer-block-${RUN_TAG}" "admit-peer-session-${RUN_TAG}" "admit-peer-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "admit-peer-set-${RUN_TAG}" "admit-peer-block-${RUN_TAG}" 0 110 1 '' "${CUAM}")"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'metadata alone admits an already above-peer source' \
+  "$(e_link "admit-def-${RUN_TAG}" "${G2}" "${ADMIT_EXERCISE}" "${CUAM}")" \
+  "$(e_session "admit-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "admit-session-${RUN_TAG}" "$(manifest "${B_UID}" "admit-session-${RUN_TAG}")"; check 'above-peer admission confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "admit-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'control admission of an above-peer source created rank origins'
+next_cuam
+push "${B_TOKEN}" 'new source replaces corrected admission without a further crossing' \
+  "$(e_set "admit-old-set-${RUN_TAG}" "admit-block-${RUN_TAG}" 0 80 1 '' "${CUAM}" | jq --argjson c "${ADMIT_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "admit-new-set-${RUN_TAG}" "admit-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")"
+confirm "${B_TOKEN}" "admit-session-${RUN_TAG}" "$(manifest "${B_UID}" "admit-session-${RUN_TAG}")"; check 'replacement admission graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "admit-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'replacement of an already above-peer admission invented a crossing'
+assert_sql 'original admitted threshold remains frozen below the fresh replacement' "select admission_scores@>
+  jsonb_build_array(jsonb_build_object('metric','e1rm','certified',false,'value',120)) and exists(
+    select 1 from app_public.group_metric_board_entries e where e.group_exercise_id=t.group_exercise_id and e.member_user_id=t.member_user_id
+      and e.metric='e1rm' and not e.certified and e.set_id='admit-new-set-${RUN_TAG}' and e.value=130)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='admit-session-${RUN_TAG}' and group_exercise_id='${ADMIT_EXERCISE}';"
+# A withdrawn old witness does not veto the Certified crossing of a fresh performed and qualified source.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Qualified source threshold",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create qualified source comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in original peer; do
+  if [[ "${source}" == original ]]; then QUAL_USER="${B_UID}"; QUAL_TOKEN="${B_TOKEN}"; QUAL_WEIGHT=100; else QUAL_USER="${C_UID}"; QUAL_TOKEN="${C_TOKEN}"; QUAL_WEIGHT=110; fi
+  next_cuam
+  push "${QUAL_TOKEN}" 'publish original and peer witness thresholds' "$(e_def "qual-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "qual-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  push "${QUAL_TOKEN}" 'performed source at its witness threshold' "$(e_session "qual-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "qual-${source}-block-${RUN_TAG}" "qual-${source}-session-${RUN_TAG}" "qual-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "qual-${source}-set-${RUN_TAG}" "qual-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+done
+drain_eval
+qualify_source_set() {
+  rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${QUAL_EXERCISE}" \
+    '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"; expect_ok 'read qualifying write token'
+  QUAL_WRITE="$(jq -er --arg u "$1" --arg s "$2" '.entries[]|select(.member.user_id==$u and .performance.set_id==$s)|.write_token' <<<"${BODY}")"
+  rpc "${A_TOKEN}" group_competition_certify "$(jq -nc --arg g "${G2}" --arg x "${QUAL_EXERCISE}" --arg u "$1" --arg s "$2" \
+    --arg t "${QUAL_WRITE}" --argjson r "${QUAL_REV}" \
+    '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_write_token:$t}')"
+  expect_ok 'real qualifying whole-set witness'; QUAL_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"; drain_eval
+}
+qualify_source_set "${B_UID}" "qual-original-set-${RUN_TAG}"; QUAL_ORIGINAL_CERT="${QUAL_CERT}"
+qualify_source_set "${C_UID}" "qual-peer-set-${RUN_TAG}"
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+rpc "${A_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${G2}" --arg c "${QUAL_ORIGINAL_CERT}" \
+  '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:"withdraw"}')"; expect_ok 'withdraw unchanged original witness'
+next_cuam
+push "${B_TOKEN}" 'fresh performed source crosses the peer after original withdrawal' \
+  "$(e_set "qual-fresh-set-${RUN_TAG}" "qual-original-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")" \
+  "$(e_session "qual-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "qual-fresh-set-${RUN_TAG}"
+confirm "${B_TOKEN}" "qual-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "qual-original-session-${RUN_TAG}")"; check 'fresh qualified graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "qual-original-session-${RUN_TAG}"
+jq -e --arg g "${G2}" 'any(.[];.group_id==$g and .rank_count==8)' <<<"${COUNTS}" >/dev/null || fail 'withdrawn original witness vetoed a fresh qualified crossing'
+QUAL_CERTIFIED_COUNT="$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
+  const { countWorkoutRankChanges } = await import(process.argv[3]);
+  const job=JSON.parse(process.argv[1]), target=job.targets.find(t=>t.group_exercise_id===process.argv[2]);
+  process.stdout.write(String(countWorkoutRankChanges(...[target.before,target.final,target.without_workout].map(rows=>rows.filter(r=>r.certified)),job.member_user_id)));
+' "${TARGETS}" "${QUAL_EXERCISE}" "${SUPABASE_DIR}/../apps/mobile/src/notifications/workout-events.ts")"
+[[ "${QUAL_CERTIFIED_COUNT}" == 4 ]] || fail 'fresh qualified source did not retain both members Certified movements'
+assert_sql 'the original performed source is unchanged and its old witness withdrawn' "select s.weight_value='100' and s.reps_value='1' and
+  (select count(*)=2 and bool_and(end_reason='withdrawn') from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${QUAL_ORIGINAL_CERT}')
+  from app_public.exercise_sets s where owner_user_id='${B_UID}' and id='qual-original-set-${RUN_TAG}';"
+# A link admitted while the source is still planned does not establish a performed score threshold.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Planned first admission",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create planned first-admission comparison'; PLANNED_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+next_cuam; PLANNED_CREATED="${CUAM}"
+push "${B_TOKEN}" 'old planned source predates its first comparison link' \
+  "$(e_def "planned-admit-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_session "planned-admit-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "planned-admit-block-${RUN_TAG}" "planned-admit-session-${RUN_TAG}" "planned-admit-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "planned-admit-set-${RUN_TAG}" "planned-admit-block-${RUN_TAG}" 0 130 1 planned "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'publish peer before the planned-source admission' \
+  "$(e_def "planned-admit-peer-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "planned-admit-peer-def-${RUN_TAG}" "${G2}" "${PLANNED_EXERCISE}" "${CUAM}")" \
+  "$(e_session "planned-admit-peer-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")" \
+  "$(e_se "planned-admit-peer-block-${RUN_TAG}" "planned-admit-peer-session-${RUN_TAG}" "planned-admit-peer-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "planned-admit-peer-set-${RUN_TAG}" "planned-admit-peer-block-${RUN_TAG}" 0 110 1 '' "${CUAM}")"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'first coherent link publication keeps the source planned' \
+  "$(e_link "planned-admit-def-${RUN_TAG}" "${G2}" "${PLANNED_EXERCISE}" "${CUAM}")"
+drain_eval
+assert_sql 'planned admission freezes no counting metric or scalar threshold' "select evaluated and admission_scores='[]'::jsonb
+  and source_controls->'planned-admit-set-${RUN_TAG}'->>'admission_pin' is not null
+  and source_controls->'planned-admit-set-${RUN_TAG}'->'admission_metrics'='[]'::jsonb
+  and not exists(select 1 from app_public.group_metric_set_scores s where s.group_exercise_id=t.group_exercise_id
+    and s.member_user_id=t.member_user_id and s.set_id='planned-admit-set-${RUN_TAG}' and s.counting)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='planned-admit-session-${RUN_TAG}' and group_exercise_id='${PLANNED_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'perform the previously planned working source and complete' \
+  "$(e_set "planned-admit-set-${RUN_TAG}" "planned-admit-block-${RUN_TAG}" 0 130 1 '' "${CUAM}" | jq --argjson c "${PLANNED_CREATED}" '.fields.created_at=$c')" \
+  "$(e_session "planned-admit-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "planned-admit-session-${RUN_TAG}" "$(manifest "${B_UID}" "planned-admit-session-${RUN_TAG}")"; check 'newly performed admission graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "planned-admit-session-${RUN_TAG}"
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==4' <<<"${COUNTS}" >/dev/null || fail 'planned admission suppressed its later first performed placement'
+assert_sql 'first performed source crosses the published peer on both metrics' "select app_public.notification_workout_ready(member_user_id,session_id)
+  and admission_scores='[]'::jsonb and source_controls->'planned-admit-set-${RUN_TAG}'->'admission_metrics'='[]'::jsonb
+  and not exists(select 1 from jsonb_array_elements(before_ranks) r where r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where r->>'member_user_id'='${B_UID}' and not (r->>'certified')::boolean)
+  and (select count(*)=2 from app_public.group_metric_board_entries e where e.group_exercise_id=t.group_exercise_id
+    and e.member_user_id=t.member_user_id and not e.certified and e.set_id='planned-admit-set-${RUN_TAG}' and e.value=130)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='planned-admit-session-${RUN_TAG}' and group_exercise_id='${PLANNED_EXERCISE}';"
+# First capture must not infer an old lower working score from its current warm-up effort.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"First-capture effort",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create first-capture effort comparison'; EFFORT_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+next_cuam
+push "${B_TOKEN}" 'first-capture original definitions and links' \
+  "$(e_def "effort-winner-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "effort-winner-def-${RUN_TAG}" "${G2}" "${EFFORT_EXERCISE}" "${CUAM}")" \
+  "$(e_def "effort-lower-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "effort-lower-def-${RUN_TAG}" "${G2}" "${EFFORT_EXERCISE}" "${CUAM}")"
+next_cuam; EFFORT_CREATED="${CUAM}"
+push "${B_TOKEN}" 'publish original working winner and lower source' \
+  "$(e_session "effort-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+  "$(e_se "effort-winner-block-${RUN_TAG}" "effort-session-${RUN_TAG}" "effort-winner-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "effort-winner-set-${RUN_TAG}" "effort-winner-block-${RUN_TAG}" 0 120 1 '' "${CUAM}")" \
+  "$(e_se "effort-lower-block-${RUN_TAG}" "effort-session-${RUN_TAG}" "effort-lower-def-${RUN_TAG}" 1 Bench "${CUAM}")" \
+  "$(e_set "effort-lower-set-${RUN_TAG}" "effort-lower-block-${RUN_TAG}" 0 110 1 '' "${CUAM}")"
+next_cuam; EFFORT_PEER_CREATED="${CUAM}"
+push "${C_TOKEN}" 'publish original first-capture peer threshold' \
+  "$(e_def "effort-peer-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "effort-peer-def-${RUN_TAG}" "${G2}" "${EFFORT_EXERCISE}" "${CUAM}")" \
+  "$(e_session "effort-peer-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")" \
+  "$(e_se "effort-peer-block-${RUN_TAG}" "effort-peer-session-${RUN_TAG}" "effort-peer-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "effort-peer-set-${RUN_TAG}" "effort-peer-block-${RUN_TAG}" 0 130 1 '' "${CUAM}")"
+drain_eval
+assert_sql 'first-capture source is eligible with old published lower working scores' "select w.eligible and not w.cutover_active and
+  (select count(*)=2 and bool_and(counting) from app_public.group_metric_set_scores
+    where group_exercise_id='${EFFORT_EXERCISE}' and member_user_id='${B_UID}' and set_id='effort-lower-set-${RUN_TAG}' and value=110)
+  and exists(select 1 from app_public.group_metric_board_entries where group_exercise_id='${EFFORT_EXERCISE}'
+    and member_user_id='${B_UID}' and metric='e1rm' and not certified and set_id='effort-winner-set-${RUN_TAG}' and value=120)
+  from app_public.notification_workouts w where member_user_id='${B_UID}' and session_id='effort-session-${RUN_TAG}';"
+run_psql "delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='effort-session-${RUN_TAG}';" >/dev/null
+next_cuam
+push "${B_TOKEN}" 'unlink winner and change lower effort before first notification capture' \
+  "$(e_link "effort-winner-def-${RUN_TAG}" "${G2}" "${EFFORT_EXERCISE}" "${CUAM}" "${NOW_MS}")" \
+  "$(e_set "effort-lower-set-${RUN_TAG}" "effort-lower-block-${RUN_TAG}" 0 110 1 '' "${CUAM}" null warm_up | jq --argjson c "${EFFORT_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "effort-fresh-set-${RUN_TAG}" "effort-lower-block-${RUN_TAG}" 1 115 1 '' "${CUAM}")" \
+  "$(e_session "effort-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'peer independently falls below the original lower source' \
+  "$(e_set "effort-peer-set-${RUN_TAG}" "effort-peer-block-${RUN_TAG}" 0 105 1 '' "${CUAM}" | jq --argjson c "${EFFORT_PEER_CREATED}" '.fields.created_at=$c')"
+confirm "${B_TOKEN}" "effort-session-${RUN_TAG}" "$(manifest "${B_UID}" "effort-session-${RUN_TAG}")"; check 'first-capture effort graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "effort-session-${RUN_TAG}"
+jq -e 'all(.[];.rank_count==0)' <<<"${COUNTS}" >/dev/null || fail 'unproved first-capture lower effort manufactured rank origins'
+assert_sql 'first-capture old placement and lost effort remain private and completion ready' "select baseline_known
+  and app_public.notification_workout_ready(member_user_id,session_id) and without_workout=final_ranks
+  and before_ranks@>jsonb_build_array(jsonb_build_object('metric','e1rm','certified',false,'member_user_id','${B_UID}','rank',2))
+  and final_ranks@>jsonb_build_array(jsonb_build_object('metric','e1rm','certified',false,'member_user_id','${B_UID}','rank',1))
+  and (source_controls->'effort-lower-set-${RUN_TAG}'->>'counted')::boolean
+  and exists(select 1 from app_public.group_metric_set_scores s where s.group_exercise_id=t.group_exercise_id
+    and s.member_user_id=t.member_user_id and s.set_id='effort-lower-set-${RUN_TAG}' and not s.counting)
+  from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='effort-session-${RUN_TAG}' and group_exercise_id='${EFFORT_EXERCISE}';"
+seed_independent_baseline
+rpc "${A_TOKEN}" group_invite_get "{\"p_group_id\":\"${G2}\"}"; expect_ok 'read real rejoin invitation'
+REJOIN_CODE="$(jq -er '.code' <<<"${BODY}")"
+rpc "${B_TOKEN}" group_leave "{\"p_group_id\":\"${G2}\"}"; expect_ok 'leave previously shared source group'
+drain_eval
+run_psql "update app_public.notification_workout_targets set before_ranks=app_public.notification_ranks(group_id,group_exercise_id,rules_revision),
+  baseline_scores='[]'::jsonb where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';" >/dev/null
+assert_sql 'readmission begins from a board without the departed source' "select not exists(select 1 from jsonb_array_elements(before_ranks) r
+  where r->>'member_user_id'='${B_UID}') from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
+rpc "${B_TOKEN}" group_join "$(jq -nc --arg c "${REJOIN_CODE}" '{p_code:$c}')"; expect_ok 'rejoin previously shared source group'
+drain_eval
+check_independent_origin 'rejoining old shared activity invented new performed rank origins'
+assert_sql 'rejoined admission predates no original workout performance' "select exists(select 1 from app_public.group_session_shares sh
+  where sh.group_id='${G2}' and sh.member_user_id='${B_UID}' and sh.session_id='${INDEP_SESSION}') and s.started_at<floor(extract(epoch from m.joined_at)*1000)
+  from app_public.sessions s join app_public.group_memberships m on m.user_id=s.owner_user_id and m.group_id='${G2}' and m.ended_at is null
+  where s.owner_user_id='${B_UID}' and s.id='${INDEP_SESSION}';"
+assert_sql 'the unchanged old shared source really regained placement' "select exists(select 1 from jsonb_array_elements(final_ranks) r
+  where r->>'member_user_id'='${B_UID}') and before_ranks<>final_ranks from app_public.notification_workout_targets
+  where member_user_id='${B_UID}' and session_id='${INDEP_SESSION}' and group_exercise_id='${INDEP_EXERCISE}';"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'public preview after private baseline capture'
-check 'public preview omits private baseline scores' '[..|objects|(has("baseline_scores") or has("baselineScores"))]|any|not'
+check 'public preview omits private source baselines and controls' '[..|objects|(has("baseline_scores") or has("baselineScores") or has("admission_scores") or has("admissionScores") or has("source_controls") or has("sourceControls"))]|any|not'
 assert_sql 'forfeited start remains absent after later recovery and worker preparation' "select not exists(select 1 from app_public.notification_intents
   where lifter_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}');"
 assert_sql 'diagnostic is sanitized' "select exists(select 1 from public.app_logs where event='notification.intake_failed'

@@ -52,11 +52,17 @@ affected comparison publication, outside its member loop. Baseline capture and
 publication commit atomically; failure retries asynchronous publication without
 failing personal sync. Final net movements are intersected with a same-direction
 causal comparison that restores its original published contribution while
-keeping other workouts current. Up to four private source best/tie rows also
-cover a workout that was not its member's board winner at baseline. They never
+keeping other workouts and control eligibility current. Four private original
+source best/tie rows cover a workout below its member's board winner. Up to four
+additional rows freeze the first coherent link/membership admission; later
+performed edits cannot claim the admission itself. Original per-set performed
+and control pins also cover non-winners. Unchanged original performances use
+current qualified scorer rows, including metadata rescoring and witnesses;
+changed performances restore comparable frozen contributions. These proofs never
 enter jobs or provider data. An incomparable source mode, dated reading context
 or achieved instant suppresses that board's rank attribution, while current
-activity/bests can still deliver; SQL never reinterprets an old numeric score. Initial/lost
+activity/bests can still deliver; the same applies when eligibility reselection
+needs an unfrozen lower original score. SQL never reinterprets an old numeric score. Initial/lost
 placement requires that workout's own eligibility transition; another member's
 new placement is not attributed merely because its numeric position shifts.
 This excludes unrelated coalesced causes while preserving

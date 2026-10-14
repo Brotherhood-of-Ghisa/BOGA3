@@ -40,6 +40,8 @@ create table app_public.notification_workout_targets (
   without_workout jsonb not null default '[]'::jsonb, -- current board with this source's original contribution restored
   best_metrics jsonb not null default '[]'::jsonb,
   baseline_scores jsonb not null default '[]'::jsonb check(jsonb_typeof(baseline_scores)='array' and jsonb_array_length(baseline_scores)<=4),
+  admission_scores jsonb not null default '[]'::jsonb check(jsonb_typeof(admission_scores)='array' and jsonb_array_length(admission_scores)<=4),
+  source_controls jsonb not null default '{}'::jsonb,
   evaluated boolean not null default false,
   primary key(member_user_id,session_id,group_exercise_id),
   foreign key(member_user_id,session_id) references app_public.notification_workouts on delete cascade
@@ -233,6 +235,56 @@ begin
 end $$;
 
 
+create function app_public.notification_source_controls(p_target app_public.notification_workout_targets,p_graph jsonb) returns jsonb
+language sql stable security definer set search_path=app_public,pg_temp as $$
+  with previous as (select case when coalesce((p_target).baseline_known,true) then coalesce((p_target).source_controls,'{}'::jsonb)
+      else '{}'::jsonb end as controls),
+  state as (select s.* from group_metric_board_state s where s.group_exercise_id=(p_target).group_exercise_id
+    and s.rules_revision=(p_target).rules_revision and s.member_user_id=(p_target).member_user_id),
+  member as (select m,gm.joined_at from jsonb_array_elements(p_graph->'members') m
+    join group_memberships gm on gm.id=(m->>'membership_id')::uuid where m->>'member_user_id'=(p_target).member_user_id::text),
+  sources as (
+    select x,old,link_time,member.m,member.joined_at,state.membership_id,state.linked_definition_ids,state.certification_ids,
+      previous.controls->(x->>'set_id') as prior
+    from jsonb_array_elements(p_graph->'sets') x cross join previous cross join member left join state on true
+    left join lateral(select s as old from group_metric_set_scores s where s.group_exercise_id=(p_target).group_exercise_id
+      and s.rules_revision=(p_target).rules_revision and s.member_user_id=(p_target).member_user_id
+      and s.session_id=(p_target).session_id and s.set_id=x->>'set_id' order by s.metric limit 1) published on true
+    left join lateral(select max((l->>'updated_at_ms')::bigint) as link_time from jsonb_array_elements(member.m->'links') l
+      where l->>'exercise_definition_id'=x->>'exercise_definition_id') binding on true
+    where x->>'member_user_id'=(p_target).member_user_id::text and x->>'session_id'=(p_target).session_id
+  ), entries as (
+    select x->>'set_id' as set_id,coalesce(prior,jsonb_build_object(
+      'context',case when (old).set_id is null then encode(extensions.digest(jsonb_build_array(x->'source_load_input_mode',
+          x->'source_mode_generation',x->'reading_pin',x->'achieved_at_ms')::text,'sha256'),'hex')
+        when (old).fingerprint=group_metric_graph_fingerprint(x||(old).performance,p_graph->'rules',(old).metric,
+          (old).performance->>'source_load_input_mode') then encode(extensions.digest(jsonb_build_array(
+            (old).performance->'source_load_input_mode',to_jsonb((old).source_mode_generation),x->'reading_pin',
+            to_jsonb((old).achieved_at_ms))::text,'sha256'),'hex') end,
+      'performed_pin',case when (old).set_id is null then x->>'observed_set_pin' else coalesce((
+          select c.observed_set_pin from group_metric_certifications c where c.id=any(coalesce(certification_ids,'{}'::uuid[]))
+            and c.set_id=x->>'set_id' order by c.certified_at,c.id limit 1),
+          group_metric_observed_set_pin((p_target).member_user_id,(old).performance,x->>'set_type')) end,
+      'certified_metrics',coalesce((select jsonb_agg(distinct c.metric) from group_metric_certifications c
+        where c.id=any(coalesce(certification_ids,'{}'::uuid[])) and c.set_id=x->>'set_id'),'[]'::jsonb),
+      'counted_metrics',coalesce((select jsonb_agg(s.metric) from group_metric_set_scores s
+        where s.group_exercise_id=(p_target).group_exercise_id and s.rules_revision=(p_target).rules_revision
+          and s.member_user_id=(p_target).member_user_id and s.set_id=x->>'set_id' and s.counting),'[]'::jsonb),
+      'counted',coalesce((old).counting,false))) ||
+      jsonb_build_object(
+        'link_admission_pin',case when not coalesce((old).counting,false) and (x->>'counting')::boolean and not
+          ((x->>'exercise_definition_id')=any(coalesce(linked_definition_ids,'{}'::text[]))) and
+          (x->>'set_created_at_ms')::bigint<coalesce(link_time,9223372036854775807)
+          then to_jsonb(x->>'observed_set_pin') else prior->'link_admission_pin' end,
+        'member_admission_pin',case when not coalesce((old).counting,false) and
+          membership_id is distinct from (m->>'membership_id')::uuid and
+          (x->>'set_created_at_ms')::bigint<floor(extract(epoch from joined_at)*1000)
+          then to_jsonb(x->>'observed_set_pin') else prior->'member_admission_pin' end) as control
+    from sources
+  ) select previous.controls||coalesce(jsonb_object_agg(set_id,control) filter(where set_id is not null),'{}'::jsonb)
+    from previous left join entries on true group by previous.controls;
+$$;
+
 create function app_public.notification_baseline_scores(p_member uuid,p_session text,p_exercise uuid,p_revision bigint,p_graph jsonb) returns jsonb
 language sql stable security definer set search_path=app_public,pg_temp as $$
   with dimensions as (select m as metric,c as certified from unnest(array['volume','e1rm']) m cross join unnest(array[false,true]) c),
@@ -240,12 +292,14 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
     select d.metric,d.certified,w.value,w.unit,w.achieved_at_ms,w.exercise_order_index,w.set_order_index,w.set_created_at_ms,
       w.set_id,w.exercise_definition_id,w.fingerprint,w.certification_id,w.source_mode_generation,
       w.performance->>'source_load_input_mode' as source_load_input_mode,w.source->>'reading_pin' as reading_pin,
-      w.source->>'observed_set_pin' as observed_set_pin,
-      w.fingerprint=w.source->'fingerprints'->>w.metric and
+      coalesce((select c.observed_set_pin from group_metric_certifications c where c.id=w.certification_id),
+        group_metric_observed_set_pin(p_member,w.performance,w.source->>'set_type')) as observed_set_pin,
+      w.fingerprint=group_metric_graph_fingerprint(w.source||w.performance,p_graph->'rules',w.metric,
+        w.performance->>'source_load_input_mode') and
         w.source_mode_generation=(w.source->>'source_mode_generation')::bigint as projection_known
     from dimensions d cross join lateral (
       select s.*,c.id as certification_id,r.x as source from group_metric_set_scores s
-      left join lateral(select x from jsonb_array_elements(p_graph->'sets') x where x->>'member_user_id'=p_member::text and x->>'set_id'=s.set_id) r on true
+      join lateral(select x from jsonb_array_elements(p_graph->'sets') x where x->>'member_user_id'=p_member::text and x->>'set_id'=s.set_id) r on true
       join group_exercises ge on ge.id=s.group_exercise_id join groups g on g.id=ge.group_id
       left join lateral group_metric_certification_matching(ge.id,s.member_user_id,s.set_id,s.metric,s.fingerprint) c on true
       where s.member_user_id=p_member and s.session_id=p_session and s.group_exercise_id=p_exercise
@@ -263,14 +317,80 @@ create function app_public.notification_ranks(p_group uuid,p_exercise uuid,p_rev
 language sql stable security definer set search_path=app_public,pg_temp as $$
   with dimensions as (select m as metric,c as certified from unnest(array['volume','e1rm']) m cross join unnest(array[false,true]) c),
   source as materialized(select group_metric_eval_source_graph(p_group,p_exercise) as graph),
-  incompatible as (select b->>'metric' as metric,(b->>'certified')::boolean as certified
-    from jsonb_array_elements((p_target).baseline_scores) b,source
-    where not coalesce((b->>'projection_known')::boolean,false) or not exists(
+  saved as (select b,false as admitted from jsonb_array_elements((p_target).baseline_scores) b
+    union all select b,true from jsonb_array_elements((p_target).admission_scores) b),
+  qualified_saved as (
+    select saved.* from saved join group_exercises ge on ge.id=p_exercise join groups g on g.id=ge.group_id
+    where (p_target).rules_revision=p_revision
+      and exists(select 1 from exercise_group_links l where l.owner_user_id=(p_target).member_user_id
+        and l.exercise_definition_id=b->>'exercise_definition_id' and l.deleted_at is null
+        and group_eval_try_uuid(l.group_id)=p_group and group_eval_try_uuid(l.group_exercise_id)=p_exercise)
+      and b->>'unit'=group_competition_unit(b->>'metric',g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
+      and (not (b->>'certified')::boolean or exists(select 1 from group_metric_certifications c
+        where c.id=(b->>'certification_id')::uuid and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint')
+          and (c.ended_at is null or (c.end_reason='voided' and exists(
+            select 1 from source,jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
+              and x->>'set_id'=b->>'set_id' and (x->>'observed_set_pin' is distinct from b->>'observed_set_pin' or not (x->>'live')::boolean))))))
+      and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,b->>'exercise_definition_id'))
+  ), compatible_saved as (
+    select q.* from qualified_saved q cross join source where coalesce((b->>'projection_known')::boolean,false) and exists(
       select 1 from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
         and x->>'set_id'=b->>'set_id' and x->>'source_load_input_mode' is not distinct from b->>'source_load_input_mode'
         and x->>'reading_pin' is not distinct from b->>'reading_pin'
         and (x->>'source_mode_generation')::bigint=(b->>'source_mode_generation')::bigint
-        and (x->>'achieved_at_ms')::bigint=(b->>'achieved_at_ms')::bigint)),
+        and (x->>'achieved_at_ms')::bigint=(b->>'achieved_at_ms')::bigint)
+  ), incompatible_baseline as (select b->>'metric' as metric,(b->>'certified')::boolean as certified
+    from qualified_saved q cross join source where not exists(select 1 from compatible_saved k where k.b=q.b)
+      and not exists(
+      select 1 from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
+        and x->>'set_id'=b->>'set_id' and x->>'observed_set_pin'=coalesce(
+          (p_target).source_controls->(b->>'set_id')->>'admission_pin',(p_target).source_controls->(b->>'set_id')->>'performed_pin'))),
+  incompatible_final as (
+    select e.metric,e.certified from group_metric_board_entries e cross join source
+    left join lateral(select x from jsonb_array_elements(source.graph->'sets') x
+      where x->>'member_user_id'=(p_target).member_user_id::text and x->>'set_id'=e.set_id) live on true
+    cross join lateral(select (p_target).source_controls->e.set_id as origin) frozen
+    where e.group_exercise_id=p_exercise and e.rules_revision=p_revision and e.member_user_id=(p_target).member_user_id
+      and e.session_id=(p_target).session_id and (
+        (coalesce(origin->>'admission_context',origin->>'context') is distinct from encode(extensions.digest(jsonb_build_array(x->'source_load_input_mode',
+          x->'source_mode_generation',x->'reading_pin',x->'achieved_at_ms')::text,'sha256'),'hex') and
+          not ((coalesce(origin->'counted_metrics','[]'::jsonb) ? e.metric or coalesce(origin->'admission_metrics','[]'::jsonb) ? e.metric) and
+            x->>'observed_set_pin'=coalesce(origin->>'admission_pin',origin->>'performed_pin'))) or
+        ((origin->>'link_admission_pin' is not null or origin->>'member_admission_pin' is not null) and origin->>'admission_pin' is null))
+  ), incompatible_changed_controls as (
+    -- A lower original source can become relevant under changed metadata too; no old numeric score is reinterpreted.
+    select s.metric,d.certified from group_metric_set_scores s cross join source
+    join dimensions d on d.metric=s.metric
+    join lateral(select x from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=s.member_user_id::text
+      and x->>'set_id'=s.set_id) live on true
+    cross join lateral(select (p_target).source_controls->s.set_id as origin) frozen
+    left join lateral group_metric_certification_matching(p_exercise,s.member_user_id,s.set_id,s.metric,s.fingerprint) c on true
+    where s.group_exercise_id=p_exercise and s.rules_revision=p_revision and s.member_user_id=(p_target).member_user_id
+      and s.session_id=(p_target).session_id and s.counting and (not d.certified or c.id is not null)
+      and (coalesce(origin->'counted_metrics','[]'::jsonb) ? d.metric or coalesce(origin->'admission_metrics','[]'::jsonb) ? d.metric)
+      and x->>'observed_set_pin' is distinct from coalesce(origin->>'admission_pin',origin->>'performed_pin')
+      and coalesce(origin->>'admission_context',origin->>'context') is distinct from encode(extensions.digest(jsonb_build_array(
+        x->'source_load_input_mode',x->'source_mode_generation',x->'reading_pin',x->'achieved_at_ms')::text,'sha256'),'hex')
+  ), incompatible_reselection as (
+    -- If a changed lower original becomes relevant after its frozen winner loses control eligibility, its old scalar is unproved.
+    select d.metric,d.certified from dimensions d cross join source
+    cross join lateral jsonb_each((p_target).source_controls) origin
+    join lateral(select x from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
+      and x->>'set_id'=origin.key) live on true
+    where (x->>'counting')::boolean and (x->>'observed_set_pin' is distinct from
+      coalesce(origin.value->>'admission_pin',origin.value->>'performed_pin') or not (x->>'live')::boolean or
+      (coalesce(origin.value->'counted_metrics','[]'::jsonb) ? d.metric and not exists(
+        select 1 from group_metric_set_scores s where s.group_exercise_id=p_exercise and s.rules_revision=p_revision
+          and s.member_user_id=(p_target).member_user_id and s.set_id=origin.key and s.metric=d.metric and s.counting)))
+      and (coalesce(origin.value->'counted_metrics','[]'::jsonb) ? d.metric or coalesce(origin.value->'admission_metrics','[]'::jsonb) ? d.metric)
+      and (not d.certified or coalesce(origin.value->'certified_metrics','[]'::jsonb) ? d.metric or
+        coalesce(origin.value->'admission_certified_metrics','[]'::jsonb) ? d.metric)
+      and not exists(select 1 from saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified and b->>'set_id'=origin.key)
+      and not exists(select 1 from compatible_saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified
+        and admitted=(coalesce(origin.value->'admission_metrics','[]'::jsonb) ? d.metric))
+  ), incompatible as (select * from incompatible_baseline union select * from incompatible_final
+    union select * from incompatible_changed_controls union select * from incompatible_reselection),
   actual as (
     select d.metric,d.certified,r.member_user_id,(r.row_json->>'value')::numeric as value,
       (r.row_json->'performance'->>'achieved_at_ms')::bigint as achieved_at_ms
@@ -288,22 +408,26 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
       and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
         not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,s.exercise_definition_id))
     union all
+    -- Unchanged original/admitted performances use current control and witness eligibility, including metadata-rescored lower sources.
+    select s.metric,d.certified,s.value,s.achieved_at_ms,s.exercise_order_index,s.set_order_index,s.set_created_at_ms,s.set_id
+    from dimensions d join group_metric_set_scores s on s.metric=d.metric cross join source
+    join group_exercises ge on ge.id=s.group_exercise_id join groups g on g.id=ge.group_id
+    left join lateral group_metric_certification_matching(ge.id,s.member_user_id,s.set_id,s.metric,s.fingerprint) c on true
+    join lateral(select x from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=s.member_user_id::text
+      and x->>'set_id'=s.set_id) live on true
+    cross join lateral(select (p_target).source_controls->s.set_id as origin) frozen
+    where s.member_user_id=(p_target).member_user_id and s.session_id=(p_target).session_id and s.group_exercise_id=p_exercise
+      and s.rules_revision=p_revision and s.counting and (not d.certified or c.id is not null)
+      and s.unit=group_competition_unit(d.metric,g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
+      and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,s.exercise_definition_id))
+      and (coalesce(origin->'counted_metrics','[]'::jsonb) ? s.metric or coalesce(origin->'admission_metrics','[]'::jsonb) ? s.metric)
+      and coalesce(origin->>'admission_pin',origin->>'performed_pin')=x->>'observed_set_pin'
+    union all
     -- Restoring the original published contribution avoids attributing someone else's movement to an unchanged old workout.
     select b->>'metric',(b->>'certified')::boolean,(b->>'value')::numeric,(b->>'achieved_at_ms')::bigint,
       (b->>'exercise_order_index')::int,(b->>'set_order_index')::int,(b->>'set_created_at_ms')::bigint,b->>'set_id'
-    from jsonb_array_elements((p_target).baseline_scores) b
-    join group_exercises ge on ge.id=p_exercise join groups g on g.id=ge.group_id
-    where (p_target).rules_revision=p_revision
-      and exists(select 1 from exercise_group_links l where l.owner_user_id=(p_target).member_user_id
-        and l.exercise_definition_id=b->>'exercise_definition_id' and l.deleted_at is null
-        and group_eval_try_uuid(l.group_id)=p_group and group_eval_try_uuid(l.group_exercise_id)=p_exercise)
-      and b->>'unit'=group_competition_unit(b->>'metric',g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
-      and (not (b->>'certified')::boolean or exists(select 1 from group_metric_certifications c
-        where c.id=(b->>'certification_id')::uuid and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint') and (c.ended_at is null or (c.end_reason='voided' and exists(
-          select 1 from source,jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
-            and x->>'set_id'=b->>'set_id' and (x->>'observed_set_pin' is distinct from b->>'observed_set_pin' or not (x->>'live')::boolean))))))
-      and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
-        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,b->>'exercise_definition_id'))
+    from compatible_saved
   ), replacement as (
     select d.metric,d.certified,(p_target).member_user_id as member_user_id,w.value,w.achieved_at_ms
     from dimensions d cross join lateral (
@@ -351,19 +475,47 @@ alter table app_public.notification_workout_targets add column performance_input
 alter table app_public.notification_workout_targets add column best_evidence jsonb not null default '[]'::jsonb;
 
 -- All live disclosure/evidence readers share this one calling-query snapshot.
-create function app_public.notification_target_capture(p_target app_public.notification_workout_targets,p_graph jsonb) returns jsonb
+create function app_public.notification_target_capture(p_target app_public.notification_workout_targets,p_graph jsonb,p_after boolean default false) returns jsonb
 language plpgsql stable security definer set search_path=app_public,pg_temp as $$
-declare target notification_workout_targets:=p_target; baseline jsonb;
+declare target notification_workout_targets:=p_target; baseline jsonb; admitted_graph jsonb; admission jsonb;
 begin
   if notification_comparison_digest(p_graph) is distinct from
     notification_comparison_digest(p_target.group_id,p_target.group_exercise_id) then return null; end if;
   baseline:=notification_baseline_scores(target.member_user_id,target.session_id,target.group_exercise_id,target.rules_revision,p_graph);
-  if not coalesce(target.baseline_known,false) then target.baseline_scores:=baseline; end if;
+  target.source_controls:=notification_source_controls(target,p_graph);
+  if not coalesce(target.baseline_known,false) then target.baseline_scores:=baseline; target.admission_scores:='[]'::jsonb; end if;
+  if p_after then
+    -- Freeze only newly control-admitted performances after their first coherent scorer publication.
+    select jsonb_set(p_graph,'{sets}',coalesce(jsonb_agg(x),'[]'::jsonb)) into admitted_graph
+      from jsonb_array_elements(p_graph->'sets') x where x->>'member_user_id'=target.member_user_id::text
+        and x->>'session_id'=target.session_id and target.source_controls->(x->>'set_id')->>'admission_pin' is null
+        and (target.source_controls->(x->>'set_id')->>'link_admission_pin' is not null or
+          target.source_controls->(x->>'set_id')->>'member_admission_pin' is not null);
+    admission:=notification_baseline_scores(target.member_user_id,target.session_id,target.group_exercise_id,target.rules_revision,admitted_graph);
+    select coalesce(jsonb_agg(b order by b->>'metric',b->>'certified'),'[]'::jsonb) into target.admission_scores from (
+      select distinct on(b->>'metric',b->>'certified') b from jsonb_array_elements(coalesce(target.admission_scores,'[]'::jsonb)||admission) b
+      order by b->>'metric',b->>'certified',(b->>'value')::numeric desc,(b->>'achieved_at_ms')::bigint,
+        (b->>'exercise_order_index')::int,(b->>'set_order_index')::int,(b->>'set_created_at_ms')::bigint,b->>'set_id' collate "C"
+    ) winners;
+    select target.source_controls||coalesce(jsonb_object_agg(x->>'set_id',target.source_controls->(x->>'set_id')||jsonb_build_object(
+      'admission_pin',x->>'observed_set_pin','admission_metrics',coalesce((select jsonb_agg(s.metric) from group_metric_set_scores s
+        where s.group_exercise_id=target.group_exercise_id and s.rules_revision=target.rules_revision
+          and s.member_user_id=target.member_user_id and s.set_id=x->>'set_id' and s.counting),'[]'::jsonb),
+      'admission_certified_metrics',coalesce((
+        select jsonb_agg(distinct s.metric) from group_metric_set_scores s
+          cross join lateral group_metric_certification_matching(s.group_exercise_id,s.member_user_id,s.set_id,s.metric,s.fingerprint) c
+          where s.group_exercise_id=target.group_exercise_id and s.rules_revision=target.rules_revision
+            and s.member_user_id=target.member_user_id and s.session_id=target.session_id and s.set_id=x->>'set_id' and s.counting
+            and c.id is not null),'[]'::jsonb),
+      'admission_context',encode(extensions.digest(jsonb_build_array(
+        x->'source_load_input_mode',x->'source_mode_generation',x->'reading_pin',x->'achieved_at_ms')::text,'sha256'),'hex'))),'{}'::jsonb)
+      into target.source_controls from jsonb_array_elements(admitted_graph->'sets') x;
+  end if;
   return jsonb_build_object('actual',notification_ranks(target.group_id,target.group_exercise_id,target.rules_revision),
     'without',notification_ranks(target.group_id,target.group_exercise_id,target.rules_revision,target),
     'evidence',notification_best_evidence(p_target.member_user_id,p_target.session_id,p_target.group_exercise_id,p_target.rules_revision,p_target.initial_publication),
     'inputs',notification_performance_inputs(p_target.member_user_id,p_target.session_id,p_graph),
-    'baseline_scores',baseline);
+    'baseline_scores',baseline,'admission_scores',coalesce(target.admission_scores,'[]'::jsonb),'source_controls',target.source_controls);
 end $$;
 
 create function app_public.notification_capture_comparison(p_group uuid,p_exercise uuid,p_revision bigint,p_after boolean,p_graph jsonb default null) returns void
@@ -398,7 +550,7 @@ begin
     probe:=t; probe.member_user_id:=source.member; probe.session_id:=source.session;
     probe.group_id:=p_group; probe.group_exercise_id:=p_exercise; probe.rules_revision:=p_revision;
     if p_after and t.rules_revision<>p_revision then probe.baseline_known:=false; end if;
-    capture:=notification_target_capture(probe,g);
+    capture:=notification_target_capture(probe,g,p_after);
     if capture is null then raise exception 'notification capture source moved' using errcode='P0001'; end if;
     if capture->'actual' is distinct from common_actual then
       raise exception 'notification capture disclosure moved' using errcode='P0001'; end if;
@@ -414,16 +566,19 @@ begin
         if w.cutover_active and exists(select 1 from jsonb_array_elements(capture->'baseline_scores') b
           where not coalesce((b->>'projection_known')::boolean,false)) then known:=false; end if;
         insert into notification_workout_targets(member_user_id,session_id,group_id,group_exercise_id,rules_revision,
-          baseline_known,before_ranks,initial_publication,performance_inputs,best_evidence,baseline_scores)
+          baseline_known,before_ranks,initial_publication,performance_inputs,best_evidence,baseline_scores,source_controls)
           values(source.member,source.session,p_group,p_exercise,p_revision,coalesce(known,false),
             case when known then actual else '[]'::jsonb end,
             not exists(select 1 from group_rule_revisions r where r.group_exercise_id=p_exercise and r.revision=p_revision and r.published_at is not null),
             case when w.cutover_active then notification_performance_inputs(source.member,source.session,g) else '{}'::jsonb end,
             case when w.cutover_active then notification_best_evidence(source.member,source.session,p_exercise,p_revision,false) else '[]'::jsonb end,
-            capture->'baseline_scores');
+            capture->'baseline_scores',capture->'source_controls');
       elsif t.rules_revision<>p_revision then
         update notification_workout_targets set initial_publication=not exists(select 1 from group_rule_revisions r
           where r.group_exercise_id=p_exercise and r.revision=p_revision and r.published_at is not null)
+          where member_user_id=source.member and session_id=source.session and group_exercise_id=p_exercise;
+      else
+        update notification_workout_targets set source_controls=capture->'source_controls'
           where member_user_id=source.member and session_id=source.session and group_exercise_id=p_exercise;
       end if;
       continue;
@@ -445,6 +600,8 @@ begin
     update notification_workout_targets set
       before_ranks=case when not baseline_known or rules_revision<>p_revision then actual else before_ranks end,
       baseline_scores=case when not baseline_known or rules_revision<>p_revision then capture->'baseline_scores' else baseline_scores end,
+      admission_scores=capture->'admission_scores',
+      source_controls=capture->'source_controls',
       baseline_known=true,rules_revision=p_revision,final_ranks=actual,without_workout=without_ranks,best_metrics=bests,evaluated=true,performance_inputs=inputs,best_evidence=evidence
       where member_user_id=source.member and session_id=source.session and group_exercise_id=p_exercise;
   end loop;
