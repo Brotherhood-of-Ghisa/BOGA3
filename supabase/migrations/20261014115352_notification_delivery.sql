@@ -446,7 +446,7 @@ create function app_public.notification_sweep() returns bigint
 language plpgsql security definer set search_path=app_public,pg_temp as $$
 declare endpoint text; key text;
 begin
-  if not exists(select 1 from notification_config where singleton and sending_enabled and provider<>'disabled') then return null; end if;
+  -- Disabling new sends must not stop accepted-ticket receipts or secret pruning.
   select decrypted_secret into endpoint from vault.decrypted_secrets where name='notification_worker_url' order by created_at desc limit 1;
   select decrypted_secret into key from vault.decrypted_secrets where name='notification_worker_key' order by created_at desc limit 1;
   if endpoint is null or key is null then return null; end if;

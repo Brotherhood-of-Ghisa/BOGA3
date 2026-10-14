@@ -159,6 +159,15 @@ run_psql "update app_public.notification_deliveries set receipt_available_at=now
   update app_public.notification_config set sending_enabled=false,provider='disabled';" >/dev/null
 http_call -X POST -H "apikey: ${SERVICE_ROLE_KEY}" --data '{}' "${API_URL}/functions/v1/notification-worker"
 check 'receipt persisted without new send' '.outcomes.receipt_ok==1 and .claimed==0'
+# Configured sweep keeps receipt/prune processing alive with new sending disabled.
+# Rollback prevents pg_net from actually issuing this fixture request.
+[[ "$(run_psql "begin;
+  do \$\$ begin
+    perform vault.create_secret('http://127.0.0.1:9/functions/v1/notification-worker','notification_worker_url');
+    perform vault.create_secret('fixture-only','notification_worker_key');
+  end \$\$;
+  select app_public.notification_sweep() is not null;
+  rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
 # Actual concurrent rotation/handoff uses separate HTTP transactions, under one held installation lock.
 RACE_DIR="$(mktemp -d)"
 RACE_CLAIM="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
