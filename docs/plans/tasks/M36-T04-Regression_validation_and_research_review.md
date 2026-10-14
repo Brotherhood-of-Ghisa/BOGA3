@@ -1,6 +1,6 @@
 # M36-T04-Regression_validation_and_research_review — Validate regression with known behaviours and approve research findings
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M36-T03
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: docs; UI impact: no
@@ -18,7 +18,11 @@ Validate the exploratory framework against known synthetic behaviours and availa
 
 ## Decided
 
-Milestone D1–D6 govern this task. This is planning only; no design, analytical selection or test-lane proposal is approved by creating the card. One card = one session = one local worktree = one PR under the task protocol. Merge the planning PR before execution.
+Milestone D1–D6 govern this task. Creating the card alone approved no design, analytical selection or test-lane proposal. One card = one session = one local worktree = one PR under the task protocol. The owner's experimental branch-stack authorisation below supersedes the initial planning-merge prerequisite.
+
+On 2026-10-14 the owner authorised T04 on the experimental branch stack after accepting T03's descriptive findings with uncertain effort provenance. Work starts from T03 commit `01ce2409cb54670f38665423aa395580f98af8a9` and a draft PR targets `m36-t03-workout-curve-validation`; main stays untouched. Compare fixed assumed RIR sigma with joint 1RM/sigma estimation. 1RM is the only free curve parameter; sigma is measurement uncertainty, and any trajectory/break model concerns that amplitude over time. Break modelling remains exploratory, with direct latent-trajectory inference deferred if evidence does not support it. Reuse the session's agreed fast and three quality gates; no app UI/production work is authorised.
+
+The [research review](../research/M36-T04-research-review.md) and [candidate oracle](../research/M36-T04-weekly-wave-oracle.json) are ready for human review after local validation. Keep `in_progress`: acceptance 5 and exact fixture freezing in acceptance 7 remain pending; T05 has not started.
 
 ## Open — resolve with the user at session start
 

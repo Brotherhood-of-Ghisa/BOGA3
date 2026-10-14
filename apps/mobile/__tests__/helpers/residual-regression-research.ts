@@ -158,6 +158,20 @@ export function recordedRirProbability(recorded: number, latent: number, sd: num
 
 export type JointRirPoint = { load: number; recordedRir: number; multipliers: number[] };
 
+function loadLogNormalizer(predicted: number, sd: number): number {
+  return -Math.log(sd * Math.sqrt(2 * Math.PI)) - Math.log(normalCdf(predicted / sd));
+}
+
+function loadLogDensity(load: number, predicted: number, sd: number): number {
+  return loadLogNormalizer(predicted, sd) - (load - predicted) ** 2 / (2 * sd * sd);
+}
+
+function logMixture(terms: number[]): number {
+  const maximum = Math.max(...terms);
+  return maximum === -Infinity ? -Infinity : maximum +
+    Math.log(terms.reduce((sum, term) => sum + Math.exp(term - maximum), 0));
+}
+
 export function jointLogLikelihood(points: JointRirPoint[], strength: number, rirSd: number, loadSd: number): number {
   if (!points.length || !Number.isFinite(strength) || strength <= 0 || !Number.isFinite(rirSd) || rirSd < 0 ||
     !Number.isFinite(loadSd) || loadSd <= 0) throw new Error('invalid joint model');
@@ -169,12 +183,32 @@ export function jointLogLikelihood(points: JointRirPoint[], strength: number, ri
       const logProbability = recordedRirLogProbability(point.recordedRir, latent, rirSd);
       if (logProbability === -Infinity) return -Infinity;
       const predicted = strength / multiplier;
-      return logProbability - Math.log(point.multipliers.length) - Math.log(loadSd * Math.sqrt(2 * Math.PI))
-        - (point.load - predicted) ** 2 / (2 * loadSd * loadSd) - Math.log(normalCdf(predicted / loadSd));
+      return logProbability - Math.log(point.multipliers.length) + loadLogDensity(point.load, predicted, loadSd);
     });
-    const maximum = Math.max(...terms);
-    if (maximum === -Infinity) return -Infinity;
-    likelihood += maximum + Math.log(terms.reduce((sum, term) => sum + Math.exp(term - maximum), 0));
+    likelihood += logMixture(terms);
   }
   return likelihood;
+}
+
+// Factor the same likelihood for repeated simulations; axes are [sigma][strength].
+export function jointLikelihoodGrid(points: JointRirPoint[], strengths: number[], sds: number[], loadSd: number): number[][] {
+  if (!strengths.length || !sds.length || strengths.some(s => !Number.isFinite(s) || s <= 0) ||
+    sds.some(s => !Number.isFinite(s) || s < 0)) throw new Error('invalid likelihood grid');
+  jointLogLikelihood(points, strengths[0], sds[0], loadSd);
+  const probabilities = sds.map(sd => {
+    const cache = new Map<string, number[]>();
+    return points.map(p => {
+      const key = `${p.recordedRir}:${p.multipliers.length}`;
+      if (!cache.has(key)) cache.set(key, p.multipliers.map((_, r) =>
+        recordedRirLogProbability(p.recordedRir, r, sd) - Math.log(p.multipliers.length)));
+      return cache.get(key)!;
+    });
+  });
+  const multipliers = [...new Set(points.flatMap(p => p.multipliers))];
+  const loads = strengths.map(s => {
+    const normalizers = new Map(multipliers.map(f => [f, loadLogNormalizer(s / f, loadSd)]));
+    return points.map(p => p.multipliers.map(f => normalizers.get(f)! - (p.load - s / f) ** 2 / (2 * loadSd * loadSd)));
+  });
+  return probabilities.map(ps => loads.map(ls => ps.reduce((sum, terms, i) =>
+    sum + logMixture(terms.map((term, r) => term + ls[i][r])), 0)));
 }
