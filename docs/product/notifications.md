@@ -1,7 +1,7 @@
 # Notifications
 
-Accepted 2026-10-07, describing the first notification release; runtime
-implementation is pending.
+Accepted 2026-10-07, with theme and preview decisions approved 2026-10-14;
+runtime implementation is pending.
 
 ### notifications.platform · definition · accepted
 
@@ -84,3 +84,26 @@ Why: the accepted start/completion sequence does not define a notification
 moment for these changes.
 Code: `supabase/functions/group-eval/index.ts` and the group competition
 publication migrations already process these causes.
+
+### notifications.theme · presentation · accepted
+
+Expanded notification content follows the recipient's currently applied app
+theme, including custom colours. The abbreviated banner retains the iOS system
+appearance. Warm-theme examples do not fix the notification palette for every
+user.
+
+Why: notifications belong visually to the app without promising control over
+system-owned presentation.
+Pending: themed native notification content is not implemented.
+
+### notifications.preview · presentation · accepted
+
+An alert identifies the lifter and one contributing group, or `N groups` when
+several contribute. Previews show positive enabled achievement counts, without
+exercise names or lifting figures. Disabled and zero-count rows are omitted.
+Activity-off previews omit start/completion wording. Only enabled, currently
+authorized groups contribute.
+
+Why: the notification is a compact summary; detailed figures belong in the
+authorized app view.
+Pending: notification preview composition is not implemented.
