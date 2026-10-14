@@ -318,6 +318,54 @@ jq -e '.binding_id' "${RACE_DIR}/a" >/dev/null; jq -e '.binding_id' "${RACE_DIR}
 [[ "$(run_psql "select count(*) from app_public.notification_installations where active and
   ((id='${SWAP_A}' and token='LocalPushToken[swap-b]') or (id='${SWAP_B}' and token='LocalPushToken[swap-a]'));")" == 2 ]] || fail 'concurrent token swap lost an installation'
 rm -rf "${RACE_DIR}"; RACE_DIR=""
+# Enqueue's multi-installation FK pass and token rotation share the allocator before row locks.
+rpc "${A_TOKEN}" notification_register "$(jq '.p_token="LocalPushToken[swap-a]"' <<<"${SWAP_REG_B}")"; expect_ok 'second recipient installation'
+RACE_DIR="$(mktemp -d)"
+run_psql_once "begin;
+  select pg_advisory_xact_lock(hashtextextended('notification-registration',0));
+  \\echo locked
+  select pg_sleep(1); commit;" >"${RACE_DIR}/lock" &
+LOCK_PID=$!
+for attempt in {1..100}; do
+  rg -q '^locked$' "${RACE_DIR}/lock" && break
+  sleep 0.01
+done
+rg -q '^locked$' "${RACE_DIR}/lock" || fail 'multi-installation barrier was not acquired'
+run_psql_once "select app_public.notification_enqueue('${A_UID}','${B_UID}','multi-${RUN_TAG}','start','${EVENT_AT}',1,'${CONTRIBUTIONS}'::jsonb);" \
+  >"${RACE_DIR}/enqueue" &
+ENQUEUE_PID=$!
+curl --silent --show-error --fail -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${A_TOKEN}" \
+  -H 'Content-Profile: app_public' -H 'Content-Type: application/json' \
+  --data "$(jq '.p_token="LocalPushToken[swap-rotated]"' <<<"${SWAP_REG_A}")" \
+  "${API_URL}/rest/v1/rpc/notification_register" >"${RACE_DIR}/rotate" &
+ROTATE_PID=$!
+BLOCKED=0
+for attempt in {1..20}; do
+  BLOCKED="$(run_psql "select count(*) from pg_locks where locktype='advisory' and not granted
+    and classid::bigint=((hashtextextended('notification-registration',0)>>32)&4294967295)
+    and objid::bigint=(hashtextextended('notification-registration',0)&4294967295);")"
+  [[ "${BLOCKED}" == 2 ]] && break
+  sleep 0.01
+done
+[[ "${BLOCKED}" == 2 ]] || fail 'enqueue/registration did not share allocator'
+wait "${LOCK_PID}"; wait "${ENQUEUE_PID}"; wait "${ROTATE_PID}"
+[[ "$(run_psql "select count(*) from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id where n.session_id='multi-${RUN_TAG}';")" == 2 ]] || fail 'multi-installation capture was incomplete'
+jq -e '.binding_id' "${RACE_DIR}/rotate" >/dev/null || fail 'multi-installation rotation failed'
+rm -rf "${RACE_DIR}"; RACE_DIR=""
+# Retiring a token cancels only its concrete old queue, preserving drain capacity for live installations.
+for index in {1..4}; do
+  run_psql "select app_public.notification_enqueue('${A_UID}','${B_UID}','retirement-${RUN_TAG}-${index}','start','${EVENT_AT}',1,'${CONTRIBUTIONS}'::jsonb);" >/dev/null
+done
+RETIRE_ID="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+RETIRE_CAP="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+rpc "${C_TOKEN}" notification_register "$(jq --arg i "${RETIRE_ID}" --arg c "${RETIRE_CAP}" \
+  '.p_installation_id=$i|.p_capability=$c|.p_token="LocalPushToken[swap-rotated]"' <<<"${REGISTER}")"
+expect_ok 'token reassignment to new installation'
+[[ "$(run_psql "select count(*) from app_public.notification_deliveries where installation_id='${SWAP_A}' and state in ('pending','retry','leased','disabled');")" == 0 ]] || fail 'retired installation kept claimable work'
+rpc "${SERVICE_ROLE_KEY}" notification_claim '{"p_limit":4}'; expect_ok 'live drain budget'
+check 'live jobs retain the complete claim budget' '.jobs|length==4'
+[[ "$(run_psql "select count(*) from app_public.notification_deliveries d join app_public.notification_installations i on i.id=d.installation_id
+  where d.state='leased' and (not i.active or d.binding_id<>i.binding_id);")" == 0 ]] || fail 'retired binding consumed claim capacity'
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'

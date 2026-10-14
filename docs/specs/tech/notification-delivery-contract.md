@@ -27,7 +27,8 @@ Preview and production accept Expo token syntax; possession is not proof of APNs
 Account, Auth session, token or encryption-key changes rotate a random binding
 UUID and cancel unsent old-binding deliveries. Tokens are unique within the
 configured project/environment. A single registration allocator lock serializes
-token reassignment before any installation row locks. Permission and opt-in are installation state;
+token reassignment before any installation row locks; enqueue and pruning share
+that allocator before their intent/FK or installation writes. Permission and opt-in are installation state;
 categories and group mutes are account preferences ([[notifications.defaults]]).
 The sender verifies the current binding and live Auth session again at handoff.
 Permission is the latest client report; OS changes cannot be observed instantly.

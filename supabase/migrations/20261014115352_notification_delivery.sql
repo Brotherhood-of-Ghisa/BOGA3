@@ -112,7 +112,7 @@ create function app_public.notification_register(p_installation_id uuid,p_capabi
   p_payload_version int default 1) returns jsonb
 language plpgsql security definer set search_path=app_public,pg_temp as $$
 declare u uuid := app_public.notification_app_user(); c notification_config; old notification_installations;
-  h bytea; b uuid; sid uuid := (auth.jwt()->>'session_id')::uuid;
+  h bytea; b uuid; retired_ids uuid[]; sid uuid := (auth.jwt()->>'session_id')::uuid;
 begin
   select * into c from notification_config where singleton;
   if not found then raise exception 'UNAVAILABLE: notification registration is disabled'; end if;
@@ -131,6 +131,8 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('notification-registration',0));
   select * into old from notification_installations where id=p_installation_id for update;
   if found and old.capability_hash <> h then raise exception 'NOT_FOUND: installation not found'; end if;
+  select coalesce(array_agg(id),'{}'::uuid[]) into retired_ids from notification_installations
+    where environment=c.environment and project_id=c.project_id and token=p_token and id<>p_installation_id;
   -- A token is a high-entropy provider capability; new-device reassignment retires the old binding.
   update notification_installations set active=false,permission=false,opted_in=false,encryption_key='',updated_at=now()
     where environment=c.environment and project_id=c.project_id and token=p_token and id<>p_installation_id;
@@ -149,7 +151,7 @@ begin
     permission=excluded.permission,opted_in=excluded.opted_in,active=true,updated_at=now();
   update notification_deliveries d set state='cancelled',claim_id=null,lease_until=null
     from notification_installations i where i.id=d.installation_id
-    and i.id=p_installation_id and (not i.active or i.binding_id<>d.binding_id) and d.state in ('pending','retry','leased','disabled');
+    and (i.id=p_installation_id or i.id=any(retired_ids)) and (not i.active or i.binding_id<>d.binding_id) and d.state in ('pending','retry','leased','disabled');
   insert into notification_preferences(user_id) values(u) on conflict do nothing;
   return jsonb_build_object('binding_id',b,'permission',p_permission,'opted_in',p_opted_in,'payload_version',1);
 end $$;
@@ -225,6 +227,7 @@ begin
     raise exception 'VALIDATION: duplicate notification group';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(p_recipient::text||':'||p_lifter::text||':'||p_session,0));
+  perform pg_advisory_xact_lock(hashtextextended('notification-registration',0));
   select * into row from notification_intents where recipient_user_id=p_recipient and lifter_user_id=p_lifter
     and session_id=p_session and kind=p_kind for update;
   if found then
@@ -436,6 +439,7 @@ end $$;
 -- Purge content/secrets, not logical tombstones. Account deletion cascades all operational rows.
 create function app_public.notification_prune() returns void
 language plpgsql security definer set search_path=app_public,pg_temp as $$ begin
+  perform pg_advisory_xact_lock(hashtextextended('notification-registration',0));
   update notification_intents set contributions='[]' where expires_at<now()-interval '30 days' and contributions<>'[]';
   update notification_installations set encryption_key='',token='retired:'||id::text
     where not active and updated_at<now()-interval '30 days'
