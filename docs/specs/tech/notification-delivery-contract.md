@@ -59,7 +59,10 @@ performed edits cannot claim the admission itself. Original per-set performed
 and control pins also cover non-winners. Unchanged original performances use
 current qualified scorer rows, including metadata rescoring and witnesses;
 changed performances restore comparable frozen contributions. These proofs never
-enter jobs or provider data. An incomparable source mode, dated reading context
+enter jobs or provider data. Both scopes reuse applicable frozen scores under
+current witnesses for the original performed pin, including re-certification;
+original scope constrains which unknown lower scores they can bound.
+An incomparable source mode, dated reading context
 or achieved instant suppresses that board's rank attribution, while current
 activity/bests can still deliver; the same applies when eligibility reselection
 needs an unfrozen lower original score. SQL never reinterprets an old numeric score. Initial/lost

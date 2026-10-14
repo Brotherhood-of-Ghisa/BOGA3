@@ -317,8 +317,11 @@ create function app_public.notification_ranks(p_group uuid,p_exercise uuid,p_rev
 language sql stable security definer set search_path=app_public,pg_temp as $$
   with dimensions as (select m as metric,c as certified from unnest(array['volume','e1rm']) m cross join unnest(array[false,true]) c),
   source as materialized(select group_metric_eval_source_graph(p_group,p_exercise) as graph),
-  saved as (select b,false as admitted from jsonb_array_elements((p_target).baseline_scores) b
+  saved_sources as (select b,false as admitted from jsonb_array_elements((p_target).baseline_scores) b
     union all select b,true from jsonb_array_elements((p_target).admission_scores) b),
+  saved as (select b,admitted,(b->>'certified')::boolean as bound_certified from saved_sources
+    union all select b||jsonb_build_object('certified',true),admitted,false from saved_sources where not (b->>'certified')::boolean
+    union all select b||jsonb_build_object('certified',false),admitted,true from saved_sources where (b->>'certified')::boolean),
   qualified_saved as (
     select saved.* from saved join group_exercises ge on ge.id=p_exercise join groups g on g.id=ge.group_id
     where (p_target).rules_revision=p_revision
@@ -327,7 +330,9 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
         and group_eval_try_uuid(l.group_id)=p_group and group_eval_try_uuid(l.group_exercise_id)=p_exercise)
       and b->>'unit'=group_competition_unit(b->>'metric',g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
       and (not (b->>'certified')::boolean or exists(select 1 from group_metric_certifications c
-        where c.id=(b->>'certification_id')::uuid and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint')
+        where c.group_exercise_id=p_exercise and c.member_user_id=(p_target).member_user_id
+          and c.set_id=b->>'set_id' and c.metric=b->>'metric' and c.observed_set_pin=b->>'observed_set_pin'
+          and (c.pinned_fingerprint=b->>'fingerprint' or c.current_fingerprint=b->>'fingerprint')
           and (c.ended_at is null or (c.end_reason='voided' and exists(
             select 1 from source,jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
               and x->>'set_id'=b->>'set_id' and (x->>'observed_set_pin' is distinct from b->>'observed_set_pin' or not (x->>'live')::boolean))))))
@@ -384,11 +389,16 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
         select 1 from group_metric_set_scores s where s.group_exercise_id=p_exercise and s.rules_revision=p_revision
           and s.member_user_id=(p_target).member_user_id and s.set_id=origin.key and s.metric=d.metric and s.counting)))
       and (coalesce(origin.value->'counted_metrics','[]'::jsonb) ? d.metric or coalesce(origin.value->'admission_metrics','[]'::jsonb) ? d.metric)
-      and (not d.certified or coalesce(origin.value->'certified_metrics','[]'::jsonb) ? d.metric or
-        coalesce(origin.value->'admission_certified_metrics','[]'::jsonb) ? d.metric)
-      and not exists(select 1 from saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified and b->>'set_id'=origin.key)
+      and (not d.certified or exists(select 1 from group_metric_certifications c
+        where c.group_exercise_id=p_exercise and c.member_user_id=(p_target).member_user_id and c.set_id=origin.key and c.metric=d.metric
+          and c.observed_set_pin=coalesce(origin.value->>'admission_pin',origin.value->>'performed_pin')
+          and (c.ended_at is null or (c.end_reason='voided' and
+            (not (x->>'live')::boolean or x->>'observed_set_pin' is distinct from c.observed_set_pin)))))
+      and not exists(select 1 from compatible_saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified and b->>'set_id'=origin.key)
       and not exists(select 1 from compatible_saved where b->>'metric'=d.metric and (b->>'certified')::boolean=d.certified
-        and admitted=(coalesce(origin.value->'admission_metrics','[]'::jsonb) ? d.metric))
+        and admitted=(coalesce(origin.value->'admission_metrics','[]'::jsonb) ? d.metric)
+        and (not bound_certified or (case when admitted then coalesce(origin.value->'admission_certified_metrics','[]'::jsonb)
+          else coalesce(origin.value->'certified_metrics','[]'::jsonb) end) ? d.metric))
   ), incompatible as (select * from incompatible_baseline union select * from incompatible_final
     union select * from incompatible_changed_controls union select * from incompatible_reselection),
   actual as (

@@ -109,6 +109,30 @@ describe('workout notification final outcomes', () => {
       final: bothMetrics(ranks(['lifter', 'peer'])), without_workout: bothMetrics(ranks(['peer'])) };
     expect(workoutContributions([result], 'lifter')).toEqual([{ group_id: 'group-a', best_count: 0, rank_count: 4 }]);
   });
+  test('withdrawn lower originals cannot veto a fresh qualified crossing, while physical voiding retains lost placement', () => {
+    const bothMetrics = (rows: NotificationRank[]): NotificationRank[] => [...rows,
+      ...rows.map(row => ({ ...row, metric: 'volume' as const }))];
+    const before = bothMetrics(ranks(['peer', 'lifter'], true));
+    const final = bothMetrics(ranks(['lifter', 'peer'], true));
+    // Both original witnesses are withdrawn; an edited lower source imposes no missing old Certified scalar.
+    expect(countWorkoutRankChanges(before, final, bothMetrics(ranks(['peer'], true)), 'lifter')).toBe(4);
+    // A physical source edit voids its original placement; the old eligible contribution stays in the counter.
+    expect(countWorkoutRankChanges(before, bothMetrics(ranks(['peer'], true)), before, 'lifter')).toBe(2);
+    expect(countWorkoutRankChanges(before, bothMetrics(ranks(['peer'], true)),
+      bothMetrics(ranks(['peer'], true)), 'lifter')).toBe(0);
+  });
+  test('current qualification shares frozen scalars between scopes without changing historical placement', () => {
+    const bothMetrics = (rows: NotificationRank[]): NotificationRank[] => [...rows,
+      ...rows.map(row => ({ ...row, metric: 'volume' as const }))];
+    const before = [...bothMetrics(ranks(['peer', 'lifter'])), ...bothMetrics(ranks(['peer'], true))];
+    const final = [...bothMetrics(ranks(['lifter', 'peer'])), ...bothMetrics(ranks(['lifter', 'peer'], true))];
+    const counter = [...bothMetrics(ranks(['peer', 'lifter'])), ...bothMetrics(ranks(['peer', 'lifter'], true))];
+    // Newly qualified original90 remains a Certified counterfactual after its own physical edit; initial placement is control-origin.
+    expect(countWorkoutRankChanges(before, final, counter, 'lifter')).toBe(6);
+    // A frozen Certified100 below an unlinked original All120 can still prove the physical All100→90 loss versus peer95.
+    expect(countWorkoutRankChanges(bothMetrics(ranks(['lifter', 'peer'])), bothMetrics(ranks(['peer', 'lifter'])),
+      bothMetrics(ranks(['lifter', 'peer'])), 'lifter')).toBe(4);
+  });
 });
 
 describe('canonical completion graph', () => {

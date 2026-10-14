@@ -1018,7 +1018,7 @@ assert_sql 'original admitted threshold remains frozen below the fresh replaceme
     select 1 from app_public.group_metric_board_entries e where e.group_exercise_id=t.group_exercise_id and e.member_user_id=t.member_user_id
       and e.metric='e1rm' and not e.certified and e.set_id='admit-new-set-${RUN_TAG}' and e.value=130)
   from app_public.notification_workout_targets t where member_user_id='${B_UID}' and session_id='admit-session-${RUN_TAG}' and group_exercise_id='${ADMIT_EXERCISE}';"
-# A withdrawn old witness does not veto the Certified crossing of a fresh performed and qualified source.
+# Ended original witnesses do not veto a fresh performed and qualified Certified crossing.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Qualified source threshold",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
 expect_ok 'create qualified source comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
@@ -1029,30 +1029,65 @@ for source in original peer; do
   push "${QUAL_TOKEN}" 'publish original and peer witness thresholds' "$(e_def "qual-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
     "$(e_link "qual-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
   next_cuam
+  if [[ "${source}" == original ]]; then QUAL_LOWER_CREATED="${CUAM}"; QUAL_FIRST_SET="qual-lower-set-${RUN_TAG}"; QUAL_WEIGHT=90; else QUAL_FIRST_SET="qual-peer-set-${RUN_TAG}"; fi
   push "${QUAL_TOKEN}" 'performed source at its witness threshold' "$(e_session "qual-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
     "$(e_se "qual-${source}-block-${RUN_TAG}" "qual-${source}-session-${RUN_TAG}" "qual-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
-    "$(e_set "qual-${source}-set-${RUN_TAG}" "qual-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+    "$(e_set "${QUAL_FIRST_SET}" "qual-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+  drain_eval
 done
+next_cuam
+push "${B_TOKEN}" 'higher original source replaces the lower published record' \
+  "$(e_set "qual-original-set-${RUN_TAG}" "qual-original-block-${RUN_TAG}" 1 100 1 '' "${CUAM}")"
 drain_eval
 qualify_source_set() {
-  rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${QUAL_EXERCISE}" \
-    '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"; expect_ok 'read qualifying write token'
-  QUAL_WRITE="$(jq -er --arg u "$1" --arg s "$2" '.entries[]|select(.member.user_id==$u and .performance.set_id==$s)|.write_token' <<<"${BODY}")"
+  if [[ -n "${3:-}" ]]; then
+    rpc "${A_TOKEN}" group_competition_session_records "$(jq -nc --arg g "${G2}" --arg u "$1" --arg s "$3" \
+      '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'read historical qualifying write token'
+    QUAL_WRITE="$(jq -er --arg s "$2" '[.records[]|select(.event.set_id==$s)|.event.record_context.metrics[]|select(.metric=="e1rm")|.write_token][0]' <<<"${BODY}")"
+  else
+    rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${QUAL_EXERCISE}" \
+      '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"; expect_ok 'read qualifying write token'
+    QUAL_WRITE="$(jq -er --arg u "$1" --arg s "$2" '.entries[]|select(.member.user_id==$u and .performance.set_id==$s)|.write_token' <<<"${BODY}")"
+  fi
   rpc "${A_TOKEN}" group_competition_certify "$(jq -nc --arg g "${G2}" --arg x "${QUAL_EXERCISE}" --arg u "$1" --arg s "$2" \
     --arg t "${QUAL_WRITE}" --argjson r "${QUAL_REV}" \
     '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_write_token:$t}')"
   expect_ok 'real qualifying whole-set witness'; QUAL_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"; drain_eval
 }
+qualify_source_set "${B_UID}" "qual-lower-set-${RUN_TAG}" "qual-original-session-${RUN_TAG}"; QUAL_LOWER_CERT="${QUAL_CERT}"
 qualify_source_set "${B_UID}" "qual-original-set-${RUN_TAG}"; QUAL_ORIGINAL_CERT="${QUAL_CERT}"
 qualify_source_set "${C_UID}" "qual-peer-set-${RUN_TAG}"
+qualified_certified_count() {
+  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
+    const { countWorkoutRankChanges } = await import(process.argv[3]);
+    const job=JSON.parse(process.argv[1]), target=job.targets.find(t=>t.group_exercise_id===process.argv[2]);
+    process.stdout.write(String(countWorkoutRankChanges(...[target.before,target.final,target.without_workout].map(rows=>rows.filter(r=>r.certified)),job.member_user_id)));
+  ' "${TARGETS}" "${QUAL_EXERCISE}" "${SUPABASE_DIR}/../apps/mobile/src/notifications/workout-events.ts"
+}
 run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}';
   delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}';
   select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
-rpc "${A_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${G2}" --arg c "${QUAL_ORIGINAL_CERT}" \
-  '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:"withdraw"}')"; expect_ok 'withdraw unchanged original witness'
+for ended_cert in "${QUAL_ORIGINAL_CERT}" "${QUAL_LOWER_CERT}"; do
+  rpc "${A_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${G2}" --arg c "${ended_cert}" \
+    '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:"withdraw"}')"; expect_ok 'withdraw original whole-set witness'
+done
+next_cuam
+push "${B_TOKEN}" 'lower performed edit after both original witnesses end' \
+  "$(e_set "qual-lower-set-${RUN_TAG}" "qual-original-block-${RUN_TAG}" 0 95 1 '' "${CUAM}" | jq --argjson c "${QUAL_LOWER_CREATED}" '.fields.created_at=$c')" \
+  "$(e_session "qual-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "qual-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "qual-original-session-${RUN_TAG}")"; check 'lower edit with ended witnesses confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "qual-original-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 0 ]] || fail 'lower edit after witness withdrawal invented Certified movement'
+assert_sql 'both original witnesses ended and the lower-only control remains ready' "select
+  (select count(*)=4 and bool_and(ended_at is not null and end_reason='withdrawn') from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id) in ('${QUAL_ORIGINAL_CERT}','${QUAL_LOWER_CERT}'))
+  and app_public.notification_workout_ready(member_user_id,session_id)
+  and not exists(select 1 from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
 next_cuam
 push "${B_TOKEN}" 'fresh performed source crosses the peer after original withdrawal' \
-  "$(e_set "qual-fresh-set-${RUN_TAG}" "qual-original-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")" \
+  "$(e_set "qual-fresh-set-${RUN_TAG}" "qual-original-block-${RUN_TAG}" 2 130 1 '' "${CUAM}")" \
   "$(e_session "qual-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
 drain_eval
 qualify_source_set "${B_UID}" "qual-fresh-set-${RUN_TAG}"
@@ -1060,16 +1095,198 @@ confirm "${B_TOKEN}" "qual-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "
 drain_eval
 prepare_outcome "${B_UID}" "qual-original-session-${RUN_TAG}"
 jq -e --arg g "${G2}" 'any(.[];.group_id==$g and .rank_count==8)' <<<"${COUNTS}" >/dev/null || fail 'withdrawn original witness vetoed a fresh qualified crossing'
-QUAL_CERTIFIED_COUNT="$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
-  const { countWorkoutRankChanges } = await import(process.argv[3]);
-  const job=JSON.parse(process.argv[1]), target=job.targets.find(t=>t.group_exercise_id===process.argv[2]);
-  process.stdout.write(String(countWorkoutRankChanges(...[target.before,target.final,target.without_workout].map(rows=>rows.filter(r=>r.certified)),job.member_user_id)));
-' "${TARGETS}" "${QUAL_EXERCISE}" "${SUPABASE_DIR}/../apps/mobile/src/notifications/workout-events.ts")"
+QUAL_CERTIFIED_COUNT="$(qualified_certified_count)"
 [[ "${QUAL_CERTIFIED_COUNT}" == 4 ]] || fail 'fresh qualified source did not retain both members Certified movements'
+assert_sql 'fresh Certified crossing remains ready after both original witnesses end' "select without_workout<>final_ranks
+  and app_public.notification_workout_ready(member_user_id,session_id)
+  and not exists(select 1 from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='qual-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
 assert_sql 'the original performed source is unchanged and its old witness withdrawn' "select s.weight_value='100' and s.reps_value='1' and
   (select count(*)=2 and bool_and(end_reason='withdrawn') from app_public.group_metric_certifications
     where coalesce(legacy_certification_id,witness_certification_id,id)='${QUAL_ORIGINAL_CERT}')
   from app_public.exercise_sets s where owner_user_id='${B_UID}' and id='qual-original-set-${RUN_TAG}';"
+# A new witness for the same old pin can require restoring an unrecorded lower source after its physical edit.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Same-pin lower recertification",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create same-pin recertification comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in original peer; do
+  if [[ "${source}" == original ]]; then QUAL_TOKEN="${B_TOKEN}"; REQUAL_SET="requal-lower-set-${RUN_TAG}"; QUAL_WEIGHT=90;
+  else QUAL_TOKEN="${C_TOKEN}"; REQUAL_SET="requal-peer-set-${RUN_TAG}"; QUAL_WEIGHT=110; fi
+  next_cuam
+  push "${QUAL_TOKEN}" 'same-pin comparison definitions' "$(e_def "requal-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "requal-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  if [[ "${source}" == original ]]; then REQUAL_LOWER_CREATED="${CUAM}"; else REQUAL_PEER_CREATED="${CUAM}"; fi
+  push "${QUAL_TOKEN}" 'publish lower record before peer threshold' "$(e_session "requal-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "requal-${source}-block-${RUN_TAG}" "requal-${source}-session-${RUN_TAG}" "requal-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "${REQUAL_SET}" "requal-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+  drain_eval
+done
+next_cuam
+push "${B_TOKEN}" 'published winner masks the original lower source' \
+  "$(e_set "requal-original-set-${RUN_TAG}" "requal-original-block-${RUN_TAG}" 1 100 1 '' "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "requal-lower-set-${RUN_TAG}" "requal-original-session-${RUN_TAG}"; REQUAL_LOWER_CERT="${QUAL_CERT}"
+qualify_source_set "${B_UID}" "requal-original-set-${RUN_TAG}"; REQUAL_ORIGINAL_CERT="${QUAL_CERT}"
+qualify_source_set "${C_UID}" "requal-peer-set-${RUN_TAG}"
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='requal-original-session-${RUN_TAG}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='requal-original-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+assert_sql 'only the original winner has frozen numeric scores' "select jsonb_array_length(baseline_scores)=4 and
+  not exists(select 1 from jsonb_array_elements(baseline_scores) b where b->>'set_id'='requal-lower-set-${RUN_TAG}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='requal-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+for ended_cert in "${REQUAL_ORIGINAL_CERT}" "${REQUAL_LOWER_CERT}"; do
+  rpc "${A_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${G2}" --arg c "${ended_cert}" \
+    '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:"withdraw"}')"; expect_ok 'withdraw same-pin original witness'
+done
+qualify_source_set "${B_UID}" "requal-lower-set-${RUN_TAG}" "requal-original-session-${RUN_TAG}"; REQUAL_NEW_CERT="${QUAL_CERT}"
+[[ "${REQUAL_NEW_CERT}" != "${REQUAL_LOWER_CERT}" ]] || fail 'same-pin recertification reused the withdrawn witness'
+assert_sql 'replacement witness retains the original performed pin' "select count(*)=2 and bool_and(ended_at is null and observed_set_pin in
+  (select observed_set_pin from app_public.group_metric_certifications where coalesce(legacy_certification_id,witness_certification_id,id)='${REQUAL_LOWER_CERT}'))
+  from app_public.group_metric_certifications where coalesce(legacy_certification_id,witness_certification_id,id)='${REQUAL_NEW_CERT}';"
+next_cuam
+push "${B_TOKEN}" 'physical edit voids replacement witness while a fresh source arrives' \
+  "$(e_set "requal-lower-set-${RUN_TAG}" "requal-original-block-${RUN_TAG}" 0 95 1 '' "${CUAM}" | jq --argjson c "${REQUAL_LOWER_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "requal-fresh-set-${RUN_TAG}" "requal-original-block-${RUN_TAG}" 2 130 1 '' "${CUAM}")" \
+  "$(e_session "requal-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+next_cuam
+push "${C_TOKEN}" 'peer independently falls below the original lower source' \
+  "$(e_set "requal-peer-set-${RUN_TAG}" "requal-peer-block-${RUN_TAG}" 0 85 1 '' "${CUAM}" | jq --argjson c "${REQUAL_PEER_CREATED}" '.fields.created_at=$c')"
+drain_eval
+qualify_source_set "${C_UID}" "requal-peer-set-${RUN_TAG}"
+qualify_source_set "${B_UID}" "requal-fresh-set-${RUN_TAG}"
+confirm "${B_TOKEN}" "requal-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "requal-original-session-${RUN_TAG}")"; check 'same-pin recertified graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "requal-original-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 0 ]] || fail 'same-pin physically voided lower witness manufactured Certified crossing'
+assert_sql 'replacement witness is physically voided and scoped Certified attribution fails closed' "select
+  (select count(*)=2 and bool_and(end_reason='voided' and ended_at is not null) from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${REQUAL_NEW_CERT}')
+  and app_public.notification_workout_ready(member_user_id,session_id)
+  and (select jsonb_agg(r order by r->>'metric',r->>'member_user_id') from jsonb_array_elements(without_workout) r where (r->>'certified')::boolean)=
+    (select jsonb_agg(r order by r->>'metric',r->>'member_user_id') from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean)
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='requal-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+# Current qualification can promote an original All-only scalar into the Certified counterfactual.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"All-only original qualification",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create All-only original comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in original peer; do
+  if [[ "${source}" == original ]]; then QUAL_TOKEN="${B_TOKEN}"; QUAL_WEIGHT=90; else QUAL_TOKEN="${C_TOKEN}"; QUAL_WEIGHT=110; fi
+  next_cuam
+  push "${QUAL_TOKEN}" 'All-only original comparison definitions' "$(e_def "allonly-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "allonly-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  if [[ "${source}" == original ]]; then ALLONLY_CREATED="${CUAM}"; fi
+  push "${QUAL_TOKEN}" 'publish All-only original and peer' "$(e_session "allonly-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "allonly-${source}-block-${RUN_TAG}" "allonly-${source}-session-${RUN_TAG}" "allonly-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "allonly-${source}-set-${RUN_TAG}" "allonly-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+done
+drain_eval
+qualify_source_set "${C_UID}" "allonly-peer-set-${RUN_TAG}"
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='allonly-original-session-${RUN_TAG}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='allonly-original-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+ALLONLY_CAPTURE_AT="$(run_psql 'select clock_timestamp();')"
+assert_sql 'original source has only two All scalar baselines and no old qualification' "select jsonb_array_length(baseline_scores)=2
+  and not exists(select 1 from jsonb_array_elements(baseline_scores) b where (b->>'certified')::boolean or (b->>'value')::numeric<>90)
+  and source_controls->'allonly-original-set-${RUN_TAG}'->'certified_metrics'='[]'::jsonb
+  and not exists(select 1 from jsonb_array_elements(before_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='allonly-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+qualify_source_set "${B_UID}" "allonly-original-set-${RUN_TAG}"; ALLONLY_CERT="${QUAL_CERT}"
+assert_sql 'unchanged original qualification is created after the frozen All-only capture' "select
+  (select count(*)=2 and bool_and(certified_at>='${ALLONLY_CAPTURE_AT}' and ended_at is null) from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${ALLONLY_CERT}')
+  and source_controls->'allonly-original-set-${RUN_TAG}'->'certified_metrics'='[]'::jsonb
+  and (select count(*)=2 and bool_and((r->>'rank')::int=2) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='allonly-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'physical edit voids new qualification while a fresh source crosses' \
+  "$(e_set "allonly-original-set-${RUN_TAG}" "allonly-original-block-${RUN_TAG}" 0 95 1 '' "${CUAM}" | jq --argjson c "${ALLONLY_CREATED}" '.fields.created_at=$c')" \
+  "$(e_set "allonly-fresh-set-${RUN_TAG}" "allonly-original-block-${RUN_TAG}" 1 130 1 '' "${CUAM}")" \
+  "$(e_session "allonly-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "allonly-fresh-set-${RUN_TAG}"
+confirm "${B_TOKEN}" "allonly-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "allonly-original-session-${RUN_TAG}")"; check 'All-only current-qualification graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "allonly-original-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 2 ]] || fail 'current qualification lost the old All scalar or invented an initial own Certified placement'
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==6' <<<"${COUNTS}" >/dev/null || fail 'All-only original qualification suppressed valid All and peer Certified crossings'
+assert_sql 'newly voided witness restores the original All scalar to Certified rank two' "select
+  (select count(*)=2 and bool_and(end_reason='voided' and ended_at is not null) from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${ALLONLY_CERT}')
+  and app_public.notification_workout_ready(member_user_id,session_id)
+  and (select count(*)=2 and bool_and((r->>'rank')::int=2) from jsonb_array_elements(without_workout) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(final_ranks) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='allonly-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+# An originally Certified lower scalar also restores All placement after its higher All source loses its link.
+rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
+  '{p_group_id:$g,p_name:"Certified scalar restores All",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
+expect_ok 'create Certified-to-All comparison'; QUAL_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+QUAL_REV="$(run_psql "select rules_revision from app_public.group_exercises where id='${QUAL_EXERCISE}';")"
+for source in original peer; do
+  if [[ "${source}" == original ]]; then QUAL_TOKEN="${B_TOKEN}"; QUAL_WEIGHT=100; else QUAL_TOKEN="${C_TOKEN}"; QUAL_WEIGHT=95; fi
+  next_cuam
+  push "${QUAL_TOKEN}" 'Certified-to-All comparison definitions' "$(e_def "symmetry-${source}-def-${RUN_TAG}" Bench "${CUAM}")" \
+    "$(e_link "symmetry-${source}-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+  next_cuam
+  if [[ "${source}" == original ]]; then SYMMETRY_CREATED="${CUAM}"; fi
+  push "${QUAL_TOKEN}" 'publish lower original record and All-only peer' "$(e_session "symmetry-${source}-session-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")" \
+    "$(e_se "symmetry-${source}-block-${RUN_TAG}" "symmetry-${source}-session-${RUN_TAG}" "symmetry-${source}-def-${RUN_TAG}" 0 Bench "${CUAM}")" \
+    "$(e_set "symmetry-${source}-set-${RUN_TAG}" "symmetry-${source}-block-${RUN_TAG}" 0 "${QUAL_WEIGHT}" 1 '' "${CUAM}")"
+  drain_eval
+done
+next_cuam
+push "${B_TOKEN}" 'higher All-only source wins above the lower original record' \
+  "$(e_def "symmetry-winner-def-${RUN_TAG}" Bench "${CUAM}")" \
+  "$(e_link "symmetry-winner-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" 'publish the higher All-only source' \
+  "$(e_se "symmetry-winner-block-${RUN_TAG}" "symmetry-original-session-${RUN_TAG}" "symmetry-winner-def-${RUN_TAG}" 1 Bench "${CUAM}")" \
+  "$(e_set "symmetry-winner-set-${RUN_TAG}" "symmetry-winner-block-${RUN_TAG}" 0 120 1 '' "${CUAM}")"
+drain_eval
+qualify_source_set "${B_UID}" "symmetry-original-set-${RUN_TAG}" "symmetry-original-session-${RUN_TAG}"; SYMMETRY_CERT="${QUAL_CERT}"
+run_psql "update app_public.notification_workouts set cutover_active=true where member_user_id='${B_UID}' and session_id='symmetry-original-session-${RUN_TAG}';
+  delete from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='symmetry-original-session-${RUN_TAG}';
+  select app_public.notification_capture_comparison('${G2}','${QUAL_EXERCISE}',${QUAL_REV},false);" >/dev/null
+SYMMETRY_BASELINE="$(run_psql "select baseline_scores from app_public.notification_workout_targets where member_user_id='${B_UID}'
+  and session_id='symmetry-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';")"
+assert_sql 'All and Certified retain different original scalar winners' "select jsonb_array_length(baseline_scores)=4
+  and (select count(*)=2 and bool_and((b->>'certified')::boolean and (b->>'value')::numeric=100)
+    from jsonb_array_elements(baseline_scores) b where b->>'set_id'='symmetry-original-set-${RUN_TAG}')
+  and (select count(*)=2 and bool_and(not (b->>'certified')::boolean and (b->>'value')::numeric=120)
+    from jsonb_array_elements(baseline_scores) b where b->>'set_id'='symmetry-winner-set-${RUN_TAG}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='symmetry-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
+next_cuam
+push "${B_TOKEN}" 'unlink higher All source and physically edit Certified lower source' \
+  "$(e_link "symmetry-winner-def-${RUN_TAG}" "${G2}" "${QUAL_EXERCISE}" "${CUAM}" "${NOW_MS}")" \
+  "$(e_set "symmetry-original-set-${RUN_TAG}" "symmetry-original-block-${RUN_TAG}" 0 90 1 '' "${CUAM}" | jq --argjson c "${SYMMETRY_CREATED}" '.fields.created_at=$c')" \
+  "$(e_session "symmetry-original-session-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+confirm "${B_TOKEN}" "symmetry-original-session-${RUN_TAG}" "$(manifest "${B_UID}" "symmetry-original-session-${RUN_TAG}")"; check 'Certified-to-All graph confirmed' '.confirmed==true'
+drain_eval
+prepare_outcome "${B_UID}" "symmetry-original-session-${RUN_TAG}"
+[[ "$(qualified_certified_count)" == 2 ]] || fail 'Certified-to-All restoration lost the physically voided own Certified placements'
+jq -e --arg g "${G2}" 'length==1 and .[0].group_id==$g and .[0].rank_count==6' <<<"${COUNTS}" >/dev/null || fail 'frozen Certified scalar did not restore four causal All movements'
+assert_sql 'frozen Certified scalar restores All without adding stored numeric history' "select baseline_scores='${SYMMETRY_BASELINE}'::jsonb
+  and app_public.notification_workout_ready(member_user_id,session_id)
+  and (select count(*)=2 and bool_and(ended_at is not null and end_reason='voided') from app_public.group_metric_certifications
+    where coalesce(legacy_certification_id,witness_certification_id,id)='${SYMMETRY_CERT}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(without_workout) r
+    where not (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=2) from jsonb_array_elements(final_ranks) r
+    where not (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and (select count(*)=2 and bool_and((r->>'rank')::int=1) from jsonb_array_elements(without_workout) r
+    where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  and not exists(select 1 from jsonb_array_elements(final_ranks) r where (r->>'certified')::boolean and r->>'member_user_id'='${B_UID}')
+  from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='symmetry-original-session-${RUN_TAG}' and group_exercise_id='${QUAL_EXERCISE}';"
 # A link admitted while the source is still planned does not establish a performed score threshold.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Planned first admission",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
