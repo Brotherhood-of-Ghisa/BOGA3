@@ -21,7 +21,7 @@ HANDOFF_PID=""
 psql_session_start
 EPOCH_AT="$(run_psql 'select started_at from app_public.notification_workout_epoch;')"
 KICK_URL="$(run_psql "select coalesce(app_public.group_eval_config('group_eval_url'),'');")"
-SWEEP_ACTIVE="$(run_psql "select active from cron.job where jobname='group-eval-sweep';")"
+SWEEP_ACTIVE="$(run_psql "select active::text from cron.job where jobname='group-eval-sweep';")"
 EVAL_SECRET="$(run_psql "select app_public.group_eval_config('group_eval_secret');")"
 cleanup() {
   if [[ -n "${HOLDER_PID}" ]]; then
@@ -269,7 +269,7 @@ push "${B_TOKEN}" 'expired original moment before a newer raw autosave' "$(e_ses
 next_cuam
 push "${B_TOKEN}" 'new raw start cannot renew expired captured timing' \
   "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null null "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recover newer raw autosave with expired original timing'
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'expired-timing recovery expected HTTP 204 with no body'
 assert_sql 'newer raw timestamp admits recovery without renewing its expired original event' "select w.eligible and w.can_start
   and s.started_at=${NOW_MS} and w.start_at=to_timestamp(${EXPIRED_START_MS}/1000.0) and m.event_at=w.start_at
   and w.start_at>=(select started_at from app_public.notification_workout_epoch) and w.start_at+interval '24 hours'<=now()
@@ -296,7 +296,7 @@ assert_sql 'backdated active source still has its recent original moment and no 
   from app_public.sessions s join app_public.notification_workout_moments m
     on m.member_user_id=s.owner_user_id and m.session_id=s.id and m.kind='start'
   where s.owner_user_id='${B_UID}' and s.id='${BACKDATED}';"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'first recovery admits captured recent start despite backdated raw source'
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'captured-time recovery expected HTTP 204 with no body'
 assert_sql 'captured timing creates one start with its original deadline across overlapping groups' "select count(*)=1 and bool_and(kind='start'
   and event_at=to_timestamp(${NOW_MS}/1000.0) and expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours')
   from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}';"
@@ -304,7 +304,7 @@ drain_worker; check 'actual local sink accepts recovered backdated source' '.out
 next_cuam
 push "${B_TOKEN}" 'repeat backdated autosave after accepted recovered start' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null null "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'repeat recovery uses immutable workout timing'
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'repeat recovery expected HTTP 204 with no body'
 drain_worker; check 'backdated autosave and recovery never replay the accepted start' '.claimed==0'
 assert_sql 'backdated source retains one real local ticket and its immutable original clock' "select count(*)=1 and bool_and(n.kind='start'
   and n.event_at=to_timestamp(${NOW_MS}/1000.0) and n.expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours'
@@ -316,7 +316,7 @@ BACKDATED_RECOVERY_AT="$(run_psql "select updated_at from app_public.notificatio
 next_cuam
 push "${B_TOKEN}" 'delete backdated source whose captured moment remains fresh' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recovery excludes deleted source despite fresh moment'
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'deleted-source recovery expected HTTP 204 with no body'
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${BACKDATED_INTENT}}"; expect_ok 'deleted captured-start projection'
 [[ "${BODY}" == null ]] || fail 'deleted backdated source projected its captured start'
 assert_sql 'deleted source is excluded from recovery and retains one immutable identity' "select updated_at='${BACKDATED_RECOVERY_AT}'
@@ -642,7 +642,7 @@ next_cuam
 push "${B_TOKEN}" 'forfeit missed start on later autosave' "$(e_session "recovery-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")"
 assert_sql 'missed start stays an immutable forfeited moment' "select event_at is null from app_public.notification_workout_moments
   where member_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}' and kind='start';"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; expect_ok 'recover explicit null start forfeiture'
+rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'forfeited-source recovery expected HTTP 204 with no body'
 assert_sql 'recent raw fallback cannot admit a null forfeited start as an alert' "select not w.can_start and m.event_at is null
   and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
   from app_public.notification_workouts w join app_public.notification_workout_moments m
