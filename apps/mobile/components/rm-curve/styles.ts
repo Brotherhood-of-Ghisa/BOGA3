@@ -1,0 +1,24 @@
+import { StyleSheet } from 'react-native';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+
+export const curveStyles = StyleSheet.create({
+  card: { padding: uiSpace.md, gap: uiSpace.sm },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.sm },
+  filter: { flexGrow: 1, flexBasis: '45%', minWidth: 0 },
+  full: { width: '100%' },
+  filterLabel: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
+  body: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base, color: uiRoles.inkMuted },
+  figure: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, flexShrink: 1 },
+  micro: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, flexWrap: 'wrap' },
+  dot: { width: 12, height: 12, borderWidth: uiBorder.width, borderColor: uiRoles.ink, borderRadius: uiGeometry.radius.pill },
+  dates: { flexDirection: 'row', justifyContent: 'space-between', gap: uiSpace.sm, flexWrap: 'wrap' },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.md },
+  metric: { flexBasis: '45%', flexGrow: 1, gap: uiSpace.xs, minWidth: 0 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: uiSpace.sm },
+});

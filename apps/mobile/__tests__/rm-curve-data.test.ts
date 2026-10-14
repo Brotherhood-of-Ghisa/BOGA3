@@ -2,9 +2,9 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import wave from './fixtures/rm-curve-weekly-wave.json';
 import oracle from './fixtures/rm-curve-weekly-wave-oracle.json';
-import { waveGraph } from './helpers/rm-curve-history';
+import { seedWaveHistory } from './helpers/rm-curve-history';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
-import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from '@/src/data/schema';
+import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from '@/src/data/schema';
 import { loadRmCurveGraph } from '@/src/data/rm-curve';
 import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
@@ -20,27 +20,7 @@ const start = new Date(wave.scenarios.plateau[0].startedAt);
 const query = { exerciseDefinitionId: 'curve', start,
   end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52 };
 
-function seed(scenario: keyof typeof wave.scenarios = 'plateau') {
-  const db = mockFixture.database; const graph = waveGraph(scenario);
-  db.insert(exerciseDefinitions).values(graph.definition).run();
-  db.insert(gyms).values({ id: 'synthetic-gym', name: 'Synthetic gym' }).run();
-  const seededSessions = new Set<string>(), blocks = new Set<string>();
-  for (const row of graph.rows) {
-    if (!seededSessions.has(row.sessionId)) {
-      db.insert(sessions).values({ id: row.sessionId, startedAt: row.startedAt,
-        completedAt: row.completedAt, status: 'completed', gymId: row.gymId }).run();
-      seededSessions.add(row.sessionId);
-    }
-    if (!blocks.has(row.sessionExerciseId)) {
-      db.insert(sessionExercises).values({ id: row.sessionExerciseId, sessionId: row.sessionId,
-        exerciseDefinitionId: 'curve', name: 'Historical name', orderIndex: row.blockOrder }).run();
-      blocks.add(row.sessionExerciseId);
-    }
-    db.insert(exerciseSets).values({ id: row.setId, sessionExerciseId: row.sessionExerciseId,
-      orderIndex: row.setOrder, weightValue: row.weightValue, repsValue: row.repsValue,
-      setType: row.setType, performanceStatus: row.performanceStatus }).run();
-  }
-}
+const seed = (scenario: keyof typeof wave.scenarios = 'plateau') => seedWaveHistory(mockFixture.database, scenario);
 beforeEach(() => { mockFixture = createInMemoryDatabase(); configurePersonalEffortPolicy(DEFAULT_PERSONAL_EFFORT_POLICY); });
 afterEach(() => { configurePersonalEffortPolicy(DEFAULT_PERSONAL_EFFORT_POLICY); mockFixture.close(); });
 

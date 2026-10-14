@@ -1,6 +1,7 @@
 # M36-T07-Implement_approved_RM_chart — Implement the approved interactive chart without UI exposure
 
-- Status: `planned`
+- Status: `in_progress`
+- Review: implementation prepared; human review and UI-lane agreement pending
 - Depends on: M36-T06
 - Milestone: `docs/plans/milestones/M36-rm-performance-curve-analytics.md`
 - Areas: frontend; UI impact: yes
@@ -22,7 +23,7 @@ Milestone D1–D6 govern this task. This is planning only; no design, analytical
 
 ## Open — resolve with the user at session start
 
-Final component seam and development preview for human review without committing a production route; precise overlap hit testing and accessibility ordering.
+The component seam and ignored developer preview are implemented; ordered candidate/list access and coordinate-free activation are covered. Review the [implemented handoff](../research/M36-T07-chart-implementation-review.md), including the brief/prototype axis conflict and repository copy/format reconciliation. Human review and the proposed T07 UI-lane narrowing remain pending.
 
 ## Deliverables and acceptance
 
