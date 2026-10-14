@@ -1,6 +1,6 @@
 # Final RM chart entry — review handoff
 
-Status: production entry implemented and independently source-reviewed on the experimental branch, based on T08 commit `7c21d18b` and draft PR #741. T09 remains in_progress. Its native lane/scenario agreement and final human entry/return review are pending; no T09 acceptance scenario has been written or run. Main is untouched, and no merge/ready transition is authorized.
+Status: production entry implemented and independently source-reviewed in [draft PR #742](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/742), based on T08 commit `7c21d18b` and draft PR #741. T09 remains in_progress. Its native lane/scenario agreement and final human entry/return review are pending; no T09 acceptance scenario has been written or run. Main is untouched, and no merge/ready transition is authorized.
 
 ## Target and scope
 
