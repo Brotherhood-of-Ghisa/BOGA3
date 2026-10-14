@@ -254,6 +254,58 @@ describe('plan form: create', () => {
     expect(screen.getByTestId('plan-form-block-1-set-1-remove')).toBeDisabled();
   });
 
+  it('duplicates the selected target once or nine times, cancels safely, then saves and reopens ordinary targets', async () => {
+    await seedCatalog();
+    const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    fillTitle('Repeated squat');
+    await addExerciseBlock('Barbell Squat');
+    fillSet(1, 1, '40.50', '8');
+    const openDuplicate = () => fireEvent.press(screen.getByTestId('plan-form-block-1-set-1-duplicate'));
+    openDuplicate();
+    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('value', '1');
+    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('keyboardType', 'number-pad');
+    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '9');
+    fireEvent.press(screen.getByTestId('plan-set-duplicate-sheet-backdrop', { includeHiddenElements: true }));
+    expect(screen.queryByTestId('plan-form-block-1-set-2-weight')).toBeNull();
+    openDuplicate();
+    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('value', '1');
+    const confirm = screen.getByTestId('plan-set-duplicate-confirm');
+    act(() => { fireEvent.press(confirm); fireEvent.press(confirm); });
+    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortW-Up');
+    expect(screen.queryByTestId('plan-form-block-1-set-3-weight')).toBeNull();
+    fillSet(1, 2, '50', '6');
+    fireEvent.press(screen.getByTestId('plan-form-block-1-set-2-effort'));
+    openDuplicate();
+    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '0');
+    expect(screen.getByTestId('plan-set-duplicate-confirm')).toBeDisabled();
+    expect(screen.getByTestId('plan-set-duplicate-count-error')).toHaveTextContent('Enter a whole number greater than zero.');
+    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '29');
+    expect(screen.getByTestId('plan-set-duplicate-confirm')).toBeDisabled();
+    expect(screen.getByTestId('plan-set-duplicate-count-error')).toHaveTextContent('This block can fit only 28 more sets.');
+    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '9');
+    fireEvent.press(screen.getByTestId('plan-set-duplicate-confirm'));
+    for (let index = 1; index <= 10; index += 1) {
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-weight`)).toHaveProp('value', '40.50');
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-reps`)).toHaveProp('value', '8');
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-effort`)).toHaveTextContent('EffortW-Up');
+    }
+    expect(screen.getByTestId('plan-form-block-1-set-11-weight')).toHaveProp('value', '50');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const [plan] = await planQueries.listUnscheduledPlans();
+    const detail = await planQueries.loadPlanDetail(plan.id);
+    const targets = detail!.blocks[0].targets;
+    expect(targets).toHaveLength(11);
+    expect(new Set(targets.map((target) => target.id)).size).toBe(11);
+    expect(targets.slice(0, 10).every((target) =>
+      target.targetWeightValue === '40.5' && target.targetReps === 8 && target.targetSetType === 'warm_up')).toBe(true);
+    expect(targets[10]).toMatchObject({ targetWeightValue: '50', targetReps: 6, targetSetType: null });
+    unmount();
+    render(<SessionPlanNewScreen editPlanId={plan.id} fromPlanId={null} />);
+    expect(await screen.findByTestId('plan-form-block-1-set-11-weight')).toHaveProp('value', '50');
+    expect(screen.queryByTestId('plan-form-block-1-set-12-weight')).toBeNull();
+  });
+
   it('keeps invalid fields in place with accessible messages and writes nothing', async () => {
     await seedCatalog();
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
@@ -972,7 +1024,8 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
   });
 
   it('catches rejected planner saves and displays error notice', async () => {
-    const onSave = jest.fn().mockRejectedValueOnce(new Error('SQLITE_FULL'));
+    const onSave = jest.fn().mockRejectedValueOnce(new Error('SQLITE_FULL'))
+      .mockResolvedValueOnce({ status: 'saved', planId: null });
     render(
       <PlanFormScreen
         initialForm={{
@@ -994,10 +1047,18 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
         saveLabel="Save"
       />
     );
+    fireEvent.press(screen.getByTestId('plan-form-block-1-set-1-duplicate'));
+    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '2');
+    fireEvent.press(screen.getByTestId('plan-set-duplicate-confirm'));
     fireEvent.press(screen.getByTestId('plan-form-save'));
     expect(await screen.findByTestId('plan-form-notice')).toHaveTextContent(
       "Couldn't save the plan. Try again."
     );
+    expect(screen.getByTestId('plan-form-block-1-set-3-weight')).toHaveProp('value', '100');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitForGone(() => screen.queryByTestId('plan-form-notice'));
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave.mock.calls.map(([form]) => form.blocks[0].sets.length)).toEqual([3, 3]);
   });
 
   it('plan exercise pick sheet shows historical session data instead of Never done', async () => {
