@@ -39,6 +39,10 @@ existing future-clock clamp can leave their values different after convergence.
 Only digests persist. Current scoring dependencies and comparison publications
 are fenced independently; capture uses the exact evaluated graph and one stable
 snapshot of live disclosure/evidence, with safe ranks rechecked at readiness; no private Sync v2 envelope changes.
+New comparison targets require a live workout-definition link; unlinked evaluator
+inputs cannot expand confirmation context. Older unrelated captures retain their
+baselines until normal pruning because unlink history is ambiguous; completions
+may require reconfirmation within their original delivery window.
 
 Confirmation proves the declared graph at that instant, not that another
 device can never add a future row. A change before handoff makes the completion

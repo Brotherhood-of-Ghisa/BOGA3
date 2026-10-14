@@ -93,4 +93,25 @@ describe('worker after an admitted start has already completed', () => {
       (startedAt + 86400000) / 1000, (startedAt + 86400000) / 1000,
     ]);
   });
+
+  test('completion waits for a ready source and enqueues only its authorized comparison contribution', async () => {
+    let prepareCalls = 0;
+    const saved: Record<string, unknown>[] = [];
+    const rpc: Rpc = async <T>(name: string, args?: Record<string, unknown>): Promise<T> => {
+      if (name === 'notification_workout_prepare') return { jobs: prepareCalls++ === 0 ? [] : [{
+        member_user_id: 'lifter', session_id: 'completed-source', generation: 3,
+        targets: [{ group_id: 'linked-group', group_exercise_id: 'linked-comparison', best_metrics: ['e1rm', 'volume'],
+          before: [], final: [], without_workout: [] }],
+      }] } as T;
+      if (name === 'notification_workout_enqueue') { saved.push(args!); return true as T; }
+      return { jobs: [], disabled: false } as T;
+    };
+    await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    expect(saved).toEqual([]);
+    const ready = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    expect(await ready.json()).toMatchObject({ outcomes: { workout_ready: 1 } });
+    expect(saved).toEqual([{ p_member: 'lifter', p_session: 'completed-source', p_generation: 3,
+      p_contributions: [{ group_id: 'linked-group', best_count: 2, rank_count: 0 }] }]);
+    expect(sendPush).not.toHaveBeenCalled();
+  });
 });
