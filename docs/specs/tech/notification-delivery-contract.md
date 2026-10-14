@@ -20,7 +20,9 @@ SHA-256 digest is stored. Rebinding an existing installation requires that
 capability. Registration checks the service-configured project, environment,
 bundle identifier and payload version; these are compatibility gates, not
 binary attestation. Local registrations accept only synthetic local tokens.
-Production accepts Expo token syntax; possession is not proof of APNs ownership.
+Preview/production use Expo only with an exact configured project/environment/
+bundle; actual sends require explicit isolated device-test or rollout enablement.
+Preview and production accept Expo token syntax; possession is not proof of APNs ownership.
 
 Account, Auth session, token or encryption-key changes rotate a random binding
 UUID and cancel unsent old-binding deliveries. Tokens are unique within the

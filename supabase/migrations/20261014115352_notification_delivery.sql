@@ -1,13 +1,13 @@
 -- Operational notification delivery. No producer, client table grants or sync entity.
 create table app_public.notification_config (
   singleton boolean primary key default true check (singleton),
-  environment text not null check (environment in ('local','production')),
+  environment text not null check (environment in ('local','preview','production')),
   project_id uuid not null,
   bundle_id text not null check (length(bundle_id) between 1 and 160),
   sending_enabled boolean not null default false,
   provider text not null default 'disabled' check (provider in ('disabled','local','expo')),
   check (provider <> 'local' or environment = 'local'),
-  check (provider <> 'expo' or environment = 'production')
+  check (provider <> 'expo' or environment in ('preview','production'))
 );
 create table app_public.notification_preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -123,7 +123,7 @@ begin
      p_encryption_key is null or p_encryption_key !~ '^[A-Za-z0-9+/]{43}=$' or
      p_token is null or length(p_token)>256 or
      (c.environment='local' and p_token !~ '^LocalPushToken\[[a-zA-Z0-9_-]{1,120}\]$') or
-     (c.environment='production' and p_token !~ '^(ExponentPushToken|ExpoPushToken)\[[a-zA-Z0-9_-]{1,120}\]$') then
+     (c.environment in ('preview','production') and p_token !~ '^(ExponentPushToken|ExpoPushToken)\[[a-zA-Z0-9_-]{1,120}\]$') then
     raise exception 'VALIDATION: invalid notification registration';
   end if;
   h := extensions.digest(decode(p_capability,'base64'),'sha256');

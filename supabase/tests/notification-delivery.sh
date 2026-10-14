@@ -182,6 +182,7 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
   end \$\$;
   select app_public.notification_sweep() is not null;
   rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
+run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null
 # Enqueue and handoff take the workout lock before the installation FK/row lock.
 QUEUE_SESSION="enqueue-race-${RUN_TAG}"
 run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
