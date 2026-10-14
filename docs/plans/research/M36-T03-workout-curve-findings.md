@@ -4,7 +4,7 @@
 
 Research deliverable for T03, on the experimental branch stack from reviewed T02. The owner authorised synthetic curves and read-only remote BOGA_DEV history, then selected one account and replaced Barbell Deadlift with Zercher Squat. The second exercise is Dumbbell Bench Presses, which supplies a longer history and a per-side load case. Account email, owner UUID, gym identities and raw private histories stay out of this report and commits.
 
-This delivers data/provenance auditing and descriptive comparisons. Effort provenance for the authorised account still needs operator clarification; no calibrated RIR accuracy, strength diagnosis, structural break or production feature is approved. T04 retains the empirical reliability and final analytical/product review gate.
+This delivers data/provenance auditing and descriptive comparisons. On 2026-10-14 the owner accepted proceeding to T04 after reviewing these results and their limitations. Imported effort provenance remains uncertain; it is not silently reclassified as measured. No calibrated RIR accuracy, strength diagnosis, structural break or production feature is approved. T04 retains the empirical reliability and final analytical/product review gate.
 
 ## Inventory
 
@@ -68,4 +68,4 @@ Focused Jest covers extraction, duplicate identities, owner/gym isolation, cutof
 
 ## Decisions remaining
 
-Confirm imported versus recorded effort provenance and accept descriptive-only claims where effort is unverified. T04 must test both configurable assumed RIR sigma and joint RM/sigma candidates with independent known truths, nuisance/dependence sensitivities and measured reliability. No dispersion in these mixed histories independently calibrates sigma. The approved first-release reference rule remains unchanged; sparse support is a finding, not permission to loosen it. Additional weekly fitted-curve UI, statistical claims and design remain unapproved.
+The owner accepted descriptive research with the recorded provenance limitations; any stronger claim still needs clarification of imported versus recorded effort. T04 must test both configurable assumed RIR sigma and joint RM/sigma candidates with independent known truths, nuisance/dependence sensitivities and measured reliability. No dispersion in these mixed histories independently calibrates sigma. The approved first-release reference rule remains unchanged; sparse support is a finding, not permission to loosen it. Additional weekly fitted-curve UI, statistical claims and design remain unapproved.

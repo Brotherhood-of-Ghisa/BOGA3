@@ -82,7 +82,7 @@ One card = one session = one local worktree = one PR under `docs/plans/README.md
 | --- | --- | --- | --- |
 | M36-T01 | Reconstruct the RM curve and agree effort/reference contracts | none | completed |
 | M36-T02 | Specify exploratory residual regression and break reliability | T01 | completed |
-| [M36-T03](../tasks/M36-T03-Workout_data_and_curve_validation.md) | Audit workout data and empirically validate the RM curve | T02 | in_progress |
+| M36-T03 | Audit workout data and empirically validate the RM curve | T02 | completed |
 | [M36-T04](../tasks/M36-T04-Regression_validation_and_research_review.md) | Validate regression with known behaviours and approve research findings | T03 | planned |
 | [M36-T05](../tasks/M36-T05-Approve_RM_chart_design.md) | Design and obtain human approval of the RM scatter chart | T04 | planned |
 | [M36-T06](../tasks/M36-T06-RM_chart_data_transformations.md) | Implement RM chart data transformations and real-data tests | T05 | planned |
