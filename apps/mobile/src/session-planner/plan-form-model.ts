@@ -1,7 +1,7 @@
 import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { parseSessionDateTime } from '@/src/utils/local-time';
-import { validatePlanDraft } from './plan-validation';
+import { PLAN_LIMITS, validatePlanDraft } from './plan-validation';
 import type { PlanDetailView } from './plan-queries';
 import type { PlanDraft, PlanFieldError } from './types';
 
@@ -49,6 +49,30 @@ export const createPlanFormSet = (previous?: PlanFormSet, displayEfforts?: reado
   targetRepsText: previous?.targetRepsText ?? '',
   targetSetType: defaultSessionSetType(previous?.targetSetType, displayEfforts),
 });
+
+/** Duplications are extra copies; the whole request must fit the block. */
+export const planSetDuplicationError = (setCount: number, countText: string): string | null => {
+  const text = countText.trim();
+  const count = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(count) || count < 1) {
+    return 'Enter a whole number greater than zero.';
+  }
+  const available = PLAN_LIMITS.exerciseSets.max - setCount;
+  if (count > available) {
+    return available <= 0
+      ? `This block already has ${PLAN_LIMITS.exerciseSets.max} sets.`
+      : `This block can fit only ${available} more ${available === 1 ? 'set' : 'sets'}.`;
+  }
+  return null;
+};
+
+/** Exact source copies, inserted after it; unlike Add set, effort never defaults. */
+export const duplicatePlanFormSet = (sets: PlanFormSet[], setId: string, countText: string): PlanFormSet[] => {
+  const index = sets.findIndex((set) => set.id === setId);
+  if (index < 0 || planSetDuplicationError(sets.length, countText)) return sets;
+  const copies = Array.from({ length: Number(countText) }, () => ({ ...sets[index], id: nextKey('set') }));
+  return [...sets.slice(0, index + 1), ...copies, ...sets.slice(index + 1)];
+};
 
 export const planFormBlockFromEmptySet = (
   exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },

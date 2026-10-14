@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   ActionButton,
@@ -16,6 +16,7 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
+import { PlanSetDuplicateForm } from '@/components/session-planner/plan-set-duplicate-form';
 import { EffortChoices } from '@/components/exercise-page/exercise-sheets';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanGymSheet, type SaveOutcome } from '@/components/session-planner/plan-form-screen';
@@ -29,6 +30,7 @@ import {
 import {
   planFormBlockFromEmptySet,
   planFormBlockFromSuggestion,
+  duplicatePlanFormSet,
   type PlanFormBlock,
   type PlanFormSet,
 } from '@/src/session-planner/plan-form-model';
@@ -59,7 +61,6 @@ const childPlanBlockEdits = (
   const updateBlock = (blockId: string, patch: Partial<PlanFormBlock>) =>
     mapBlock(blockId, (block) => ({ ...block, ...patch }));
   return {
-    updateBlock,
     updateSet: (blockId: string, setId: string, patch: Partial<PlanFormSet>) =>
       mapBlock(blockId, (block) => ({
         ...block,
@@ -67,12 +68,26 @@ const childPlanBlockEdits = (
       })),
     addSet: (blockId: string) =>
       mapBlock(blockId, (block) => ({ ...block, sets: [...block.sets, createPlanFormSet(block.sets.at(-1), displayEfforts)] })),
+    duplicateSet: (blockId: string, setId: string, countText: string) =>
+      mapBlock(blockId, (block) => ({ ...block, sets: duplicatePlanFormSet(block.sets, setId, countText) })),
     // The last set stays: a block always keeps at least one target.
     removeSet: (blockId: string, setId: string) =>
       mapBlock(blockId, (block) =>
         block.sets.length > 1 ? { ...block, sets: block.sets.filter((set) => set.id !== setId) } : block
       ),
-    appendBlock: (block: PlanFormBlock) => patchBlocks([...plan.blocks, block]),
+    pickExercise: (blockId: string | null, { exercise, suggestion }: PlanExercisePickResult) => {
+      const hasSuggestion = suggestion && suggestion.sets.length > 0;
+      const block = hasSuggestion
+        ? planFormBlockFromSuggestion(exercise, suggestion.sets, displayEfforts)
+        : planFormBlockFromEmptySet(exercise, displayEfforts);
+      if (blockId === null) patchBlocks([...plan.blocks, block]);
+      else updateBlock(blockId, {
+        exerciseDefinitionId: exercise.id,
+        name: exercise.name,
+        loadInputMode: exercise.loadInputMode,
+        sets: block.sets,
+      });
+    },
     removeBlock: (blockId: string) => {
       patchBlocks(plan.blocks.filter((b) => b.id !== blockId));
     },
@@ -114,6 +129,7 @@ function ProgrammeSessionEditSheet({
   const [pickBlockId, setPickBlockId] = useState<string | null>(null);
   const [isPickingNew, setIsPickingNew] = useState(false);
   const [effortRequest, setEffortRequest] = useState<{ blockId: string; setId: string } | null>(null);
+  const [duplicateRequest, setDuplicateRequest] = useState<{ blockId: string; setId: string } | null>(null);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
 
   if (!plan || planIndex === null) {
@@ -123,8 +139,11 @@ function ProgrammeSessionEditSheet({
   const prefix = `plans.${planIndex}`;
   const effortSet = plan.blocks.find((block) => block.id === effortRequest?.blockId)
     ?.sets.find((set) => set.id === effortRequest?.setId);
+  const duplicateBlock = plan.blocks.find((block) => block.id === duplicateRequest?.blockId);
+  const duplicateSetNumber = (duplicateBlock?.sets.findIndex((set) => set.id === duplicateRequest?.setId) ?? -1) + 1;
   const dismiss = () => {
     setEffortRequest(null);
+    setDuplicateRequest(null);
     onDismiss();
   };
 
@@ -142,29 +161,11 @@ function ProgrammeSessionEditSheet({
   const selectedGymName =
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
 
-  const { updateBlock, updateSet, addSet, removeSet, appendBlock, removeBlock, moveBlock } =
+  const { updateSet, addSet, duplicateSet, removeSet, pickExercise, removeBlock, moveBlock } =
     childPlanBlockEdits(plan, planIndex, onUpdatePlan, trainingPreferences.displayEfforts);
 
   const onPickExercise = (blockId: string | null, result: PlanExercisePickResult) => {
-    const { exercise, suggestion } = result;
-    if (blockId === null) {
-      const newBlock =
-        suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts)
-          : planFormBlockFromEmptySet(exercise, trainingPreferences.displayEfforts);
-      appendBlock(newBlock);
-    } else {
-      const newSets =
-        suggestion && suggestion.sets.length > 0
-          ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts).sets
-          : [createPlanFormSet(undefined, trainingPreferences.displayEfforts)];
-      updateBlock(blockId, {
-        exerciseDefinitionId: exercise.id,
-        name: exercise.name,
-        loadInputMode: exercise.loadInputMode,
-        sets: newSets,
-      });
-    }
+    pickExercise(blockId, result);
     setPickBlockId(null);
     setIsPickingNew(false);
   };
@@ -172,18 +173,18 @@ function ProgrammeSessionEditSheet({
   return (
     <PageSheet
       closeLabel="Close session editor"
-      headerLeading={effortSet ? (
+      headerLeading={effortSet || duplicateSetNumber > 0 ? (
         <IconButton
           accessibilityLabel="Back to session"
           name="chevron-left"
-          onPress={() => setEffortRequest(null)}
-          testID="programme-child-plan-effort-back"
+          onPress={() => { Keyboard.dismiss(); setEffortRequest(null); setDuplicateRequest(null); }}
+          testID={effortSet ? 'programme-child-plan-effort-back' : 'programme-child-plan-duplicate-back'}
         />
       ) : undefined}
       keyboardAvoiding
       onDismiss={dismiss}
       testID="programme-child-plan-editor-sheet"
-      title={effortSet ? 'Effort' : `Edit ${plan.title || 'Session'}`}
+      title={effortSet ? 'Effort' : duplicateSetNumber > 0 ? `Duplicate set ${duplicateSetNumber}` : `Edit ${plan.title || 'Session'}`}
       visible={visible}>
       {effortRequest && effortSet ? (
         <View style={styles.childEditorBody}>
@@ -196,11 +197,22 @@ function ProgrammeSessionEditSheet({
           />
         </View>
       ) : null}
+      {duplicateRequest && duplicateBlock && duplicateSetNumber > 0 ? (
+        <View style={styles.childEditorBody}>
+          <PlanSetDuplicateForm
+            onDuplicate={(countText) => {
+              duplicateSet(duplicateBlock.id, duplicateRequest.setId, countText);
+              setDuplicateRequest(null);
+            }}
+            setCount={duplicateBlock.sets.length}
+          />
+        </View>
+      ) : null}
       <ScrollView
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        style={[styles.childEditorScroll, effortSet ? styles.hidden : null]}
+        style={[styles.childEditorScroll, effortSet || duplicateSetNumber > 0 ? styles.hidden : null]}
         testID="programme-child-plan-editor-scroll">
         <View style={styles.childEditorBody} testID="programme-child-plan-editor-body">
           <FormField
@@ -266,10 +278,12 @@ function ProgrammeSessionEditSheet({
                 index={blockIdx}
                 key={block.id}
                 onAddSet={addSet}
+                onDuplicateSet={duplicateSet}
                 onChangeSet={updateSet}
                 onMoveBlock={moveBlock}
                 onPickExercise={(id) => setPickBlockId(id)}
                 onOpenEffort={(blockId, setId) => setEffortRequest({ blockId, setId })}
+                onOpenDuplicate={(blockId, setId) => setDuplicateRequest({ blockId, setId })}
                 onRemoveBlock={removeBlock}
                 onRemoveSet={removeSet}
               />

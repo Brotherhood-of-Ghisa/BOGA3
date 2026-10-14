@@ -332,6 +332,11 @@ path is defined so the permitted operation can never block sync.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
   last**, and a new **From planner** entry selects available authored blocks.
 
+Planner target **Duplicate** opens a count-only form, default 1. It inserts
+that many exact copies immediately after the selected target, with fresh IDs.
+Existing targets retain values and relative order. Over-limit requests refuse
+atomically; ordinary Add set stays unchanged. Programme children share this form.
+
 ## 6. Agent API and MCP Tools
 
 ### 6.1 Agent API Routes (`supabase/functions/agent-api/`)
