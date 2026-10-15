@@ -1,6 +1,6 @@
-# Strength-regime assessment contract — proposed for analytical review
+# Strength-regime assessment contract — analytically approved
 
-Status: research proposal; not approved for UI inference integration. Read the [current paper](M36-T04-research-review.md) for the sole adopted model and matching evidence. This document defines the proposed handoff, not another paper.
+Status: product owner approved the analytical handoff on 2026-10-15: “The plan analytics is approved as you describe it to me.” Analytical choices are settled; updated UI design approval remains required before implementation. Read the [current paper](M36-T04-research-review.md) for the sole adopted model and matching evidence. This document defines the proposed handoff, not another paper.
 
 ## Identity and scope
 
@@ -22,15 +22,15 @@ The derived result contains:
 
 Insufficient means no admissible cut with eight sampled sessions per side. Eight is only a search constraint. Unresolved means any compared fit has nonconvergence, rank deficiency or a strength/tau search boundary. Keep raw diagnostics for research but abstain from calibrated assessment/emphasis. Physical p endpoints are allowed; they do not prove effort-reading accuracy. A near-zero continuous quadratic vertex is a strength boundary even when all sampled strengths are positive. Local optimizer convergence is not proof of a global maximum.
 
-## Evidence and uncertainty proposal
+## Evidence and uncertainty
 
 The calibration reference is the worst 95% upper order statistic over constant/linear/quadratic no-break histories, maximizing over every cut/model and the declared 16/24/32-session assessments. The nominal 5% convention is a repeated-search reference within that declared family, not a posterior probability, membership probability, visibility threshold or guarantee for arbitrary histories. Report measured evaluation rates and Monte Carlo error from the paper.
 
-For an estimable assessment within that declared scope, proposed normalized emphasis is D/(D+c), where c is the method's calibrated reference. It is zero at D=0, 0.5 at D=c and increases monotonically toward one. The renderer supplies a readable baseline style at zero; weak evidence never hides an otherwise estimable tentative candidate. Label both curves as fitted/tentative; retain the gradual-progress competitor so visually separated plateaus do not imply a break. No calibrated emphasis is supplied outside the calibration family. A future experimental view may show an explicitly uncalibrated fit only after the owner approves that presentation.
+For an estimable assessment within that declared scope, approved normalized emphasis is D/(D+c), where c is the method's calibrated reference. It is zero at D=0, 0.5 at D=c and increases monotonically toward one. The renderer supplies a readable baseline style at zero; weak evidence never hides an otherwise estimable tentative candidate. Label both curves as fitted/tentative; retain the gradual-progress competitor so visually separated plateaus do not imply a break. No calibrated emphasis is supplied outside the calibration family. The approved analytical handoff permits explicitly uncalibrated exploratory fits; their presentation remains subject to UI design approval.
 
 Latest-window strength/effect radii are calibrated on 32-session constant/+2/+5/+10 kg histories; cut-profile likelihood-drop references use the +2/+5/+10 steps. A no-break history has no true break date. Interval references account for finite calibration uncertainty using an exact binomial order-statistic tolerance bound: 95% content with simultaneous 95% calibration confidence across the22 component/family references for both methods, rank392/400. This is conditional on independent matching histories, not a guarantee for arbitrary users. Their evaluation coverage is unconditional on successful fitting; failures remain misses. Date regions are conditional on the step family and are not a joint region across strength, effect, date and nuisance parameters, nor proof that a step model is true. The strength radius covers both amplitudes together. Preserve nonfinite/unbounded references as unresolved, never substitute a finite interval. Do not transfer the earlier RSS benchmark or constant-strength grid intervals to this fitter.
 
-Proposed strength-precision gate for a calibrated display: finite strength bounds for both regimes with full width no more than 10% of the corresponding estimate, in addition to numerical and support checks. This practical tolerance is an owner decision, not something established by eight-per-side sampling or simulation coverage. No effect-size/significance threshold controls candidate visibility. If the scope lacks validated strength uncertainty, mark precision unavailable rather than assert enough information.
+Approved strength-precision gate for a calibrated display: finite strength bounds for both regimes with full width no more than 10% of the corresponding estimate, in addition to numerical and support checks. This practical tolerance is an approved owner decision, not something established by eight-per-side sampling or simulation coverage. No effect-size/significance threshold controls candidate visibility. If the scope lacks validated strength uncertainty, mark precision unavailable rather than assert enough information.
 
 ## Supported and unsupported use
 
@@ -40,4 +40,4 @@ The weekly16–32 sensitivity checks repeated looks using the declared reference
 
 ## Gates and next action
 
-Human analytical approval must explicitly accept the measured reliability limits, evidence mapping, practical strength-precision rule and handling of unsupported real-history fits before UI integration. Then update the design target with Reference / Strength regimes and Fixed / Joint controls, tentative/readable weak-evidence curves, uncertainty/unsupported states and stale-result handling. Human design approval precedes UI implementation and acceptance testing. Main remains untouched; experimental activation is a separate owner decision.
+Human analytical approval has accepted the measured reliability limits, evidence mapping, practical strength-precision rule and handling of unsupported real-history fits. Update the design target with Reference / Strength regimes and Fixed / Joint controls, tentative/readable weak-evidence curves, uncertainty/unsupported states and stale-result handling. Human design approval precedes UI implementation and acceptance testing. Main remains untouched; experimental activation is a separate owner decision.
