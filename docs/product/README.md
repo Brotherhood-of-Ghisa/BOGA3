@@ -23,6 +23,7 @@ purpose, in its own PR.
 | `comparison` | `comparison.md` | Which periods are compared, and how a change is shown |
 | `notifications` | `notifications.md` | Group alerts: recipients, defaults, batching, freshness |
 | `groups` | `groups.md` | Group competition: certification's scope and end |
+| `appearance` | `appearance.md` | App icon selection and the default fallback |
 
 A fact states a rule that holds across the app. How one screen or view lays a
 rule out is not a fact: that belongs to the screen's spec

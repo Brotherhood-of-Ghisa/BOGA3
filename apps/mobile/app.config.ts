@@ -70,7 +70,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
     slug: "boga3",
     version: "2.1.0",
     orientation: "portrait",
-    icon: "./assets/images/icon.png",
+    icon: "./assets/images/app-icons/warm.png",
     scheme: "boga3",
     // Light-only by decision (2026-09-19). Dark mode is explicitly not a
     // product goal, and "automatic" is not free: it hands the OS-owned
@@ -106,6 +106,14 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     plugins: [
         "expo-dev-client",
+        [
+            "expo-alternate-app-icons",
+            ["Slate", "Forest", "Plum"].map((name) => ({
+                name,
+                ios: `./assets/images/app-icons/${name.toLowerCase()}.png`,
+                android: { foregroundImage: `./assets/images/app-icons/${name.toLowerCase()}.png` },
+            })),
+        ],
         "expo-router",
         [
             "expo-splash-screen",
