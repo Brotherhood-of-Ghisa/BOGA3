@@ -5,6 +5,8 @@ process.env.TZ = 'Europe/London';
 module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  // Edge worker tests import code outside this directory; resolve its transforms from this worktree's mobile deps.
+  modulePaths: ['<rootDir>/node_modules'],
   testMatch: ['**/?(*.)+(test).[tj]s?(x)'],
   // Suites excluded from the default (`jest` / `npm test`) run because they need
   // live infrastructure the fast lane does not provision:

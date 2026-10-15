@@ -60,6 +60,7 @@ Deno.test('worker bounds work, reports only outcomes and persists accepted ticke
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const rpc: Rpc = async <T>(name: string, args?: Record<string, unknown>) => {
     calls.push([name,args]);
+    if (name === 'notification_workout_prepare') return { jobs: [] } as T;
     if (name === 'notification_claim') return { jobs: calls.filter(([n])=>n==='notification_claim').length===1
       ? [{ id: 1, claim_id: 'claim', generation: 1 }] : [], disabled: false } as T;
     if (name === 'notification_receipt_claim') return { jobs: [] } as T;
@@ -75,6 +76,29 @@ Deno.test('worker bounds work, reports only outcomes and persists accepted ticke
   const body = await response.text(); assert(!body.includes('SECRET')); assert(!body.includes('LocalPushToken'));
   assert(calls.some(([name,args]) => name === 'notification_send_result' && args?.p_outcome === 'ticket'));
   equal(calls.filter(([name])=>name==='notification_claim').length,2);
+});
+
+Deno.test('real worker uses the portable final-outcome calculation and isolates intake failure', async () => {
+  const rank = (members: string[]) => members.map((member_user_id,index)=>({metric:'e1rm',certified:false,member_user_id,rank:index+1}));
+  let contribution: unknown;
+  let sends = 0;
+  const rpc: Rpc = async <T>(name: string,args?: Record<string,unknown>) => {
+    if (name === 'notification_workout_prepare') return {jobs:[{member_user_id:'lifter',session_id:'workout',generation:2,
+      targets:[{group_id:'group',group_exercise_id:'bench',best_metrics:['e1rm','volume'],
+        before:rank(['a','b','c','lifter']),final:rank(['a','lifter','b','c']),without_workout:rank(['a','b','c','lifter'])}]}]} as T;
+    if (name === 'notification_workout_enqueue') { contribution=args?.p_contributions; return true as T; }
+    if (name === 'notification_claim') sends+=1;
+    return {jobs:[],disabled:false} as T;
+  };
+  const request = () => new Request('https://local/worker',{method:'POST',headers:{apikey:'service-key'}});
+  equal((await handleNotificationRequest(request(),{serviceKey:'service-key',rpc})).status,200);
+  equal(contribution,[{group_id:'group',best_count:2,rank_count:3}]);
+  const broken: Rpc = <T>(name: string,args?: Record<string,unknown>): Promise<T> => {
+    if (name === 'notification_workout_prepare') throw new Error('PRIVATE SOURCE VALUES');
+    return rpc<T>(name,args);
+  };
+  const response=await handleNotificationRequest(request(),{serviceKey:'service-key',rpc:broken});
+  equal(response.status,200); assert(!(await response.text()).includes('PRIVATE')); equal(sends,2);
 });
 
 Deno.test('provider handoff preserves the absolute deadline and never uses a renewing TTL', async () => {
@@ -112,6 +136,7 @@ Deno.test('fresh bounded claims do not waste send or receipt leases on slow prov
       : {status:'ok',id:'fixture-ticket'} });
   };
   const rpc: Rpc = async <T>(name: string,args?: Record<string,unknown>): Promise<T> => {
+    if (name === 'notification_workout_prepare') return { jobs: [] } as T;
     if (name === 'notification_receipt_claim' || name === 'notification_claim') {
       equal(args?.p_limit,4);
       const receipt = name === 'notification_receipt_claim'; const start = receipt ? receipts : sends;
