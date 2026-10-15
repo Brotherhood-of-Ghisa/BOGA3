@@ -1,5 +1,7 @@
 # Strength amplitude with RIR and load uncertainty
 
+> Historical results below use the completed T04 reporting model. The owner-approved exact-zero/Gaussian follow-up assumptions are recorded in the [validation contract](M36-T04-validation-contract.md#approved-follow-up-assumptions--2026-10-15); these experiments have not been rerun under that revision.
+
 ## Revised two-approach contract
 
 The owner added uncertainty from discrete gym load choices: **1.25 kg per-side entry SD and 2.50 kg total-load entry SD**. These are per-observation SDs, rather than the standard error of a sample mean. Existing loading semantics give total-load SD F×entrySD: 2×1.25=2.50 kg for a per-side entry, or 1×2.50=2.50 kg for a total-load entry. One logged per-side value controls both sides; there is no independent-side variance calculation or second scaling. Dated bodyweight contribution remains the existing fixed context.
