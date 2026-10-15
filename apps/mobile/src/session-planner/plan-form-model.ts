@@ -42,16 +42,16 @@ export type PlanFormState = {
 let formKey = 0;
 const nextKey = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${formKey++}`;
 
-/** Add set follows the recorder: copy values, then apply visible effort defaults. */
-export const createPlanFormSet = (previous?: PlanFormSet, displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
+/** The first target starts with the recorder's visible effort default. */
+export const createPlanFormSet = (displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
   id: nextKey('set'),
-  targetWeightText: previous?.targetWeightText ?? '',
-  targetRepsText: previous?.targetRepsText ?? '',
-  targetSetType: defaultSessionSetType(previous?.targetSetType, displayEfforts),
+  targetWeightText: '',
+  targetRepsText: '',
+  targetSetType: defaultSessionSetType(undefined, displayEfforts),
 });
 
-/** Duplications are extra copies; the whole request must fit the block. */
-export const planSetDuplicationError = (setCount: number, countText: string): string | null => {
+/** The whole Add set(s) request must fit the block. */
+export const planSetCountError = (setCount: number, countText: string): string | null => {
   const text = countText.trim();
   const count = Number(text);
   if (!/^\d+$/.test(text) || !Number.isSafeInteger(count) || count < 1) {
@@ -66,12 +66,12 @@ export const planSetDuplicationError = (setCount: number, countText: string): st
   return null;
 };
 
-/** Exact source copies, inserted after it; unlike Add set, effort never defaults. */
-export const duplicatePlanFormSet = (sets: PlanFormSet[], setId: string, countText: string): PlanFormSet[] => {
-  const index = sets.findIndex((set) => set.id === setId);
-  if (index < 0 || planSetDuplicationError(sets.length, countText)) return sets;
-  const copies = Array.from({ length: Number(countText) }, () => ({ ...sets[index], id: nextKey('set') }));
-  return [...sets.slice(0, index + 1), ...copies, ...sets.slice(index + 1)];
+/** Append exact copies of the last target, including its effort. */
+export const addPlanFormSets = (sets: PlanFormSet[], countText: string): PlanFormSet[] => {
+  const source = sets.at(-1);
+  if (!source || planSetCountError(sets.length, countText)) return sets;
+  const copies = Array.from({ length: Number(countText) }, () => ({ ...source, id: nextKey('set') }));
+  return [...sets, ...copies];
 };
 
 export const planFormBlockFromEmptySet = (
@@ -83,7 +83,7 @@ export const planFormBlockFromEmptySet = (
   exerciseDefinitionId: exercise.id,
   name: exercise.name,
   loadInputMode: exercise.loadInputMode ?? null,
-  sets: [createPlanFormSet(undefined, displayEfforts)],
+  sets: [createPlanFormSet(displayEfforts)],
 });
 
 export const planFormBlockFromSuggestion = (
@@ -104,7 +104,7 @@ export const planFormBlockFromSuggestion = (
           targetRepsText: s.repsValue,
           targetSetType: normalizeSessionSetType(s.setType),
         }))
-      : [createPlanFormSet(undefined, displayEfforts)],
+      : [createPlanFormSet(displayEfforts)],
 });
 
 export const emptyPlanForm = (): PlanFormState => ({

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, IconButton, ListRow, Sheet, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { IconButton, ListRow, Sheet, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { SetEntryFields } from '@/components/exercise-page/set-entry-fields';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
 import { nextSessionSetType } from '@/src/data/set-types';
 import type { PlanFormBlock, PlanFormSet } from '@/src/session-planner/plan-form-model';
-import { PlanSetDuplicateForm } from './plan-set-duplicate-form';
+import { PlanSetAddForm } from './plan-set-add-form';
 
 export type PlanBlockEditorProps = {
   block: PlanFormBlock;
@@ -15,15 +15,14 @@ export type PlanBlockEditorProps = {
   count: number;
   errors: Map<string, string>;
   onChangeSet: (blockId: string, setId: string, patch: Partial<PlanFormSet>) => void;
-  onAddSet: (blockId: string) => void;
-  onDuplicateSet: (blockId: string, setId: string, countText: string) => void;
+  onAddSets: (blockId: string, countText: string) => void;
   onRemoveSet: (blockId: string, setId: string) => void;
   onRemoveBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, step: -1 | 1) => void;
   onPickExercise: (blockId: string) => void;
   /** A sheet host presents choices in its own body rather than stacking a picker. */
   onOpenEffort?: (blockId: string, setId: string) => void;
-  onOpenDuplicate?: (blockId: string, setId: string) => void;
+  onOpenAddSets?: (blockId: string) => void;
   /** Custom error path prefix, e.g. 'plans.0.exercises'. Defaults to 'exercises'. */
   errorPrefix?: string;
   /** The account's displayed efforts, cycling like the recorder. */
@@ -33,8 +32,8 @@ export type PlanBlockEditorProps = {
 /**
  * One block's editor in the plan form: the picked exercise (its name row
  * opens the pick sheet) and the ordered target sets — effort, weight, reps per
- * set. Duplicate asks only for extra copies, inserted after the source with
- * exact values. Target entry follows the shared fields ([[copy.set-entry]]).
+ * set. Add set(s) asks how many exact copies of the last target to append.
+ * Target entry follows the shared fields ([[copy.set-entry]]).
  */
 export function PlanBlockEditor({
   block,
@@ -42,20 +41,18 @@ export function PlanBlockEditor({
   count,
   errors,
   onChangeSet,
-  onAddSet,
-  onDuplicateSet,
+  onAddSets,
   onRemoveSet,
   onRemoveBlock,
   onMoveBlock,
   onPickExercise,
   onOpenEffort,
-  onOpenDuplicate,
+  onOpenAddSets,
   errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
   const [effortSetId, setEffortSetId] = useState<string | null>(null);
-  const [duplicateSetId, setDuplicateSetId] = useState<string | null>(null);
-  const duplicateSetNumber = block.sets.findIndex((set) => set.id === duplicateSetId) + 1;
+  const [addSetsOpen, setAddSetsOpen] = useState(false);
   const effortSet = block.sets.find((set) => set.id === effortSetId);
   const prefix = errorPrefix ?? 'exercises';
   const blockPath = `${prefix}.${index}`;
@@ -152,20 +149,6 @@ export function PlanBlockEditor({
                 {repsError}
               </Text>
             ) : null}
-            <View style={styles.duplicateAction}>
-              <ActionButton
-                accessibilityLabel={`Duplicate set ${setIndex + 1} of ${block.name || 'exercise'}`}
-                label="Duplicate"
-                onPress={() => {
-                  Keyboard.dismiss();
-                  if (onOpenDuplicate) onOpenDuplicate(block.id, set.id);
-                  else setDuplicateSetId(set.id);
-                }}
-                size="compact"
-                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-duplicate`}
-                variant="outline"
-              />
-            </View>
           </View>
         );
       })}
@@ -183,20 +166,20 @@ export function PlanBlockEditor({
           onDismiss={() => setEffortSetId(null)}
         />
       )}
-      {onOpenDuplicate ? null : (
+      {onOpenAddSets ? null : (
         <Sheet
-          dismissLabel="Dismiss set duplication"
+          dismissLabel="Dismiss adding sets"
           keyboardAvoiding
-          onDismiss={() => setDuplicateSetId(null)}
-          testID="plan-set-duplicate-sheet"
-          title={`Duplicate set ${duplicateSetNumber}`}
-          visible={duplicateSetNumber > 0}>
-          {duplicateSetId && duplicateSetNumber > 0 ? (
-            <View style={styles.duplicateSheetBody}>
-              <PlanSetDuplicateForm
-                onDuplicate={(countText) => {
-                  onDuplicateSet(block.id, duplicateSetId, countText);
-                  setDuplicateSetId(null);
+          onDismiss={() => setAddSetsOpen(false)}
+          testID="plan-set-add-sheet"
+          title="Add set(s)"
+          visible={addSetsOpen}>
+          {addSetsOpen ? (
+            <View style={styles.addSetsSheetBody}>
+              <PlanSetAddForm
+                onAddSets={(countText) => {
+                  onAddSets(block.id, countText);
+                  setAddSetsOpen(false);
                 }}
                 setCount={block.sets.length}
               />
@@ -205,11 +188,15 @@ export function PlanBlockEditor({
         </Sheet>
       )}
       <ListRow
-        accessibilityLabel={`Add target set to ${block.name || 'exercise'}`}
+        accessibilityLabel={`Add target sets to ${block.name || 'exercise'}`}
         density="list"
         divider
-        label="Add set"
-        onPress={() => onAddSet(block.id)}
+        label="Add set(s)"
+        onPress={() => {
+          Keyboard.dismiss();
+          if (onOpenAddSets) onOpenAddSets(block.id);
+          else setAddSetsOpen(true);
+        }}
         testID={`plan-form-block-${index + 1}-add-set`}
       />
     </View>
@@ -217,7 +204,7 @@ export function PlanBlockEditor({
 }
 
 const styles = StyleSheet.create({
-  duplicateSheetBody: {
+  addSetsSheetBody: {
     paddingHorizontal: uiSpace.lg,
   },
   block: {
@@ -253,11 +240,6 @@ const styles = StyleSheet.create({
   },
   setBlock: {
     gap: uiSpace.xs,
-  },
-  duplicateAction: {
-    minHeight: uiGeometry.tapTarget,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
   },
   setRemove: {
     width: uiGeometry.tapTarget,

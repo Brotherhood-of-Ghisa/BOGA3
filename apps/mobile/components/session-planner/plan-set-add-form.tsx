@@ -2,39 +2,39 @@ import { useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 
 import { ActionButton, FormField, uiSpace } from '@/components/ui';
-import { planSetDuplicationError } from '@/src/session-planner/plan-form-model';
+import { planSetCountError } from '@/src/session-planner/plan-form-model';
 
 /** Count-only body shared by the plan's sheet and the programme child editor. */
-export function PlanSetDuplicateForm({ setCount, onDuplicate }: {
+export function PlanSetAddForm({ setCount, onAddSets }: {
   setCount: number;
-  onDuplicate: (countText: string) => void;
+  onAddSets: (countText: string) => void;
 }) {
   const [countText, setCountText] = useState('1');
   const submitted = useRef(false);
-  const error = planSetDuplicationError(setCount, countText);
+  const error = planSetCountError(setCount, countText);
 
   return (
     <View style={styles.body}>
       <FormField
-        accessibilityLabel="Number of duplications"
+        accessibilityLabel="Number of sets to add"
         error={error}
         keyboardType="number-pad"
-        label="Duplications"
+        label="Sets"
         onChangeText={setCountText}
         selectTextOnFocus
-        testID="plan-set-duplicate-count"
+        testID="plan-set-add-count"
         value={countText}
       />
       <ActionButton
         disabled={error !== null}
-        label="Duplicate"
+        label="Add"
         onPress={() => {
           if (error !== null || submitted.current) return;
           submitted.current = true;
           Keyboard.dismiss();
-          onDuplicate(countText);
+          onAddSets(countText);
         }}
-        testID="plan-set-duplicate-confirm"
+        testID="plan-set-add-confirm"
         variant="primary"
       />
     </View>

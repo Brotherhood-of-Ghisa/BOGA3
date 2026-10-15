@@ -185,7 +185,7 @@ describe('plan form: create', () => {
     expect(unscheduled[0]).toMatchObject({ title: 'Heavy Day', progress: 'planned' });
   });
 
-  it('uses recorder effort entry and copies the last target without changing earlier rows', async () => {
+  it('uses recorder effort entry and keeps the last target effort unchanged when adding sets', async () => {
     await seedCatalog();
     const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     fillTitle('Copy targets');
@@ -201,7 +201,8 @@ describe('plan form: create', () => {
     expect(screen.getByTestId(`${first}-reps`)).toHaveProp('selectTextOnFocus', true);
     fillSet(1, 1, '40.5', '100');
     fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
-    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('Effort—');
+    fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
+    expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortW-Up');
     expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40.5');
     expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '100');
 
@@ -212,11 +213,12 @@ describe('plan form: create', () => {
     expect(dismissKeyboard).toHaveBeenCalledTimes(1);
     fireEvent.press(within(await screen.findByTestId('exercise-effort-sheet')).getByTestId('exercise-effort-option-rir_3'));
     dismissKeyboard.mockRestore();
-    // Hiding a stored effort preserves it; a new row uses the same fallback as the recorder.
+    // Adding sets preserves a stored effort even after it is hidden.
     act(() => updatePreferences({ displayEfforts: ['unspecified', 'rir_4', 'rir_2'] }));
     expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 3');
     fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
-    expect(screen.getByTestId('plan-form-block-1-set-3-effort')).toHaveTextContent('EffortRIR 2');
+    fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
+    expect(screen.getByTestId('plan-form-block-1-set-3-effort')).toHaveTextContent('EffortRIR 3');
     fillSet(1, 3, '45', '101');
     fireEvent.press(screen.getByTestId('plan-form-save'));
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
@@ -224,13 +226,13 @@ describe('plan form: create', () => {
     const detail = await planQueries.loadPlanDetail(plan.id);
     expect(detail?.blocks[0].targets.map(({ targetWeightValue, targetReps, targetSetType }) =>
       [targetWeightValue, targetReps, targetSetType])).toEqual([
-      ['40.5', 100, 'warm_up'], ['40.5', 100, 'rir_3'], ['45', 101, 'rir_2'],
+      ['40.5', 100, 'warm_up'], ['40.5', 100, 'rir_3'], ['45', 101, 'rir_3'],
     ]);
     unmount();
     mockParams = { planId: plan.id };
     render(<SessionPlanDetailRoute />);
     expect(await screen.findByTestId('plan-detail-block-1-targets')).toHaveTextContent(
-      '40.5 kg × 100 (W-Up) · 40.5 kg × 100 (RIR 3) · 45 kg × 101 (RIR 2)'
+      '40.5 kg × 100 (W-Up) · 40.5 kg × 100 (RIR 3) · 45 kg × 101 (RIR 3)'
     );
   });
 
@@ -249,47 +251,49 @@ describe('plan form: create', () => {
     fireEvent.press(screen.getByTestId('exercise-effort-option-cooldown'));
     expect(screen.getByTestId(effort)).toHaveTextContent('EffortCD');
     fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
     expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortCD');
     fireEvent.press(screen.getByTestId('plan-form-block-1-set-2-remove'));
     expect(screen.getByTestId('plan-form-block-1-set-1-remove')).toBeDisabled();
   });
 
-  it('duplicates the selected target once or nine times, cancels safely, then saves and reopens ordinary targets', async () => {
+  it('adds one or nine exact last-target copies, cancels safely, then saves and reopens ordinary targets', async () => {
     await seedCatalog();
     const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     fillTitle('Repeated squat');
     await addExerciseBlock('Barbell Squat');
     fillSet(1, 1, '40.50', '8');
-    const openDuplicate = () => fireEvent.press(screen.getByTestId('plan-form-block-1-set-1-duplicate'));
-    openDuplicate();
-    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('value', '1');
-    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('keyboardType', 'number-pad');
-    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '9');
-    fireEvent.press(screen.getByTestId('plan-set-duplicate-sheet-backdrop', { includeHiddenElements: true }));
+    const openAddSets = () => fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    openAddSets();
+    expect(screen.getByTestId('plan-set-add-count')).toHaveProp('value', '1');
+    expect(screen.getByTestId('plan-set-add-count')).toHaveProp('keyboardType', 'number-pad');
+    fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '9');
+    fireEvent.press(screen.getByTestId('plan-set-add-sheet-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('plan-form-block-1-set-2-weight')).toBeNull();
-    openDuplicate();
-    expect(screen.getByTestId('plan-set-duplicate-count')).toHaveProp('value', '1');
-    const confirm = screen.getByTestId('plan-set-duplicate-confirm');
+    openAddSets();
+    expect(screen.getByTestId('plan-set-add-count')).toHaveProp('value', '1');
+    const confirm = screen.getByTestId('plan-set-add-confirm');
     act(() => { fireEvent.press(confirm); fireEvent.press(confirm); });
     expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortW-Up');
     expect(screen.queryByTestId('plan-form-block-1-set-3-weight')).toBeNull();
     fillSet(1, 2, '50', '6');
     fireEvent.press(screen.getByTestId('plan-form-block-1-set-2-effort'));
-    openDuplicate();
-    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '0');
-    expect(screen.getByTestId('plan-set-duplicate-confirm')).toBeDisabled();
-    expect(screen.getByTestId('plan-set-duplicate-count-error')).toHaveTextContent('Enter a whole number greater than zero.');
-    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '29');
-    expect(screen.getByTestId('plan-set-duplicate-confirm')).toBeDisabled();
-    expect(screen.getByTestId('plan-set-duplicate-count-error')).toHaveTextContent('This block can fit only 28 more sets.');
-    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '9');
-    fireEvent.press(screen.getByTestId('plan-set-duplicate-confirm'));
-    for (let index = 1; index <= 10; index += 1) {
-      expect(screen.getByTestId(`plan-form-block-1-set-${index}-weight`)).toHaveProp('value', '40.50');
-      expect(screen.getByTestId(`plan-form-block-1-set-${index}-reps`)).toHaveProp('value', '8');
-      expect(screen.getByTestId(`plan-form-block-1-set-${index}-effort`)).toHaveTextContent('EffortW-Up');
+    openAddSets();
+    fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '0');
+    expect(screen.getByTestId('plan-set-add-confirm')).toBeDisabled();
+    expect(screen.getByTestId('plan-set-add-count-error')).toHaveTextContent('Enter a whole number greater than zero.');
+    fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '29');
+    expect(screen.getByTestId('plan-set-add-confirm')).toBeDisabled();
+    expect(screen.getByTestId('plan-set-add-count-error')).toHaveTextContent('This block can fit only 28 more sets.');
+    fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '9');
+    fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
+    expect(screen.queryByLabelText(/Duplicate set/)).toBeNull();
+    expect(screen.getByTestId('plan-form-block-1-set-1-weight')).toHaveProp('value', '40.50');
+    for (let index = 2; index <= 11; index += 1) {
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-weight`)).toHaveProp('value', '50');
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-reps`)).toHaveProp('value', '6');
+      expect(screen.getByTestId(`plan-form-block-1-set-${index}-effort`)).toHaveTextContent('Effort—');
     }
-    expect(screen.getByTestId('plan-form-block-1-set-11-weight')).toHaveProp('value', '50');
     fireEvent.press(screen.getByTestId('plan-form-save'));
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
     const [plan] = await planQueries.listUnscheduledPlans();
@@ -297,9 +301,9 @@ describe('plan form: create', () => {
     const targets = detail!.blocks[0].targets;
     expect(targets).toHaveLength(11);
     expect(new Set(targets.map((target) => target.id)).size).toBe(11);
-    expect(targets.slice(0, 10).every((target) =>
-      target.targetWeightValue === '40.5' && target.targetReps === 8 && target.targetSetType === 'warm_up')).toBe(true);
-    expect(targets[10]).toMatchObject({ targetWeightValue: '50', targetReps: 6, targetSetType: null });
+    expect(targets[0]).toMatchObject({ targetWeightValue: '40.5', targetReps: 8, targetSetType: 'warm_up' });
+    expect(targets.slice(1).every((target) =>
+      target.targetWeightValue === '50' && target.targetReps === 6 && target.targetSetType === null)).toBe(true);
     unmount();
     render(<SessionPlanNewScreen editPlanId={plan.id} fromPlanId={null} />);
     expect(await screen.findByTestId('plan-form-block-1-set-11-weight')).toHaveProp('value', '50');
@@ -1047,9 +1051,9 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
         saveLabel="Save"
       />
     );
-    fireEvent.press(screen.getByTestId('plan-form-block-1-set-1-duplicate'));
-    fireEvent.changeText(screen.getByTestId('plan-set-duplicate-count'), '2');
-    fireEvent.press(screen.getByTestId('plan-set-duplicate-confirm'));
+    fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+    fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '2');
+    fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
     fireEvent.press(screen.getByTestId('plan-form-save'));
     expect(await screen.findByTestId('plan-form-notice')).toHaveTextContent(
       "Couldn't save the plan. Try again."
