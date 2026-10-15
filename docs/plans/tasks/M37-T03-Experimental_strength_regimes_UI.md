@@ -45,3 +45,9 @@ Appearance:
 - Shades convey relative likelihood evidence with the approved monotone mapping and readable minimum contrast. Labels and selected-point affordances remain readable at weak evidence; zero evidence does not hide an estimable candidate.
 - Unsupported fits remain explicitly exploratory without calibrated confidence claims. Resolve the compact visual treatment in the target rather than adding a technical subtitle.
 - Reuse existing design tokens, chart axes, filters and point details. No production UI or native acceptance flow is changed during target preparation.
+
+## Visual review target m1
+
+The owner approved the UI guidelines on 2026-10-15; approval of the rendered target is pending. The review board is `apps/mobile/artifacts/design/strength-regimes/m1/review-board.png`; its prompt and source/output hashes are beside it. Built-in image generation extends the directly inspected approved native r1 screenshot. It is one design in four states, not four competing directions: one curve, two periods, weaker evidence and insufficient data. It covers the proposed model/assumption controls, temporal legend, selected-set card and no-subtitle direction. The board's large state headings are outside the app frames and are review labels only.
+
+This target governs the proposed content hierarchy, date-based colour/shape assignment and plain copy for these states. It does not certify numeric coordinates, observation counts, touch sizes or accessibility; adopted calculation functions, frozen vectors and native implementation checks remain authoritative. Reference remains the default even though this review board selects Fit. Loading, retry, unsupported/exploratory and stale-result behavior follow the UX/assessment contracts; this board does not claim those additional states are approved by implication. No production UI or UI acceptance test has been implemented.
