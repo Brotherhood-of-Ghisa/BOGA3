@@ -36,9 +36,11 @@ import {
   CURRENT_APP_VERSION,
   PER_SIDE_LOAD_SEED_IDS,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
+  SYSTEM_MUSCLE_GROUP_SEEDS,
+  type MuscleGroupSeed,
   readSeedsAppliedMarker,
 } from './exercise-catalog-seeds';
-import { exerciseDefinitions, syncRuntimeState } from './schema';
+import { exerciseDefinitions, muscleGroups, syncRuntimeState } from './schema';
 import type { LocalDatabase } from './bootstrap';
 
 const PRIMARY_RUNTIME_STATE_ID = 'primary';
@@ -83,6 +85,7 @@ export interface BundleMigrationRepo {
    * is left exactly as it is.
    */
   insertExerciseDefinitionIfAbsent(values: { id: string; name: string }): void;
+  insertMuscleGroupIfAbsent(values: MuscleGroupSeed): void;
 }
 
 /**
@@ -127,6 +130,19 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
         const contribution = BODYWEIGHT_SEED_CONTRIBUTIONS[seed.id];
         if (contribution !== undefined) {
           repo.reviseUntouchedBodyweightSeed(seed.id, seed.name, contribution);
+        }
+      }
+    },
+  },
+  {
+    appVersion: 4,
+    apply(repo) {
+      for (const seed of SYSTEM_MUSCLE_GROUP_SEEDS) {
+        if ([
+          'tibialis_anterior', 'hip_flexors', 'rotator_cuff',
+          'serratus_anterior', 'traps_lower', 'brachialis',
+        ].includes(seed.id)) {
+          repo.insertMuscleGroupIfAbsent(seed);
         }
       }
     },
@@ -180,6 +196,20 @@ export const __setCurrentAppVersionForTests = (version: number | null): void => 
  * rows commit atomically with the marker advance and ride the next sync push.
  */
 const createBundleMigrationRepo = (tx: Transaction): BundleMigrationRepo => ({
+  insertMuscleGroupIfAbsent(values) {
+    const stampMs = nowMonotonic(tx);
+    const now = new Date();
+    tx.insert(muscleGroups)
+      .values({
+        ...values,
+        createdAt: now,
+        updatedAt: now,
+        localDirty: true,
+        localUpdatedAtMs: stampMs,
+      })
+      .onConflictDoNothing({ target: muscleGroups.id })
+      .run();
+  },
   reviseUntouchedBodyweightSeed(id, expectedName, contribution) {
     tx.update(exerciseDefinitions).set({ bodyweightContribution: contribution,
       updatedAt: new Date(), localDirty: true, localUpdatedAtMs: nowMonotonic(tx) })

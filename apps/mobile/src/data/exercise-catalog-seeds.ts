@@ -33,7 +33,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 3;
+export const CURRENT_APP_VERSION = 4;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -155,14 +155,18 @@ const createGranularWeightKey = (exerciseDefinitionId: string, muscleGroupId: st
 
 export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, isEditable: 0 },
+  { id: 'serratus_anterior', displayName: 'Serratus Anterior', familyName: 'Chest', sortOrder: 0, isEditable: 0 },
   { id: 'delts_front', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 1, isEditable: 0 },
   { id: 'delts_lateral', displayName: 'Lateral Delts', familyName: 'Shoulders', sortOrder: 2, isEditable: 0 },
   { id: 'delts_rear', displayName: 'Rear Delts', familyName: 'Shoulders', sortOrder: 3, isEditable: 0 },
+  { id: 'rotator_cuff', displayName: 'Rotator Cuff', familyName: 'Shoulders', sortOrder: 3, isEditable: 0 },
   { id: 'back_lats', displayName: 'Lats', familyName: 'Back', sortOrder: 4, isEditable: 0 },
   { id: 'back_upper', displayName: 'Upper Back (Rhomboids + Mid Traps)', familyName: 'Back', sortOrder: 5, isEditable: 0,  },
   { id: 'traps_upper', displayName: 'Upper Traps', familyName: 'Back', sortOrder: 6, isEditable: 0 },
+  { id: 'traps_lower', displayName: 'Lower Traps', familyName: 'Back', sortOrder: 7, isEditable: 0 },
   { id: 'spinal_erectors', displayName: 'Spinal Erectors', familyName: 'Back', sortOrder: 7, isEditable: 0 },
   { id: 'biceps', displayName: 'Biceps', familyName: 'Arms', sortOrder: 8, isEditable: 0 },
+  { id: 'brachialis', displayName: 'Brachialis', familyName: 'Arms', sortOrder: 8, isEditable: 0 },
   { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 9, isEditable: 0 },
   { id: 'forearms_grip', displayName: 'Forearms / Grip', familyName: 'Arms', sortOrder: 10, isEditable: 0 },
   { id: 'abs_rectus', displayName: 'Abs (Rectus Abdominis)', familyName: 'Core', sortOrder: 11, isEditable: 0 },
@@ -172,7 +176,9 @@ export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'glutes_max', displayName: 'Glute Max', familyName: 'Legs', sortOrder: 15, isEditable: 0 },
   { id: 'hip_abductors', displayName: 'Hip Abductors (Glute Med/Min)', familyName: 'Legs', sortOrder: 16, isEditable: 0 },
   { id: 'adductors', displayName: 'Adductors', familyName: 'Legs', sortOrder: 17, isEditable: 0 },
+  { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs', sortOrder: 17, isEditable: 0 },
   { id: 'calves', displayName: 'Calves', familyName: 'Lower Legs', sortOrder: 18, isEditable: 0 },
+  { id: 'tibialis_anterior', displayName: 'Tibialis Anterior', familyName: 'Lower Legs', sortOrder: 19, isEditable: 0 },
 ];
 
 const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loadInputMode' | 'bodyweightContribution'>[] = [
