@@ -91,18 +91,9 @@ Two windows:
 1. **Agent read → device push → agent write.** Solvable on the agent side with
    optimistic concurrency: the agent sends the base version it read, and the
    server rejects if the plan moved. **This is required.**
-2. **Agent write → device pushes a stale offline edit.** The device's older
-   `client_updated_at_ms` loses under LWW with no error to the device. This is
-   the residual risk; closing it fully means per-row conflict detection on
-   sync push, which is a larger change to Sync v2 and out of scope here. It
-   should be named honestly, not hidden (see §9, Q4).
-   *LWW key monotonicity:* Sync v2 permits device timestamps up to 5 minutes
-   ahead of server time (`least(client_updated_at_ms, now_ms + 5 min)`). To
-   ensure the agent write actually wins and is never dropped by mobile clients on
-   pull (`incoming <= local`), every agent mutation RPC must advance the LWW
-   key strictly monotonically (`client_updated_at_ms =
-   greatest(stored.client_updated_at_ms + 1, now_ms)`) rather than writing bare
-   server `now_ms`.
+2. **Agent write → device pushes a stale offline edit.**
+   - *Synced state:* The agent RPC strictly advances `client_updated_at_ms = greatest(stored.client_updated_at_ms + 1, now_ms)`, ensuring the key never regresses and preventing mobile clients from dropping the update on pull (`incoming <= local`).
+   - *Offline / fast-clock residual:* Sync v2 permits device timestamps up to 5 minutes ahead of server time (`least(client_updated_at_ms, now_ms + 5 min)`). If an offline device made an edit *before* the agent write using a fast clock, its unseen timestamp could exceed both `stored + 1` and `now_ms`. When it later pushes, LWW will overwrite the agent edit. Conversely, an offline edit stamped with an older timestamp will be silently dropped by the agent write. This two-way data-loss residual is inherent to pure LWW without push-time conflict detection; it is an accepted trade-off here (see §9, Q4).
 
 The design therefore needs a **version token** on plan/programme reads and a new
 typed rejection, not just an update RPC.
@@ -136,22 +127,29 @@ and orphans local edits.
 | `reorder_programme_plans` | `reorderProgrammePlans` | exact set of live child plans; keeps 2..50 |
 | `reorder_plan_blocks` | `reorderPlanExercises` | exact set of live blocks |
 | `reorder_block_sets` | `reorderPlanSets` | exact set of live sets |
-| `remove_plan_block` | `tombstonePlanExercise` | soft-delete block + live sets; pending only |
-| `remove_plan_from_programme` | `tombstonePlan` / detach | detaches (`programme_id = null`); keeps performed history; ≥2 plans remain or the op is refused |
+| `remove_plan_block` | `tombstonePlanExercise` | soft-delete block + live sets; pending only; requires ≥1 live blocks to remain (refuses 0-block plans) |
+| `detach_plan_from_programme` | dedicated detach (not `tombstonePlan`) | clears `programme_id` and `programme_order_index`, redensifies siblings; plan remains live standalone; keeps performed history; ≥2 plans remain or the op is refused |
+| `remove_plan` | `tombstonePlan` | soft-delete plan + live blocks + live sets; pending only; detaches from programme if attached |
 | `remove_programme` | `tombstoneProgramme` | soft-delete programme, detach live child plans |
 
 Removal is **always a tombstone (`deleted_at`)**, never a hard delete, so it
-propagates through sync and preserves any provenance links. "Remove plan from
-programme" follows the existing `deleteProgramme` detach rule (§4.6) rather than
-cascading.
+propagates through sync and preserves any provenance links. Detaching a plan from
+a programme (`detach_plan_from_programme`) is distinct from deletion: it clears
+`programme_id` and `programme_order_index` so the plan becomes standalone, leaving
+the plan and its blocks/sets live. `remove_plan` tombstones the plan and its
+blocks/sets.
 
 ### 5.3 Concurrency contract
 
 - Reads that support editing (`get_upcoming_session_plans`, and a new
-  programme-detail read) return a per-plan/programme **version token** derived
-  from the server's own row state (natural candidate: `server_received_at`,
-  which every push — device or agent — advances; a monotonic revision column is
-  the alternative if timestamps prove too coarse).
+  programme-detail read) return a per-plan/programme **version token** covering
+  the **entire plan graph** (root plan, blocks, and target sets). A root-only
+  token (e.g. `session_plans.server_received_at`) is insufficient because Sync
+  v2 updates child tables (`session_plan_exercises`, `session_plan_sets`)
+  independently without advancing the root plan's timestamp; an agent editing a
+  block would otherwise miss concurrent child-level device edits. The token can
+  be derived from the maximum `server_received_at` across the graph (or a
+  monotonic graph revision/hash).
 - Every mutation carries the token it read as `base_version`.
 - If the live row no longer matches, the server rejects with a new wire-stable
   `PLAN_CONCURRENT_MODIFICATION` (409) and writes nothing. The agent re-reads and
@@ -180,7 +178,11 @@ enabled for this coach.") needs an edit-specific variant.
 edited by an agent". Two options:
 
 - **(a) `last_modified_by` column** (`'human' | 'agent'`) on the four authored
-  entities, advanced on every agent mutation. Cheap, syncs naturally.
+  entities, advanced on every agent mutation. Cheap, but requires explicit
+  wiring across the stack: mobile SQLite schemas (Drizzle), `ENTITY_FIELDS`
+  mapping in `apps/mobile/src/sync/cycle.ts`, `sync_push`/`sync_pull` projections,
+  and updating mobile store writes (`session-plan-store.ts`) to stamp `'human'`
+  so human edits reset the attribution.
 - **(b) A control-table edit log** (like the receipts table: owner, client,
   entity, operation, timestamp, no payload). Richer audit, not a synced entity.
 
@@ -192,21 +194,22 @@ fact → ask (§7).
 ### 5.6 MCP tool metadata
 
 Edit tools are **not** all non-destructive. `remove_plan_block`,
-`remove_plan_from_programme` and `remove_programme` destroy authored intent, so
-their annotations must be `destructiveHint: true`; MCP clients use that hint to
-gate user confirmation. Reorder/meta tools stay `destructiveHint: false`. This is
-a real change to the tool contract, not a copy tweak.
+`detach_plan_from_programme`, `remove_plan` and `remove_programme` destroy
+authored intent or structure, so their annotations must be
+`destructiveHint: true`; MCP clients use that hint to gate user confirmation.
+Reorder/meta tools stay `destructiveHint: false`. This is a real change to the
+tool contract, not a copy tweak.
 
 ### 5.7 Error tokens
 
 | Token | Status | Meaning |
 | :--- | :--- | :--- |
-| `PLAN_CONCURRENT_MODIFICATION` | **new** | `base_version` no longer matches the live row. |
+| `PLAN_CONCURRENT_MODIFICATION` | **new** | `base_version` no longer matches the live graph. |
 | `PLAN_EDIT_PERMISSION_REQUIRED` | **new** (or reuse `PLAN_PERMISSION_REQUIRED` with a distinct message) | edit not enabled for this coach. |
 | `IMMUTABLE_BLOCK_MUTATION` | reserved §7.2, **unimplemented** | target block is attached or resolved. |
 | `FOREIGN_RESOURCE_REFERENCE` | existing | referenced exercise/gym/plan not the user's. |
 | `IDEMPOTENCY_CONFLICT` | existing | same key, different payload. |
-| `INVALID_ARGUMENT` | existing | limits, reorder set mismatch, "<2 plans remain". |
+| `INVALID_ARGUMENT` | existing | limits, reorder set mismatch, "<2 plans remain", "<1 blocks remain". |
 
 ## 6. Wire / RPC sketch
 
@@ -230,7 +233,9 @@ owner row):
 - `app_public.agent_insert_plan_block(...)`
 - `app_public.agent_update_plan_block(...)` — refuses non-pending/non-attached
 - `app_public.agent_reorder_plan_blocks(...)` / `…_programme_plans` / `…_block_sets`
-- `app_public.agent_tombstone_plan_block(...)` / `…_plan` / `…_programme`
+- `app_public.agent_tombstone_plan_block(...)` — refuses non-pending/non-attached; refuses if plan would be left with <1 live blocks
+- `app_public.agent_detach_programme_plan(...)` — detaches child plan without tombstoning; redensifies siblings; refuses if programme left with <2 plans
+- `app_public.agent_tombstone_plan(...)` / `…_programme`
 
 Every RPC sets `client_updated_at_ms = greatest(stored.client_updated_at_ms + 1,
 now_ms)` on every mutated or tombstoned row. Writing bare `now_ms` would regress
@@ -243,12 +248,15 @@ Migration sketch (one new migration, no change to applied ones):
 1. `alter table public.agent_plan_permissions add column plan_edit_enabled boolean not null default false;`
 2. Widen `agent_plan_write_receipts_operation_valid` to include the new
    operations (drop + re-add the CHECK; existing rows stay valid).
-3. `add column last_modified_by text` (option 5.5a) on the four authored
-   entities, if adopted.
+3. If option 5.5a is adopted: `add column last_modified_by text` on the four
+   authored entities, update `sync_push` / `sync_pull` projections, add mobile
+   Drizzle migrations, wire `apps/mobile/src/sync/cycle.ts` (`ENTITY_FIELDS`),
+   and update `session-plan-store.ts` human writes to set `'human'`.
 4. The RPCs above; each claims/validates the idempotency key, checks
-   `base_version`, enforces pending-only, advances `client_updated_at_ms`
-   monotonically (`greatest(existing + 1, now_ms)`), tombstones rather than
-   deletes, and re-checks ownership.
+   graph-wide `base_version`, enforces pending-only and graph limits (≥1 block,
+   ≥2 plans), advances `client_updated_at_ms` monotonically
+   (`greatest(existing + 1, now_ms)`), tombstones or detaches appropriately,
+   and re-checks ownership.
 5. Extend `dev_wipe_my_data` parity if any new table is added (none if 5.5a).
 
 ## 7. Spec and product impact
@@ -270,7 +278,7 @@ Migration sketch (one new migration, no change to applied ones):
   edit → `PLAN_EDIT_PERMISSION_REQUIRED`; stale `base_version` →
   `PLAN_CONCURRENT_MODIFICATION` and no write; edit/remove an attached block →
   `IMMUTABLE_BLOCK_MUTATION`; idempotent replay and conflict; remove-plan detaches
-  and preserves performed history; `<2 plans remain` refused.
+  and preserves performed history; `<2 plans remain` refused; `<1 blocks remain` refused.
 - **`boga test mcp-smoke`:** end-to-end edit round-trip through the MCP server.
 - A stale-version write must be proven to write nothing, not just to error.
 
@@ -280,8 +288,8 @@ Migration sketch (one new migration, no change to applied ones):
 | :--- | :--- | :--- |
 | Q1 | Separate edit consent, or one `plan_access_enabled` covering both? | Separate (§5.4). |
 | Q2 | Provenance: `last_modified_by` column, edit log, or both? | Column + receipt (§5.5a). |
-| Q3 | Version token: `server_received_at` or a dedicated monotonic revision? | Decide with a spike; revision is safer if clock resolution bites. |
-| Q4 | Do we accept the window-2 residual (device stale push loses under LWW), or scope Sync v2 conflict detection in? | Accept + surface in v1; revisit. |
+| Q3 | Version token: graph-wide max(`server_received_at`) or a dedicated monotonic revision? | Decide with a spike; must cover root + child blocks + sets to detect child mutations. |
+| Q4 | Do we accept the window-2 residual (two-way silent LWW overwrite on offline device push with clock skew), or scope Sync v2 conflict detection in? | Accept + surface in v1; revisit. |
 | Q5 | New token `PLAN_EDIT_PERMISSION_REQUIRED`, or reuse `PLAN_PERMISSION_REQUIRED` with a distinct message? | Distinct token; clients gate on it. |
 | Q6 | Is `scheduled_for` (rescheduling) in scope, or its own permission/tool? | In scope, but flag it — it is the most surprising edit. |
 | Q7 | Should agents ever edit `provenance = 'human'` plans, or only agent-authored ones? | Both, gated by the edit consent. |
@@ -308,3 +316,7 @@ Migration sketch (one new migration, no change to applied ones):
 | 4 | 2026-10-14 | Removals are tombstones; programme removal detaches child plans. |
 | 5 | 2026-10-14 | Destructive edit tools must carry `destructiveHint: true`. |
 | 6 | 2026-10-15 | Agent mutation RPCs advance `client_updated_at_ms` monotonically (`greatest(stored + 1, now_ms)`) to prevent LWW regression under Sync v2's 5-minute future clamp. |
+| 7 | 2026-10-15 | Detaching a plan from a programme (`detach_plan_from_programme`) is a dedicated operation distinct from plan deletion (`remove_plan`). |
+| 8 | 2026-10-15 | Version tokens must cover the full graph (root plan + child blocks + sets) because Sync v2 updates child rows independently. |
+| 9 | 2026-10-15 | `remove_plan_block` enforces a minimum of 1 live block remaining per plan. |
+| 10 | 2026-10-15 | `last_modified_by` (if adopted) requires full mobile Drizzle + `cycle.ts` + sync projection + store wiring. |
