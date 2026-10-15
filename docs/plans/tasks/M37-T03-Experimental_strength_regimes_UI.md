@@ -1,8 +1,8 @@
 # M37-T03 — Integrate the experimental Strength regimes mode
 
 - Status: `in_progress`
-- Phase: updated design target; analytical approval recorded 2026-10-15. UI implementation and acceptance have not started.
-- Depends on: M37-T02 + human analytical approval; updated design approval is the pre-implementation gate within this task
+- Phase: implementation complete for automated review; native validation and implemented-UI acceptance pending; analytical approval recorded 2026-10-15. Owner approved the visual design and requested implementation on 2026-10-15; build and validation are now in progress.
+- Depends on: M37-T02 + human analytical approval; analytical and visual design approvals recorded; native validation and implemented-UI acceptance remain
 - Milestone: `docs/plans/milestones/M37-strength-regime-inference.md`
 - Areas: frontend; UI impact: yes
 
@@ -14,7 +14,7 @@ Connect the approved assessment contract to the existing RM screen, replacing it
 
 The owner approved removal of Reference mode. Offer One curve / Two curves and Parsimonious / Rich, initially One curve + Parsimonious. Parsimonious means fixed uncertainty; Rich means shared joint uncertainty estimation. Use the same exercise/gym/time/effort scope, with an explicit All gyms option alongside individual gyms. Display all qualifying points but retain the validated inferential sample. Joint p/load uncertainty is shared; weak evidence can show a tentative candidate with readable evidence-driven emphasis. Unavailable fits retain observations without a historical-reference fallback; never label a candidate as confirmed membership/change.
 
-Before implementation, pin an updated target based on the approved two-curve concept, covering selectors, readouts and loading/insufficient/failure states; obtain human design approval. Analytical approval of T02 is independently required. No UI acceptance testing precedes design approval.
+The owner approved the updated visual design and requested implementation on 2026-10-15. The m2 target plus the All gyms-only m3 revision and approved UX contract are the build inputs. T02 analytical approval is recorded separately. Implemented-UI acceptance remains outstanding.
 
 ## Deliverables and acceptance
 
@@ -56,10 +56,22 @@ The owner approved the UI guidelines on 2026-10-15; approval of the rendered tar
 
 This target governs the proposed content hierarchy, date-based colour/shape assignment and plain copy for these states. It does not certify numeric coordinates, observation counts, touch sizes or accessibility; adopted calculation functions, frozen vectors and native implementation checks remain authoritative. This earlier board shows Reference / Fit; that selector was subsequently removed by explicit owner direction. Loading, retry, unsupported/exploratory and stale-result behavior follow the UX/assessment contracts; this board does not claim those additional states are approved by implication. No production UI or UI acceptance test has been implemented.
 
-## Current visual review target m2
+## Approved visual review target m2 + m3
 
-The owner approved Reference removal and requested Parsimonious / Rich naming on 2026-10-15. The current review board is `apps/mobile/artifacts/design/strength-regimes/m2/review-board.png`, with exact generation prompt and source/output hashes beside it. The two selectors are now One curve / Two curves and Parsimonious / Rich. One curve + Parsimonious is the proposed initial view. Visible names map to existing fixed versus shared-joint uncertainty; no likelihood, parameter-estimation or sampling rule changed. The board otherwise preserves temporal colours, markers, date labels, shades and the selected-set readout. Guideline changes are approved; visual m2 approval remains pending. The subsequent All gyms decision must be reflected in the next visual revision before approval. Previous images remain intact and are not the current implementation target. No production UI changed.
+The owner approved Reference removal and requested Parsimonious / Rich naming on 2026-10-15. The current review board is `apps/mobile/artifacts/design/strength-regimes/m2/review-board.png`, with exact generation prompt and source/output hashes beside it. The two selectors are now One curve / Two curves and Parsimonious / Rich. One curve + Parsimonious is the proposed initial view. Visible names map to existing fixed versus shared-joint uncertainty; no likelihood, parameter-estimation or sampling rule changed. The board otherwise preserves temporal colours, markers, date labels, shades and the selected-set readout. Owner approved the visual design on 2026-10-15 and authorized the All gyms revision plus implementation/testing. The m3 board at `apps/mobile/artifacts/design/strength-regimes/m3/review-board.png` applies only that filter-label change; m2 governs all other visuals. The approved UX contract governs interactions and states. Previous images remain intact and are not the current implementation target. No production UI changed.
 
 ## Real-account numerical preview
 
 On 2026-10-15 the owner authorized another read-only BOGA_DEV preview for the same named account. The generated m2 board uses illustrative points, not account-derived fits. A separate actual-data figure is `apps/mobile/artifacts/review/strength-regimes-real-data/real-workout-curves.png`, with restricted raw input, computed coordinates and SHA256 manifest beside it. Scientific plotting uses the canonical estimator/recorded coordinates; no image generation redraws these observations. It compares Zercher Squat and Dumbbell Bench Press at AF SP over their full fetched completed history, without mixing gyms. There are 15/40 eligible plotted sets but only 3/1 known-effort first-working-set samples respectively. Exploratory one-curve lines are explicitly labelled; no second regime is fitted or fabricated. This is numerical grounding for insufficient/unsupported states, not implementation, UI acceptance or visual approval of m2. No remote records changed.
+
+## Implementation and review checkpoint — 2026-10-15
+
+The experimental branch now connects the promoted likelihood fitter to One/Two curves and Parsimonious/Rich controls, adds All gyms, keeps the approved first-ordinal sample and rejects invalidated work. Chart periods use dedicated categorical teal/plum roles, circles/solid versus diamonds/dashed, and Before/From labels; the selected card shares the current period identity. Reference UI is removed. All plotted/selected metrics retain canonical loading. The current paper reflects this model and runtime state.
+
+Unsupported real histories stay explicitly exploratory with uniform readable curves, without calibrated evidence shading or intervals; this applies even to the synthetic UI fixture, which is not calibration evidence. Internal diagnostics retain the searched fits, raw likelihood contrast and observed session boundary bracket. The eight-per-side search minimum is not a sufficiency claim.
+
+Independent code/product review found the selected-period identity gap and the need to retain the superseded stable product-fact ID; both were fixed. Dedicated role contrast and connected migrated-SQLite tests cover both methods, pooled gyms, selection and unchanged workout rows. Final numerical/test evidence is recorded locally under `apps/mobile/artifacts/review/strength-regimes-ui/`.
+
+The operator was asked to agree fast + coverage + complexity + dependencies + docs-check and one focused native scenario (selectors, All gyms, overlap selection and workout return/draft preservation). The standing non-native quality set is agreed; the new native scenario agreement remains pending. No new Maestro flow/lane has been added or run. Native screenshots/comparison, device interaction proof, implemented-UI acceptance and the draft PR remain outstanding; do not mark this task complete or activate/merge it.
+
+Final automated gates passed: fast (290 Jest suites / 3,956 tests plus its required lint/typecheck/UI/meta/backend smoke lanes), coverage (86.86% branches / 94.50% lines), complexity, dependencies (13 unchanged known violations) and docs-check. Native validation has not run.

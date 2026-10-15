@@ -7,6 +7,7 @@ import { RmCurveContent, type CurveScope } from '@/components/rm-curve/content';
 import { setDescription } from '@/components/rm-curve/details';
 import { axisLabel, curveGeometry, pointsAt } from '@/components/rm-curve/geometry';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
+import { assessSingleCurve } from '@/src/strength-regimes/assessment';
 import { buildRmCurveModel } from '@/src/rm-curve/model';
 import { loadRmCurve } from '@/src/rm-curve/repository';
 import { exerciseSets, sessions } from '@/src/data/schema';
@@ -61,9 +62,11 @@ it.each([2, 6, 10, 14, 18, 22])('renders the held-load/RIR and load-step readout
   const model = (await loadRmCurve({ ...query, end: new Date(wave.scenarios.plateau[week * 3 - 1].completedAt + 1) }))!;
   render(<RmCurveContent {...props} read={read(model)} />);
   const p = model.observations.find(p => p.setId === `week-${week}:1`)!;
-  const mark = curveGeometry(model, 300).points.find(mark => mark.id === p.setId)!;
+  await screen.findByText('Exploratory fit');
+  const mark = curveGeometry(model, 300, assessSingleCurve(model, 'fixed').curves).points.find(mark => mark.id === p.setId)!;
   expect(screen.getByTestId(`rm-point-${p.setId}`).props).toMatchObject({ cx: mark.x, cy: mark.y });
-  expect(screen.getByText('Reference 100.0 kg · 6 prior sessions')).toBeTruthy();
+  expect(screen.queryByText(/Reference/)).toBeNull();
+  await screen.findByText('Exploratory fit');
   fireEvent.press(screen.getByText('View sets')); fireEvent.press(screen.getByLabelText(setDescription(p, 'YYYY-MM-DD')));
   expect(screen.getByText(`${p.reps} / ${p.rir}`)).toBeTruthy();
   expect(screen.getByText(`${formatWeight(p.weightKg)} / ${formatOneRepMax(p.existingOneRepMax)}`)).toBeTruthy();
@@ -135,7 +138,8 @@ it('renders sparse, insufficient reference, missing/unknown effort, zero and hig
   // Canonical high RIR has no qualifying prior reference.
   const sparse = (await loadRmCurve({ ...query, rir: 12 }))!;
   render(<RmCurveContent {...props} read={read(sparse)} />);
-  expect(screen.getByText('Reference unavailable · 0 of 6 prior sessions')).toBeTruthy();
+  await screen.findByText('More sessions needed');
+  expect(screen.queryByText(/Reference/)).toBeNull();
   expect(screen.queryByTestId('rm-reference-line')).toBeNull(); expect(screen.getByTestId('rm-point-week-24:3').props.cy).toBe(228);
   expect(screen.getByText(/1 missing effort; 1 unknown effort/)).toBeTruthy();
   expect(model.observations.length).toBe(1);

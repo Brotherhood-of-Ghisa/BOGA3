@@ -30,6 +30,8 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim'> = {
   recordWash: '#FBF3E2',
   recordRule: '#EEDFBE',
   danger: '#A4262C',
+  regimeOlder: '#006C70',
+  regimeNewer: '#7A286B',
   gain: '#15703F',
   loss: '#C01048',
   viz0: '#F0ECE7',
@@ -310,3 +312,12 @@ function relativeLuminance(hex: string): number {
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+
+it('keeps temporal regime identities distinct and readable across presets', () => {
+  const roles = generateRoles(defaultThemeSeeds);
+  expect(roles.regimeOlder).not.toBe(roles.regimeNewer);
+  for (const colour of [roles.regimeOlder, roles.regimeNewer]) {
+    expect(contrastRatio(colour, roles.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colour, roles.paper)).toBeGreaterThanOrEqual(4.5);
+  }
+});

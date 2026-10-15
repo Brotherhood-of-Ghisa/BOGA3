@@ -327,46 +327,28 @@ total kg·reps independent of target mode. Display rounding does
 not determine competitive rank. Raw kg storage and historical group audits retain their original values and
 revisions; personal facts rebuild under the new calculation rules.
 
-## 6. RM curve analytics — descriptive read model
+## 6. RM curve analytics — experimental fitting
 
-[[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and
-[[1rm.curve-load]] and [[1rm.curve-scope]] govern the first deliverable. Equivalence is a modelling
-assumption; empirical, human design and UI acceptance gates remain separate.
-Regression and structural-break detection stay research-only.
+[[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-fitting]],
+[[1rm.curve-load]] and [[1rm.curve-scope]] govern the read model. For fitting,
+numerical diagnostics, cancellation and calibration limits, load
+`strength-regimes-contract.md`. This branch implements the approved experimental
+view; activation and human implemented-UI acceptance remain separate gates.
 
-Research compares fixed RIR/load uncertainty with jointly fitted noise and
-latent 1RM. Only 1RM changes curve amplitude; noise scales never
-reshape the adopted estimator or replace the independent reference. A Gaussian
-load discrepancy can approximate discrete gym choices while logged weight stays
-exact. Sparse histories, unverified effort and dependent sets do not establish
-noise accuracy, confidence, physiological change or a structural break. The
-descriptive chart carries no inference feature or confidence claim.
-
-`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives the read model and refreshes through existing source signals. `components/rm-curve/` renders it, hosted by `app/rm-curve.tsx`.
+`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives
+observations and prespecified session samples. `components/rm-curve/` renders it,
+hosted by `app/rm-curve.tsx`. No derived figure writes back to workouts.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
 then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
 Under [[1rm.curve-effort]], validate `Number.isSafeInteger(m+n)` before passing
-u to the shared estimator; its positive-integer domain has no parser rep cap.
-Use finite analytical total RM only; actual metrics can be finite while this
-second estimate overflows. Zero calculated load remains zero but supplies no
-positive reference support. Missing/unknown RIR cannot be inferred from targets.
+u to the shared estimator. Actual metrics can be finite while this second
+estimate overflows; retain only finite analytical values. Missing/unknown RIR
+cannot be inferred from targets.
 
-Let `f(u) = estimateOneRepMax(1,u)`, analytical RM `A = estimateOneRepMax(L,u)`
-and inverse prediction `P = M/f(u)` for independent reference M. This preserves
-[[1rm.formula]] unchanged. Its single branch applies when u is one; a performed
-single with positive RIR has a different analytical estimate. Full precision
-and integer predictions precede drawing interpolation; high-rep boundedness
-is not empirical validity. Reference support is [[1rm.curve-reference]], not an
-entry restriction.
-
-`exercise-calculations/rm-curve.ts` owns projection/inversion and residuals: `L−P` kg and `100×(L−P)/P` percent. Zero prediction has no
-percentage; absent reference or nonfinite arithmetic has no corresponding
-residual. Dividing both loads by entry factor preserves percentage; subtracting
-bodyweight does not. Never fit a point to its own A: residual is then zero;
-a maximum of evaluated A forces nonpositive residuals. Session maxima/medians
-retain selection bias and dependent sets are not independent sessions.
-
-Retain raw effort, actual/equivalent reps, both metric types, IDs/order,
-start/end, gym, policy/metadata and dated-reading provenance before lossy history
-normalization. Recompute both populations from one current snapshot. Test sensitivity, high reps, missing effort, sparse support and context confounding; assumed RIR accuracy is no confidence interval. For chart projection, load `bodyweight-load-contract.md` §11.
+`exercise-calculations/rm-curve.ts` owns projection, inversion and integer knots;
+full precision precedes rendering interpolation. Its residual helper remains
+available to numerical research; no residual or legacy historical benchmark
+controls the fitted production chart. Retain raw effort, actual/equivalent reps,
+IDs/order, dates, gym and loading/reading provenance before lossy normalization.
+For chart/bodyweight projection, load `bodyweight-load-contract.md` §11.

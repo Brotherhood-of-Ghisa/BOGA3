@@ -114,6 +114,9 @@ export type UiRoles = {
   viz2: string;
   viz3: string;
   viz4: string;
+  // Categorical temporal regimes, never direction or recency magnitude.
+  regimeOlder: string;
+  regimeNewer: string;
   // The dimmed backdrop behind a sheet.
   scrim: string;
 };
@@ -155,6 +158,8 @@ export function generateRoles(seeds: ThemeSeeds): UiRoles {
     viz2: at(STEPS.viz2),
     viz3: at(STEPS.viz3),
     viz4: at(STEPS.viz4),
+    regimeOlder: '#006C70',
+    regimeNewer: '#7A286B',
     // The dimmed backdrop behind a sheet: `ink` at 42%, so the page behind
     // reads as the same ground gone dark rather than as a neutral grey.
     scrim: withAlpha(ink, 0.42),

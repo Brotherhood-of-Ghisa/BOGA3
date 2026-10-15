@@ -32,9 +32,9 @@ The RM curve chart includes confirmed personal working sets
 ([[set.performed]], [[set.eligibility]]) with any canonical known RIR by default.
 Effort filters may narrow this population; sparse data never widens it.
 Missing/Unspecified and unknown labels remain distinct and supply neither an
-RIR-normalized point nor the reference. Preserve canonical high RIR numerically.
-Observation and reference cohorts match exercise definition, effort and gym;
-missing gym is separate. A programme phase called Technique/reset recorded as
+RIR-normalized point nor a fit. Preserve canonical high RIR numerically.
+Plotting and fitting use the selected exercise, time, effort and gym scope;
+All gyms pools gyms, including Unspecified, while individual gym choices stay separate. A programme phase called Technique/reset recorded as
 RIR 4 remains working under the existing policy; it does not become a Technique
 or warm-up effort label.
 
@@ -57,28 +57,54 @@ Why: the product owner requested effort normalization on 2026-10-13 as a
 modelling assumption, not empirical proof. RIR uncertainty must be tested.
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
 
-### 1rm.curve-reference · calculation · accepted
+### 1rm.curve-reference · calculation · superseded-by: 1rm.curve-fitting
 
-The initial reference is fixed before the selected evaluation range starts.
-Its prior interval starts at History look-back's calendar start computed at
-that instant and ends strictly before it. Take the six most recent qualifying
-completed sessions in that interval. Each supplies its maximum finite positive
-analytical total RM from 1–10 RIR0-equivalent reps; their median is the reference. Fewer than six
-sessions means observed points without a curve, with no automatic fallback.
-Evaluated sessions, tied cutoff timestamps and later workouts cannot enter the
-fit. Keep the reference fixed during evaluation; source edits, account policy
-or filter changes recompute both populations together.
+Replaced by [[1rm.curve-fitting]] with owner approval on 2026-10-15.
 
-Why: a prior benchmark avoids self-reference while giving sessions equal weight.
-Approved 2026-10-13 as an initial choice, not a statistically validated estimator
-or reliability threshold.
-Code: `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
+### 1rm.curve-fitting · calculation · accepted
+
+Replace Reference with One curve / Two curves and Parsimonious / Rich; default
+to One curve + Parsimonious. One curve fits a constant
+total 1RM; Two curves fit two free positive total 1RMs and a complete-session
+boundary against constant/linear/quadratic no-break alternatives. No minimum
+strength increment applies; only 1RM changes curve amplitude.
+
+Fit the first working ordinal per completed session, chosen before effort or
+residual inspection. Missing effort/unusable load omits that session without
+later substitution. Plot all qualifying sets independently. Unavailable fits
+retain observations without a historical fallback; logged metrics stay intact.
+
+Why: owner approved 2026-10-15; activation remains separate.
+Code: `apps/mobile/src/strength-regimes/`.
+
+### 1rm.curve-uncertainty · calculation · accepted
+
+Parsimonious fixes uncertainty; Rich jointly estimates shared uncertainty across
+periods. Logged RIR0 is exact; positive logged n permits actual n−1/n/n+1 with
+symmetric extremes and initial central probability 0.50. Fixed total-load SD is
+2.50 kg (1.25 kg in per-side entry units). Likelihood shading conveys relative
+evidence, never break or membership probability. Unverified real histories remain
+exploratory, without calibrated shading or confidence claims.
+
+Why: owner approved 2026-10-15.
+Code: `apps/mobile/src/strength-regimes/assessment.ts`.
+
+### 1rm.curve-periods · presentation · accepted
+
+Before/From date labels, distinct markers and matching point/curve hues identify
+temporal periods, keeping complete sessions together. Selected-set details carry
+the current fitted period's label/hue; invalidated fits remove that assignment.
+Selection follows a tapped point or View sets choice and persists while the
+observation remains valid, without automatic representative selection.
+
+Why: owner approved 2026-10-15.
+Code: `apps/mobile/components/rm-curve/`.
 
 ### 1rm.curve-load · presentation · accepted
 
 The RM curve chart plots calculated load divided by the exercise's entry
-factor: one for total-load entry, two for per-side entry. Its reference is analytical total
-RM divided by that same factor. Ordinary points coincide with entered
+factor: one for total-load entry, two for per-side entry. Fitted analytical total
+1RM uses that same factor. Ordinary points coincide with entered
 Weight; when bodyweight contributes, the chart coordinate includes its applicable
 dated contribution. This is a chart-only exception to hiding calculated load:
 the axis must distinguish its coordinate from Weight. Point details keep raw
@@ -98,7 +124,9 @@ trained gym cohort, including Unspecified; stable gym ID resolves ties.
 Range choices are 4, 12, 24 weeks or the configured History look-back, all
 clamped to those bounds. Effort scope follows [[1rm.curve-population]].
 Changing exercise selects its most recent gym. Applied range/gym/effort
-changes recompute observations and [[1rm.curve-reference]] coherently.
+changes recompute observations and [[1rm.curve-fitting]] coherently.
+All gyms is an additional option, preserving gym provenance. Pooling does not
+establish equivalent equipment or reliable strength changes.
 
 Why: the product owner approved the chart design and scope defaults on
 2026-10-14.

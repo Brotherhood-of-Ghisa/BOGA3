@@ -4,6 +4,9 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
+- `strength-regimes-contract.md`: experimental RM fitting, session sampling,
+  numerical abstention, asynchronous lifecycle and calibration boundaries.
+
 - `training-metrics-contract.md`: the one definition of what counts toward a
   statistic — the working set and the counted session — and where records and
   calculations are owned.

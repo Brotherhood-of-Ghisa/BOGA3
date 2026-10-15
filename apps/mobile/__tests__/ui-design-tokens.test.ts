@@ -37,6 +37,8 @@ describe('design-language tokens', () => {
         'record',
         'recordRule',
         'recordWash',
+        'regimeOlder',
+        'regimeNewer',
         'rule',
         'ruleSoft',
         'scrim',

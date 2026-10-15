@@ -2,9 +2,11 @@ import { compareReadingIds } from '@/src/bodyweight/as-of';
 import { requireDate } from '@/src/bodyweight/weight-entry';
 import type { RmCurveGraph, RmCurveRow } from '@/src/data/rm-curve';
 import { projectRmCurveSet, rmCurveKnots, rmCurveResidual, type RmCurveExclusion, type RmCurveValues } from '@/src/exercise-calculations/rm-curve';
+import type { RegimeSession } from '@/src/strength-regimes/fit';
 import { MAX_HISTORY_LOOKBACK_WEEKS } from '@/src/preferences/model';
 import { historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
+export const ALL_GYMS = '__all_gyms__';
 export type RmCurveRange = 4 | 12 | 24 | 'history';
 export type RmCurveEvaluation = {
   start: Date; end: Date; historyLookbackWeeks: number;
@@ -79,7 +81,7 @@ export function buildRmCurveModel(graph: RmCurveGraph, scope: RmCurveEvaluation)
       performanceStatus: row.performanceStatus === null ? null : 'unperformed' }) }));
   const gyms = gymOptions(projected);
   const gymId = scope.gymId === undefined ? gyms[0]?.gymId ?? null : scope.gymId;
-  const cohort = projected.filter(({ row }) => row.gymId === gymId);
+  const cohort = projected.filter(({ row }) => (gymId === ALL_GYMS || row.gymId === gymId));
   const effortOptions = [...new Set(cohort.flatMap(({ value }) => typeof value === 'string' ? [] : [value.rir]))].sort((a, b) => a - b);
   const points = cohort.flatMap(({ row, value }) => typeof value === 'string' || (scope.rir != null && value.rir !== scope.rir)
     ? [] : [{ ...row, ...value }]);
@@ -91,7 +93,21 @@ export function buildRmCurveModel(graph: RmCurveGraph, scope: RmCurveEvaluation)
   const maxReps = observations.reduce((max, row) => Math.max(max, row.equivalentReps), 20);
   return { definition: graph.definition, start: scope.start, end: scope.end, gymId, rir: scope.rir ?? null,
     gyms, effortOptions, reference, observations, excluded,
+    inferenceSessions: inferenceSessions(cohort, scope),
     curve: rmCurveKnots(reference.totalRm, graph.definition.loadInputMode, maxReps) };
 }
 
 export type RmCurveModel = ReturnType<typeof buildRmCurveModel>;
+
+/** First working ordinal is chosen before effort filtering; missing effort never substitutes a later set. */
+function inferenceSessions(cohort: ProjectedRow[], scope: RmCurveEvaluation): RegimeSession[] {
+  const first = new Map<string, ProjectedRow>();
+  for (const item of cohort) {
+    if (item.row.completedAt < scope.start || item.value === 'not_working') continue;
+    const previous = first.get(item.row.sessionId);
+    if (!previous || compareObservations(item.row, previous.row) < 0) first.set(item.row.sessionId, item);
+  }
+  return [...first.values()].map(({row, value}) => ({ sessionId: row.sessionId, time: row.completedAt.getTime(),
+    firstWorkingSet: typeof value === 'string' || (scope.rir !== null && scope.rir !== undefined && value.rir !== scope.rir)
+      ? null : { setId: row.setId, reps: value.reps, rir: value.rir, load: value.calculatedLoadKg } }));
+}

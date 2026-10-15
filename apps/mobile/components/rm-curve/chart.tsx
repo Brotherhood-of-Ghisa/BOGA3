@@ -1,20 +1,22 @@
 import { useRef, useState } from 'react';
-import { Platform, Pressable, Text, View, type ViewInstance } from 'react-native';
+import { Platform, Pressable, Text, type ViewInstance } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import type { RegimeCurve } from '@/src/strength-regimes/assessment';
 import type { RmCurveModel } from '@/src/rm-curve/model';
 import { axisLabel, curveGeometry, pointsAt, PLOT_HEIGHT } from './geometry';
 import { curveStyles as styles } from './styles';
 
-const recencyColours = [uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4];
+export const periodColour = (period: RegimeCurve['period']) => period === 'newer' ? uiRoles.regimeNewer : uiRoles.regimeOlder;
 
-/** Exact coordinates, a fixed reference, recency only; the set list provides every value. */
-export function RmCurveChart({ model, selectedId, onPick, plotRef }: {
+/** Exact coordinates; complete-session date partitions share curve and point identity. */
+export function RmCurveChart({ model, selectedId, onPick, plotRef, curves = [], boundary = null }: {
+  curves?: RegimeCurve[]; boundary?: number | null;
   model: RmCurveModel; selectedId: string | null; onPick: (ids: string[]) => void; plotRef: (node: ViewInstance | null) => void;
 }) {
   const [width, setWidth] = useState(300);
   const host = useRef<ViewInstance | null>(null);
-  const plot = curveGeometry(model, width);
+  const plot = curveGeometry(model, width, curves);
   return <>
     <Pressable ref={node => { host.current = node; plotRef(node); }} testID="rm-curve-plot" accessibilityRole="button"
       accessibilityLabel={`${model.observations.length} observed sets. RIR0-equivalent repetitions versus load. Open the set list for values.`}
@@ -45,17 +47,21 @@ export function RmCurveChart({ model, selectedId, onPick, plotRef }: {
           textAnchor={i === 4 ? 'end' : 'middle'} fill={uiRoles.inkMuted} fontFamily={uiFonts.figure.family} fontWeight="500" fontSize={uiTypography.size.xxs}>
           {axisLabel(plot.maxReps * (i / 4))}
         </SvgText>)}
-        {model.curve.length > 0 ? <Polyline testID="rm-reference-line" points={plot.line} fill="none" stroke={uiRoles.ink} strokeWidth={2} /> : null}
-        {plot.points.map(p => <Circle key={p.id} testID={`rm-point-${p.id}`} cx={p.x} cy={p.y} r={5}
-          fill={recencyColours[p.recency]} stroke={uiRoles.ink} strokeWidth={1} />)}
+        {plot.lines.map(line => <Polyline key={line.period} testID={`rm-fit-${line.period}`} points={line.line} fill="none"
+          stroke={periodColour(line.period)} strokeWidth={2} strokeDasharray={line.period === 'newer' ? '6 4' : undefined} opacity={line.opacity} />)}
+        {plot.points.map((p, index) => {
+          const newer = boundary !== null && model.observations[index].completedAt.getTime() >= boundary;
+          const colour = boundary === null && !curves.length ? uiRoles.inkMuted : periodColour(newer ? 'newer' : 'older');
+          return newer ? <Polyline key={p.id} testID={`rm-point-${p.id}`} points={`${p.x},${p.y - 5} ${p.x + 5},${p.y} ${p.x},${p.y + 5} ${p.x - 5},${p.y} ${p.x},${p.y - 5}`}
+            fill={uiRoles.surface} stroke={colour} strokeWidth={2} />
+            : <Circle key={p.id} testID={`rm-point-${p.id}`} cx={p.x} cy={p.y} r={4}
+              fill={uiRoles.surface} stroke={colour} strokeWidth={2} />;
+        })}
         {plot.points.filter(p => p.id === selectedId).map(p => <Polyline key={p.id} testID="rm-selection-caret"
           points={`${p.x - 4},${p.y - 12} ${p.x},${p.y - 8} ${p.x + 4},${p.y - 12}`}
           fill="none" stroke={uiRoles.ink} strokeWidth={2} />)}
       </Svg>
     </Pressable>
-    <Text allowFontScaling={false} style={styles.micro}>REPETITIONS · RIR0 EQUIVALENT</Text>
-    <View style={styles.legend}><Text allowFontScaling={false} style={styles.body}>Earlier</Text>
-      {recencyColours.map(colour => <View key={colour} style={[styles.dot, { backgroundColor: colour }]} />)}
-      <Text allowFontScaling={false} style={styles.body}>Newer</Text></View>
+    <Text allowFontScaling={false} style={styles.micro}>REPS + RIR</Text>
   </>;
 }

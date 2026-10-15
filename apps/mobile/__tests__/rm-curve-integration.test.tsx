@@ -53,7 +53,7 @@ it('hides stale connected-screen values on storage failure and restores the sele
   expect(mockFixture.database.select().from(exerciseSets).all()).toEqual(before);
 });
 
-it('keeps Unspecified gym separate and changes both plotted and reference populations when the gym or effort changes', async () => {
+it('keeps Unspecified gym separate and changes both plotted and fitting populations when the gym or effort changes', async () => {
   const db = mockFixture.database; seedWaveHistory(db);
   db.insert(sessions).values({ id: 'unspecified', startedAt: new Date(now.getTime() + 10000), completedAt: new Date(now.getTime() + 30000), status: 'completed' }).run();
   db.insert(sessionExercises).values({ id: 'unspecified-block', sessionId: 'unspecified', exerciseDefinitionId: 'curve', name: 'Synthetic exercise', orderIndex: 0 }).run();
@@ -61,15 +61,16 @@ it('keeps Unspecified gym separate and changes both plotted and reference popula
   render(<RmCurveScreen exerciseDefinitionId="curve" now={new Date(now.getTime() + 60000)} />);
   await screen.findByText('1 set · 1 session');
   expect(screen.getByLabelText('gym: Unspecified gym')).toBeTruthy();
-  expect(screen.getByText('Reference unavailable · 0 of 6 prior sessions')).toBeTruthy();
+  await screen.findByText('Exploratory fit');
   fireEvent.press(screen.getByLabelText('gym: Unspecified gym'));
   fireEvent.press(screen.getByRole('radio', { name: 'Synthetic gym' }));
   await screen.findByText('36 sets · 12 sessions');
-  expect(screen.getByTestId('rm-reference-line')).toBeTruthy();
+  await screen.findByTestId('rm-fit-all');
+  expect(screen.queryByTestId('rm-reference-line')).toBeNull();
   expect(screen.queryByTestId('rm-point-unspecified-set')).toBeNull();
   fireEvent.press(screen.getByLabelText('effort: All known RIR'));
   fireEvent.press(screen.getByRole('radio', { name: 'RIR 4' }));
-  await screen.findByText('Reference unavailable · 0 of 6 prior sessions');
+  await screen.findByText('Exploratory fit');
   expect(screen.getByTestId('rm-curve-plot')).toBeTruthy();
   expect(screen.queryByTestId('rm-reference-line')).toBeNull();
   fireEvent.press(screen.getByLabelText('gym: Synthetic gym'));
@@ -110,13 +111,14 @@ function PrefixPreview({ name, week }: { name: keyof typeof wave.scenarios; week
     exercises={[{ id: 'curve', name: 'Synthetic exercise' }]} catalogStatus="ready" retryCatalog={() => undefined} dateFormat="YYYY-MM-DD" historyWeeks={52} />;
 }
 
-it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to real SQLite while retaining the approved fixed reference and actual set details', async name => {
+it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to real SQLite while fitting the current scope and preserving actual set details', async name => {
   seedWaveHistory(mockFixture.database, name);
   for (const week of [2, 14, 22]) {
     const expected = oracle.oracle.find(control => control.name === name)!.weekly[week - 1];
     const component = render(<PrefixPreview name={name} week={week} />);
     await screen.findByText(`${expected.sets} sets · ${expected.sessions} sessions`);
-    expect(screen.getByText('Reference 100.0 kg · 6 prior sessions')).toBeTruthy();
+    await screen.findByText('Exploratory fit');
+    expect(screen.queryByText(/Reference/)).toBeNull();
     expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
     const first = wave.scenarios[name][(week - 1) * 3];
     const date = formatShortDate(new Date(first.completedAt), 'YYYY-MM-DD');

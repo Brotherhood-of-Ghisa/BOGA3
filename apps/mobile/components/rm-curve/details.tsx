@@ -4,23 +4,27 @@ import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/forma
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { RmCurveModel, RmCurveObservation } from '@/src/rm-curve/model';
 import { formatShortDate } from '@/src/utils/local-time';
+import { periodColour } from './chart';
 import { curveStyles as styles } from './styles';
 
 export function setDescription(point: RmCurveObservation, dateFormat: ExerciseDateFormat) {
   const unit = point.loadContext.loadInputMode === 'per_side_load' ? 'kg per side' : 'kg';
   return `${formatShortDate(point.completedAt, dateFormat)} · block ${point.blockOrder + 1}, set ${point.setOrder + 1}. ` +
     `${point.reps} reps, RIR ${point.rir}, ${point.equivalentReps} equivalent reps. ` +
-    `Load ${formatWeight(point.loadKg)} ${unit}, Weight ${formatWeight(point.weightKg)} ${unit}, 1RM ${formatOneRepMax(point.existingOneRepMax)} ${unit}.`;
+    `Load ${formatWeight(point.loadKg)} ${unit}, Weight ${formatWeight(point.weightKg)} ${unit}, 1RM ${formatOneRepMax(point.existingOneRepMax)} ${unit}. ${point.gymName ?? 'Unspecified gym'}.`;
 }
 
-export function RmCurveDetails({ model, point, dateFormat, onSelect }: {
+export function RmCurveDetails({ model, point, dateFormat, onSelect, period, periodLabel }: {
+  period?: 'all' | 'older' | 'newer'; periodLabel?: string;
   model: RmCurveModel; point: RmCurveObservation; dateFormat: ExerciseDateFormat; onSelect: (id: string) => void;
 }) {
   const index = model.observations.findIndex(p => p.setId === point.setId);
   const unit = model.definition.loadInputMode === 'per_side_load' ? 'KG PER SIDE' : 'KG';
   return <Card style={styles.card} testID="rm-curve-details">
     <Text allowFontScaling={false} style={styles.micro}>SELECTED SET</Text>
+    {period && periodLabel ? <Text testID="rm-selected-period" allowFontScaling={false} style={[styles.figure, { color: periodColour(period) }]}>{periodLabel}</Text> : null}
     <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(point.completedAt, dateFormat)} · block {point.blockOrder + 1}, set {point.setOrder + 1}</Text>
+    <Text allowFontScaling={false} style={styles.body}>{point.gymName ?? 'Unspecified gym'}</Text>
     <View style={styles.metrics}>
       <View style={styles.metric}><Text allowFontScaling={false} style={styles.micro}>REPS / RIR</Text><Text allowFontScaling={false} style={styles.figure}>{point.reps} / {point.rir}</Text></View>
       <View style={styles.metric}><Text allowFontScaling={false} style={styles.micro}>WEIGHT / 1RM · {unit}</Text>

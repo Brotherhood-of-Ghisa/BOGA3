@@ -1,20 +1,10 @@
 // Research-only profile grids and searched regression diagnostics.
-import { fitRegression, jointLikelihoodGrid, latentRirStates, scanBreaks, type BreakFit, type JointRirPoint, type ResearchRow } from './residual-regression-research';
-import { estimateOneRepMax } from '../../src/exercise-calculations/index.ts';
+import { fitRegression, jointLikelihoodGrid, scanBreaks, type BreakFit, type JointRirPoint, type ResearchRow } from './residual-regression-research';
 import type { LoadInputMode } from '../../src/exercise-calculations/load-metrics';
 
 export const DEFAULT_ENTRY_LOAD_SD_KG: Record<LoadInputMode, number> = { per_side_load: 1.25, total_load: 2.5 };
 
-export function rirCurveMultipliers(performedReps: number, recordedRir: number): number[] {
-  if (!Number.isSafeInteger(performedReps) || performedReps <= 0) throw new Error('invalid performed reps');
-  return latentRirStates(recordedRir).map(r => {
-    const equivalent = performedReps + r;
-    if (!Number.isSafeInteger(equivalent)) throw new Error('equivalent reps overflow');
-    const multiplier = estimateOneRepMax(1, equivalent);
-    if (multiplier === null || !Number.isFinite(multiplier) || multiplier <= 0) throw new Error('invalid RM multiplier');
-    return multiplier;
-  });
-}
+export { rirCurveMultipliers } from '../../src/strength-regimes/multipliers';
 
 export function jointUncertaintyProfiles(points: JointRirPoint[], strengths: number[], correctProbabilities: number[], loadSds: number[]) {
   if (!loadSds.length) throw new Error('nonempty load uncertainty axis required');

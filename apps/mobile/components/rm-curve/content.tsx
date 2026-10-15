@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, FlatList, Platform, Text, View, type ViewInstance } from 'react-native';
-import { Card, Icon, ListRow, ScreenScroll, Sheet, StatePanel } from '@/components/ui';
-import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
+import { Card, Icon, ListRow, ScreenScroll, SegmentedControl, Sheet, StatePanel } from '@/components/ui';
+import { formatWeight } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { ALL_GYMS } from '@/src/rm-curve/model';
+import type { CurveMode, UncertaintyMethod } from '@/src/strength-regimes/assessment';
 import type { RmCurveModel, RmCurveRange } from '@/src/rm-curve/model';
 import { formatShortDate } from '@/src/utils/local-time';
-import { RmCurveChart } from './chart';
+import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
+import { periodLabel, RmRegimes, selectedPeriod } from './regimes';
 import { RmCurveDetails, setDescription } from './details';
 import { curveStyles as styles } from './styles';
 
@@ -35,6 +38,8 @@ const rangeLabel = (range: RmCurveRange, historyWeeks: number) => range === 'his
  * All points are available as dated rows; the plot never moves overlapping data.
  */
 export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus, retryCatalog, dateFormat, historyWeeks }: RmCurveContentProps) {
+  const [mode, setMode] = useState<CurveMode>('one');
+  const [method, setMethod] = useState<UncertaintyMethod>('fixed');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [candidates, setCandidates] = useState<string[] | null>(null);
@@ -67,8 +72,8 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
   const choices: Record<Picker, Choice[]> = {
     exercise: exercises.map(e => ({ id: e.id, label: e.name, checked: e.id === scope.exerciseId,
       choose: () => apply({ exerciseId: e.id, gymId: undefined }) })),
-    gym: (model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'unspecified', label: g.name ?? 'Unspecified gym', checked: g.gymId === model?.gymId,
-      choose: () => apply({ gymId: g.gymId }) })),
+    gym: [{ id: ALL_GYMS, label: 'All gyms', checked: scope.gymId === ALL_GYMS, choose: () => apply({ gymId: ALL_GYMS }) }, ...(model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'unspecified', label: g.name ?? 'Unspecified gym', checked: g.gymId === model?.gymId,
+      choose: () => apply({ gymId: g.gymId }) }))],
     range: ([4, 12, 24, 'history'] as const).map(r => ({ id: String(r),
       label: r === 'history' ? rangeLabel(r, historyWeeks) : `${r} weeks${r > historyWeeks ? ' (limited to History)' : ''}`,
       checked: r === scope.range, choose: () => apply({ range: r }) })),
@@ -81,16 +86,20 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
   };
   const labelModel = read.data;
   const gymLabel = scope.gymId === undefined ? labelModel ? labelModel.gyms.find(g => g.gymId === labelModel.gymId)?.name ?? 'Unspecified gym' : 'Latest trained gym'
-    : scope.gymId === null ? 'Unspecified gym' : labelModel?.gyms.find(g => g.gymId === scope.gymId)?.name ?? 'Selected gym';
+    : scope.gymId === ALL_GYMS ? 'All gyms' : scope.gymId === null ? 'Unspecified gym' : labelModel?.gyms.find(g => g.gymId === scope.gymId)?.name ?? 'Selected gym';
   return <>
     <ScreenScroll testID="rm-curve-content">
       {filter('exercise', exercises.find(e => e.id === scope.exerciseId)?.name ?? model?.definition.name ?? 'Selected exercise', true)}
       <View style={styles.filters}>{filter('gym', gymLabel)}{filter('range', rangeLabel(scope.range, historyWeeks))}
         {filter('effort', scope.rir === null ? 'All known RIR' : `RIR ${scope.rir}`, true)}</View>
+      <SegmentedControl testIDPrefix="rm-mode" accessibilityLabel="Curves" value={mode} onChange={setMode}
+        options={[{ value: 'one', label: 'One curve' }, { value: 'two', label: 'Two curves' }]} />
+      <SegmentedControl testIDPrefix="rm-method" accessibilityLabel="Model" value={method} onChange={setMethod}
+        options={[{ value: 'fixed', label: 'Parsimonious' }, { value: 'joint', label: 'Rich' }]} />
       {read.status === 'loading' ? <StatePanel kind="loading" title="Loading sets" fill={false} />
         : read.status === 'error' ? <StatePanel kind="error" title="Couldn’t load sets" body="Your filters are retained. Retry to load the chart and details."
           action={{ label: 'Retry', onPress: read.retry }} fill={false} />
-          : model ? <CurveResult model={model} pointId={point?.setId ?? null} dateFormat={dateFormat} onSelect={setSelectedId}
+          : model ? <CurveResult mode={mode} method={method} model={model} pointId={point?.setId ?? null} dateFormat={dateFormat} onSelect={setSelectedId}
             onPick={ids => { if (ids.length === 1) setSelectedId(ids[0]); else if (ids.length > 1) { origin.current = refs.current.plot ?? null; setCandidates(ids); setPicker('sets'); } }}
             plotRef={node => { refs.current.plot = node; }}
             onFilters={() => open('effort')} onSets={() => open('sets')} setListRef={node => { refs.current.sets = node; }} />
@@ -120,31 +129,32 @@ function CurveChoices({ picker, choices, catalogStatus, retryCatalog, close, res
     </Sheet>;
 }
 
-function CurveResult({ model, pointId, dateFormat, onSelect, onPick, onFilters, onSets, setListRef, plotRef }: {
-  model: RmCurveModel; pointId: string | null; dateFormat: ExerciseDateFormat; onSelect: (id: string) => void;
+function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPick, onFilters, onSets, setListRef, plotRef }: {
+  mode: CurveMode; method: UncertaintyMethod; model: RmCurveModel; pointId: string | null; dateFormat: ExerciseDateFormat; onSelect: (id: string) => void;
   onPick: (ids: string[]) => void; onFilters: () => void; onSets: () => void; setListRef: (node: ViewInstance | null) => void;
   plotRef: (node: ViewInstance | null) => void;
 }) {
+  const result = useRegimeAssessment(model, mode, method);
   const points = model.observations, point = points.find(p => p.setId === pointId);
   if (!points.length) {
     const noEffort = model.excluded.missing_effort + model.excluded.unknown_effort > 0;
     return <StatePanel fill={false} title={model.rir !== null ? 'No sets match these filters' : noEffort ? 'No sets with known RIR' : excludedMessage(model) ? 'No qualifying observations' : 'No completed sets'}
       body={excludedMessage(model) || 'Choose another effort, gym or time range.'} action={{ label: 'Change filters', onPress: onFilters }} />;
   }
+  const period = point ? selectedPeriod(point.completedAt, result?.data) : undefined;
   const factor = model.definition.loadInputMode === 'per_side_load' ? 2 : 1;
   const sessionsCount = new Set(points.map(p => p.sessionId)).size;
   return <>
     <Text allowFontScaling={false} style={styles.figure}>{points.length} {points.length === 1 ? 'set' : 'sets'} · {sessionsCount} {sessionsCount === 1 ? 'session' : 'sessions'}</Text>
     <Card style={styles.card}>
       <Text allowFontScaling={false} style={styles.micro}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''} · KG{factor === 2 ? ' PER SIDE' : ''}</Text>
-      <RmCurveChart model={model} selectedId={pointId} onPick={onPick} plotRef={plotRef} />
+      <RmRegimes result={result} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} plotRef={plotRef} />
       <View style={styles.dates}><Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>
         <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points[0].completedAt, dateFormat)}</Text></View>
-      <Text allowFontScaling={false} style={styles.body}>{model.reference.totalRm === null ? `Reference unavailable · ${Math.min(6, model.reference.qualifyingSessions)} of 6 prior sessions`
-        : `Reference ${formatOneRepMax(model.reference.totalRm / factor)} kg${factor === 2 ? ' per side' : ''} · 6 prior sessions`}</Text>
+
     </Card>
-    {point ? <RmCurveDetails model={model} point={point} dateFormat={dateFormat} onSelect={onSelect} />
-      : <Text allowFontScaling={false} style={styles.body}>Tap a point or open View sets to inspect an observation.</Text>}
+    {point ? <RmCurveDetails period={period} periodLabel={period ? periodLabel(period, result?.data?.boundary ?? null, dateFormat) : undefined} model={model} point={point} dateFormat={dateFormat} onSelect={onSelect} />
+      : null}
     <Card><ListRow ref={setListRef} divider={false} label="View sets" onPress={onSets} trailing={<Icon name="chevron-down" />} /></Card>
     {excludedMessage(model) ? <Text allowFontScaling={false} style={styles.body}>{excludedMessage(model)}</Text> : null}
   </>;
