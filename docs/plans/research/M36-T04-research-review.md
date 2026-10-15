@@ -58,8 +58,8 @@ Both approaches minimize negative ell on identical observations:
 
 | Approach | Estimated parameters | Fixed parameters |
 | --- | --- | --- |
-| Fixed uncertainty | S | p=0.50; total-load tau=2.50 kg |
-| Joint estimation | S, p, tau | Adopted curve shape, equal tails and RIR support |
+| Parsimonious (fixed uncertainty) | S | p=0.50; total-load tau=2.50 kg |
+| Rich (joint estimation) | S, p, tau | Adopted curve shape, equal tails and RIR support |
 
 This is a mixture-likelihood objective, not ordinary least squares on RIR-normalized RM. Its density normalization and mixture weights matter. Even the mixture's expected load generally differs from the curve at m+n because inversion of the adopted kernel is nonlinear. Simulation therefore draws an actual-RIR component before drawing load.
 

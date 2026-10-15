@@ -7,7 +7,7 @@
 
 ## Objective and scope
 
-Connect the conditional RIR/load likelihood to a one-break strength model, measure its reliability, and then expose a reviewed experimental Strength regimes mode. Only total 1RM changes the adopted RM curve's amplitude. Preserve all logged metrics, loading semantics and the existing historical-reference chart.
+Connect the conditional RIR/load likelihood to a one-break strength model, measure its reliability, and then expose a reviewed experimental Strength regimes mode. Only total 1RM changes the adopted RM curve's amplitude. Preserve all logged metrics, loading semantics while replacing the historical-reference UI as approved on 2026-10-15.
 
 In: segmented likelihood fitting, fixed/shared joint uncertainty, gradual no-break competitors, unknown session boundaries, empirical/synthetic reliability, an assessment contract and a gated two-curve mode. Out: multiple breaks, slope-change alternatives, posterior break probabilities, confirmed physiological diagnoses, alerts, new server/schema/sync behavior and automatic production activation.
 
@@ -27,7 +27,7 @@ T01 ends with independently reviewed fitting and diagnostics. T02 ends with meas
 
 ### D4. Approved UI choices
 
-Separate Reference / Strength regimes modes on the same screen; Reference stays default. Strength regimes exposes Fixed / Joint, initially Fixed. Shared uncertainty applies to both regimes. Once both fits are estimable, show a labelled tentative candidate even at weak evidence; monotonically increase emphasis using validated evidence with readable minimum contrast. No confirmed-break or point-membership assertion follows. A missing historical reference never triggers an automatic regime-fit fallback.
+The owner approved removal of Reference mode on 2026-10-15. Offer One curve / Two curves and Parsimonious / Rich, initially One curve + Parsimonious. Parsimonious is fixed uncertainty; Rich jointly estimates the shared uncertainty parameters. This naming does not change the analytical methods. Shared uncertainty applies to both regimes. Once both fits are estimable, show a labelled tentative candidate even at weak evidence; monotonically increase emphasis using validated evidence with readable minimum contrast. No confirmed-break or point-membership assertion follows. Unavailable fits retain observations without a historical-reference fallback.
 
 ### D5. Design, checks and experimental delivery
 

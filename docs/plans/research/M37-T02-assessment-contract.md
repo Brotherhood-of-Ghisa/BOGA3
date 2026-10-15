@@ -13,7 +13,7 @@ Inference samples the prespecified first working ordinal per completed session, 
 The derived result contains:
 
 - Status: insufficient / unresolved / estimable, plus calibration scope: matching / unsupported. No detected-break status.
-- Snapshot/model/calibration identity and fixed/joint method. Fixed remains the default.
+- Snapshot/model/calibration identity and fixed/joint method. Visible names are Parsimonious (fixed uncertainty, default) and Rich (shared joint uncertainty estimation), approved by the owner on 2026-10-15.
 - Counts: input sessions, sampled sessions, omissions and complete-session support per candidate side.
 - Best constant/linear/quadratic no-break fit and best one-step fit, their log likelihoods and all searched cuts.
 - Older/newer total 1RM, freely fitted without a minimum strength increment, one shared p/tau and corresponding curve coordinates. Uninformed p stays unavailable; exact-zero observations retain load discrepancy.
@@ -40,4 +40,4 @@ The weekly16–32 sensitivity checks repeated looks using the declared reference
 
 ## Gates and next action
 
-Human analytical approval has accepted the measured reliability limits, evidence mapping, practical strength-precision rule and handling of unsupported real-history fits. Update the design target with Reference / Strength regimes and Fixed / Joint controls, tentative/readable weak-evidence curves, uncertainty/unsupported states and stale-result handling. Human design approval precedes UI implementation and acceptance testing. Main remains untouched; experimental activation is a separate owner decision.
+Human analytical approval has accepted the measured reliability limits, evidence mapping, practical strength-precision rule and handling of unsupported real-history fits. The owner approved Reference removal and One curve / Two curves with Parsimonious / Rich controls (initially One curve + Parsimonious). Update the design target with these controls, tentative/readable weak-evidence curves, uncertainty/unsupported states and stale-result handling. Human design approval precedes UI implementation and acceptance testing. Main remains untouched; experimental activation is a separate owner decision.
