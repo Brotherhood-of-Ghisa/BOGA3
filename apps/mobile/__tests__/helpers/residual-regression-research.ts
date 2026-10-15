@@ -160,7 +160,7 @@ export function normalCdf(x: number): number {
 export type JointRirPoint = { load: number; recordedRir: number; multipliers: number[] };
 
 function loadLogNormalizer(predicted: number, sd: number): number {
-  return -Math.log(sd * Math.sqrt(2 * Math.PI)) - Math.log(normalCdf(predicted / sd));
+  return -Math.log(sd * Math.sqrt(2 * Math.PI)) - (predicted / sd >= 9 ? 0 : Math.log(normalCdf(predicted / sd)));
 }
 
 function loadLogDensity(load: number, predicted: number, sd: number): number {
@@ -205,4 +205,18 @@ export function jointLikelihoodGrid(points: JointRirPoint[], strengths: number[]
   });
   return weights.map(ps => loads.map(ls => ps.reduce((sum, terms, i) =>
     sum + logMixture(terms.map((term, r) => term + ls[i][r])), 0)));
+}
+
+// Compile invariant component data once for repeated trajectory likelihood evaluations.
+export function conditionalTrajectoryLikelihood(points: JointRirPoint[]) {
+  jointLogLikelihood(points, 1, 0.5, 2.5);
+  const components = points.map(p => ({ load: p.load, inverse: p.multipliers.map(f => 1 / f), zero: p.recordedRir === 0 }));
+  return (strengths: number[], probability: number, sd: number): number => {
+    if (strengths.length !== points.length || strengths.some(s => !Number.isFinite(s) || s <= 0) ||
+      !Number.isFinite(probability) || probability < 0 || probability > 1 || !Number.isFinite(sd) || sd <= 0)
+      throw new Error('invalid conditional trajectory');
+    const central = Math.log(probability), tail = Math.log((1 - probability) / 2);
+    return components.reduce((sum, point, i) => sum + logMixture(point.inverse.map((inverse, j) =>
+      (point.zero ? 0 : j === 1 ? central : tail) + loadLogDensity(point.load, strengths[i] * inverse, sd))), 0);
+  };
 }

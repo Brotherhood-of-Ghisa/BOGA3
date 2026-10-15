@@ -37,7 +37,7 @@ Reuse the approved two-curve concept, but pin and obtain human approval of the u
 
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| [M37-T01](../tasks/M37-T01-Segmented_likelihood_fitting.md) | Direct segmented likelihood, smooth competitors and numerical diagnostics | reviewed M36 experimental baseline | planned |
+| M37-T01 | Direct segmented likelihood, smooth competitors and numerical diagnostics | reviewed M36 experimental baseline | completed |
 | [M37-T02](../tasks/M37-T02-Regime_reliability_and_contract.md) | Reliability, adequacy and evidence contract; human analytical gate | T01 | planned |
 | [M37-T03](../tasks/M37-T03-Experimental_strength_regimes_UI.md) | Approved experimental mode, fixed/joint selector and tentative curves | T02 + human analytical/design gates | planned |
 
