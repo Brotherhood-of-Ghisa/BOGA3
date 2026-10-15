@@ -17,6 +17,7 @@
 
 import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
+import { CURRENT_APP_VERSION } from '@/src/data/exercise-catalog-seeds';
 import { gyms, syncRuntimeState } from '@/src/data/schema';
 import { __resetAuthRequiredSignalForTests } from '@/src/sync/auth-required-signal';
 import { __resetCycleErrorSignalForTests } from '@/src/sync/cycle-error-signal';
@@ -78,10 +79,12 @@ const stubServerCapturingBatches = (): void => {
 const markBootstrapDone = (): void => {
   database
     .insert(syncRuntimeState)
-    .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date(1_700_000_000_000) })
+    .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date(1_700_000_000_000),
+      appliedSeedMigrationAppVersion: CURRENT_APP_VERSION })
     .onConflictDoUpdate({
       target: syncRuntimeState.id,
-      set: { bootstrapCompletedAt: new Date(1_700_000_000_000) },
+      set: { bootstrapCompletedAt: new Date(1_700_000_000_000),
+        appliedSeedMigrationAppVersion: CURRENT_APP_VERSION },
     })
     .run();
 };

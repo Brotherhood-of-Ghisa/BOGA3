@@ -406,8 +406,8 @@ describe('a wiped/reinstalled client re-pulls muscle_groups before its mappings 
 
     await expect(runSyncCycle()).resolves.toBe('converged');
 
-    // The server now holds the whole Layer 0 -> Layer 1 catalog.
-    expect(server.count('muscle_groups')).toBe(1);
+    // The server holds the fixture catalog plus the six bundled muscle additions.
+    expect(server.count('muscle_groups')).toBe(7);
     expect(server.count('exercise_definitions')).toBe(1);
     expect(server.count('exercise_muscle_mappings')).toBe(1);
 
@@ -433,6 +433,13 @@ describe('a wiped/reinstalled client re-pulls muscle_groups before its mappings 
       .get();
     expect(restoredGroup?.displayName).toBe(MG.displayName);
     expect(restoredGroup?.localDirty).toBe(false);
+    for (const id of [
+      'tibialis_anterior', 'hip_flexors', 'rotator_cuff',
+      'serratus_anterior', 'traps_lower', 'brachialis',
+    ]) {
+      expect(database.select().from(muscleGroups)
+        .where(eq(muscleGroups.id, id)).get()).toMatchObject({ localDirty: false });
+    }
 
     const restoredMapping = database
       .select()

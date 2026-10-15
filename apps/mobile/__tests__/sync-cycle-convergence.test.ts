@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm';
 import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { gyms, sessions, syncRuntimeState } from '@/src/data/schema';
+import { CURRENT_APP_VERSION } from '@/src/data/exercise-catalog-seeds';
 // Bound to the stubbed bootstrap/supabase modules below; babel-jest hoists the
 // jest.mock calls above every import so the cycle resolves the stubs.
 import {
@@ -75,6 +76,10 @@ beforeEach(() => {
   __resetCycleErrorSignalForTests();
   fixture = createInMemoryDatabase();
   database = fixture.database;
+  database.insert(syncRuntimeState).values({
+    id: PRIMARY_RUNTIME_STATE_ID,
+    appliedSeedMigrationAppVersion: CURRENT_APP_VERSION,
+  }).run();
   mockBootstrapState.database = database;
   mockRpc.mockReset();
   mockLogEvent.mockReset();

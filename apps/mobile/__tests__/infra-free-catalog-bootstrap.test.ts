@@ -14,6 +14,7 @@ import { maintainInfraFreeStarterCatalog } from '@/src/data/infra-free-catalog-b
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
+  muscleGroups,
   syncRuntimeState,
 } from '@/src/data/schema';
 
@@ -45,7 +46,14 @@ describe('infra-free starter catalog bootstrap', () => {
     expect(fixture.database.select().from(exerciseMuscleMappings).all()).toHaveLength(
       SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length
     );
+    expect(fixture.database.select().from(muscleGroups).all()).toHaveLength(25);
     expect(readSeedsAppliedMarker(asLocalDatabase(fixture))).toBe(CURRENT_APP_VERSION);
+    expect(fixture.database.select().from(muscleGroups)
+      .where(eq(muscleGroups.id, 'tibialis_anterior')).get()).toMatchObject({
+      displayName: 'Tibialis Anterior',
+      familyName: 'Lower Legs',
+      localDirty: true,
+    });
   });
 
   it('uses generation 2 migration for a marker-1 install without overwriting renamed or edited/extra mapping data', () => {
