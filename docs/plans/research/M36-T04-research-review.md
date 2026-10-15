@@ -1,89 +1,134 @@
-# Strength amplitude with RIR and load uncertainty
+# Estimating strength from repetitions, load and reported RIR
 
-> Historical results below use the completed T04 reporting model. The owner-approved exact-zero/Gaussian follow-up assumptions are recorded in the [validation contract](M36-T04-validation-contract.md#historical-gaussian-follow-up-assumptions--2026-10-15); these original results are retained; the separate [revalidation](M36-T04-exact-zero-revalidation.md) records new runs rather than replacing their assumptions.
+BoGa research paper · 2026-10-15
 
-> Current implementation and revalidation use the [conditional three-point revision](M36-T04-three-point-revalidation.md); the original and intermediate Gaussian results remain historical.
+## Abstract
 
-## Revised two-approach contract
+We compare two ways to fit BoGa's adopted repetitions–load curve: hold observational uncertainty fixed, or estimate it jointly with strength. The curve has one free parameter, total 1RM S. Positive logged RIR has conditional three-point uncertainty; logged RIR 0 is exact. Load discrepancy is modelled separately. Synthetic experiments recover S under matching assumptions but identify RIR accuracy much less precisely. Session dependence and misspecified errors can invalidate uncertainty. A separate regression benchmark examines changes in curve amplitude; operational structural-break inference remains research.
 
-The owner added uncertainty from discrete gym load choices: **1.25 kg per-side entry SD and 2.50 kg total-load entry SD**. These are per-observation SDs, rather than the standard error of a sample mean. Existing loading semantics give total-load SD F×entrySD: 2×1.25=2.50 kg for a per-side entry, or 1×2.50=2.50 kg for a total-load entry. One logged per-side value controls both sides; there is no independent-side variance calculation or second scaling. Dated bodyweight contribution remains the existing fixed context.
+## Observations and curve
 
-**Fixed uncertainty** fits latent total 1RM S while holding RIR sigma at 1 rep and total-load tau at 2.50 kg. **Joint estimation** fits S, RIR sigma and total-load tau together. Both use the adopted unit-load kernel f and identical observations/prior/likelihood. Predicted load is S/f(m+r); S alone changes curve amplitude, never curve shape. Keep S distinct from observed analytical RM A and the approved independent reference M. Logged weight and existing actual-rep metrics stay exact and unchanged.
+For each qualifying set, retain performed repetitions m, logged RIR n, total calculated load L, exercise/gym identity, session time/order and loading/bodyweight context. Preserve logged values and existing metrics. Population and missing-effort handling follow [[1rm.curve-population]]; analytical equivalence follows [[1rm.curve-effort]]. Missing effort is not inferred from a target or treated as zero. Independent sessions, rather than individual sets, are the primary replication units.
 
-Load discrepancy represents a continuous curve's mismatch with available loads, not unknown plate mass. A centred Gaussian/truncated-normal proxy and independence of RIR/load errors are initial research assumptions. The specified SD does not determine a plate-step width or selection bias; do not add a second rounding variance to the primary model. A separately labelled nearest 2.5 kg-rounded stress tests additional quantisation. Joint tau can absorb fatigue, task variation or curve misspecification as well as gym granularity; it cannot identify those causes separately.
+Define f(u) as the existing `estimateOneRepMax(1, u)` kernel under [[1rm.formula]]. Given actual RIR r, the predicted total load is
 
-The [validation contract](M36-T04-validation-contract.md) records this revision before evaluating it. The earlier tau 1 kg result/approval proposal is superseded. T04 research is accepted and complete; the owner accepted these research limits and exact shared-wave freezing by requesting continuation; T05 design may begin. Production behaviour, main and the fixed reference contract are untouched.
+```text
+mu(S, m, r) = S / f(m + r),    S > 0.
+```
 
-## Paired recovery and uncertainty
+Only S changes the curve amplitude. The adopted shape and single-repetition branch remain intact under [[1rm.formula]]. Candidate repetition counts must be positive safe integers. Bodyweight and per-side/total loading resolve through existing calculation functions, not an alternative formula.
 
-The [strength/error script](M36-T04-strength-error-validation.ts) uses the existing uniform latent integer-RIR 0–4 prior and recorded max(0,round(r+normal error)), with no upper clamp or filtering by n/u. Primary recovery uses the first ordinal chosen before generating observations, once per independent completed session in a constant-S window. Support 1–10 only restricts prior reference M. Three-set dependence is a separate sensitivity.
+Distinguish three quantities: latent strength S, observed analytical RM A evaluated at logged m+n, and the independent historical reference M governed by [[1rm.curve-reference]]. Descriptive load residuals against M are L−M/f(m+n), or 100 times that difference divided by the prediction. These are not latent-strength errors or independent evidence of a break. A point fitted to its own A has zero residual by construction.
 
-Counts 12/16/24/48 × true RIR sigma 0/.5/1/2 use 400 evaluation repetitions each, all at true total-load SD 2.50 kg. Separate 400-repetition calibration cells calibrate fixed cutoffs and conservative joint profile cutoffs across that RIR family. Joint profiles maximize over the other two parameters, on load-SD grid .5/1.25/2.5/3.75/5/7.5 kg. Twelve stresses use 200 repetitions: off-grid S/RIR/load truth, true load SD 5 assumed 2.5 versus explicit 5, plate rounding, wrong/wave priors, high reps, reporting bias, serial errors, varying strength and independent/dependent three-set histories. Total 6,400 calibration and 8,800 evaluation datasets; seeds and paired raw results are retained locally.
+## Conditional RIR and load model
 
-| True RIR sigma;24 sessions, true load SD 2.5 kg | Fixed 1RM RMSE | Joint 1RM RMSE | Fixed / joint S interval coverage |
-| --- | ---: | ---: | ---: |
-| 0 | 0.697 kg | 0.639 kg | 99.0% / 97.0% |
-| 0.5 | 0.716 kg | 0.696 kg | 98.0% / 95.8% |
-| 1 | 0.755 kg | 0.771 kg | 98.8% / 97.5% |
-| 2 | 0.977 kg | 0.933 kg | 92.8% / 96.8% |
+Let p be the probability that a positive logged RIR reading has zero error. The initial value is p=0.50; the joint approach may estimate p in [0,1]. Both extremes always have equal probability.
 
-At the owner's matching uncertainties both recover strength similarly: fixed RMSE 0.755 kg versus joint 0.771 kg. Joint RIR-SD RMSE is 0.392 reps; load-SD RMSE 0.813 kg. Their separate profile interval coverage is 94.8% and 95.5%; these are marginal, not a simultaneous three-parameter confidence region. Correctly fixed uncertainties are oracle information; joint fitting need not outperform them.
-
-All reported coverage is conditional on the declared generator and finite grid. Calibration is at true tau 2.50 kg; other load scales are stresses, not independently calibrated policies. Failure/coverage use all repetitions; finite-fit bias/RMSE are conditional. Actual Monte Carlo SE, widths, disconnected profiles and unresolved endpoints are retained for all three parameters. Near 95% with 400 repetitions rate SE is about 1.1 percentage points; a zero observed rate is not proof of zero probability. A single .25 kg versus .5 kg strength-grid diagnostic changes the upper endpoint by 0.015 kg and not its 100 kg optimum, while keeping the nuisance grids fixed. It establishes no global convergence or nuisance-grid accuracy.
-
-With true load SD 5 kg but fixed assumption 2.5 kg, strength coverage is 79.0% fixed versus 96.0% joint. However, 37.0% of joint load intervals reach an unresolved grid endpoint: apparent coverage is not a finite reliable noise estimate. With a wrong high-RIR prior, S bias is -1.558/-2.072 kg and coverage 55.0%/44.0%. Learning both scales does not fix a wrong effort population.
-
-For shared errors, first-set coverage 97.0%/96.5% drops to 83.0%/84.5% when the three set rows are incorrectly treated as independent. Fixed sigma 0 still cannot explain recorded RIR above 4: 86.3% of 24-session sigma 1 samples are no-fit, count as uncovered, and are never clamped/deleted. A changing-S window is explicitly compared with its initial S(t₀), not a legitimate single constant-S truth. Exact deterministic copies are profile diagnostics only; load density can diverge toward zero SD. A lower .5 kg grid optimum is an unresolved bound, not a measured noise floor or proof of accurate effort. Impossible scores remain explicit `-Infinity`.
-
-## Amplitude-break research at the revised load scale
-
-The [regression script](M36-T04-amplitude-regression-validation.ts) isolates known S(t) through RIR 0 singles, so load SD 2.50 kg is exactly amplitude observation SD; RIR is known in this benchmark. Constant/linear/quadratic trajectories and one-jump/one-hinge changes all vary S(t), never f. Another stress adds RIR/load error and changing rep populations to observed A; it cannot be interpreted automatically as latent S(t).
-
-The complete two-form/cut/prefix 12/16/24/48 search is recalibrated on 400 separate null-family repetitions, at cutoff 10.018403. Minimum 8 independent sessions per side yields no search at 12, and only one possible cut at 16 (exact midpoint localisation there comes from the constraint). Thirty primary cells use 400 evaluations and ten stresses 200, totaling 14,000 evaluations. The smooth quadratic competitor remains intentionally conservative.
-
-| Known amplitude change; load SD 2.50 kg |16 sessions |24 sessions |48 sessions |
-| --- | ---: | ---: | ---: |
-| +2.5 kg level jump | 0.5% | 2.5% | 8.2% |
-| +5 kg level jump | 3.5% | 11.8% | 60.0% |
-| +10 kg level jump | 30.5% | 79.0% | 99.8% |
-| +0.5 kg/week slope increase | 0.0% | 0.5% | 1.8% |
-| +1 kg/week slope increase | 0.0% | 0.8% | 18.0% |
-
-Independent 48-session null flag rates are 0.8% stable, 0.8% linear, 1.2% smooth, including earlier prefixes. Serial errors raise flags to 16.5%; dependent session medians give 0.0%, naive set rows 28.5%. Output distinguishes misses, unconditional detection/form rates and conditional form accuracy. Earlier-only forecasts are retained; BIC or visual changes do not supply significance.
-
-Retrospective wild bootstrap redoes the whole search with session signs or four-session block signs. Across 80 independent histories, false flags are 6.3%/5.0%; across 80 serial histories 56.3%/25.0% (199 bootstrap draws per method/history). This remains too unreliable for production; block choice and serial inference are open research. Minimum-segment 6/10 stresses reuse the 8-session cutoff and are not calibrated policies.
-
-Separate-seed known-form date/effect intervals use 97.5% marginal error radii across declared effect sizes. They are conditional on known form and matched independence, not post-selection latent-strength intervals. At 24 sessions a +5 kg jump has 96.8% known-form joint coverage; a long gap drops to 23.5%, and outside-search cuts to 5.5%. Gap dates remain between observations, not precise inferred days. Direct joint segmented S(t)/RIR/load-noise inference and production detection remain deferred.
-
-## Historical limits and unchanged wave
-
-The [history/oracle replay](M36-T04-history-and-oracle-review.ts) reuses the already-authorised Zercher Squat and Dumbbell Bench Press snapshot. No new remote query or account is accessed; raw records remain local. Six exercise/gym cohorts have 1–7 evaluated sessions, insufficient for the declared break search. Bench's only supported reference remains 60.636 kg total. Its observed-A mean 53.366 kg, descriptive slope−0.0574 kg/week and 8.30 kg residual scatter do not establish physiology or calibrated uncertainty.
-
-Choosing the first performed working ordinal before effort availability leaves at most one known-effort first set per cohort; no later set substitutes for missing first effort. Both approaches use those same points; fixed uses 2.5 kg total-load SD and joint profiles both noise scales. Every available one-point joint load maximum hits the .5 kg lower search boundary, demonstrating inadequate identification rather than estimating gym error. Imported effort provenance remains uncertain. No fitted S supplies a missing M.
-
-The existing synthetic weekly wave and [numerical oracle](../../../apps/mobile/__tests__/fixtures/rm-curve-weekly-wave-oracle.json) are frozen under generic test-fixture names: SHA256 `1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce`. Only the provisional flag and oracle approval metadata changed; every programme input and numerical expectation is preserved. The replay preserves all 24 completed prefixes for plateau, stable and smooth controls; fixed six-prior M100; five-prior M unavailable; stable session-median 99 kg (set fatigue); smooth endpoint 122.76 kg. This primary programme has no invented single physiological S(t) truth.
-
-First Strength sets at weeks 2/6/10/14 hold 80.625679 kg while RIR follows 1/1/2/3: analytical RM100/100/102.935948/105.818232 kg, existing actual-rep 1RM97.017347 kg. Week 18 raises load to 85.316668 kg at RIR 1 and retains analytical 105.818232 kg; week 22RIR 2 gives 108.925000 kg. These exact logged/kernel equivalences are unchanged by uncertainty assumptions and prove no structural break. The owner approved the exact input/oracle freeze on 2026-10-14.
-
-## Release decision, reproduction and checks
-
-The proposed first chart still uses known-RIR m+n observations, approved load coordinates/logged details and independent six-prior reference M. Both uncertainty approaches and all weekly fitted-amplitude/break inference remain research; there is no fallback, production confidence copy or statistical-strength conclusion. Human research/product review and exact fixture freezing are recorded on 2026-10-14; design still needs its separate human approval. True-RIR prior, empirical provenance, centred/independent noise assumptions, quantisation likelihood, nuisance-grid refinement, heteroskedastic effort error and serial inference remain research limitations.
-
-In the leased worktree run each TypeScript script with `apps/mobile/node_modules/.bin/tsx --tsconfig apps/mobile/tsconfig.json`; no arguments gives full strength/regression output, `--quick` is development-only. History replay uses `TZ=Europe/London`, the existing authorised local snapshot and T03 replay results. The Matplotlib 3.9.4/NumPy 2.0.2 plotting script reads full JSON and implements no RM formula. Evidence under `apps/mobile/artifacts/research/m36-t04/` includes final JSON, figures, gate logs and review; previous tau 1 results are separately archived locally. Private data stays gitignored/chmod 600; the tracked oracle is synthetic only.
-
-The prior gate agreement persists for this research/test-only revision: `fast`, `jest-coverage`, `complexity`, `dependencies`, `docs-check`. Focused tests now also verify per-side/total/BW parity, both noise-profile axes against the scalar likelihood and lower/upper load boundaries. Simulation/oracle consistency assertions pass. Three shared-fixture Jest cases additionally check held-load RIR progression, all 72 completed-prefix expectations and retained observations with insufficient prior support. No production source, schema, dependency, metric or UI change is made.
-
-## Checks and review
-
-The session's agreed research/test-only gates ran locally on the finished revision. Production thresholds and baselines are unchanged; no UI/backend slow lane is required for this delta. No test duration is asserted.
-
-| Local gate | Result | Raw artifact |
+| Logged RIR n | Actual RIR r | Conditional probability |
 | --- | --- | --- |
-| `./boga test fast` | PASS: 279 suites/3,859 tests plus docs/meta/backend-fast/consent/MCP checks | `fast.log` |
-| `./boga test jest-coverage` | PASS: 86.45% branches/94.35% lines | `jest-coverage.log` |
-| `./boga test complexity` | PASS | `complexity.log` |
-| `./boga test dependencies` | PASS: 513 modules/2,568 dependencies, 13 existing known violations unchanged | `dependencies.log` |
-| `./boga test docs-check` | PASS | `docs-check.log` |
-| Full strength/regression/history/oracle runs | PASS consistency assertions; statistical limitations retained above | final JSON outputs/logs |
+| 0 | 0 | 1 |
+| n > 0 | n−1 | (1−p)/2, initially 0.25 |
+| n > 0 | n | p, initially 0.50 |
+| n > 0 | n+1 | (1−p)/2, initially 0.25 |
 
-Independent code/statistical review of the revised models and subsequent fixture-freeze delta is clean; product-facts verdict: clean. The reviewer reconciled unit conversion, three-axis profile calibration, numerical tables, unresolved noise bounds, sparse historical support and both figures with the revised evidence. Reports are `independent-review.txt` and `freeze-review.txt`; the older tau 1 review is separately archived and does not substitute for it. No production facts change. Research acceptance and exact fixture freezing are complete; no merge or design approval is implied.
+Thus logged 1 permits actual 0, 1 or 2. A true failure may be logged 1, while a logged zero always means no further repetition was possible at that load. Exact RIR does not establish exact S or imply that another load could not produce a different RM equivalent. Load/performance discrepancy remains at RIR 0.
+
+For positive readings, E[r|n]=n and Var(r−n|n)=1−p; initial RIR error SD is sqrt(0.5), approximately 0.707 repetitions. The initial model shares p across positive readings. Its ±1 support, symmetric tails and exact-zero reliability are assumptions to test, not measured properties of the available histories. The likelihood is conditional on logged n; no additional latent-RIR prior or likelihood for the frequency of logged readings is included.
+
+Conditional on each actual-RIR state, L follows a Gaussian with location mu and scale tau, truncated to nonnegative loads:
+
+```text
+g(L | mu, tau) = phi((L−mu)/tau) / [tau × Phi(mu/tau)],    L >= 0, tau > 0.
+```
+
+Here phi and Phi are the standard normal density and distribution functions. Truncation means mu is the untruncated location, not exactly the truncated expectation. Logged Weight stays exact. This discrepancy represents variation around the curve and discrete load choices; it does not assert uncertainty in the mass of a plate or isolate gym granularity from fatigue or model error.
+
+The fixed load SD is 1.25 kg for a per-side entry and 2.50 kg for a total-load entry. Existing semantics give total-load SD F times entry SD: 2×1.25=2.50 kg or 1×2.50=2.50 kg. One entered per-side value controls both sides. There is no independent-side variance calculation, second scaling or additional primary rounding variance. Dated bodyweight is fixed context; chart coordinates remain governed by [[1rm.curve-load]].
+
+## Estimation and identification
+
+For each observation i, let R(n_i) and w(r|n_i,p) be the states and probabilities above. The conditional log likelihood is
+
+```text
+ell(S,p,tau) = sum_i log [sum_{r in R(n_i)}
+                         w(r|n_i,p) × g(L_i | S/f(m_i+r), tau)].
+```
+
+Both approaches minimize negative ell on identical observations:
+
+| Approach | Estimated parameters | Fixed parameters |
+| --- | --- | --- |
+| Fixed uncertainty | S | p=0.50; total-load tau=2.50 kg |
+| Joint estimation | S, p, tau | Adopted curve shape, equal tails and RIR support |
+
+This is a mixture-likelihood objective, not ordinary least squares on RIR-normalized RM. Its density normalization and mixture weights matter. Even the mixture's expected load generally differs from the curve at m+n because inversion of the adopted kernel is nonlinear. Simulation therefore draws an actual-RIR component before drawing load.
+
+Nuisance profiles maximize over the other parameters. Probability bounds 0/1 are finite physical endpoints; S/tau search boundaries remain unresolved when a profile reaches them. Retain disconnected profile components and interpolate crossings between grid scores. All-zero histories contain no p information. Positive readings may also contain no p information where the adopted kernel saturates. A numerical profile span ≤1e−10 suppresses the p estimate/interval while retaining the raw scores; it is a floating-point diagnostic, not a sufficient-data rule. A boundary optimum or broad [0,1] interval does not establish accurate effort reporting.
+
+## Simulation design
+
+Primary strength recovery uses one prespecified first ordinal per independent completed session in a constant-S window. Select it before outcomes; missing first effort does not trigger substitution of a later set. Generate logged n from a declared design, draw r|n, then draw load from its truncated component. Matching cells use logged integers 0–4 uniformly, m cycling through 2/4/6, S=100 kg and tau=2.50 kg.
+
+Use 12/16/24/48 sessions and true p=0/0.5/0.75/1, with 400 calibration and 400 separate evaluation replications per cell. Joint profile cutoffs use the worst matching p-cell quantile at true tau=2.50 kg. Evaluate 19 stress cells, including off-grid truth, with 200 replications each: load-scale errors, rounding, logged-RIR designs, rep range, asymmetric/wider errors, false-zero labels, dependence/fatigue, changing S and information-poor designs. Correlated categorical stress draws use a Gaussian copula; the RIR marginal distribution remains three-point.
+
+Full evidence comprises 6,400 strength-calibration datasets, 10,200 strength evaluations in 35 cells and 14,600 regression evaluations in 43 cells. Calibration and evaluation seed families are unique and disjoint. The strength grid is 80–120 kg by 0.5 kg, p has 13 candidates including both endpoints, and tau uses 0.5/1.25/2.5/3.75/5/7.5 kg. These are finite-grid research approximations, not globally converged optimizers.
+
+Report finite-fit bias/RMSE separately from unconditional coverage and failures, plus Monte Carlo standard errors, widths, no-information counts, both p endpoint rates, disconnected components and unresolved boundaries. Intervals are conditional on the simulated family and calibration policy; arbitrary histories/load scales have no confidence guarantee.
+
+## Strength results
+
+The following cells have true S=100 kg, p=0.50 and tau=2.50 kg, with 400 independent evaluation replications each.
+
+| Independent sessions | Fixed S RMSE kg | Joint S RMSE kg | Fixed / joint S interval coverage |
+| --- | ---: | ---: | ---: |
+| 12 | 1.057 | 1.164 | 93.00% / 94.50% |
+| 16 | 0.904 | 0.931 | 93.75% / 97.00% |
+| 24 | 0.752 | 0.770 | 93.75% / 95.00% |
+| 48 | 0.485 | 0.478 | 95.75% / 97.00% |
+
+At 24 sessions joint S bias is −0.006 kg (Monte Carlo SE 0.039 kg). Joint p RMSE is 0.358 and mean profile-set width is 0.946 on a possible range of 1; its optimum reaches 0/1 in 12.75%/22.50% of runs. At 48 sessions p RMSE remains 0.296 and mean width 0.862. S can be estimated more precisely than RIR accuracy. Joint tau RMSE at 24 sessions is 0.581 kg; marginal p/tau profile coverage is 98.25%/97.00%, not simultaneous coverage of all parameters. A rate near 95% with 400 replications has Monte Carlo SE about 1.1 percentage points; each output retains its actual SE. No numerical S fit fails in any evaluated cell.
+
+All-zero and saturated positive-RIR designs suppress p estimates/intervals in 200/200 runs each while retaining S/tau profiles. Logged-1-only data include actual failure: fixed/joint S RMSE is 0.796/0.861 kg and coverage 95.5%/93.0%. Matching-population cutoffs are not separately calibrated for these conditional designs. Correctly fixed nuisance values supply information that joint estimation must learn; joint fitting need not improve S recovery.
+
+| Stress; 24 sessions, 200 replications | Fixed / joint S interval coverage |
+| --- | ---: |
+| Load SD 5 kg, fixed assumption 2.5 kg | 66.5% / 97.0% |
+| Asymmetric RIR errors | 70.0% / 79.5% |
+| Serial categorical errors | 81.0% / 84.0% |
+| False-zero labels | 36.5% / 85.5% |
+| Errors outside ±1 | 77.5% / 99.0% |
+| Shared-session errors, first set only | 95.0% / 95.5% |
+| Shared-session errors, naive use of every set | 74.0% / 78.5% |
+| Changing S, coverage of initial S | 0.0% / 3.0% |
+
+Joint fitting can absorb some violations without validating their assumed support or mechanism. Broad coverage under wider errors is not evidence that ±1 is correct. A changing-strength window violates the constant-S estimand.
+
+## Structural-break methodology
+
+A break concerns the curve parameter S over time, not a change in curve shape. The implemented isolated benchmark uses known-RIR0 singles on a weekly synthetic grid, where f(1)=1 and Gaussian load SD 2.50 kg is also amplitude observation SD. It compares constant, linear and quadratic no-break trajectories with searched linear-plus-jump and linear-plus-hinge alternatives. Mixed-RIR/composition/false-zero/logged-1 stresses target observed analytical amplitude A and cannot automatically establish latent S(t).
+
+For each admissible cut k, fit the jump and hinge by regression. With RSS_Q for the quadratic competitor and RSS_B for the best cut/form, the nonnegative search statistic is (RSS_Q−RSS_B)/(RSS_Q/N). An unusably small RSS_Q or insufficient segment support yields no result. Cuts occur between distinct completed-session times, with at least eight sessions on each side. Maximize over the declared 12/16/24/48 prefixes, then calibrate that complete search against the constant/linear/quadratic null family on separate seeds. This accounts for the declared family only; arbitrary repeated weekly monitoring remains unvalidated.
+
+The full benchmark gives cutoff 10.018403233720234. At 48 sessions stable/linear false flags are 0.75% each and quadratic false flags 1.25%. A +5 kg level jump is detected in 11.75% of 24-session runs and 60.0% at 48. A +0.5 kg/week hinge is detected in only 0.5%/1.75%: a smooth quadratic competitor makes this alternative difficult to distinguish. Serial errors give 16.5% false flags at 24 sessions; naive correlated sets give 28.5%. Eight-per-side is a research search constraint, not an empirically sufficient sample size. Separate-seed known-form date/effect intervals are not post-selection guarantees. For a +5 kg jump at 24 sessions, their joint date/effect coverage is 96.75% in 400 runs, versus 23.5% with a long gap and 5.5% for a cut outside the search in 200 runs each. Gaps constrain dates to intervals between observations.
+
+Retrospective wild bootstrap reruns the complete observed-prefix search with single-session or four-session-block signs. With 199 draws per method and 80 histories per error design, independent-history false flags are 6.25%/5.0%, but serial-history false flags are 56.25%/25.0%. These attempted dependence corrections are unreliable in that stress and do not validate operational inference.
+
+Direct segmented conditional-likelihood fitting of S(t) with RIR/load uncertainty is exploratory work, separate from that RSS benchmark. The adopted direction is relative likelihood evidence to control the future candidate curve's emphasis. A candidate statistic is D=2(max ell_break−max ell_no-break), comparing the same observations and comparable error assumptions. Which nuisance parameters may vary by regime, search adjustments, adequate information, useful effect sizes and the evidence-to-emphasis mapping still require validation. D is neither a posterior break probability nor a point-membership probability. A second line or visually apparent shift is not proof of a statistically reliable break. The production chart makes no such assertion.
+
+## Workout data and weekly progression
+
+Read-only replay uses the authorized local Zercher Squat and Dumbbell Bench Press snapshot. Raw records remain private. Six exercise/gym cohorts have 1–7 evaluated sessions and at most one known-effort prespecified first set each; available efforts are positive. Sparse one-point profiles do not measure p/tau, lower load-grid optima are unresolved, and no cohort supports eight sessions on each side of a break. These histories cannot validate the error distribution or a physiological strength change.
+
+The frozen weekly programme includes plateau/repeated-exposure progression plus stable and smooth controls. Held-load Strength exposures follow RIR 1/1/2/3; a later load increase returns to RIR 1 at the same analytical RM equivalent. This illustrates how additional reserve can signal progress before another load increment, subject to RIR uncertainty. All 72 descriptive prefixes, the six-prior reference of 100 and unavailable five-prior reference reconcile with the frozen oracle. They are logged/kernel equivalences, not a known physiological S(t) trajectory or proof of a break.
+
+## Reproduction and verification
+
+Use the [strength/error script](M36-T04-strength-error-validation.ts), [regression script](M36-T04-amplitude-regression-validation.ts) and [history/oracle replay](M36-T04-history-and-oracle-review.ts) when reproducing results. Run each with worktree-local `apps/mobile/node_modules/.bin/tsx --tsconfig apps/mobile/tsconfig.json`; no arguments produces full simulation output, and --quick is development-only for strength/regression. History replay requires TZ=Europe/London and the authorized local inputs. Method checks in `M36-T02-residual-regression-checks.ts` accept --correct-probability=<0..1>. The [figure script](M36-T04-statistical-figures.py) reads full strength/regression JSON and contains no RM formula.
+
+Matching numerical evidence was generated from research code at commit `3add201e2fa930fec475affc3a0d5034e740a373`. Restricted local JSON, figures, logs, independent review and SHA256 manifest are under `apps/mobile/artifacts/research/rm-curve-three-point/`. Frozen fixture SHA256 is `1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce`. Raw account data is not committed.
+
+Seeded method checks at p=0/0.5/0.75/1 pass. An independent Python math.erfc oracle verifies 81 conditional-mixture parameter cells, 243 point-load density evaluations and 162 scalar/grid comparisons, including low loads and p endpoints; maximum absolute log-likelihood difference is 3.372e−11. Independent Codex source/product, numerical and figure review is clean. Completed code gates: fast 286 suites/3,931 tests; coverage 86.56% branches/94.41% lines; complexity and dependencies pass, with 13 unchanged known dependency violations. Documentation consolidation is checked separately; numerical code and results are unchanged.
+
+## Limitations and scope
+
+The ±1 bound, equal and constant tails, exact-zero reliability, load discrepancy and session independence require adequate empirical validation. Parameter recovery under the declared generator does not establish real-user calibration. Keep both fixed and joint approaches available, with weak identification and unresolved boundaries visible. The first-release chart remains descriptive under [[1rm.curve-scope]]; latent-strength inference, structural-break decisions and evidence-driven curve emphasis remain research work.

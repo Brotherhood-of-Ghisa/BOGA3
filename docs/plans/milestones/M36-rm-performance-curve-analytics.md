@@ -28,7 +28,7 @@ Reuse [[1rm.formula]], [[set.performed]] and [[set.eligibility]], the kernel and
 
 Order: **Research → Empirical validation → Design → Implementation and testing → UI exposure**. Research findings do not decide an open product fact or alter an accepted one. T01's first-deliverable effort/reference/load-coordinate rules are approved in [[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-reference]] and [[1rm.curve-load]]. The owner accepted T04's research limitations and frozen fixture on 2026-10-14; T05 may begin. Unsupported real-data evidence must be reported honestly and its limitations accepted.
 
-The owner's two research approaches account for RIR and discrete-load uncertainty: fixed RIR SD 1 rep/load SD 1.25 kg per-side or 2.50 kg total, versus joint estimation of 1RM and both noise scales. 1RM remains the only curve parameter; noise scales do not alter its shape or logged values. T04's [validation contract](../research/M36-T04-validation-contract.md) records units, assumptions and limits; these experiments authorise no production statistical feature.
+The two research approaches use exact logged RIR 0 and conditional three-point uncertainty for positive readings: initially 25%/50%/25%, with the central probability estimable and equal tails. Fixed uncertainty fits 1RM at p=0.50 and total-load SD 2.50 kg; joint estimation fits 1RM, p and load SD. Per-side entry SD 1.25 kg scales once. The [research paper](../research/M36-T04-research-review.md) contains the current model and matching results; the [validation contract](../research/M36-T04-validation-contract.md) governs checks. Only 1RM changes curve amplitude; no production statistical feature follows.
 
 ### D3. First release is the observed-set scatter and reference overlay
 
