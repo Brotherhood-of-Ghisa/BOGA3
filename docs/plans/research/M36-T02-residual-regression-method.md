@@ -1,5 +1,7 @@
 # Exploratory session residual regression and validation plan
 
+> Historical method/results below describe the original T02 model. The current helper and numerical checks use the [exact-zero Gaussian revision](M36-T04-exact-zero-revalidation.md), with separately recorded validation; the original numerical claims are not outputs of that revised model.
+
 Prepared from T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`. The research specification and small method checks are delivered for review; **human analytical approval of this validation plan remains pending**. T02 is not complete until that approval and its agreed code/review gates pass. T03 provenance work and T04 reliability validation have not been executed. The work remains on the experimental stacked branch; no production detector, statistical dependency, route or product default follows from this document.
 
 ## Inputs and analysis unit

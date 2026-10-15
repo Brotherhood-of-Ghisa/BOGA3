@@ -6,7 +6,7 @@ import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculation
 import { isWorkingSet } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '../../../apps/mobile/src/exercise-calculations/effort-policy.ts';
 import { priorCurveReference, projectCurveHistory, curveScopeKey, type CurveHistoryRow } from '../../../apps/mobile/__tests__/helpers/curve-history-research.ts';
-import { fitRegression, median, scanBreaks } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
+import { fitRegression, median, RIR_REPORTING_MODEL, scanBreaks } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
 import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileSet } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
 
 assert.equal(process.env.TZ, 'Europe/London');
@@ -86,13 +86,14 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
       linear: fitRegression(responses, 'linear'), quadratic: fitRegression(responses, 'quadratic'),
       searchedCandidates: scanBreaks(responses, 8).length } : null,
     relativeLikelihood: points.length ? (() => {
-      const { cube, strengthProfile, sigmaProfile, loadProfile } = jointUncertaintyProfiles(points, strengthAxis, sigmas, loadSds);
+      const { cube, strengthProfile, sigmaProfile, loadProfile, positiveRirObservations } = jointUncertaintyProfiles(points, strengthAxis, sigmas, loadSds);
       const grid = cube[loadSds.indexOf(2.5)], loadMaximum = profileSet(loadSds, loadProfile, 0);
       return { fixedTotalLoadSd: 2.5, enteredLoadSds: DEFAULT_ENTRY_LOAD_SD_KG, strengthAxis, sigmas, loadSds,
         fixedSigma1Profile: grid[sigmas.indexOf(1)], strengthProfile, sigmaProfile, loadProfile,
         fixedMaximum: profileSet(strengthAxis, grid[sigmas.indexOf(1)], 0)?.estimate ?? null,
         jointMaximum: profileSet(strengthAxis, strengthProfile, 0)?.estimate ?? null,
-        jointSigmaMaximum: profileSet(sigmas, sigmaProfile, 0)?.estimate ?? null,
+        positiveRirObservations, sigmaUnidentified: positiveRirObservations === 0,
+        jointSigmaMaximum: positiveRirObservations ? profileSet(sigmas, sigmaProfile, 0)?.estimate ?? null : null,
         jointTotalLoadMaximum: loadMaximum?.estimate ?? null,
         loadGridBoundary: loadMaximum?.lowerBoundary || loadMaximum?.upperBoundary };
     })() : null,
@@ -100,6 +101,6 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
 });
 assert.ok(historical.every((h: any) => h.analyticalRegression === null || h.analyticalRegression.searchedCandidates === 0));
 assert.equal(historical.find((h: any) => h.referenceRm !== null).independentSessions, 7);
-console.log(JSON.stringify({ fixtureSha256, freezeStatus: 'owner-approved and frozen 2026-10-14',
+console.log(JSON.stringify({ rirReportingModel: RIR_REPORTING_MODEL, fixtureSha256, freezeStatus: 'owner-approved and frozen 2026-10-14',
   oracle, plateauProgression, referenceOracle, historical, limits: 'Private snapshot stays local; anonymized cohort labels do not verify effort provenance.' },
   (_, value) => value === -Infinity ? '-Infinity' : value, 2));

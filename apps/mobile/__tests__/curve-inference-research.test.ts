@@ -35,6 +35,22 @@ describe('research amplitude/error comparison', () => {
     expect(() => jointUncertaintyProfiles(points, strengths, rirs, [0])).toThrow();
   });
 
+  it('anchors failure-set strength while leaving RIR dispersion unidentified and load discrepancy nonzero', () => {
+    const multipliers = Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, 6 + r)!);
+    const load = 100 / multipliers[0];
+    const points = [-2.5, 0, 2.5].map(error => ({ load: load + error, recordedRir: 0, multipliers }));
+    const fit = jointUncertaintyProfiles(points, [95, 100, 105], [0, 0.5, 1, 2], [1.25, 2.5, 5]);
+    expect(fit.positiveRirObservations).toBe(0);
+    expect(fit.sigmaProfile.every(score => score === fit.sigmaProfile[0])).toBe(true);
+    expect(profileSet([95, 100, 105], fit.strengthProfile, 0)!.estimate).toBe(100);
+    expect(jointLogLikelihood(points, 100, 0, 2.5)).toBe(jointLogLikelihood(points, 100, 5, 2.5));
+    // The prior mass of r=0 is constant; a failure reading cannot be explained by another latent RIR.
+    const singles = points.map(point => ({ ...point, multipliers: [multipliers[0]] }));
+    expect(jointLogLikelihood(points, 100, 1, 2.5)).toBeCloseTo(
+      jointLogLikelihood(singles, 100, 1, 2.5) - points.length * Math.log(5), 10);
+    expect(fit.loadProfile.every(Number.isFinite)).toBe(true);
+  });
+
   it('retains the adopted single-rep amplitude and scores a truncated Gaussian with a known latent RIR', () => {
     expect(estimateOneRepMax(1, 1)).toBe(1);
     const points = [{ load: 2, recordedRir: 0, multipliers: [1] }];

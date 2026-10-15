@@ -1,7 +1,7 @@
 // Paired research simulations; no runtime consumer or production inference.
 import assert from 'node:assert/strict';
 import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculations/index.ts';
-import { jointLikelihoodGrid, jointLogLikelihood, recordedRirFromLatent, seededRandom,
+import { jointLikelihoodGrid, jointLogLikelihood, recordedRirFromLatent, RIR_REPORTING_MODEL, seededRandom,
   type JointRirPoint } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
 import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileContains, profileSet, upperQuantile,
   type ProfileResult } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
@@ -16,7 +16,8 @@ const fixedLoadSd = DEFAULT_ENTRY_LOAD_SD_KG.total_load, loadSds = [0.5, 1.25, 2
 const seedFor = (base: number, replication: number) => (base ^ Math.imul(replication + 1, 0x9e3779b1)) >>> 0;
 type Scenario = { name: string; n: number; sigma: number; strength?: number; loadSd?: number;
   assumedLoadSd?: number; sets?: number; shared?: boolean; serial?: boolean; rounding?: boolean;
-  reportingBias?: number; prior?: 'high' | 'phase'; highReps?: boolean; trend?: boolean };
+  reportingBias?: number; prior?: 'high' | 'phase' | 'zero' | 'positive' | 'zero-to-positive'; highReps?: boolean; trend?: boolean;
+  falseZero?: boolean; missedZero?: boolean };
 
 function generate(scenario: Scenario, seed: number) {
   const random = seededRandom(seed), all: JointRirPoint[] = [], first: JointRirPoint[] = [];
@@ -27,7 +28,8 @@ function generate(scenario: Scenario, seed: number) {
     const fatigue = scenario.shared ? random.normal() : 0;
     for (let set = 0; set < (scenario.sets ?? 1); set++) {
       const m = scenario.highReps ? [8, 12, 15][session % 3] : [2, 4, 6][session % 3];
-      const latent = scenario.prior === 'high' ? (random.uniform() < 0.8 ? 4 : 3)
+      const latent = scenario.prior === 'zero' ? 0 : scenario.prior === 'positive' ? 1 + Math.floor(random.uniform() * 4)
+        : scenario.prior === 'zero-to-positive' ? (session < scenario.n / 2 ? 0 : 4) : scenario.prior === 'high' ? (random.uniform() < 0.8 ? 4 : 3)
         : scenario.prior === 'phase' ? [3, 2, 1, 4][session % 4] : Math.floor(random.uniform() * 5);
       const multipliers = Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, m + r)!);
       const strength = (scenario.strength ?? 100) + (scenario.trend ? 0.3 * session : 0);
@@ -40,7 +42,9 @@ function generate(scenario: Scenario, seed: number) {
       } while (load < 0);
       if (scenario.rounding) load = Math.round(load / 2.5) * 2.5;
       const draw = scenario.shared ? commonError : scenario.serial ? serial : random.normal();
-      const n = recordedRirFromLatent(latent, scenario.sigma, draw + (scenario.reportingBias ?? 0));
+      let n = recordedRirFromLatent(latent, scenario.sigma, draw + (scenario.reportingBias ?? 0));
+      if (scenario.falseZero && latent > 0 && random.uniform() < 0.2) n = 0;
+      if (scenario.missedZero && latent === 0) n = 1;
       const point = { load, recordedRir: n, multipliers };
       all.push(point);
       if (set === 0) first.push(point); // Ordinal fixed before observations; never select by n or effective reps.
@@ -90,7 +94,7 @@ for (const n of counts) {
 
 type Observation = { estimate: number | null; covered: boolean; intervalWidth: number | null;
   lowerBoundary: boolean; upperBoundary: boolean; unbounded: boolean; disconnected: boolean;
-  sigmaEstimate?: number; sigmaCovered?: boolean; sigmaWidth?: number | null; sigmaUpperBoundary?: boolean;
+  sigmaUnidentified?: boolean; sigmaEstimate?: number; sigmaCovered?: boolean; sigmaWidth?: number | null; sigmaUpperBoundary?: boolean;
   sigmaUnbounded?: boolean; sigmaDisconnected?: boolean;
   loadEstimate?: number; loadCovered?: boolean; loadWidth?: number | null; loadBoundary?: boolean;
   loadUnbounded?: boolean; loadDisconnected?: boolean };
@@ -115,6 +119,7 @@ function summarize(observations: Observation[], truth: number, sigma: number, lo
     unbounded: rate(observations.filter(o => o.unbounded).length, observations.length),
     gridBoundary: rate(observations.filter(o => o.lowerBoundary || o.upperBoundary).length, observations.length),
     disconnected: rate(observations.filter(o => o.disconnected).length, observations.length),
+    sigmaUnidentified: rate(observations.filter(o => o.sigmaUnidentified).length, observations.length),
     sigma: sigmaErrors.length ? { conditionalBias: mean(sigmaErrors), conditionalRmse: Math.sqrt(mean(sigmaErrors.map(e => e * e))!),
       unconditionalCoverage: rate(observations.filter(o => o.sigmaCovered).length, observations.length),
       upperBoundary: rate(observations.filter(o => o.sigmaUpperBoundary).length, observations.length),
@@ -138,6 +143,11 @@ scenarios.push(...[
   { name: 'reporting-bias-plus-one', reportingBias: 1 }, { name: 'serial-reporting-error', serial: true },
   { name: 'changing-strength-in-constant-window', trend: true }, { name: 'three-sets-independent', sets: 3 },
   { name: 'three-sets-shared-error-fatigue', sets: 3, shared: true },
+  { name: 'all-zero-rir-conditional', prior: 'zero' as const },
+  { name: 'all-positive-rir-conditional', prior: 'positive' as const },
+  { name: 'zero-to-positive-rir-composition', prior: 'zero-to-positive' as const },
+  { name: 'false-zero-readings-assumption-violation', falseZero: true },
+  { name: 'missed-zero-readings-generator-sensitivity', missedZero: true },
 ].map(s => ({ n: 24, sigma: 1, ...s })));
 
 const experiments = scenarios.map((scenario, i) => {
@@ -154,16 +164,16 @@ const experiments = scenarios.map((scenario, i) => {
       for (const sd of fixedSigmas) output[selection][`fixed-${sd}`].push(observation(
         profileSet(strengths, fitted.grid[sigmas.indexOf(sd)], cutoffs.fixed[String(sd)]), scenario.strength ?? 100));
       const p = profileSet(strengths, fitted.strengthProfile, cutoffs.strength);
-      const sp = profileSet(sigmas, fitted.sigmaProfile, cutoffs.sigma);
+      const sp = fitted.positiveRirObservations ? profileSet(sigmas, fitted.sigmaProfile, cutoffs.sigma) : null;
       const lp = profileSet(loadSds, fitted.loadProfile, cutoffs.load);
-      output[selection].joint.push({ ...observation(p, scenario.strength ?? 100), sigmaEstimate: sp?.estimate,
+      output[selection].joint.push({ ...observation(p, scenario.strength ?? 100), sigmaUnidentified: fitted.positiveRirObservations === 0, sigmaEstimate: sp?.estimate,
         sigmaCovered: profileContains(sp, scenario.sigma), sigmaWidth: width(sp, 0), sigmaUpperBoundary: sp?.upperBoundary,
         sigmaUnbounded: sp?.components.some(c => c.upper === null), sigmaDisconnected: (sp?.components.length ?? 0) > 1,
         loadEstimate: lp?.estimate, loadCovered: profileContains(lp, scenario.loadSd ?? fixedLoadSd), loadWidth: width(lp),
         loadBoundary: lp?.lowerBoundary || lp?.upperBoundary, loadUnbounded: lp?.components.some(c => c.lower === null || c.upper === null),
         loadDisconnected: (lp?.components.length ?? 0) > 1 });
       if (replication === 0 && selection === 'first') example = { points: data.first, cube: fitted.cube, grid: fitted.grid,
-        strengthProfile: fitted.strengthProfile, sigmaScores: fitted.sigmaProfile, loadScores: fitted.loadProfile,
+        positiveRirObservations: fitted.positiveRirObservations, strengthProfile: fitted.strengthProfile, sigmaScores: fitted.sigmaProfile, loadScores: fitted.loadProfile,
         fixed: profileSet(strengths, fitted.grid[sigmas.indexOf(1)], cutoffs.fixed['1']), joint: p, sigmaProfile: sp, loadProfile: lp,
         curve: Array.from({ length: 15 }, (_, r) => ({ reps: r + 1, truth: (scenario.strength ?? 100) / estimateOneRepMax(1, r + 1)!,
           fixed: output.first['fixed-1'][0].estimate! / estimateOneRepMax(1, r + 1)!, joint: p!.estimate / estimateOneRepMax(1, r + 1)! })) };
@@ -185,6 +195,9 @@ const gridSensitivity = { coarse: profileSet(strengths, coarse.strengthProfile, 
 assert.ok(Math.abs(gridSensitivity.coarse!.estimate - gridSensitivity.fine!.estimate) <= 0.5);
 assert.ok(experiments.filter(e => e.scenario.name.startsWith('matched')).every(e =>
   e.methods.first.joint.validFits === e.replications));
+const allZero = experiments.find(e => e.scenario.name === 'all-zero-rir-conditional')!.methods.first.joint;
+assert.equal(allZero.sigma, null);
+assert.equal(allZero.sigmaUnidentified.fraction, 1);
 const multipliers = Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, 6 + r)!);
 const deterministicPoint = { load: 100 / multipliers[2], recordedRir: 2, multipliers };
 const repeatedRecordDiagnostic = [1, 24, 72].map(copies => {
@@ -193,6 +206,7 @@ const repeatedRecordDiagnostic = [1, 24, 72].map(copies => {
     limit: 'Exact copies of one deterministic m6/RIR2 observation; no known stochastic sigma, recovery/coverage or independent-session claims.' };
 });
 console.log(JSON.stringify({ design: { quick, repetitions, stressRepetitions, strengths, sigmas, loadSds, fixedSigmas, counts,
+  rirReportingModel: RIR_REPORTING_MODEL, positiveRirSigma: 'pre-rounding SD; positive Gaussian draws censored at one',
   latentPrior: 'uniform integers 0-4', fixedLoadSd, enteredLoadSds: DEFAULT_ENTRY_LOAD_SD_KG,
   generator: 'nonnegative truncated normal; no RIR/u selection; load-granularity discrepancy, logged weights exact',
   interval: 'separate-seed fixed cutoffs; worst matched-RIR joint cutoffs conditional on true total-load SD2.5kg; interpolated grids',

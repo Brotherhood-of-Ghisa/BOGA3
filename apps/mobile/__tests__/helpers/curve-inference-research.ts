@@ -7,7 +7,7 @@ export const DEFAULT_ENTRY_LOAD_SD_KG: Record<LoadInputMode, number> = { per_sid
 export function jointUncertaintyProfiles(points: JointRirPoint[], strengths: number[], rirSds: number[], loadSds: number[]) {
   if (!loadSds.length) throw new Error('nonempty load uncertainty axis required');
   const cube = loadSds.map(sd => jointLikelihoodGrid(points, strengths, rirSds, sd));
-  return { cube,
+  return { cube, positiveRirObservations: points.filter(point => point.recordedRir > 0).length,
     strengthProfile: strengths.map((_, i) => Math.max(...cube.flatMap(grid => grid.map(row => row[i])))),
     sigmaProfile: rirSds.map((_, i) => Math.max(...cube.flatMap(grid => grid[i]))),
     loadProfile: cube.map(grid => Math.max(...grid.flat())) };

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { estimateOneRepMax } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import { fitRegression, predict, scanBreaks, seededRandom, sessionMedians,
-  recordedRirFromLatent, type ResearchRow } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
+  recordedRirFromLatent, RIR_REPORTING_MODEL, type ResearchRow } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
 import { DEFAULT_ENTRY_LOAD_SD_KG, prefixBreakMaximum, searchedBreak, upperQuantile } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
 
 const quick = process.argv.includes('--quick');
@@ -12,7 +12,7 @@ const prefixes = [12, 16, 24, 48], seedFor = (base: number, r: number) => (base 
 const loadSd = DEFAULT_ENTRY_LOAD_SD_KG.total_load;
 type Scenario = { name: string; n: number; model: 'constant' | 'linear' | 'quadratic' | 'jump' | 'hinge';
   effect?: number; cut?: number; gap?: boolean; serial?: boolean; outlier?: boolean; heteroscedastic?: boolean;
-  reportedRirMix?: boolean; dependence?: boolean; minimum?: number };
+  reportedRirMix?: boolean; rirComposition?: boolean; falseZero?: boolean; dependence?: boolean; minimum?: number };
 const valueAt = (s: Scenario, t: number) => 100 + (s.model === 'constant' ? 0 : 0.2 * t) +
   (s.model === 'quadratic' ? 0.008 * t * t : s.model === 'jump' ? s.effect! * Number(t > s.cut!)
     : s.model === 'hinge' ? s.effect! * Math.max(0, t - s.cut!) : 0);
@@ -26,9 +26,11 @@ function generate(s: Scenario, seed: number) {
     const error = s.serial ? serial : random.normal();
     let value = valueAt(s, time) + loadSd * error * (s.heteroscedastic ? 1 + i / s.n * 2 : 1);
     if (s.outlier && i === Math.floor(s.n / 2)) value += 10;
-    if (s.reportedRirMix) {
-      const m = i < s.n / 2 ? 4 : 12, r = i < s.n / 2 ? 0 : 4;
-      const n = recordedRirFromLatent(r, 1, random.normal());
+    if (s.reportedRirMix || s.rirComposition || s.falseZero) {
+      const m = s.reportedRirMix ? (i < s.n / 2 ? 4 : 12) : 6;
+      const r = i < s.n / 2 ? 0 : 4;
+      let n = recordedRirFromLatent(r, 1, random.normal());
+      if (s.falseZero && r > 0 && i % 3 === 0) n = 0;
       const f = estimateOneRepMax(1, m + r)!;
       value = estimateOneRepMax(valueAt(s, time) / f + loadSd * error, m + n)!;
     } else {
@@ -96,7 +98,7 @@ scenarios.push(
   { name: 'off-grid-jump', n: 24, model: 'jump', effect: 5, cut: 11.2 },
   { name: 'gap-jump', n: 24, model: 'jump', effect: 5, cut: 20 },
   { name: 'boundary-jump-outside-search', n: 24, model: 'jump', effect: 5, cut: 3.5 },
-  ...['serial', 'outlier', 'heteroscedastic', 'reportedRirMix', 'dependence'].map(key =>
+  ...['serial', 'outlier', 'heteroscedastic', 'reportedRirMix', 'dependence', 'rirComposition', 'falseZero'].map(key =>
     ({ name: `constant-${key}`, n: 24, model: 'constant' as const, [key]: true })),
   { name: 'jump-minimum-six', n: 24, model: 'jump', effect: 5, cut: 11.5, minimum: 6 },
   { name: 'jump-minimum-ten', n: 24, model: 'jump', effect: 5, cut: 11.5, minimum: 10 });
@@ -162,7 +164,8 @@ const bootstrap = [false, true].map(serial => {
 });
 assert.ok(experiments.filter(e => e.scenario.n === 12).every(e => e.noAdmissibleSearch.fraction === 1));
 console.log(JSON.stringify({ design: { quick, repetitions, stressRepetitions, prefixes, minimumSegment: 8,
-  benchmarkTarget: 'S(t) via noisy RIR0 single; reportedRirMix targets A instead', independentErrorSd: loadSd,
+  rirReportingModel: RIR_REPORTING_MODEL,
+  benchmarkTarget: 'S(t) via noisy RIR0 single; mixed-RIR/composition/false-zero stresses target observed A instead', independentErrorSd: loadSd,
   nullShapes: noBreak, nominalFamilyError: 0.05, interval: 'separate-seed known-form, worst effect-size 97.5% marginal error radii; not post-selection',
   seedFor: 'base xor imul(replication+1, 0x9e3779b1)' }, cutoff, calibrationMaximums, intervalCalibration,
   intervalEvidence, experiments, bootstrap: { bootstrapRepetitions, bootstrapHistories, results: bootstrap } }, null, 2));

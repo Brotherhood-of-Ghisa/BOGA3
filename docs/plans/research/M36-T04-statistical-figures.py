@@ -55,7 +55,7 @@ for panel, scores, sd_axis, truth, best_sd, label, title in [
     panel.set(xlim=(96, 104), xlabel='1RM amplitude S (kg)', ylabel=label, title=title)
     panel.legend(fontsize=8, facecolor='#666666', labelcolor='white')
 fig.colorbar(mesh, ax=axes[3], label='Relative likelihood loss (not confidence regions)')
-fig.suptitle('Two approaches · RIR SD 1 rep / load SD 1.25 kg per side = 2.50 kg total\nJoint fits both scales; same curve shape · 24 independent synthetic sessions · no real-world calibration claim', fontsize=13)
+fig.suptitle('Two approaches · exact RIR0; positive-RIR Gaussian SD 1 rep / load SD 2.50 kg total\nJoint fits both scales; same curve shape · 24 independent synthetic sessions · no real-world calibration claim', fontsize=13)
 fig.savefig(folder / 'two-statistical-approaches.png', dpi=160)
 plt.close(fig)
 
@@ -94,6 +94,6 @@ for model, effect, label, color in [('jump', 5, '+5 kg level change', colors['fi
 axes[1, 1].set(xlabel='Independent sessions', ylabel='Any-prefix detection (%)', ylim=(-3, 103),
                title='Power depends on change size and form')
 axes[1, 1].legend(fontsize=9)
-fig.suptitle('Research validation · 400 repetitions per matched cell / 200 per stress cell\nBars show one Monte Carlo SE; no production reliability claim', fontsize=13)
+fig.suptitle('Exact-zero Gaussian research · 400 repetitions per matched cell / 200 per stress cell\nBars show one Monte Carlo SE; no production reliability claim', fontsize=13)
 fig.savefig(folder / 'statistical-validation.png', dpi=160)
 plt.close(fig)

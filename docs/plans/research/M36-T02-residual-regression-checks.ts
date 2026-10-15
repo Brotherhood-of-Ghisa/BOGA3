@@ -7,7 +7,7 @@ import { calculateSetMetrics } from '../../../apps/mobile/src/exercise-calculati
 import { getSessionSetRir } from '../../../apps/mobile/src/exercise-calculations/effort-policy.ts';
 import { isWorkingSet } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import { fitRegression, jointLogLikelihood, median, normalCdf, predict, recordedRirFromLatent,
-  recordedRirLogProbability, recordedRirProbability, researchBic, scanBreaks, seededRandom, sessionMedians,
+  recordedRirLogProbability, recordedRirProbability, RIR_REPORTING_MODEL, researchBic, scanBreaks, seededRandom, sessionMedians,
   type JointRirPoint, type ResearchRow } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
 
 type WaveSet = {
@@ -146,6 +146,16 @@ const rirBoundary = [...new Set([0, 0.5, 1, 2, rirSd])].flatMap(sd => [0, 1, 2, 
   return { sd, latent, meanRecorded: mean(recorded), minimum: Math.min(...recorded), maximum: Math.max(...recorded) };
 }));
 assert.equal(recordedRirFromLatent(0, 1, -2), 0);
+assert.equal(recordedRirFromLatent(0, 5, 100), 0);
+assert.equal(recordedRirFromLatent(1, 5, -100), 1);
+for (const sd of [0, 0.5, 1, 2]) {
+  assert.equal(recordedRirProbability(0, 0, sd), 1);
+  for (const r of [1, 2, 4]) {
+    assert.equal(recordedRirProbability(0, r, sd), 0);
+    assert.equal(recordedRirProbability(r, 0, sd), 0);
+    close(Array.from({ length: 100 }, (_, n) => recordedRirProbability(n, r, sd)).reduce((a, b) => a + b, 0), 1);
+  }
+}
 assert.equal(recordedRirFromLatent(4, 1, 3), 7, 'no high-RIR clamp');
 const noisyPrior = forward(fixture.prior, rirSd, seed + 2);
 const noisyStable = forward(fixture.scenarios.stable, rirSd, seed + 3);
@@ -206,21 +216,22 @@ function jointProfile(points: JointRirPoint[], loadSd: number) {
     logLikelihood: jointLogLikelihood(points, strength, sd, loadSd) }))).sort((a, b) => b.logLikelihood - a.logLikelihood);
   const maximum = candidates[0];
   const near = candidates.filter(row => row.logLikelihood >= maximum.logLikelihood - 2);
-  return { loadSd, maximum, fixedSdOne: candidates.find(row => row.sd === 1),
+  const sigmaUnidentified = points.every(point => point.recordedRir === 0);
+  return { loadSd, sigmaUnidentified, maximum: { ...maximum, sd: sigmaUnidentified ? null : maximum.sd }, fixedSdOne: candidates.find(row => row.sd === 1),
     descriptiveWithinTwoLogUnits: { count: near.length, strengthRange: [Math.min(...near.map(row => row.strength)), Math.max(...near.map(row => row.strength))],
       sdRange: [Math.min(...near.map(row => row.sd)), Math.max(...near.map(row => row.sd))] },
     profileSd: sdGrid.map(sd => candidates.find(row => row.sd === sd)) };
 }
 const jointProfiles = [0.2, 1, 3].map(loadSd => jointProfile(jointPoints, loadSd));
 assert.ok(Math.abs(jointProfiles[0].maximum.strength - 100) <= 1);
-assert.ok(jointProfiles[0].maximum.sd >= 0.5 && jointProfiles[0].maximum.sd <= 1.5);
+assert.ok(jointProfiles[0].maximum.sd !== null && jointProfiles[0].maximum.sd >= 0.5 && jointProfiles[0].maximum.sd <= 1.5);
 const repeated = Array.from({ length: 8 }, () => ({ load: 80, recordedRir: 2,
   multipliers: Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, 6 + r)!) }));
 const weakJointProfile = jointProfile(repeated, 3);
 const exactMismatch = Math.min(...repeated[0].multipliers.flatMap(a => repeated[0].multipliers.map(b => Math.abs(80 * a - 81 * b))));
 assert.ok(exactMismatch > 1e-6, 'two nearby loads need not share an exact common integer-RIR strength');
 
-console.log(JSON.stringify({ seed, rirSd, fixtureSha256: createHash('sha256').update(source).digest('hex'),
+console.log(JSON.stringify({ seed, rirSd, rirReportingModel: RIR_REPORTING_MODEL, fixtureSha256: createHash('sha256').update(source).digest('hex'),
   controls: { sessions: stable.length, baseline: m, stableIntercept: stableFit.coefficients[0],
     gradualInterceptAtTimeZero: gradualFit.coefficients[0], gradualSlope: gradualFit.coefficients[1] },
   rirOracle, knownHinge: best(knownHinge, 'hinge'), knownJump: best(knownJump, 'jump'),

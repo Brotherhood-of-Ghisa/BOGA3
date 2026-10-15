@@ -1,4 +1,5 @@
 // Research/test-only calculations. No runtime consumer or inferential guarantee.
+export const RIR_REPORTING_MODEL = 'exact-zero-positive-censored-gaussian.v1';
 export type ResearchRow = { time: number; value: number; covariates?: number[] };
 export type ResearchModel = 'constant' | 'linear' | 'quadratic' | 'hinge' | 'jump';
 export type ResearchFit = {
@@ -113,7 +114,9 @@ export function seededRandom(seed: number): { uniform: () => number; normal: () 
 export function recordedRirFromLatent(latentRir: number, sd: number, standardNormalDraw: number): number {
   if (!Number.isSafeInteger(latentRir) || latentRir < 0 || !Number.isFinite(sd) || sd < 0 ||
     !Number.isFinite(standardNormalDraw)) throw new Error('invalid forward RIR model');
-  const recorded = Math.max(0, Math.round(latentRir + sd * standardNormalDraw));
+  if (latentRir === 0) return 0;
+  // Positive readings accumulate the lower Gaussian tail at one, never at exact failure.
+  const recorded = Math.max(1, Math.round(latentRir + sd * standardNormalDraw));
   if (!Number.isSafeInteger(recorded)) throw new Error('RIR overflow');
   return recorded;
 }
@@ -142,8 +145,8 @@ export function normalCdf(x: number): number {
 export function recordedRirLogProbability(recorded: number, latent: number, sd: number): number {
   if (![recorded, latent].every(n => Number.isSafeInteger(n) && n >= 0) || !Number.isFinite(sd) || sd < 0)
     throw new Error('invalid RIR probability');
-  if (sd === 0) return recorded === latent ? 0 : -Infinity;
-  if (recorded === 0) return normalLogSurvival((latent - 0.5) / sd);
+  if (recorded === 0 || latent === 0 || sd === 0) return recorded === latent ? 0 : -Infinity;
+  if (recorded === 1) return normalLogSurvival((latent - 1.5) / sd);
   let lower = (recorded - 0.5 - latent) / sd, upper = (recorded + 0.5 - latent) / sd;
   if (lower < 0 && upper > 0) return upper < 2 ? Math.log(2 * normalAreaFromZero(upper))
     : Math.log1p(-2 * Math.exp(normalLogSurvival(upper)));
