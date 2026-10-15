@@ -1,6 +1,7 @@
 # M37-T02 — Validate regime reliability and approve the assessment contract
 
-- Status: `planned`
+- Status: `in_progress`
+- Execution: research deliverable prepared on the experimental stack; full analytical acceptance remains pending human review of the measured limits and proposed assessment contract.
 - Depends on: M37-T01
 - Milestone: `docs/plans/milestones/M37-strength-regime-inference.md`
 - Areas: docs; UI impact: no

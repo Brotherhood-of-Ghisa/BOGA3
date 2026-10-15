@@ -115,11 +115,58 @@ Retrospective wild bootstrap reruns the complete observed-prefix search with sin
 
 Direct segmented fitting now maximizes the same conditional mixture likelihood over S(t). The no-break family is constant, linear and smooth quadratic strength; the one-break alternative is two constant positive amplitudes with a cut between complete sessions. Fixed fitting retains p=0.50/tau=2.50 kg. Joint fitting estimates one shared p and tau across both segments, not separate error processes. This first direct alternative detects abrupt level changes, not slope changes. The RSS benchmark above is a separate diagnostic and its thresholds/intervals do not transfer to this fitter.
 
-For each admissible cut, retain both amplitudes, shared nuisance estimates, log likelihood and numerical diagnostics. Report D=max(0,2(max ell_step−max ell_no-break)) on identical observations. D is raw relative likelihood evidence, neither a posterior break probability nor a point-membership probability. No calibrated date interval, evidence-emphasis mapping or adequate-data assertion follows yet. Eight sampled independent sessions per side is only a search constraint. The returned boundary brackets the adjacent observed session times, including unobserved gaps.
+For each admissible cut, retain both amplitudes, shared nuisance estimates, log likelihood and numerical diagnostics. Report D=max(0,2(max ell_step−max ell_no-break)) on identical observations. D is raw relative likelihood evidence, neither a posterior break probability nor a point-membership probability. Raw D alone supplies no calibrated date interval or adequacy claim; the scoped calibration and proposed mapping below require human approval. Eight sampled independent sessions per side is only a search constraint. The returned boundary brackets the adjacent observed session times, including unobserved gaps.
 
 The research optimizer is a bounded multistart simplex with a refinement run. Time and amplitudes are normalized; control bounds adapt to observed implied strengths. Joint tau is currently searched within 0.5–7.5 kg and p within its physical endpoints. A constant feasible start protects against an invalid quadratic initialization; quadratic positivity is checked continuously between observations, not only at the sample dates. Rank-deficient time designs, nonconvergence and strength/tau search boundaries are explicit unresolved diagnostics. With no admissible cut the result is insufficient even when a no-break fit has numerical warnings. Multistart agreement and convergence are not guarantees of a global maximum; broader-start/independent-solver validation remains required.
 
 Focused numerical checks recover Gaussian segment means and their closed-form likelihood at exact RIR0, recover a shared tau, reconcile mixed-RIR scores with the existing scalar likelihood, and cover gap boundaries, time/order invariance, missing effort, zero loads, rank deficiency and near-zero quadratic vertices. A seeded 32-session mixed-RIR example (true S=100/112 kg, cut16) estimates Fixed S=100.339/111.741 and Joint S=99.944/111.767, both at cut16. The Joint p=0.276/tau=1.361 illustrates nuisance variability, not their reliable recovery. This is a method check, not a power or calibration study. Use [the direct likelihood checks](M37-T01-likelihood-checks.ts) to reproduce it. Reliability calibration and human approval of the assessment contract must precede UI inference integration. The production chart remains descriptive.
+
+## Direct regime reliability
+
+The current direct study uses 13,400 unique synthetic histories, paired across Fixed and Joint: 2,400 calibration histories, 8,600 development/diagnostic histories and 2,400 fresh held-out histories. Interval-calibration policy was informed by discovery checks; final matching claims use the untouched holdout seed family. No observation-model or curve-form change is made. Calibration/holdout each use 400 histories for constant, linear, quadratic and +2/+5/+10 kg steps. Nineteen stress cells use 200 histories each. Development data include two independent matching evaluations, each with 400 per design. Seeds are disjoint across all four stages.
+
+Each matching history has 32 independent sessions, one prespecified first set per session, logged RIR uniformly 0–4, reps cycling 2/4/6 and total load SD 2.50 kg. Step truth is S=100 kg before session 16 and S=102/105/110 afterward. Both amplitudes are continuously fitted; the test increments are not fixed gaps, a minimum effect or a regularization penalty. Negative fitted changes are allowed, although these matching power cells use increases. Every assessment fits the full no-break family and every admissible cut; calibration maximizes D over assessments at 16/24/32 sessions. Because the gradual family is not nested in the two-level alternative and the cut is searched, no naive chi-square likelihood-ratio p-value is used.
+
+The worst no-break upper 95% search references are 5.890321676 for Fixed and7.969833541 for Joint. These are search-adjusted references within the declared family, not break probabilities. Fresh-holdout search flags/power are:
+
+| Truth; 400 histories each | Fixed | Joint |
+| --- | ---: | ---: |
+| No break: constant | 0.25% | 0.75% |
+| No break: linear | 2.50% | 2.25% |
+| No break: quadratic | 1.25% | 0.50% |
+| +2 kg step | 3.50% | 2.25% |
+| +5 kg step | 32.00% | 23.25% |
+| +10 kg step | 91.00% | 81.75% |
+
+All matching holdout fits at the latest window are numerically resolved. A flag uses the maximum over declared assessments, while a future plotted candidate would use its current D against that reference. Small changes are often missed; low evidence does not establish no strength change. Each rate output retains count/denominator, plug-in Monte Carlo SE and Wilson 95% bounds; zero events do not imply zero risk.
+
+Strength-pair/effect radii are calibrated on constant/+2/+5/+10 histories, and cut-profile loss on +2/+5/+10. To account for finite calibration uncertainty, each interval reference uses the exact binomial order-statistic tolerance bound for 95% content with simultaneous 95% calibration confidence across 22 component/family references. This selects rank 392/400 rather than a plug-in 95th percentile; insufficient calibration or nonfinite bounds remain unresolved. This confidence statement is conditional on independent matching calibration histories, not arbitrary users. At the latest 32-session window, the simultaneous radius for the two amplitudes is2.959 kg Fixed/3.200 kg Joint; effect radii are 4.156/4.161 kg. Cut-profile likelihood-drop references are 7.667/10.641. Strength, effect and date regions are separate, not a joint confidence region across all parameters or proof that a step exists. Fresh-holdout coverage is:
+
+| Truth | Strength pair Fixed / Joint | Effect Fixed / Joint | Date profile Fixed / Joint |
+| --- | ---: | ---: | ---: |
+| Constant | 97.50% / 97.25% | 98.50% / 98.00% | No true break date |
+| +2 kg | 97.75% / 98.50% | 97.75% / 96.75% | 98.50% / 99.00% |
+| +5 kg | 99.75% / 100.00% | 100.00% / 100.00% | 97.50% / 98.25% |
+| +10 kg | 99.75% / 99.75% | 100.00% / 100.00% | 99.25% / 99.50% |
+
+For +2 kg steps, mean date-region envelope widths are 16.19/16.53 session-time units; for +10 kg they are 2.58/3.83. Wide coverage can carry little localization information. +10 kg strength-pair RMSE is0.917/0.951 kg. These interval claims remain limited to the declared latest-window family.
+
+Stress results are sensitivities, not additions to the supported calibration family. The serial cell couples serial categorical/load errors; session-fatigue adds independent extra noise to the selected first set, not multiple correlated sets.
+
+| Stress; 200 histories each | Fixed / Joint search flags | Joint latest unresolved |
+| --- | ---: | ---: |
+| Load SD 2.5→5 kg; no strength change | 7.00% / 0.00% | 0.00% |
+| RIR errors outside ±1 | 8.50% / 0.00% | 0.00% |
+| False-zero labels | 12.50% / 0.00% | 0.00% |
+| Serial errors | 0.00% / 6.50% | 0.00% |
+| Independent extra fatigue noise | 4.00% / 0.50% | 0.00% |
+| Load SD 9 kg; no strength change | 71.00% / 0.00% | 86.50% |
+| +10 kg at session26, outside admissible cut range | 3.50% / 0.50% | 0.00% |
+| No break; all weekly16–32 assessments | 1.00% / 0.50% | 0.00% |
+
+Joint abstentions remain failures/misses in all unconditional rates. Their low false-flag count under SD 9 kg does not demonstrate calibrated robustness: most fits reach the upper nuisance bound. Fixed fitting can interpret underestimated noise as strength evidence. Serial/error misspecification and false zeros remain unresolved real-history risks. Date coverage for the late cut is zero for both approaches; it is not silently localized to an admissible observed cut. Missing/gapped/sparse and alternative RIR/rep designs remain sensitivities. The weekly stress tests constant strength only; it does not validate arbitrary monitoring schedules or repeated looks under all gradual alternatives.
+
+The proposed normalized emphasis D/(D+c) is a monotone display rescaling anchored to the method's null reference c, not a validated probability or perceptual opacity scale. D=0 maps to 0, D=c to 0.5; the renderer must retain a readable tentative curve at weak evidence. There is no significance-based visibility gate. The [proposed assessment contract](M37-T02-assessment-contract.md) keeps numerical abstention, assumed calibration scope, uncertainty and a proposed 10% full-strength-width practical tolerance explicit. That tolerance and uncalibrated real-history presentation require human analytical approval; UI work additionally requires the updated design target's approval.
 
 ## Workout data and weekly progression
 
@@ -134,6 +181,10 @@ Use the [strength/error script](M36-T04-strength-error-validation.ts), [regressi
 Matching numerical evidence was generated from research code at commit `3add201e2fa930fec475affc3a0d5034e740a373`. Restricted local JSON, figures, logs, independent review and SHA256 manifest are under `apps/mobile/artifacts/research/rm-curve-three-point/`. Frozen fixture SHA256 is `1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce`. Raw account data is not committed.
 
 Seeded method checks at p=0/0.5/0.75/1 pass. An independent Python math.erfc oracle verifies 81 conditional-mixture parameter cells, 243 point-load density evaluations and 162 scalar/grid comparisons, including low loads and p endpoints; maximum absolute log-likelihood difference is 3.372e−11. Independent Codex source/product, numerical and figure review is clean. Completed code gates: fast 286 suites/3,931 tests; coverage 86.56% branches/94.41% lines; complexity and dependencies pass, with 13 unchanged known dependency violations. Documentation consolidation is checked separately; numerical code and results are unchanged.
+
+Direct studies reproduce with [the cell runner](M37-T02-regime-validation.ts): run calibration, confirmation and holdout for constant/linear/quadratic/small-step/step5/step10 and evaluation for all 25 scenarios in the research helper registry. Full runs are required; --quick is development-only. Then run [the summary](M37-T02-regime-summary.py) on the local output directory. [Local history replay](M37-T02-history-replay.ts) requires TZ=Europe/London and REGIME_PRIVATE_ROOT pointing to the already-authorized snapshot directory. It confirms all 72 frozen prefixes and six insufficient historical cohorts without another hosted query. The direct fitter is at commit 0f79030c; new runner/source hashes and full outputs are retained under restricted local `apps/mobile/artifacts/research/strength-regime-reliability/` with a manifest.
+
+An independent Python math.erfc mixture oracle exactly matches one mixed-RIR joint fixed-cut likelihood (−74.32281709745061); the continuous solution exceeds a broad 388,311-tuple coarse grid by 1.4437394 log units. This is one numerical cross-check, not proof of global optimization. Current research gates pass fast 288 suites/3,946 tests, coverage 86.56% branches/94.41% lines, complexity and dependencies (13 unchanged known violations). Independent source/product and final numerical/paper review evidence is retained with the local outputs; analytical acceptance remains pending.
 
 ## Limitations and scope
 
