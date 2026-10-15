@@ -6,7 +6,7 @@ Status: visual concept c1 approved by the product owner on 2026-10-14 (“Design
 
 T02 already specifies residual trend/segmented regression, searched jumps/hinges, session dependence and reliability checks. T04 validates amplitude recovery, known-strength break benchmarks and search reliability; its accepted limitations explicitly defer direct joint latent S(t)/RIR/load-noise segmented inference. Its completed research is not a calibrated probability that the latest observations belong to a new strength regime.
 
-T06 implements descriptive observation/reference transformations, T07 the first-release chart, T08 its acceptance and T09 its final exposure. They exclude production inference/breakpoint UI. **There is no remaining card delivering an operational detector or its two-curve UI.** Do not duplicate T02/T04 or silently put that work into T07. Further inferential research/validation and subsequent production delivery need explicitly scoped follow-up cards before that capability can be promised. Their scheduling/IDs are not decided here.
+T06 implements descriptive observation/reference transformations, T07 the first-release chart, T08 its acceptance and T09 its final exposure. They exclude production inference/breakpoint UI. The owner-authorized [M37 follow-up](../milestones/M37-strength-regime-inference.md) assigns segmented fitting, reliability/assessment review and a separately gated experimental Strength regimes mode. It does not add a production detector to M36 or bypass analytical/design/activation decisions.
 
 T05 owns the future interaction/appearance concept now; statistical meaning and eventual activation remain research decisions. Production routing remains the final implementation step for the first release.
 
@@ -14,7 +14,7 @@ T05 owns the future interaction/appearance concept now; statistical meaning and 
 
 Both curves reuse BoGa's adopted shape and existing loading/RIR rules; their only curve parameter is latent total 1RM S. The older fitted regime and candidate newer fitted regime are different estimates of S. Neither is automatically the fixed historical reference M, and logged Weight/global 1RM remain unchanged.
 
-Null: no abrupt regime change, allowing declared gradual strength trends and cycle/task effects. Alternative: a persistent level change in S after an unknown cut, with slope changes investigated separately. A recent curve differing from M alone is not evidence of a structural break. Keep both uncertainty approaches: configurable assumed RIR/load SDs, versus joint estimation of S and both noise scales. They remain nuisance parameters, not extra curve-shape parameters.
+Null: no abrupt regime change, allowing declared gradual strength trends and cycle/task effects. Alternative: a persistent level change in S after an unknown cut, with slope changes investigated separately. A recent curve differing from M alone is not evidence of a structural break. Keep both uncertainty approaches: fixed p=.50/total-load SD2.50 kg, versus joint estimation of S, p and load SD shared across regimes. They remain nuisance parameters, not extra curve-shape parameters.
 
 Recent means a complete chronological suffix. Candidate cuts fall between completed sessions; do not split dependent sets in a session. Report N recent sessions and the number of qualifying sets separately. N is part of the candidate search, not a cherry-picked count that escapes the test's selection adjustment. Searching cuts/suffix lengths and checking again each week must be covered by the inference/calibration strategy.
 
