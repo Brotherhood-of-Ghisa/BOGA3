@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { applyThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { RootStack } from '@/components/navigation/root-stack';
 import { launchTheme } from '@/components/ui/theme-launch';
@@ -38,6 +39,7 @@ export default function RootLayout() {
     // A stored theme this launch could not use (unknown preset, unreadable
     // store) falls back to the default theme; say so in the logs.
     reportLaunchThemeProblem(launchTheme.problem);
+    void applyThemeAppIcon(launchTheme.preset);
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
