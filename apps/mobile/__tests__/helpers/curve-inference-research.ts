@@ -1,15 +1,27 @@
 // Research-only profile grids and searched regression diagnostics.
-import { fitRegression, jointLikelihoodGrid, scanBreaks, type BreakFit, type JointRirPoint, type ResearchRow } from './residual-regression-research';
+import { fitRegression, jointLikelihoodGrid, latentRirStates, scanBreaks, type BreakFit, type JointRirPoint, type ResearchRow } from './residual-regression-research';
+import { estimateOneRepMax } from '../../src/exercise-calculations/index.ts';
 import type { LoadInputMode } from '../../src/exercise-calculations/load-metrics';
 
 export const DEFAULT_ENTRY_LOAD_SD_KG: Record<LoadInputMode, number> = { per_side_load: 1.25, total_load: 2.5 };
 
-export function jointUncertaintyProfiles(points: JointRirPoint[], strengths: number[], rirSds: number[], loadSds: number[]) {
+export function rirCurveMultipliers(performedReps: number, recordedRir: number): number[] {
+  if (!Number.isSafeInteger(performedReps) || performedReps <= 0) throw new Error('invalid performed reps');
+  return latentRirStates(recordedRir).map(r => {
+    const equivalent = performedReps + r;
+    if (!Number.isSafeInteger(equivalent)) throw new Error('equivalent reps overflow');
+    const multiplier = estimateOneRepMax(1, equivalent);
+    if (multiplier === null || !Number.isFinite(multiplier) || multiplier <= 0) throw new Error('invalid RM multiplier');
+    return multiplier;
+  });
+}
+
+export function jointUncertaintyProfiles(points: JointRirPoint[], strengths: number[], correctProbabilities: number[], loadSds: number[]) {
   if (!loadSds.length) throw new Error('nonempty load uncertainty axis required');
-  const cube = loadSds.map(sd => jointLikelihoodGrid(points, strengths, rirSds, sd));
+  const cube = loadSds.map(sd => jointLikelihoodGrid(points, strengths, correctProbabilities, sd));
   return { cube, positiveRirObservations: points.filter(point => point.recordedRir > 0).length,
     strengthProfile: strengths.map((_, i) => Math.max(...cube.flatMap(grid => grid.map(row => row[i])))),
-    sigmaProfile: rirSds.map((_, i) => Math.max(...cube.flatMap(grid => grid[i]))),
+    correctProfile: correctProbabilities.map((_, i) => Math.max(...cube.flatMap(grid => grid[i]))),
     loadProfile: cube.map(grid => Math.max(...grid.flat())) };
 }
 
@@ -39,6 +51,14 @@ export function profileSet(axis: number[], scores: number[], cutoff: number): Pr
   const best = scores.indexOf(maximum);
   return { estimate: axis[best], maximum, components, lowerBoundary: best === 0,
     upperBoundary: best === axis.length - 1 };
+}
+
+export function correctProbabilitySet(axis: number[], scores: number[], cutoff: number): ProfileResult | null {
+  if (axis[0] !== 0 || axis[axis.length - 1] !== 1) throw new Error('complete probability support required');
+  const profile = profileSet(axis, scores, cutoff);
+  // Numerical flatness is an identification diagnostic, not a statistical adequacy threshold.
+  if (!profile || Math.max(...scores) - Math.min(...scores) <= 1e-10) return null;
+  return { ...profile, components: profile.components.map(c => ({ lower: c.lower ?? 0, upper: c.upper ?? 1 })) };
 }
 
 export function profileContains(profile: ProfileResult | null, truth: number): boolean {

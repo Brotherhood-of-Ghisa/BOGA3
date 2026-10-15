@@ -1,6 +1,6 @@
 # Exploratory session residual regression and validation plan
 
-> Historical method/results below describe the original T02 model. The current helper and numerical checks use the [exact-zero Gaussian revision](M36-T04-exact-zero-revalidation.md), with separately recorded validation; the original numerical claims are not outputs of that revised model.
+> Historical method/results below describe the original T02 model. The current helper and numerical checks use the [conditional three-point revision](M36-T04-three-point-revalidation.md), with separately recorded validation; the original numerical claims are not outputs of that revised model.
 
 Prepared from T01 commit `43482cd7de537dfce0982acfdbc8b8ab8b109bab`. The research specification and small method checks are delivered for review; **human analytical approval of this validation plan remains pending**. T02 is not complete until that approval and its agreed code/review gates pass. T03 provenance work and T04 reliability validation have not been executed. The work remains on the experimental stacked branch; no production detector, statistical dependency, route or product default follows from this document.
 
@@ -55,7 +55,7 @@ initial sigma_RIR = 1 rep, equally for every r
 illustrative sensitivities: 0, 0.5, 1, 2 reps
 ```
 
-The check script accepts `--rir-sd=<value>`; no upper clamp at4 is applied. Gaussian draws are a proposed distributional experiment; their shape is not empirically calibrated. Round with JavaScript `Math.round` and clamp negative recorded values to zero, validating safe integers. The latent r stays nonnegative and distinct from the simulated record. Truncating/resampling the error instead would be a different model, not a hidden implementation detail. Boundary censoring changes mean and variance near RIR0: constant pre-rounding SD does not imply constant recorded variance or constant analytical RM variance across loads/reps. High-RIR-specific SD can be examined later; it is not the initial assumption.
+The original check script accepted `--rir-sd=<value>` (current commands are below); no upper clamp at4 is applied. Gaussian draws are a proposed distributional experiment; their shape is not empirically calibrated. Round with JavaScript `Math.round` and clamp negative recorded values to zero, validating safe integers. The latent r stays nonnegative and distinct from the simulated record. Truncating/resampling the error instead would be a different model, not a hidden implementation detail. Boundary censoring changes mean and variance near RIR0: constant pre-rounding SD does not imply constant recorded variance or constant analytical RM variance across loads/reps. High-RIR-specific SD can be examined later; it is not the initial assumption.
 
 Generate known-control loads using latent r and the adopted estimator, then analyse the forward-generated recorded n through the actual kernel. For the illustration, the starter stable/prior RIR coordinates serve as synthetic latent inputs only; this does not declare real recorded RIR to be latent truth. For actual histories, true RIR, reporting bias, formula mismatch and session variation are not identifiable from m/load/n alone. Adding noise to observed n is a sensitivity perturbation, not a posterior draw of true RIR. Repeated calibrated effort assessments or independent task-standard evidence would be needed to identify an empirical error model.
 
@@ -104,9 +104,11 @@ Condition on observed M when comparing trend shape on a fixed cohort; M is a sha
 
 Research script: `M36-T02-residual-regression-checks.ts`; test-only numerical helper: `apps/mobile/__tests__/helpers/residual-regression-research.ts`; focused suite: `apps/mobile/__tests__/residual-regression-research.test.ts`. Research scripts and focused tests reuse the frozen synthetic fixture in `apps/mobile/__tests__/fixtures/`; no production import/dependency is introduced. The helper contains no domain rule or copied RM constants. The files are applied and reviewed; repository gates pass. Evidence is recorded with the experimental research draft PR.
 
+Current conditional three-point checks (the numerical table below remains historical):
+
 ```sh
-node docs/plans/research/M36-T02-residual-regression-checks.ts
-node docs/plans/research/M36-T02-residual-regression-checks.ts --rir-sd=0.5
+apps/mobile/node_modules/.bin/tsx --tsconfig apps/mobile/tsconfig.json docs/plans/research/M36-T02-residual-regression-checks.ts
+apps/mobile/node_modules/.bin/tsx --tsconfig apps/mobile/tsconfig.json docs/plans/research/M36-T02-residual-regression-checks.ts --correct-probability=0.75
 ```
 
 Node24, seed20261013; provisional fixture SHA256 `172dae999afb8e2a0a3dcf34ced8c474f17eca76c04a68aa17edc753e144ae26`. Standalone assertions passed atσ0/.5/1/2 in staging against the actual kernel, plus the joint candidate's seeded recovery/profile checks. Independent Python `math.erfc` checks cover321 CDF points (maximum absolute error2.792e−11) and576 RIR intervals (maximum relative error2.809e−10 where the oracle probability is representable). All interval log probabilities remain finite, including15 cases whose ordinary oracle probabilities underflow. Outputs are reproducible JSON; gate/evidence artifacts belong with the PR. The scripts are method checks, not a new test lane. A Node module-format warning occurred; no runtime/package configuration was changed to remove it.

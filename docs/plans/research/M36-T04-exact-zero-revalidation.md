@@ -1,5 +1,7 @@
 # Exact-zero RIR Gaussian research revalidation
 
+> Historical Gaussian revision at commit `db3b4b79`. The owner subsequently adopted the [conditional three-point model](M36-T04-three-point-revalidation.md). Results below remain evidence for their declared Gaussian world; current scripts implement the newer model and do not regenerate these old results.
+
 Status: research implementation and full simulations completed and independently reviewed on the experimental branch, 2026-10-15. The final documentation check is recorded with the evidence after this report is saved. This is research-only; no production chart, loading, reference, recorded metric, fixture input or structural-break detector changes.
 
 ## Reporting model and parameters

@@ -7,7 +7,7 @@ import { isWorkingSet } from '../../../apps/mobile/src/exercise-calculations/set
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '../../../apps/mobile/src/exercise-calculations/effort-policy.ts';
 import { priorCurveReference, projectCurveHistory, curveScopeKey, type CurveHistoryRow } from '../../../apps/mobile/__tests__/helpers/curve-history-research.ts';
 import { fitRegression, median, RIR_REPORTING_MODEL, scanBreaks } from '../../../apps/mobile/__tests__/helpers/residual-regression-research.ts';
-import { DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileSet } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
+import { correctProbabilitySet, DEFAULT_ENTRY_LOAD_SD_KG, jointUncertaintyProfiles, profileSet, rirCurveMultipliers } from '../../../apps/mobile/__tests__/helpers/curve-inference-research.ts';
 
 assert.equal(process.env.TZ, 'Europe/London');
 assert.equal(process.argv.length, 2);
@@ -73,10 +73,10 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
   const responses = cohort.main.sessionResponses.map((r: { time: number; value: number }) => ({
     time: r.time, value: (1 + r.value / 100) * cohort.reference.rm }));
   const points = first.map(p => ({ load: p.load, recordedRir: p.rir,
-    multipliers: Array.from({ length: 5 }, (_, r) => estimateOneRepMax(1, p.reps + r)!) }));
+    multipliers: rirCurveMultipliers(p.reps, p.rir) }));
   const center = points.length ? median(first.map(p => p.analyticalRm)) : null;
   const strengthAxis = center === null ? [] : Array.from({ length: 101 }, (_, i) => center * (0.5 + i * 0.01));
-  const sigmas = [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5];
+  const correctProbabilities = [0, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1];
   const loadSds = [0.5, 1.25, 2.5, 3.75, 5, 7.5];
   return { cohort: `C${index + 1}`, exercise: index < 3 ? 'Zercher Squat' : 'Dumbbell Bench Press',
     independentSessions: cohort.main.evaluatedSessions, sets: cohort.main.evaluatedSets,
@@ -86,14 +86,15 @@ const historical = results.remote.cohorts.map((cohort: any, index: number) => {
       linear: fitRegression(responses, 'linear'), quadratic: fitRegression(responses, 'quadratic'),
       searchedCandidates: scanBreaks(responses, 8).length } : null,
     relativeLikelihood: points.length ? (() => {
-      const { cube, strengthProfile, sigmaProfile, loadProfile, positiveRirObservations } = jointUncertaintyProfiles(points, strengthAxis, sigmas, loadSds);
+      const { cube, strengthProfile, correctProfile, loadProfile, positiveRirObservations } = jointUncertaintyProfiles(points, strengthAxis, correctProbabilities, loadSds);
       const grid = cube[loadSds.indexOf(2.5)], loadMaximum = profileSet(loadSds, loadProfile, 0);
-      return { fixedTotalLoadSd: 2.5, enteredLoadSds: DEFAULT_ENTRY_LOAD_SD_KG, strengthAxis, sigmas, loadSds,
-        fixedSigma1Profile: grid[sigmas.indexOf(1)], strengthProfile, sigmaProfile, loadProfile,
-        fixedMaximum: profileSet(strengthAxis, grid[sigmas.indexOf(1)], 0)?.estimate ?? null,
+      const accuracy = correctProbabilitySet(correctProbabilities, correctProfile, 0);
+      return { fixedTotalLoadSd: 2.5, enteredLoadSds: DEFAULT_ENTRY_LOAD_SD_KG, strengthAxis, correctProbabilities, loadSds,
+        fixedHalfCorrectProfile: grid[correctProbabilities.indexOf(0.5)], strengthProfile, correctProfile, loadProfile,
+        fixedMaximum: profileSet(strengthAxis, grid[correctProbabilities.indexOf(0.5)], 0)?.estimate ?? null,
         jointMaximum: profileSet(strengthAxis, strengthProfile, 0)?.estimate ?? null,
-        positiveRirObservations, sigmaUnidentified: positiveRirObservations === 0,
-        jointSigmaMaximum: positiveRirObservations ? profileSet(sigmas, sigmaProfile, 0)?.estimate ?? null : null,
+        positiveRirObservations, correctUnidentified: accuracy === null,
+        jointCorrectProbabilityMaximum: accuracy?.estimate ?? null,
         jointTotalLoadMaximum: loadMaximum?.estimate ?? null,
         loadGridBoundary: loadMaximum?.lowerBoundary || loadMaximum?.upperBoundary };
     })() : null,

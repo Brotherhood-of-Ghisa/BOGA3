@@ -1,6 +1,12 @@
 # Statistical comparison and validation contract
 
-## Approved follow-up assumptions — 2026-10-15
+## Current conditional three-point assumptions — 2026-10-15
+
+The owner replaced Gaussian RIR error with conditional three-point uncertainty: logged 0 fixes true 0; positive logged n permits true n−1/n/n+1, initially 25%/50%/25%. Estimate the central correct-reading probability p jointly if desired, with equal tail probabilities (1−p)/2. Logged 1 may represent true 0; do not restore the superseded positive floor or the assumption that all true failures are logged 0. The prior sigma 1 parameter is replaced by p; fixed p=0.50 has positive-reading SD sqrt(0.5). No extra latent-RIR prior factor enters this conditional load likelihood.
+
+Both fixed and joint S/p/load-discrepancy paths retain the adopted formula and load rules. Physical p bounds are [0,1]; flat profiles, including all-zero or high-rep saturation, supply no p estimate. The [current revalidation](M36-T04-three-point-revalidation.md) owns implementation, generator, tests, assumptions and new simulation evidence. The Gaussian contracts/results below and in the preceding report are historical; they do not calibrate the new model.
+
+## Historical Gaussian follow-up assumptions — 2026-10-15
 
 The owner adopted exact recorded RIR 0 and retained Gaussian reporting error for uncertain readings. This section governs the [exact-zero research revision](M36-T04-exact-zero-revalidation.md); its implementation and validation are recorded there. The completed T04 experiments below retain their original rounded/censored Gaussian generator and results. Production inference, chart, reference and logged metrics are unchanged; earlier calibration does not validate this revision.
 

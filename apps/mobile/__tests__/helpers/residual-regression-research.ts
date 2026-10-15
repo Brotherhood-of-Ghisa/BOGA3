@@ -1,5 +1,5 @@
 // Research/test-only calculations. No runtime consumer or inferential guarantee.
-export const RIR_REPORTING_MODEL = 'exact-zero-positive-censored-gaussian.v1';
+export const RIR_REPORTING_MODEL = 'exact-zero-conditional-three-point.v1';
 export type ResearchRow = { time: number; value: number; covariates?: number[] };
 export type ResearchModel = 'constant' | 'linear' | 'quadratic' | 'hinge' | 'jump';
 export type ResearchFit = {
@@ -111,14 +111,28 @@ export function seededRandom(seed: number): { uniform: () => number; normal: () 
   return { uniform, normal: () => Math.sqrt(-2 * Math.log(uniform())) * Math.cos(2 * Math.PI * uniform()) };
 }
 
-export function recordedRirFromLatent(latentRir: number, sd: number, standardNormalDraw: number): number {
-  if (!Number.isSafeInteger(latentRir) || latentRir < 0 || !Number.isFinite(sd) || sd < 0 ||
-    !Number.isFinite(standardNormalDraw)) throw new Error('invalid forward RIR model');
-  if (latentRir === 0) return 0;
-  // Positive readings accumulate the lower Gaussian tail at one, never at exact failure.
-  const recorded = Math.max(1, Math.round(latentRir + sd * standardNormalDraw));
-  if (!Number.isSafeInteger(recorded)) throw new Error('RIR overflow');
-  return recorded;
+export function latentRirStates(recorded: number): number[] {
+  if (!Number.isSafeInteger(recorded) || recorded < 0 || !Number.isSafeInteger(recorded + 1))
+    throw new Error('invalid recorded RIR');
+  return recorded === 0 ? [0] : [recorded - 1, recorded, recorded + 1];
+}
+
+export function conditionalRirProbability(recorded: number, latent: number, correctProbability: number): number {
+  const states = latentRirStates(recorded);
+  if (!Number.isSafeInteger(latent) || latent < 0 || !Number.isFinite(correctProbability) ||
+    correctProbability < 0 || correctProbability > 1) throw new Error('invalid conditional RIR model');
+  if (!states.includes(latent)) return 0;
+  if (recorded === 0) return 1;
+  return latent === recorded ? correctProbability : (1 - correctProbability) / 2;
+}
+
+export function latentRirFromRecorded(recorded: number, correctProbability: number, uniformDraw: number): number {
+  const states = latentRirStates(recorded);
+  conditionalRirProbability(recorded, recorded, correctProbability);
+  if (!Number.isFinite(uniformDraw) || uniformDraw < 0 || uniformDraw >= 1) throw new Error('invalid uniform draw');
+  if (recorded === 0) return 0;
+  const tail = (1 - correctProbability) / 2;
+  return uniformDraw < tail ? states[0] : uniformDraw < tail + correctProbability ? states[1] : states[2];
 }
 
 function normalAreaFromZero(x: number): number {
@@ -142,23 +156,7 @@ export function normalCdf(x: number): number {
   return x <= 0 ? Math.exp(normalLogSurvival(-x)) : -Math.expm1(normalLogSurvival(x));
 }
 
-export function recordedRirLogProbability(recorded: number, latent: number, sd: number): number {
-  if (![recorded, latent].every(n => Number.isSafeInteger(n) && n >= 0) || !Number.isFinite(sd) || sd < 0)
-    throw new Error('invalid RIR probability');
-  if (recorded === 0 || latent === 0 || sd === 0) return recorded === latent ? 0 : -Infinity;
-  if (recorded === 1) return normalLogSurvival((latent - 1.5) / sd);
-  let lower = (recorded - 0.5 - latent) / sd, upper = (recorded + 0.5 - latent) / sd;
-  if (lower < 0 && upper > 0) return upper < 2 ? Math.log(2 * normalAreaFromZero(upper))
-    : Math.log1p(-2 * Math.exp(normalLogSurvival(upper)));
-  if (upper <= 0) [lower, upper] = [-upper, -lower];
-  const logLowerTail = normalLogSurvival(lower), logUpperTail = normalLogSurvival(upper);
-  return logLowerTail + Math.log(-Math.expm1(logUpperTail - logLowerTail));
-}
-
-export function recordedRirProbability(recorded: number, latent: number, sd: number): number {
-  return Math.exp(recordedRirLogProbability(recorded, latent, sd));
-}
-
+// Multipliers follow latentRirStates(recordedRir): one state at zero, otherwise lower/central/upper.
 export type JointRirPoint = { load: number; recordedRir: number; multipliers: number[] };
 
 function loadLogNormalizer(predicted: number, sd: number): number {
@@ -175,43 +173,36 @@ function logMixture(terms: number[]): number {
     Math.log(terms.reduce((sum, term) => sum + Math.exp(term - maximum), 0));
 }
 
-export function jointLogLikelihood(points: JointRirPoint[], strength: number, rirSd: number, loadSd: number): number {
-  if (!points.length || !Number.isFinite(strength) || strength <= 0 || !Number.isFinite(rirSd) || rirSd < 0 ||
-    !Number.isFinite(loadSd) || loadSd <= 0) throw new Error('invalid joint model');
+export function jointLogLikelihood(points: JointRirPoint[], strength: number, correctProbability: number, loadSd: number): number {
+  if (!points.length || !Number.isFinite(strength) || strength <= 0 || !Number.isFinite(correctProbability) ||
+    correctProbability < 0 || correctProbability > 1 || !Number.isFinite(loadSd) || loadSd <= 0)
+    throw new Error('invalid conditional model');
   let likelihood = 0;
   for (const point of points) {
-    if (!Number.isFinite(point.load) || point.load < 0 || !point.multipliers.length ||
-      point.multipliers.some(value => !Number.isFinite(value) || value <= 0)) throw new Error('invalid joint point');
-    const terms = point.multipliers.map((multiplier, latent) => {
-      const logProbability = recordedRirLogProbability(point.recordedRir, latent, rirSd);
-      if (logProbability === -Infinity) return -Infinity;
-      const predicted = strength / multiplier;
-      return logProbability - Math.log(point.multipliers.length) + loadLogDensity(point.load, predicted, loadSd);
+    const states = latentRirStates(point.recordedRir);
+    if (!Number.isFinite(point.load) || point.load < 0 || point.multipliers.length !== states.length ||
+      point.multipliers.some(value => !Number.isFinite(value) || value <= 0)) throw new Error('invalid conditional point');
+    const terms = point.multipliers.map((multiplier, index) => {
+      const probability = conditionalRirProbability(point.recordedRir, states[index], correctProbability);
+      return Math.log(probability) + loadLogDensity(point.load, strength / multiplier, loadSd);
     });
     likelihood += logMixture(terms);
   }
   return likelihood;
 }
 
-// Factor the same likelihood for repeated simulations; axes are [sigma][strength].
-export function jointLikelihoodGrid(points: JointRirPoint[], strengths: number[], sds: number[], loadSd: number): number[][] {
-  if (!strengths.length || !sds.length || strengths.some(s => !Number.isFinite(s) || s <= 0) ||
-    sds.some(s => !Number.isFinite(s) || s < 0)) throw new Error('invalid likelihood grid');
-  jointLogLikelihood(points, strengths[0], sds[0], loadSd);
-  const probabilities = sds.map(sd => {
-    const cache = new Map<string, number[]>();
-    return points.map(p => {
-      const key = `${p.recordedRir}:${p.multipliers.length}`;
-      if (!cache.has(key)) cache.set(key, p.multipliers.map((_, r) =>
-        recordedRirLogProbability(p.recordedRir, r, sd) - Math.log(p.multipliers.length)));
-      return cache.get(key)!;
-    });
-  });
+// Factor the same conditional load mixture; axes are [correctProbability][strength].
+export function jointLikelihoodGrid(points: JointRirPoint[], strengths: number[], probabilities: number[], loadSd: number): number[][] {
+  if (!strengths.length || !probabilities.length || strengths.some(s => !Number.isFinite(s) || s <= 0) ||
+    probabilities.some(p => !Number.isFinite(p) || p < 0 || p > 1)) throw new Error('invalid likelihood grid');
+  jointLogLikelihood(points, strengths[0], probabilities[0], loadSd);
+  const weights = probabilities.map(probability => points.map(point => latentRirStates(point.recordedRir)
+    .map(r => Math.log(conditionalRirProbability(point.recordedRir, r, probability)))));
   const multipliers = [...new Set(points.flatMap(p => p.multipliers))];
   const loads = strengths.map(s => {
     const normalizers = new Map(multipliers.map(f => [f, loadLogNormalizer(s / f, loadSd)]));
     return points.map(p => p.multipliers.map(f => normalizers.get(f)! - (p.load - s / f) ** 2 / (2 * loadSd * loadSd)));
   });
-  return probabilities.map(ps => loads.map(ls => ps.reduce((sum, terms, i) =>
+  return weights.map(ps => loads.map(ls => ps.reduce((sum, terms, i) =>
     sum + logMixture(terms.map((term, r) => term + ls[i][r])), 0)));
 }

@@ -1,6 +1,8 @@
 # Strength amplitude with RIR and load uncertainty
 
-> Historical results below use the completed T04 reporting model. The owner-approved exact-zero/Gaussian follow-up assumptions are recorded in the [validation contract](M36-T04-validation-contract.md#approved-follow-up-assumptions--2026-10-15); these original results are retained; the separate [revalidation](M36-T04-exact-zero-revalidation.md) records new runs rather than replacing their assumptions.
+> Historical results below use the completed T04 reporting model. The owner-approved exact-zero/Gaussian follow-up assumptions are recorded in the [validation contract](M36-T04-validation-contract.md#historical-gaussian-follow-up-assumptions--2026-10-15); these original results are retained; the separate [revalidation](M36-T04-exact-zero-revalidation.md) records new runs rather than replacing their assumptions.
+
+> Current implementation and revalidation use the [conditional three-point revision](M36-T04-three-point-revalidation.md); the original and intermediate Gaussian results remain historical.
 
 ## Revised two-approach contract
 
