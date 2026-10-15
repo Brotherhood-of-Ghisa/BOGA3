@@ -96,6 +96,13 @@ Two windows:
    the residual risk; closing it fully means per-row conflict detection on
    sync push, which is a larger change to Sync v2 and out of scope here. It
    should be named honestly, not hidden (see §9, Q4).
+   *LWW key monotonicity:* Sync v2 permits device timestamps up to 5 minutes
+   ahead of server time (`least(client_updated_at_ms, now_ms + 5 min)`). To
+   ensure the agent write actually wins and is never dropped by mobile clients on
+   pull (`incoming <= local`), every agent mutation RPC must advance the LWW
+   key strictly monotonically (`client_updated_at_ms =
+   greatest(stored.client_updated_at_ms + 1, now_ms)`) rather than writing bare
+   server `now_ms`.
 
 The design therefore needs a **version token** on plan/programme reads and a new
 typed rejection, not just an update RPC.
@@ -225,6 +232,12 @@ owner row):
 - `app_public.agent_reorder_plan_blocks(...)` / `…_programme_plans` / `…_block_sets`
 - `app_public.agent_tombstone_plan_block(...)` / `…_plan` / `…_programme`
 
+Every RPC sets `client_updated_at_ms = greatest(stored.client_updated_at_ms + 1,
+now_ms)` on every mutated or tombstoned row. Writing bare `now_ms` would regress
+the LWW key whenever a device wrote with a fast clock (Sync v2 allows clocks up
+to 5 minutes ahead), causing mobile clients to drop the pull update and allowing
+stale pushes to win.
+
 Migration sketch (one new migration, no change to applied ones):
 
 1. `alter table public.agent_plan_permissions add column plan_edit_enabled boolean not null default false;`
@@ -233,8 +246,9 @@ Migration sketch (one new migration, no change to applied ones):
 3. `add column last_modified_by text` (option 5.5a) on the four authored
    entities, if adopted.
 4. The RPCs above; each claims/validates the idempotency key, checks
-   `base_version`, enforces pending-only, tombstones rather than deletes, and
-   re-checks ownership.
+   `base_version`, enforces pending-only, advances `client_updated_at_ms`
+   monotonically (`greatest(existing + 1, now_ms)`), tombstones rather than
+   deletes, and re-checks ownership.
 5. Extend `dev_wipe_my_data` parity if any new table is added (none if 5.5a).
 
 ## 7. Spec and product impact
@@ -293,3 +307,4 @@ Migration sketch (one new migration, no change to applied ones):
 | 3 | 2026-10-14 | Optimistic concurrency (`base_version`) is mandatory; `PLAN_CONCURRENT_MODIFICATION` added. |
 | 4 | 2026-10-14 | Removals are tombstones; programme removal detaches child plans. |
 | 5 | 2026-10-14 | Destructive edit tools must carry `destructiveHint: true`. |
+| 6 | 2026-10-15 | Agent mutation RPCs advance `client_updated_at_ms` monotonically (`greatest(stored + 1, now_ms)`) to prevent LWW regression under Sync v2's 5-minute future clamp. |
