@@ -37,6 +37,7 @@ import {
   readSeedsAppliedMarker,
 } from '@/src/data/exercise-catalog-seeds';
 import { exerciseDefinitions, muscleGroups, syncRuntimeState } from '@/src/data/schema';
+import { subscribeToExerciseCatalogInvalidation } from '@/src/exercise-catalog/invalidation';
 import type { LocalDatabase } from '@/src/data/bootstrap';
 
 import {
@@ -360,6 +361,10 @@ describe('bundle-migration runtime loop', () => {
     });
 
     it('resumes from the last committed generation after a mid-loop failure', () => {
+      const committedMarkers: number[] = [];
+      const unsubscribe = subscribeToExerciseCatalogInvalidation(() => {
+        committedMarkers.push(readMarker(fixture));
+      });
       const boom = new Error('simulated migration failure');
       const firstAttempt = [
         {
@@ -381,6 +386,8 @@ describe('bundle-migration runtime loop', () => {
       setMarker(fixture, 1);
 
       expect(() => runBundleMigrations(asLocalDatabase(fixture))).toThrow(boom);
+      unsubscribe();
+      expect(committedMarkers).toEqual([2]);
 
       // Generation 2 committed (its own transaction); generation 3 rolled back.
       expect(readMarker(fixture)).toBe(2);
@@ -413,6 +420,8 @@ describe('bundle-migration runtime loop', () => {
     });
 
     it('rolls back the marker advance with the migration when its transaction throws', () => {
+      const invalidated = jest.fn();
+      const unsubscribe = subscribeToExerciseCatalogInvalidation(invalidated);
       __setBundleMigrationsForTests([
         {
           appVersion: 2,
@@ -425,6 +434,8 @@ describe('bundle-migration runtime loop', () => {
       setMarker(fixture, 1);
 
       expect(() => runBundleMigrations(asLocalDatabase(fixture))).toThrow();
+      unsubscribe();
+      expect(invalidated).not.toHaveBeenCalled();
 
       // The whole transaction rolled back: neither the row write nor the marker
       // advance survived.

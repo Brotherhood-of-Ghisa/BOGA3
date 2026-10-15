@@ -29,6 +29,7 @@
 //     never flip the dirty bit itself.
 
 import { and, eq, isNull } from 'drizzle-orm';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { BODYWEIGHT_SEED_CONTRIBUTIONS } from '@/src/exercise-core/bodyweight-contribution';
 
 import { nowMonotonic, type Transaction } from './clock';
@@ -324,6 +325,8 @@ export const runBundleMigrations = (database: LocalDatabase): void => {
       advanceAppliedMarker(tx as Transaction, migration.appVersion);
     });
     marker = migration.appVersion;
+    // Refresh committed catalog changes even if a later migration fails.
+    invalidateExerciseCatalogCache();
   }
 
   // No migration carried the marker all the way to the current generation
