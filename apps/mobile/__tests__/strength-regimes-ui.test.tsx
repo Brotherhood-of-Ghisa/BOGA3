@@ -4,7 +4,7 @@ import { periodLabel, selectedPeriod } from '@/components/rm-curve/regimes';
 import { curveGeometry } from '@/components/rm-curve/geometry';
 import { ALL_GYMS, buildRmCurveModel } from '@/src/rm-curve/model';
 import { assessRegimes, assessSingleCurve } from '@/src/strength-regimes/assessment';
-import { fitStrengthRegimes, iterateStrengthRegimes } from '@/src/strength-regimes/fit';
+import { fitStrengthRegimes, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
 import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { generateRegimeHistory } from './helpers/regime-reliability-research';
 import { waveGraph } from './helpers/rm-curve-history';
@@ -37,7 +37,7 @@ it.each(['fixed', 'joint'] as const)('preserves the reviewed %s fitter results a
   const iterator = iterateStrengthRegimes(sessions, { method });
   let next = iterator.next(), chunks = 0;
   while (!next.done) { chunks++; next = iterator.next(); }
-  expect(chunks).toBe(expected.noBreakFits.length + expected.cutProfile.length);
+  expect(chunks).toBeGreaterThan(expected.noBreakFits.length + expected.cutProfile.length);
   expect(next.value).toEqual(expected);
   const assessment = assessRegimes(model(), expected);
   expect(assessment.evidence).toBe(expected.evidence);
@@ -129,4 +129,67 @@ it('updates selected-set temporal identity on a changed boundary and removes inv
   expect(selectedPeriod(new Date(), { ...a, curves: [] })).toBeUndefined();
   expect(periodLabel('all', null, 'YYYY-MM-DD')).toBe('All dates');
   expect(periodLabel('newer', new Date(2026, 9, 15).getTime(), 'YYYY-MM-DD')).toBe('From 2026-10-15');
+});
+
+it('yields within a long trajectory, caps work before the next evaluation, and closes cancelled work', () => {
+  const sessions = Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
+    firstWorkingSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } }));
+  const points = prepareRegimePoints(sessions), budget = { remaining: 20_000 };
+  const fit = iterateStrengthTrajectory(points, 'quadratic', { method: 'joint' }, undefined, budget);
+  expect(fit.next().done).toBe(false);
+  expect(budget.remaining).toBeGreaterThan(0);
+  expect(budget.remaining).toBeLessThan(20_000);
+  let chunks = 1;
+  expect(() => {
+    while (true) {
+      const before = budget.remaining, next = fit.next();
+      expect(before - budget.remaining).toBeLessThanOrEqual(7000);
+      if (next.done) break;
+      chunks++;
+    }
+  }).toThrow(FitWorkLimitError);
+  expect(chunks).toBeGreaterThan(1);
+  expect(budget.remaining).toBe(0);
+  const cancelled = iterateStrengthTrajectory(points, 'constant', { method: 'fixed' }, undefined, { remaining: 20_000 });
+  expect(cancelled.next().done).toBe(false);
+  expect(cancelled.return(undefined as never).done).toBe(true);
+  expect(cancelled.next().done).toBe(true);
+  expect(() => fitStrengthRegimes(sessions, { method: 'fixed', maxPointEvaluations: 0 })).toThrow('invalid regime options');
+});
+
+it('bounds a thousand-session UI request, retains every plotted point, and recovers after narrowing', () => {
+  jest.useFakeTimers();
+  const m = model();
+  const large = { ...m, inferenceSessions: Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
+    firstWorkingSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
+  const props = { read: { status: 'ready' as const, data: large, retry: jest.fn() },
+    scope: { exerciseId: 'curve', range: 'history' as const, rir: null }, onScope: jest.fn(),
+    exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,
+    retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 520 };
+  const view = render(<RmCurveContent {...props} />);
+  fireEvent.press(screen.getByTestId('rm-mode-two'));
+  act(() => { jest.runAllTimers(); });
+  expect(screen.getByText('Choose a shorter range')).toBeTruthy();
+  expect(screen.getAllByTestId(/^rm-point-/)).toHaveLength(m.observations.length);
+  expect(screen.queryAllByTestId(/^rm-fit-/)).toHaveLength(1); // Only the state label, never a partial curve.
+  expect(screen.queryByTestId('rm-fit-older')).toBeNull();
+  expect(screen.queryByTestId('rm-fit-newer')).toBeNull();
+  view.rerender(<RmCurveContent {...props} read={{ ...props.read, data: m }} />);
+  expect(screen.getByText('Fitting curves')).toBeTruthy();
+  act(() => { jest.runAllTimers(); });
+  expect(screen.queryByText('Choose a shorter range')).toBeNull();
+  expect(screen.getByTestId('rm-fit-older')).toBeTruthy();
+  view.unmount();
+  expect(jest.getTimerCount()).toBe(0);
+});
+
+it('shares the work budget across completed competitors instead of resetting it per trajectory', () => {
+  const sessions = generateRegimeHistory('step10', 37201).sessions;
+  const budget = { remaining: 1_000_000 };
+  const constant = iterateStrengthTrajectory(prepareRegimePoints(sessions), 'constant', { method: 'fixed' }, undefined, budget);
+  let constantChunks = 0;
+  while (!constant.next().done) constantChunks++;
+  const profile = iterateStrengthRegimes(sessions, { method: 'fixed', maxPointEvaluations: 1_000_000 - budget.remaining });
+  for (let i = 0; i < constantChunks + 1; i++) expect(profile.next().done).toBe(false);
+  expect(() => profile.next()).toThrow(FitWorkLimitError);
 });

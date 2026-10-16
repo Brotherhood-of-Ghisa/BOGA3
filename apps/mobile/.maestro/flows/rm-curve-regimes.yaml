@@ -1,10 +1,12 @@
 appId: com.dinoderek.mobile
 ---
-# Approved focused device proof: native chart/SVG touch geometry, overlapping
-# observations, sheets/model controls, History stack return and intact workout.
-# Numerical methods, source races and SQLite population rules are owned by Jest:
-# strength-regimes-local-data, strength-regimes-ui and rm-curve-navigation suites.
-# Fixture is synthetic UI data, never a calibration context or real-user export.
+# Proves: actual chart/overlap selection, native sheets/model controls, History
+# stack return and intact planned workout values.
+# Why device: SVG/native touch geometry, sheets and navigation need the device;
+# Jest cannot prove real gestures or the native stack/scroll interaction.
+# Jest counterpart: strength-regimes-local-data.test.tsx, strength-regimes-ui.test.tsx,
+# rm-curve-navigation.test.tsx own numerics, source races, SQLite scope and controls.
+# Fixture is synthetic UI data, never calibration evidence or a real-user export.
 - openLink: "boga3://maestro-harness?reset=data&fixture=strength-regimes&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
 - extendedWaitUntil:
     visible: { id: "exercise-page" }

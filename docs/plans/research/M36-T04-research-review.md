@@ -183,3 +183,12 @@ An independent Python math.erfc mixture oracle exactly matches one mixed-RIR joi
 ## Limitations and scope
 
 The ±1 bound, equal and constant tails, exact-zero reliability, load discrepancy and session independence require adequate empirical validation. Parameter recovery under the declared generator does not establish real-user calibration. Keep both fixed and joint approaches available, with weak identification and unresolved boundaries visible. The experimental chart follows [[1rm.curve-fitting]] and [[1rm.curve-scope]], offers the two uncertainty methods and renders numerically estimable temporal curves. It retains observations on insufficient/unresolved fits. Real histories do not inherit calibrated evidence shades, intervals or adequacy claims; identifying a reliable physiological structural break still requires empirical validation. Main and production activation remain untouched.
+
+## Interactive execution
+
+The numerical optimizer yields within trajectory searches. Interactive requests
+share a two-million point-evaluation computation budget; exhaustion retains all
+observations but displays no partial curve, cut profile or likelihood comparison.
+Users can narrow the time range. Research uses the same objective, optimizer and
+full cut search without this default execution budget. This resource boundary is
+neither statistical sufficiency nor a change to the population/model.

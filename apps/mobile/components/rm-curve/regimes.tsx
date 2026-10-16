@@ -19,7 +19,7 @@ export function RmRegimes({ model, result, selectedId, dateFormat, onPick, plotR
     <RmCurveChart model={model} selectedId={selectedId} onPick={onPick} plotRef={plotRef}
       curves={assessment?.curves ?? []} boundary={assessment?.boundary ?? null} />
     <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={styles.body}>
-      {result === null ? 'Fitting curves' : result.error ? 'Fit unavailable' : assessment?.message}
+      {result === null ? 'Fitting curves' : result.limited ? 'Choose a shorter range' : result.error ? 'Fit unavailable' : assessment?.message}
     </Text>
     {assessment ? <Text allowFontScaling={false} style={styles.figure}>{assessment.sampledSessions} fitting sessions</Text> : null}
     {assessment?.curves.map(curve => <View key={curve.period} style={styles.legend}>

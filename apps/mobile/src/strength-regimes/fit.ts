@@ -2,13 +2,15 @@
 import { conditionalTrajectoryLikelihood, type JointRirPoint } from './likelihood';
 import { fitRegression, median } from './regression';
 import { rirCurveMultipliers } from './multipliers';
-import { boundedSearch } from './bounded-search';
+import { iterateBoundedSearch } from './bounded-search';
 
 export type RegimeSession = { sessionId: string; time: number;
   firstWorkingSet: { setId: string; reps: number; rir: number | null; load: number } | null };
 export type RegimePoint = JointRirPoint & { sessionId: string; setId: string; time: number };
 export type RegimeOptions = { method: 'fixed' | 'joint'; minimumSegment?: number;
-  correctProbability?: number; loadSd?: number; loadSdBounds?: [number, number]; maxIterations?: number };
+  correctProbability?: number; loadSd?: number; loadSdBounds?: [number, number]; maxIterations?: number; maxPointEvaluations?: number };
+export type FitBudget = { remaining: number };
+export class FitWorkLimitError extends Error {}
 export type TrajectoryKind = 'constant' | 'linear' | 'quadratic' | 'step';
 export type TrajectoryFit = { kind: TrajectoryKind; controls: number[]; fittedStrengths: number[];
   correctProbability: number | null; loadSd: number; logLikelihood: number; converged: boolean;
@@ -38,6 +40,7 @@ function validateOptions(options: RegimeOptions) {
   if (!['fixed', 'joint'].includes(options.method) || !Number.isSafeInteger(minimum) || minimum < 2 ||
     !Number.isFinite(p) || p < 0 || p > 1 || !Number.isFinite(sd) || sd <= 0 ||
     bounds.length !== 2 || !bounds.every(Number.isFinite) || bounds[0] <= 0 || bounds[0] >= bounds[1] ||
+    (options.maxPointEvaluations !== undefined && (!Number.isSafeInteger(options.maxPointEvaluations) || options.maxPointEvaluations < 1)) ||
     (options.maxIterations !== undefined && (!Number.isSafeInteger(options.maxIterations) || options.maxIterations < 1)))
     throw new Error('invalid regime options');
   return { minimum, p, sd, bounds };
@@ -74,7 +77,8 @@ function minimumControl(x: number[], kind: TrajectoryKind, count: number) {
     ? (1 - vertex) ** 2 * a + 2 * vertex * (1 - vertex) * b + vertex ** 2 * c : Infinity);
 }
 
-export function fitStrengthTrajectory(points: RegimePoint[], kind: TrajectoryKind, options: RegimeOptions, cut?: number): TrajectoryFit {
+export function* iterateStrengthTrajectory(points: RegimePoint[], kind: TrajectoryKind, options: RegimeOptions,
+  cut?: number, budget: FitBudget = { remaining: options.maxPointEvaluations ?? Infinity }): Generator<void, TrajectoryFit> {
   const checked = validateOptions(options);
   if (!points.length || points.some((p, i) => !Number.isFinite(p.time) || (i > 0 && p.time < points[i - 1].time)) ||
     !['constant', 'linear', 'quadratic', 'step'].includes(kind) ||
@@ -96,19 +100,24 @@ export function fitStrengthTrajectory(points: RegimePoint[], kind: TrajectoryKin
   const decode = (x: number[]) => ({ strengths: basis.map(row => scale * row.reduce((s, w, i) => s + w * x[i], 0)),
     p: freeP ? x[count] : checked.p, sd: joint ? Math.exp(x[x.length - 1]) : checked.sd });
   const objective = (x: number[]) => {
+    if (budget.remaining < points.length) throw new FitWorkLimitError('interactive fit work limit');
+    budget.remaining -= points.length;
     const decoded = decode(x);
     if (decoded.strengths.some(s => !Number.isFinite(s) || s <= 0)) return Infinity;
     if (minimumControl(x, kind, count) <= 0) return Infinity;
     return -likelihood(decoded.strengths, decoded.p, decoded.sd);
   };
   const initial = startingControls(points, kind, scale, cut);
-  const starts = [0.95, 1, 1.05].map((factor, i) => {
+  const starts = [];
+  const factors = [0.95, 1, 1.05], yieldEvery = Math.max(1, Math.floor(1024 / points.length));
+  for (const [i, factor] of factors.entries()) {
     const x = i === 1 ? Array(count).fill(Math.max(0.001, median(amplitudes) / scale)) : initial.values.map(v => v * factor);
     if (freeP) x.push([0.15, 0.5, 0.85][i]);
     if (joint) x.push(Math.log(Math.max(checked.bounds[0], Math.min(checked.bounds[1], checked.sd))));
-    return boundedSearch(objective, x, bounds, options.maxIterations ?? 450);
-  }).sort((a, b) => a.value - b.value);
-  const refined = boundedSearch(objective, starts[0].x, bounds, options.maxIterations ?? 450);
+    starts.push(yield* iterateBoundedSearch(objective, x, bounds, options.maxIterations ?? 450, yieldEvery));
+  }
+  starts.sort((a, b) => a.value - b.value);
+  const refined = yield* iterateBoundedSearch(objective, starts[0].x, bounds, options.maxIterations ?? 450, yieldEvery);
   const best = refined.value <= starts[0].value ? refined : starts[0], decoded = decode(best.x);
   return { kind, controls: best.x.slice(0, count).map(s => s * scale), fittedStrengths: decoded.strengths,
     correctProbability: informed ? decoded.p : null, loadSd: decoded.sd, logLikelihood: -best.value,
@@ -125,16 +134,17 @@ export function* iterateStrengthRegimes(sessions: RegimeSession[], options: Regi
   const distinct = new Set(points.map(p => p.time)).size;
   const kinds: TrajectoryKind[] = distinct >= 3 && points.length > 3 ? ['constant', 'linear', 'quadratic']
     : distinct >= 2 && points.length > 2 ? ['constant', 'linear'] : ['constant'];
+  const budget = { remaining: options.maxPointEvaluations ?? Infinity };
   const noBreakFits: TrajectoryFit[] = [];
   for (const kind of points.length ? kinds : []) {
-    noBreakFits.push(fitStrengthTrajectory(points, kind, options));
+    noBreakFits.push(yield* iterateStrengthTrajectory(points, kind, options, undefined, budget));
     yield;
   }
   const bestNoBreak = noBreakFits.slice().sort((a, b) => b.logLikelihood - a.logLikelihood)[0] ?? null;
   const cuts: CutFit[] = [];
   for (let cut = minimum; cut <= points.length - minimum; cut++) {
     if (points[cut - 1].time === points[cut].time) continue;
-    cuts.push({ ...fitStrengthTrajectory(points, 'step', options, cut), cutIndex: cut,
+    cuts.push({ ...yield* iterateStrengthTrajectory(points, 'step', options, cut, budget), cutIndex: cut,
       leftTime: points[cut - 1].time, rightTime: points[cut].time });
     yield;
   }
@@ -148,7 +158,15 @@ export function* iterateStrengthRegimes(sessions: RegimeSession[], options: Regi
     limit: 'Numerical optimization/profile only; calibration and uncertainty require a matching assessment context.' };
 }
 
-/** Synchronous research caller; runtime yields between the identical trajectory fits. */
+/** Synchronous research callers drain the same resumable numerical operations. */
+export function fitStrengthTrajectory(points: RegimePoint[], kind: TrajectoryKind, options: RegimeOptions, cut?: number): TrajectoryFit {
+  const fit = iterateStrengthTrajectory(points, kind, options, cut);
+  let next = fit.next();
+  while (!next.done) next = fit.next();
+  return next.value;
+}
+
+/** Without an explicit budget, research retains the exhaustive search. */
 export function fitStrengthRegimes(sessions: RegimeSession[], options: RegimeOptions) {
   const fits = iterateStrengthRegimes(sessions, options);
   let next = fits.next();

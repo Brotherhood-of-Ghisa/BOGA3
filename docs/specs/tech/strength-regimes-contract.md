@@ -35,9 +35,14 @@ context. All gyms combines rows once within the other selected filters.
 
 `useRmCurve` scopes reads to account revision, exercise, gym, dates, effort and
 source revisions. `useRegimeAssessment` keys results by that immutable model
-object and selected mode/method. It schedules one trajectory per chunk, yields
-between candidates and cancels queued chunks on change/unmount. Each trajectory
-remains synchronous; cancellation takes effect at the next chunk boundary.
+object and selected mode/method. Both modes yield inside simplex searches, with iteration batches shrinking as
+sample size grows (roughly 1,024 point operations per iteration batch, multiplied
+by the simplex's bounded evaluations per iteration). Cancelling closes the
+iterator at the next chunk boundary. Interactive requests share a two-million
+point-evaluation budget across all starts, competitors, refinement and cuts.
+Exhaustion publishes no partial curve/profile/evidence: retain all points and
+show `Choose a shorter range`. No history subsampling occurs. Research wrappers
+drain identical operations synchronously with no default work budget.
 Selection remains inspectable while fitting. A failed or insufficient fit
 retains points; storage failures hide retained stale values and offer Retry.
 No source write, server/schema change or workflow/navigation replacement occurs.
@@ -52,7 +57,7 @@ The simulated null references and uncertainty radii are conditional on their
 validated designs; sample size or joint fitting alone cannot transfer them.
 A future matching-context assessment must explicitly establish that scope before
 applying its D/(D+c) mapping or the accepted precision gate. This limitation does
-not suppress an otherwise numerically estimable tentative curve.
+not suppress a numerically estimable tentative curve within the interactive budget.
 
 Gym/equipment changes, missing effort, fatigue, serial dependence and changing
 noise can mimic strength changes. Neither temporal colour assignment nor a
