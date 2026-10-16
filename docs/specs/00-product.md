@@ -54,6 +54,6 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
 - Decision: Current preferences, contributions and dated readings reinterpret
   derived history without rewriting raw sets (`Top weight` stays raw; contract
   §4). User-facing calculation surfaces
-  use only `Weight`, `Top weight`, `1RM` and `Volume` and do not expose the
-  calculation breakdown. The complete boundary is owned by
+  use `Weight`, `Top weight`, `1RM` and `Volume`; only the approved RM chart
+  coordinate ([[1rm.curve-load]]) exposes calculated load. The complete boundary is owned by
   `tech/bodyweight-load-contract.md`.

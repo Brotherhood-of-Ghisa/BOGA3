@@ -1,23 +1,16 @@
 # Product facts
 
-The product decisions BOGA is built to: what a working set is, how 1RM is
-calculated, what a set row shows, how screens use words. Each decision is
-stated once, here, with a stable ID. Specs describe how the code implements a
-fact; they cite it and never restate it.
-
-Where a spec and a fact disagree, the fact records the decision and the spec
-records today's code (see each fact's `Pending:` line).
+Each product decision has one stable ID here. Specs cite facts and describe
+their implementation; `Pending:` identifies gaps between decisions and code.
 
 ## Subjects
 
-A question belongs to exactly one subject, and that subject's file is the only
-place it is answered. A fact that fits no subject means adding a subject on
-purpose, in its own PR.
+Each question belongs to one subject/file. Add a new subject in its own PR.
 
 | Subject | File | Covers |
 | --- | --- | --- |
 | `set` | `set.md` | A performed set, which sets feed which figure, set counts and rows |
-| `1rm` | `1rm.md` | The 1RM estimate and its display |
+| `1rm` | `1rm.md` | The 1RM estimate, display and RM curve analytics |
 | `muscle` | `muscle.md` | How sets and work are attributed to muscles |
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
 | `comparison` | `comparison.md` | Which periods are compared, and how a change is shown |
@@ -25,13 +18,10 @@ purpose, in its own PR.
 | `groups` | `groups.md` | Group competition: certification's scope and end |
 | `appearance` | `appearance.md` | App icon selection and the default fallback |
 
-A fact states a rule that holds across the app. How one screen or view lays a
-rule out is not a fact: that belongs to the screen's spec
-(`docs/specs/ui/screen-map.md`, `docs/specs/ui/components-catalog.md`), the
-component's own README, and the tests that pin it.
+Facts govern app-wide rules; screen layout belongs in `docs/specs/ui/screen-map.md`,
+`docs/specs/ui/components-catalog.md`, component READMEs and tests.
 
-Not yet here: volume totals, records, session counts, bodyweight, groups-only
-scoring, and the session summary and volume comparison. Until they move in,
+Volume, records, sessions, bodyweight, group scoring and summary/comparison rules:
 `docs/specs/tech/training-metrics-contract.md` owns them.
 
 ## Fact format
@@ -90,5 +80,4 @@ prints every fact's statement size against the cap.
 
 ## Reviewing a change against the facts
 
-`REVIEW.md` is the prompt. Any agent runs it on a diff with this whole
-directory loaded.
+Review diffs using `REVIEW.md`, with this directory loaded.

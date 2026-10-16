@@ -109,6 +109,17 @@ describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
     expect(asymptote - at200 / 100).toBeLessThan(0.001);
   });
 
+  it('round-trips a reference through the unit-load inverse including singles, zero and the parser boundary', () => {
+    for (const reps of [1, 2, 8, 10, 30, MAX_SET_REPS]) {
+      for (const reference of [0, 1, 100, 1e6]) {
+        const predictedLoad = reference / estimateOneRepMax(1, reps)!;
+        expect(estimateOneRepMax(predictedLoad, reps)).toBeCloseTo(reference, 8);
+      }
+    }
+    expect(100 / estimateOneRepMax(1, 1)!).toBe(100);
+    expect(100 / estimateOneRepMax(1, MAX_SET_REPS)!).toBeCloseTo(48.8, 10);
+  });
+
   it('is monotonically increasing in both weight and reps', () => {
     expect(estimateOneRepMax(100, 5)).toBeLessThan(estimateOneRepMax(100, 6) as number);
     expect(estimateOneRepMax(100, 5)).toBeLessThan(estimateOneRepMax(110, 5) as number);

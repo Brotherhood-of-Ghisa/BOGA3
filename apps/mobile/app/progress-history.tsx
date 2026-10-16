@@ -18,7 +18,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, historyDayHref, progressHistoryHref, sessionsWeekHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
 import { exerciseCountedMuscles } from '@/src/exercise-catalog/exercise-muscles';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
@@ -27,7 +27,7 @@ import { updatePreferences, useAccountLocalPreferenceState } from '@/src/prefere
 // One exercise's or one muscle's history, pushed from Progress. The subject is
 // the page's native title, and the view and metric selectors sit in one row
 // above the chart. The header's ⋮ holds the Timeline's focused week's sessions
-// and, for an exercise, the history of each muscle it counts towards. The
+// and, for an exercise, its RM curve and each counted muscle’s history. The
 // params carry an id, never a name: the page resolves the name from the
 // exercise catalogue cache, which also decides the unavailable state
 // (`navigation-contract.md`: a bad id renders in route).
@@ -77,15 +77,15 @@ type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondar
 
 const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary' } as const;
 
-// The page's ⋮: the focused week's sessions, while the Timeline focuses a week
-// that has some, and each muscle an exercise counts towards. With neither,
-// the button goes rather than opening an empty sheet.
-function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle }: {
+// The page's ⋮ offers applicable week, muscle and exercise-chart actions.
+// With no applicable action, hide the button rather than opening an empty sheet.
+function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenCurve }: {
   title: string;
   week: FocusedTimelineWeek | null;
   muscles: readonly HistoryMuscleLink[];
   onOpenWeek: (weekStartDateKey: string) => void;
   onOpenMuscle: (muscleGroupId: string) => void;
+  onOpenCurve?: () => void;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const sessionsWeek = week?.hasTraining ? week : null;
@@ -97,7 +97,7 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle }: {
     setOptionsVisible(false);
     onOpenMuscle(muscleGroupId);
   };
-  const hasOptions = sessionsWeek !== null || muscles.length > 0;
+  const hasOptions = sessionsWeek !== null || muscles.length > 0 || onOpenCurve !== undefined;
   return (
     <>
       <Stack.Screen
@@ -107,6 +107,7 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle }: {
           // the key out would keep the last button on screen.
           headerRight: hasOptions ? () => (
             <IconButton
+              nativeHeader
               accessibilityLabel="Options"
               name="more-vertical"
               onPress={() => setOptionsVisible(true)}
@@ -121,6 +122,15 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle }: {
         testID="progress-history-options-sheet"
         title={title}
         visible={optionsVisible}>
+        {onOpenCurve ? (
+          <ListRow
+            label="RM curve"
+            leading={<Icon color={uiRoles.inkMuted} name="timeline-columns" size="md" />}
+            onPress={() => { setOptionsVisible(false); onOpenCurve(); }}
+            testID="progress-history-rm-curve"
+            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+          />
+        ) : null}
         {sessionsWeek ? (
           <ListRow
             description={sessionsWeek.label}
@@ -259,6 +269,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     <Screen testID="progress-history-screen">
       <HistoryHeader
         muscles={muscleLinks}
+        onOpenCurve={exercise && !exercise.deletedAt ? () => router.push(rmCurveHref(exercise.id)) : undefined}
         onOpenMuscle={openMuscle}
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}

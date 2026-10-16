@@ -1,9 +1,7 @@
 # Training metrics contract
 
-How the app, the group evaluator and the coaching API implement the product
-facts on sets and 1RM (`docs/product/`), and the rules for sessions, records
-and totals that have no fact yet. A fact is cited as `[[id]]`, never restated
-here; other specs link here for the code.
+Implements the product facts in `docs/product/` for mobile, groups and coaching,
+and owns the remaining session, record and total rules.
 
 | § | Definition | Code |
 | --- | --- | --- |
@@ -233,7 +231,8 @@ displayed 1RM   = (total 1RM - c × B) / F
 
 Bodyweight contributes once. Ordinary per-side exercise Volume counts both
 sides; displayed 1RM stays in entered external-Weight units. Screens show Weight,
-1RM and Volume, never the calculated-load breakdown.
+1RM and Volume; only the RM chart's approved coordinate ([[1rm.curve-load]], §6)
+exposes calculated load.
 
 **1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
 
@@ -327,3 +326,29 @@ converts source entered units to the declared group target, while Volume is
 total kg·reps independent of target mode. Display rounding does
 not determine competitive rank. Raw kg storage and historical group audits retain their original values and
 revisions; personal facts rebuild under the new calculation rules.
+
+## 6. RM curve analytics — experimental fitting
+
+[[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-fitting]],
+[[1rm.curve-load]] and [[1rm.curve-scope]] govern the read model. For fitting,
+numerical diagnostics, cancellation and calibration limits, load
+`strength-regimes-contract.md`. This branch implements the approved experimental
+view; activation and human implemented-UI acceptance remain separate gates.
+
+`src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives
+observations and prespecified session samples. `components/rm-curve/` renders it,
+hosted by `app/rm-curve.tsx`. No derived figure writes back to workouts.
+
+Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
+then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
+Under [[1rm.curve-effort]], validate `Number.isSafeInteger(m+n)` before passing
+u to the shared estimator. Actual metrics can be finite while this second
+estimate overflows; retain only finite analytical values. Missing/unknown RIR
+cannot be inferred from targets.
+
+`exercise-calculations/rm-curve.ts` owns projection, inversion and integer knots;
+full precision precedes rendering interpolation. Its residual helper remains
+available to numerical research; no residual or legacy historical benchmark
+controls the fitted production chart. Retain raw effort, actual/equivalent reps,
+IDs/order, dates, gym and loading/reading provenance before lossy normalization.
+For chart/bodyweight projection, load `bodyweight-load-contract.md` §11.

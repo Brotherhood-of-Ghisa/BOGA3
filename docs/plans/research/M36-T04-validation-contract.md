@@ -1,0 +1,41 @@
+# Statistical validation contract
+
+When reproducing or extending the research model, use the [research paper](M36-T04-research-review.md) for its conditional likelihood, parameters and numerical findings. This contract owns the validation requirements.
+
+## Paper maintenance
+
+Update the paper in place whenever the model or matching simulation evidence changes. Present only the adopted model, its matching results and clearly labelled open research questions; remove superseded formulations/results instead of appending iteration reports. Git history retains provenance. Never relabel an older simulation as evidence for different assumptions.
+
+## Model and paired comparisons
+
+Use exact logged RIR 0 and the conditional three-point distribution for positive readings. Compare S fitted with p=0.50 and total-load tau=2.50 kg against joint S/p/tau fitting on identical observations. Keep the tails equal, p within [0,1], load discrepancy positive and the adopted RM kernel unchanged. Missing effort remains unavailable. Logged metrics, loading semantics, chart/reference rules and the frozen programme are not modified by research fitting.
+
+Primary strength recovery uses a prespecified first ordinal from each independent completed session in a constant-S window. Select the ordinal before outcomes; never replace it because its effort is missing. Separate all-set fits and shared/serial errors are dependence stresses. Keep exercise/gym identity, timing/order and load/bodyweight context available for diagnosing confounding.
+
+## Calibration and reporting
+
+Use separate, unique calibration and evaluation seeds. Matching cells cover 12/16/24/48 independent sessions and true p=0/0.5/0.75/1 at total-load tau=2.50 kg, with 400 replications for each calibration/evaluation cell. Calibrate fixed and joint profiles under their declared policy. Stress cells use 200 replications and include off-grid truth, alternate load scales, rounding, effort/rep designs, dependency, asymmetry, wider RIR errors, false zeros, changing S and information-poor data. Other load scales and designs are sensitivities, not automatically calibrated policies.
+
+Report finite-fit bias/RMSE, unconditional failure/coverage, Monte Carlo SE, profile widths/components and grid diagnostics. A no-fit outcome counts as uncovered; do not remove impossible observations or silently widen eligibility. Retain both physical p endpoint rates. Flat p profiles, including all-zero and kernel-saturated histories, supply no p estimate or interval. Distinguish numerical flatness from a statistical adequacy decision; broad intervals can remain uninformative without being exactly flat.
+
+Use interpolated profile crossings while retaining disconnected components. Treat p endpoints as finite physical bounds and S/tau grid endpoints as unresolved. A lower tau grid optimum can hide divergence toward zero in repeated deterministic data and does not measure a noise floor. Record grid sensitivity; one refinement check is not global convergence. Simulation coverage and Monte Carlo precision do not establish real-history reliability.
+
+## Amplitude and break validation
+
+S is the only curve parameter. The isolated regression benchmark uses known-RIR0 singles with total-load SD 2.50 kg, separating curve-amplitude changes from RIR error. Calibrate the maximum over no-break competitors, both break forms, admissible session cuts and declared 12/16/24/48 prefixes. Minimum eight sessions per side, with six/ten sensitivities, is a search constraint rather than a sufficient-data rule. Report power, false flags, form confusion, misses, gaps/boundaries and conditional versus unconditional localization/effect coverage. Forecast checks use only earlier observations.
+
+Mixed-RIR stresses concern observed analytical amplitude unless a direct segmented conditional likelihood is fitted and validated. For that research, compare break/no-break likelihoods on the same data with comparable nuisance assumptions, account for cut/suffix/form selection and repeated assessments, and examine noise-only alternatives and serial dependence. Relative likelihood evidence may guide future candidate-curve emphasis; no probability, threshold, opacity mapping or production assertion follows from the RSS benchmark.
+
+## Direct conditional-likelihood regime validation
+
+For the direct level-change fitter, use the same conditional likelihood for constant/linear/quadratic no-break strength and two positive plateau strengths, with shared joint p/tau. Calibrate/evaluate complete cut/model searches and declared16/24/32-session assessments on separate seed families. The initial direct study uses400 replications per constant/linear/quadratic/+2/+5/+10kg matching cell, plus200 per stress; weekly16–32 checks are a monitoring sensitivity, not a universally calibrated schedule. Eight sessions per side remains a search constraint.
+
+Calibrate the worst no-break upper95% search reference. Separately evaluate latest32-session strength/effect errors under constant and declared step histories; true-cut profile losses require the step family. Account for finite calibration-sample uncertainty with exact binomial order-statistic tolerance limits for interval references. Use fresh held-out seeds after validation-policy decisions informed by development results. Preserve unconditional failures, nonfinite references, misses outside the searched cut range, Monte Carlo SE and the actual scope of each interval. A nominal calibration target is not achieved reliability until independent evaluation supports it. Do not transfer confidence intervals or thresholds from the RSS benchmark or constant-strength grid study.
+
+Stress noise-only/accuracy-only changes, error misspecification, dependence, fatigue, missing/sparse/gapped histories, rounding, small/late changes and numerical nuisance boundaries. A one-set/session fatigue cell represents independent extra noise; serial dependence has its own cell. Compare an independent likelihood oracle with supplied canonical multipliers; never claim a finite grid proves global optimality. Read the [approved assessment contract](M37-T02-assessment-contract.md) when integrating the analytically approved handoff; separate UI design approval still precedes implementation.
+
+## Empirical and human review
+
+Use only authorized histories; raw exports stay restricted locally and published summaries remain anonymized. Verify effort provenance and comparable exercise/gym/loading context. Sparse sessions, missing first effort and grid-edge estimates are limitations, not reasons to substitute a fitted reference or claim a measured accuracy. Reuse the frozen weekly plateau/RIR progression and stable/smooth controls with all completed prefixes and insufficient-reference checks.
+
+Analytical evidence, human design approval and UI acceptance remain distinct gates. These experiments change no product fact or production inference feature.

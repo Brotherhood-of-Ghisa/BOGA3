@@ -1,0 +1,588 @@
+{
+  "fixtureSha256": "1701f0287aeedc5ebb98a86d23a5fa18eb640cf319f22350662fdb7cfe452fce",
+  "reviewState": "Owner-approved synthetic validation fixture and oracle, 2026-10-14; not a training prescription",
+  "oracle": [
+    {
+      "name": "gradual",
+      "referenceRm": 100,
+      "weekly": [
+        {
+          "week": 1,
+          "sets": 3,
+          "sessions": 1,
+          "constantAnalyticalRm": null,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 2,
+          "sets": 6,
+          "sessions": 2,
+          "constantAnalyticalRm": 100.485,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 3,
+          "sets": 9,
+          "sessions": 3,
+          "constantAnalyticalRm": 100.98,
+          "linearAnalyticalRm": 101.97
+        },
+        {
+          "week": 4,
+          "sets": 12,
+          "sessions": 4,
+          "constantAnalyticalRm": 101.47500000000001,
+          "linearAnalyticalRm": 102.95999999999998
+        },
+        {
+          "week": 5,
+          "sets": 15,
+          "sessions": 5,
+          "constantAnalyticalRm": 101.97,
+          "linearAnalyticalRm": 103.95
+        },
+        {
+          "week": 6,
+          "sets": 18,
+          "sessions": 6,
+          "constantAnalyticalRm": 102.465,
+          "linearAnalyticalRm": 104.93999999999998
+        },
+        {
+          "week": 7,
+          "sets": 21,
+          "sessions": 7,
+          "constantAnalyticalRm": 102.96000000000001,
+          "linearAnalyticalRm": 105.93
+        },
+        {
+          "week": 8,
+          "sets": 24,
+          "sessions": 8,
+          "constantAnalyticalRm": 103.45500000000001,
+          "linearAnalyticalRm": 106.91999999999999
+        },
+        {
+          "week": 9,
+          "sets": 27,
+          "sessions": 9,
+          "constantAnalyticalRm": 103.94999999999999,
+          "linearAnalyticalRm": 107.91
+        },
+        {
+          "week": 10,
+          "sets": 30,
+          "sessions": 10,
+          "constantAnalyticalRm": 104.445,
+          "linearAnalyticalRm": 108.89999999999999
+        },
+        {
+          "week": 11,
+          "sets": 33,
+          "sessions": 11,
+          "constantAnalyticalRm": 104.93999999999998,
+          "linearAnalyticalRm": 109.89
+        },
+        {
+          "week": 12,
+          "sets": 36,
+          "sessions": 12,
+          "constantAnalyticalRm": 105.43499999999999,
+          "linearAnalyticalRm": 110.88
+        },
+        {
+          "week": 13,
+          "sets": 39,
+          "sessions": 13,
+          "constantAnalyticalRm": 105.92999999999999,
+          "linearAnalyticalRm": 111.86999999999998
+        },
+        {
+          "week": 14,
+          "sets": 42,
+          "sessions": 14,
+          "constantAnalyticalRm": 106.425,
+          "linearAnalyticalRm": 112.85999999999999
+        },
+        {
+          "week": 15,
+          "sets": 45,
+          "sessions": 15,
+          "constantAnalyticalRm": 106.91999999999999,
+          "linearAnalyticalRm": 113.84999999999998
+        },
+        {
+          "week": 16,
+          "sets": 48,
+          "sessions": 16,
+          "constantAnalyticalRm": 107.41499999999999,
+          "linearAnalyticalRm": 114.83999999999999
+        },
+        {
+          "week": 17,
+          "sets": 51,
+          "sessions": 17,
+          "constantAnalyticalRm": 107.91,
+          "linearAnalyticalRm": 115.82999999999998
+        },
+        {
+          "week": 18,
+          "sets": 54,
+          "sessions": 18,
+          "constantAnalyticalRm": 108.405,
+          "linearAnalyticalRm": 116.82
+        },
+        {
+          "week": 19,
+          "sets": 57,
+          "sessions": 19,
+          "constantAnalyticalRm": 108.89999999999999,
+          "linearAnalyticalRm": 117.80999999999999
+        },
+        {
+          "week": 20,
+          "sets": 60,
+          "sessions": 20,
+          "constantAnalyticalRm": 109.395,
+          "linearAnalyticalRm": 118.80000000000001
+        },
+        {
+          "week": 21,
+          "sets": 63,
+          "sessions": 21,
+          "constantAnalyticalRm": 109.89,
+          "linearAnalyticalRm": 119.78999999999999
+        },
+        {
+          "week": 22,
+          "sets": 66,
+          "sessions": 22,
+          "constantAnalyticalRm": 110.385,
+          "linearAnalyticalRm": 120.78
+        },
+        {
+          "week": 23,
+          "sets": 69,
+          "sessions": 23,
+          "constantAnalyticalRm": 110.88,
+          "linearAnalyticalRm": 121.77
+        },
+        {
+          "week": 24,
+          "sets": 72,
+          "sessions": 24,
+          "constantAnalyticalRm": 111.375,
+          "linearAnalyticalRm": 122.76
+        }
+      ]
+    },
+    {
+      "name": "stable",
+      "referenceRm": 100,
+      "weekly": [
+        {
+          "week": 1,
+          "sets": 3,
+          "sessions": 1,
+          "constantAnalyticalRm": null,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 2,
+          "sets": 6,
+          "sessions": 2,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 3,
+          "sets": 9,
+          "sessions": 3,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99.00000000000001
+        },
+        {
+          "week": 4,
+          "sets": 12,
+          "sessions": 4,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 5,
+          "sets": 15,
+          "sessions": 5,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 6,
+          "sets": 18,
+          "sessions": 6,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 7,
+          "sets": 21,
+          "sessions": 7,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 8,
+          "sets": 24,
+          "sessions": 8,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 9,
+          "sets": 27,
+          "sessions": 9,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 10,
+          "sets": 30,
+          "sessions": 10,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 11,
+          "sets": 33,
+          "sessions": 11,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 12,
+          "sets": 36,
+          "sessions": 12,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 13,
+          "sets": 39,
+          "sessions": 13,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 14,
+          "sets": 42,
+          "sessions": 14,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 15,
+          "sets": 45,
+          "sessions": 15,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 16,
+          "sets": 48,
+          "sessions": 16,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 17,
+          "sets": 51,
+          "sessions": 17,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 18,
+          "sets": 54,
+          "sessions": 18,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 19,
+          "sets": 57,
+          "sessions": 19,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 20,
+          "sets": 60,
+          "sessions": 20,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 21,
+          "sets": 63,
+          "sessions": 21,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 22,
+          "sets": 66,
+          "sessions": 22,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 23,
+          "sets": 69,
+          "sessions": 23,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        },
+        {
+          "week": 24,
+          "sets": 72,
+          "sessions": 24,
+          "constantAnalyticalRm": 99,
+          "linearAnalyticalRm": 99
+        }
+      ]
+    },
+    {
+      "name": "plateau",
+      "referenceRm": 100,
+      "weekly": [
+        {
+          "week": 1,
+          "sets": 3,
+          "sessions": 1,
+          "constantAnalyticalRm": null,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 2,
+          "sets": 6,
+          "sessions": 2,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": null
+        },
+        {
+          "week": 3,
+          "sets": 9,
+          "sessions": 3,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 4,
+          "sets": 12,
+          "sessions": 4,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 5,
+          "sets": 15,
+          "sessions": 5,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 6,
+          "sets": 18,
+          "sessions": 6,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 7,
+          "sets": 21,
+          "sessions": 7,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 8,
+          "sets": 24,
+          "sessions": 8,
+          "constantAnalyticalRm": 100,
+          "linearAnalyticalRm": 100
+        },
+        {
+          "week": 9,
+          "sets": 27,
+          "sessions": 9,
+          "constantAnalyticalRm": 100.296337170992,
+          "linearAnalyticalRm": 101.00754638137279
+        },
+        {
+          "week": 10,
+          "sets": 30,
+          "sessions": 10,
+          "constantAnalyticalRm": 100.56029825545403,
+          "linearAnalyticalRm": 101.79010118035423
+        },
+        {
+          "week": 11,
+          "sets": 33,
+          "sessions": 11,
+          "constantAnalyticalRm": 100.80163065982943,
+          "linearAnalyticalRm": 102.4297974415181
+        },
+        {
+          "week": 12,
+          "sets": 36,
+          "sessions": 12,
+          "constantAnalyticalRm": 101.00274099680892,
+          "linearAnalyticalRm": 102.89093143672423
+        },
+        {
+          "week": 13,
+          "sets": 39,
+          "sessions": 13,
+          "constantAnalyticalRm": 101.33113014054548,
+          "linearAnalyticalRm": 103.79400831579544
+        },
+        {
+          "week": 14,
+          "sets": 42,
+          "sessions": 14,
+          "constantAnalyticalRm": 101.65163742013381,
+          "linearAnalyticalRm": 104.61945076561338
+        },
+        {
+          "week": 15,
+          "sets": 45,
+          "sessions": 15,
+          "constantAnalyticalRm": 101.9674045375211,
+          "linearAnalyticalRm": 105.39312989795746
+        },
+        {
+          "week": 16,
+          "sets": 48,
+          "sessions": 16,
+          "constantAnalyticalRm": 102.24370076523503,
+          "linearAnalyticalRm": 105.99777198015686
+        },
+        {
+          "week": 17,
+          "sets": 51,
+          "sessions": 17,
+          "constantAnalyticalRm": 102.42182424171438,
+          "linearAnalyticalRm": 106.23377237003429
+        },
+        {
+          "week": 18,
+          "sets": 54,
+          "sessions": 18,
+          "constantAnalyticalRm": 102.61051356466257,
+          "linearAnalyticalRm": 106.52768586212554
+        },
+        {
+          "week": 19,
+          "sets": 57,
+          "sessions": 19,
+          "constantAnalyticalRm": 102.80933622867737,
+          "linearAnalyticalRm": 106.87161248923395
+        },
+        {
+          "week": 20,
+          "sets": 60,
+          "sessions": 20,
+          "constantAnalyticalRm": 102.98827662629068,
+          "linearAnalyticalRm": 107.14936479841136
+        },
+        {
+          "week": 21,
+          "sets": 63,
+          "sessions": 21,
+          "constantAnalyticalRm": 103.23071274539804,
+          "linearAnalyticalRm": 107.67470959034596
+        },
+        {
+          "week": 22,
+          "sets": 66,
+          "sessions": 22,
+          "constantAnalyticalRm": 103.48954399965041,
+          "linearAnalyticalRm": 108.25607890233763
+        },
+        {
+          "week": 23,
+          "sets": 69,
+          "sessions": 23,
+          "constantAnalyticalRm": 103.76428012255012,
+          "linearAnalyticalRm": 108.889128121321
+        },
+        {
+          "week": 24,
+          "sets": 72,
+          "sessions": 24,
+          "constantAnalyticalRm": 104.01612156854154,
+          "linearAnalyticalRm": 109.42606411834703
+        }
+      ]
+    }
+  ],
+  "plateauProgression": [
+    {
+      "week": 2,
+      "reps": 6,
+      "rir": 1,
+      "load": 80.62567860293464,
+      "analyticalRm": 100,
+      "existingRm": 97.01734671490911
+    },
+    {
+      "week": 6,
+      "reps": 6,
+      "rir": 1,
+      "load": 80.62567860293464,
+      "analyticalRm": 100,
+      "existingRm": 97.01734671490911
+    },
+    {
+      "week": 10,
+      "reps": 6,
+      "rir": 2,
+      "load": 80.62567860293464,
+      "analyticalRm": 102.9359480156124,
+      "existingRm": 97.01734671490911
+    },
+    {
+      "week": 14,
+      "reps": 6,
+      "rir": 3,
+      "load": 80.62567860293464,
+      "analyticalRm": 105.81823205478187,
+      "existingRm": 97.01734671490911
+    },
+    {
+      "week": 18,
+      "reps": 6,
+      "rir": 1,
+      "load": 85.316667679796,
+      "analyticalRm": 105.81823205478187,
+      "existingRm": 102.66204108017482
+    },
+    {
+      "week": 22,
+      "reps": 6,
+      "rir": 2,
+      "load": 85.316667679796,
+      "analyticalRm": 108.92500033895037,
+      "existingRm": 102.66204108017482
+    }
+  ],
+  "referenceOracle": {
+    "complete": {
+      "support": 6,
+      "rm": 100
+    },
+    "insufficient": {
+      "support": 5,
+      "rm": null
+    }
+  }
+}

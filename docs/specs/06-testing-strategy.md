@@ -140,7 +140,7 @@ Every iOS lane runs the **same** dev-client build in one of two deliberately
 exclusive configurations, selected by whether the app sees
 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`:
 
-- **infra-free** (`ios-smoke`, `ios-data-smoke`, `ios-exercise-page`,
+- **infra-free** (`ios-smoke`, `ios-data-smoke`, `ios-exercise-page`, `ios-rm-curve`,
   `ios-session-view`, and their `android-smoke` / `android-data-smoke` twins): no
   Supabase. The app runs local-only with the
   login-on-start gate disabled, which keeps these lanes fast and focused on the
@@ -158,6 +158,7 @@ lane and restores afterwards. The mechanism is owned by `11`; **do not hand-edit
 
 | Lane | Exists to prove |
 |---|---|
+| `ios-rm-curve` | Native RM chart touch/overlap selection, model and gym controls, scoped insufficient data, History return and intact workout on synthetic local data. Numerical inference and calibration stay in Jest/research. |
 | `ios-smoke` | A freshly installed dev client cold-launches intact: Today, the four tabs, Train's Start opening an empty session view. The cold-start lane — real tab navigation, no teleport. |
 | `ios-data-smoke` | Real `expo-sqlite` migration + write/read on the native runtime, backend-less catalog seeding, a workout logged through Train and read back through Progress’s pinned By Exercise switch; native history header snap-back/dismissal and independent chart scrolling; plus the native share sheet and catalogue editor. |
 | `ios-exercise-page` | The exercise page's device claims: history push and native back, a set committed on the keyboard. |

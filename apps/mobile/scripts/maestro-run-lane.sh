@@ -11,7 +11,7 @@
 #
 #   ./scripts/maestro-run-lane.sh <lane>
 #
-# Lanes: iOS (smoke, data-smoke, exercise-page, session-view, auth-profile,
+# Lanes: iOS (smoke, data-smoke, exercise-page, rm-curve, session-view, auth-profile,
 # sync-e2e, groups-e2e) and Android (android-smoke, android-data-smoke). The
 # platform decides only which provision/launch/teardown runner is used
 # (maestro-<platform>-run-flow.sh / -run-flows.sh); the lane data is shared. The
@@ -29,7 +29,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
+LANES="smoke|data-smoke|exercise-page|rm-curve|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 RUN_FLOW="$SCRIPT_DIR/maestro-ios-run-flow.sh"
@@ -132,6 +132,11 @@ case "$lane" in
   # maestro-harness deep link. Infra-free, no Supabase.
   exercise-page)
     run_flow data "Exercise page" exercise-page.yaml
+    ;;
+
+  # Approved native-only proof: chart touch/SVG, model controls and History return.
+  rm-curve)
+    run_flow data "RM curve regimes" rm-curve-regimes.yaml
     ;;
 
   # The session view: one flow that seeds its session through the harness

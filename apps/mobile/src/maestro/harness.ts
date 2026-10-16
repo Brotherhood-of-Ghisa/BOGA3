@@ -15,6 +15,7 @@ import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
 import { seedBodyweightRmVolumeFixture } from './bodyweight-load-fixture';
+import { seedStrengthRegimesFixture } from './strength-regimes-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
@@ -24,6 +25,7 @@ import { setBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-p
 export type MaestroHarnessResetMode = 'none' | 'data';
 export type MaestroHarnessFixtureName =
   | 'none'
+  | 'strength-regimes'
   | 'exercise-block-history'
   // The block history plus a newest completed session with two PRs.
   | 'completion-two-prs'
@@ -86,6 +88,7 @@ export const resolveMaestroHarnessResetMode = (
 export const resolveMaestroHarnessFixtureName = (
   value: string | null | undefined
 ): MaestroHarnessFixtureName =>
+  value === 'strength-regimes' ||
   value === 'exercise-block-history' ||
   value === 'completion-two-prs' ||
   value === 'bodyweight-rm-volume' ||
@@ -197,6 +200,7 @@ export const runMaestroHarnessReset = async (resetMode: MaestroHarnessResetMode)
 };
 
 export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {
+  if (fixtureName === 'strength-regimes') await seedStrengthRegimesFixture();
   if (fixtureName === 'exercise-block-history') {
     await seedExerciseBlockHistoryFixture();
   }

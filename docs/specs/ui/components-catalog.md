@@ -35,7 +35,7 @@ Two standing rules:
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
-| An icon-only control | `IconButton` (`icon-button.tsx`) |
+| An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
 | One choice from a few: a filter, a breakdown, a view | `SegmentedControl` (`segmented-control.tsx`) — `fill` / `fit` / `inline`, `density="compact"` and icon segments for two controls sharing a row |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
@@ -86,6 +86,7 @@ folder rather than re-implementing its row, card or sheet.
 
 | Folder | What it owns |
 | --- | --- |
+| `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the experimental reps–load scatter, fitted temporal curves, model/scope controls and dated set inspection; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view and exercise history; `MoreHubBackButton` (the `source=more` back action); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
 | `exercise-core/` | `ExerciseCoreFields` — the exercise name and weight-entry controls with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |
 | `exercise-catalog/` | `ExerciseEditorModal` (create/edit, reused by the catalogue, the picker's `Add new`, group `Add as new`, the exercise page and the group exercises page) and `ExerciseListContent` / `ExerciseListPreferenceControls` — the shared list rows, family headers and filter row for every exercise list. The grouping, filtering, sorting, row stats and preference models are `apps/mobile/src/exercise-catalog/` |

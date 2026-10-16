@@ -148,7 +148,8 @@ management or deletes anything. The personal exercise editor shows only
 
 The logger always says `Weight`; rows, records, History, Stats, completion and
 share surfaces use `Top weight`, `1RM` and `Volume`. They do not expose the
-calculation breakdown or prompt for a reading during a workout. A valid zero
+calculation breakdown, except the approved RM chart coordinate
+([[1rm.curve-load]], §11), or prompt for a reading during a workout. A valid zero
 renders as a number in its figure's format (`training-metrics-contract.md` §4,
 [[1rm.formula]]), not as unavailable. Raw top Weight stays independent from derived
 1RM and Volume.
@@ -251,3 +252,25 @@ same selected valid tuple for numerator and denominator; Off/zero guarantees
 lazy SQL/TypeScript resolution and never queries the private reading helper.
 Public readers suppress raw/absolute counterparts and keep immutable audit
 server-side; this changes no personal missing-reading fallback.
+
+## 11. RM chart projection — approved contract, implementation pending
+
+[[1rm.curve-load]] authorizes one analytical coordinate, without changing
+entered Weight or displayed 1RM. With actual-reps kernel load `L`, analytical total reference RM
+`M`, entry factor `F` and `f(u) = estimateOneRepMax(1, u)`, project the chart
+point as `L/F` and its overlay as `M/[F × f(u)]`. The existing kernel resolves
+dated bodyweight and applies F once; u comes from [[1rm.curve-effort]]. The
+chart adds no second entry conversion.
+
+For internal checks, entered-Weight prediction is `(M/f(u) − cB)/F`; it depends
+on each session's resolved context. An entered-unit analytical RM q requires
+total reference `Fq + cB`, so changing dated B yields a family of entered curves.
+Never apply one latest-reading raw-Weight curve backwards or clamp a negative
+external prediction into a supported weight. Missing personal readings keep
+the existing zero fallback; retain provenance for research sensitivity without
+adding a user-facing missing-reading warning. Reading/source edits recalculate
+both populations under current metadata; no session snapshot is introduced.
+
+When implementing the reference and research residuals, load
+`training-metrics-contract.md` §6. Empirical validation and human chart design/UI
+approval remain pending; analytical approval alone fulfills neither gate.

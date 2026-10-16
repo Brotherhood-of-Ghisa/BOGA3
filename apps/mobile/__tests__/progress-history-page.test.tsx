@@ -426,6 +426,7 @@ describe('ProgressHistoryScreen', () => {
     expect(screen.getByTestId('progress-history-view-sessions')).toHaveTextContent(/View sessions.*1 – 7 Jun/);
     // A muscle's own page links to no other muscle.
     expect(screen.queryByTestId(/^progress-history-muscle-/)).toBeNull();
+    expect(screen.queryByTestId('progress-history-rm-curve')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
     expect(mockPush).toHaveBeenLastCalledWith('/sessions?week=2026-06-01');
     // Closed by the choice it answered.
@@ -497,10 +498,13 @@ describe('ProgressHistoryScreen', () => {
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ muscleGroupId: 'front_delts' }));
   });
 
-  it('offers no ⋮ on an exercise with no counted muscle and no focused training week', async () => {
+  it('offers the RM curve even without counted muscles or a focused training week', async () => {
     render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(mockScreenOptions.title).toBe('Bench Press'));
-    expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-history-options-button'));
+    fireEvent.press(screen.getByTestId('progress-history-rm-curve'));
+    expect(mockPush).toHaveBeenLastCalledWith('/rm-curve?exerciseDefinitionId=ex1');
+    expect(screen.queryByTestId('progress-history-options-sheet')).toBeNull();
   });
 
   it('keeps its declared title until the catalogue resolves the name', async () => {

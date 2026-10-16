@@ -45,6 +45,10 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 - **`danger` and the two change directions are not seeded** (§6): a decrease
   must not read as a delete, so `loss` keeps its own hue away from `danger`'s.
 
+`regimeOlder` / `regimeNewer` are fixed categorical hues for [[1rm.curve-periods]],
+with readable text contrast; they do not reuse the sequential `viz` ramp or
+the gain/loss meanings.
+
 **Four seeds make a theme.** `generateRoles(seeds)` turns `ground`, `accent`,
 `record` and `viz` into every role, synchronously at module load so every
 module-scope `StyleSheet.create` keeps working. A seed sets hue and chroma; the
