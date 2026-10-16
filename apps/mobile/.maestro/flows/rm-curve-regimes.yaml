@@ -1,0 +1,114 @@
+appId: com.dinoderek.mobile
+---
+# Approved focused device proof: native chart/SVG touch geometry, overlapping
+# observations, sheets/model controls, History stack return and intact workout.
+# Numerical methods, source races and SQLite population rules are owned by Jest:
+# strength-regimes-local-data, strength-regimes-ui and rm-curve-navigation suites.
+# Fixture is synthetic UI data, never a calibration context or real-user export.
+- openLink: "boga3://maestro-harness?reset=data&fixture=strength-regimes&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
+- extendedWaitUntil:
+    visible: { id: "exercise-page" }
+    timeout: 30000
+- extendedWaitUntil:
+    visible: { id: "exercise-set-logger-reps" }
+    timeout: 15000
+- takeScreenshot: "01-workout-before"
+# Open the existing History route; navigation does not reset the active draft.
+- openLink: "boga3://progress-history?exerciseDefinitionId=seed_barbell_bench_press&metric=sets"
+- extendedWaitUntil:
+    visible: { id: "progress-history-options-button" }
+    timeout: 15000
+- tapOn: { id: "progress-history-options-button" }
+- assertVisible: { id: "progress-history-rm-curve" }
+- takeScreenshot: "02-history-menu"
+- tapOn: { id: "progress-history-rm-curve" }
+- extendedWaitUntil:
+    visible: { id: "rm-mode-one" }
+    timeout: 15000
+- assertVisible: { id: "rm-method-fixed" }
+- extendedWaitUntil:
+    visible: { text: "Exploratory fit" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "rm-curve-plot" }
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "03-one-curve"
+- scrollUntilVisible:
+    element: { text: "gym: Gym B" }
+    direction: UP
+    centerElement: true
+- tapOn: { text: "gym: Gym B" }
+- tapOn: { text: "All gyms" }
+- extendedWaitUntil:
+    visible: { text: "103 sets · 34 sessions" }
+    timeout: 15000
+- tapOn: { id: "rm-mode-two" }
+- scrollUntilVisible:
+    element: { id: "rm-curve-plot" }
+    direction: DOWN
+    centerElement: true
+- extendedWaitUntil:
+    visible: { text: "Before .*" }
+    timeout: 20000
+- assertVisible: { text: "From .*" }
+- takeScreenshot: "04-two-curves"
+- tapOn: { id: "rm-method-joint" }
+- extendedWaitUntil:
+    visible: { text: "Before .*" }
+    timeout: 20000
+- assertVisible: { text: "From .*" }
+- takeScreenshot: "05-rich"
+# Tap a known triplicate near the newest period's rep/load coordinate. Relative
+# coordinates are within the plot element; the 44pt hit area admits overlap.
+- scrollUntilVisible:
+    element: { id: "rm-curve-plot" }
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "rm-curve-plot"
+    point: "31%,22%"
+- assertVisible: { text: "Observed sets · newest first" }
+- tapOn:
+    text: ".*block 1, set 1\\..*Gym B\\."
+    index: 0
+- scrollUntilVisible:
+    element: { id: "rm-curve-details" }
+    direction: DOWN
+    centerElement: true
+- assertVisible: { id: "rm-selected-period", text: "From .*" }
+- assertVisible: { text: "WEIGHT / 1RM · KG" }
+- takeScreenshot: "06-selected-set"
+- scrollUntilVisible:
+    element: { id: "rm-method-fixed" }
+    direction: UP
+    centerElement: true
+- tapOn: { id: "rm-method-fixed" }
+- tapOn: { text: "range: 12 weeks" }
+- tapOn: { text: "4 weeks" }
+- scrollUntilVisible:
+    element: { id: "rm-curve-plot" }
+    direction: DOWN
+    centerElement: true
+- extendedWaitUntil:
+    visible: { text: "More sessions needed" }
+    timeout: 15000
+- assertVisible: { id: "rm-curve-plot" }
+- takeScreenshot: "07-insufficient"
+- tapOn: { id: "rm-curve-back" }
+- extendedWaitUntil:
+    visible: { id: "progress-history-screen" }
+    timeout: 15000
+- takeScreenshot: "08-history-return"
+# Reopen the same active exercise without reset/reseeding: planned draft survives.
+- openLink: "boga3://session/maestro_exercise_page_session/exercise/maestro_exercise_page_bench"
+- extendedWaitUntil:
+    visible: { id: "exercise-page" }
+    timeout: 15000
+- assertVisible: { id: "exercise-set-logger-weight", text: "82.5" }
+- assertVisible: { id: "exercise-set-logger-reps", text: "6" }
+- takeScreenshot: "09-workout-return"
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible: { id: "stats-history-screen" }
+    timeout: 30000

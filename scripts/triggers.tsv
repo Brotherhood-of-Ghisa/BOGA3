@@ -68,6 +68,7 @@ apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-
 apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/session-plan.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
+apps/mobile/.maestro/flows/rm-curve-regimes.yaml	-frontend,ios-rm-curve	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
 apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it
 apps/mobile/.maestro/flows/sync-first-run-log-and-roundtrip.yaml	-frontend,ios-sync-e2e	single flow → the lane that runs it
