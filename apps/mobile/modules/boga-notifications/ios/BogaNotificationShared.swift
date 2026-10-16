@@ -49,6 +49,14 @@ enum BogaNotificationError: Error {
 enum BogaNotificationCrypto {
   static let headings = ["Started a workout", "Finished a workout", "Workout achievements", "Group exercise bests", "Leaderboard changes"]
 
+  static func validHeading(_ value: String) -> Bool {
+    if headings.contains(value) { return true }
+    guard let prefix = ["Started a workout at ", "Finished a workout at "].first(where: { value.hasPrefix($0) }) else { return false }
+    let location = value.dropFirst(prefix.count)
+    return !location.isEmpty && location.unicodeScalars.count <= 100 &&
+      !location.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) })
+  }
+
   static func decrypt(_ envelope: [String: Any], binding: BogaNotificationBinding,
                       environment: String, now: Double = Date().timeIntervalSince1970 * 1000) -> BogaNotificationProjection? {
     guard Set(envelope.keys) == Set(["v", "bindingId", "nonce", "ciphertext"]),
@@ -71,7 +79,7 @@ enum BogaNotificationCrypto {
       let result = try JSONDecoder().decode(BogaNotificationProjection.self, from: clear)
       guard result.v == 1, result.bindingId == binding.bindingId,
             result.recipientUserId == binding.userId, result.expiresAt.isFinite, result.expiresAt > now,
-            ["start", "completion"].contains(result.kind), headings.contains(result.heading),
+            ["start", "completion"].contains(result.kind), validHeading(result.heading),
             result.bestCount >= 0, result.bestCount <= Int32.max,
             result.rankCount >= 0, result.rankCount <= Int32.max,
             !result.identity.isEmpty, result.identity.utf8.count <= 1024,

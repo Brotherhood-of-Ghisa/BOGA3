@@ -175,6 +175,10 @@ expanded-content comparison and cold-tap/Back acceptance remain outstanding.
 Keep this card and milestone in progress until acceptance is complete. Hosted
 deployment, sending enablement and release require separate authority.
 
+The owner-approved gym-heading follow-up was added after the validated
+`be394aba` snapshot, with tests/builds deliberately skipped at the owner's
+request. Earlier evidence covers that snapshot, not this subsequent change.
+
 Proposed: `fast`, `backend`, and `frontend` after the required native rebuild.
 The full frontend gate includes `ios-sync-e2e` and `ios-groups-e2e`; do not
 repeat included lanes without a new change/failure. `groups-protocol4` is

@@ -56,4 +56,21 @@ verify(decrypt(try encrypt(start)) == nil, "Start cannot expose achievement coun
 start["bestCount"] = 0
 start["rankCount"] = 0
 verify(decrypt(try encrypt(start))?.summary == "", "Plain activity has no count rows")
+var located = clear
+located["heading"] = "Finished a workout at Main Gym"
+verify(decrypt(try encrypt(located))?.heading == "Finished a workout at Main Gym", "Mapped completion gym")
+located["heading"] = "Finished a workout at a secret location"
+verify(decrypt(try encrypt(located))?.heading == "Finished a workout at a secret location", "Unmapped completion location")
+located["heading"] = "Finished a workout at " + String(repeating: "💪", count: 100)
+verify(decrypt(try encrypt(located)) != nil, "Gym limit counts Unicode code points")
+located["heading"] = "Finished a workout"
+verify(decrypt(try encrypt(located)) != nil, "Legacy completion heading")
+start["heading"] = "Started a workout at Main Gym"
+verify(decrypt(try encrypt(start))?.heading == "Started a workout at Main Gym", "Mapped start gym")
+start["heading"] = "Started a workout at a secret location"
+verify(decrypt(try encrypt(start))?.heading == "Started a workout at a secret location", "Unmapped start location")
+for heading in ["Started a workout at ", "Finished a workout at " + String(repeating: "a", count: 101), "Finished a workout at Main\nGym"] {
+  located["heading"] = heading
+  verify(decrypt(try encrypt(located)) == nil, "Malformed location heading")
+}
 print("Native authenticated notification checks passed: \(checked)")

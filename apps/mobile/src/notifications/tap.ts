@@ -12,12 +12,20 @@ export const notificationEnvelope = (value: unknown): NotificationEnvelope | nul
   return { v: 1, bindingId: value.bindingId, nonce: value.nonce, ciphertext: value.ciphertext };
 };
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+const isNotificationHeading = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  if (['Started a workout', 'Finished a workout', 'Workout achievements', 'Group exercise bests', 'Leaderboard changes'].includes(value)) return true;
+  const prefix = ['Started a workout at ', 'Finished a workout at '].find(item => value.startsWith(item));
+  if (!prefix) return false;
+  const location = value.slice(prefix.length);
+  return location.length > 0 && Array.from(location).length <= 100 && !/[\u0000-\u001f\u007f-\u009f]/.test(location);
+};
 export const isNotificationProjection = (value: unknown): value is NotificationProjection => {
   if (!isRecord(value) || !isRecord(value.route)) return false;
   return value.v === 1 && uuid(value.bindingId) && uuid(value.recipientUserId) && typeof value.notificationId === 'string' && /^\d{1,20}$/.test(value.notificationId) &&
     typeof value.expiresAt === 'number' && Number.isSafeInteger(value.expiresAt) && value.expiresAt > Date.now() &&
     (value.kind === 'start' || value.kind === 'completion') && typeof value.identity === 'string' && value.identity.length > 0 && Array.from(value.identity).length <= 220 &&
-    typeof value.heading === 'string' && ['Started a workout', 'Finished a workout', 'Workout achievements', 'Group exercise bests', 'Leaderboard changes'].includes(value.heading) &&
+    isNotificationHeading(value.heading) &&
     Number.isSafeInteger(value.bestCount) && (value.bestCount as number) >= 0 && Number.isSafeInteger(value.rankCount) && (value.rankCount as number) >= 0 &&
     uuid(value.route.groupId) && uuid(value.route.memberId) && typeof value.route.sessionId === 'string' &&
     value.route.sessionId.length > 0 && value.route.sessionId.length <= 160 && !/[\u0000-\u001f]/.test(value.route.sessionId) &&

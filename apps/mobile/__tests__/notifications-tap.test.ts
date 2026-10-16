@@ -101,3 +101,11 @@ test('long Unicode names remain valid and reach the authorized workout after a l
   expect(onOpen).toHaveBeenCalledWith(projection.route);
   expect(onUnavailable).not.toHaveBeenCalled();
 });
+
+test.each(['Started a workout at Main Gym', 'Finished a workout at Main Gym', 'Finished a workout at a secret location',
+  'Started a workout', 'Finished a workout', `Finished a workout at ${'💪'.repeat(100)}`])('accepts bounded workout locations and legacy heading: %s', heading => {
+  expect(isNotificationProjection({ ...notificationProjectionFixture(), heading })).toBe(true);
+});
+test.each(['Started a workout at ', `Finished a workout at ${'a'.repeat(101)}`, 'Finished a workout at Main\nGym'])('rejects malformed workout location: %s', heading => {
+  expect(isNotificationProjection({ ...notificationProjectionFixture(), heading })).toBe(false);
+});

@@ -7,7 +7,7 @@ export const notificationGroup = '44444444-4444-4444-8444-444444444444';
 export const notificationMember = '55555555-5555-4555-8555-555555555555';
 export const notificationEnvelopeFixture = { v: 1 as const, bindingId: notificationBinding, nonce: 'AAAAAAAAAAAAAAAA', ciphertext: 'AAAAAA==' };
 export const notificationProjectionFixture = (): NotificationProjection => ({ v: 1, bindingId: notificationBinding, recipientUserId: notificationUser,
-  notificationId: '12', expiresAt: Date.now() + 60_000, kind: 'completion', identity: 'Alex · Friends', heading: 'Finished a workout',
+  notificationId: '12', expiresAt: Date.now() + 60_000, kind: 'completion', identity: 'Alex · Friends', heading: 'Finished a workout at Main Gym',
   bestCount: 1, rankCount: 1, route: { groupId: notificationGroup, memberId: notificationMember, sessionId: 'workout-1' } });
 
 export const fakeNotificationNative = () => {

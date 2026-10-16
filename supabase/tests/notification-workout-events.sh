@@ -186,7 +186,7 @@ DELAYED_START_DELIVERY="$(run_psql "select id from app_public.notification_deliv
 DELAYED_COMPLETION_DELIVERY="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_COMPLETION} and installation_id='${INSTALL_ID}';")"
 DELAYED_SECOND_START="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_START} and installation_id='${DELAYED_INSTALL}';")"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${DELAYED_START}}"; expect_ok 'captured start projects after raw completion'
-check 'delayed start keeps activity copy and overlap projection' '.kind=="start" and .heading=="Started a workout" and .identity=="MemberB · 2 groups" and .bestCount==0 and .rankCount==0'
+check 'delayed start keeps activity copy and overlap projection' '.kind=="start" and .heading=="Started a workout at a secret location" and .identity=="MemberB · 2 groups" and .bestCount==0 and .rankCount==0'
 run_psql 'update app_public.notification_config set sending_enabled=true;' >/dev/null
 for held_state in pending retry disabled; do
   run_psql "update app_public.notification_deliveries set state='${held_state}',available_at=now()+interval '1 hour',claim_id=null,lease_until=null
@@ -991,7 +991,7 @@ enqueue_outcome "${B_UID}" "${ATTR_SESSION}"
 ATTR_INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}'
   and session_id='${ATTR_SESSION}' and kind='completion';")"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${ATTR_INTENT}}"; expect_ok 'project incomparable-source completion'
-check 'completion activity and bests remain available when ranks fail closed' '.kind=="completion" and .heading=="Finished a workout" and .bestCount==2 and .rankCount==0'
+check 'completion activity and bests remain available when ranks fail closed' '.kind=="completion" and .heading=="Finished a workout at a secret location" and .bestCount==2 and .rankCount==0'
 certify_attribution_set() {
   rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${ATTR_EXERCISE}" \
     '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"

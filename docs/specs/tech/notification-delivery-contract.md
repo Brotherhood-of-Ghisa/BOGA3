@@ -198,8 +198,10 @@ delay. The adapter checks expiry immediately before the request.
 Preparation rechecks opt-in, permission, binding/session, category/mute state,
 membership, live share/session and expiry. It composes a narrow public preview
 ([[notifications.preview]]) from current names and authorized contributions;
-no privileged raw event is a push payload. Event producers must refresh coherent
-achievement contributions before handoff; the dormant foundation creates none.
+no privileged raw event is a push payload. The workout's gym display name is
+resolved through the lifter's live owner-scoped row before encryption. Event
+producers must refresh coherent achievement contributions before handoff; the
+dormant foundation creates none.
 
 Ticket IDs persist; receipts start after 15 minutes, retry with bounded backoff
 and stop after 24 hours. `DeviceNotRegistered` disables only the matching token

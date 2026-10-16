@@ -108,13 +108,14 @@ Reference copy for this build input:
 
 | State | Heading |
 | --- | --- |
-| Start, Activity enabled | Started a workout |
-| Completion, Activity enabled | Finished a workout |
+| Start, Activity enabled | `Started a workout at <gym name>` |
+| Completion, Activity enabled | `Finished a workout at <gym name>` |
 | Activity off, bests only | Group exercise bests |
 | Activity off, ranks only | Leaderboard changes |
 | Activity off, both | Workout achievements |
 
-The reference rows read `N new group bests` and `N leaderboard changes`, with
+The gym label and fallback follow [[notifications.preview]]. The reference
+rows read `N new group bests` and `N leaderboard changes`, with
 singular wording for one. [[notifications.preview]] governs their visibility.
 
 iOS controls the abbreviated banner; the themed expanded view requires a

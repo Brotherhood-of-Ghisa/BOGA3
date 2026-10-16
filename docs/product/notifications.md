@@ -1,6 +1,6 @@
 # Notifications
 
-Accepted 2026-10-07, with theme and preview decisions approved 2026-10-14.
+Accepted 2026-10-07; theme/preview approved 2026-10-14, gym wording 2026-10-16.
 
 ### notifications.platform · definition · accepted
 
@@ -113,14 +113,16 @@ Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationCon
 ### notifications.preview · presentation · accepted
 
 An alert identifies the lifter and one contributing group, or `N groups` when
-several contribute. Previews show positive enabled achievement counts, without
+several contribute. Activity headings read `Started a workout at <gym name>` or
+`Finished a workout at <gym name>`, using `a secret location` when no mapped gym
+name is available. Previews show positive enabled achievement counts, without
 exercise names or lifting figures. Disabled and zero-count rows are omitted.
 Activity-off previews omit start/completion wording. Only enabled, currently
 authorized groups contribute.
 
 Why: the notification is a compact summary; detailed figures belong in the
 authorized app view.
-Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
+Code: `supabase/migrations/20261016164705_notification_workout_location.sql`.
 Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationContent.swift`.
 
 ### notifications.foreground · presentation · accepted

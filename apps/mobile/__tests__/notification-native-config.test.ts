@@ -189,13 +189,13 @@ it('generates real extension plists, sources and fonts through the production co
     Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const projection = { v: 1, bindingId: '22222222-2222-4222-8222-222222222222',
       recipientUserId: '11111111-1111-4111-8111-111111111111', expiresAt: 2000, notificationId: '42', kind: 'completion',
-      identity: 'Alex · Strength Club', heading: 'Finished a workout', bestCount: 2, rankCount: 3,
+      identity: 'Alex · Strength Club', heading: 'Finished a workout at Main Gym', bestCount: 2, rankCount: 3,
       route: { groupId: '66666666-6666-4666-8666-666666666666', memberId: '77777777-7777-4777-8777-777777777777', sessionId: 'shared-session' } };
     const envelope = await encryptProjection(Buffer.alloc(32, 55).toString('base64'), projection.bindingId, projection);
     const fixture = path.join(temporary, 'fixture.json');
     fs.writeFileSync(fixture, JSON.stringify({ envelope, projection }));
     const result = spawnSync(binary, [fixture], { encoding: 'utf8', timeout: 10000 });
     expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
-    expect(result.stdout).toBe('Native authenticated notification checks passed: 23\n');
+    expect(result.stdout).toBe('Native authenticated notification checks passed: 32\n');
   });
 });
