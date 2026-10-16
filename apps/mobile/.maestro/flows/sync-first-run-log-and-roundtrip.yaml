@@ -17,8 +17,8 @@ appId: com.dinoderek.mobile
 #      access switch from the gate to the app;
 #   2. a write on the device reaching the server through the scheduler's own
 #      cycle (nothing taps Refresh);
-#   3. clearState wipes BOTH the SQLite data and the SecureStore session (see
-#      src/auth/storage.ts), which only a reinstall reproduces.
+#   3. clearState wipes SQLite; clearKeychain drops the SecureStore session
+#      to simulate a fresh device. Reinstall alone preserves iOS Keychain data.
 # Jest counterpart: __tests__/sync/cycle-round-trip.test.ts (live server:
 #   the gym → session → exercise → set chain and kg readings pushed, then
 #   restored on a wiped client), __tests__/sync-bootstrapper.test.ts (seed
@@ -50,6 +50,7 @@ appId: com.dinoderek.mobile
 # load-bearing after clearState.
 - launchApp:
     clearState: true
+    clearKeychain: true
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
@@ -94,6 +95,18 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
+- extendedWaitUntil:
+    notVisible:
+      id: "sign-in-screen"
+    timeout: 60000
+# Decline only iOS credential saving; leave notification and other alerts intact.
+- runFlow:
+    when:
+      visible:
+        text: "Save Password\\?"
+    commands:
+      - tapOn:
+          text: "Not Now"
 - extendedWaitUntil:
     visible:
       id: "today-screen"
@@ -149,6 +162,7 @@ appId: com.dinoderek.mobile
 # Same dev-menu dismissal as step 1.
 - launchApp:
     clearState: true
+    clearKeychain: true
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
@@ -181,6 +195,18 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
+- extendedWaitUntil:
+    notVisible:
+      id: "sign-in-screen"
+    timeout: 60000
+# Decline only iOS credential saving; leave notification and other alerts intact.
+- runFlow:
+    when:
+      visible:
+        text: "Save Password\\?"
+    commands:
+      - tapOn:
+          text: "Not Now"
 - extendedWaitUntil:
     visible:
       id: "today-screen"

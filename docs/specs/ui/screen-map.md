@@ -39,7 +39,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
 | `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
-| `/settings` | Account, AI coaching, preferences, sync status, About, and dev-only tools in one support surface | `(tabs)/settings.tsx` |
+| `/settings` | Account, AI coaching, preferences, Notifications opening a scrollable sheet, sync status, About, and dev-only tools | `(tabs)/settings.tsx` |
 
 ## Sessions
 

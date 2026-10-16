@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { applyThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
+import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { RootStack } from '@/components/navigation/root-stack';
 import { launchTheme } from '@/components/ui/theme-launch';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
@@ -73,6 +74,7 @@ export default function RootLayout() {
         <AuthProvider>
           <AuthRouteGuard>
             <RootStack />
+            <NotificationTapBridge />
           </AuthRouteGuard>
           {/* The app renders on a fixed light background (no dark-mode theming),
               so force dark status-bar content — `auto` turns the clock/icons

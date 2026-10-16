@@ -131,6 +131,8 @@ export default ({ config }: { config: ExpoConfig }) => ({
             }
         ],
         "expo-secure-store",
+        ["expo-notifications", { enableRemoteNotifications: true }],
+        ["./plugins/with-boga-notifications", { fonts: EMBEDDED_FONT_FACES.map((face) => embeddedFontPath(face.file)) }],
         [
             "expo-location",
             {

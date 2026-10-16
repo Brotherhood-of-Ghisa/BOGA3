@@ -168,6 +168,10 @@ the scripts' names:
    `EXDevMenuIsOnboardingFinished=true` via the
    `apps/mobile/plugins/with-android-dev-menu-preferences.js` config plugin.
    Best-effort on both — a failed grant is logged, not fatal.
+5. **iOS password AutoFill bootstrap.** Before auth lanes on a new leased
+   simulator, turn off Settings → General → AutoFill & Passwords → AutoFill
+   Passwords and Passkeys using the normal UI. Maestro 2.11 omits native
+   SafariViewService save dialogs from its hierarchy.
 
 ## 5. Runtime state and logs
 

@@ -30,6 +30,9 @@ jest.mock('@/components/appearance/theme-app-icon', () => ({
   applyThemeAppIcon: (...args: unknown[]) => mockApplyThemeAppIcon(...args),
 }));
 
+// Native notification routing has its own bridge and lifecycle suites.
+jest.mock('@/components/navigation/notification-tap-bridge', () => ({ NotificationTapBridge: () => null }));
+
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
   require('./helpers/local-data').localDataBootstrapModule()

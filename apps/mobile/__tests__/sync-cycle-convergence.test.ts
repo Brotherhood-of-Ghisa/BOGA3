@@ -1,3 +1,5 @@
+import { getSignedInUserId } from '@/src/auth/session-user';
+import { withLocalDataLock } from '@/src/sync/account-wipe';
 import { subscribeToBodyWeightContext } from '@/src/bodyweight/invalidation';
 /**
  * Whole-cycle coverage with a stubbed server:
@@ -52,12 +54,14 @@ jest.mock('@/src/data/bootstrap', () => ({
 }));
 
 const mockRpc = jest.fn();
+const mockNotificationSession = jest.fn();
 
 // The cycle selects the RPC schema before dispatching: `client.schema(...).rpc(...)`.
 // Both the `.schema(name).rpc(...)` path and a bare `.rpc(...)` resolve to the
 // same spy so the existing call assertions are unaffected.
 jest.mock('@/src/auth/supabase', () => ({
   getRequiredSupabaseMobileClient: jest.fn(() => ({
+    auth: { getSession: mockNotificationSession },
     rpc: mockRpc,
     schema: () => ({ rpc: mockRpc }),
   })),
@@ -82,6 +86,8 @@ beforeEach(() => {
   }).run();
   mockBootstrapState.database = database;
   mockRpc.mockReset();
+  mockNotificationSession.mockReset();
+  mockNotificationSession.mockResolvedValue({ data: { session: null }, error: null });
   mockLogEvent.mockReset();
   mockLogEvent.mockResolvedValue(undefined);
 });
@@ -683,4 +689,36 @@ it('refreshes dated projections after a committed pull even if the following pus
     expect(changed).toHaveBeenCalledTimes(1);
     expect(database.select().from(gyms).get()?.localDirty).toBe(true);
   } finally { unsubscribe(); }
+});
+
+it('confirms only after quiet convergence, keeps the local-data lock, and ignores acknowledgement failure', async () => {
+  markBootstrapDone();
+  database.update(syncRuntimeState).set({ accountUserId: 'notification-user' }).where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).run();
+  database.insert(sessions).values({ id: 'notify-completed', status: 'completed', startedAt: new Date(10), completedAt: new Date(20),
+    localDirty: true, localUpdatedAtMs: 50 }).run();
+  jest.mocked(getSignedInUserId).mockResolvedValueOnce('notification-user');
+  mockNotificationSession.mockResolvedValue({ data: { session: { user: { id: 'notification-user' }, access_token: 'notification-bearer' } }, error: null });
+  let release!: (value: unknown) => void;
+  let started!: () => void;
+  const acknowledging = new Promise<void>(resolve => { started = resolve; });
+  mockRpc.mockImplementation((name: string) => {
+    if (name === 'sync_pull') return Promise.resolve({ data: emptyPage, error: null });
+    if (name === 'sync_push') return Promise.resolve(pushOk);
+    return { abortSignal: () => ({ setHeader: () => {
+      if (name === 'notification_pending_completions') return Promise.resolve({ data: { session_ids: ['notify-completed'], next_session_id: null }, error: null });
+      started(); return new Promise(resolve => { release = resolve; });
+    } }) };
+  });
+  const cycle = runSyncCycle();
+  await acknowledging;
+  expect(database.select().from(sessions).where(eq(sessions.id, 'notify-completed')).get()?.localDirty).toBe(false);
+  const names = mockRpc.mock.calls.map(call => call[0]);
+  expect(names.indexOf('notification_pending_completions')).toBeGreaterThan(names.lastIndexOf('sync_pull'));
+  let enteredAfterLock = false;
+  const afterLock = withLocalDataLock(async () => { enteredAfterLock = true; });
+  await Promise.resolve(); expect(enteredAfterLock).toBe(false);
+  release({ data: null, error: { message: 'network unavailable' }, status: 0 });
+  await expect(cycle).resolves.toBe('converged');
+  await afterLock; expect(enteredAfterLock).toBe(true);
+  expect(getCycleErrorCode()).toBeNull();
 });

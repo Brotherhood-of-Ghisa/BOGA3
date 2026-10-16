@@ -1,6 +1,6 @@
 # M34-T03-iOS_notification_controls — iOS opt-in, controls and tap navigation
 
-- Status: `planned`
+- Status: `in-progress`
 - Depends on: M34-T01-Backend_push_delivery (completed; backend delivery contract), [M34-T02-Workout_notification_events](M34-T02-Workout_notification_events.md)
 - Milestone: [M34](../milestones/M34-group-workout-notifications.md)
 - Areas: frontend, auth lifecycle, cross-stack; UI impact: yes
@@ -29,16 +29,31 @@ after a user action, not merely because the app cold-launches. An OS refusal
 does not block the app, logging or sync. Reuse existing server preferences and
 the failure-isolated sender; do not create a mobile group-push path.
 
-## Open — resolve with the user at session start
+## Accepted task target and checks
 
-M34 D6 pins the accepted notification target; obtain its selected reference and
-full-family images before implementation. Pin the separate Settings/group
-controls target per `docs/specs/ui/ai-design-policy.md`. Set foreground
-presentation with the owner; preview detail is settled by
-[[notifications.preview]]. Notification taps use the existing shared-session
-page; the Achievements section and its future notification target are deferred
-to [issue #733](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/733).
-Do not reopen settled notification decisions or make that follow-up a dependency.
+The owner selected controls option 2 on 2026-10-16: a Notifications section on
+Settings opens a scrollable in-route `Sheet`, like Appearance. The fixed handle
+and title sit above a scrolling status/action and category body. Group details
+reuse a mute switch below Members. The selected mock and its refinement are
+preserved in the task conversation; local comparison inputs are under the
+gitignored `apps/mobile/artifacts/design/m34-notifications/` directory. The
+refined `controls-reference.png` governs controls; D6's completion and family
+references govern expanded notifications. Existing tokens and primitives govern
+production integration; mock spacing or icons do not replace them.
+
+The owner subsequently approved both displayed mockups: `controls-reference.png`
+and `family-reference.png`. Actual small/large controls comparisons are now
+recorded below; signed-device notification acceptance remains pending.
+
+The owner approved the normal iOS banner without sound while the app is open.
+Notification taps use the existing shared-session page; the Achievements section
+remains deferred to [issue #733](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/733).
+
+Agreed checks: `fast`, `backend`, `frontend`, `jest-coverage`, `complexity` and
+`dependencies`, with the native dev-client force rebuild before iOS checks.
+The owner declined new Maestro scenarios: use existing flows and manual device
+evidence. Signed-device delivery remains separate from simulator and local-sink
+proof; hosted sending and a release are not authorized.
 
 ## Deliverables and acceptance
 
@@ -124,6 +139,42 @@ denied, failed-write and muted control states with their separate target.
 
 ## Gates and release boundary
 
+### Implementation checkpoint — 2026-10-16
+
+Branch: `codex/m34-t03-ios-notifications`. The implementation and runtime
+corrections passed Ponytail and independent native Codex source review; product
+review is clean. The agreed backend set passed across initial/resumed runs.
+Both forced simulator builds passed with SDK module registrations, app/extension
+ad-hoc entitlements and embedded fonts verified. Xcode setup and doctor are green.
+
+Final code checks passed: lint/typecheck, 302 Jest suites / 4,134 tests,
+UI guardrails and all three quality targets. Coverage is 87.10% branches and
+94.62% lines; limits and dependency baselines are unchanged. Backend smoke
+passed after manual capture. Repository/docs evidence accompanies the gate logs.
+Evidence is under gitignored `apps/mobile/artifacts/notification-original-final-*.log`.
+
+All eight frontend lane bodies passed across canonical runs. The original
+single-process sync scenario proved upload-zero, full wipe, fresh sign-in and
+the server-restored 80 kg reading; auth/profile and two-user groups passed again.
+SafariViewService's password-save dialog was absent from Maestro's hierarchy.
+Normal simulator AutoFill setup resolved it; the unsuccessful driver-splitting
+workaround was removed. Per-new-simulator setup belongs to
+`docs/specs/11-maestro-runtime-and-testing-conventions.md`. No scenario was added.
+
+Actual preview captures at 375×667 pt and 440×956 pt prove the Settings section,
+sheet, user-triggered permission prompt, denial/Allow, normal iOS Settings
+permission change, category writes and group mute/restoration. Current-source
+recaptures confirm fixes for a clipped switch, disappearing Retry and unbounded
+token acquisition. Registration stayed truthfully unsuccessful. Content fitted
+both viewports, including the native maximum-text attempt, so displacement from
+overflow was not demonstrated. Combined comparisons and deviations are recorded
+in gitignored `apps/mobile/artifacts/design/m34-notifications/design-qa.md`.
+
+Prepare a draft PR with the sanitized evidence. Signed-iPhone delivery,
+expanded-content comparison and cold-tap/Back acceptance remain outstanding.
+Keep this card and milestone in progress until acceptance is complete. Hosted
+deployment, sending enablement and release require separate authority.
+
 Proposed: `fast`, `backend`, and `frontend` after the required native rebuild.
 The full frontend gate includes `ios-sync-e2e` and `ios-groups-e2e`; do not
 repeat included lanes without a new change/failure. `groups-protocol4` is
@@ -134,6 +185,6 @@ in the PR. Hosted smoke/release is separate and needs explicit authority;
 document required APNs/Expo credentials without exposing their values. Run
 the full sweep on the eventual release commit, not on this planning approval.
 
-Review code/security and product facts. Delete this card and the completed M34
-milestone in the implementing PR. Follow the task protocol through human review,
-merge confirmation and owning-worktree release.
+Review code/security and product facts. Delete this card and the M34 milestone
+once their remaining acceptance is complete. Follow the task protocol through
+human review, merge confirmation and owning-worktree release.

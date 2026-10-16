@@ -79,6 +79,7 @@ import {
 } from '@/src/groups';
 import type { CompetitionCertificationWire,CompetitionSessionRecordsWire,CompetitionStreamWire as GroupStreamResult,CompetitionStreamItemWire as StreamItem,CompetitionSessionDetailWire as GroupSessionDetailResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
+import * as notificationApi from '@/src/notifications/api';
 import type { CompetitionPeriodWindow } from '@/src/groups/api';
 import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
@@ -699,6 +700,29 @@ describe('Group screen', () => {
     // D14: members live behind the header member count.
     fireEvent.press(screen.getByTestId('group-screen-members-link'));
     expect(mockPush).toHaveBeenCalledWith('/group/group-a/members');
+  });
+
+  it('does not carry group A’s confirmed mute into group B when route params change offline', async () => {
+    const notificationRead = jest.spyOn(notificationApi, 'getGroupNotificationPreferences').mockImplementation(async groupId => {
+      if (groupId !== 'group-a') throw new notificationApi.NotificationApiError('NETWORK');
+      return { activity: true, bests: true, ranks: true, muted: true };
+    });
+    try {
+      const { rerender } = render(<GroupScreenRoute />);
+      await waitFor(() => expect(screen.getByRole('switch', { name: 'Mute notifications' }).props.accessibilityState.checked).toBe(true));
+
+      seed(groupCacheKeys.group('group-b'), { group: GROUP_B, members: [] });
+      seed(groupCacheKeys.groupExercises('group-b'), { contract_version: 4, exercises: [] });
+      api.getGroup.mockRejectedValue(networkError());
+      api.listCompetitionExercises.mockRejectedValue(networkError());
+      mockParams = { groupId: 'group-b' };
+      rerender(<GroupScreenRoute />);
+
+      await waitFor(() => expect(screen.getByTestId('group-screen-name')).toHaveTextContent('Lunch Lifters'));
+      expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
+      expect(screen.queryByRole('switch', { name: 'Mute notifications' })).toBeNull();
+      expect(within(screen.getByTestId('group-notifications-status')).getByText('Offline')).toBeTruthy();
+    } finally { notificationRead.mockRestore(); }
   });
 
   it('the Members screen lists members sorted by role then username', async () => {

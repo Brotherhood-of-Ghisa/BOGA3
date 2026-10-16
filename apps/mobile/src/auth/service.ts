@@ -10,6 +10,7 @@ import { flushLogs, logEvent, setLoggingUserId } from '@/src/logging';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 import { requestSync } from '@/src/sync/scheduler';
+import { __resetNotificationAccountForTests, notificationSessionIdentity, setNotificationAccount } from '@/src/notifications/auth-boundary';
 import { setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
@@ -68,6 +69,10 @@ const emitAuthSnapshot = () => {
 };
 
 const setAuthSnapshot = (nextSnapshot: Partial<AuthSnapshot>) => {
+  if (Object.hasOwn(nextSnapshot, 'session')) {
+    const session = nextSnapshot.session ?? null;
+    setNotificationAccount(notificationSessionIdentity(session), session?.access_token);
+  }
   authSnapshot = {
     ...authSnapshot,
     ...nextSnapshot,
@@ -77,6 +82,7 @@ const setAuthSnapshot = (nextSnapshot: Partial<AuthSnapshot>) => {
 
 const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot => {
   const runtimeConfig = getMobileAuthRuntimeConfig();
+  setNotificationAccount(notificationSessionIdentity(session), session?.access_token);
 
   const userId = session?.user?.id ?? null;
 
@@ -170,6 +176,7 @@ export const bootstrapAuthState = async () => {
   const runtimeConfig = getMobileAuthRuntimeConfig();
 
   if (!runtimeConfig.isConfigured) {
+    setNotificationAccount(null);
     setLoggingUserId(null);
     authSnapshot = {
       status: 'ready',
@@ -242,6 +249,7 @@ export const clearAuthError = () => {
 
 export const signInWithPassword = async ({ email, password }: SignInWithPasswordCredentials) => {
   const client = getRequiredSupabaseMobileClient();
+  setNotificationAccount(null);
 
   setAuthSnapshot({
     lastError: null,
@@ -286,6 +294,7 @@ export const signInWithPassword = async ({ email, password }: SignInWithPassword
 
 export const signOut = async () => {
   const client = getRequiredSupabaseMobileClient();
+  setNotificationAccount(null);
 
   setAuthSnapshot({
     lastError: null,
@@ -358,6 +367,7 @@ export const updateUserPassword = async ({ password }: UpdateUserPasswordInput):
 };
 
 export const __resetAuthForTests = () => {
+  __resetNotificationAccountForTests();
   authSubscription?.unsubscribe();
   authSubscription = null;
   authBootstrapPromise = null;

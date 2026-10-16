@@ -23,6 +23,7 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { GroupNotificationMuteRow } from '@/components/notifications/group-mute-row';
 import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import {
   canManageGroup,
@@ -131,6 +132,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           testID="group-screen-members-link"
           trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}
         />
+        <GroupNotificationMuteRow key={`${userId}:${groupId}`} groupId={groupId} offline={offline} />
       </GroupHeaderCard>
       {canManageGroup(summary.my_role) ? (
         <View style={groupScreenStyles.actionRow}>

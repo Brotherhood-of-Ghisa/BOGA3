@@ -10,6 +10,8 @@
  * process alive (the open-handle guard).
  */
 
+import type { Session } from '@supabase/supabase-js';
+
 export interface GroupsLiveEnv {
   url: string;
   anonKey: string;
@@ -47,7 +49,7 @@ type RpcResult = { data: unknown; error: { message: string } | null };
 type LiveSupabaseClient = {
   auth: {
     signInWithPassword: (creds: { email: string; password: string }) => Promise<{
-      data: { session: { access_token: string } | null; user: { id: string } | null };
+      data: { session: Session | null; user: { id: string } | null };
       error: { message: string } | null;
     }>;
     signOut: () => Promise<unknown>;
@@ -58,6 +60,7 @@ type LiveSupabaseClient = {
 export interface LiveClient {
   client: LiveSupabaseClient;
   userId: string;
+  session: Session;
   teardown: () => Promise<void>;
 }
 
@@ -80,6 +83,7 @@ export const signInLiveClient = async (env: GroupsLiveEnv, email: string): Promi
   return {
     client,
     userId: data.user.id,
+    session: data.session,
     teardown: async () => {
       await authClient.auth.signOut().catch(() => undefined);
       await client.auth.signOut().catch(() => undefined);

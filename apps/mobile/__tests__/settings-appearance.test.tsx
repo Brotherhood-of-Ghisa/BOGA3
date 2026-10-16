@@ -160,12 +160,12 @@ it('offers a custom colour last, opening the picker once the sheet has gone', ()
   fireEvent.press(custom);
   // The sheet's modal must be gone before a route can be pushed over it.
   expect(mockPush).not.toHaveBeenCalled();
-  act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+  act(() => screen.UNSAFE_getAllByType(Modal).find(modal => modal.props.testID === 'settings-appearance-sheet-modal')!.props.onDismiss());
   expect(mockPush).toHaveBeenCalledWith('/theme-colour');
 
   // Dismissing the sheet any other way opens nothing.
   mockPush.mockReset();
-  act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+  act(() => screen.UNSAFE_getAllByType(Modal).find(modal => modal.props.testID === 'settings-appearance-sheet-modal')!.props.onDismiss());
   expect(mockPush).not.toHaveBeenCalled();
 });
 

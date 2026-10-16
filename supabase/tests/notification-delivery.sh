@@ -66,6 +66,10 @@ for idx in "${!RPC_NAMES[@]}"; do
   rpc "${ANON_KEY}" "${RPC_NAMES[$idx]}" "${RPC_BODIES[$idx]}"; expect_error AUTH_REQUIRED "anon ${RPC_NAMES[$idx]}"
   rpc "${AGENT}" "${RPC_NAMES[$idx]}" "${RPC_BODIES[$idx]}"; expect_error AGENT_FORBIDDEN "OAuth ${RPC_NAMES[$idx]}"
 done
+rpc "${ANON_KEY}" notification_pending_completions '{}'
+[[ "${STATUS}" == 401 || "${STATUS}" == 403 ]] || fail 'anonymous completion reader was not denied'
+check 'anonymous completion reader has no execute grant' '.code=="42501"'
+rpc "${AGENT}" notification_pending_completions '{}'; expect_error AGENT_FORBIDDEN 'OAuth completion reader'
 rpc "${A_TOKEN}" notification_register "${REGISTER}"; expect_ok register
 BINDING="$(jq -r '.binding_id' <<<"${BODY}")"
 check 'register response contains no token/key/account' 'keys|sort == ["binding_id","opted_in","payload_version","permission"]'
@@ -373,5 +377,6 @@ check 'live jobs retain the complete claim budget' '.jobs|length==4'
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'
+rpc "${C_TOKEN}" notification_pending_completions '{}'; expect_error AUTH_REQUIRED 'revoked completion reader session'
 COMPLETED=1
 pass 'registration, role matrix, prefs, binding rotation, generation fencing, order, recovery, encrypted sink tickets and receipts'

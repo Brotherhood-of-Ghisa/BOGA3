@@ -128,13 +128,12 @@ without the marker. The More rows that carry it are declared in
 
 ## Allowed transitions
 
-Nothing outside this table navigates. A route not listed as a source
-(`/exercise-link`, `/gyms`, `/theme-colour`, `/body-weight`,
-`/connected-agents`, `/profile`) never navigates on its own.
+Only the transitions below navigate; other routes never navigate on their own.
 
 | From | To | Trigger, method |
 | --- | --- | --- |
 | `/` | `/today` | root `<Redirect />` |
+| validated notification tap | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | after account/first-sync gates and live authorization (`push` unless already current); failure stays in a sheet |
 | any app route | `/sign-in` | a configured launch with no session, a sign-out, or a cycle reporting "no signed-in user": access flips to `sign-in` |
 | `/sign-in` | `/sync-setup`, else `index` → `/today` | a successful sign-in removes the route |
 | `/sync-setup` | `index` → `/today` | the first sync drains. Neither gate screen ever navigates itself: the stack drops it and the router lands |

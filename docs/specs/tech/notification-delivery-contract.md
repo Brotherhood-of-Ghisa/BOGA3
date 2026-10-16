@@ -52,6 +52,18 @@ later edits even when intake was deferred. Missing/parked evaluation remains
 pending, never an empty-achievement success. Accepted summaries retain their
 identity after later edits or reopen/completion cycles.
 
+The authenticated `notification_pending_completions` reader selects the
+caller's live completed sessions using immutable captured completion time,
+retaining epoch, eligibility, forfeiture and original deadline guards. It pages
+ten IDs in stable ID order. A keyset
+cursor prevents an unprovable early graph from starving later candidates;
+confirmed graphs remain candidates because their context can change. The
+mobile quiet-round hook reads one page under the existing local-data lock,
+captures the five domain types including tombstones through `entityToWire`,
+and omits dirty/quarantined graphs. It excludes clocks/bookkeeping, pins the
+request's account token and bounds acknowledgement requests; an acknowledgement
+failure never changes personal sync's converged outcome.
+
 The publisher captures a full actual rank baseline before a workout's first
 affected comparison publication, outside its member loop. Baseline capture and
 publication commit atomically; failure retries asynchronous publication without
@@ -124,6 +136,39 @@ The encrypted projection carries its original expiry and recipient identity;
 native code validates both before rendering or routing. Keys are service-only
 operational secrets, never returned by a read RPC or logged.
 
+## Native app integration
+
+`apps/mobile/src/notifications/` owns the injectable Expo adapter, confirmed
+server preferences, installation lifecycle and pending encrypted tap. The auth
+service calls its synchronous account boundary before publishing an identity
+transition or explicitly signing out; a failed Keychain deletion stops that
+mutation. Initial restore preserves a matching account/session binding for a
+cold-launch tap. Unsupported builds remain usable without registration.
+Bundle identity selects preview/production; it is separate from APNs' own
+sandbox/production token inference.
+
+The local Expo module under `apps/mobile/modules/boga-notifications/` shares
+one atomic Keychain binding with the two extensions. Registration material uses
+platform randomness and preserves installation capability independently from
+the current decryption binding. Existing Auth SecureStore access remains in
+the app's default Keychain group. The plugin generates extension targets,
+shared entitlements and embedded fonts; applied launch colour roles are shared
+through an atomic app-group file, implementing [[notifications.theme]].
+The service extension leaves the original encrypted envelope in `userInfo`;
+the content extension and app tap both decrypt again against current identity.
+Native and JS readers validate version, recipient, binding, expiry and routing
+shape before use. Foreground handling implements [[notifications.foreground]].
+
+Settings' notification sheet reuses shared controls and reflects OS permission,
+registration and confirmed server preference state. Group mute uses the live
+membership RPC. Failed writes retain confirmed values with Retry; account and
+group changes remount their controls. No background write queue is introduced.
+The root tap bridge stays alongside the mounted navigator, waits for its key
+and existing auth/first-sync gates, then requires a live authorized session read.
+It rechecks identity after that request. Offline taps retain only the encrypted
+intent for explicit retry; dismissal discards it. Duplicate taps never stack the
+current target, and access failure opens existing unavailable words in a sheet.
+
 ## Durable delivery
 
 One intent per recipient/lifter/session/start-or-completion implements
@@ -176,3 +221,28 @@ publication and service boundaries, with synthetic local registrations.
 Use `./boga test fast` plus the operator-agreed backend lane set; registration,
 claims and the sink contract live in `supabase/tests/notification-delivery.sh`;
 workout proof/publication fixtures in `supabase/tests/notification-workout-events.sh`.
+
+## Rollout boundary
+
+Before signing/submitting a device build, load
+[`ios-release.md`](../../procedures/ios-release.md) and agree the profile and
+release identity with the operator. Local gates do not authorize hosted sending.
+
+1. Apply the forward migrations before shipping the compatible client; keep
+   notification sending disabled. Deploy the current worker under the existing
+   service-only/Vault invocation boundary.
+2. Configure the one notification environment with the exact EAS project and
+   chosen bundle: preview `com.phano.boga3.dev` or production `com.phano.boga3`.
+   The singleton configuration accepts one environment at a time. Keep Expo
+   credentials, including `EXPO_ACCESS_TOKEN` when required, server-side.
+3. Provision the app and both generated extension targets, their shared app
+   group/Keychain entitlements and APNs credentials through the approved signing
+   workflow. Rebuild the binary; a JavaScript update cannot add these targets.
+4. Use explicitly authorized test accounts in an isolated group on signed
+   devices. Opt in through Settings and verify start/completion, expanded theme,
+   denied permission, muting/categories, cold-launch Back and account switching.
+   Enable actual Expo sending only for that agreed test/rollout window; local
+   synthetic sink success is not provider or device-display proof.
+5. Record the signed-device evidence before closing the feature. Revert sending
+   to disabled if the test fails; native generic fallback and original deadlines
+   remain unchanged. Publish a release only under separate operator authority.

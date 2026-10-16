@@ -50,6 +50,26 @@ afterEach(() => {
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 
+// Notifications cross the native boundary here; service/controller suites inject its outcomes.
+jest.mock('expo-notifications', () => ({
+  IosAuthorizationStatus: { NOT_DETERMINED: 0, DENIED: 1, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+  getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true, status: 'undetermined', ios: { status: 0 } })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false, status: 'denied', ios: { status: 1 } })),
+  getExpoPushTokenAsync: jest.fn(async () => { throw new Error('No native push provider in Jest'); }),
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponse: jest.fn(() => null),
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+  clearLastNotificationResponse: jest.fn(),
+  clearLastNotificationResponseAsync: jest.fn(async () => undefined),
+  dismissAllNotificationsAsync: jest.fn(async () => undefined),
+  cancelAllScheduledNotificationsAsync: jest.fn(async () => undefined),
+  setNotificationHandler: jest.fn(),
+  setNotificationCategoryAsync: jest.fn(async () => undefined),
+}));
+
 // react-native-gesture-handler's native runtime and dev-only RootView assertions
 // are not needed in unit tests; provide lightweight stubs.
 jest.mock('react-native-gesture-handler', () => {

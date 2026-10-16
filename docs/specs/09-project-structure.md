@@ -131,7 +131,12 @@ Define the canonical repository structure, path ownership, and placement convent
 - `supabase/functions/group-eval/`
   - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md`). It has no client-facing API.
 - `apps/mobile/src/notifications/` owns portable delivery decisions shared with
-  the Edge worker; native registration and UI adapters remain separate.
+  the Edge worker, the mobile native adapter, account/installation lifecycle,
+  preferences, validated taps and exact post-convergence completion proofs.
+- `apps/mobile/modules/boga-notifications/` owns the local Expo bridge and shared
+  Swift decoder, Keychain binding, service extension and themed content extension.
+  `apps/mobile/plugins/with-boga-notifications.js` generates their targets,
+  entitlements and font resources during prebuild.
 - `supabase/functions/notification-worker/` owns service-only encrypted push
   handoff, the deterministic local sink and runtime-native adapter tests.
 - `supabase/tests/lib/`
