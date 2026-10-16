@@ -6,6 +6,7 @@ import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor'
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import {
   createPlanFormSet,
+  addPlanFormSets,
   planFormBlockFromEmptySet,
   planFormBlockFromSuggestion,
   planFormErrors,
@@ -117,13 +118,10 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
 
   const removeBlock = (blockId: string) =>
     setForm((current) => ({ ...current, blocks: current.blocks.filter((block) => block.id !== blockId) }));
-  const addSet = (blockId: string) =>
-    setForm((current) => ({
-      ...current,
-      blocks: current.blocks.map((block) =>
-        block.id === blockId ? { ...block, sets: [...block.sets, createPlanFormSet(block.sets.at(-1), trainingPreferences.displayEfforts)] } : block,
-      ),
-    }));
+  const addSets = (blockId: string, countText: string) => setForm((current) => ({
+    ...current, blocks: current.blocks.map((block) => block.id === blockId
+      ? { ...block, sets: addPlanFormSets(block.sets, countText) } : block),
+  }));
   const removeSet = (blockId: string, setId: string) =>
     setForm((current) => ({
       ...current,
@@ -154,7 +152,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       const newSets =
         suggestion && suggestion.sets.length > 0
           ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts).sets
-          : [createPlanFormSet(undefined, trainingPreferences.displayEfforts)];
+          : [createPlanFormSet(trainingPreferences.displayEfforts)];
       patchBlock(blockId, {
         exerciseDefinitionId: exercise.id,
         name: exercise.name,
@@ -177,9 +175,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
 
   const save = async () => {
     setSubmitted(true);
-    if (saving || planFormErrors(form).size > 0) {
-      return;
-    }
+    if (saving || planFormErrors(form).size > 0) return;
     setSaving(true);
     setSaveNotice(null);
     try {
@@ -236,7 +232,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
             errors={errors}
             index={index}
             key={block.id}
-            onAddSet={addSet}
+            onAddSets={addSets}
             onChangeSet={patchSet}
             onMoveBlock={moveBlock}
             displayEfforts={trainingPreferences.displayEfforts}

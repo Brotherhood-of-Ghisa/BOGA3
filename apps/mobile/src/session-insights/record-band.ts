@@ -43,18 +43,12 @@ export const recordBandLines = (record: ExercisePersonalRecord, blockId: string)
   return lines;
 };
 
-/** The completion's and View Session's record list: each record set's kinds, then Volume, in plain words. */
+/** Summary bands span every block: each record set's kinds, then Volume. */
 export const personalRecordLines = (record: ExercisePersonalRecord): RecordLine[] => {
-  const lines = record.sets.map((set): RecordLine => {
-    const figures = setFigures(set);
-    const label = [set.oneRepMax ? `1RM ${oneRepMaxOf(set)}` : null, set.topWeight ? 'Top weight' : null]
-      .filter(Boolean)
-      .join(' · ');
-    return { key: set.setId, label, set: figures, spoken: `${label.replace(' · ', ' and ')}, ${figures}` };
-  });
+  const lines = record.sets.map(bandSetLine);
   if (record.volume !== null) {
     const value = formatVolume(record.volume);
-    lines.push({ key: 'volume', label: `Volume ${value}`, set: null, spoken: `Volume ${value}` });
+    lines.push({ key: 'volume', label: `New volume record · ${value}`, set: null, spoken: `new volume record ${value}` });
   }
   return lines;
 };

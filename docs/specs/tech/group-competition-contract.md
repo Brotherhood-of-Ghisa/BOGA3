@@ -180,7 +180,9 @@ snapshot, reading schema or stored achievement belongs to it.
 The worker evaluates protocol-4 graphs with the shared competition scorer
 (`competition-evaluation.ts`). SQL checks the evaluation contract,
 claim/generation, revision and complete source token before publishing
-unrounded scores in one transaction. Previous ordinary winners are rescored
+unrounded scores in one transaction. If changing notification publication hooks,
+load [notification-delivery-contract.md](notification-delivery-contract.md):
+atomic whole-board capture preserves the scorer and public boundary. Previous ordinary winners are rescored
 by the same kernel using current source modes, as comparison baselines only;
 their raw snapshots and immutable audits stay intact. Readers take shared group locks so a
 policy change cannot split authorization and disclosure. Random score tokens

@@ -44,6 +44,11 @@ This is the shortest operational summary. Use the "Further reading" section when
 18. Group non-membership and nonexistence must be indistinguishable to the caller (`NOT_FOUND`). A member whose role disallows an action gets `FORBIDDEN`.
 19. **Certification authz** implements [[groups.certification]]. The RPCs enforce current membership, another member's eligible record set and a live comparison (`VALIDATION`/`NOT_FOUND`). They enforce certifier-only withdrawal and owner/admin cancellation (`FORBIDDEN`). RPCs create witnesses; the evaluator and failure-isolated source-mode trigger perform server corrections. Certification tables have no client privileges.
 
+When changing installation registration, preferences or notification delivery,
+load [`tech/notification-delivery-contract.md`](tech/notification-delivery-contract.md).
+Notification RPCs derive account identity, reject OAuth and revoked Auth sessions;
+installation keys/tokens and worker RPCs are service-only.
+
 ## Practical guidance for API developers (backend)
 
 - Prefer simple ownership policies on each table: compare `owner_user_id` to `auth.uid()`.

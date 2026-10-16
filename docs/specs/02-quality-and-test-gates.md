@@ -54,7 +54,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.9s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~17s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
-| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~1.6s |
+| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.8s |
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.1m |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.7s |
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |

@@ -146,7 +146,7 @@ describe('exercise catalog seeds', () => {
 
     const summary = getSystemExerciseCatalogSeedSummary();
 
-    expect(summary.muscleGroupCount).toBe(19);
+    expect(summary.muscleGroupCount).toBe(25);
     expect(summary.exerciseCount).toBe(136);
     expect(summary.mappingCount).toBe(412);
     expect(summary.defaultWeightPolicy).toContain('non-normalized');
@@ -164,6 +164,32 @@ describe('exercise catalog seeds', () => {
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => mapping.muscleGroupId !== 'chest_upper')).toBe(true);
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => ['primary', 'secondary'].includes(mapping.role))).toBe(true);
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => [1, 0.5].includes(mapping.weight))).toBe(true);
+  });
+
+  it('includes Tibialis Anterior after Calves in Lower Legs', () => {
+    expect(SYSTEM_MUSCLE_GROUP_SEEDS.filter((muscle) => muscle.familyName === 'Lower Legs')).toEqual([
+      { id: 'calves', displayName: 'Calves', familyName: 'Lower Legs', sortOrder: 18, isEditable: 0 },
+      { id: 'tibialis_anterior', displayName: 'Tibialis Anterior', familyName: 'Lower Legs', sortOrder: 19, isEditable: 0 },
+    ]);
+  });
+
+  it.each([
+    { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs' },
+    { id: 'rotator_cuff', displayName: 'Rotator Cuff', familyName: 'Shoulders' },
+    { id: 'serratus_anterior', displayName: 'Serratus Anterior', familyName: 'Chest' },
+    { id: 'traps_lower', displayName: 'Lower Traps', familyName: 'Back' },
+    { id: 'brachialis', displayName: 'Brachialis', familyName: 'Arms' },
+  ])('includes $displayName in $familyName', (muscle) => {
+    expect(SYSTEM_MUSCLE_GROUP_SEEDS.find((seed) => seed.id === muscle.id)).toMatchObject(muscle);
+  });
+
+  it('keeps each muscle family together in catalog sort order', () => {
+    const families = [...SYSTEM_MUSCLE_GROUP_SEEDS]
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.displayName.localeCompare(right.displayName))
+      .map((muscle) => muscle.familyName);
+    expect(families.filter((family, index) => index === 0 || family !== families[index - 1])).toEqual([
+      'Chest', 'Shoulders', 'Back', 'Arms', 'Core', 'Legs', 'Lower Legs',
+    ]);
   });
 
   it('ships the pruned starter list while preserving every current incline seed', () => {

@@ -36,7 +36,8 @@ import {
   CURRENT_APP_VERSION,
   readSeedsAppliedMarker,
 } from '@/src/data/exercise-catalog-seeds';
-import { exerciseDefinitions, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, muscleGroups, syncRuntimeState } from '@/src/data/schema';
+import { subscribeToExerciseCatalogInvalidation } from '@/src/exercise-catalog/invalidation';
 import type { LocalDatabase } from '@/src/data/bootstrap';
 
 import {
@@ -96,8 +97,8 @@ describe('bundle-migration runtime loop', () => {
     fixture.close();
   });
 
-  it('ships the load-mode and bodyweight migrations in order', () => {
-    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3]);
+  it('ships the load-mode, bodyweight and muscle migrations in order', () => {
+    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4]);
   });
 
   describe('shipped migration behaviour', () => {
@@ -120,7 +121,7 @@ describe('bundle-migration runtime loop', () => {
       expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
     });
 
-    it('does not write any catalog rows when there is nothing to migrate', () => {
+    it('does not recreate absent exercise definitions during upgrades', () => {
       setMarker(fixture, 0);
 
       runBundleMigrations(asLocalDatabase(fixture));
@@ -143,6 +144,51 @@ describe('bundle-migration runtime loop', () => {
       });
       expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
     });
+
+    it('adds the new muscles to an older catalog once and marks them for sync', () => {
+      setMarker(fixture, 3);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      const rows = fixture.database.select().from(muscleGroups).all();
+      expect(rows.map((row) => row.id).sort()).toEqual([
+        'brachialis', 'hip_flexors', 'rotator_cuff', 'serratus_anterior', 'tibialis_anterior', 'traps_lower',
+      ]);
+      for (const row of rows) {
+        expect(row).toMatchObject({ isEditable: 0, localDirty: true });
+        expect(row.localUpdatedAtMs).toBeGreaterThan(0);
+      }
+      expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
+
+      setMarker(fixture, 3);
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      expect(fixture.database.select().from(muscleGroups).all()).toEqual(rows);
+    });
+
+    it.each([null, new Date('2026-10-01T12:00:00.000Z')])(
+      'preserves an existing Tibialis Anterior row, including deletedAt=%s',
+      (deletedAt) => {
+        fixture.database.insert(muscleGroups).values({
+          id: 'tibialis_anterior',
+          displayName: 'My Tibialis',
+          familyName: 'Custom',
+          sortOrder: 42,
+          deletedAt,
+          localDirty: false,
+          localUpdatedAtMs: 123,
+        }).run();
+        const before = fixture.database.select().from(muscleGroups)
+          .where(eq(muscleGroups.id, 'tibialis_anterior')).get();
+        setMarker(fixture, 3);
+
+        runBundleMigrations(asLocalDatabase(fixture));
+
+        expect(fixture.database.select().from(muscleGroups)
+          .where(eq(muscleGroups.id, 'tibialis_anterior')).get()).toEqual(before);
+        expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
+      }
+    );
   });
 
   describe('short-circuit when the marker already meets or exceeds current', () => {
@@ -315,6 +361,10 @@ describe('bundle-migration runtime loop', () => {
     });
 
     it('resumes from the last committed generation after a mid-loop failure', () => {
+      const committedMarkers: number[] = [];
+      const unsubscribe = subscribeToExerciseCatalogInvalidation(() => {
+        committedMarkers.push(readMarker(fixture));
+      });
       const boom = new Error('simulated migration failure');
       const firstAttempt = [
         {
@@ -336,6 +386,8 @@ describe('bundle-migration runtime loop', () => {
       setMarker(fixture, 1);
 
       expect(() => runBundleMigrations(asLocalDatabase(fixture))).toThrow(boom);
+      unsubscribe();
+      expect(committedMarkers).toEqual([2]);
 
       // Generation 2 committed (its own transaction); generation 3 rolled back.
       expect(readMarker(fixture)).toBe(2);
@@ -368,6 +420,8 @@ describe('bundle-migration runtime loop', () => {
     });
 
     it('rolls back the marker advance with the migration when its transaction throws', () => {
+      const invalidated = jest.fn();
+      const unsubscribe = subscribeToExerciseCatalogInvalidation(invalidated);
       __setBundleMigrationsForTests([
         {
           appVersion: 2,
@@ -380,6 +434,8 @@ describe('bundle-migration runtime loop', () => {
       setMarker(fixture, 1);
 
       expect(() => runBundleMigrations(asLocalDatabase(fixture))).toThrow();
+      unsubscribe();
+      expect(invalidated).not.toHaveBeenCalled();
 
       // The whole transaction rolled back: neither the row write nor the marker
       // advance survived.

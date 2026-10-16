@@ -178,6 +178,10 @@ Completion writes only if `generation` is unchanged since the claim. Failures
 back off (2 s … 5 min) and park at `group_eval_max_attempts()`; nothing is
 dropped or retried forever.
 
+**Notification capture.** If changing workout notifications, load
+[notification-delivery-contract.md](notification-delivery-contract.md): isolated
+intake and atomic whole-board snapshots.
+
 **Enqueue.** Isolated triggers on sessions, session exercises, sets,
 `load_input_mode` changes and links, plus catch-up on unarchive and on a new
 membership period. No `DELETE` triggers: the next evaluation drops hard-delete
@@ -321,7 +325,7 @@ payload or calculation change bumps the versioned keys (`cache.ts`).
 Live follow (needs membership RLS through the helpers, spec 10 rule 16, or a
 broadcast channel); history PR highlights on cards (needs unshared history;
 no SQL mirrors of TS set rules); group gyms, time-windowed boards, member
-proposals, disputes, push notifications.
+proposals, disputes, native notification integration.
 
 ## Rule IDs
 

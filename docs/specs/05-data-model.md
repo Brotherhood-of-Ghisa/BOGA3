@@ -8,9 +8,7 @@
 > **Load when:** adding or changing a table, a migration, or a sync-scope
 > boundary.
 
-Columns, checks and FK targets are the code's to state. This doc states what
-the schema cannot: which layer a table belongs to, whether it is in sync/backup
-scope, and the invariants a migration could break silently.
+Code owns columns/checks/FKs; this doc owns layering, sync scope and invariants.
 
 ## Layers
 
@@ -23,9 +21,7 @@ scope, and the invariants a migration could break silently.
    under per-row last-write-wins. No projection function and no event log: the
    data is the event.
 
-The seeded taxonomies (`exercise_definitions`, `muscle_groups`) are
-system-seeded *starter catalogs* that then sync as ordinary per-user entities,
-not static read-only data.
+Starter taxonomies sync as ordinary per-user entities.
 
 The kg-only wire uses `x-boga-sync-protocol: 3`; a missing, malformed or
 unsupported version receives `UPDATE_REQUIRED` before row access. Group
@@ -56,6 +52,7 @@ round-trip and the drift checker ignores it.
 | `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the sixteen-table mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
 | `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permission is a default-denied per-client plan grant the app owns; receipts are hash-only and service-role only | `supabase/migrations/` |
+| Every `app_public.notification_*` table | out — operational installations, preferences and durable delivery; no `owner_user_id` or mirror FK | `supabase/migrations/` |
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
 No group table carries `owner_user_id` or an FK into a Sync v2 table, so the
@@ -67,8 +64,7 @@ and never rewrite source kg or readings. Load
 and RPCs, and
 [`tech/group-competition-contract.md`](tech/group-competition-contract.md) for
 competition scoring. `exercise_group_links` is the one exception above (Sync v2
-rule 8). There are no backend ingest-metadata tables either: with no event log,
-nothing needs per-device deduplication.
+rule 8). Notification installation/delivery metadata never enters private sync.
 
 ## Device-local preferences
 

@@ -1,7 +1,7 @@
 import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { parseSessionDateTime } from '@/src/utils/local-time';
-import { validatePlanDraft } from './plan-validation';
+import { PLAN_LIMITS, validatePlanDraft } from './plan-validation';
 import type { PlanDetailView } from './plan-queries';
 import type { PlanDraft, PlanFieldError } from './types';
 
@@ -42,13 +42,37 @@ export type PlanFormState = {
 let formKey = 0;
 const nextKey = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${formKey++}`;
 
-/** Add set follows the recorder: copy values, then apply visible effort defaults. */
-export const createPlanFormSet = (previous?: PlanFormSet, displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
+/** The first target starts with the recorder's visible effort default. */
+export const createPlanFormSet = (displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
   id: nextKey('set'),
-  targetWeightText: previous?.targetWeightText ?? '',
-  targetRepsText: previous?.targetRepsText ?? '',
-  targetSetType: defaultSessionSetType(previous?.targetSetType, displayEfforts),
+  targetWeightText: '',
+  targetRepsText: '',
+  targetSetType: defaultSessionSetType(undefined, displayEfforts),
 });
+
+/** The whole Add set(s) request must fit the block. */
+export const planSetCountError = (setCount: number, countText: string): string | null => {
+  const text = countText.trim();
+  const count = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(count) || count < 1) {
+    return 'Enter a whole number greater than zero.';
+  }
+  const available = PLAN_LIMITS.exerciseSets.max - setCount;
+  if (count > available) {
+    return available <= 0
+      ? `This block already has ${PLAN_LIMITS.exerciseSets.max} sets.`
+      : `This block can fit only ${available} more ${available === 1 ? 'set' : 'sets'}.`;
+  }
+  return null;
+};
+
+/** Append exact copies of the last target, including its effort. */
+export const addPlanFormSets = (sets: PlanFormSet[], countText: string): PlanFormSet[] => {
+  const source = sets.at(-1);
+  if (!source || planSetCountError(sets.length, countText)) return sets;
+  const copies = Array.from({ length: Number(countText) }, () => ({ ...source, id: nextKey('set') }));
+  return [...sets, ...copies];
+};
 
 export const planFormBlockFromEmptySet = (
   exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
@@ -59,7 +83,7 @@ export const planFormBlockFromEmptySet = (
   exerciseDefinitionId: exercise.id,
   name: exercise.name,
   loadInputMode: exercise.loadInputMode ?? null,
-  sets: [createPlanFormSet(undefined, displayEfforts)],
+  sets: [createPlanFormSet(displayEfforts)],
 });
 
 export const planFormBlockFromSuggestion = (
@@ -80,7 +104,7 @@ export const planFormBlockFromSuggestion = (
           targetRepsText: s.repsValue,
           targetSetType: normalizeSessionSetType(s.setType),
         }))
-      : [createPlanFormSet(undefined, displayEfforts)],
+      : [createPlanFormSet(displayEfforts)],
 });
 
 export const emptyPlanForm = (): PlanFormState => ({

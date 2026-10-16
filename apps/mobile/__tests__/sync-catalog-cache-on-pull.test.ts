@@ -24,7 +24,8 @@ import { eq } from 'drizzle-orm';
 
 import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
-import { exerciseDefinitions, gyms, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, gyms, muscleGroups, syncRuntimeState } from '@/src/data/schema';
+import { CURRENT_APP_VERSION, SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { __resetAuthRequiredSignalForTests } from '@/src/sync/auth-required-signal';
 import { __resetCycleErrorSignalForTests } from '@/src/sync/cycle-error-signal';
 import { runSyncCycle, type WireEntity } from '@/src/sync/cycle';
@@ -95,10 +96,12 @@ const exerciseEntity = (id: string, name: string, ms: number): WireEntity => ({
 const markBootstrapDone = (): void => {
   database
     .insert(syncRuntimeState)
-    .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date(1_700_000_000_000) })
+    .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date(1_700_000_000_000),
+      appliedSeedMigrationAppVersion: CURRENT_APP_VERSION })
     .onConflictDoUpdate({
       target: syncRuntimeState.id,
-      set: { bootstrapCompletedAt: new Date(1_700_000_000_000) },
+      set: { bootstrapCompletedAt: new Date(1_700_000_000_000),
+        appliedSeedMigrationAppVersion: CURRENT_APP_VERSION },
     })
     .run();
 };
@@ -157,6 +160,33 @@ afterEach(async () => {
 });
 
 describe('catalog cache reacts to a steady-state pull', () => {
+  it('refreshes a loaded muscle catalog after migration even when pulls change no rows', async () => {
+    const addedIds = [
+      'tibialis_anterior', 'hip_flexors', 'rotator_cuff',
+      'serratus_anterior', 'traps_lower', 'brachialis',
+    ];
+    database.insert(muscleGroups)
+      .values(SYSTEM_MUSCLE_GROUP_SEEDS.filter(seed => !addedIds.includes(seed.id)))
+      .run();
+    database.update(syncRuntimeState).set({ appliedSeedMigrationAppVersion: 3 }).run();
+    mockRpc.mockImplementation(async (name: string) =>
+      name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk);
+    await ensureExerciseCatalogLoaded();
+    expect(getExerciseCatalogSnapshot().muscleGroups).toHaveLength(19);
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    await settle();
+
+    const snapshot = getExerciseCatalogSnapshot();
+    expect(snapshot.status).toBe('ready');
+    expect(snapshot.muscleGroups).toHaveLength(25);
+    expect(Object.keys(snapshot.muscleGroupsById)).toEqual(expect.arrayContaining(addedIds));
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    await settle();
+    expect(getExerciseCatalogSnapshot()).toBe(snapshot);
+  });
+
   it('makes a pulled rename visible in the cache snapshot with no manual reload', async () => {
     database
       .insert(exerciseDefinitions)

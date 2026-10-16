@@ -24,6 +24,11 @@ const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => P
 const mockStackScreen = jest.fn();
 const mockStack = jest.fn();
 const mockReportLaunchThemeProblem = jest.fn();
+const mockApplyThemeAppIcon = jest.fn();
+
+jest.mock('@/components/appearance/theme-app-icon', () => ({
+  applyThemeAppIcon: (...args: unknown[]) => mockApplyThemeAppIcon(...args),
+}));
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -120,6 +125,7 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
+import { customTheme, themePresets } from '@/components/ui/theme-presets';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
@@ -144,6 +150,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockRegisterBackgroundSyncTask.mockReset();
     mockStackScreen.mockReset();
     mockReportLaunchThemeProblem.mockReset();
+    mockApplyThemeAppIcon.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
   });
@@ -156,6 +163,16 @@ describe('RootLayout auth bootstrap wiring', () => {
 
     expect(mockReportLaunchThemeProblem).toHaveBeenCalledTimes(1);
     expect(mockReportLaunchThemeProblem).toHaveBeenCalledWith(problem);
+    jest.restoreAllMocks();
+  });
+
+  it.each([...themePresets, customTheme(200)])('applies the $label icon policy once on mount', (preset) => {
+    jest.replaceProperty(themeLaunch, 'launchTheme', { preset, problem: null });
+
+    render(<RootLayout />);
+
+    expect(mockApplyThemeAppIcon).toHaveBeenCalledTimes(1);
+    expect(mockApplyThemeAppIcon).toHaveBeenCalledWith(preset);
     jest.restoreAllMocks();
   });
 

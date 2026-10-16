@@ -199,6 +199,7 @@ describe('programme screens', () => {
       fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
       fireEvent.press(screen.getByTestId('exercise-effort-option-rir_2'));
       fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+      fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
       expect(screen.getByTestId('plan-form-block-1-set-2-weight')).toHaveProp('value', '40');
       expect(screen.getByTestId('plan-form-block-1-set-2-reps')).toHaveProp('value', '8');
       expect(screen.getByTestId('plan-form-block-1-set-2-effort')).toHaveTextContent('EffortRIR 2');
@@ -384,6 +385,44 @@ describe('programme screens', () => {
 
       const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
       expect(detail?.plans).toHaveLength(4);
+    });
+
+    it('adds exact copies of the last child target in the existing sheet, cancels with Back and persists only that child', async () => {
+      const { unmount } = render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
+      fireEvent.press(screen.getByTestId('exercise-effort-option-rir_3'));
+      act(() => updatePreferences({ displayEfforts: ['unspecified', 'rir_4', 'rir_2'] }));
+      expect(screen.queryByLabelText(/Duplicate set/)).toBeNull();
+      const openAddSets = () => fireEvent.press(screen.getByTestId('plan-form-block-1-add-set'));
+      openAddSets();
+      expect(screen.getByTestId('programme-child-plan-editor-sheet-title')).toHaveTextContent('Add set(s)');
+      expect(screen.queryByTestId('programme-child-plan-title-input')).toBeNull();
+      expect(screen.queryByTestId('plan-set-add-sheet', { includeHiddenElements: true })).toBeNull();
+      expect(screen.UNSAFE_getAllByType(Modal).filter((modal) => modal.props.visible)).toHaveLength(1);
+      fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '9');
+      fireEvent.press(screen.getByTestId('programme-child-plan-add-sets-back'));
+      expect(screen.queryByTestId('plan-form-block-1-set-2-weight')).toBeNull();
+      openAddSets();
+      expect(screen.getByTestId('plan-set-add-count')).toHaveProp('value', '1');
+      fireEvent.changeText(screen.getByTestId('plan-set-add-count'), '9');
+      fireEvent.press(screen.getByTestId('plan-set-add-confirm'));
+      expect(screen.getByTestId('plan-form-block-1-set-10-effort')).toHaveTextContent('EffortRIR 3');
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+      await saveProgramme();
+      const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
+      const child = await planQueries.loadPlanDetail(detail!.plans[0].id);
+      expect(child!.blocks[0].targets).toHaveLength(10);
+      expect(child!.blocks[0].targets.every((target) =>
+        target.targetWeightValue === '140' && target.targetReps === 5 && target.targetSetType === 'rir_3')).toBe(true);
+      const otherChild = await planQueries.loadPlanDetail(detail!.plans[1].id);
+      expect(otherChild!.blocks[0].targets).toHaveLength(1);
+      unmount();
+      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      expect(screen.getByTestId('plan-form-block-1-set-10-reps')).toHaveProp('value', '5');
     });
 
     it('persists removing a child session', async () => {

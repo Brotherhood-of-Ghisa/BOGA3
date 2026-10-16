@@ -25,6 +25,9 @@ Current docs:
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.
 
+When changing notifications, load `notification-delivery-contract.md` for
+installation/account binding, encrypted provider handoff and receipt recovery.
+
 Maintenance rule:
 
 - keep these docs concise and implementation-oriented;
