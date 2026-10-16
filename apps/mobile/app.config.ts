@@ -108,7 +108,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
         "expo-dev-client",
         [
             "expo-alternate-app-icons",
-            ["Slate", "Forest", "Plum"].map((name) => ({
+            ["Slate", "Forest", "Plum", "Rainbow"].map((name) => ({
                 name,
                 ios: `./assets/images/app-icons/${name.toLowerCase()}.png`,
                 android: { foregroundImage: `./assets/images/app-icons/${name.toLowerCase()}.png` },

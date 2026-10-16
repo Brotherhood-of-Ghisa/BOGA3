@@ -59,12 +59,10 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "plan-form-block-1-set-1-reps"
 - inputText: "5"
-# Drag in the form's gutter dismisses the numeric keypad. The accessibility
-# hierarchy still reports Save as visible when the keyboard covers it.
-- swipe:
-    start: "7%,60%"
-    end: "7%,30%"
-    duration: 400
+# The title's text keyboard has a return key that Maestro can dismiss reliably.
+- tapOn:
+    id: "plan-form-title"
+- hideKeyboard
 
 # Save ends the scroll content and is clear of fixed chrome once the keyboard closes.
 - scrollUntilVisible:
