@@ -33,10 +33,26 @@ it.each<[ThemePresetId, string | null]>([
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
 });
 
-it.each([0, 200, 359])('uses the default Warm icon for custom hue %s', async (hue) => {
+it.each([0, 200, 359])('uses the Rainbow icon for custom hue %s', async (hue) => {
   jest.mocked(appIcons.getAppIconName).mockReturnValue('Forest');
   await applyThemeAppIcon(customTheme(hue));
-  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(null);
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith('Rainbow');
+});
+
+it('keeps Rainbow between custom colours and restores Warm when chosen', async () => {
+  let activeIcon: string | null = 'Forest';
+  jest.mocked(appIcons.getAppIconName).mockImplementation(() => activeIcon);
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementation(async (name) => {
+    activeIcon = name;
+    return name;
+  });
+
+  await applyThemeAppIcon(customTheme(0));
+  await applyThemeAppIcon(customTheme(200));
+  await applyThemeAppIcon(customTheme(359));
+  await applyThemeAppIcon(getThemePreset('warm'));
+
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Rainbow'], [null]]);
 });
 
 it.each([null, 'neon', 'hue:400'])('uses Warm when the saved theme is absent or invalid (%s)', async (storedId) => {

@@ -6,7 +6,7 @@ import { logEvent } from '@/src/logging';
 // Selection follows [[appearance.app-icon-theme]]; names match the config plugin.
 export async function applyThemeAppIcon(preset: ResolvedTheme['preset']): Promise<void> {
   if (!supportsAlternateIcons) return;
-  const iconName = preset.id === 'custom' || preset.id === DEFAULT_THEME_PRESET_ID ? null : preset.label;
+  const iconName = preset.id === DEFAULT_THEME_PRESET_ID ? null : preset.id === 'custom' ? 'Rainbow' : preset.label;
   try {
     if (getAppIconName() === iconName) return;
     await setAlternateAppIcon(iconName);
