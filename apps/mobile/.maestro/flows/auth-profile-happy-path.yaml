@@ -29,6 +29,7 @@ appId: com.dinoderek.mobile
 # bundle reloads from Metro into the freshly-wiped sandbox before asserting.
 - launchApp:
     clearState: true
+    clearKeychain: true
 # Re-open the dev-client deep link (carrying this worktree's Metro port, exported
 # by maestro-ios-launch.sh) to re-point the wiped dev client at Metro. The
 # URL-scheme trust dialog is pre-authorized in maestro-ios-launch.sh, so it never
@@ -86,6 +87,14 @@ appId: com.dinoderek.mobile
     id: "sign-in-submit-button"
 - assertNotVisible:
     id: "sign-in-screen"
+# Decline only iOS credential saving; leave notification and other alerts intact.
+- runFlow:
+    when:
+      visible:
+        text: "Save Password\\?"
+    commands:
+      - tapOn:
+          text: "Not Now"
 # Drain the first cycle: stamp the bootstrap flag AND teleport to the normal
 # route in one harness link. The flag is stamped before the teleport navigates,
 # so the first-sync gate has lifted by the time the route renders.

@@ -57,7 +57,7 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
   }),
 }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import SettingsRoute from '../app/(tabs)/settings';
 import {
@@ -96,6 +96,7 @@ describe('settings onboarding surface', () => {
       'settings-section-account',
       'settings-section-ai-coaching',
       'settings-section-preferences',
+      'settings-section-notifications',
       'settings-section-data-sync',
       'settings-section-about',
       'settings-section-developer-tools',
@@ -114,6 +115,8 @@ describe('settings onboarding surface', () => {
     expect(screen.getByText('Version 1.2.3 (build 45)')).toBeTruthy();
     expect(screen.getByText('Release Ziocleziano')).toBeTruthy();
     expect(screen.getByText('Flavor Preview')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-section-notifications')).getByTestId('settings-notifications-row')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-section-preferences')).queryByTestId('settings-notifications-row')).toBeNull();
   });
 
   it('opens the public setup page as an external link', async () => {

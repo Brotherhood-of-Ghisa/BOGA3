@@ -8,6 +8,7 @@ import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
+import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import {
   ActionButton,
   Card,
@@ -261,6 +262,11 @@ export default function SettingsScreen() {
             />
           </View>
         </Card>
+      </View>
+
+      <View style={styles.section} testID="settings-section-notifications">
+        <SectionLabel title="Notifications" />
+        <Card><NotificationSettingsRow key={user?.id ?? 'signed-out'} userId={user?.id ?? null} /></Card>
       </View>
 
       <ProgressSettings key={user ? `account:${user.id}` : 'local'} state={preferences} />

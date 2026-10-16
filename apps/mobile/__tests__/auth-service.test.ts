@@ -59,6 +59,8 @@ import {
 import { migrationCompleteKey } from '@/src/preferences/migration';
 import { preferenceKey } from '@/src/preferences/storage';
 import { subscribeToAuthState } from '@/src/auth/service';
+import { __setNotificationNativeAdapterForTests, getNotificationNativeAdapter } from '@/src/notifications/native-adapter';
+import { fakeNotificationNative, notificationBinding, notificationSession, notificationUser } from './helpers/notification-native';
 import {
   __resetAuthRequiredSignalForTests,
   getAuthRequiredSignal,
@@ -143,6 +145,24 @@ describe('auth service bootstrap', () => {
     });
 
     __resetAuthForTests();
+  });
+
+  it('invalidates the native notification key before sign-out and stops when Keychain cannot clear it', async () => {
+    const originalNative = getNotificationNativeAdapter();
+    const native = fakeNotificationNative();
+    __setNotificationNativeAdapterForTests(native);
+    try {
+      const accessToken = `header.${btoa(JSON.stringify({ session_id: notificationSession }))}.signature`;
+      const session = createMockSession({ userId: notificationUser, accessToken });
+      mockGetSession.mockResolvedValueOnce({ data: { session }, error: null });
+      await bootstrapAuthState();
+      native.activateBinding({ installationId: '77777777-7777-4777-8777-777777777777', userId: notificationUser,
+        authSessionId: notificationSession, bindingId: notificationBinding, environment: 'preview', encryptionKey: 'key' });
+      native.invalidateBinding = jest.fn(() => { throw new Error('Keychain unavailable'); });
+      await expect(signOut()).rejects.toThrow('Keychain unavailable');
+      expect(mockSignOut).not.toHaveBeenCalled();
+      expect(getAuthSnapshot().user?.id).toBe(notificationUser);
+    } finally { __setNotificationNativeAdapterForTests(originalNative); }
   });
 
   afterAll(() => {

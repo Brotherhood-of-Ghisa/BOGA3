@@ -66,6 +66,10 @@ for idx in "${!RPC_NAMES[@]}"; do
   rpc "${ANON_KEY}" "${RPC_NAMES[$idx]}" "${RPC_BODIES[$idx]}"; expect_error AUTH_REQUIRED "anon ${RPC_NAMES[$idx]}"
   rpc "${AGENT}" "${RPC_NAMES[$idx]}" "${RPC_BODIES[$idx]}"; expect_error AGENT_FORBIDDEN "OAuth ${RPC_NAMES[$idx]}"
 done
+rpc "${ANON_KEY}" notification_pending_completions '{}'
+[[ "${STATUS}" == 401 || "${STATUS}" == 403 ]] || fail 'anonymous completion reader was not denied'
+check 'anonymous completion reader has no execute grant' '.code=="42501"'
+rpc "${AGENT}" notification_pending_completions '{}'; expect_error AGENT_FORBIDDEN 'OAuth completion reader'
 rpc "${A_TOKEN}" notification_register "${REGISTER}"; expect_ok register
 BINDING="$(jq -r '.binding_id' <<<"${BODY}")"
 check 'register response contains no token/key/account' 'keys|sort == ["binding_id","opted_in","payload_version","permission"]'
@@ -136,9 +140,32 @@ rpc "${SERVICE_ROLE_KEY}" notification_begin_send "{\"p_delivery_id\":${DELIVERY
 expect_ok 'authorized begin'
 check 'public projection allowlist and zero start counts' '.projection.bestCount==0 and .projection.rankCount==0 and
   (.projection|keys|sort)==["bestCount","bindingId","expiresAt","heading","identity","kind","notificationId","rankCount","recipientUserId","route","v"]'
+check 'unmapped start uses the exact location fallback' '.projection.heading=="Started a workout at a secret location"'
+run_psql "insert into app_public.gyms(owner_user_id,id,name,created_at,updated_at,client_updated_at_ms) values
+  ('${B_UID}','notification-gym-${RUN_TAG}','Main Gym',1,1,1),
+  ('${C_UID}','notification-gym-${RUN_TAG}','Hidden foreign gym',1,1,1);
+  update app_public.sessions set gym_id='notification-gym-${RUN_TAG}' where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'mapped start projection'
+check 'workout gym is owner-matched and distinct from group identity' '.heading=="Started a workout at Main Gym" and .identity=="Lifter · Notification contract"'
+run_psql "update app_public.gyms set name=E' \\t\\n ' where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'blank gym projection'
+check 'blank owner gym cannot expose another owners matching gym' '.heading=="Started a workout at a secret location"'
+run_psql "update app_public.gyms set name=repeat('💪',101) where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'bounded gym projection'
+check 'gym preview is bounded to one hundred Unicode code points' '.heading==("Started a workout at "+("💪"*100))'
+run_psql "update app_public.gyms set name='Main Gym',deleted_at=1 where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'deleted gym projection'
+check 'deleted owner gym uses the exact fallback' '.heading=="Started a workout at a secret location"'
+run_psql "update app_public.gyms set deleted_at=null where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
 run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 enqueue completion
 COMPLETION="${BODY}"
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"; expect_ok 'mapped completion projection'
+check 'completion uses the same owner gym' '.heading=="Finished a workout at Main Gym"'
+rpc "${A_TOKEN}" notification_preferences_set '{"p_activity":false,"p_bests":true,"p_ranks":true}'; expect_ok 'disable activity copy'
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"; expect_ok 'achievements-only projection'
+check 'activity off omits workout and location wording' '.heading=="Workout achievements"'
+rpc "${A_TOKEN}" notification_preferences_set '{"p_activity":true,"p_bests":true,"p_ranks":true}'; expect_ok 'restore activity copy'
 run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='active',completed_at=null where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${COMPLETION}}"; expect_ok 'reopened completion projection'
 [[ "${BODY}" == null ]] || fail 'reopened workout projected a completed alert'
@@ -373,5 +400,6 @@ check 'live jobs retain the complete claim budget' '.jobs|length==4'
 # Server session revocation invalidates an otherwise well-formed app JWT immediately.
 run_psql "delete from auth.sessions where user_id='${C_UID}';" >/dev/null
 rpc "${C_TOKEN}" notification_preferences_get '{}'; expect_error AUTH_REQUIRED 'revoked session'
+rpc "${C_TOKEN}" notification_pending_completions '{}'; expect_error AUTH_REQUIRED 'revoked completion reader session'
 COMPLETED=1
 pass 'registration, role matrix, prefs, binding rotation, generation fencing, order, recovery, encrypted sink tickets and receipts'

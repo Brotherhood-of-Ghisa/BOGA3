@@ -25,6 +25,7 @@
  */
 
 import { readGroupsLiveEnv, signInLiveClient, type LiveClient } from './helpers/groups-live-endpoint';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 let mockActiveClient: LiveClient['client'] | null = null;
 
@@ -49,6 +50,10 @@ import {
   transferGroupOwnership,
   updateGroup,
 } from '@/src/groups/api';
+
+import { getNotificationPreferences, registerNotificationInstallation, setGroupNotificationMuted,
+  setNotificationCategories, unregisterNotificationInstallation } from '@/src/notifications/api';
+import { notificationSessionIdentity, setNotificationAccount } from '@/src/notifications/auth-boundary';
 
 const env = readGroupsLiveEnv();
 let owner: LiveClient;
@@ -119,5 +124,53 @@ describe('groups client against the live server', () => {
     expect(await as(member, () => leaveGroup(second.groupId))).toEqual({ group_id: second.groupId });
     const after = await as(owner, () => getGroup(second.groupId));
     expect(after.group.member_count).toBe(1);
+  });
+});
+
+const asNotification = async <T>(user: LiveClient, call: () => Promise<T>): Promise<T> => {
+  const account = notificationSessionIdentity(user.session);
+  if (!account) throw new Error('Notification live fixture has no Auth session identity');
+  setNotificationAccount(account, user.session.access_token);
+  try { return await as(user, call); }
+  finally { setNotificationAccount(null); }
+};
+
+describe('notification client against the live server', () => {
+  it('persists account categories and group mutes with live membership and owner isolation', async () => {
+    const { groupId } = await groupWithMember('Live notification controls');
+    const defaults = { activity: true, bests: true, ranks: true, muted: false };
+    expect(await asNotification(owner, () => getNotificationPreferences(groupId))).toEqual(defaults);
+    expect(await asNotification(owner, () => setNotificationCategories({ activity: false, bests: true, ranks: false })))
+      .toMatchObject({ activity: false, bests: true, ranks: false });
+    expect(await asNotification(owner, () => setGroupNotificationMuted(groupId, true))).toMatchObject({ muted: true });
+    expect(await asNotification(owner, () => getNotificationPreferences(groupId))).toMatchObject({ activity: false, ranks: false, muted: true });
+    expect(await asNotification(member, () => getNotificationPreferences(groupId))).toEqual(defaults);
+    await as(owner, () => removeGroupMember(groupId, member.userId));
+    await expect(asNotification(member, () => getNotificationPreferences(groupId))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(asNotification(member, () => setGroupNotificationMuted(groupId, true))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('registers exact local wire material, rotates token/account bindings and rejects a foreign capability', async () => {
+    const projectId = process.env.GROUPS_LIVE_NOTIFICATION_PROJECT_ID;
+    const bundleId = process.env.GROUPS_LIVE_NOTIFICATION_BUNDLE_ID;
+    if (!projectId || !bundleId) throw new Error('Notification live configuration is required');
+    const material = { installationId: randomUUID(), capability: randomBytes(32).toString('base64'),
+      encryptionKey: randomBytes(32).toString('base64'), token: `LocalPushToken[${randomUUID()}]`,
+      environment: 'local' as const, projectId, bundleId, permission: true, optedIn: true };
+    const first = await asNotification(owner, () => registerNotificationInstallation(material));
+    expect(await asNotification(owner, () => registerNotificationInstallation(material))).toBe(first);
+    const rotated = { ...material, token: `LocalPushToken[${randomUUID()}]` };
+    const second = await asNotification(owner, () => registerNotificationInstallation(rotated));
+    expect(second).not.toBe(first);
+    await expect(asNotification(member, () => registerNotificationInstallation({ ...rotated, capability: randomBytes(32).toString('base64') })))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const rebound = { ...rotated, encryptionKey: randomBytes(32).toString('base64') };
+    const third = await asNotification(member, () => registerNotificationInstallation(rebound));
+    expect(third).not.toBe(second);
+    const binding = { installationId: material.installationId, bindingId: third };
+    await asNotification(owner, () => unregisterNotificationInstallation(binding));
+    expect(await asNotification(member, () => registerNotificationInstallation(rebound))).toBe(third);
+    await asNotification(member, () => unregisterNotificationInstallation(binding));
+    expect(await asNotification(member, () => registerNotificationInstallation(rebound))).not.toBe(third);
   });
 });

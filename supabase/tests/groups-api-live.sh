@@ -32,18 +32,26 @@ RUN_TAG="$(printf '%s' "$(date +%s)-$$-${RANDOM}" | tr -c 'a-z0-9-' '-')"
 PASSWORD="GroupsApiLive!${RUN_TAG}"
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 RUN_USER_IDS=()
+NOTIFICATION_CONFIG_RESTORE=""
+NOTIFICATION_PROJECT_ID="3c00cd23-0946-4eb6-bbf0-4542879cd314"
+NOTIFICATION_BUNDLE_ID="com.phano.boga3.dev"
 
 cleanup() {
-  [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
-  local ids
-  ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"; ids="${ids%,}"
-  run_psql "begin;
-    delete from public.app_logs where event like 'group.%' and user_id in (${ids});
-    delete from app_public.group_eval_queue where member_user_id in (${ids});
-    delete from app_public.groups where created_by in (${ids})
-      or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
-    delete from auth.users where id in (${ids});
-    commit;" >/dev/null
+  local failed=0 ids
+  if [[ ${#RUN_USER_IDS[@]} -gt 0 ]]; then
+    ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"; ids="${ids%,}"
+    run_psql "begin;
+      delete from public.app_logs where event like 'group.%' and user_id in (${ids});
+      delete from app_public.group_eval_queue where member_user_id in (${ids});
+      delete from app_public.groups where created_by in (${ids})
+        or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
+      delete from auth.users where id in (${ids});
+      commit;" >/dev/null || failed=1
+  fi
+  if [[ -n "${NOTIFICATION_CONFIG_RESTORE}" ]]; then
+    run_psql "begin; ${NOTIFICATION_CONFIG_RESTORE} commit;" >/dev/null || failed=1
+  fi
+  return "${failed}"
 }
 COMPLETED=0
 cleanup_on_exit() {
@@ -61,6 +69,16 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
+# Registration uses the real mobile API but only synthetic local tokens; preserve this slot's configuration.
+NOTIFICATION_CONFIG_RESTORE="$(run_psql "select 'delete from app_public.notification_config;' || coalesce((
+  select format('insert into app_public.notification_config(environment,project_id,bundle_id,sending_enabled,provider) values(%L,%L::uuid,%L,%L::boolean,%L);',
+    environment,project_id,bundle_id,sending_enabled,provider) from app_public.notification_config where singleton), '');")"
+run_psql "begin;
+  delete from app_public.notification_config;
+  insert into app_public.notification_config(environment,project_id,bundle_id,sending_enabled,provider)
+    values('local','${NOTIFICATION_PROJECT_ID}','${NOTIFICATION_BUNDLE_ID}',false,'local');
+  commit;" >/dev/null
+
 echo "[${LANE_LABEL}] run ${RUN_TAG}: provisioning the owner and the member"
 provision OWNER owner
 provision MEMBER member
@@ -76,6 +94,8 @@ echo "[${LANE_LABEL}] running the groups client suite against ${API_URL}"
   export GROUPS_LIVE_MEMBER_EMAIL="${FIXTURE_EMAIL_PREFIX}-member-${RUN_TAG}@example.test"
   export GROUPS_LIVE_PASSWORD="${PASSWORD}"
   export GROUPS_LIVE_RUN_TAG="${RUN_TAG}"
+  export GROUPS_LIVE_NOTIFICATION_PROJECT_ID="${NOTIFICATION_PROJECT_ID}"
+  export GROUPS_LIVE_NOTIFICATION_BUNDLE_ID="${NOTIFICATION_BUNDLE_ID}"
   npm run --silent test:groups:live
 )
 COMPLETED=1

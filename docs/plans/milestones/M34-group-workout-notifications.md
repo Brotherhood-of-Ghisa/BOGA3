@@ -1,6 +1,6 @@
 # M34 — iOS group workout notifications
 
-- Status: `planned`
+- Status: `in-progress`
 - Created: 2026-10-07, planning baseline `39cd6f8f9576aad248e984d2f93058bc59fbbded` on `origin/main`
 
 ## Objective
@@ -108,13 +108,14 @@ Reference copy for this build input:
 
 | State | Heading |
 | --- | --- |
-| Start, Activity enabled | Started a workout |
-| Completion, Activity enabled | Finished a workout |
+| Start, Activity enabled | `Started a workout at <gym name>` |
+| Completion, Activity enabled | `Finished a workout at <gym name>` |
 | Activity off, bests only | Group exercise bests |
 | Activity off, ranks only | Leaderboard changes |
 | Activity off, both | Workout achievements |
 
-The reference rows read `N new group bests` and `N leaderboard changes`, with
+The gym label and fallback follow [[notifications.preview]]. The reference
+rows read `N new group bests` and `N leaderboard changes`, with
 singular wording for one. [[notifications.preview]] governs their visibility.
 
 iOS controls the abbreviated banner; the themed expanded view requires a
@@ -138,13 +139,13 @@ before task execution; execute the cards in dependency order.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | M34-T01-Backend_push_delivery | Installation/preferences RPCs, durable queue, worker and receipts | none | completed |
-| [M34-T02-Workout_notification_events](../tasks/M34-T02-Workout_notification_events.md) | Start/completion producers, group bests, all rank movement and overlap deduplication | T01 | planned |
-| [M34-T03-iOS_notification_controls](../tasks/M34-T03-iOS_notification_controls.md) | Native registration, themed content, controls, lifecycle, tap navigation and device acceptance | T01, T02 | planned |
+| [M34-T02-Workout_notification_events](../tasks/M34-T02-Workout_notification_events.md) | Start/completion producers, group bests, all rank movement and overlap deduplication | T01 | completed ([#746](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/746)) |
+| [M34-T03-iOS_notification_controls](../tasks/M34-T03-iOS_notification_controls.md) | Native registration, themed content, controls, lifecycle, tap navigation and device acceptance | T01, T02 | in-progress |
 
 ## Risks and task-start decisions
 
-- Resolve non-workout rank delivery with the owner in T02; it remains an open
-  product fact, not an exclusion inferred by this plan.
+- Non-workout rank delivery is deferred under the accepted
+  [[notifications.non-workout-ranks]] decision.
 - Existing `session` events appear at first share, and existing `lead_change`
   history covers first place. Neither is a complete completion/full-rank signal.
 - Active-session records are provisional. Sending a summary requires current

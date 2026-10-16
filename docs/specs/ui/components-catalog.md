@@ -107,6 +107,7 @@ folder rather than re-implementing its row, card or sheet.
 | `bodyweight/` | `WeightEntrySheet`, `BodyWeightSettingsRow`, `BodyWeightScreen` — the only bodyweight entry surfaces. No session, logger or analytics component shows or edits a reading (`docs/specs/tech/bodyweight-load-contract.md`) |
 | `sync-status/` | `SyncStatusPanel`, Settings' one Data & Sync card |
 | `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview |
+| `notifications/` | Settings' scrollable notification controls and the group mute row; server-confirmed state comes from `src/notifications` |
 | `preferences/` | the Settings preference editors (effort, Progress) and `NumberField` |
 | `profile/` | the Profile cards and their panel and form hooks |
 

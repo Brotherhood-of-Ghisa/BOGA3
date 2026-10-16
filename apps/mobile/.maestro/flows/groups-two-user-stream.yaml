@@ -64,6 +64,7 @@ appId: com.dinoderek.mobile
 # for the iOS-26 accessibility-churn rationale behind waits and retries.
 - launchApp:
     clearState: true
+    clearKeychain: true
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
@@ -95,6 +96,14 @@ appId: com.dinoderek.mobile
     id: "sign-in-submit-button"
 - assertNotVisible:
     id: "sign-in-screen"
+# Decline only iOS credential saving; leave notification and other alerts intact.
+- runFlow:
+    when:
+      visible:
+        text: "Save Password\\?"
+    commands:
+      - tapOn:
+          text: "Not Now"
 # Lift the first-sync gate and land on a normal route in one harness link.
 - openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
 - extendedWaitUntil:

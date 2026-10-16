@@ -111,8 +111,8 @@ prepare_workspace() {
   rsync -a \
     --exclude '.expo/' \
     --exclude 'artifacts/' \
-    --exclude 'ios/' \
-    --exclude 'android/' \
+    --exclude '/ios/' \
+    --exclude '/android/' \
     --exclude 'node_modules/' \
     --exclude '.maestro/maestro.env.local' \
     "$APP_DIR/" "$WORKSPACE_DIR/"
@@ -175,6 +175,8 @@ build_dev_client() {
   # the default fat arm64+x86_64. This cache is host-local and the host's own
   # simulators run the host architecture, so the second slice is dead weight that
   # roughly doubles compile time. ARCHS pins the slice deterministically.
+  # Ad-hoc simulator signing embeds generated Keychain/app-group entitlements
+  # without an Apple team or provisioning profile.
   xcodebuild \
     -workspace "$workspace_path" \
     -scheme "$scheme_name" \
@@ -184,7 +186,8 @@ build_dev_client() {
     -derivedDataPath "$DERIVED_DATA_DIR" \
     ARCHS="$host_arch" \
     ONLY_ACTIVE_ARCH=YES \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_ALLOWED=YES \
+    CODE_SIGN_IDENTITY=- \
     build 2>&1 | tee -a "$BUILD_LOG_FILE"
 
   built_app_path="$DERIVED_DATA_DIR/Build/Products/Debug-iphonesimulator/$scheme_name.app"

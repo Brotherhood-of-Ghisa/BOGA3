@@ -21,6 +21,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 
 import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
+import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { ensureLocalDataOwnedBy, withLocalDataLock } from '@/src/sync/account-wipe';
@@ -1454,6 +1455,7 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       const pulledAfter = await runPullLeg(database);
 
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
+        await confirmSyncedNotificationCompletions(database, entityToWire, userId);
         return markConverged();
       }
     }

@@ -186,7 +186,7 @@ DELAYED_START_DELIVERY="$(run_psql "select id from app_public.notification_deliv
 DELAYED_COMPLETION_DELIVERY="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_COMPLETION} and installation_id='${INSTALL_ID}';")"
 DELAYED_SECOND_START="$(run_psql "select id from app_public.notification_deliveries where intent_id=${DELAYED_START} and installation_id='${DELAYED_INSTALL}';")"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${DELAYED_START}}"; expect_ok 'captured start projects after raw completion'
-check 'delayed start keeps activity copy and overlap projection' '.kind=="start" and .heading=="Started a workout" and .identity=="MemberB · 2 groups" and .bestCount==0 and .rankCount==0'
+check 'delayed start keeps activity copy and overlap projection' '.kind=="start" and .heading=="Started a workout at a secret location" and .identity=="MemberB · 2 groups" and .bestCount==0 and .rankCount==0'
 run_psql 'update app_public.notification_config set sending_enabled=true;' >/dev/null
 for held_state in pending retry disabled; do
   run_psql "update app_public.notification_deliveries set state='${held_state}',available_at=now()+interval '1 hour',claim_id=null,lease_until=null
@@ -991,7 +991,7 @@ enqueue_outcome "${B_UID}" "${ATTR_SESSION}"
 ATTR_INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}'
   and session_id='${ATTR_SESSION}' and kind='completion';")"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${ATTR_INTENT}}"; expect_ok 'project incomparable-source completion'
-check 'completion activity and bests remain available when ranks fail closed' '.kind=="completion" and .heading=="Finished a workout" and .bestCount==2 and .rankCount==0'
+check 'completion activity and bests remain available when ranks fail closed' '.kind=="completion" and .heading=="Finished a workout at a secret location" and .bestCount==2 and .rankCount==0'
 certify_attribution_set() {
   rpc "${A_TOKEN}" group_competition_board "$(jq -nc --arg g "${G2}" --arg x "${ATTR_EXERCISE}" \
     '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"
@@ -1812,5 +1812,59 @@ assert_sql 'forfeited start remains absent after later recovery and worker prepa
   where lifter_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}');"
 assert_sql 'diagnostic is sanitized' "select exists(select 1 from public.app_logs where event='notification.intake_failed'
   and user_id='${B_UID}' and context? 'sqlstate' and not context? 'error');"
+
+# The compatible client pages original captured completions, even after raw backdating.
+provision E completion-reader
+provision F other-completion-reader
+READER_PREFIX="reader-${RUN_TAG}"
+run_psql "begin;
+  select set_config('request.jwt.claims','{\"sub\":\"${E_UID}\",\"role\":\"authenticated\"}',true);
+  insert into app_public.sessions(owner_user_id,id,status,started_at,completed_at,created_at,updated_at,client_updated_at_ms)
+  select '${E_UID}','${READER_PREFIX}-'||lpad(n::text,2,'0'),'completed',${NOW_MS},${NOW_MS}+1000,1,1,1
+  from generate_series(1,21) n;
+  insert into app_public.notification_workout_moments(member_user_id,session_id,kind,event_at)
+    select '${E_UID}',id,'completion',now() from app_public.sessions where owner_user_id='${E_UID}'
+    on conflict(member_user_id,session_id,kind) do update set event_at=excluded.event_at;
+  insert into app_public.notification_workouts(member_user_id,session_id,completion_at,eligible)
+    select '${E_UID}',id,now(),true from app_public.sessions where owner_user_id='${E_UID}'
+    on conflict(member_user_id,session_id) do update set completion_at=excluded.completion_at,eligible=true;
+  update app_public.sessions set completed_at=${NOW_MS}-172800000 where owner_user_id='${E_UID}';
+  update app_public.notification_workout_moments set event_at=null
+    where member_user_id='${E_UID}' and session_id='${READER_PREFIX}-14' and kind='completion';
+  update app_public.notification_workouts set eligible=false
+    where member_user_id='${E_UID}' and session_id='${READER_PREFIX}-15';
+  update app_public.notification_workout_moments set event_at=now()-interval '25 hours'
+    where member_user_id='${E_UID}' and session_id='${READER_PREFIX}-16' and kind='completion';
+  update app_public.notification_workouts set completion_at=now()-interval '25 hours'
+    where member_user_id='${E_UID}' and session_id in ('${READER_PREFIX}-16','${READER_PREFIX}-20');
+  update app_public.notification_workout_moments set event_at=now()-interval '90 minutes'
+    where member_user_id='${E_UID}' and session_id='${READER_PREFIX}-17' and kind='completion';
+  update app_public.sessions set deleted_at=${NOW_MS} where owner_user_id='${E_UID}' and id='${READER_PREFIX}-18';
+  update app_public.sessions set status='active' where owner_user_id='${E_UID}' and id='${READER_PREFIX}-19';
+  update app_public.notification_workout_moments set event_at=now()+interval '6 minutes'
+    where member_user_id='${E_UID}' and session_id='${READER_PREFIX}-21' and kind='completion';
+  update app_public.notification_workout_epoch set started_at=now()-interval '1 hour';
+  select set_config('request.jwt.claims','{\"sub\":\"${F_UID}\",\"role\":\"authenticated\"}',true);
+  insert into app_public.sessions(owner_user_id,id,status,started_at,completed_at,created_at,updated_at,client_updated_at_ms)
+    values('${F_UID}','${READER_PREFIX}-01','completed',${NOW_MS},${NOW_MS}+1000,1,1,1);
+  commit;" >/dev/null
+rpc "${E_TOKEN}" notification_pending_completions '{}'; expect_ok 'page captured completion ids'
+check 'completion page has only ids and cursor' 'keys|sort==["next_session_id","session_ids"]'
+check 'first page is bounded and unaffected by raw backdating' \
+  '.session_ids==[range(1;11)|$p+"-"+(if .<10 then "0" else "" end)+tostring] and .next_session_id==$p+"-10"' --arg p "${READER_PREFIX}"
+rpc "${E_TOKEN}" notification_pending_completions "$(jq -nc --arg c "${READER_PREFIX}-10" '{p_after_session_id:$c}')"
+expect_ok 'page beyond first ten completion ids'
+check 'later page excludes forfeited, ineligible, old, pre-cutover, deleted, reopened and future moments' \
+  '.session_ids==[$p+"-11",$p+"-12",$p+"-13"] and .next_session_id==null' --arg p "${READER_PREFIX}"
+rpc "${F_TOKEN}" notification_pending_completions '{}'; expect_ok 'other account completion ids'
+check 'same session id in another account cannot expose the first account backlog' \
+  '.session_ids==[$p+"-01"] and .next_session_id==null' --arg p "${READER_PREFIX}"
+run_psql "update app_public.notification_workout_epoch set started_at=now()-interval '3 days';" >/dev/null
+rpc "${E_TOKEN}" notification_pending_completions "$(jq -nc --arg c "${READER_PREFIX}-15" '{p_after_session_id:$c}')"
+expect_ok 'read captured deadline independently of cutover'
+check 'expired captured moments and older workout deadlines do not renew' \
+  '.session_ids==[$p+"-17"] and .next_session_id==null' --arg p "${READER_PREFIX}"
+rpc "${E_TOKEN}" notification_pending_completions '{"p_after_session_id":""}'
+expect_error VALIDATION 'invalid completion cursor'
 COMPLETED=1
 pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and recovery contracts'
