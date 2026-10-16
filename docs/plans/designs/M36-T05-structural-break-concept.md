@@ -6,7 +6,7 @@ Status: visual concept c1 approved by the product owner on 2026-10-14 (“Design
 
 T02 already specifies residual trend/segmented regression, searched jumps/hinges, session dependence and reliability checks. T04 validates amplitude recovery, known-strength break benchmarks and search reliability; its accepted limitations explicitly defer direct joint latent S(t)/RIR/load-noise segmented inference. Its completed research is not a calibrated probability that the latest observations belong to a new strength regime.
 
-T06 implements descriptive observation/reference transformations, T07 the first-release chart, T08 its acceptance and T09 its final exposure. They exclude production inference/breakpoint UI. The owner-authorized [M37 follow-up](../milestones/M37-strength-regime-inference.md) assigns segmented fitting, reliability/assessment review and a separately gated experimental Strength regimes mode. It does not add a production detector to M36 or bypass analytical/design/activation decisions.
+T06 implements descriptive observation/reference transformations, T07 the first-release chart, T08 its acceptance and T09 its final exposure. They exclude production inference/breakpoint UI. The owner-authorized M37 follow-up completed segmented fitting, reliability/assessment review and the experimental Strength regimes mode; human implemented-UI acceptance was recorded on 2026-10-16. It does not add a production detector to M36 or bypass analytical/design/activation decisions.
 
 T05 owns the future interaction/appearance concept now; statistical meaning and eventual activation remain research decisions. Production routing remains the final implementation step for the first release.
 
