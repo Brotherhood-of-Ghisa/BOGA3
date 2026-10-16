@@ -4,9 +4,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
+import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
 import {
   createPlanFormSet,
   addPlanFormSets,
+  formatScheduleText,
   planFormBlockFromEmptySet,
   planFormBlockFromSuggestion,
   planFormErrors,
@@ -14,6 +16,7 @@ import {
   type PlanFormSet,
   type PlanFormState,
 } from '@/src/session-planner/plan-form-model';
+import { parseSessionDateTime } from '@/src/utils/local-time';
 import { upsertLocalGym } from '@/src/data';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -94,6 +97,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [gymSheetOpen, setGymSheetOpen] = useState(false);
+  const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false);
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [pickRequest, setPickRequest] = useState<{ blockId: string | null } | null>(null);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
@@ -203,18 +207,14 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           testID="plan-form-title"
           value={form.title}
         />
-        <FormField
-          accessibilityHint="YYYY-MM-DD HH:mm, or leave blank to keep the plan unscheduled"
-          accessibilityLabel="Plan schedule"
-          autoCapitalize="none"
-          autoCorrect={false}
-          error={errors.get('scheduledFor')}
-          keyboardType="numbers-and-punctuation"
+        <ListRow
+          accessibilityLabel={`Plan schedule, ${form.scheduleText.trim().length > 0 ? form.scheduleText : 'Unscheduled'}`}
+          density="list"
+          divider
+          description={form.scheduleText.trim().length > 0 ? form.scheduleText : 'Unscheduled'}
           label="Schedule (optional)"
-          onChangeText={(scheduleText) => patchForm({ scheduleText })}
-          placeholder="YYYY-MM-DD HH:mm"
+          onPress={() => setScheduleSheetOpen(true)}
           testID="plan-form-schedule"
-          value={form.scheduleText}
         />
         <ListRow
           accessibilityLabel={`Plan gym, ${form.gymId === null ? 'none' : 'selected'}`}
@@ -278,6 +278,15 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           patchForm({ gymId });
         }}
         visible={gymSheetOpen}
+      />
+
+      <PlanScheduleSheet
+        currentSchedule={form.scheduleText.trim().length > 0 ? parseSessionDateTime(form.scheduleText) : null}
+        onConfirm={(date) => {
+          patchForm({ scheduleText: date ? formatScheduleText(date) : '' });
+        }}
+        onDismiss={() => setScheduleSheetOpen(false)}
+        visible={scheduleSheetOpen}
       />
 
       <PlanExercisePickSheet

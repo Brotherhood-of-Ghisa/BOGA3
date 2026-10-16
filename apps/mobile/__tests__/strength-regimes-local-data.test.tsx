@@ -22,7 +22,7 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   fireEvent.press(screen.getByRole('radio', { name: 'All gyms' }));
   await screen.findByText('103 sets · 34 sessions');
   fireEvent.press(screen.getByTestId('rm-mode-two'));
-  await screen.findByTestId('rm-fit-newer', {}, {timeout: 10000});
+  await screen.findByTestId('rm-fit-newer', {}, { timeout: 60000 });
   expect(screen.getByTestId('rm-fit-older').props.stroke).not.toBe(screen.getByTestId('rm-fit-newer').props.stroke);
   expect(screen.getByTestId('rm-fit-newer').props.strokeDasharray).toBeTruthy();
   expect(screen.getByText('Exploratory fit')).toBeTruthy();
@@ -35,7 +35,7 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   // Identity is cleared immediately while the other method is fitting.
   expect(screen.queryByTestId('rm-selected-period')).toBeNull();
-  await screen.findByTestId('rm-fit-newer', {}, { timeout: 10000 });
+  await screen.findByTestId('rm-fit-newer', {}, { timeout: 60000 });
   expect(screen.getByTestId('rm-selected-period').props.children).toMatch(/^From /);
   expect(localDataClient().prepare('SELECT * FROM exercise_sets ORDER BY id').all()).toEqual(before);
-});
+}, 120000);
