@@ -46,8 +46,8 @@ Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/se
 ([[set.performed]]); every other row goes — a planned set never done, typed
 values never confirmed, a blank row — so the exercise reads as what was
 trained. It asks first, naming the count, unless every row going is blank.
-This is the one place a plan is deleted: a swipe never deletes one, and the
-session view's Done keeps planned rows.
+The exercise page's swipe-left also deletes a planned row; the session view's
+Done keeps planned rows.
 
 Why: the alert promised removal; a finished exercise still listing sets nobody
 did misreports the session to its own reader.

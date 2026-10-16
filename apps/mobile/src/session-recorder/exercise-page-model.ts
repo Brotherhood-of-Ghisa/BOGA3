@@ -301,33 +301,18 @@ export const toggleSetPerformed = (sets: ExercisePageSet[], setId: string): Exer
 
 /**
  * Swipe-left drop (`ux-rules.md` "Swipes on the exercise page"), on any row:
- * - an ad-hoc row (no plan) is removed from the list, confirmed or not;
- * - a planned row returns to its pristine state — typed weight and reps clear,
- *   its actual effort goes back to blank and it reads as its plan again (the
- *   display falls back to the prescribed effort), planned rather than
- *   performed. It keeps its place, and the cursor stays on it: a swipe never
- *   deletes a plan.
- * Returns the same array when there is nothing to drop — an untouched planned
- * row, or an unknown id.
+ * the row is removed from the list — a planned row too, confirmed or not, and
+ * whatever it holds; a plan is not special-cased. Returns the same array when
+ * the id is unknown.
  */
 export const dropSet = (sets: ExercisePageSet[], setId: string): ExercisePageSet[] => {
-  const set = sets.find((candidate) => candidate.id === setId);
-  if (!set) return sets;
-  if (!hasPlannedValues(set)) return sets.filter((candidate) => candidate.id !== setId);
-  const untouched = !isPerformed(set) && !hasEnteredValues(set) && (set.setType ?? null) === null;
-  if (untouched) return sets;
-  return replaceSet(sets, setId, (current) => ({
-    ...current,
-    weightValue: '',
-    repsValue: '',
-    setType: null,
-    performanceStatus: 'planned',
-  }));
+  if (!sets.some((set) => set.id === setId)) return sets;
+  return sets.filter((set) => set.id !== setId);
 };
 
-/** Whether swipe-left would change the row: the page offers the drop only then. */
+/** Whether swipe-left would change the list: the page offers the drop for any row it holds. */
 export const canDropSet = (sets: ExercisePageSet[], setId: string): boolean =>
-  dropSet(sets, setId) !== sets;
+  sets.some((set) => set.id === setId);
 
 /** Whether swipe-right would confirm the row: its displayed values are a valid set. */
 export const canConfirmSet = (sets: ExercisePageSet[], setId: string): boolean => {

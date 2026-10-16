@@ -37,7 +37,7 @@ type SetLoggerProps = {
   // the tick confirms without the swipe's last-set add-set continuation. Absent when the values are not a valid set.
   onConfirm?: () => void;
   // The swipe-left equivalent, as the logger's `discard` accessibility action.
-  // Absent when dropping would change nothing.
+  // Offered for any row the page holds.
   onDrop?: () => void;
 };
 

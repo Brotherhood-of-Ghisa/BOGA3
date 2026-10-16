@@ -17,9 +17,8 @@ type SetRowProps = {
   divider: boolean;
   onOpen: (setId: string) => void;
   onToggle: (setId: string) => void;
-  // Swipe-left's non-gesture path, offered only when the drop would change the
-  // row (`canDropSet`): removes an ad-hoc row, returns a planned one to its
-  // plan.
+  // Swipe-left's non-gesture path, offered for any row the page holds
+  // (`canDropSet`): removes the row, planned or ad-hoc.
   onDrop?: () => void;
 };
 
