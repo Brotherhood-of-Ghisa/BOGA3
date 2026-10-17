@@ -269,8 +269,8 @@ in one transaction with deferred constraints, forces the FK check before it
 returns (so it can raise `FK_VIOLATION`), and commits or rolls back the whole
 batch.
 
-**`fields`.** Protocol-4 writers send every typed column. Any extra key is
-rejected as drift rather than preserved. Local-only columns are never sent.
+**`fields`.** Protocol-4 writers send every typed column. A key the server does
+not know is ignored, not stored. Local-only columns are never sent.
 LWW stays per row; there are no per-field clocks.
 
 **Update-required cutoff.** A normal authenticated call whose
