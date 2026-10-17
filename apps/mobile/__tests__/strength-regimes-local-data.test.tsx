@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { periodColour } from '@/components/rm-curve/chart';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
 import { loadRmCurve } from '@/src/rm-curve/repository';
@@ -9,19 +9,21 @@ import { resetLocalData, closeLocalData, localDataClient } from './helpers/local
 
 jest.mock('@/src/data/bootstrap', () => require('./helpers/local-data').localDataBootstrapModule());
 beforeEach(async () => { await resetLocalData(); });
-afterEach(() => closeLocalData());
+afterEach(() => { closeLocalData(); jest.useRealTimers(); });
 
 it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selected logged metrics and leaves the active workout intact', async () => {
   const now = new Date(2026, 9, 15, 12);
   await seedStrengthRegimesFixture(now);
   const before = localDataClient().prepare('SELECT * FROM exercise_sets ORDER BY id').all();
+  jest.useFakeTimers();
   render(<RmCurveScreen exerciseDefinitionId={EXERCISE_PAGE_FIXTURE.benchExerciseId} now={now} />);
   await screen.findByTestId('rm-curve-plot');
   fireEvent.press(screen.getByLabelText('gym: Gym B'));
   fireEvent.press(screen.getByRole('radio', { name: 'All gyms' }));
   await screen.findByText('103 sets · 34 sessions');
   fireEvent.press(screen.getByTestId('rm-mode-two'));
-  await screen.findByTestId('rm-fit-newer', {}, { timeout: 60000 });
+  act(() => { jest.runAllTimers(); });
+  expect(screen.getByTestId('rm-fit-newer')).toBeTruthy();
   expect(screen.getByTestId('rm-fit-older').props.stroke).not.toBe(screen.getByTestId('rm-fit-newer').props.stroke);
   expect(screen.getByTestId('rm-fit-newer').props.strokeDasharray).toBeTruthy();
   expect(screen.getByText('Exploratory fit')).toBeTruthy();
@@ -34,7 +36,8 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   // Identity is cleared immediately while the other method is fitting.
   expect(screen.queryByTestId('rm-selected-period')).toBeNull();
-  await screen.findByTestId('rm-fit-newer', {}, { timeout: 60000 });
+  act(() => { jest.runAllTimers(); });
+  expect(screen.getByTestId('rm-fit-newer')).toBeTruthy();
   expect(screen.getByTestId('rm-selected-period').props.children).toMatch(/^From /);
   expect(localDataClient().prepare('SELECT * FROM exercise_sets ORDER BY id').all()).toEqual(before);
-}, 120000);
+});

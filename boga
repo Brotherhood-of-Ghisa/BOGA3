@@ -25,6 +25,7 @@
 #   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
+#   boga ios release --at <UTC time|now> --profile preview|prod --project-ref <ref> [--dry-run]
 #   boga env dev|lan|hosted|tailscale
 #
 # `test` (except --list / for), `db`, `ios`, and `env` fail hard without this
@@ -399,7 +400,8 @@ case "${cmd}" in
     case "${sub}" in
       build-client) dispatch_script "${REPO_ROOT}/apps/mobile/scripts/maestro-ios-dev-client-build.sh" "$@" ;;
       start)        dispatch_script "${REPO_ROOT}/apps/mobile/scripts/ios-dev-client-start.sh" "$@" ;;
-      *) fail "usage: boga ios build-client|start" ;;
+      release)      dispatch_script "${REPO_ROOT}/scripts/ios-release.sh" "$@" ;;
+      *) fail "usage: boga ios build-client|start|release" ;;
     esac
     ;;
   env)
