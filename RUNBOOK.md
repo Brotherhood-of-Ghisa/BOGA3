@@ -12,7 +12,7 @@ Load one of these instead when that is your task:
 | running the app on an Android emulator | `docs/runbook-android-emulator.md` |
 | running a development build on a physical iPhone (LAN, Tailscale, tunnel) | `docs/runbook-physical-iphone.md` |
 | operating a **hosted** Supabase project — reset, function deploys, agent/MCP rollout | `docs/runbook-hosted-operations.md` |
-| scheduling an iOS build and Apple submission, including backend migration | [iOS release guide](docs/procedures/ios-release.md) |
+| scheduling an iOS build and Apple submission, including backend migration | [Schedule an iOS release](docs/runbook-scheduled-ios-release.md) |
 
 Machine prerequisites, worktree open/release, and per-worktree dependency
 isolation live in `docs/specs/01-worktree-and-environment.md`; `./boga doctor`

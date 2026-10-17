@@ -7,118 +7,77 @@ Use a Bash session for the fenced commands, including the sourced Supabase
 helpers. Enable `set -euo pipefail` so a failed check stops subsequent commands.
 Other worktrees can continue development.
 
-## Schedule without gates (human instructions)
+## Schedule without gates (operator reference)
 
-Use this route when you intentionally want database migration, backend deployment,
-a local iOS build and Apple submission without test lanes or a sweep. Each
-invocation without `--dry-run` schedules one run on this Mac. It keeps the current
-app version/name and creates no Git tag.
+For the human terminal command, use
+[Schedule an iOS build and submission](../runbook-scheduled-ios-release.md).
+This route requires an explicit choice to omit test lanes and the release sweep.
+It keeps app metadata unchanged and creates no Git tag.
 
-### 1. Prepare this Mac
+### Prerequisites
 
-Open a Bash terminal at the root of an up-to-date checkout containing
-`boga ios release`. Set up its slot lease and read the required tools:
-
-```bash
-./boga worktree start
-./boga ios release --help
-```
-
-Have Xcode, CocoaPods and Node/npm installed, Docker running, and EAS login,
-signing and submission credentials ready for non-interactive use. To check the
-logged-in EAS account:
-
-```bash
-(cd apps/mobile && npx eas-cli whoami)
-```
+`./boga ios release --help` lists the tools and options. The Mac needs Xcode,
+CocoaPods, Node/npm, running Docker, and EAS login/signing/submission credentials
+that work non-interactively.
 
 Configure `supabase/.env.hosted` with `SUPABASE_PROJECT_REF`, `SUPABASE_URL`,
 `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. The URL must be
-`https://<project-ref>.supabase.co`; the ref must match the command below. Keep
-credentials out of Git. The selected EAS environment must also contain readable
-`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`, pointing to that
-same project. For profile choices, use "Agree the release choices upfront" below;
-the profile name alone does not select the database.
+`https://<project-ref>.supabase.co`, matching the explicit project ref. The EAS
+environment must contain readable `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` for that same project. Profile choices are below;
+the profile name alone does not select a database.
 
-### 2. Review the command, then schedule
+### Source and scheduling behavior
 
-Replace these example values. Time uses UTC (`Z`), so convert your intended local
-time to UTC and choose a future date. To start immediately, set
-`BOGA_RELEASE_AT=now` instead.
+`--at` accepts a future UTC timestamp ending in `Z`, or `now`. `--dry-run` prints
+the plan and resolves the locally known ref without creating a job or validating
+credentials/connectivity. Each real invocation creates one job; changing its
+time means cancelling it and scheduling another. The job cannot survive
+logout/reboot; keep the Mac logged in, lid open and signing keys accessible.
 
-```bash
-BOGA_RELEASE_AT='2026-10-18T01:00:00Z'
-BOGA_RELEASE_PROFILE='prod'  # preview or prod
-BOGA_RELEASE_PROJECT_REF='replace-with-your-project-ref'
+Default jobs pull `origin/main` with `--ff-only` at execution, then record the
+actual SHA. Other `--ref` values stay pinned when scheduled. Tracked files matching
+this Mac's last successful upload for the same profile/backend skip deployment,
+build and submission. The first run builds; failed uploads preserve the local
+success record under the BOGA config directory (default
+`~/.config/boga/releases/`). Schedule only reviewed, compatible migrations:
+deployment omits seeds, reset and history repair. This operates on an existing
+hosted project.
 
-./boga ios release --at "$BOGA_RELEASE_AT" --profile "$BOGA_RELEASE_PROFILE" \
-  --project-ref "$BOGA_RELEASE_PROJECT_REF" --dry-run
-```
+### Logs, cancellation and closeout
 
-The dry run prints the plan and resolves the locally known source ref. It creates
-no job and does not validate credentials, backend connectivity or build readiness.
-When the values are correct, schedule the real task:
-
-```bash
-./boga ios release --at "$BOGA_RELEASE_AT" --profile "$BOGA_RELEASE_PROFILE" \
-  --project-ref "$BOGA_RELEASE_PROJECT_REF"
-```
-
-Save the printed **PID**, **Checkout** and **Artifacts/log** paths. At execution,
-the default source pulls `origin/main` with `--ff-only`, then records the actual
-SHA. Changes merged before execution enter the release. To release one reviewed
-commit instead, add `--ref <full-commit-SHA>` to both commands; it stays pinned.
-Schedule only reviewed, compatible migrations: deployment omits seeds, reset and
-history repair. This operates on an existing hosted project.
-
-Keep the Mac powered on, logged in, lid open, online and able to access signing
-keys, with Docker running. The background job prevents idle sleep but cannot
-survive logout/reboot.
-
-### 3. Follow progress and read the result
-
-Use the exact **Artifacts/log** directory printed by your command:
+The command prints PID, checkout and artifact paths. Use its exact artifact path:
 
 ```bash
 BOGA_RELEASE_RECORD='/paste/the/Artifacts-log/directory/here'
 tail -f "$BOGA_RELEASE_RECORD/release.log"
-# Ctrl-C stops watching the log; the release keeps running.
+# Ctrl-C stops watching; the release keeps running.
 cat "$BOGA_RELEASE_RECORD/status"
 ```
 
-The log shows live progress. `status` starts as `scheduled` and records the final
-stage and exit code when the worker ends. `commit.txt` appears after source
-selection; the IPA, identity and checksum remain in the same directory.
+The log shows live progress. `status` starts as `scheduled`, then records the
+final stage/exit code when the worker ends. `commit.txt` appears after source
+selection. The IPA, identity and checksum remain in that artifact directory.
+Skipped/uploaded results exit 0; a nonzero exit needs investigation. Uploaded
+means the submission command completed; check Apple processing/tester availability
+separately. Inspect logs and remote state before retrying a failed or uncertain
+upload; there is no automatic retry.
 
-- **Skipped / exit 0:** tracked files match this Mac's last successful submission
-  for the same profile/backend. Deployment, build and submission were skipped.
-  The first run builds; failures never advance the local success record, stored
-  under the BOGA config directory (default `~/.config/boga/releases/`).
-- **Uploaded / exit 0:** submission completed. Check processing and tester
-  availability in App Store Connect; hosted smoke and device verification remain
-  separate.
-- **Nonzero exit:** inspect the log and remote state before continuing. There is
-  no automatic retry, including after an uncertain upload.
-
-### 4. Cancel, reschedule and clean up
-
-While this job is pending or running, cancel its whole process group:
+While the job is pending or running, cancel its whole process group:
 
 ```bash
 kill -TERM -- "-$(cat "$BOGA_RELEASE_RECORD/pid")"
 ```
 
-To change its time, cancel it first, then repeat step 2 with the new time. Each
-invocation creates a new job. After collecting the external artifacts and
-finishing with a stopped job, release its retained detached checkout using
-"Apply the optional tag and close out" below.
+After collecting the external artifacts and finishing with a stopped job, release
+its retained detached checkout using "Apply the optional tag and close out" below.
 
 When notification deployment needs explanation, load
 `docs/specs/tech/notification-delivery-contract.md` ("Rollout boundary"). The
 script configures the worker's Vault invocation and exact app environment;
 new sending defaults off, existing sending settings are retained, and a
-conflicting preview/production registration environment fails. Render and
-consent-site deployment remain separate.
+conflicting preview/production registration environment fails. Render/consent-site
+deployment, hosted smoke and signed-device verification remain separate.
 
 ## Agree the release choices upfront
 
