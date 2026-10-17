@@ -157,7 +157,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
       annotations: readOnlyAnnotations,
       description:
         'Get exact keyset-paginated performed set history for one exercise owned by the authorizing user, in reverse chronological completed-session order. Drain cursor to exhaustion when analyzing full training history.' +
-        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym is the reported bucket’s gym and exercise.gym_buckets lists the others.',
+        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym is the reported bucket’s gym and exercise.gym_buckets lists the others; a history cursor stays in its own bucket, so drain it without repeating gym_bucket.',
       inputSchema: z.object({
         cursor: z.string().max(500).optional(),
         exercise_id: z.string().min(1).max(200),

@@ -9,12 +9,20 @@
 /** A bucket key: a gym id, or null for the no-gym bucket. */
 export type GymBucket = string | null;
 
-/** The `gym_bucket` request value that selects the no-gym bucket. */
+/**
+ * The `gym_bucket` request value that selects the no-gym bucket. It is a
+ * reserved value in the gym-id space, so a gym whose own id is `none` cannot
+ * be named; `bucketKey` keeps the two apart everywhere else.
+ */
 export const NO_GYM_BUCKET = 'none';
 
 export type GymBucketRank = { bucket: GymBucket; lastPerformedAt: number };
 
-/** The bucket a `gym_bucket` value names; undefined when the caller named none. */
+/** A map key that cannot confuse a gym with the no-gym bucket. */
+const bucketKey = (bucket: GymBucket): string =>
+  bucket === null ? 'no-gym' : `gym:${bucket}`;
+
+/** The bucket a `gym_bucket` value names; undefined when the request named none. */
 export const gymBucketFromParam = (raw: string | null): GymBucket | undefined => {
   if (raw === null) return undefined;
   return raw === NO_GYM_BUCKET ? null : raw;
@@ -30,7 +38,7 @@ export const rankGymBuckets = (
 ): GymBucketRank[] => {
   const newest = new Map<string, GymBucketRank>();
   for (const session of sessions) {
-    const key = session.gym_id ?? NO_GYM_BUCKET;
+    const key = bucketKey(session.gym_id);
     const held = newest.get(key);
     if (!held || session.completed_at > held.lastPerformedAt) {
       newest.set(key, { bucket: session.gym_id, lastPerformedAt: session.completed_at });
@@ -42,7 +50,7 @@ export const rankGymBuckets = (
 };
 
 /**
- * The bucket reported when the caller named none: the most recently performed
+ * The bucket reported when the request named none: the most recently performed
  * one. With no history at all the no-gym bucket answers, so the response is a
  * single empty bucket rather than an error.
  */

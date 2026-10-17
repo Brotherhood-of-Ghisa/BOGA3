@@ -22,7 +22,7 @@ describe('coaching gym buckets', () => {
     expect(gymBucketFromParam(NO_GYM_BUCKET)).toBeNull();
   });
 
-  it('leaves the bucket unchosen when the caller named none', () => {
+  it('leaves the bucket unchosen when the request carries no selector', () => {
     expect(gymBucketFromParam(null)).toBeUndefined();
   });
 
@@ -36,6 +36,13 @@ describe('coaching gym buckets', () => {
       { bucket: 'gym-away', lastPerformedAt: 500 },
       { bucket: null, lastPerformedAt: 400 },
       { bucket: 'gym-home', lastPerformedAt: 300 },
+    ]);
+  });
+
+  it('keeps a gym whose own id is the reserved value out of the no-gym bucket', () => {
+    expect(rankGymBuckets([session(NO_GYM_BUCKET, 200), session(null, 100)])).toEqual([
+      { bucket: NO_GYM_BUCKET, lastPerformedAt: 200 },
+      { bucket: null, lastPerformedAt: 100 },
     ]);
   });
 

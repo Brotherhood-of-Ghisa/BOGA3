@@ -7,7 +7,7 @@ import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
 import {
-  defaultGymBucket, gymBucketFromParam, rankGymBuckets,
+  NO_GYM_BUCKET, defaultGymBucket, gymBucketFromParam, rankGymBuckets,
   type GymBucket, type GymBucketRank,
 } from './gym-buckets.ts';
 import {
@@ -20,6 +20,8 @@ const DEFAULT_EXERCISE_LIMIT = 20;
 const MAX_EXERCISE_LIMIT = 50;
 const DEFAULT_RECENT_SESSIONS = 5;
 const MAX_RECENT_SESSIONS = 20;
+/** The longest `gym_buckets` list a split exercise reports, newest first. */
+const MAX_GYM_BUCKETS = 50;
 const DEFAULT_WORKOUT_LIMIT = 10;
 const MAX_WORKOUT_LIMIT = 25;
 const DEFAULT_SET_LIMIT = 20;
@@ -945,7 +947,8 @@ const loadGymNames = async (
     .select('id,name')
     .eq('owner_user_id', userId)
     .in('id', gymIds)
-    .limit(50)
+    // Every requested id, so no gym in the list reports a null name.
+    .limit(gymIds.length)
     .returns<Array<{ id: string; name: string }>>();
   throwDatabaseError(error);
   return new Map((data ?? []).map((row) => [row.id, row.name]));
@@ -965,36 +968,47 @@ const loadDefinitionsById = async (
   return new Map(rows.map(row => [row.id, row]));
 };
 
-/** The requested bucket, or undefined when the caller named none. */
+/** The requested bucket, or undefined when the request named none. */
 const parseGymBucket = (
   url: URL, definition: ExerciseDefinitionRow,
 ): GymBucket | undefined => {
-  const bucket = gymBucketFromParam(
-    parseOptionalText(url.searchParams.get('gym_bucket'), 200, 'gym_bucket'),
-  );
-  if (bucket !== undefined && !definition.split_by_gym) {
+  const raw = url.searchParams.get('gym_bucket');
+  if (raw === null) return undefined;
+  if (!definition.split_by_gym) {
     throw new ApiError(
       400,
       'INVALID_ARGUMENT',
       'gym_bucket applies only to an exercise tracked separately per gym.',
     );
   }
-  return bucket;
+  const value = parseOptionalText(raw, 200, 'gym_bucket');
+  if (value === null) {
+    throw new ApiError(
+      400, 'INVALID_ARGUMENT', `gym_bucket must name a gym or "${NO_GYM_BUCKET}".`,
+    );
+  }
+  return gymBucketFromParam(value);
 };
 
 /** The split fields on a split exercise: the reported bucket and every bucket. */
 const gymBucketFields = async (
   client: SupabaseClient, userId: string, selected: GymBucket, ranked: GymBucketRank[],
 ): Promise<JsonObject> => {
-  const names = await loadGymNames(
-    client, userId, uniqueStrings([selected, ...ranked.map((entry) => entry.bucket)], 50),
-  );
-  // A null gym is the `No gym` bucket, not an unknown one.
+  const listed = ranked.slice(0, MAX_GYM_BUCKETS);
+  const candidates = [selected, ...listed.map((entry) => entry.bucket)];
+  const names = await loadGymNames(client, userId, uniqueStrings(candidates, candidates.length));
+  // A named gym nobody owns and one owned by somebody else are the same 404,
+  // as everywhere else in this API — and a 200 holding an empty bucket would
+  // read as "trained there, nothing recorded".
+  if (selected !== null && !names.has(selected)) {
+    throw new ApiError(404, 'NOT_FOUND', 'Gym not found.');
+  }
+  // A null gym is the no-gym bucket, not an unknown one.
   const gymField = (bucket: GymBucket) =>
     bucket === null ? null : { id: bucket, name: names.get(bucket) ?? null };
   return {
     gym: gymField(selected),
-    gym_buckets: ranked.map((entry) => ({
+    gym_buckets: listed.map((entry) => ({
       gym: gymField(entry.bucket),
       last_performed_at: toIsoTimestamp(entry.lastPerformedAt),
     })),
@@ -1092,8 +1106,15 @@ const getExerciseContext = async (
     .filter(row => row.workingSetCount > 0);
 
   // A split exercise is never pooled: every figure below comes from one bucket.
+  // The buckets are ranked over every session that performed a set of this
+  // exercise, warm-up-only ones included, so both exercise routes see the same
+  // buckets in the same order.
+  const performedSessions = completedSessions.filter((session) =>
+    (blocksBySession.get(session.id) ?? [])
+      .some((block) => (setsByBlock.get(block.id) ?? []).length > 0)
+  );
   const rankedBuckets = definition.split_by_gym
-    ? rankGymBuckets(performanceRows.map((row) => row.session))
+    ? rankGymBuckets(performedSessions)
     : [];
   const selectedBucket = definition.split_by_gym
     ? (requestedBucket === undefined ? defaultGymBucket(rankedBuckets) : requestedBucket)
@@ -1331,8 +1352,28 @@ const getExerciseHistory = async (
     throw new ApiError(404, 'NOT_FOUND', 'Exercise not found.');
   }
   const requestedBucket = parseGymBucket(url, definition);
-  const reportedBucket = (ranked: GymBucketRank[]): GymBucket =>
-    requestedBucket === undefined ? defaultGymBucket(ranked) : requestedBucket;
+  // The cursor carries its own bucket, so draining it keeps paging that bucket
+  // even when the caller does not repeat `gym_bucket` — otherwise page two
+  // would silently switch buckets and apply page one's keyset filter to it.
+  const cursorBucket = ((): GymBucket | undefined => {
+    if (!cursor || cursor.gym_bucket === undefined) return undefined;
+    const value = cursor.gym_bucket;
+    if (value !== null && typeof value !== 'string') {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
+    }
+    return value;
+  })();
+  if (cursorBucket !== undefined && requestedBucket !== undefined
+    && cursorBucket !== requestedBucket) {
+    throw new ApiError(
+      400, 'INVALID_ARGUMENT', 'gym_bucket does not match the cursor; drop one of them.',
+    );
+  }
+  const reportedBucket = (ranked: GymBucketRank[]): GymBucket => {
+    if (cursorBucket !== undefined) return cursorBucket;
+    if (requestedBucket !== undefined) return requestedBucket;
+    return defaultGymBucket(ranked);
+  };
   // The exercise descriptor, carrying the reported bucket of a split exercise.
   const exerciseField = async (ranked: GymBucketRank[]): Promise<JsonObject> => ({
     id: definition.id,
@@ -1508,6 +1549,7 @@ const getExerciseHistory = async (
     next_cursor: hasMore && lastItem
       ? encodeCursor({
         kind: 'exercise_history',
+        ...(definition.split_by_gym ? { gym_bucket: pagedBucket } : {}),
         session_completed_at: lastItem.session.completed_at,
         session_id: lastItem.session.id,
         exercise_order: lastItem.block.order_index,

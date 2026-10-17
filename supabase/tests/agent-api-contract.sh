@@ -766,6 +766,8 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}-set','${SPLIT_NONE_SESSION}-block',0,'150','5',null,
        null,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set','${SPLIT_AWAY_SESSION}-block',0,'100','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set-2','${SPLIT_AWAY_SESSION}-block',1,'95','5',null,
        null,${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
@@ -803,8 +805,8 @@ agent_get "exercises/${EXERCISE_SPLIT}/history"
 assert_status "200" "split exercise history"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
   .data.exercise.gym.id == $away
-  and (.data.sets | length) == 1
-  and .data.sets[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
+  and (.data.sets | length) == 2
+  and ([.data.sets[].session_id] | unique) == ["'"${SPLIT_AWAY_SESSION}"'"]
   and .data.next_cursor == null
 ' >/dev/null || fail "split exercise history pooled its gyms"
 
@@ -815,6 +817,37 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   and (.data.sets | length) == 1
   and .data.sets[0].session_id == "'"${SPLIT_NONE_SESSION}"'"
 ' >/dev/null || fail "gym_bucket=none did not page the no-gym bucket history"
+
+# A drained cursor must stay in its own bucket even when gym_bucket is dropped,
+# or page two would silently answer for another gym.
+agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=${GYM_A}&limit=1"
+assert_status "200" "split exercise history first page"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg home "${GYM_A}" '
+  .data.exercise.gym.id == $home and (.data.sets | length) == 1 and .data.next_cursor == null
+' >/dev/null || fail "a named bucket did not page its own gym"
+agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=none&limit=1"
+assert_status "200" "no-gym bucket first page"
+NO_GYM_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor // ""')"
+[[ -z "${NO_GYM_CURSOR}" ]] || fail "the single-set no-gym bucket returned a cursor"
+
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1"
+assert_status "200" "split exercise history newest bucket page 1"
+AWAY_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ -n "${AWAY_CURSOR}" && "${AWAY_CURSOR}" != "null" ]] || fail "a two-set bucket returned no cursor"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}"
+assert_status "200" "split exercise history page 2 without gym_bucket"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
+  .data.exercise.gym.id == $away
+  and (.data.sets | length) == 1
+  and .data.sets[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
+' >/dev/null || fail "following the cursor left the bucket it was issued for"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}&gym_bucket=none"
+assert_status "400" "cursor and gym_bucket naming different buckets"
+
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=agent-api-${RUN_TAG}-gym-absent"
+assert_status "404" "gym_bucket naming a gym the user does not own"
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket="
+assert_status "400" "empty gym_bucket"
 
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "unsplit exercise context"

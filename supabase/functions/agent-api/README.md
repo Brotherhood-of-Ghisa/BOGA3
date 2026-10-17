@@ -222,14 +222,21 @@ An exercise the user tracks separately per gym (`exercise.split_by_gym`) reports
 one exercise per gym, with the sessions that had no gym forming their own
 bucket; it is never pooled, so both exercise routes answer for one bucket at a
 time. The reported bucket is the exercise's most recently performed one unless
-`gym_bucket` names another: a gym id, or `none` for the sessions with no gym.
-`gym_bucket` on an exercise that is not split is `400 INVALID_ARGUMENT`.
+`gym_bucket` names another: a gym id, or `none` for the sessions with no gym
+(so a gym whose own id is `none` cannot be named). `gym_bucket` is
+`400 INVALID_ARGUMENT` on an exercise that is not split, or empty, or against a
+cursor for another bucket, and `404` for a gym the user does not own.
 
 `exercise.gym` is the reported bucket's gym — `null` means the no-gym bucket,
-not an unknown gym — and `exercise.gym_buckets` lists every bucket this response
-could see, most recently performed first, so a client can ask for another one.
-A truncated history (`history_truncated`) can hide a bucket. An exercise that is
-not split carries `split_by_gym: false` and neither field.
+not an unknown gym — and `exercise.gym_buckets` lists the buckets this response
+could see, most recently performed first (at most 50), so a client can ask for
+another one. Both routes rank buckets over every session that performed a set of
+the exercise, warm-ups included, so they agree on the order; a truncated history
+(`history_truncated`) can still hide a bucket. An exercise that is not split
+carries `split_by_gym: false` and neither field.
+
+A history `next_cursor` carries its own bucket, so draining it pages that bucket
+whether or not the caller repeats `gym_bucket`.
 
 ## Workout detail
 
@@ -335,7 +342,9 @@ governs.
 tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v6"` applies the source entry factor to total
+`metric_revision: "working_sets_v6"` reports an exercise the user tracks
+separately per gym one [gym bucket](#gym-buckets) at a time.
+`"working_sets_v5"` applies the source entry factor to total
 Volume for every exercise, retaining entered Weight and displayed 1RM units.
 `"working_sets_v4"` omitted the factor from ordinary exercise Volume. 1RM follows
 [[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v3"` estimated a
