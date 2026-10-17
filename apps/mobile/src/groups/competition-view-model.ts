@@ -9,7 +9,7 @@ import { formatMemberName, formatMetricFigure } from './stream-view-model';
 import type { GroupExercise } from './types';
 
 export const COMPETITION_LABELS = { volume: 'Volume', e1rm: '1RM' } as const;
-// Ordinary units have no label; only `%BW` is named (training-metrics-contract, Display).
+// Unit labels follow [[copy.no-weight-unit]]; wire units remain unchanged.
 export const COMPETITION_UNIT_LABELS = { kg_reps: '', kg: '', percent_bw_reps: '%BW·reps', percent_bw: '%BW' } as const;
 const withUnit = (text: string, unit: string): string => unit ? `${text} ${unit}` : text;
 /** A competition figure with its unit label: `213.3`, `142.5 %BW`. */

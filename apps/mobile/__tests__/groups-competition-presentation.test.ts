@@ -1,5 +1,5 @@
 import { buildCompetitionRow, buildCompetitionPodiums, competitionViewLabel, formatContributionPercent,
-  formatCompetitionValue, formatCompetitionPerformance, competitionLinkExercise } from '@/src/groups/competition-view-model';
+  formatCompetitionValue, formatCompetitionHistoricalValue, formatCompetitionPerformance, competitionLinkExercise } from '@/src/groups/competition-view-model';
 import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
 import { buildStreamRecordSheet } from '@/src/groups/competition-stream-view-model';
 import { competitionBoard,competitionCertification,competitionEvent,competitionExercise,competitionRow,competitionSession } from './helpers/competition-fixtures';
@@ -7,8 +7,25 @@ import { competitionBoard,competitionCertification,competitionEvent,competitionE
 test.each([
   ['volume','kg_reps',125.5,'125.5'],['volume','percent_bw_reps',611.111111,'611.1 %BW·reps'],
   ['e1rm','kg',125.5,'125.5'],['e1rm','percent_bw',145.728,'145.7 %BW'],
-] as const)('formats %s with explicit %s while preserving the server value', (metric,unit,value,expected) => {
+] as const)('formats %s from wire unit %s while preserving the server value', (metric,unit,value,expected) => {
   const score={ metric,unit,value };expect(formatCompetitionValue(score)).toBe(expected);expect(score.value).toBe(value);
+});
+test.each([
+  ['kg', 'Weight 125.5'], ['kg_reps', 'Weight 125.5'],
+  ['percent_bw', 'Weight 125.5 %BW'], ['percent_bw_reps', 'Weight 125.5 %BW·reps'],
+])('formats historical %s without changing its wire unit', (unit, expected) => {
+  const value = { ...competitionEvent.values[0], metric: 'weight' as const, unit, value: 125.5 };
+  expect(formatCompetitionHistoricalValue(value)).toBe(expected);
+  expect(value.unit).toBe(unit);
+  expect(formatCompetitionHistoricalValue({ ...value, unavailable: true })).toBe('Score unavailable');
+  expect(formatCompetitionHistoricalValue({ ...value, value: null })).toBe('Score unavailable');
+});
+test.each(['total_load', 'per_side_load'] as const)('retains %s context without a weight unit', source_load_input_mode => {
+  const performance = { visibility: 'ordinary' as const, session_id: 's', session_exercise_id: 'se',
+    exercise_definition_id: 'd', set_id: 'set', reps: 5, performance_status: null, source_load_input_mode,
+    achieved_at_ms: 1, exercise_order_index: 0, set_order_index: 0, weight_value: '20' };
+  expect(formatCompetitionPerformance(performance)).toBe(source_load_input_mode === 'per_side_load'
+    ? 'Weight 20.0 per side × 5' : 'Weight 20.0 × 5');
 });
 test.each([0,-1,NaN,Infinity])('invalid score %s uses generic unavailable copy', value => {
   expect(formatCompetitionValue({ metric: 'e1rm',unit: 'percent_bw',value })).toBe('Score unavailable');
@@ -122,7 +139,7 @@ describe('buildStreamRecordSheet', () => {
     expect(model.certification).toBeNull();
     expect(model.metrics).toEqual([expect.objectContaining({ value: 'Score unavailable' })]);
   });
-  it('labels a historical metric with its unit', () => {
+  it('omits the historical ordinary weight unit', () => {
     const model = buildStreamRecordSheet({ ...competitionEvent, values: [{ ...competitionEvent.values[0], metric: 'weight', unit: 'kg', value: 100 }] }, undefined, 'me', NOW);
     expect(model.metrics).toEqual([{ metric: 'weight', label: 'Weight', value: '100.0' }]);
   });

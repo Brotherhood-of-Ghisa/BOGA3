@@ -182,14 +182,13 @@ addressable, each resolving to a canonical owner for tab selection.
 
 - **Personal bodyweight calculations** (Settings On/Off): while enabled, the
   personal exercise editor adds only `Bodyweight contribution (%)`. Session and
-  exercise routes keep ordinary kg Weight / 1RM / Volume labels and never show
+  exercise routes keep ordinary Weight / 1RM / Volume labels ([[copy.no-weight-unit]]) and never show
   bodyweight context or entry actions. Reading or deletion changes recalculate
   affected projections silently.
 - **Group bodyweight calculations** (admin-only group toggle): while enabled,
   add/edit group exercise shows only the group's own independent
   `Bodyweight contribution (%)`; linking never changes personal settings or
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
-  boards and podiums then show `%BW·reps` / `%BW`; ordinary boards show no
-  unit; record detail and history retain public witness state and original
-  units, and normalized sessions omit raw loads and all session aggregate
+  boards and podiums follow [[copy.no-weight-unit]]; record detail and history
+  retain public witness state and original wire units, and normalized sessions omit raw loads and all session aggregate
   volume. See `docs/specs/tech/group-competition-contract.md`.
