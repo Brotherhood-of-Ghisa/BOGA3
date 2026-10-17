@@ -92,13 +92,13 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
   const updated = (await loadRmCurve(query))!.observations[0];
   expect(updated.loadKg - initial.loadKg).toBeCloseTo(1.25, 10);
   await screen.findByText(`${formatWeight(initial.weightKg)} / ${formatOneRepMax(updated.existingOneRepMax)}`);
-  expect(screen.getByText(`Equivalent reps ${updated.equivalentReps} · Load ${formatWeight(updated.loadKg)} kg per side`)).toBeTruthy();
+  expect(screen.getByText(`Equivalent reps ${updated.equivalentReps} · Load ${formatWeight(updated.loadKg)} per side`)).toBeTruthy();
   expect(screen.getByTestId('rm-selection-caret')).toBeTruthy();
   expect(db.select().from(exerciseSets).all()).toEqual(before);
   act(() => { db.update(bodyWeightMeasurements).set({ deletedAt: now }).where(eq(bodyWeightMeasurements.id, 'dated')).run(); invalidateBodyWeightContext(); });
-  await waitForGone(() => screen.queryByText('LOAD (WITH DATED BODYWEIGHT) · KG PER SIDE'));
+  await waitForGone(() => screen.queryByText('LOAD (WITH DATED BODYWEIGHT) · PER SIDE'));
   await screen.findByTestId('rm-curve-details');
-  expect(screen.getByText('LOAD · KG PER SIDE')).toBeTruthy();
+  expect(screen.getByText('LOAD · PER SIDE')).toBeTruthy();
   expect(db.select().from(exerciseSets).all()).toEqual(before);
 });
 
@@ -124,7 +124,7 @@ it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to 
     expect(screen.getByText(`${date} · block 1, set 1`)).toBeTruthy();
     expect(screen.getByText(`${first.repsValue} / ${first.rir}`)).toBeTruthy();
     expect(screen.getByText(`${formatWeight(Number(first.weightValue))} / ${formatOneRepMax(first.rm)}`)).toBeTruthy();
-    expect(screen.getByText(`Equivalent reps ${Number(first.repsValue) + first.rir} · Load ${formatWeight(Number(first.weightValue))} kg`)).toBeTruthy();
+    expect(screen.getByText(`Equivalent reps ${Number(first.repsValue) + first.rir} · Load ${formatWeight(Number(first.weightValue))}`)).toBeTruthy();
     expect(screen.queryByText(/structural break|significant|strength gain/i)).toBeNull();
     component.unmount();
   }

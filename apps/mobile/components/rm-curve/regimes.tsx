@@ -26,7 +26,7 @@ export function RmRegimes({ model, result, selectedId, dateFormat, onPick }: {
       <View style={[styles.dot, { borderColor: periodColour(curve.period), backgroundColor: 'transparent' }, curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
       <Text allowFontScaling={false} style={[styles.figure, { color: periodColour(curve.period) }]}>
         {periodLabel(curve.period, assessment.boundary, dateFormat)}
-        {' · 1RM '}{formatOneRepMax(curve.totalRm / factor)} kg{factor === 2 ? ' per side' : ''}
+        {' · 1RM '}{formatOneRepMax(curve.totalRm / factor)}{factor === 2 ? ' per side' : ''}
       </Text>
     </View>)}
   </>;

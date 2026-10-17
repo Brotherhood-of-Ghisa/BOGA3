@@ -75,7 +75,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
 - assertVisible: { id: "rm-selected-period", text: "From .*" }
-- assertVisible: { text: "WEIGHT / 1RM · KG" }
+- assertVisible: { text: "WEIGHT / 1RM" }
 - takeScreenshot: "06-selected-set"
 - scrollUntilVisible:
     element: { id: "rm-method-fixed" }

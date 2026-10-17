@@ -99,7 +99,7 @@ export const validatePlanSetDraft = (
   const weight = parseTargetWeight(draft.targetWeightText);
   if (!weight.ok) {
     errors.push(
-      error(`${path}.targetWeight`, 'invalid_weight', 'Weight must be a kg amount from 0 to 9999.99, or blank.'),
+      error(`${path}.targetWeight`, 'invalid_weight', 'Weight must be from 0 to 9999.99, or blank.'),
     );
   }
 

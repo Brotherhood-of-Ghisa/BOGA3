@@ -677,7 +677,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(cell('up', 'change')).toHaveTextContent('+4.7');
     expect(cell('down', 'change')).toHaveTextContent('−5.0');
     expect(screen.getByTestId('stats-exercise-row-up').props.accessibilityLabel).toBe(
-      'Open Up heatmap. Now 104.7, previous 100.0, change +4.7. kg.'
+      'Open Up heatmap. Now 104.7, previous 100.0, change +4.7. 1RM.'
     );
     // The whole row is one target, so the figures inside offer no second
     // element of their own.
@@ -795,7 +795,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     });
 
     const header = () => screen.getByTestId('stats-exercise-sort-now');
-    expect(header().props.accessibilityLabel).toContain('Now, kg.');
+    expect(header().props.accessibilityLabel).toContain('Now, 1RM.');
 
     expect(sortedExerciseIds()).toEqual(['heavy', 'mid', 'none']);
     expect(header().props.accessibilityState).toEqual({ selected: true });
@@ -970,7 +970,7 @@ it('shows Volume with no coverage note and uses ordinary strength copy for bodyw
   expect(screen.queryByTestId('stats-exercise-coverage-bw')).toBeNull();
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. Now 800, previous 0, change new. kg·reps.');
+    .toBe('Open Pull-up heatmap. Now 800, previous 0, change new. volume.');
   // A sum that is not finite is dashed, never explained ([[copy.no-inline-explanation]]).
   expect(screen.getByTestId('stats-exercise-row-huge-now')).toHaveTextContent('—');
   expect(screen.getByTestId('stats-exercise-row-huge-change')).toHaveTextContent('—');
@@ -984,18 +984,18 @@ it('drops the muscle table title and the header unit, keeping the unit spoken', 
   expect(screen.queryByText('Work by muscle')).toBeNull();
   const header = () => within(screen.getByTestId('stats-muscle-table-header'));
   expect(header().getByText('Muscle')).toBeTruthy();
-  expect(header().queryByText(/kg·reps/)).toBeNull();
+  expect(header().queryByText(/volume/i)).toBeNull();
   expect(screen.getByLabelText('Now, working sets')).toBeTruthy();
 
   view.rerender(<StatsScreenShell {...buildShellProps({ tableMetric: 'totalVolume' })} />);
-  expect(header().queryByText(/kg·reps/)).toBeNull();
+  expect(header().queryByText(/volume/i)).toBeNull();
   expect(header().getByText('Now')).toBeTruthy();
   expect(header().getByText('Prev')).toBeTruthy();
   for (const column of ['Now', 'Previous', 'Change']) {
-    expect(screen.getByLabelText(`${column}, kg·reps`)).toBeTruthy();
+    expect(screen.getByLabelText(`${column}, volume`)).toBeTruthy();
   }
   expect(screen.getByTestId('stats-muscle-row-chest-figures').props.accessibilityLabel)
-    .toBe('Now 1800, previous 1500, change +20%. kg·reps.');
+    .toBe('Now 1800, previous 1500, change +20%. volume.');
 });
 
 it('draws both breakdowns in one table style', () => {
@@ -1135,7 +1135,7 @@ it.each([375, 430])('uses the full row width for parent and contribution figures
   expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-contribution-bench-figures')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('stats-muscle-row-chest-figures').props.accessibilityLabel)
-    .toMatch(/^Now 188271603422374, previous 6172839456170, change .*\. kg·reps\.$/);
+    .toMatch(/^Now 188271603422374, previous 6172839456170, change .*\. volume\.$/);
   expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
   expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
   // A contributor's figures stay on its muscle's columns, whatever the width.

@@ -93,7 +93,7 @@ describe('body weight log', () => {
 
     fireEvent.press(screen.getByTestId('body-weight-add'));
     fireEvent.changeText(screen.getByTestId('weight-entry-value'), '82');
-    expect(screen.getByLabelText('Body weight in kilograms')).toBeTruthy();
+    expect(screen.getByLabelText('Body weight')).toBeTruthy();
     expect(screen.queryByTestId('weight-entry-unit-lb')).toBeNull();
     fireEvent.press(screen.getByTestId('weight-entry-save'));
 
@@ -103,7 +103,7 @@ describe('body weight log', () => {
     expect(saved).toMatchObject({ weightKg: 82, deletedAt: null, localDirty: true });
     expect(await screen.findByTestId(`body-weight-reading-${saved.id}`, {}, AFTER_WRITE)).toBeTruthy();
     expect(screen.getByTestId('body-weight-current'))
-      .toHaveProp('accessibilityLabel', 'Current body weight · kg 82');
+      .toHaveProp('accessibilityLabel', 'Current body weight 82');
   });
 
   it('keeps invalid and failed input editable, then retries successfully', async () => {

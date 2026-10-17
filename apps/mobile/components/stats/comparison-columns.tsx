@@ -48,7 +48,7 @@ export const COLUMN_KEYS = ['now', 'previous', 'change'] as const;
 export type ComparisonColumnKey = (typeof COLUMN_KEYS)[number];
 
 export const metricUnit = (metric: ComparisonMetric): string =>
-  metric === 'totalVolume' ? 'kg·reps' : metric === 'estimatedOneRepMax' ? 'kg' : 'working sets';
+  metric === 'totalVolume' ? 'volume' : metric === 'estimatedOneRepMax' ? '1RM' : 'working sets';
 
 const metricValue = (period: ComparisonPeriodFigures, metric: ComparisonMetric): number | null =>
   metric === 'workingSetCount' ? period.workingSetCount

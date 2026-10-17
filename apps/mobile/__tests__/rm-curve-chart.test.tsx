@@ -84,7 +84,8 @@ it('opens inline values on coordinate-free chart activation and can browse every
   expect(screen.getByLabelText('Previous set')).toBeDisabled();
   expect(screen.getByLabelText('Next set')).not.toBeDisabled();
   const label = setDescription({ ...model.observations[0], loadContext: { ...model.observations[0].loadContext, loadInputMode: 'per_side_load' } }, 'YYYY-MM-DD');
-  expect(label.match(/kg per side/g)).toHaveLength(3);
+  expect(label.match(/ per side/g)).toHaveLength(3);
+  expect(label).not.toMatch(/\bkg\b/);
 });
 
 it('uses viewport mouse coordinates after document scrolling instead of shifted page coordinates', async () => {

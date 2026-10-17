@@ -65,7 +65,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             BEST EVER
           </Text>
           <Text allowFontScaling={false} style={[styles.figure, styles.recordFigure, text(roles.record)]}>
-            105 kg
+            105.0
           </Text>
         </View>
       </View>

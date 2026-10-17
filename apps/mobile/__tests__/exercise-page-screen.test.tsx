@@ -192,8 +192,8 @@ describe('ExercisePageScreen', () => {
     ]);
     expect(screen.getByTestId('exercise-set-4-values')).toHaveTextContent('82.5 × 6');
     // Only the logger carries the unit label; the other set rows stay quiet.
-    expect(screen.getAllByText('Weight · kg')).toHaveLength(1);
-    expect(screen.getByLabelText('Set 3 weight in kilograms')).toHaveProp('value', '82.5');
+    expect(screen.getAllByText('Weight')).toHaveLength(1);
+    expect(screen.getByLabelText('Set 3 weight')).toHaveProp('value', '82.5');
   });
 
   it('keeps the recorder weight label for per-side exercises', async () => {
@@ -202,8 +202,8 @@ describe('ExercisePageScreen', () => {
       loadInputMode: 'per_side_load', bodyweightContribution: 0,
       mappings: [{ muscleGroupId: 'chest', role: 'primary', weight: 1 }] });
     render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
-    expect(await screen.findByLabelText('Set 3 weight in kilograms')).toHaveProp('value', '82.5');
-    expect(screen.getAllByText('Weight · kg')).toHaveLength(1);
+    expect(await screen.findByLabelText('Set 3 weight')).toHaveProp('value', '82.5');
+    expect(screen.getAllByText('Weight')).toHaveLength(1);
     expect(screen.queryByText('Weight per side · kg')).toBeNull();
     expect(screen.queryByLabelText('Set 3 weight per side in kilograms')).toBeNull();
   });

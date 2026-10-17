@@ -202,7 +202,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID);
 
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^Certified · 1RM kg$/);
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^Certified · 1RM$/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10 Sep/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-you`)).toHaveTextContent('You: 5th');
     expect(screen.getByTestId('group-podium-card-ge-old-archived')).toHaveTextContent('Archived');
@@ -295,8 +295,8 @@ describe('Full board (E1.2)', () => {
     expect(await screen.findByTestId('group-board-row-1')).toBeTruthy();
     expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm', certified: false, cursor: null }));
 
-    expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145.0 kg');
-    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('Weight 135.0 kg × 2');
+    expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145.0');
+    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('Weight 135.0 × 2');
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
@@ -319,8 +319,8 @@ describe('Full board (E1.2)', () => {
     await waitFor(() =>
       expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume', certified: false, cursor: null })),
     );
-    expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('270.0 kg·reps');
-    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('Weight 135.0 kg × 2');
+    expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('270.0');
+    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('Weight 135.0 × 2');
 
     fireEvent.press(screen.getByTestId('group-board-history-button'));
     expect(mockRouter.push).toHaveBeenCalledWith(
@@ -428,11 +428,11 @@ describe('Competition history',()=>{
     api.getCompetitionHistory.mockResolvedValueOnce(historyPage({ events: [event],next_cursor: 'older-events' }))
       .mockResolvedValueOnce(historyPage({ events: [{ ...event,event_id: 'lc1',sequence: 7,
         values: [{ ...event.values[0],value: 138,member: { user_id: 'u2',username: 'Sam' } }] }] }));
-    openHistory();expect(await screen.findByTestId('group-board-history-item-12-sentence')).toHaveTextContent('Dave · #1 1RM · 142.5 kg.');
+    openHistory();expect(await screen.findByTestId('group-board-history-item-12-sentence')).toHaveTextContent('Dave · #1 1RM · 142.5.');
     expect(screen.getByTestId('group-board-history-item-12-date')).toHaveTextContent('10 Sep');
     await act(async()=>fireEvent(screen.getByTestId('group-board-history-list'),'onEndReached'));
     expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ before: 'older-events' }));
-    expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent('Sam · #1 1RM · 138.0 kg.');
+    expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent('Sam · #1 1RM · 138.0.');
     expect(cacheKeys()).toEqual([groupCacheKeys.groupExercises(GROUP_ID)]);
   });
   it('shows empty history for the selected metric and scope',async()=>{

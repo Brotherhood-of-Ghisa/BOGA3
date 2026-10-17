@@ -70,8 +70,8 @@ const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
 const UNIT_LABELS: Record<CalendarHeatmapMetric, (value: number) => string> = {
   totalVolume: () => 'volume',
   workingSetCount: value => value === 1 ? 'set' : 'sets',
-  estimatedRM1: () => 'kg',
-  highestWeight: () => 'kg',
+  estimatedRM1: () => '',
+  highestWeight: () => '',
 };
 
 // What the Timeline needs beyond the heatmaps: the subject whose week it

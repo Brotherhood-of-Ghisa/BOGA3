@@ -338,11 +338,6 @@ export const appendSuggestedPlan = (
 export const getSetQualityDisplayLabel = (setType: SessionSetTypeValue): string =>
   formatSessionSetType(setType) ?? '•';
 
-export const formatSetWeightLabel = (value: string | null | undefined): string => {
-  const trimmed = (value ?? '').trim() || '0';
-  return `${trimmed}kg`;
-};
-
 export const formatSetRepsLabel = (value: string | null | undefined): string => {
   const trimmed = (value ?? '').trim() || '0';
   return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;

@@ -189,7 +189,7 @@ addressable, each resolving to a canonical owner for tab selection.
   add/edit group exercise shows only the group's own independent
   `Bodyweight contribution (%)`; linking never changes personal settings or
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
-  boards and podiums then show explicit `kg·reps` / `kg` or `%BW·reps` / `%BW`
-  units; record detail and history retain public witness state and original
+  boards and podiums then show `%BW·reps` / `%BW`; ordinary boards show no
+  unit; record detail and history retain public witness state and original
   units, and normalized sessions omit raw loads and all session aggregate
   volume. See `docs/specs/tech/group-competition-contract.md`.

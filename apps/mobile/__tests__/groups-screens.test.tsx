@@ -827,7 +827,7 @@ describe("Friend's session view", () => {
     expect(screen.queryByTestId('group-session-record-ev-1:volume')).toBeNull();
     expect(screen.queryByText(/kg·reps/)).toBeNull();
     expect(rm.getByText('Bench · 1RM')).toBeTruthy();
-    expect(rm.getByText('119.6 kg')).toBeTruthy();
+    expect(rm.getByText('119.6')).toBeTruthy();
     expect(rm.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
     expect(rm.getByText('Not certified')).toBeTruthy();
     expect(screen.getByText('#1 in group · 1RM')).toBeTruthy();

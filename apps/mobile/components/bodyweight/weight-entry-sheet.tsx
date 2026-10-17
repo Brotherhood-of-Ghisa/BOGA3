@@ -65,7 +65,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
       onDismiss={() => { if (!saving.current) onDismiss(); }} testID="weight-entry-sheet">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
         {explanation ? <Text allowFontScaling={false} style={styles.body}>{explanation}</Text> : null}
-        <FormField label="Body weight (kg)" accessibilityLabel="Body weight in kilograms"
+        <FormField label="Body weight" accessibilityLabel="Body weight"
           value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus={autoFocus}
           editable={!busy} error={valueError} testID="weight-entry-value" />
         <FormField label="Measured at" accessibilityLabel="Measurement date and time"
