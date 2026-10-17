@@ -373,6 +373,57 @@ assert_json_expr --argjson cuam "${T_PATCH_RENAME}" \
   "exercise-definition update retains load mode and contribution"
 
 # ===========================================================================
+# 3b. The gym-split flag is additive: a writer that omits the key keeps the
+#     stored value, so a build predating the field cannot clear it
+#     (docs/specs/05-data-model.md, "Client schema drift rule").
+# ===========================================================================
+
+echo "[sync-push] an omitted split_by_gym keeps the stored value"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=split_by_gym"
+assert_json_expr 'length == 1 and .[0].split_by_gym == false' \
+  "an insert without the key stores the default"
+
+T_SPLIT_ON=$((BASE_MS + 140))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_SPLIT_ON}" --argjson ts "${T_SPLIT_ON}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Renamed Target", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
+              split_by_gym: true, created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "exercise-definition split_by_gym update"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=split_by_gym"
+assert_json_expr 'length == 1 and .[0].split_by_gym == true' "a payload carrying the key sets it"
+
+T_SPLIT_OMITTED=$((BASE_MS + 150))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_SPLIT_OMITTED}" --argjson ts "${T_SPLIT_OMITTED}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Older Writer", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "exercise-definition update omitting split_by_gym"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=name,split_by_gym"
+assert_json_expr 'length == 1 and .[0].name == "Older Writer" and .[0].split_by_gym == true' \
+  "a newer write omitting the key keeps the stored flag while its other fields land"
+
+T_SPLIT_OFF=$((BASE_MS + 160))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_SPLIT_OFF}" --argjson ts "${T_SPLIT_OFF}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Older Writer", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
+              split_by_gym: false, created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "exercise-definition split_by_gym cleared"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=split_by_gym"
+assert_json_expr 'length == 1 and .[0].split_by_gym == false' "an explicit false clears the flag"
+
+# ===========================================================================
 # 4. LWW newer wins — push T=100, then T=200 with a different name.
 # ===========================================================================
 

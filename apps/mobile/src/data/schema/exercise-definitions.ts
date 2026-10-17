@@ -13,6 +13,10 @@ export const exerciseDefinitions = sqliteTable(
       .notNull()
       .default('total_load'),
     bodyweightContribution: real('bodyweight_contribution').notNull().default(0),
+    // Report this exercise once per gym instead of once overall (docs/product/gym.md,
+    // gym.split). Synced and retroactive: it selects the reporting bucket at read
+    // time and never rewrites a raw row.
+    splitByGym: integer('split_by_gym', { mode: 'boolean' }).notNull().default(false),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),

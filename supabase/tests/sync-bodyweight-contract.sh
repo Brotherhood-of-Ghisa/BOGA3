@@ -22,7 +22,7 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $def, client_updated_at_ms: $ts,
      fields: {name: "Pull-Up", load_input_mode: "total_load", bodyweight_contribution: 1,
-              created_at: $ts, updated_at: $ts, deleted_at: null}},
+              split_by_gym: false, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercises", id: $sx, client_updated_at_ms: $ts,
      fields: {session_id: $session, exercise_definition_id: $def, source_plan_exercise_id: null,
               name: "Pull-Up", machine_name: null,

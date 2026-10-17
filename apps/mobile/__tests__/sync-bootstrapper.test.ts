@@ -95,6 +95,7 @@ const exerciseDefinitionRow = (id: string, name: string, updatedAtMs: number): W
     name,
     load_input_mode: 'total_load',
     bodyweight_contribution: 0,
+    split_by_gym: false,
     created_at: updatedAtMs,
     updated_at: updatedAtMs,
     deleted_at: null,

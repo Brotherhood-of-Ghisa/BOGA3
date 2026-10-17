@@ -239,6 +239,7 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
         name: decision.exerciseName,
         load_input_mode: decision.loadInputMode,
         bodyweight_contribution: decision.bodyweightContribution,
+        split_by_gym: false,
         created_at: generatedAtMs,
         updated_at: generatedAtMs,
         deleted_at: null,

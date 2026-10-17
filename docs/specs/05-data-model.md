@@ -23,9 +23,7 @@ Code owns columns/checks/FKs; this doc owns layering, sync scope and invariants.
 
 Starter taxonomies sync as ordinary per-user entities.
 
-The kg-only wire uses `x-boga-sync-protocol: 3`; a missing, malformed or
-unsupported version receives `UPDATE_REQUIRED` before row access. Group
-projections and calculated metrics stay outside the mirror: no derived
+Group projections and calculated metrics stay outside the mirror: no derived
 Volume/1RM column is ever stored.
 
 Load [`tech/bodyweight-load-contract.md`](tech/bodyweight-load-contract.md)
@@ -244,8 +242,8 @@ the data-model-level invariants.
 2. Row identity is the composite PK `(owner_user_id, id)`, and invariant 4's
    LWW rule is applied identically on both ends: the `sync_push` upsert
    predicate and the client pull-apply.
-3. Under protocol 3, restore/bootstrap is a full `sync_pull` drain across all
-   five topological layers (first sign-in, or a wiped-client reinstall),
+3. Restore/bootstrap is a full `sync_pull` drain across all five
+   topological layers (first sign-in, or a wiped-client reinstall),
    coherent across every user-owned entity, with parents draining before
    children at each layer boundary.
 4. **Effort labels cost nothing to add.** `exercise_sets.set_type` and
@@ -323,7 +321,11 @@ column with a compatible Postgres type, **and the server migration must be
 deployed to production before the client change ships**.
 
 Why server first: a client depending on a typed server column not yet deployed
-cannot round-trip it, because the server has nowhere typed to store it.
+cannot round-trip it, because the server has nowhere typed to store it. An
+additive column never moves the protocol version: `sync_push` reads named keys
+only and ignores the rest. Keeping a stored value when a key is omitted is per
+column — only a branch guarding on `_fields ? '<key>'` does, which a new column
+needs so an older writer cannot clear it.
 Server-first additions must also preserve old writers that omit new fields and
 keep unknown entity types out of old-reader pulls; adding columns alone is not
 a complete compatibility policy. The kg-only removal/rename was a protocol-3

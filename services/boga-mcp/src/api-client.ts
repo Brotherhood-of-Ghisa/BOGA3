@@ -101,12 +101,12 @@ export class BogaAgentApi {
 
   async getExerciseContext(
     accessToken: string,
-    input: { exercise_id: string; recent_sessions?: number },
+    input: { exercise_id: string; gym_bucket?: string; recent_sessions?: number },
   ): Promise<Record<string, unknown>> {
     return this.#getObject(
       `v1/agent/exercises/${encodeURIComponent(input.exercise_id)}/context`,
       accessToken,
-      { recent_sessions: input.recent_sessions },
+      { gym_bucket: input.gym_bucket, recent_sessions: input.recent_sessions },
     );
   }
 
@@ -119,12 +119,12 @@ export class BogaAgentApi {
 
   async getExerciseHistory(
     accessToken: string,
-    input: { cursor?: string; exercise_id: string; limit?: number },
+    input: { cursor?: string; exercise_id: string; gym_bucket?: string; limit?: number },
   ): Promise<Record<string, unknown>> {
     return this.#getObject(
       `v1/agent/exercises/${encodeURIComponent(input.exercise_id)}/history`,
       accessToken,
-      { cursor: input.cursor, limit: input.limit },
+      { cursor: input.cursor, gym_bucket: input.gym_bucket, limit: input.limit },
     );
   }
 

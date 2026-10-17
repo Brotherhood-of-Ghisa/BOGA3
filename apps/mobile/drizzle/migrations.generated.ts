@@ -127,6 +127,12 @@ export const generatedMigrationBundle = {
     tag: "0019_ambitious_slyde",
     breakpoints: true,
   },
+  {
+    idx: 20,
+    when: 1792243773148,
+    tag: "0020_exercise_split_by_gym",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -791,6 +797,7 @@ UPDATE \`sync_runtime_state\` SET \`pull_cursor\` = '{}';
 ALTER TABLE \`exercise_session_facts\` DROP COLUMN \`volume_complete\`;
 `,
   m0019: `ALTER TABLE \`session_plan_exercises\` DROP COLUMN \`machine_name\`;`,
+  m0020: `ALTER TABLE \`exercise_definitions\` ADD \`split_by_gym\` integer DEFAULT false NOT NULL;`,
   },
 } as const;
 

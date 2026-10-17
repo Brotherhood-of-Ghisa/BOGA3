@@ -136,9 +136,9 @@ describe('domain schema and runtime migrations', () => {
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
     // the local store's owning account (`account_user_id`) is m0015, and the
     // session planning schema (0016) plus pull-cursor reset (0017) append after it,
-    // m0018 drops the facts' volume completeness flag, and m0019 drops the plan
-    // block's machine snapshot.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(20);
+    // m0018 drops the facts' volume completeness flag, m0019 drops the plan
+    // block's machine snapshot, and m0020 adds the gym-split flag.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(21);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -188,6 +188,7 @@ describe('domain schema and runtime migrations', () => {
       'm0017',
       'm0018',
       'm0019',
+      'm0020',
     ]);
   });
 
@@ -306,6 +307,14 @@ describe('domain schema and runtime migrations', () => {
     const loadModeMigration = localRuntimeMigrations.migrations.m0003;
     expect(loadModeMigration).toContain('`load_input_mode` text DEFAULT \'total_load\' NOT NULL');
     expect(loadModeMigration).toContain('exercise_definitions_load_input_mode_valid');
+  });
+
+  it('adds the gym-split flag in the m0020 follow-up migration', () => {
+    // The flag is a synced domain column, so it pairs with the server migration
+    // that added app_public.exercise_definitions.split_by_gym (spec 05, "Client
+    // schema drift rule"); it defaults off, so an upgrade changes no report.
+    expect(localRuntimeMigrations.migrations.m0020)
+      .toContain('ADD `split_by_gym` integer DEFAULT false NOT NULL');
   });
 });
 

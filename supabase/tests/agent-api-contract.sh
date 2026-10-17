@@ -679,7 +679,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v5"
+  .data.metric_revision == "working_sets_v6"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -705,7 +705,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v5"
+  .data.metric_revision == "working_sets_v6"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -716,6 +716,181 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   and .data.workouts[0].exercises[1].set_count == 0
   and .data.workouts[0].exercises[1].volume.value == 0
 ' >/dev/null || fail "warm-ups leaked into workout counts or volume"
+
+echo "[agent-api-test] verifying a split exercise reports one gym bucket at a time"
+GYM_SPLIT="agent-api-${RUN_TAG}-gym-split"
+GYM_SPLIT_WARMUP="agent-api-${RUN_TAG}-gym-warmup"
+EXERCISE_SPLIT="agent-api-${RUN_TAG}-exercise-split"
+SPLIT_WARMUP_SESSION="agent-api-${RUN_TAG}-split-warmup-session"
+SPLIT_HOME_SESSION="agent-api-${RUN_TAG}-split-home-session"
+SPLIT_NONE_SESSION="agent-api-${RUN_TAG}-split-none-session"
+SPLIT_AWAY_SESSION="agent-api-${RUN_TAG}-split-away-session"
+run_psql "
+  begin;
+    set constraints all deferred;
+    insert into app_public.gyms
+      (owner_user_id,id,name,created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${GYM_SPLIT}','Agent A Away Gym',${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${GYM_SPLIT_WARMUP}','Agent A Warm-Up Gym',${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.exercise_definitions
+      (owner_user_id,id,name,load_input_mode,split_by_gym,created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${EXERCISE_SPLIT}','Agent A Split Row','total_load',true,
+       ${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.sessions
+      (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,
+       created_at,updated_at,client_updated_at_ms)
+    values
+      -- The heaviest history is the oldest bucket, so a pooled reader would
+      -- report 200 kg for every bucket.
+      ('${USER_A_UUID}'::uuid,'${SPLIT_HOME_SESSION}','${GYM_A}','completed',
+       $((NOW_MS - 9100000)),$((NOW_MS - 9000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}',null,'completed',
+       $((NOW_MS - 6100000)),$((NOW_MS - 6000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}','${GYM_SPLIT}','completed',
+       $((NOW_MS - 5100000)),$((NOW_MS - 5000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
+      -- This exercise's newest session, and warm-ups only: no stat footprint,
+      -- so its gym is neither listed as a bucket nor the reported one.
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}','${GYM_SPLIT_WARMUP}','completed',
+       $((NOW_MS - 4100000)),$((NOW_MS - 4000000)),600,${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.session_exercises
+      (owner_user_id,id,session_id,exercise_definition_id,order_index,name,machine_name,
+       created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${SPLIT_HOME_SESSION}-block','${SPLIT_HOME_SESSION}','${EXERCISE_SPLIT}',0,
+       'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}-block','${SPLIT_NONE_SESSION}','${EXERCISE_SPLIT}',0,
+       'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-block','${SPLIT_AWAY_SESSION}','${EXERCISE_SPLIT}',0,
+       'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}-block','${SPLIT_WARMUP_SESSION}','${EXERCISE_SPLIT}',0,
+       'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.exercise_sets
+      (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
+       performance_status,created_at,updated_at,client_updated_at_ms)
+    values
+      ('${USER_A_UUID}'::uuid,'${SPLIT_HOME_SESSION}-set','${SPLIT_HOME_SESSION}-block',0,'200','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}-set','${SPLIT_NONE_SESSION}-block',0,'150','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set','${SPLIT_AWAY_SESSION}-block',0,'100','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set-2','${SPLIT_AWAY_SESSION}-block',1,'95','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}-set','${SPLIT_WARMUP_SESSION}-block',0,'250','3','warm_up',
+       null,${NOW_MS},${NOW_MS},${NOW_MS});
+  commit;
+" >/dev/null
+
+agent_get "exercises/${EXERCISE_SPLIT}/context"
+assert_status "200" "split exercise context"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" \
+  --arg warmup "${GYM_SPLIT_WARMUP}" '
+  .data.exercise.split_by_gym == true
+  and .data.exercise.gym.id == $away
+  and .data.exercise.gym.name == "Agent A Away Gym"
+  and (.data.exercise.gym_buckets | length) == 3
+  and (.data.exercise.gym_buckets | map(.gym.id // null)) == [$away, null, $home]
+  # Every gym reports its own records in this one response, never a pooled one.
+  and (.data.exercise.gym_buckets | map(.personal_records.top_weight.value)) == [100, 150, 200]
+  and (.data.exercise.gym_buckets | map(.session_count)) == [1, 1, 1]
+  # The newest session is warm-ups only, so its gym is neither listed nor
+  # reported and its 250 kg never becomes a record.
+  and (.data.exercise.gym_buckets | map(.gym.id // null) | index($warmup)) == null
+  and (.data.exercise | has("gym_buckets_truncated") | not)
+  and (.data.recent_performances | length) == 1
+  and .data.recent_performances[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
+  and .data.personal_records.top_weight.value == 100
+  and (.data.volume_series | length) == 1
+' >/dev/null || fail "split exercise context pooled its gyms or missed a bucket's records"
+
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=${GYM_A}"
+assert_status "200" "split exercise context for a named bucket"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg home "${GYM_A}" '
+  .data.exercise.gym.id == $home
+  and (.data.recent_performances | length) == 1
+  and .data.personal_records.top_weight.value == 200
+' >/dev/null || fail "gym_bucket did not select the named gym"
+
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=none"
+assert_status "200" "split exercise context for the no-gym bucket"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.exercise.gym == null
+  and .data.personal_records.top_weight.value == 150
+' >/dev/null || fail "gym_bucket=none did not select the sessions with no gym"
+
+agent_get "exercises/${EXERCISE_SPLIT}/history"
+assert_status "200" "split exercise history"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" \
+  --arg warmup "${GYM_SPLIT_WARMUP}" '
+  # Paging does not partition by gym: one page, every gym, each set labelled.
+  (.data.exercise | has("gym") | not)
+  and (.data.exercise | has("gym_buckets") | not)
+  and (.data.exercise | has("gym_buckets_truncated") | not)
+  and (.data.sets | length) == 5
+  # Raw history keeps every performed set, warm-up included, newest first.
+  and (.data.sets | map(.gym.id // null)) == [$warmup, $away, $away, null, $home]
+  and .data.next_cursor == null
+' >/dev/null || fail "split exercise history partitioned its page by gym"
+
+agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=none"
+assert_status "200" "split exercise history filtered to the no-gym bucket"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.exercise.gym == null
+  and (.data.sets | length) == 1
+  and .data.sets[0].session_id == "'"${SPLIT_NONE_SESSION}"'"
+  and .data.sets[0].gym == null
+' >/dev/null || fail "gym_bucket=none did not filter the history stream"
+
+# An unfiltered drain walks every gym in one chronological stream; a filtered
+# one keeps its filter even when the caller stops repeating gym_bucket.
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=2"
+assert_status "200" "unfiltered history page 1"
+ALL_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ -n "${ALL_CURSOR}" && "${ALL_CURSOR}" != "null" ]] || fail "a five-set history returned no cursor"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=3&cursor=${ALL_CURSOR}"
+assert_status "200" "unfiltered history page 2"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" '
+  (.data.sets | map(.gym.id // null)) == [$away, null, $home]
+  and .data.next_cursor == null
+' >/dev/null || fail "an unfiltered cursor did not keep walking every gym"
+
+agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=${GYM_SPLIT}&limit=1"
+assert_status "200" "filtered history page 1"
+AWAY_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
+  .data.exercise.gym.id == $away and (.data.sets | length) == 1
+' >/dev/null || fail "gym_bucket did not filter the first page"
+[[ -n "${AWAY_CURSOR}" && "${AWAY_CURSOR}" != "null" ]] || fail "the filtered two-set bucket returned no cursor"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}"
+assert_status "200" "filtered history page 2 without gym_bucket"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
+  .data.exercise.gym.id == $away
+  and (.data.sets | map(.gym.id)) == [$away]
+  and .data.sets[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
+' >/dev/null || fail "following a filtered cursor left its gym"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}&gym_bucket=none"
+assert_status "400" "cursor and gym_bucket naming different buckets"
+
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=agent-api-${RUN_TAG}-gym-absent"
+assert_status "404" "gym_bucket naming a gym the user does not own"
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket="
+assert_status "400" "empty gym_bucket"
+
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status "200" "unsplit exercise context"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.exercise.split_by_gym == false
+  and (.data.exercise | has("gym") | not)
+  and (.data.exercise | has("gym_buckets") | not)
+  and (.data.recent_performances[0].sets[0] | has("gym") | not)
+' >/dev/null || fail "an unsplit exercise carries gym-bucket fields"
+
+agent_get "exercises/${EXERCISE_A}/context?gym_bucket=none"
+assert_status "400" "gym_bucket on an unsplit exercise"
+agent_get "exercises/${EXERCISE_A}/history?gym_bucket=none"
+assert_status "400" "gym_bucket on an unsplit exercise history"
 
 # Exercise and workout projections share the mobile load-calculation kernel.
 # Updates use the owner's database identity, as ordinary sync writes do, while
@@ -737,7 +912,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v5"
+  .data.metric_revision == "working_sets_v6"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325

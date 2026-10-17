@@ -69,6 +69,7 @@ export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
       name: exercise.name,
       load_input_mode: exercise.loadInputMode,
       bodyweight_contribution: exercise.bodyweightContribution,
+      split_by_gym: false,
       ...timestamps(atMs),
     },
   })),
