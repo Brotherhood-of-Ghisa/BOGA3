@@ -213,4 +213,78 @@ describe('rest-timer store and pure rules', () => {
     expect(result.current.view).toEqual({ status: 'idle' });
     expect(result.current.toggleForSession).toBeUndefined();
   });
+
+  it('updates view to completed when restarting and clock advances past expiry before first interval callback', () => {
+    jest.useFakeTimers();
+    let nowMs = 0;
+    const now = () => nowMs;
+
+    const { result } = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 90,
+        autoStart: true,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 90 });
+
+    act(() => {
+      nowMs = 90_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'completed', remainingSec: 0 });
+
+    act(() => {
+      result.current.restart();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 90 });
+
+    act(() => {
+      nowMs = 180_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'completed', remainingSec: 0 });
+  });
+
+  it('renders first tick when replacing timer at 89 seconds', () => {
+    jest.useFakeTimers();
+    let nowMs = 0;
+    const now = () => nowMs;
+
+    const { result } = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 90,
+        autoStart: true,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 90 });
+
+    act(() => {
+      nowMs = 1_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 89 });
+
+    act(() => {
+      result.current.onSetConfirmed();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 90 });
+
+    act(() => {
+      nowMs = 2_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 89 });
+  });
 });

@@ -151,7 +151,15 @@ export function useSessionRestTimer(
   } = options;
   const entry = useSyncExternalStore(subscribeRestTimer, getRestTimerEntry, getRestTimerEntry);
   const view = isActiveSession ? deriveRestTimerView(entry, sessionId, now()) : IDLE_REST_TIMER_VIEW;
-  const [, setObservedRemainingSec] = useState(view.status === 'idle' ? -1 : view.remainingSec);
+  const timerKey = entry && entry.sessionId === sessionId
+    ? `${entry.startedAtMs}:${entry.endsAtMs}`
+    : null;
+  const initialRemaining = view.status === 'idle' ? -1 : view.remainingSec;
+  const [observed, setObserved] = useState({ timerKey, remainingSec: initialRemaining });
+
+  if (observed.timerKey !== timerKey) {
+    setObserved({ timerKey, remainingSec: initialRemaining });
+  }
   const isRunningForSession = view.status === 'running';
 
   useEffect(() => {
@@ -159,10 +167,15 @@ export function useSessionRestTimer(
     const interval = setInterval(() => {
       const nextView = deriveRestTimerView(getRestTimerEntry(), sessionId, now());
       const nextRemaining = nextView.status === 'idle' ? -1 : nextView.remainingSec;
-      setObservedRemainingSec((prev) => (prev === nextRemaining ? prev : nextRemaining));
+      setObserved((prev) => {
+        if (prev.timerKey === timerKey && prev.remainingSec === nextRemaining) {
+          return prev;
+        }
+        return { timerKey, remainingSec: nextRemaining };
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunningForSession, entry?.endsAtMs, now, sessionId]);
+  }, [isRunningForSession, timerKey, now, sessionId]);
 
   const isActive = view.status !== 'idle';
 
