@@ -310,6 +310,10 @@ describe('Session view', () => {
     await openSession();
     const before = await readSession(SESSION);
 
+    fireEvent.press(screen.getByTestId('session-view-rest-timer-button'));
+    fireEvent.press(screen.getByTestId('timer-mode-selector-repeating'));
+    expect(getRestTimerEntry()?.mode).toBe('repeating');
+
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-finish-button'));
     });
@@ -321,6 +325,7 @@ describe('Session view', () => {
     const after = await readSession(SESSION);
     expect(after).toMatchObject({ status: 'completed', gymId: FIXTURE_GYM, startedAt: before!.startedAt });
     expect(after!.completedAt).toBeInstanceOf(Date);
+    expect(getRestTimerEntry()).toBeNull();
     // Done sets only, planned rows and the all-planned exercise dropped.
     expect(after!.exercises.map((exercise) => exercise.name)).toEqual([
       'Barbell Bench Press',
@@ -687,7 +692,7 @@ describe('Session view', () => {
     expect(await screen.findByLabelText(BENCH_LABEL)).toBeTruthy();
   });
 
-  it('toggles and adjusts the rest timer on the active session view, shares state with the exercise page, and clears it on Abandon', async () => {
+  it.each(['rest', 'repeating'] as const)('shares the %s timer with the exercise page and clears it on Abandon', async (mode) => {
     jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     await openSession();
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
@@ -703,11 +708,18 @@ describe('Session view', () => {
     fireEvent.press(screen.getByTestId('rest-timer-minus-15'));
     expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
 
+    if (mode === 'repeating') {
+      fireEvent.press(screen.getByTestId('timer-mode-selector-repeating'));
+      expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent('Get ready');
+    }
+    const countdownId = mode === 'repeating' ? 'repeating-timer-countdown' : 'rest-timer-countdown';
+    const countdown = mode === 'repeating' ? '0:15' : '1:30';
+
     // Navigating to the exercise page sees the same active rest timer.
     screen.unmount();
     render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
-    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+    expect(screen.getByTestId(countdownId)).toHaveTextContent(countdown);
 
     // Returning to the session view and abandoning the session clears the timer.
     screen.unmount();

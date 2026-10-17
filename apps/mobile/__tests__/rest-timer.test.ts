@@ -27,7 +27,7 @@ import {
 describe('rest-timer store and pure rules', () => {
   beforeEach(() => {
     __resetRestTimerForTests();
-    jest.useRealTimers();
+    jest.useFakeTimers({ now: 0 });
     jest.clearAllMocks();
   });
 
@@ -142,180 +142,153 @@ describe('rest-timer store and pure rules', () => {
     expect(getRestTimerEntry()).toBeNull();
   });
 
-  it('derives repeating timer views with zero cumulative drift across rounds and intervals', () => {
-    // 60-second interval (standard EMOM)
+  it('keeps preparation outside drift-free round and interval calculations', () => {
     startRepeatingTimer('session-1', 60, 10_000);
     const entry = getRestTimerEntry();
     expect(entry).toEqual({
-      mode: 'repeating',
-      sessionId: 'session-1',
-      startedAtMs: 10_000,
-      accumulatedMs: 0,
-      pausedAtMs: null,
-      intervalSec: 60,
+      mode: 'repeating', sessionId: 'session-1', startedAtMs: 10_000,
+      accumulatedMs: 0, pausedAtMs: null, intervalSec: 60,
     });
-
-    // At start (t=0): Round 1, 60s remaining
     expect(deriveRestTimerView(entry, 'session-1', 10_000)).toEqual({
-      mode: 'repeating',
-      status: 'running',
-      sessionId: 'session-1',
-      round: 1,
-      remainingSec: 60,
-      formatted: '1:00',
-      intervalSec: 60,
-      isPaused: false,
+      mode: 'repeating', status: 'preparing', sessionId: 'session-1',
+      round: 0, remainingSec: 15, formatted: '0:15', intervalSec: 60, isPaused: false,
     });
-
-    // 15 seconds into round 1: Round 1, 45s remaining
-    expect(deriveRestTimerView(entry, 'session-1', 25_000)).toMatchObject({
-      round: 1,
-      remainingSec: 45,
-      formatted: '0:45',
+    expect(deriveRestTimerView(entry, 'session-1', 24_999)).toMatchObject({
+      status: 'preparing', round: 0, remainingSec: 1,
     });
-
-    // 59 seconds into round 1: Round 1, 1s remaining
-    expect(deriveRestTimerView(entry, 'session-1', 69_000)).toMatchObject({
-      round: 1,
-      remainingSec: 1,
-      formatted: '0:01',
-    });
-
-    // Exactly at 60s boundary: Round 2 begins immediately with 60s remaining
-    expect(deriveRestTimerView(entry, 'session-1', 70_000)).toMatchObject({
-      round: 2,
-      remainingSec: 60,
-      formatted: '1:00',
-    });
-
-    // Round 2 at 30s in: Round 2, 30s remaining
-    expect(deriveRestTimerView(entry, 'session-1', 100_000)).toMatchObject({
-      round: 2,
-      remainingSec: 30,
-      formatted: '0:30',
-    });
-
-    // After 10 full rounds (600 seconds elapsed): Round 11 begins at 60s remaining with zero drift
-    expect(deriveRestTimerView(entry, 'session-1', 610_000)).toMatchObject({
-      round: 11,
-      remainingSec: 60,
-      formatted: '1:00',
-    });
-
-    // 45-second interval
+    for (const [nowMs, round, remainingSec] of [
+      [25_000, 1, 60], [40_000, 1, 45], [84_000, 1, 1],
+      [85_000, 2, 60], [115_000, 2, 30], [625_000, 11, 60],
+    ]) {
+      expect(deriveRestTimerView(entry, 'session-1', nowMs)).toMatchObject({
+        status: 'running', round, remainingSec,
+      });
+    }
     const entry45 = {
-      mode: 'repeating' as const,
-      sessionId: 'session-1',
-      startedAtMs: 0,
-      accumulatedMs: 0,
-      pausedAtMs: null,
-      intervalSec: 45,
+      mode: 'repeating' as const, sessionId: 'session-1', startedAtMs: 0,
+      accumulatedMs: 0, pausedAtMs: null, intervalSec: 45,
     };
-    expect(deriveRepeatingTimerView(entry45, 'session-1', 0)).toMatchObject({
-      round: 1,
-      remainingSec: 45,
-      formatted: '0:45',
-    });
-    expect(deriveRepeatingTimerView(entry45, 'session-1', 44_000)).toMatchObject({
-      round: 1,
-      remainingSec: 1,
-      formatted: '0:01',
-    });
-    expect(deriveRepeatingTimerView(entry45, 'session-1', 45_000)).toMatchObject({
-      round: 2,
-      remainingSec: 45,
-      formatted: '0:45',
-    });
+    for (const [nowMs, round, remainingSec] of [[15_000, 1, 45], [59_000, 1, 1], [60_000, 2, 45]]) {
+      expect(deriveRepeatingTimerView(entry45, 'session-1', nowMs)).toMatchObject({ round, remainingSec });
+    }
   });
 
-  it('freezes countdown when paused and resumes with zero drift', () => {
+  it.each([5_000, 35_000])('retains preparation or round position when paused at %i ms', (pauseAtMs) => {
     startRepeatingTimer('session-1', 60, 0);
-
-    // Run for 20 seconds, then pause
-    stopRepeatingTimer('session-1', 20_000);
-    const pausedEntry = getRestTimerEntry();
-    expect(pausedEntry).toMatchObject({
-      mode: 'repeating',
-      accumulatedMs: 20_000,
-      pausedAtMs: 20_000,
+    const beforePause = deriveRestTimerView(getRestTimerEntry(), 'session-1', pauseAtMs);
+    stopRepeatingTimer('session-1', pauseAtMs);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', pauseAtMs + 600_000)).toEqual({
+      ...beforePause, status: 'paused', isPaused: true,
     });
-
-    // Time advances 10 minutes while paused: view remains frozen at Round 1, 40s remaining
-    expect(deriveRestTimerView(pausedEntry, 'session-1', 620_000)).toMatchObject({
-      status: 'paused',
-      round: 1,
-      remainingSec: 40,
-      formatted: '0:40',
-      isPaused: true,
-    });
-
-    // Resume at t = 620_000ms
-    startRepeatingTimer('session-1', 60, 620_000);
-    const resumedEntry = getRestTimerEntry();
-    expect(resumedEntry).toMatchObject({
-      mode: 'repeating',
-      startedAtMs: 620_000,
-      accumulatedMs: 20_000,
-      pausedAtMs: null,
-    });
-
-    // 10 seconds later (total elapsed 30s): Round 1, 30s remaining
-    expect(deriveRestTimerView(resumedEntry, 'session-1', 630_000)).toMatchObject({
-      status: 'running',
-      round: 1,
-      remainingSec: 30,
-      formatted: '0:30',
-      isPaused: false,
-    });
-
-    // Another 30 seconds later (total elapsed 60s): Round 2 begins
-    expect(deriveRestTimerView(resumedEntry, 'session-1', 660_000)).toMatchObject({
-      status: 'running',
-      round: 2,
-      remainingSec: 60,
-      formatted: '1:00',
+    startRepeatingTimer('session-1', 60, pauseAtMs + 600_000);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', pauseAtMs + 600_000)).toEqual(beforePause);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', 675_000)).toMatchObject({
+      status: 'running', round: 2, remainingSec: 60,
     });
   });
 
   it('supports toggle, reset, and interval adjustments for repeating timer', () => {
     startRepeatingTimer('session-1', 60, 0);
-
-    // Toggle while running -> pauses
     toggleRepeatingTimer('session-1', 15_000);
     expect(getRestTimerEntry()).toMatchObject({ pausedAtMs: 15_000, accumulatedMs: 15_000 });
-
-    // Toggle while paused -> resumes
     toggleRepeatingTimer('session-1', 25_000);
     expect(getRestTimerEntry()).toMatchObject({ pausedAtMs: null, startedAtMs: 25_000, accumulatedMs: 15_000 });
 
-    // Reset resets to round 1 with 0 accumulated time
     resetRepeatingTimer('session-1', 30_000);
-    expect(getRestTimerEntry()).toMatchObject({
-      startedAtMs: 30_000,
-      accumulatedMs: 0,
-      pausedAtMs: null,
-      intervalSec: 60,
-    });
     expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', 30_000)).toMatchObject({
-      round: 1,
-      remainingSec: 60,
-      formatted: '1:00',
+      status: 'preparing', round: 0, remainingSec: 15,
     });
-
-    // Adjust interval: +15s -> 75s
     adjustRepeatingTimer('session-1', REPEATING_TIMER_STEP_SEC, 35_000);
-    expect(getRestTimerEntry()).toMatchObject({ intervalSec: 75 });
-    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', 35_000)).toMatchObject({
-      round: 1,
-      remainingSec: 75,
-      formatted: '1:15',
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', 50_000)).toMatchObject({
+      round: 1, remainingSec: 75, formatted: '1:15',
     });
-
-    // Adjust interval clamps to [15, 600]
     adjustRepeatingTimer('session-1', -100, 40_000);
     expect(getRestTimerEntry()).toMatchObject({ intervalSec: 15 });
     adjustRepeatingTimer('session-1', 1_000, 45_000);
     expect(getRestTimerEntry()).toMatchObject({ intervalSec: 600 });
+
+    stopRepeatingTimer('session-1', 50_000);
+    resetRepeatingTimer('session-1', 55_000);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', 100_000)).toMatchObject({
+      status: 'paused', round: 0, remainingSec: 15,
+    });
+  });
+
+  it.each([[15, -15], [600, 15]])('preserves progress at the %i-second interval limit', (intervalSec, deltaSec) => {
+    startRepeatingTimer('session-1', intervalSec, 0);
+    const nowMs = 15_000 + intervalSec * 3_000 + 2_000;
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1', nowMs)).toMatchObject({
+      round: 4, remainingSec: intervalSec - 2,
+    });
+    const runningEntry = getRestTimerEntry();
+    adjustRepeatingTimer('session-1', deltaSec, nowMs);
+    expect(getRestTimerEntry()).toBe(runningEntry);
+    stopRepeatingTimer('session-1', nowMs);
+    const pausedEntry = getRestTimerEntry();
+    adjustRepeatingTimer('session-1', deltaSec, nowMs + 1_000);
+    expect(getRestTimerEntry()).toBe(pausedEntry);
+  });
+
+  it('owns one cue clock across multiple views and after all views unmount', () => {
+    const first = renderHook(() => useSessionRestTimer('session-1'));
+    const second = renderHook(() => useSessionRestTimer('session-1'));
+    act(() => first.result.current.switchMode('repeating'));
+    act(() => jest.advanceTimersByTime(14_999));
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(1));
+    expect(first.result.current.view).toMatchObject({ status: 'running', round: 1, remainingSec: 60 });
+    expect(second.result.current.view).toMatchObject({ round: 1 });
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    first.unmount();
+    second.unmount();
+    jest.advanceTimersByTime(60_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(2);
+    expect(Vibration.vibrate).toHaveBeenLastCalledWith(400);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({ round: 2 });
+  });
+
+  it('stops cues while paused and resumes on the exact boundary', () => {
+    startRepeatingTimer('session-1');
+    jest.advanceTimersByTime(5_125);
+    stopRepeatingTimer('session-1');
+    jest.advanceTimersByTime(60_000);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+    startRepeatingTimer('session-1');
+    jest.advanceTimersByTime(9_874);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(20_123);
+    stopRepeatingTimer('session-1');
+    jest.advanceTimersByTime(120_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    startRepeatingTimer('session-1');
+    jest.advanceTimersByTime(39_877);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['dismiss', 'switch', 'replace'] as const)('cancels repeating cues on %s', (action) => {
+    startRepeatingTimer('session-1');
+    if (action === 'dismiss') dismissRestTimer('session-1');
+    if (action === 'switch') switchTimerMode('session-1', 'rest');
+    if (action === 'replace') startRepeatingTimer('session-2');
+    jest.advanceTimersByTime(15_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(action === 'replace' ? 1 : 0);
+    dismissRestTimer();
+    jest.advanceTimersByTime(120_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(action === 'replace' ? 1 : 0);
+  });
+
+  it('signals once after a delayed callback skips rounds, then realigns to the wall clock', () => {
+    startRepeatingTimer('session-1');
+    jest.setSystemTime(190_000);
+    jest.advanceTimersByTime(15_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({ round: 4, remainingSec: 50 });
+    jest.advanceTimersByTime(49_999);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(1);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(2);
   });
 
   it('switches timer modes smoothly between rest and repeating', () => {
@@ -378,9 +351,8 @@ describe('rest-timer store and pure rules', () => {
   });
 
   it('isolates set logging from repeating mode: onSetConfirmed neither restarts nor interrupts repeating timer', () => {
-    jest.useFakeTimers();
-    let nowMs = 1_000;
-    const now = () => nowMs;
+    jest.setSystemTime(1_000);
+    const now = () => Date.now();
 
     const { result } = renderHook(() =>
       useSessionRestTimer('session-1', {
@@ -392,20 +364,20 @@ describe('rest-timer store and pure rules', () => {
       }),
     );
 
-    // Start repeating timer and advance 25 seconds
+    // Prepare, then advance 25 seconds into round 1
     act(() => {
       result.current.switchMode('repeating');
     });
     expect(result.current.view).toMatchObject({
       mode: 'repeating',
-      round: 1,
-      remainingSec: 60,
-      formatted: '1:00',
+      status: 'preparing',
+      round: 0,
+      remainingSec: 15,
+      formatted: '0:15',
     });
 
     act(() => {
-      nowMs = 26_000;
-      jest.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(40_000);
     });
     expect(result.current.view).toMatchObject({
       mode: 'repeating',
@@ -427,8 +399,7 @@ describe('rest-timer store and pure rules', () => {
 
     // Advance clock past round boundary -> Round 2 starts automatically and triggers cue
     act(() => {
-      nowMs = 61_000;
-      jest.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(35_000);
     });
     expect(result.current.view).toMatchObject({
       mode: 'repeating',

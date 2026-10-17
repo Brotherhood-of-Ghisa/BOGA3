@@ -4,6 +4,23 @@ import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
 
 describe('RestTimerBar', () => {
+  it.each([false, true])('shows preparation without a round number (paused: %s)', (isPaused) => {
+    render(
+      <RestTimerBar
+        onAdjust={jest.fn()}
+        onDismiss={jest.fn()}
+        onRestart={jest.fn()}
+        view={{
+          mode: 'repeating', status: isPaused ? 'paused' : 'preparing', sessionId: 'session-1',
+          round: 0, remainingSec: 15, formatted: '0:15', intervalSec: 60, isPaused,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(isPaused ? 'Get ready · PAUSED' : 'Get ready');
+    expect(screen.getByLabelText(`Repeating timer preparation, 0:15 remaining${isPaused ? ', paused' : ''}`)).toBeTruthy();
+    expect(screen.queryByText(/Round 0/)).toBeNull();
+  });
+
   it('renders nothing when view is idle', () => {
     const idleView: RestTimerView = { status: 'idle' };
     render(
