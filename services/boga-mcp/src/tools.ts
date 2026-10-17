@@ -123,7 +123,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
       annotations: readOnlyAnnotations,
       description:
         'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user.' +
-        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym is the reported bucket’s gym and exercise.gym_buckets lists the others. Weight is the entered kg value. When the user enables bodyweight calculations for an exercise with a positive contribution, derived metrics use the latest applicable dated reading; otherwise they use ordinary load math. Records, volume, 1RM and counts use working sets only: warm-ups (set_type "warm_up") are listed with their own figures but never count, and a session with only warm-ups for this exercise is left out. Check completeness and null values; known_subtotal is not a complete total.',
+        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym_buckets always lists every gym with that gym’s own records and session count, so compare them from one call; exercise.gym names the bucket the other figures come from. Weight is the entered kg value. When the user enables bodyweight calculations for an exercise with a positive contribution, derived metrics use the latest applicable dated reading; otherwise they use ordinary load math. Records, volume, 1RM and counts use working sets only: warm-ups (set_type "warm_up") are listed with their own figures but never count, and a session with only warm-ups for this exercise is left out. Check completeness and null values; known_subtotal is not a complete total.',
       inputSchema: z.object({
         exercise_id: z.string().min(1).max(200),
         gym_bucket: z.string().trim().min(1).max(200).optional(),
@@ -157,7 +157,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
       annotations: readOnlyAnnotations,
       description:
         'Get exact keyset-paginated performed set history for one exercise owned by the authorizing user, in reverse chronological completed-session order. Drain cursor to exhaustion when analyzing full training history.' +
-        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym is the reported bucket’s gym and exercise.gym_buckets lists the others; a history cursor stays in its own bucket, so drain it without repeating gym_bucket.',
+        ' An exercise the user tracks separately per gym (split_by_gym true) reports one gym bucket at a time, never pooled: the most recently performed bucket unless gym_bucket names another ("none" selects the sessions with no gym). exercise.gym is the reported bucket’s gym and exercise.gym_buckets lists every gym. Paging does not partition by gym: one page spans every gym and each set carries its own, while gym_bucket filters the stream to one and the cursor then keeps that filter.',
       inputSchema: z.object({
         cursor: z.string().max(500).optional(),
         exercise_id: z.string().min(1).max(200),

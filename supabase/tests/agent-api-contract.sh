@@ -780,11 +780,14 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${G
   and .data.exercise.gym.name == "Agent A Away Gym"
   and (.data.exercise.gym_buckets | length) == 3
   and (.data.exercise.gym_buckets | map(.gym.id // null)) == [$away, null, $home]
+  # Every gym reports its own records in this one response, never a pooled one.
+  and (.data.exercise.gym_buckets | map(.personal_records.top_weight.value)) == [100, 150, 200]
+  and (.data.exercise.gym_buckets | map(.session_count)) == [1, 1, 1]
   and (.data.recent_performances | length) == 1
   and .data.recent_performances[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
   and .data.personal_records.top_weight.value == 100
   and (.data.volume_series | length) == 1
-' >/dev/null || fail "split exercise context pooled its gyms or missed the newest bucket"
+' >/dev/null || fail "split exercise context pooled its gyms or missed a bucket's records"
 
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=${GYM_A}"
 assert_status "200" "split exercise context for a named bucket"
@@ -803,44 +806,51 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 
 agent_get "exercises/${EXERCISE_SPLIT}/history"
 assert_status "200" "split exercise history"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
-  .data.exercise.gym.id == $away
-  and (.data.sets | length) == 2
-  and ([.data.sets[].session_id] | unique) == ["'"${SPLIT_AWAY_SESSION}"'"]
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" '
+  # Paging does not partition by gym: one page, every gym, each set labelled.
+  (.data.exercise | has("gym") | not)
+  and (.data.exercise.gym_buckets | length) == 3
+  and (.data.sets | length) == 4
+  and (.data.sets | map(.gym.id // null)) == [$away, $away, null, $home]
   and .data.next_cursor == null
-' >/dev/null || fail "split exercise history pooled its gyms"
+' >/dev/null || fail "split exercise history partitioned its page by gym"
 
 agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=none"
-assert_status "200" "split exercise history for the no-gym bucket"
+assert_status "200" "split exercise history filtered to the no-gym bucket"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
   .data.exercise.gym == null
   and (.data.sets | length) == 1
   and .data.sets[0].session_id == "'"${SPLIT_NONE_SESSION}"'"
-' >/dev/null || fail "gym_bucket=none did not page the no-gym bucket history"
+  and .data.sets[0].gym == null
+' >/dev/null || fail "gym_bucket=none did not filter the history stream"
 
-# A drained cursor must stay in its own bucket even when gym_bucket is dropped,
-# or page two would silently answer for another gym.
-agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=${GYM_A}&limit=1"
-assert_status "200" "split exercise history first page"
+# An unfiltered drain walks every gym in one chronological stream; a filtered
+# one keeps its filter even when the caller stops repeating gym_bucket.
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=2"
+assert_status "200" "unfiltered history page 1"
+ALL_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
+[[ -n "${ALL_CURSOR}" && "${ALL_CURSOR}" != "null" ]] || fail "a four-set history returned no cursor"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=2&cursor=${ALL_CURSOR}"
+assert_status "200" "unfiltered history page 2"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg home "${GYM_A}" '
-  .data.exercise.gym.id == $home and (.data.sets | length) == 1 and .data.next_cursor == null
-' >/dev/null || fail "a named bucket did not page its own gym"
-agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=none&limit=1"
-assert_status "200" "no-gym bucket first page"
-NO_GYM_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor // ""')"
-[[ -z "${NO_GYM_CURSOR}" ]] || fail "the single-set no-gym bucket returned a cursor"
+  (.data.sets | map(.gym.id // null)) == [null, $home]
+  and .data.next_cursor == null
+' >/dev/null || fail "an unfiltered cursor did not keep walking every gym"
 
-agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1"
-assert_status "200" "split exercise history newest bucket page 1"
+agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=${GYM_SPLIT}&limit=1"
+assert_status "200" "filtered history page 1"
 AWAY_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
-[[ -n "${AWAY_CURSOR}" && "${AWAY_CURSOR}" != "null" ]] || fail "a two-set bucket returned no cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
+  .data.exercise.gym.id == $away and (.data.sets | length) == 1
+' >/dev/null || fail "gym_bucket did not filter the first page"
+[[ -n "${AWAY_CURSOR}" && "${AWAY_CURSOR}" != "null" ]] || fail "the filtered two-set bucket returned no cursor"
 agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}"
-assert_status "200" "split exercise history page 2 without gym_bucket"
+assert_status "200" "filtered history page 2 without gym_bucket"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
   .data.exercise.gym.id == $away
-  and (.data.sets | length) == 1
+  and (.data.sets | map(.gym.id)) == [$away]
   and .data.sets[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
-' >/dev/null || fail "following the cursor left the bucket it was issued for"
+' >/dev/null || fail "following a filtered cursor left its gym"
 agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}&gym_bucket=none"
 assert_status "400" "cursor and gym_bucket naming different buckets"
 
@@ -855,6 +865,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   .data.exercise.split_by_gym == false
   and (.data.exercise | has("gym") | not)
   and (.data.exercise | has("gym_buckets") | not)
+  and (.data.recent_performances[0].sets[0] | has("gym") | not)
 ' >/dev/null || fail "an unsplit exercise carries gym-bucket fields"
 
 agent_get "exercises/${EXERCISE_A}/context?gym_bucket=none"
