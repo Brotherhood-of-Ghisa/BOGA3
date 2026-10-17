@@ -328,20 +328,25 @@ export const loadFlaggedExerciseSessionFacts = async (
 };
 
 /**
- * Which sessions count toward one exercise's all-time bests. Both gyms are
- * three-state, the repository-wide convention: unset is every gym, `null` is
- * the sessions with no gym, an id is that gym.
+ * Which sessions count toward one exercise's all-time bests.
+ *
+ * There is exactly one gym filter, `gymId`, on the repository-wide three-state
+ * convention: unset is every gym, `null` is the sessions with no gym, an id is
+ * that gym. Picking a split exercise's bucket is a different question, and
+ * `inSessionId` answers it with the session the reader is looking at rather
+ * than a second gym.
  */
 export type ExerciseBestsScope = {
   exerciseDefinitionId: string;
-  /** Keep only this gym's sessions (the `Past records gym filter`). */
+  /** The gym filter (the `Past records gym filter`). */
   gymId?: string | null;
   /**
-   * The gym the reader is at, which picks the bucket a split exercise reports
-   * ([[gym.split]]). Unset, the exercise reports its most recently performed
-   * bucket; an unsplit exercise ignores it, having one pooled bucket.
+   * The session being viewed. Its own gym picks the bucket a split exercise
+   * reports ([[gym.split]]); an unsplit exercise has one pooled bucket and
+   * ignores it. Unset (no session in hand), a split exercise reports its most
+   * recently performed bucket, so no reader ever pools one.
    */
-  atGymId?: string | null;
+  inSessionId?: string | null;
   /** Only the sessions before this completed session, in PR-history order. */
   beforeSessionId?: string | null;
 };
@@ -417,17 +422,27 @@ const gymScope = (gymId: string | null | undefined) => {
   return gymId === null ? isNull(sessions.gymId) : eq(sessions.gymId, gymId);
 };
 
+/** One session's gym, or undefined when the scope named no session. */
+const sessionGym = (
+  database: LocalDatabase,
+  inSessionId: string | null | undefined,
+): string | null | undefined => {
+  if (!inSessionId) return undefined;
+  const row = database.select({ gymId: sessions.gymId }).from(sessions)
+    .where(eq(sessions.id, inSessionId)).get();
+  if (!row) throw new Error(`session ${inSessionId} is missing`);
+  return row.gymId;
+};
+
 /**
- * The buckets a scope can read, or undefined when it names no gym at all. A
- * definition's rows all carry either the pooled bucket or a gym's, so naming
- * both selects exactly one of them without reading the split flag.
+ * The buckets a scope can read, or undefined when it has neither a gym filter
+ * nor a session. A definition's rows all carry either the pooled bucket or a
+ * gym's, so naming both selects exactly one without reading the split flag.
  */
-const bucketScope = (scope: Pick<ExerciseBestsScope, 'gymId' | 'atGymId'>) => {
-  const gymId = scope.gymId !== undefined ? scope.gymId : scope.atGymId;
-  return gymId === undefined
+const bucketScope = (gymId: string | null | undefined) =>
+  gymId === undefined
     ? undefined
     : inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(gymId));
-};
 
 /**
  * One bucket's rows when the scope named no gym: a split exercise is never
@@ -496,10 +511,13 @@ const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
 export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
+  // The filter names a gym when it is on; otherwise the viewed session's gym
+  // picks the bucket, which is not a filter and narrows nothing on its own.
+  const bucketGym = scope.gymId !== undefined ? scope.gymId : sessionGym(database, scope.inSessionId);
   const rows = selectBestsRows(database, and(
     eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
     gymScope(scope.gymId),
-    bucketScope(scope),
+    bucketScope(bucketGym),
   ));
   return pickBests(inOneBucket(rowsBefore(database, rows, scope.beforeSessionId)));
 };
@@ -520,14 +538,12 @@ export const loadEarlierBestsByDefinition = async (
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
   const before = (row: BestsRow) => compareFactSessionOrder(row, target) < 0;
-  const targetGym = database.select({ gymId: sessions.gymId }).from(sessions)
-    .where(eq(sessions.id, target.sessionId)).get();
-  if (!targetGym) throw new Error(`session ${target.sessionId} is missing`);
+  const targetGym = sessionGym(database, target.sessionId) as string | null;
   for (const ids of chunks(exerciseDefinitionIds)) {
     const rows = selectBestsRows(database, and(
       inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
       lte(exerciseSessionFacts.achievedAt, target.completedAt),
-      inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(targetGym.gymId)),
+      inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(targetGym)),
     )).filter(before);
     const rowsByDefinition = new Map<string, BestsRow[]>();
     for (const row of rows) {

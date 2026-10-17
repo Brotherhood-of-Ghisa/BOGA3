@@ -64,17 +64,19 @@ un-splitting is a merge. Rejected.
   `exercise_definitions.split_by_gym` update queue the definition(s).
 - Readers: `loadExerciseBests`, `loadEarlierBestsByDefinition`,
   `recordBaselinesOf`, flagged facts (Today PRs), session insights baselines,
-  record bands, share image (plain name). `loadExerciseBests` gained
-  `atGymId` — the gym the reader is at, which picks the bucket; unset, the
-  most recently performed bucket answers (the coaching default).
+  record bands, share image (plain name). `loadExerciseBests` keeps one gym
+  filter and takes `inSessionId` — the session on screen, whose gym picks the
+  bucket; with neither, the most recently performed bucket answers. The
+  exercise page hands the session over the route as `fromSessionId`.
 - Lanes: `fast`, `backend` (sync path), `frontend-android` if flows touch
   record bands.
-- Gym-scoped APIs now use one three-state convention, stated in spec `09`
-  (`src/utils/gym-scope-route.ts`). The gym chips PR 4 adds carry
-  `NO_GYM_ROUTE_PARAM` at the route boundary. `Past records gym filter` stays
-  `Unchanged` per the Decisions table: a session with no gym has no current
-  gym to narrow to, so the filter is inert there (operator's call, after the
-  product review raised it).
+- Gym-scoped APIs now use one three-state convention and **one gym filter per
+  reader**, stated in spec `09` (`src/utils/gym-scope-route.ts`). The gym chips
+  PR 4 adds carry `NO_GYM_ROUTE_PARAM` at the route boundary; a bucket or
+  context takes a session id, never a second gym. `Past records gym filter`
+  stays `Unchanged` per the Decisions table: a session with no gym has no
+  current gym to narrow to, so the filter is inert there (operator's call,
+  after the product review raised it).
 
 ### 4. Aggregations and labels
 

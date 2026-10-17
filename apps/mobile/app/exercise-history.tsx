@@ -377,6 +377,7 @@ export default function ExerciseHistoryRoute() {
     period?: string | string[];
     gymId?: string | string[];
     currentGymId?: string | string[];
+    fromSessionId?: string | string[];
   }>();
   const [listPreferences] = useExerciseListPreferences();
 
@@ -384,21 +385,21 @@ export default function ExerciseHistoryRoute() {
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
   const initialPeriod = parsePeriodParam(coerceRouteParam(params.period));
 
-  // Both gym params are three-state over the route boundary
-  // (`src/utils/gym-scope-route.ts`). `currentGymId` is the gym of the session
-  // the reader came from: it picks a split exercise's bucket ([[gym.split]]),
-  // and narrows the sessions too only under `Current gym only`.
+  // One gym filter, three-state over the route boundary
+  // (`src/utils/gym-scope-route.ts`): the chip's gym, else the gym the reader
+  // came from under `Current gym only`, else every gym. A session with no gym
+  // has no current gym to narrow to, so the filter stays off there.
   const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
-  const atGymId = decodeGymRouteParam(coerceRouteParam(params.currentGymId));
-  // `Current gym only` is unchanged: a session with no gym has no current gym
-  // to narrow to, so it still lists every gym. The bucket is a separate
-  // question, and `atGymId` answers it on its own.
+  const routeCurrentGymId = coerceRouteParam(params.currentGymId);
   const appliedGymId: string | null | undefined =
     routeGymId !== undefined
       ? routeGymId
-      : listPreferences.pastRecordsGymScope === 'current-gym' && atGymId
-        ? atGymId
+      : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+        ? routeCurrentGymId
         : undefined;
+  // Not a filter: the session the reader came from, whose gym picks a split
+  // exercise's bucket ([[gym.split]]).
+  const fromSessionId = coerceRouteParam(params.fromSessionId);
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -414,7 +415,7 @@ export default function ExerciseHistoryRoute() {
       nextPeriod: ExerciseHistoryPeriod,
       nextTagDefinitionId: string | null,
       nextGymId: string | null | undefined,
-      nextAtGymId: string | null | undefined
+      nextFromSessionId: string | null
     ) => {
       if (!exerciseDefinitionId) {
         setSummary(null);
@@ -430,7 +431,7 @@ export default function ExerciseHistoryRoute() {
           period: nextPeriod,
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
-          ...(nextAtGymId === undefined ? {} : { atGymId: nextAtGymId }),
+          ...(nextFromSessionId ? { inSessionId: nextFromSessionId } : {}),
         });
         if (next === null) {
           setSummary(null);
@@ -449,25 +450,25 @@ export default function ExerciseHistoryRoute() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadSummary(period, appliedTagDefinitionId, appliedGymId, atGymId);
+      void loadSummary(period, appliedTagDefinitionId, appliedGymId, fromSessionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
-    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId, atGymId, datedWeightRevision])
+    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId, fromSessionId, datedWeightRevision])
   );
 
   const handleSelectPeriod = useCallback(
     (next: ExerciseHistoryPeriod) => {
       setPeriod(next);
-      void loadSummary(next, appliedTagDefinitionId, appliedGymId, atGymId);
+      void loadSummary(next, appliedTagDefinitionId, appliedGymId, fromSessionId);
     },
-    [loadSummary, appliedTagDefinitionId, appliedGymId, atGymId]
+    [loadSummary, appliedTagDefinitionId, appliedGymId, fromSessionId]
   );
 
   const handleSelectTag = useCallback(
     (next: string | null) => {
       setAppliedTagDefinitionId(next);
-      void loadSummary(period, next, appliedGymId, atGymId);
+      void loadSummary(period, next, appliedGymId, fromSessionId);
     },
-    [loadSummary, period, appliedGymId, atGymId]
+    [loadSummary, period, appliedGymId, fromSessionId]
   );
 
   const title = summary?.exerciseName ?? 'Exercise History';

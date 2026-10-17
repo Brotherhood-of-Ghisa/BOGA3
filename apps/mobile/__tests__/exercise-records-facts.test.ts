@@ -261,29 +261,36 @@ describe('records of an exercise split per gym', () => {
     insertSession('none-1', 4, bench(['40', '5']));
   });
 
-  it('answers for the gym the reader is at, never pooling the gyms', async () => {
+  it('answers for the bucket of the session on screen, never pooling the gyms', async () => {
     split();
-    const at = async (atGymId: string | null) =>
-      await loadExerciseBests({ exerciseDefinitionId: BENCH, atGymId });
+    const inSession = async (inSessionId: string) =>
+      await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId });
 
-    expect((await at('home')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
-    expect((await at('club')).topWeight).toMatchObject({ sessionId: 'club-2', weight: 70, gymName: 'Club' });
-    expect((await at(null)).topWeight).toMatchObject({ sessionId: 'none-1', weight: 40, gymId: null });
-    // A gym with no history of the exercise reports nothing, not another gym's.
-    expect(await at('nowhere')).toEqual({ oneRepMax: null, topWeight: null, volume: null, latest: null });
+    expect((await inSession('home-1')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
+    expect((await inSession('club-1')).topWeight).toMatchObject({ sessionId: 'club-2', weight: 70, gymName: 'Club' });
+    expect((await inSession('none-1')).topWeight).toMatchObject({ sessionId: 'none-1', weight: 40, gymId: null });
+  });
+
+  it('reports nothing for a gym with no history of the exercise, never another gym\'s', async () => {
+    split();
+    db().insert(gyms).values({ id: 'annex', name: 'Annex' }).run();
+    insertSession('annex-1', 5, [{ definitionId: SQUAT, sets: [['50', '5']] }], 'annex');
+
+    expect(await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'annex-1' }))
+      .toEqual({ oneRepMax: null, topWeight: null, volume: null, latest: null });
   });
 
   it('keeps `Last` in the bucket', async () => {
     split();
-    const last = async (atGymId: string | null) =>
-      (await loadExerciseRecords({ exerciseDefinitionId: BENCH, atGymId })).last;
+    const last = async (inSessionId: string) =>
+      (await loadExerciseRecords({ exerciseDefinitionId: BENCH, inSessionId })).last;
 
-    expect((await last('home'))?.completedAt).toEqual(day(1));
-    expect((await last('club'))?.completedAt).toEqual(day(3));
-    expect((await last(null))?.completedAt).toEqual(day(4));
+    expect((await last('home-1'))?.completedAt).toEqual(day(1));
+    expect((await last('club-1'))?.completedAt).toEqual(day(3));
+    expect((await last('none-1'))?.completedAt).toEqual(day(4));
   });
 
-  it('reports the most recently performed bucket when the reader names no gym', async () => {
+  it('reports the most recently performed bucket with no session and no gym named', async () => {
     split();
     expect((await loadExerciseBests({ exerciseDefinitionId: BENCH })).topWeight)
       .toMatchObject({ sessionId: 'none-1', weight: 40 });
@@ -294,21 +301,29 @@ describe('records of an exercise split per gym', () => {
       .toMatchObject({ sessionId: 'home-1', weight: 100 });
   });
 
-  it('ignores the gym the reader is at while the exercise is not split', async () => {
-    const at = async (atGymId: string | null) =>
-      (await loadExerciseBests({ exerciseDefinitionId: BENCH, atGymId })).topWeight;
+  it('ignores the session on screen while the exercise is not split', async () => {
+    const inSession = async (inSessionId: string) =>
+      (await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId })).topWeight;
 
-    for (const atGymId of ['home', 'club', null] as const) {
-      expect(await at(atGymId)).toMatchObject({ sessionId: 'home-1', weight: 100 });
+    for (const sessionId of ['home-1', 'club-1', 'none-1']) {
+      expect(await inSession(sessionId)).toMatchObject({ sessionId: 'home-1', weight: 100 });
     }
   });
 
   it('lets `Current gym only` select exactly what the split already selects', async () => {
     split();
-    const filtered = await loadExerciseBests({ exerciseDefinitionId: BENCH, gymId: 'club', atGymId: 'club' });
+    const filtered = await loadExerciseBests({
+      exerciseDefinitionId: BENCH, gymId: 'club', inSessionId: 'club-1',
+    });
 
-    expect(filtered).toEqual(await loadExerciseBests({ exerciseDefinitionId: BENCH, atGymId: 'club' }));
+    expect(filtered).toEqual(await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'club-1' }));
     expect(filtered.topWeight).toMatchObject({ sessionId: 'club-2', weight: 70 });
+  });
+
+  it('fails loudly when the session on screen is not in the store', async () => {
+    split();
+    await expect(loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'missing' }))
+      .rejects.toThrow('session missing is missing');
   });
 
   it('counts only the sessions before a completed session being edited, inside the bucket', async () => {
@@ -316,7 +331,7 @@ describe('records of an exercise split per gym', () => {
     insertSession('club-3', 5, bench(['200', '5']), 'club');
 
     const bests = await loadExerciseBests({
-      exerciseDefinitionId: BENCH, atGymId: 'club', beforeSessionId: 'club-2',
+      exerciseDefinitionId: BENCH, inSessionId: 'club-1', beforeSessionId: 'club-2',
     });
 
     expect(bests.topWeight).toMatchObject({ sessionId: 'club-1', weight: 60 });
@@ -332,32 +347,32 @@ describe('exercise history all-time bests of a split exercise', () => {
       .where(eq(exerciseDefinitions.id, BENCH)).run();
   });
 
-  const best = async (scope: { gymId?: string | null; atGymId?: string | null }) =>
+  const best = async (scope: { gymId?: string | null; inSessionId?: string | null }) =>
     (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all', ...scope }))!
       .allTimeBest.topWeight;
 
-  it('reports the bucket of the gym the reader came from, not the newest one', async () => {
-    // `atGymId` alone picks the bucket; without it the most recently performed
-    // bucket answers, which is the no-gym one here.
-    expect(await best({ atGymId: 'home' })).toMatchObject({ sessionId: 'home-1', weight: 150 });
-    expect(await best({ atGymId: 'club' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
-    expect(await best({ atGymId: null })).toMatchObject({ sessionId: 'none-1', weight: 70 });
+  it('reports the bucket of the session the reader came from, not the newest one', async () => {
+    // The session alone picks the bucket; without one the most recently
+    // performed bucket answers, which is the no-gym one here.
+    expect(await best({ inSessionId: 'home-1' })).toMatchObject({ sessionId: 'home-1', weight: 150 });
+    expect(await best({ inSessionId: 'club-1' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
+    expect(await best({ inSessionId: 'none-1' })).toMatchObject({ sessionId: 'none-1', weight: 70 });
     expect(await best({})).toMatchObject({ sessionId: 'none-1', weight: 70 });
   });
 
   it('agrees with the records panel of the session the reader came from', async () => {
-    for (const atGymId of ['home', 'club', null] as const) {
-      const panel = await loadExerciseBests({ exerciseDefinitionId: BENCH, atGymId });
+    for (const inSessionId of ['home-1', 'club-1', 'none-1']) {
+      const panel = await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId });
 
-      expect(await best({ atGymId })).toMatchObject({
+      expect(await best({ inSessionId })).toMatchObject({
         sessionId: panel.topWeight!.sessionId, weight: panel.topWeight!.weight,
       });
     }
   });
 
-  it('keeps the gym filter narrowing the sessions, bucket and filter agreeing', async () => {
-    expect(await best({ gymId: 'club', atGymId: 'club' })).toMatchObject({ sessionId: 'club-1' });
-    expect(await best({ gymId: null, atGymId: null })).toMatchObject({ sessionId: 'none-1' });
+  it('keeps the one gym filter narrowing the sessions, bucket and filter agreeing', async () => {
+    expect(await best({ gymId: 'club', inSessionId: 'club-1' })).toMatchObject({ sessionId: 'club-1' });
+    expect(await best({ gymId: null, inSessionId: 'none-1' })).toMatchObject({ sessionId: 'none-1' });
   });
 });
 
@@ -476,15 +491,18 @@ describe('records from the facts equal the replay on a generated history', () =>
     db().update(exerciseDefinitions).set({ splitByGym: true }).where(eq(exerciseDefinitions.id, BENCH)).run();
 
     let compared = 0;
-    for (const atGymId of ['home', 'club', null] as const) {
-      const entries = history.filter((entry) => (entry.gymId ?? null) === atGymId);
+    for (const gym of ['home', 'club', null] as const) {
+      const entries = history.filter((entry) => (entry.gymId ?? null) === gym);
+      // Any session at that gym names the bucket; take the first.
+      const inSessionId = db().select().from(sessions).all()
+        .find((row) => (row.gymId ?? null) === gym)!.id;
 
-      const fromFacts = await loadExerciseRecords({ exerciseDefinitionId: BENCH, atGymId });
+      const fromFacts = await loadExerciseRecords({ exerciseDefinitionId: BENCH, inSessionId });
 
       // The split narrows the exercise to one gym, which is exactly what the
       // replay over that gym's completed sessions derives.
-      expect(rounded({ atGymId, ...fromFacts }))
-        .toEqual(rounded({ atGymId, records: replayRecords(entries), last: deriveLastSession(entries) }));
+      expect(rounded({ gym, ...fromFacts }))
+        .toEqual(rounded({ gym, records: replayRecords(entries), last: deriveLastSession(entries) }));
       compared += fromFacts.records.oneRepMax ? 1 : 0;
     }
     expect(compared).toBe(3);

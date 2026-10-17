@@ -29,20 +29,24 @@ export const loadExerciseRecords = async (scope: ExerciseBestsScope): Promise<Ex
 
 export type LoadExerciseRecords = typeof loadExerciseRecords;
 
+/**
+ * Where the panel is being read from: the session on screen, that session's
+ * gym, and the account's gym-filter choice. The session is not a filter — its
+ * gym picks the bucket an exercise split per gym reports ([[gym.split]]) —
+ * while `scope` alone decides whether the one gym filter is on.
+ */
 export type ExerciseRecordsGymFilter = {
   scope: PastRecordsGymScope;
   /** The viewing session's gym; `null` when it has none. */
   currentGymId: string | null;
+  /** The viewing session. Omitted by a caller reading outside one. */
+  sessionId?: string | null;
 };
 
 /**
  * All-time records and the previous session for one exercise definition.
  * `beforeSessionId` names a completed session being edited: only the sessions
  * before it count, the session view's live record rule.
- *
- * The session's gym always reaches the reader as `atGymId`, so an exercise
- * split per gym reports the gym being lifted at ([[gym.split]]); `scope` only
- * decides whether an unsplit exercise is narrowed to it as well.
  */
 export const useExerciseRecords = (
   exerciseDefinitionId: string | null,
@@ -58,8 +62,7 @@ export const useExerciseRecords = (
   const datedWeightRevision = useBodyWeightContextRevision();
   const filterScope = gymFilter?.scope ?? 'all';
   const filterGymId = gymFilter?.currentGymId ?? null;
-  // No gym context at all (a caller with no session) leaves `atGymId` unset.
-  const hasGymContext = gymFilter !== undefined;
+  const inSessionId = gymFilter?.sessionId ?? null;
 
   useFocusEffect(useCallback(() => {
     if (!exerciseDefinitionId) return;
@@ -68,7 +71,7 @@ export const useExerciseRecords = (
     void load({
       exerciseDefinitionId,
       beforeSessionId,
-      ...(hasGymContext ? { atGymId: filterGymId } : {}),
+      inSessionId,
       ...(filterScope === 'current-gym' && filterGymId ? { gymId: filterGymId } : {}),
     })
       .then((summary) => {
@@ -82,7 +85,7 @@ export const useExerciseRecords = (
     };
   // The explicit revision invalidates history after a saved-weight or load review.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, hasGymContext, load, refreshKey, datedWeightRevision]));
+  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, inSessionId, load, refreshKey, datedWeightRevision]));
 
   return state;
 };

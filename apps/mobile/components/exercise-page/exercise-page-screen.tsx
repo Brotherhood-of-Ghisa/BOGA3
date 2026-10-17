@@ -49,7 +49,6 @@ import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
 import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
-import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
@@ -142,6 +141,8 @@ export function ExercisePageScreen({
     {
       scope: listPreferences.pastRecordsGymScope,
       currentGymId,
+      // Not a filter: this session's gym picks a split exercise's bucket.
+      sessionId,
     },
     JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode])
   );
@@ -394,9 +395,10 @@ export function ExercisePageScreen({
                 pathname: '/exercise-history',
                 params: {
                   exerciseDefinitionId: exercise.exerciseDefinitionId,
-                  // Three-state over the route: a session with no gym says so,
-                  // so its bucket survives the hop ([[gym.split]]).
-                  currentGymId: currentGymId ?? NO_GYM_ROUTE_PARAM,
+                  // The session carries the bucket over the hop ([[gym.split]]);
+                  // `currentGymId` stays the gym filter's input alone.
+                  fromSessionId: sessionId,
+                  ...(currentGymId ? { currentGymId } : {}),
                 },
               })
             }

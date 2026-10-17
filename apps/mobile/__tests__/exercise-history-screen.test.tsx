@@ -61,7 +61,6 @@ import {
   __resetExerciseListPreferencesForTests,
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
-import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -266,12 +265,13 @@ describe('ExerciseHistoryRoute over real data', () => {
   });
 
   it('still lists every gym under Current gym only when the session had no gym', async () => {
-    // A session with no gym has no current gym to narrow to, so the filter is
-    // inert — it is the split that keys the records, not this preference.
+    // A session with no gym sends no `currentGymId`, so there is no gym to
+    // narrow to and the filter is inert. `fromSessionId` is not a filter: it
+    // only lets a split exercise's bests pick that session's bucket.
     act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
 
     await openHistory(
-      { exerciseDefinitionId: SQUAT, currentGymId: NO_GYM_ROUTE_PARAM },
+      { exerciseDefinitionId: SQUAT, fromSessionId: EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId },
       logSquatElsewhere
     );
 

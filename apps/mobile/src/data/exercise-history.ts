@@ -160,14 +160,15 @@ export type ExerciseHistoryStore = {
     sessionId?: string;
   }): Promise<ExerciseHistorySessionRow[]>;
   /**
-   * Both gyms are three-state: unset is every gym, `null` the sessions with no
-   * gym, an id that gym. `gymId` keeps only its sessions; `atGymId` is the gym
-   * the reader is at, which picks a split exercise's bucket ([[gym.split]]).
+   * `gymId` is the one gym filter, three-state: unset every gym, `null` the
+   * sessions with no gym, an id that gym. `inSessionId` is not a filter — it
+   * names the session the reader came from, whose gym picks a split exercise's
+   * bucket ([[gym.split]]).
    */
   loadAllTimeBest(input: {
     exerciseDefinitionId: string;
     gymId?: string | null;
-    atGymId?: string | null;
+    inSessionId?: string | null;
   }): Promise<ExerciseHistoryBest>;
   loadSetsForSessionExercises(input: {
     sessionExerciseIds: string[];
@@ -185,11 +186,11 @@ export type LoadExercisePerformanceHistoryOptions = {
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   gymId?: string | null;
   /**
-   * The gym the reader is at — the session they opened this history from. It
-   * picks the bucket a split exercise's `All-time bests` report ([[gym.split]])
-   * and nothing else; `gymId` alone narrows the listed sessions.
+   * The session this history was opened from. Not a filter: its gym picks the
+   * bucket a split exercise's `All-time bests` report ([[gym.split]]).
+   * `gymId` alone narrows the listed sessions.
    */
-  atGymId?: string | null;
+  inSessionId?: string | null;
   now?: Date;
 };
 
@@ -466,8 +467,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         ...resolveWeight(row.startedAt),
       }));
   },
-  async loadAllTimeBest({ exerciseDefinitionId, gymId, atGymId }) {
-    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId, atGymId });
+  async loadAllTimeBest({ exerciseDefinitionId, gymId, inSessionId }) {
+    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId, inSessionId });
     return {
       estimatedOneRepMax: oneRepMax
         ? { value: oneRepMax.value, sessionId: oneRepMax.sessionId, completedAt: oneRepMax.completedAt }
@@ -574,7 +575,7 @@ export const createExerciseHistoryRepository = (
       store.loadAllTimeBest({
         exerciseDefinitionId: options.exerciseDefinitionId,
         ...(appliedGymId === undefined ? {} : { gymId: appliedGymId }),
-        ...(options.atGymId === undefined ? {} : { atGymId: options.atGymId }),
+        ...(options.inSessionId ? { inSessionId: options.inSessionId } : {}),
       }),
     ]);
 

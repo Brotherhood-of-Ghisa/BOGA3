@@ -148,9 +148,11 @@ sets. There are three kinds:
   session's own gym, the sessions with no gym forming their own bucket.
   `reportingBucket` (`exercise-calculations/gym-bucket.ts`) is the one
   implementation; the fold runs once per bucket, so one gym never sets or
-  raises another's record and a split exercise is never pooled. A reader at a
-  gym reports that gym's bucket; a reader naming none reports the most recently
-  performed one. Within the bucket every gym's sessions count by default, and
+  raises another's record and a split exercise is never pooled. A reader
+  viewing a session reports that session's gym's bucket; one with no session
+  and no gym named reports the most recently performed bucket. Which bucket to
+  report is not a gym filter and narrows nothing on its own, so a reader takes
+  the session, never a second gym. Within the bucket every gym's sessions count by default, and
   where a screen offers the current-gym filter (today only the exercise page)
   only that gym's do — on a split exercise that selects what the split already
   selected. A completed session being edited, and an active session, are
