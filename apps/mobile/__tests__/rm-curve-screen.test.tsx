@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
-import { setDescription } from '@/components/rm-curve/details';
 import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, userSettings } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
@@ -25,8 +24,7 @@ it('uses the real read hook/catalogue for default scope, effort/range/exercise c
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot');
   expect(screen.getByLabelText('range: 12 weeks')).toBeTruthy(); expect(screen.queryByTestId('rm-curve-details')).toBeNull();
-  const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve' }))!;
-  fireEvent.press(screen.getByText('View sets')); fireEvent.press(screen.getByLabelText(setDescription(model.observations[0], 'DD-MM-YYYY')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('effort: All known RIR')); fireEvent.press(screen.getByRole('radio', { name: 'RIR 4' }));
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
@@ -50,7 +48,7 @@ it('labels dated bodyweight-inclusive per-side Load separately from raw Weight a
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot'); expect(screen.getByText('LOAD (WITH DATED BODYWEIGHT) · KG PER SIDE')).toBeTruthy();
   const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve' }))!;
-  fireEvent.press(screen.getByText('View sets')); fireEvent.press(screen.getByLabelText(setDescription(model.observations[0], 'DD-MM-YYYY')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByText('WEIGHT / 1RM · KG PER SIDE')).toBeTruthy();
   act(() => updatePreferences({ dateFormat: 'YYYY-MM-DD' }));
   await screen.findByText(/2026-06-15 · block 1, set 1/);

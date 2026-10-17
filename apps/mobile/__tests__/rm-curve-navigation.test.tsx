@@ -65,10 +65,9 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   expect(route.getPathname()).toBe('/rm-curve');
   expect(screen.getByLabelText('exercise: Synthetic exercise')).toBeTruthy();
   expect(screen.getByText('36 sets · 12 sessions')).toBeTruthy();
-  fireEvent.press(screen.getByText('View sets'));
-  expect(screen.getByLabelText(/^2026-06-01 · block 1, set 1\./)).toBeTruthy();
-  expect(screen.queryByLabelText(/^2026-06-15/)).toBeNull();
-  fireEvent.press(screen.getByLabelText(/^2026-06-01 · block 1, set 1\./));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  expect(screen.getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
+  expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
   fireEvent.press(screen.getByLabelText('range: 12 weeks'));
   fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
   await screen.findByText('12 sets · 4 sessions');
@@ -105,8 +104,7 @@ it('resets the selected chart when a new exercise link reaches the mounted route
   invalidateExerciseCatalogCache(); await ensureExerciseCatalogLoaded();
   await open(String(rmCurveHref('curve')));
   await screen.findByTestId('rm-curve-plot');
-  fireEvent.press(screen.getByText('View sets'));
-  fireEvent.press(screen.getByLabelText(/^2026-06-01 · block 1, set 1\./));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   await act(async () => navigate.setParams({ exerciseDefinitionId: 'other' }));
   await screen.findByText('No completed sets');
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));

@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { RmCurveContent } from '@/components/rm-curve/content';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
-import { setDescription } from '@/components/rm-curve/details';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
@@ -35,8 +34,7 @@ it('hides stale connected-screen values on storage failure and restores the sele
   await screen.findByTestId('rm-curve-plot');
   const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve' }))!;
   const selected = model.observations[0];
-  fireEvent.press(screen.getByText('View sets'));
-  fireEvent.press(screen.getByLabelText(setDescription(selected, 'DD-MM-YYYY')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   const before = mockFixture.database.select().from(exerciseSets).all();
   act(() => { mockReadFailure = true; notifyLocalWrite(); });
   await screen.findByText('Couldn’t load sets');
@@ -88,7 +86,7 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
   await screen.findByTestId('rm-curve-plot');
   const query = { ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve' };
   const initial = (await loadRmCurve(query))!.observations[0];
-  fireEvent.press(screen.getByText('View sets')); fireEvent.press(screen.getByLabelText(setDescription(initial, 'DD-MM-YYYY')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   const before = db.select().from(exerciseSets).all();
   act(() => { db.update(bodyWeightMeasurements).set({ weightKg: 90 }).where(eq(bodyWeightMeasurements.id, 'dated')).run(); invalidateBodyWeightContext(); });
   const updated = (await loadRmCurve(query))!.observations[0];
@@ -122,8 +120,8 @@ it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to 
     expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
     const first = wave.scenarios[name][(week - 1) * 3];
     const date = formatShortDate(new Date(first.completedAt), 'YYYY-MM-DD');
-    fireEvent.press(screen.getByText('View sets'));
-    fireEvent.press(screen.getByLabelText(new RegExp(`^${date} · block 1, set 1\\.`)));
+    fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+    expect(screen.getByText(`${date} · block 1, set 1`)).toBeTruthy();
     expect(screen.getByText(`${first.repsValue} / ${first.rir}`)).toBeTruthy();
     expect(screen.getByText(`${formatWeight(Number(first.weightValue))} / ${formatOneRepMax(first.rm)}`)).toBeTruthy();
     expect(screen.getByText(`Equivalent reps ${Number(first.repsValue) + first.rir} · Load ${formatWeight(Number(first.weightValue))} kg`)).toBeTruthy();

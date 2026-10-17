@@ -1,7 +1,7 @@
-import { createRef, useState } from 'react';
+import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
-import { Platform, type ViewInstance } from 'react-native';
+import { Platform, View, type ViewInstance } from 'react-native';
 import { RmCurveChart } from '@/components/rm-curve/chart';
 import { RmCurveContent, type CurveScope } from '@/components/rm-curve/content';
 import { setDescription } from '@/components/rm-curve/details';
@@ -41,7 +41,7 @@ it.each(['plateau', 'stable', 'gradual'] as const)('renders %s prefix coordinate
   }
 });
 
-it('selects overlapping marks through dated rows and preserves actual reps, effort, Weight and existing 1RM', async () => {
+it('selects overlapping marks inline without a set-list popup and preserves actual reps, effort, Weight and existing 1RM', async () => {
   const model = (await loadRmCurve(query))!;
   render(<RmCurveContent {...props} read={read(model)} />);
   expect(screen.queryByTestId('rm-curve-details')).toBeNull();
@@ -49,7 +49,8 @@ it('selects overlapping marks through dated rows and preserves actual reps, effo
   fireEvent.press(screen.getByTestId('rm-curve-plot'), { nativeEvent: { locationX: mark.x, locationY: mark.y } });
   const ids = pointsAt(plot, mark.x, mark.y, 44); expect(ids.length).toBeGreaterThan(1);
   const p = model.observations.find(p => ids[0] === p.setId)!;
-  fireEvent.press(screen.getByLabelText(setDescription(p, 'YYYY-MM-DD')));
+  expect(screen.queryByText('View sets')).toBeNull();
+  expect(screen.queryByTestId('rm-curve-sheet')).toBeNull();
   expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
   expect(screen.getByText(`${p.reps} / ${p.rir}`)).toBeTruthy();
   expect(screen.getByText(`${formatWeight(p.weightKg)} / ${formatOneRepMax(p.existingOneRepMax)}`)).toBeTruthy();
@@ -67,18 +68,21 @@ it.each([2, 6, 10, 14, 18, 22])('renders the held-load/RIR and load-step readout
   expect(screen.getByTestId(`rm-point-${p.setId}`).props).toMatchObject({ cx: mark.x, cy: mark.y });
   expect(screen.queryByText(/Reference/)).toBeNull();
   await screen.findByText('Exploratory fit');
-  fireEvent.press(screen.getByText('View sets')); fireEvent.press(screen.getByLabelText(setDescription(p, 'YYYY-MM-DD')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByText(`${p.reps} / ${p.rir}`)).toBeTruthy();
   expect(screen.getByText(`${formatWeight(p.weightKg)} / ${formatOneRepMax(p.existingOneRepMax)}`)).toBeTruthy();
   expect(screen.queryByText(/strength gain|structural break|probability/i)).toBeNull();
 });
 
-it('opens dated values on coordinate-free chart activation, including per-side units in the modal', async () => {
+it('opens inline values on coordinate-free chart activation and can browse every set without a popup', async () => {
   const model = (await loadRmCurve(query))!;
   render(<RmCurveContent {...props} read={read(model)} />);
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
-  expect(screen.getByText('Observed sets · newest first')).toBeTruthy();
-  expect(screen.getByLabelText(setDescription(model.observations[0], 'YYYY-MM-DD'))).toBeTruthy();
+  expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
+  expect(screen.queryByTestId('rm-curve-sheet')).toBeNull();
+  for (let i = 1; i < model.observations.length; i++) fireEvent.press(screen.getByLabelText('Previous set'));
+  expect(screen.getByLabelText('Previous set')).toBeDisabled();
+  expect(screen.getByLabelText('Next set')).not.toBeDisabled();
   const label = setDescription({ ...model.observations[0], loadContext: { ...model.observations[0].loadContext, loadInputMode: 'per_side_load' } }, 'YYYY-MM-DD');
   expect(label.match(/kg per side/g)).toHaveLength(3);
 });
@@ -87,12 +91,9 @@ it('uses viewport mouse coordinates after document scrolling instead of shifted 
   jest.replaceProperty(Platform, 'OS', 'web');
   const model = (await loadRmCurve(query))!, pick = jest.fn();
   const geometry = curveGeometry(model, 300), mark = geometry.points[0];
-  const host = createRef<ViewInstance>();
-  render(<RmCurveChart model={model} selectedId={null} onPick={pick} plotRef={node => { host.current = node; }} />, {
-    createNodeMock: element => (element.props as { testID?: string }).testID === 'rm-curve-plot'
-      ? { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => callback(100, 200, 300, 252) } : null,
-  });
-  jest.spyOn(host.current!, 'measureInWindow').mockImplementation(callback => callback(100, 200, 300, 252));
+  render(<RmCurveChart model={model} selectedId={null} onPick={pick} />);
+  jest.spyOn(screen.UNSAFE_getByType(View).instance as ViewInstance, 'measureInWindow')
+    .mockImplementation(callback => callback(100, 200, 300, 252));
   fireEvent.press(screen.getByTestId('rm-curve-plot'), { nativeEvent: { clientX: mark.x + 100, clientY: mark.y + 200,
     pageX: mark.x + 100, pageY: mark.y + 400 } });
   expect(pick).toHaveBeenCalledWith(pointsAt(geometry, mark.x, mark.y, 44));
@@ -111,8 +112,7 @@ it('retains named gym labels on read failure and distinguishes an empty RIR filt
 it('preserves still-visible selection, clears removed IDs, and never resurrects them or stale details', async () => {
   const model = (await loadRmCurve(query))!;
   const component = render(<RmCurveContent {...props} read={read(model)} />);
-  fireEvent.press(screen.getByText('View sets'));
-  fireEvent.press(screen.getByLabelText(setDescription(model.observations[0], 'YYYY-MM-DD')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   component.rerender(<RmCurveContent {...props} read={read(await loadRmCurve({ ...query, rir: model.observations[0].rir }))} />);
   expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
   mockFixture.database.update(exerciseSets).set({ deletedAt: query.end }).where(eq(exerciseSets.id, model.observations[0].setId)).run();
@@ -138,7 +138,8 @@ it('renders sparse, insufficient reference, missing/unknown effort, zero and hig
   // Canonical high RIR has no qualifying prior reference.
   const sparse = (await loadRmCurve({ ...query, rir: 12 }))!;
   render(<RmCurveContent {...props} read={read(sparse)} />);
-  await screen.findByText('More sessions needed');
+  await screen.findByText('Fit unavailable');
+  expect(screen.getByText('1 fitting sessions')).toBeTruthy();
   expect(screen.queryByText(/Reference/)).toBeNull();
   expect(screen.queryByTestId('rm-reference-line')).toBeNull(); expect(screen.getByTestId('rm-point-week-24:3').props.cy).toBe(228);
   expect(screen.getByText(/1 missing effort; 1 unknown effort/)).toBeTruthy();

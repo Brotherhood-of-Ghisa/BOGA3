@@ -336,7 +336,7 @@ numerical diagnostics, cancellation and calibration limits, load
 view; activation and human implemented-UI acceptance remain separate gates.
 
 `src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives
-observations and prespecified session samples. `components/rm-curve/` renders it,
+observations and selected session samples. `components/rm-curve/` renders it,
 hosted by `app/rm-curve.tsx`. No derived figure writes back to workouts.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,

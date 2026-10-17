@@ -10,17 +10,17 @@ import { curveStyles as styles } from './styles';
 export const periodColour = (period: RegimeCurve['period']) => period === 'newer' ? uiRoles.regimeNewer : uiRoles.regimeOlder;
 
 /** Exact coordinates; complete-session date partitions share curve and point identity. */
-export function RmCurveChart({ model, selectedId, onPick, plotRef, curves = [], boundary = null }: {
+export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary = null }: {
   curves?: RegimeCurve[]; boundary?: number | null;
-  model: RmCurveModel; selectedId: string | null; onPick: (ids: string[]) => void; plotRef: (node: ViewInstance | null) => void;
+  model: RmCurveModel; selectedId: string | null; onPick: (ids: string[]) => void;
 }) {
   const [width, setWidth] = useState(300);
   const host = useRef<ViewInstance | null>(null);
   const plot = curveGeometry(model, width, curves);
   return <>
-    <Pressable ref={node => { host.current = node; plotRef(node); }} testID="rm-curve-plot" accessibilityRole="button"
-      accessibilityLabel={`${model.observations.length} observed sets. RIR0-equivalent repetitions versus load. Open the set list for values.`}
-      accessibilityHint="Tap near a point to select; coincident points open a choice list."
+    <Pressable ref={host} testID="rm-curve-plot" accessibilityRole="button"
+      accessibilityLabel={`${model.observations.length} observed sets. RIR0-equivalent repetitions versus load. Select a set for values.`}
+      accessibilityHint="Tap near a point to select; use Previous set and Next set to browse overlapping sets."
       onLayout={event => { if (event.nativeEvent.layout.width > 0) setWidth(event.nativeEvent.layout.width); }}
       onAccessibilityTap={() => onPick(plot.points.map(p => p.id))}
       onPress={event => {
