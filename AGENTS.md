@@ -212,11 +212,14 @@ opening a PR or publishing a review, verify attribution; preserve commit
 metadata through squash/merge. Never invent identities or attribute
 human-only work to AI.
 
-Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md`:
-**Objective / Tests / Review hard / Deviations**, using data and `file:line`
-pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
-the lanes that ran, each with its result and an evidence link ("CI green" alone
-is not enough), and notes that the set was agreed with the operator, including
-any default lane skipped and the reason. Before opening it, run
-`docs/procedures/product-review.md` on the branch diff next to `/code-review`, and put
-its verdict on the Tests section's `Product facts:` line.
+**Codex only:** When creating or materially updating GitHub PRs, use OpenAI's
+official [`codex-pr-body` skill](https://github.com/openai/codex/blob/14272b21e95ed9a54fae21c27d33d3771a9ee30f/.codex/skills/codex-pr-body/SKILL.md)
+(install that revision if unavailable). Preserve repository templates and
+manually written content.
+
+Follow `.github/pull_request_template.md`: **Objective / Tests / Review hard /
+Deviations**, using data and `file:line` pointers, not prose (~25 lines; link,
+don't quote). **Tests** lists each lane run, result and evidence link ("CI green"
+alone is insufficient), operator agreement, and skipped defaults with reasons.
+Before opening, run `docs/procedures/product-review.md` on the branch diff
+alongside `/code-review`; put its verdict on **Tests**' `Product facts:` line.
