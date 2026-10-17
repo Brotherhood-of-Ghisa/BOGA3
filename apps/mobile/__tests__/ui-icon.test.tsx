@@ -103,10 +103,15 @@ describe('no record figure draws a mark beside the number', () => {
   // Every `<Icon ... />` element, self-closing and possibly spanning lines.
   const ICON_ELEMENT = /<Icon\b[\s\S]*?\/>/g;
 
-  it('pairs `uiRoles.record` with no arrow glyph in app, components or src', () => {
+  // `name="arrow-up"` and `name={'arrow-up'}` both; `color` as the role or
+  // through the `record` text style.
+  const ARROW_NAME = /name=\{?['"]arrow-/;
+  const RECORD_COLOUR = /uiRoles\.record\b|record\.color\b/;
+
+  it('pairs a record colour with no arrow glyph in app, components or src', () => {
     const offenders = uiSources().flatMap((file) =>
       (readFileSync(file, 'utf8').match(ICON_ELEMENT) ?? [])
-        .filter((element) => element.includes('uiRoles.record') && /name="arrow-/.test(element))
+        .filter((element) => RECORD_COLOUR.test(element) && ARROW_NAME.test(element))
         .map((element) => `${relative(APP_ROOT, file)}: ${element.replace(/\s+/g, ' ')}`),
     );
     expect(offenders).toEqual([]);

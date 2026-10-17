@@ -205,7 +205,6 @@ const styles = StyleSheet.create({
   recordLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.xs,
   },
   recordText: {
     flexShrink: 1,

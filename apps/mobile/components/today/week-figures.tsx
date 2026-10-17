@@ -125,10 +125,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
+  // One child since the record mark went; `row` still sizes the figure to its
+  // content rather than stretching it.
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.xs,
   },
   track: {
     height: BAR_HEIGHT,
