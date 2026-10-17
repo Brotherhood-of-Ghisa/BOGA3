@@ -348,12 +348,12 @@ const exit = new Promise(resolve => child.once('exit', (code, signal) => { finis
 JS
 rm "$FIXTURE/clock" "$FIXTURE/block-sleep"
 
-for every in 4h 24h; do
+for every in 1h 4h 12h 24h 48h; do
   "$FIXTURE/repo/scripts/ios-release.sh" --every "$every" --profile prod \
     --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run > "$FIXTURE/plan-$every"
   [[ "$(cat "$FIXTURE/plan-$every")" == *"Repeats every $every"*'No job created.'* ]] || fail 'repeat dry-run invalid'
 done
-for every in daily 0h 1h -4h; do
+for every in daily 0h 1.5h -4h 12 999999999999999999999999999h 2400000000h; do
   if "$FIXTURE/repo/scripts/ios-release.sh" --every "$every" --profile prod \
     --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run >/dev/null 2>&1; then
     fail "invalid interval accepted: $every"
@@ -369,7 +369,7 @@ for at in '' 2020-01-01T01:00:00Z 2099-02-31T01:00:00Z 2099-10-18T01:00:00; do
     fail "invalid schedule accepted: $at"
   fi
 done
-"$FIXTURE/repo/scripts/ios-release.sh" --every 4h --profile prod --project-ref abcdefghijklmnopqrst \
+"$FIXTURE/repo/scripts/ios-release.sh" --every 12h --profile prod --project-ref abcdefghijklmnopqrst \
   > "$FIXTURE/scheduled"
 for attempt in {1..50}; do
   [[ ! -f "$FIXTURE/job-group" ]] || break
@@ -379,7 +379,7 @@ record=("$FIXTURE/config/releases/"ios-*)
 [[ "$(cat "$FIXTURE/job-group")" == "$(cat "${record[0]}/pid")" ]] || fail 'job lacks its own process group'
 [[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled starting commit not recorded'
 [[ "$(cat "${record[0]}/job.env")" == *'ref=origin/main'* ]] || fail 'main refresh not scheduled'
-[[ "$(cat "${record[0]}/job.env")" == *'repeat_seconds=14400'* ]] || fail 'repeat interval not persisted'
+[[ "$(cat "${record[0]}/job.env")" == *'repeat_seconds=43200'* ]] || fail 'repeat interval not persisted'
 cmp "$FIXTURE/repo/scripts/ios-release.sh" "${record[0]}/runner.sh" || fail 'runner not preserved'
 [[ "$(cat "$FIXTURE/job-argv")" == *'--run '* ]] || fail 'worker not scheduled'
 assert_absent 'credential-must-not-leak' "${record[0]}" 'schedule persisted credentials'

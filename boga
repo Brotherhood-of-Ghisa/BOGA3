@@ -25,7 +25,7 @@
 #   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
-#   boga ios release [--at <UTC time|now>] [--every 24h|4h] --profile preview|prod --project-ref <ref> [--dry-run]
+#   boga ios release [--at <UTC time|now>] [--every <hours>h] --profile preview|prod --project-ref <ref> [--dry-run]
 #   boga env dev|lan|hosted|tailscale
 #
 # `test` (except --list / for), `db`, `ios`, and `env` fail hard without this

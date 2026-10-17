@@ -17,6 +17,9 @@ below and replace `YOUR_SUPABASE_PROJECT_REF` with your project's 20-character I
   --profile prod --project-ref YOUR_SUPABASE_PROJECT_REF
 ```
 
+For another interval, replace `4h` with any positive whole number of hours,
+for example `12h`, `1h` or `48h`.
+
 These recurring commands **start immediately**, then repeat at the chosen interval.
 To choose the first run instead, add `--at 2026-10-18T22:00:00Z`, replacing it with
 your desired future UTC time. Intervals stay fixed in UTC across daylight-saving

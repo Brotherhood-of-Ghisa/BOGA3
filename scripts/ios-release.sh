@@ -8,7 +8,7 @@ fail() { echo "[ios-release] $*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Usage: ./boga ios release [--at <UTC time|now>] [--every <24h|4h>]
+Usage: ./boga ios release [--at <UTC time|now>] [--every <hours>h]
                         --profile <preview|prod> --project-ref <Supabase ref>
                         [--ref <git ref>] [--dry-run]
 
@@ -24,10 +24,11 @@ and backend, skip the release. Otherwise:
   3. Configure group evaluation and notification invocation/registration.
   4. Build locally, inspect/checksum the IPA, and submit that IPA to Apple.
 
-Without --every, --at is required and schedules one run. --every repeats at fixed
-24-hour or 4-hour intervals, starting now unless --at sets the first run. It reuses
-one checkout, retains a separate record per run, and stops on any failure. Extra
-missed intervals are skipped. Repetition stops on cancellation, logout or reboot.
+Without --every, --at is required and schedules one run. --every accepts any positive
+whole number of hours (e.g. 1h, 4h, 12h, 24h, 48h), starting now unless --at sets
+the first run. It reuses one checkout, retains a separate record per run, and stops
+on any failure. Extra missed intervals are skipped. Repetition stops on
+cancellation, logout or reboot.
 
 No gates, sweep, metadata changes, Git tags, or automatic retries after failure.
 Docker must be running for function bundling. Hosted credentials come from
@@ -301,10 +302,6 @@ while (( $# )); do
 done
 [[ "$profile" == preview || "$profile" == prod ]] || fail '--profile must be preview or prod'
 [[ "$project" =~ ^[a-z0-9]{20}$ ]] || fail '--project-ref must be a 20-character hosted project ref'
-case "$every" in
-  "") ;; 4h) repeat_seconds=14400 ;; 24h) repeat_seconds=86400 ;;
-  *) fail "--every must be 24h or 4h" ;;
-esac
 [[ -n "$at" || -z "$every" ]] || at=now
 at_epoch="$(node - "$at" <<'JS'
 const value = process.argv[2];
@@ -317,6 +314,22 @@ if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value) || !Number.isFinite(date.ge
 console.log(date.getTime()/1000);
 JS
 )"
+repeat_seconds="$(node - "$every" "$at_epoch" <<'JS'
+const [value, first] = process.argv.slice(2);
+if (!value) { console.log(0); process.exit(); }
+const match = /^([0-9]+)h$/.exec(value);
+const seconds = Number(match?.[1]) * 3600;
+if (!Number.isSafeInteger(seconds) || seconds <= 0) {
+  console.error('--every must be a positive whole number of hours, e.g. 4h, 12h or 24h');
+  process.exit(1);
+}
+if (!Number.isFinite(new Date((Number(first) + seconds) * 1000).getTime())) {
+  console.error('--every exceeds the supported date range'); process.exit(1);
+}
+console.log(seconds);
+JS
+)"
+
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$script")/.."
 source scripts/worktree-lib.sh

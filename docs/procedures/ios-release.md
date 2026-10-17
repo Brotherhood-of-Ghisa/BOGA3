@@ -9,7 +9,7 @@ Other worktrees can continue development.
 
 ## Schedule without gates (operator reference)
 
-For human one-time, daily and four-hour scheduling commands, use
+For human one-time and recurring scheduling commands, use
 [Schedule an iOS build and submission](../runbook-scheduled-ios-release.md).
 This route requires an explicit choice to omit test lanes and the release sweep.
 It keeps app metadata unchanged and creates no Git tag.
@@ -30,11 +30,13 @@ the profile name alone does not select a database.
 ### Source and scheduling behavior
 
 `--at` accepts a future UTC timestamp ending in `Z`, or `now`. Without `--every`,
-it is required and schedules one run. `--every 24h` / `--every 4h` repeats at fixed
-UTC intervals, starting immediately unless `--at` chooses the first run. Runs are
-serial; after an overrun or late wake, the next interval is in the future. One
-checkout and slot serve the whole schedule. Each run has its own artifact directory; the
-parent's `latest-run.txt` points at the current run, and its log includes all runs.
+it is required and schedules one run. `--every <hours>h` accepts any positive whole
+number of hours (such as `1h`, `4h`, `12h`, `24h` or `48h`), within the supported
+date range. Intervals stay fixed in UTC, starting now unless `--at` sets the first
+run. Runs are serial; after an overrun or late wake, the next interval is in the
+future. One checkout and slot serve the whole schedule. Each run has its own
+artifact directory; the parent's `latest-run.txt` points at the current run, and
+its log includes all runs.
 A failure stops repetition, preserving the failed run for inspection. Starting a
 new schedule after failure is a manual decision, especially after uncertain upload.
 
