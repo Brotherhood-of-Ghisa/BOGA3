@@ -69,11 +69,13 @@ lands within 35° of it, then steps 35° away on the far side — that step is w
 makes the `record`-to-`accent` floor hold, so do not "simplify" it away.
 `ui-theme.test.ts` gates the generator and every preset.
 
-The launcher icon follows [[appearance.app-icon-theme]]. The native boundary
-is `apps/mobile/components/appearance/theme-app-icon.ts`; `app.config.ts`
-bundles the PNGs in `apps/mobile/assets/images/app-icons/`. A native failure
-attempts the primary icon and is logged; even a failed fallback leaves boot
-usable. Already-matching icons are left alone to avoid repeated OS alerts.
+The launcher icon follows [[appearance.app-icon-theme]]. The native boundary,
+`apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
+active and retries interruptions after foregrounding. Other native failures
+attempt the primary icon and are logged without blocking boot. Matching icons
+are left alone to avoid repeated OS alerts. `app.config.ts` bundles the PNGs in
+`apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
+every launcher alias.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
 empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps

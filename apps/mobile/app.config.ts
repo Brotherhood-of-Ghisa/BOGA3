@@ -1,5 +1,7 @@
 import { ExpoConfig } from 'expo/config';
 
+const APP_SCHEME = "boga3";
+
 const DEFAULT_BOGA_AGENT_CONNECT_URL =
     "https://sparkling-violet-dc56.sboschianpest.workers.dev/connect";
 
@@ -71,7 +73,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
     version: "2.1.0",
     orientation: "portrait",
     icon: "./assets/images/app-icons/warm.png",
-    scheme: "boga3",
+    scheme: APP_SCHEME,
     // Light-only by decision (2026-09-19). Dark mode is explicitly not a
     // product goal, and "automatic" is not free: it hands the OS-owned
     // chrome — Alert.alert dialogs, the keyboard, native pickers — a dark
@@ -96,7 +98,13 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     android: {
         package: resolveAndroidPackage(),
-        predictiveBackGestureEnabled: false
+        predictiveBackGestureEnabled: false,
+        // Alternate launcher aliases inherit explicit filters, not Expo's scheme filter.
+        intentFilters: [{
+            action: "VIEW",
+            category: ["BROWSABLE", "DEFAULT"],
+            data: { scheme: APP_SCHEME },
+        }]
     },
 
     web: {
