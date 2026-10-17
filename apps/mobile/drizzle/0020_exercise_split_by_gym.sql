@@ -1,0 +1,1 @@
+ALTER TABLE `exercise_definitions` ADD `split_by_gym` integer DEFAULT false NOT NULL;

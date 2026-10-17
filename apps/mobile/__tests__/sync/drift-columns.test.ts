@@ -118,8 +118,10 @@ describe('sync drift column rules', () => {
     expect(isTypeCompatible('real', 'float8', 'gyms', 'n')).toBe(true);
     expect(isTypeCompatible('real', 'numeric', 'gyms', 'n')).toBe(true);
     expect(isTypeCompatible('integer', 'bool', 'user_settings', 'bodyweight_calculations_enabled')).toBe(true);
+    expect(isTypeCompatible('integer', 'bool', 'exercise_definitions', 'split_by_gym')).toBe(true);
     expect(isTypeCompatible('integer', 'bool', 'user_settings', 'other_flag')).toBe(false);
     expect(isTypeCompatible('integer', 'bool', 'gyms', 'bodyweight_calculations_enabled')).toBe(false);
+    expect(isTypeCompatible('integer', 'bool', 'gyms', 'split_by_gym')).toBe(false);
     expect(isTypeCompatible('text', 'uuid', 'gyms', 'id')).toBe(false);
     expect(isTypeCompatible('real', 'int8', 'gyms', 'n')).toBe(false);
   });

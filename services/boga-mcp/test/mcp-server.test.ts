@@ -57,7 +57,7 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'working_sets_v5',
+    metric_revision: 'working_sets_v6',
     recent_performances: [{
       session_body_weight: { status: 'known', value: 80, unit: 'kg', measured_at: '2026-09-01T10:00:00Z' },
       volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
@@ -67,17 +67,17 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    metric_revision: 'working_sets_v5',
+    metric_revision: 'working_sets_v6',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/history': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'working_sets_v5',
+    metric_revision: 'working_sets_v6',
     next_cursor: null,
     sets: [{ id: 'set-1', reps: 8, load: { value: 100, unit: 'kg' } }],
   },
   '/functions/v1/agent-api/v1/agent/workouts/workout-a': {
-    metric_revision: 'working_sets_v5',
+    metric_revision: 'working_sets_v6',
     workout: {
       id: 'workout-a',
       exercises: [{ id: 'block-1', name: 'Bench Press' }],
@@ -341,6 +341,30 @@ describe('BoGa MCP server', () => {
     );
     expect(called).toContain(
       'POST /functions/v1/agent-api/v1/agent/programmes',
+    );
+  });
+
+  it('forwards the gym bucket of a split exercise to both exercise routes', async () => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+
+    await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', gym_bucket: 'gym-a' },
+      name: 'get_exercise_context',
+    });
+    await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', gym_bucket: 'none' },
+      name: 'get_exercise_history',
+    });
+
+    const called = running.requests.slice(before)
+      .map((r) => `${r.method} ${r.url.pathname}${r.url.search}`);
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/context?gym_bucket=gym-a',
+    );
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/history?gym_bucket=none',
     );
   });
 

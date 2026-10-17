@@ -312,6 +312,7 @@ describe('session planning graph round-trips through the sync cycle and survives
           name: 'Bench Press',
           load_input_mode: 'total_load',
           bodyweight_contribution: 0,
+          split_by_gym: false,
           created_at: stamp,
           updated_at: stamp,
         },

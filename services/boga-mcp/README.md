@@ -43,11 +43,16 @@ Two create-only planning tools (require explicit plan permission, idempotent):
 - `create_session_plan` — create one authored session plan with pending blocks.
 - `create_training_programme` — create a multi-session programme with pending blocks.
 
+`get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`
+for an exercise the user tracks separately per gym: a gym id, or `none` for the
+sessions with no gym. Without it they report that exercise's most recently
+performed bucket, never a pooled figure.
+
 Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v5"` pass through
+Training projections with `metric_revision: "working_sets_v6"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a set that is not a working set ([[set.eligibility]]) is listed with its own per-set figures but feeds no record,

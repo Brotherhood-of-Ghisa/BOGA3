@@ -41,6 +41,16 @@ export const WIRE_ENVELOPE_COLUMNS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The synced booleans the client stores as a SQLite integer against a server
+ * `boolean`. Listed one by one, so a new integer column cannot silently pair
+ * with a server bool.
+ */
+const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
+  'user_settings.bodyweight_calculations_enabled',
+  'exercise_definitions.split_by_gym',
+]);
+
+/**
  * sqliteType is what `pragma table_info.type` reports for a Drizzle column
  * (`text`, `integer`, `real`). udtName is what `information_schema.udt_name`
  * reports for the server column (`text`, `int4`, `int8`, `float8`, `numeric`,
@@ -49,7 +59,8 @@ export const WIRE_ENVELOPE_COLUMNS: ReadonlySet<string> = new Set([
  * Returns true if the pair is acceptable per this narrow map. The
  * timestamp_ms discriminator on the client is reflected as `integer` by the SQLite catalog; bigint on the
  * server is `int8`. The narrow map accepts client `integer` against either
- * `int4` or `int8`, plus the one synced SQLite boolean stored as integer.
+ * `int4` or `int8`, plus the synced SQLite booleans stored as integer
+ * (SQLITE_BOOLEAN_COLUMNS).
  * Default-expression equality is NOT compared.
  */
 export function isTypeCompatible(sqliteType: string, udtName: string, entity: string, wireName: string): boolean {
@@ -57,8 +68,8 @@ export function isTypeCompatible(sqliteType: string, udtName: string, entity: st
   const s = udtName.toLowerCase();
   if (c === 'text' && s === 'text') return true;
   if (c === 'integer' && (s === 'int4' || s === 'int8')) return true;
-  if (c === 'integer' && s === 'bool' && entity === 'user_settings'
-    && wireName === 'bodyweight_calculations_enabled') return true;
+  if (c === 'integer' && s === 'bool'
+    && SQLITE_BOOLEAN_COLUMNS.has(`${entity}.${wireName}`)) return true;
   if (c === 'real' && (s === 'float8' || s === 'numeric')) return true;
   return false;
 }
@@ -95,7 +106,8 @@ export function diffEntityColumns(
           kind: 'type_mismatch',
           message:
             `${entity}.${wireName}: type mismatch — client ${col.type} vs server ${serverCol.udt_name} (udt). ` +
-            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; user_settings.bodyweight_calculations_enabled integer↔bool (see isTypeCompatible).`,
+            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; ` +
+            `${[...SQLITE_BOOLEAN_COLUMNS].join(' and ')} integer↔bool (see isTypeCompatible).`,
         });
       }
       continue;

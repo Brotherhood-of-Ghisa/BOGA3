@@ -144,19 +144,20 @@ check 'unmapped start uses the exact location fallback' '.projection.heading=="S
 run_psql "insert into app_public.gyms(owner_user_id,id,name,created_at,updated_at,client_updated_at_ms) values
   ('${B_UID}','notification-gym-${RUN_TAG}','Main Gym',1,1,1),
   ('${C_UID}','notification-gym-${RUN_TAG}','Hidden foreign gym',1,1,1);
+  set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}';
   update app_public.sessions set gym_id='notification-gym-${RUN_TAG}' where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'mapped start projection'
 check 'workout gym is owner-matched and distinct from group identity' '.heading=="Started a workout at Main Gym" and .identity=="Lifter · Notification contract"'
-run_psql "update app_public.gyms set name=E' \\t\\n ' where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.gyms set name=E' \\t\\n ' where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'blank gym projection'
 check 'blank owner gym cannot expose another owners matching gym' '.heading=="Started a workout at a secret location"'
-run_psql "update app_public.gyms set name=repeat('💪',101) where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.gyms set name=repeat('💪',101) where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'bounded gym projection'
 check 'gym preview is bounded to one hundred Unicode code points' '.heading==("Started a workout at "+("💪"*100))'
-run_psql "update app_public.gyms set name='Main Gym',deleted_at=1 where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.gyms set name='Main Gym',deleted_at=1 where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${START_INTENT}}"; expect_ok 'deleted gym projection'
 check 'deleted owner gym uses the exact fallback' '.heading=="Started a workout at a secret location"'
-run_psql "update app_public.gyms set deleted_at=null where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
+run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.gyms set deleted_at=null where owner_user_id='${B_UID}' and id='notification-gym-${RUN_TAG}';" >/dev/null
 run_psql "set request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}'; update app_public.sessions set status='completed',completed_at=started_at+60000 where owner_user_id='${B_UID}' and id='notification-${RUN_TAG}';" >/dev/null
 enqueue completion
 COMPLETION="${BODY}"

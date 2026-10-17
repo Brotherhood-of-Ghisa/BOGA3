@@ -278,10 +278,10 @@ run_psql_sql "
   insert into app_public.gyms (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms, server_received_at)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-gym-1', 'Gym 1',
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:00.000+00');
-  insert into app_public.exercise_definitions (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms, server_received_at)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-1', 'Bench',
+  insert into app_public.exercise_definitions (owner_user_id, id, name, split_by_gym, created_at, updated_at, client_updated_at_ms, server_received_at)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-1', 'Bench', false,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:01.000+00'),
-           ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-2', 'Squat',
+           ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-2', 'Squat', true,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:02.000+00');
 " >/dev/null
 
@@ -301,6 +301,10 @@ assert_jq '.entities[-1].type == "exercise_definitions" and .entities[-1].id == 
 # next_cursor is the sort key of the last emitted row.
 assert_jq '.next_cursor | type == "object" and has("server_received_at") and has("owner_user_id") and has("type") and has("id")' "scenario 1 next_cursor shape"
 assert_jq '.next_cursor.type == "exercise_definitions" and .next_cursor.id == "pull-'"${RUN_TAG}"'-ed-2"' "scenario 1 next_cursor points at last row"
+# Every typed column is projected, the gym-split flag included, with its stored
+# value — a column the projection forgets cannot round-trip.
+assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-1")][0].fields.split_by_gym == false' "scenario 1 projects split_by_gym false"
+assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-2")][0].fields.split_by_gym == true' "scenario 1 projects split_by_gym true"
 
 # Also exercise the cursor=null snapshot path: the initial pull of this layer
 # must include all three seeded rows (count scoped to our run tag so unrelated

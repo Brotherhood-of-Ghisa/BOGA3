@@ -90,7 +90,7 @@ const exerciseEntity = (id: string, name: string, ms: number): WireEntity => ({
   id,
   client_updated_at_ms: ms,
   fields: { name, load_input_mode: 'total_load', bodyweight_contribution: 0,
-    created_at: ms - 10, updated_at: ms, deleted_at: null },
+    split_by_gym: false, created_at: ms - 10, updated_at: ms, deleted_at: null },
 });
 
 const markBootstrapDone = (): void => {

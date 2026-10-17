@@ -7,6 +7,10 @@ import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
 import {
+  defaultGymBucket, gymBucketFromParam, rankGymBuckets,
+  type GymBucket, type GymBucketRank,
+} from './gym-buckets.ts';
+import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
 } from './training-metrics.ts';
@@ -64,6 +68,7 @@ type ExerciseDefinitionRow = ExerciseLoadRow & {
   id: string;
   load_input_mode: string;
   name: string;
+  split_by_gym: boolean;
 };
 
 type MappingRow = {
@@ -98,7 +103,7 @@ type SessionRow = SessionWeightRow & {
 
 type SetRow = EnteredSetRow & { session_exercise_id: string };
 
-const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution';
+const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution,split_by_gym';
 const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec';
 
 class ApiError extends Error {
@@ -930,6 +935,22 @@ const loadAllSetsForBlocks = async (
   return rows;
 };
 
+const loadGymNames = async (
+  client: SupabaseClient, userId: string, gymIds: string[],
+): Promise<Map<string, string>> => {
+  if (gymIds.length === 0) return new Map();
+  const { data, error } = await client
+    .schema('app_public')
+    .from('gyms')
+    .select('id,name')
+    .eq('owner_user_id', userId)
+    .in('id', gymIds)
+    .limit(50)
+    .returns<Array<{ id: string; name: string }>>();
+  throwDatabaseError(error);
+  return new Map((data ?? []).map((row) => [row.id, row.name]));
+};
+
 const loadDefinitionsById = async (
   client: SupabaseClient, userId: string, exerciseIds: string[],
 ): Promise<Map<string, ExerciseDefinitionRow>> => {
@@ -944,6 +965,42 @@ const loadDefinitionsById = async (
   return new Map(rows.map(row => [row.id, row]));
 };
 
+/** The requested bucket, or undefined when the caller named none. */
+const parseGymBucket = (
+  url: URL, definition: ExerciseDefinitionRow,
+): GymBucket | undefined => {
+  const bucket = gymBucketFromParam(
+    parseOptionalText(url.searchParams.get('gym_bucket'), 200, 'gym_bucket'),
+  );
+  if (bucket !== undefined && !definition.split_by_gym) {
+    throw new ApiError(
+      400,
+      'INVALID_ARGUMENT',
+      'gym_bucket applies only to an exercise tracked separately per gym.',
+    );
+  }
+  return bucket;
+};
+
+/** The split fields on a split exercise: the reported bucket and every bucket. */
+const gymBucketFields = async (
+  client: SupabaseClient, userId: string, selected: GymBucket, ranked: GymBucketRank[],
+): Promise<JsonObject> => {
+  const names = await loadGymNames(
+    client, userId, uniqueStrings([selected, ...ranked.map((entry) => entry.bucket)], 50),
+  );
+  // A null gym is the `No gym` bucket, not an unknown one.
+  const gymField = (bucket: GymBucket) =>
+    bucket === null ? null : { id: bucket, name: names.get(bucket) ?? null };
+  return {
+    gym: gymField(selected),
+    gym_buckets: ranked.map((entry) => ({
+      gym: gymField(entry.bucket),
+      last_performed_at: toIsoTimestamp(entry.lastPerformedAt),
+    })),
+  };
+};
+
 const getExerciseContext = async (
   client: SupabaseClient,
   userId: string,
@@ -951,7 +1008,7 @@ const getExerciseContext = async (
   url: URL,
   bodyweightCalculationsEnabled: boolean,
 ): Promise<JsonObject> => {
-  rejectUnexpectedQuery(url, new Set(['recent_sessions']));
+  rejectUnexpectedQuery(url, new Set(['recent_sessions', 'gym_bucket']));
   if (exerciseId.length === 0 || exerciseId.length > 200) {
     throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
   }
@@ -975,6 +1032,7 @@ const getExerciseContext = async (
   if (!definition) {
     throw new ApiError(404, 'NOT_FOUND', 'Exercise not found.');
   }
+  const requestedBucket = parseGymBucket(url, definition);
 
   const { data: blocks, error: blockError } = await client
     .schema('app_public')
@@ -1033,10 +1091,24 @@ const getExerciseContext = async (
     // A session with only warm-ups for this exercise has no stat footprint.
     .filter(row => row.workingSetCount > 0);
 
+  // A split exercise is never pooled: every figure below comes from one bucket.
+  const rankedBuckets = definition.split_by_gym
+    ? rankGymBuckets(performanceRows.map((row) => row.session))
+    : [];
+  const selectedBucket = definition.split_by_gym
+    ? (requestedBucket === undefined ? defaultGymBucket(rankedBuckets) : requestedBucket)
+    : undefined;
+  const bucketRows = selectedBucket === undefined
+    ? performanceRows
+    : performanceRows.filter((row) => row.session.gym_id === selectedBucket);
+  const splitFields = selectedBucket === undefined
+    ? {}
+    : await gymBucketFields(client, userId, selectedBucket, rankedBuckets);
+
   // The app's record book (`records.ts`): ties keep the earliest session and a
   // zero is never a record. A bounded history has no complete volume record.
   const records = createRecordBook();
-  for (const row of [...performanceRows].sort((left, right) =>
+  for (const row of [...bucketRows].sort((left, right) =>
     left.session.completed_at - right.session.completed_at || left.session.id.localeCompare(right.session.id))) {
     const total = row.volumeCoverage.totalVolumeKgReps;
     records.add({
@@ -1057,8 +1129,10 @@ const getExerciseContext = async (
       ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
       muscles: mappings.get(exerciseId) ?? [],
       equipment: equipmentByExercise.get(exerciseId) ?? [],
+      split_by_gym: definition.split_by_gym,
+      ...splitFields,
     },
-    recent_performances: performanceRows.slice(0, recentSessions).map((row) => ({
+    recent_performances: bucketRows.slice(0, recentSessions).map((row) => ({
       session_id: row.session.id,
       started_at: toIsoTimestamp(row.session.started_at),
       completed_at: toIsoTimestamp(row.session.completed_at),
@@ -1080,14 +1154,14 @@ const getExerciseContext = async (
         ? null
         : { value: maxSessionVolume, unit: 'kg_reps' },
       history_truncated: historyIncomplete,
-      excluded_incomplete_volume_sessions: performanceRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
+      excluded_incomplete_volume_sessions: bucketRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
     },
-    volume_series: performanceRows.slice(0, 12).reverse().map((row) => ({
+    volume_series: bucketRows.slice(0, 12).reverse().map((row) => ({
       completed_at: toIsoTimestamp(row.session.completed_at),
       ...volumePayload(row.volumeCoverage, historyIncomplete),
     })),
-    last_performed_at: performanceRows.length > 0
-      ? toIsoTimestamp(performanceRows[0].session.completed_at)
+    last_performed_at: bucketRows.length > 0
+      ? toIsoTimestamp(bucketRows[0].session.completed_at)
       : null,
     training_notes: [],
     unavailable_fields: ['failed_set_semantics', 'user_authored_training_notes'],
@@ -1161,19 +1235,7 @@ const getRecentWorkouts = async (
     loadDefinitionsById(client, userId, (blocks ?? []).flatMap(row => row.exercise_definition_id ? [row.exercise_definition_id] : [])),
   ]);
 
-  const gymIds = uniqueStrings(page.map((row) => row.gym_id), 50);
-  const { data: gyms, error: gymError } = gymIds.length === 0
-    ? { data: [] as Array<{ id: string; name: string }>, error: null }
-    : await client
-      .schema('app_public')
-      .from('gyms')
-      .select('id,name')
-      .eq('owner_user_id', userId)
-      .in('id', gymIds)
-      .limit(50)
-      .returns<Array<{ id: string; name: string }>>();
-  throwDatabaseError(gymError);
-  const gymById = new Map((gyms ?? []).map((row) => [row.id, row.name]));
+  const gymById = await loadGymNames(client, userId, uniqueStrings(page.map((row) => row.gym_id), 50));
 
   const blocksBySession = new Map<string, SessionExerciseRow[]>();
   for (const block of blocks ?? []) {
@@ -1243,7 +1305,7 @@ const getExerciseHistory = async (
   url: URL,
   bodyweightCalculationsEnabled: boolean,
 ): Promise<JsonObject> => {
-  rejectUnexpectedQuery(url, new Set(['limit', 'cursor']));
+  rejectUnexpectedQuery(url, new Set(['limit', 'cursor', 'gym_bucket']));
   if (exerciseId.length === 0 || exerciseId.length > 200) {
     throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
   }
@@ -1268,6 +1330,19 @@ const getExerciseHistory = async (
   if (!definition) {
     throw new ApiError(404, 'NOT_FOUND', 'Exercise not found.');
   }
+  const requestedBucket = parseGymBucket(url, definition);
+  const reportedBucket = (ranked: GymBucketRank[]): GymBucket =>
+    requestedBucket === undefined ? defaultGymBucket(ranked) : requestedBucket;
+  // The exercise descriptor, carrying the reported bucket of a split exercise.
+  const exerciseField = async (ranked: GymBucketRank[]): Promise<JsonObject> => ({
+    id: definition.id,
+    name: definition.name,
+    ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
+    split_by_gym: definition.split_by_gym,
+    ...(definition.split_by_gym
+      ? await gymBucketFields(client, userId, reportedBucket(ranked), ranked)
+      : {}),
+  });
 
   // Load all non-deleted session_exercises for this exercise definition
   const { data: blocks, error: blockError } = await client
@@ -1285,11 +1360,7 @@ const getExerciseHistory = async (
   if (allBlocks.length === 0) {
     return {
       metric_revision: METRIC_REVISION,
-      exercise: {
-        id: definition.id,
-        name: definition.name,
-        ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
-      },
+      exercise: await exerciseField([]),
       sets: [],
       next_cursor: null,
     };
@@ -1315,11 +1386,7 @@ const getExerciseHistory = async (
   if (completedSessions.length === 0) {
     return {
       metric_revision: METRIC_REVISION,
-      exercise: {
-        id: definition.id,
-        name: definition.name,
-        ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
-      },
+      exercise: await exerciseField([]),
       sets: [],
       next_cursor: null,
     };
@@ -1349,7 +1416,17 @@ const getExerciseHistory = async (
     allItems.push({ set, block, session });
   }
 
-  allItems.sort((a, b) => {
+  // A split exercise is never pooled: page one bucket, so a drained cursor
+  // returns that bucket's history and nothing else.
+  const rankedBuckets = definition.split_by_gym
+    ? rankGymBuckets(allItems.map((item) => item.session))
+    : [];
+  const pagedBucket = reportedBucket(rankedBuckets);
+  const bucketItems = definition.split_by_gym
+    ? allItems.filter((item) => item.session.gym_id === pagedBucket)
+    : allItems;
+
+  bucketItems.sort((a, b) => {
     if (a.session.completed_at !== b.session.completed_at) {
       return b.session.completed_at - a.session.completed_at;
     }
@@ -1364,7 +1441,7 @@ const getExerciseHistory = async (
     return a.set.id.localeCompare(b.set.id);
   });
 
-  let filteredItems = allItems;
+  let filteredItems = bucketItems;
   if (cursor) {
     if (
       typeof cursor.session_completed_at !== 'number' ||
@@ -1376,7 +1453,7 @@ const getExerciseHistory = async (
     ) {
       throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
     }
-    filteredItems = allItems.filter((item) => {
+    filteredItems = bucketItems.filter((item) => {
       if (item.session.completed_at < cursor.session_completed_at) return true;
       if (item.session.completed_at > cursor.session_completed_at) return false;
       const cmpS = item.session.id.localeCompare(cursor.session_id);
@@ -1426,11 +1503,7 @@ const getExerciseHistory = async (
   const lastItem = pageItems[pageItems.length - 1];
   return {
     metric_revision: METRIC_REVISION,
-    exercise: {
-      id: definition.id,
-      name: definition.name,
-      ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
-    },
+    exercise: await exerciseField(rankedBuckets),
     sets: projectedSets,
     next_cursor: hasMore && lastItem
       ? encodeCursor({
@@ -2063,19 +2136,7 @@ const getUpcomingSessionPlans = async (
     }
   }
 
-  const gymIds = uniqueStrings(page.map((row) => row.gym_id), 50);
-  const { data: gyms, error: gymError } = gymIds.length === 0
-    ? { data: [] as Array<{ id: string; name: string }>, error: null }
-    : await client
-      .schema('app_public')
-      .from('gyms')
-      .select('id,name')
-      .eq('owner_user_id', agent.userId)
-      .in('id', gymIds)
-      .limit(50)
-      .returns<Array<{ id: string; name: string }>>();
-  throwDatabaseError(gymError);
-  const gymById = new Map((gyms ?? []).map((row) => [row.id, row.name]));
+  const gymById = await loadGymNames(client, agent.userId, uniqueStrings(page.map((row) => row.gym_id), 50));
 
   const blocksByPlan = new Map<string, PlanBlockRow[]>();
   for (const block of blocks) {
