@@ -10,6 +10,7 @@ import {
 
 export const REST_TIMER_STEP_SEC = 15;
 export const REPEATING_TIMER_STEP_SEC = 15;
+export const REPEATING_TIMER_PREPARATION_SEC = 15;
 
 export type TimerMode = 'rest' | 'repeating';
 
@@ -43,7 +44,7 @@ export type RestTimerModeView = {
 
 export type RepeatingTimerModeView = {
   mode: 'repeating';
-  status: 'running' | 'paused';
+  status: 'preparing' | 'running' | 'paused';
   sessionId: string;
   round: number;
   remainingSec: number;
@@ -61,9 +62,11 @@ const IDLE_REST_TIMER_VIEW: RestTimerView = { status: 'idle' };
 
 let activeEntry: WorkoutTimerEntry | null = null;
 let lastSignaledRound: number | null = null;
+let roundBoundaryTimeout: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 const emit = () => {
+  scheduleRoundBoundaryCue();
   for (const listener of listeners) {
     listener();
   }
@@ -102,18 +105,20 @@ export const deriveRepeatingTimerView = (
   nowMs: number = Date.now(),
 ): RepeatingTimerModeView => {
   const isPaused = entry.pausedAtMs !== null;
-  const elapsedMs = isPaused
+  const totalElapsedMs = isPaused
     ? entry.accumulatedMs
     : Math.max(0, nowMs - entry.startedAtMs + entry.accumulatedMs);
+  const elapsedMs = totalElapsedMs - REPEATING_TIMER_PREPARATION_SEC * 1000;
+  const isPreparing = elapsedMs < 0;
   const intervalMs = Math.max(1, entry.intervalSec) * 1000;
-  const round = Math.floor(elapsedMs / intervalMs) + 1;
+  const round = isPreparing ? 0 : Math.floor(elapsedMs / intervalMs) + 1;
   const roundElapsedMs = elapsedMs % intervalMs;
-  const remainingMs = intervalMs - roundElapsedMs;
+  const remainingMs = isPreparing ? -elapsedMs : intervalMs - roundElapsedMs;
   const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
 
   return {
     mode: 'repeating',
-    status: isPaused ? 'paused' : 'running',
+    status: isPaused ? 'paused' : isPreparing ? 'preparing' : 'running',
     sessionId,
     round,
     remainingSec,
@@ -122,6 +127,24 @@ export const deriveRepeatingTimerView = (
     isPaused,
   };
 };
+
+// The store owns cues so navigating away from a timer view cannot silence them.
+function scheduleRoundBoundaryCue(): void {
+  if (roundBoundaryTimeout !== null) clearTimeout(roundBoundaryTimeout);
+  roundBoundaryTimeout = null;
+  if (!activeEntry || activeEntry.mode !== 'repeating' || activeEntry.pausedAtMs !== null) return;
+
+  const elapsedMs = Math.max(0, Date.now() - activeEntry.startedAtMs + activeEntry.accumulatedMs)
+    - REPEATING_TIMER_PREPARATION_SEC * 1000;
+  const intervalMs = activeEntry.intervalSec * 1000;
+  const remainingMs = elapsedMs < 0 ? -elapsedMs : intervalMs - elapsedMs % intervalMs;
+  roundBoundaryTimeout = setTimeout(() => {
+    if (activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null) {
+      checkAndTriggerRoundBoundary(deriveRepeatingTimerView(activeEntry, activeEntry.sessionId).round);
+    }
+    scheduleRoundBoundaryCue();
+  }, remainingMs);
+}
 
 export const deriveRestTimerView = (
   entry: WorkoutTimerEntry | null,
@@ -250,7 +273,7 @@ export const startRepeatingTimer = (
     pausedAtMs: null,
     intervalSec: clampedInterval,
   };
-  lastSignaledRound = 1;
+  lastSignaledRound = 0;
   emit();
 };
 
@@ -304,7 +327,7 @@ export const resetRepeatingTimer = (
     accumulatedMs: 0,
     pausedAtMs: isPaused ? nowMs : null,
   };
-  lastSignaledRound = 1;
+  lastSignaledRound = 0;
   emit();
 };
 
@@ -325,6 +348,7 @@ export const adjustRepeatingTimer = (
     MIN_REPEATING_TIMER_INTERVAL_SECONDS,
     Math.min(MAX_REPEATING_TIMER_INTERVAL_SECONDS, activeEntry.intervalSec + Math.round(deltaSec)),
   );
+  if (nextInterval === activeEntry.intervalSec) return;
   const isPaused = activeEntry.pausedAtMs !== null;
   activeEntry = {
     ...activeEntry,
@@ -333,7 +357,7 @@ export const adjustRepeatingTimer = (
     accumulatedMs: 0,
     pausedAtMs: isPaused ? nowMs : null,
   };
-  lastSignaledRound = 1;
+  lastSignaledRound = 0;
   emit();
 };
 
@@ -369,6 +393,7 @@ export const dismissRestTimer = (sessionId?: string): void => {
 export const __resetRestTimerForTests = (): void => {
   activeEntry = null;
   lastSignaledRound = null;
+  scheduleRoundBoundaryCue();
   listeners.clear();
 };
 
@@ -416,7 +441,7 @@ export function useSessionRestTimer(
   }
 
   const isRunningForSession =
-    view.status === 'running' &&
+    (view.status === 'running' || view.status === 'preparing') &&
     entry !== null &&
     entry.sessionId === sessionId &&
     (entry.mode === 'rest' || entry.pausedAtMs === null);
@@ -429,15 +454,6 @@ export function useSessionRestTimer(
       const nextRemaining = nextView.status === 'idle' ? -1 : nextView.remainingSec;
       const nextRound =
         nextView.status !== 'idle' && nextView.mode === 'repeating' ? nextView.round : -1;
-
-      if (
-        currentEntry &&
-        currentEntry.sessionId === sessionId &&
-        currentEntry.mode === 'repeating' &&
-        currentEntry.pausedAtMs === null
-      ) {
-        checkAndTriggerRoundBoundary(nextRound);
-      }
 
       setObserved((prev) => {
         if (
