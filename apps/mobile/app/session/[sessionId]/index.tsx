@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
+import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import type { Session } from '@/components/session-recorder/types';
 import {
   SessionExerciseCard,
@@ -21,7 +22,9 @@ import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from 
 import { mainTabHref } from '@/src/navigation/main-tabs';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
 import { findNearbyGym } from '@/src/location/gym-location-reads';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { activeGymOptions, listGymDirectory, type SessionGymOption } from '@/src/session-recorder/gym-options';
+import { useSessionRestTimer } from '@/src/session-recorder/rest-timer';
 import {
   abandonActiveSession,
   completeActiveSession,
@@ -46,6 +49,9 @@ const TRAIN_ROUTE = mainTabHref('train');
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
+
+const isActiveSessionReady = (state: { status: string; data?: { status: string } }): boolean =>
+  state.status === 'ready' && state.data?.status !== 'completed';
 
 // Resolves true when the user confirms. Dismissing the alert (Android back,
 // tapping outside) is a cancel.
@@ -128,6 +134,12 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
+  const { values: trainingPreferences } = useAccountLocalPreferenceState();
+  const restTimer = useSessionRestTimer(sessionId, {
+    defaultDurationSec: trainingPreferences.restTimerDurationSec,
+    autoStart: trainingPreferences.restTimerAutoStart,
+    isActiveSession: isActiveSessionReady(state),
+  });
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [gymPicker, setGymPicker] = useState<GymPickerState>(CLOSED_GYM_PICKER);
   // Bumped on every open and close, so a lookup that resolves after the sheet
@@ -398,11 +410,19 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
             startedAt={state.data.startedAt}
             onFinish={() => void finish()}
             onOpenOptions={() => setIsOptionsVisible(true)}
+            onToggleRestTimer={restTimer.toggleForSession}
+            restTimerActive={restTimer.isActive}
           />
         )
       ) : (
         <View style={[styles.statusSpacer, { paddingTop: insets.top }]} />
       )}
+      <RestTimerBar
+        onAdjust={restTimer.adjust}
+        onDismiss={restTimer.dismiss}
+        onRestart={restTimer.restart}
+        view={restTimer.view}
+      />
       {body}
       {/* A completed session is history, which lives under Progress. */}
       {/* Train while this workout is in progress is this screen: nothing to open. */}

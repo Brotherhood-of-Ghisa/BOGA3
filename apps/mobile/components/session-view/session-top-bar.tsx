@@ -17,6 +17,9 @@ type SessionTopBarProps =
       now?: () => Date;
       onOpenOptions: () => void;
       onFinish: () => void;
+      // Starts or dismisses the active session's rest timer.
+      onToggleRestTimer?: () => void;
+      restTimerActive?: boolean;
       // While a Finish is being written, so a second tap cannot start another.
       finishDisabled?: boolean;
     }
@@ -83,6 +86,15 @@ export function SessionTopBar(props: SessionTopBarProps) {
           {copy.title}
         </Text>
       )}
+      {props.mode === 'active' && props.onToggleRestTimer ? (
+        <IconButton
+          accessibilityLabel={props.restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
+          hitSlop={uiSpace.xs}
+          name="timer"
+          onPress={props.onToggleRestTimer}
+          testID="session-view-rest-timer-button"
+        />
+      ) : null}
       {props.mode === 'active' ? (
         <IconButton
           accessibilityLabel="Session options"

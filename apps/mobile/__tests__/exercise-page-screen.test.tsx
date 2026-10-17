@@ -917,6 +917,57 @@ describe('ExercisePageScreen', () => {
       'No completed sessions for this gym yet.'
     );
   });
+
+  it('auto-starts the rest timer on set confirmation, supports -15s/+15s/Restart/Dismiss and manual toggle, and suppresses it when auto-start is off or on completed edits', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    await openPage();
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    expect(screen.getByTestId('exercise-page-rest-timer-button')).toBeTruthy();
+
+    // Confirming set 3 via the logger tick auto-starts the rest timer at the 90s default (1:30).
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+
+    // Adjust -15s and +15s, then Restart and Dismiss.
+    fireEvent.press(screen.getByTestId('rest-timer-minus-15'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:15');
+    fireEvent.press(screen.getByTestId('rest-timer-plus-15'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+    fireEvent.press(screen.getByTestId('rest-timer-minus-15'));
+    fireEvent.press(screen.getByTestId('rest-timer-restart'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+    fireEvent.press(screen.getByTestId('rest-timer-dismiss'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Toggling an already-performed set back to unperformed does NOT start the timer,
+    // while toggling a planned set (set 4) to performed DOES auto-start it.
+    fireEvent.press(screen.getByTestId('exercise-set-1-toggle'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-set-4-toggle'));
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+
+    // Top-bar timer button toggles the timer off and back on with the configured duration.
+    act(() => updatePreferences({ restTimerDurationSec: 120, restTimerAutoStart: false }));
+    fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // With auto-start off, confirming set 5 does not start the timer, but manual toggle starts it at 2:00.
+    fireEvent.press(screen.getByTestId('exercise-set-5-toggle'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
+    expect(await screen.findByTestId('rest-timer-countdown')).toHaveTextContent('2:00');
+
+    // Completed-session edit hides both the top-bar timer button and the timer bar.
+    act(() => updatePreferences({ restTimerDurationSec: 90, restTimerAutoStart: true }));
+    screen.unmount();
+    render(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
+    await screen.findByTestId('exercise-page');
+    expect(screen.queryByTestId('exercise-page-rest-timer-button')).toBeNull();
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+  });
 });
 
 describe('exercise page route', () => {

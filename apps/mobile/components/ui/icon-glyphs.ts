@@ -99,6 +99,8 @@ export const ICON_GLYPHS = {
     path('M3 6h18'),
     path('M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'),
   ],
+  // Lucide `timer`: the active-session rest timer.
+  timer: [path('M10 2h4'), path('M12 14v-4'), circle(12, 14, 8)],
 
   // --- Choice and status ---
   // Lucide `wifi-off`: no connection; the data shown may be stale.

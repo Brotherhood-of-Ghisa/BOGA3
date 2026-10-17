@@ -90,6 +90,7 @@ import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-his
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 import * as insightsRepository from '@/src/session-insights/repository';
+import { getRestTimerEntry } from '@/src/session-recorder/rest-timer';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
 import { setAccountLocalPreferences } from '@/src/preferences/account-local';
 import {
@@ -684,6 +685,41 @@ describe('Session view', () => {
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));
     expect(await screen.findByLabelText(BENCH_LABEL)).toBeTruthy();
+  });
+
+  it('toggles and adjusts the rest timer on the active session view, shares state with the exercise page, and clears it on Abandon', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    await openSession();
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Start manually from the session view top-bar timer button.
+    fireEvent.press(screen.getByTestId('session-view-rest-timer-button'));
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+
+    // Adjust +15s and -15s on the session view.
+    fireEvent.press(screen.getByTestId('rest-timer-plus-15'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:45');
+    fireEvent.press(screen.getByTestId('rest-timer-minus-15'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+
+    // Navigating to the exercise page sees the same active rest timer.
+    screen.unmount();
+    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+
+    // Returning to the session view and abandoning the session clears the timer.
+    screen.unmount();
+    render(<SessionViewScreen sessionId={SESSION} />);
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+
+    answerAlerts(() => 'Abandon');
+    fireEvent.press(screen.getByTestId('session-view-options-button'));
+    await act(async () => {
+      fireEvent.press(await screen.findByTestId('session-view-abandon'));
+    });
+    expect(getRestTimerEntry()).toBeNull();
   });
 });
 

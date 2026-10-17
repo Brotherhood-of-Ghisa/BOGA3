@@ -118,11 +118,18 @@ it.each(['progressBreakdown', 'progressMetric', 'progressExerciseMetric'] as con
     expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages[field]);
   });
 
-it('validates window limits, RIR zero and the last visible grade', () => {
+it('validates window limits, rest timer limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('targetWindowWeeks', 52)).toBe(true);
   expect(isPreferenceValue('targetWindowWeeks', 53)).toBe(false);
   expect(isPreferenceValue('historyLookbackWeeks', 520)).toBe(true);
   expect(isPreferenceValue('historyLookbackWeeks', 521)).toBe(false);
+  expect(isPreferenceValue('restTimerAutoStart', true)).toBe(true);
+  expect(isPreferenceValue('restTimerAutoStart', false)).toBe(true);
+  expect(isPreferenceValue('restTimerAutoStart', 'true')).toBe(false);
+  expect(isPreferenceValue('restTimerDurationSec', 15)).toBe(true);
+  expect(isPreferenceValue('restTimerDurationSec', 600)).toBe(true);
+  expect(isPreferenceValue('restTimerDurationSec', 14)).toBe(false);
+  expect(isPreferenceValue('restTimerDurationSec', 601)).toBe(false);
   expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
   // 1RM is the Exercise table's alone: the Muscle table's metric rejects it.
@@ -135,6 +142,24 @@ it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('displayEfforts', ['rir_0', 'technique'])).toBe(true);
   expect(isPreferenceValue('workingSetEfforts', [])).toBe(true);
   expect(isPreferenceValue('volumeEfforts', ['rir_12'])).toBe(false);
+});
+
+it('persists rest timer preferences per account and rejects out-of-range durations without writing', async () => {
+  await account();
+  expect(values().restTimerAutoStart).toBe(true);
+  expect(values().restTimerDurationSec).toBe(90);
+
+  setAccountLocalPreferences({ restTimerAutoStart: false, restTimerDurationSec: 120 });
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values().restTimerAutoStart).toBe(false);
+  expect(values().restTimerDurationSec).toBe(120);
+
+  const write = jest.spyOn(Storage, 'setItemSync');
+  setAccountLocalPreferences({ restTimerDurationSec: 10 });
+  expect(values().restTimerDurationSec).toBe(120);
+  expect(getAccountLocalPreferenceState().error).toMatch(/from 15 to 600/);
+  expect(write).not.toHaveBeenCalled();
 });
 
 it('persists the 520-week limit and rejects 521 without changing the saved value', async () => {

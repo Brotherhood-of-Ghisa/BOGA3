@@ -117,8 +117,10 @@ export const resetLocalData = (): void => {
   closeLocalData();
   const { __resetExerciseCatalogCacheForTests } = require('@/src/exercise-catalog/cache');
   const { __resetExerciseCatalogStatsCacheForTests } = require('@/src/exercise-catalog/stats-cache');
+  const { __resetRestTimerForTests } = require('@/src/session-recorder/rest-timer');
   __resetExerciseCatalogCacheForTests();
   __resetExerciseCatalogStatsCacheForTests();
+  __resetRestTimerForTests();
 };
 
 /** Closes the current database. Call from `afterEach`. */
