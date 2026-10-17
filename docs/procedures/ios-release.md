@@ -9,7 +9,7 @@ Other worktrees can continue development.
 
 ## Schedule without gates (operator reference)
 
-For the human terminal command, use
+For human one-time, daily and four-hour scheduling commands, use
 [Schedule an iOS build and submission](../runbook-scheduled-ios-release.md).
 This route requires an explicit choice to omit test lanes and the release sweep.
 It keeps app metadata unchanged and creates no Git tag.
@@ -29,11 +29,20 @@ the profile name alone does not select a database.
 
 ### Source and scheduling behavior
 
-`--at` accepts a future UTC timestamp ending in `Z`, or `now`. `--dry-run` prints
-the plan and resolves the locally known ref without creating a job or validating
-credentials/connectivity. Each real invocation creates one job; changing its
-time means cancelling it and scheduling another. The job cannot survive
-logout/reboot; keep the Mac logged in, lid open and signing keys accessible.
+`--at` accepts a future UTC timestamp ending in `Z`, or `now`. Without `--every`,
+it is required and schedules one run. `--every 24h` / `--every 4h` repeats at fixed
+UTC intervals, starting immediately unless `--at` chooses the first run. Runs are
+serial; after an overrun or late wake, the next interval is in the future. One
+checkout and slot serve the whole schedule. Each run has its own artifact directory; the
+parent's `latest-run.txt` points at the current run, and its log includes all runs.
+A failure stops repetition, preserving the failed run for inspection. Starting a
+new schedule after failure is a manual decision, especially after uncertain upload.
+
+`--dry-run` prints the plan and resolves the locally known ref without creating a
+job or validating credentials/connectivity. Each real invocation creates a new
+job; changing time/frequency means cancelling the old one and scheduling another.
+The job cannot survive logout/reboot; keep the Mac logged in, lid open and signing
+keys accessible.
 
 Default jobs pull `origin/main` with `--ff-only` at execution, then record the
 actual SHA. Other `--ref` values stay pinned when scheduled. Tracked files matching

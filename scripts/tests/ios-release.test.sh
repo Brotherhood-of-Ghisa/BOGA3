@@ -105,6 +105,7 @@ case "$*" in
   'eas-cli build '*)
     [[ "${FAIL_STAGE:-}" != build ]] || exit 9
     while [[ "$1" != --output ]]; do shift; done
+    if [[ -f "$FIXTURE/overrun" ]]; then echo 110 > "$FIXTURE/clock"; rm "$FIXTURE/overrun"; fi
     printf 'fake IPA\n' > "$2" ;;
   'eas-cli submit '*) [[ "${FAIL_STAGE:-}" != submission ]] || exit 10 ;;
   *) exit 99 ;;
@@ -255,6 +256,111 @@ if worker rewound origin/main; then fail 'rewound main accepted'; fi
 assert_absent 'boga worktree start|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'rewound main started release'
 git -C "$FIXTURE/repo" push -q origin HEAD:main
 
+# Advance a fake clock to prove serial repeats, missed-slot skipping and failure stops.
+cat > "$FIXTURE/bin/date" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == +%s && -f "$FIXTURE/clock" ]]; then cat "$FIXTURE/clock"; else exec /bin/date "$@"; fi
+EOF
+cat > "$FIXTURE/bin/sleep" <<'EOF'
+#!/usr/bin/env bash
+if [[ ! "$1" =~ ^[0-9]+$ || ! -f "$FIXTURE/clock" ]]; then exec /bin/sleep "$@"; fi
+if [[ -f "$FIXTURE/block-sleep" ]]; then
+  touch "$FIXTURE/sleep-entered"
+  exec /bin/sleep 60
+fi
+clock="$(cat "$FIXTURE/clock")"
+printf '%s\n' "$((clock + $1))" > "$FIXTURE/clock"
+count=0
+[[ ! -f "$FIXTURE/sleeps" ]] || count="$(cat "$FIXTURE/sleeps")"
+count=$((count + 1))
+printf '%s\n' "$count" > "$FIXTURE/sleeps"
+if (( count == 2 )); then echo dirty >> "$FIXTURE/repo/apps/mobile/release-input.txt"; fi
+EOF
+chmod +x "$FIXTURE/bin/date" "$FIXTURE/bin/sleep"
+recurring_job() {
+  mkdir "$FIXTURE/$1"
+  cp "$FIXTURE/repo/scripts/ios-release.sh" "$FIXTURE/$1/runner.sh"
+  printf 'release_root=%q\nsha=%q\nref=origin/main\nprofile=prod\nproject=abcdefghijklmnopqrst\nat_epoch=%s\nrepeat_seconds=1\n' \
+    "$FIXTURE/repo" "$sha" "$2" > "$FIXTURE/$1/job.env"
+}
+echo 100 > "$FIXTURE/clock"
+touch "$FIXTURE/overrun"
+rm "$success_file"
+git -C "$FIXTURE/repo" checkout -q --detach "$initial_sha"
+sha="$initial_sha"
+: > "$FIXTURE/calls"
+recurring_job recurring 100
+if repeat_seconds=999 bash "$FIXTURE/recurring/runner.sh" --run "$FIXTURE/recurring" > "$FIXTURE/recurring/log" 2>&1; then
+  fail 'recurring job continued after failed run'
+fi
+[[ "$(cat "$FIXTURE/recurring/status")" == 'stopped after failed run;'*'(exit 1)' ]] || fail 'recurring failure status missing'
+[[ "$(grep -c 'npx eas-cli build' "$FIXTURE/calls")" == 1 ]] || fail 'unchanged source rebuilt'
+[[ "$(grep -c 'npx eas-cli submit' "$FIXTURE/calls")" == 1 ]] || fail 'recurring submission count wrong'
+[[ ! -d "$FIXTURE/worktrees" ]] || fail 'recurring job created additional worktrees'
+node - "$FIXTURE/recurring" <<'JS'
+const fs = require('node:fs'), assert = require('node:assert/strict');
+const root = process.argv[2];
+const runs = fs.readdirSync(root + '/runs').map(name => root + '/runs/' + name);
+assert.equal(runs.length, 3);
+const statuses = runs.map(run => fs.readFileSync(run + '/status', 'utf8'));
+for (const stage of ['uploaded;', 'skipped;', 'source-update ']) {
+  assert.equal(statuses.filter(status => status.startsWith(stage)).length, 1, stage);
+}
+const starts = runs.map(run => Number(fs.readFileSync(run + '/job.env', 'utf8').match(/^at_epoch=(\d+)$/m)[1]));
+assert.deepEqual(starts.sort((a, b) => a - b), [100, 111, 112]);
+assert(runs.includes(fs.readFileSync(root + '/latest-run.txt', 'utf8').trim()));
+assert(runs.every(run => fs.existsSync(run + '/release.log')));
+JS
+assert_absent 'credential-must-not-leak' "$FIXTURE/recurring" 'recurring record leaked credentials'
+if bash "$FIXTURE/recurring/runner.sh" --run "$FIXTURE/recurring" >/dev/null 2>&1; then
+  fail 'recurring scheduler ran twice'
+fi
+git -C "$FIXTURE/repo" checkout -- apps/mobile/release-input.txt
+sha="$target_sha"
+
+# Cancel a waiting recurring group, including its child worker and sleep.
+touch "$FIXTURE/block-sleep"
+recurring_job cancelled-recurring 200
+node - "$FIXTURE" <<'JS'
+const fs = require('node:fs'), assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
+const { setTimeout: sleep } = require('node:timers/promises');
+const root = process.argv[2], record = root + '/cancelled-recurring';
+const log = fs.openSync(record + '/log', 'a');
+const child = spawn('/bin/bash', [record + '/runner.sh', '--run', record], { detached: true, stdio: ['ignore', log, log] });
+fs.closeSync(log);
+let finished = false;
+const exit = new Promise(resolve => child.once('exit', (code, signal) => { finished = true; resolve({code, signal}); }));
+(async () => {
+  try {
+    const deadline = Date.now() + 5000;
+    while (!fs.existsSync(root + '/sleep-entered') && Date.now() < deadline && !finished) await sleep(10);
+    assert(fs.existsSync(root + '/sleep-entered'), 'recurring worker did not wait');
+    process.kill(-child.pid, 'SIGTERM');
+    const result = await Promise.race([exit, sleep(5000, undefined, { ref: false }).then(() => { throw new Error('cancellation timed out'); })]);
+    assert.equal(result.code, 143);
+    assert(fs.readFileSync(record + '/status', 'utf8').includes('exit 143'));
+    assert.equal(fs.readdirSync(record + '/runs').length, 1);
+  } finally {
+    if (!finished) process.kill(-child.pid, 'SIGKILL');
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });
+JS
+rm "$FIXTURE/clock" "$FIXTURE/block-sleep"
+
+for every in 4h 24h; do
+  "$FIXTURE/repo/scripts/ios-release.sh" --every "$every" --profile prod \
+    --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run > "$FIXTURE/plan-$every"
+  [[ "$(cat "$FIXTURE/plan-$every")" == *"Repeats every $every"*'No job created.'* ]] || fail 'repeat dry-run invalid'
+done
+for every in daily 0h 1h -4h; do
+  if "$FIXTURE/repo/scripts/ios-release.sh" --every "$every" --profile prod \
+    --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run >/dev/null 2>&1; then
+    fail "invalid interval accepted: $every"
+  fi
+done
+
+
 args=(--profile prod --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run)
 "$FIXTURE/repo/scripts/ios-release.sh" --at 2099-10-18T01:00:00Z "${args[@]}" > "$FIXTURE/plan"
 [[ "$(cat "$FIXTURE/plan")" == *'No job created.'* ]] || fail 'dry-run scheduled a job'
@@ -263,7 +369,7 @@ for at in '' 2020-01-01T01:00:00Z 2099-02-31T01:00:00Z 2099-10-18T01:00:00; do
     fail "invalid schedule accepted: $at"
   fi
 done
-"$FIXTURE/repo/scripts/ios-release.sh" --at now --profile prod --project-ref abcdefghijklmnopqrst \
+"$FIXTURE/repo/scripts/ios-release.sh" --every 4h --profile prod --project-ref abcdefghijklmnopqrst \
   > "$FIXTURE/scheduled"
 for attempt in {1..50}; do
   [[ ! -f "$FIXTURE/job-group" ]] || break
@@ -273,7 +379,8 @@ record=("$FIXTURE/config/releases/"ios-*)
 [[ "$(cat "$FIXTURE/job-group")" == "$(cat "${record[0]}/pid")" ]] || fail 'job lacks its own process group'
 [[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled starting commit not recorded'
 [[ "$(cat "${record[0]}/job.env")" == *'ref=origin/main'* ]] || fail 'main refresh not scheduled'
+[[ "$(cat "${record[0]}/job.env")" == *'repeat_seconds=14400'* ]] || fail 'repeat interval not persisted'
 cmp "$FIXTURE/repo/scripts/ios-release.sh" "${record[0]}/runner.sh" || fail 'runner not preserved'
 [[ "$(cat "$FIXTURE/job-argv")" == *'--run '* ]] || fail 'worker not scheduled'
 assert_absent 'credential-must-not-leak' "${record[0]}" 'schedule persisted credentials'
-echo 'ios-release: main refresh, unchanged-source skip, successful-upload baselines, ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'
+echo 'ios-release: serial repeats, missed intervals, recurring failure stops/cancellation, main refresh, unchanged-source skip, successful-upload baselines, ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'

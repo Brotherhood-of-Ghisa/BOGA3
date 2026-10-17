@@ -1,20 +1,47 @@
 # Schedule an iOS build and submission
 
-In Terminal, from the BOGA3 folder on your configured Mac, paste this command:
+Open Terminal in the BOGA3 folder (the one containing `boga`). Choose one command
+below and replace `YOUR_SUPABASE_PROJECT_REF` with your project's 20-character ID.
+
+## Daily — every 24 hours
+
+```bash
+./boga worktree start && ./boga ios release --every 24h \
+  --profile prod --project-ref YOUR_SUPABASE_PROJECT_REF
+```
+
+## Every 4 hours
+
+```bash
+./boga worktree start && ./boga ios release --every 4h \
+  --profile prod --project-ref YOUR_SUPABASE_PROJECT_REF
+```
+
+These recurring commands **start immediately**, then repeat at the chosen interval.
+To choose the first run instead, add `--at 2026-10-18T22:00:00Z`, replacing it with
+your desired future UTC time. Intervals stay fixed in UTC across daylight-saving
+changes.
+
+## Once at a chosen time
 
 ```bash
 ./boga worktree start && ./boga ios release \
-  --at 2026-10-18T01:00:00Z --profile prod \
+  --at 2026-10-18T22:00:00Z --profile prod \
   --project-ref YOUR_SUPABASE_PROJECT_REF
 ```
 
-Replace the time with your desired future **UTC** time and the project ref with
-your Supabase project's 20-character ID.
+The command sets up a background job and prints its PID and log location. Each run
+pulls `main`, applies migrations, deploys the backend, builds the app and uploads
+it to Apple. Unchanged source skips that run. Recurring runs share one release
+checkout and stop after any failure; inspect the logs before scheduling again.
 
-The command sets up a one-time background job. At that time it pulls `main`,
-applies migrations, deploys the backend, builds the app and uploads it to Apple.
-Unchanged source skips the release. It prints the job's PID and log location.
+To stop all future runs, use the printed PID:
 
-Keep the Mac powered on, logged in and lid open, with Docker running. Expo/Apple
-and Supabase credentials must already be configured. For setup, logs or
-cancellation, use the [operator reference](procedures/ios-release.md).
+```bash
+kill -TERM -- -PRINTED_PID
+```
+
+Keep the Mac powered on, logged in and lid open, with Docker running. The job
+stops on logout/reboot. Expo/Apple and Supabase credentials must already be
+configured. For setup, logs or cleanup, use the
+[operator reference](procedures/ios-release.md).
