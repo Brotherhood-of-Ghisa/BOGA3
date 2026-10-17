@@ -31,6 +31,7 @@ const MODE_OPTIONS: readonly SegmentedControlOption<TimerMode>[] = [
  * The active-session timer strip rendered directly below `ExerciseTopBar` and
  * `SessionTopBar`. Supports both Rest timer (fixed countdown per set) and
  * Repeating timer (generalised EMOM interval with drift-free round tracking).
+ * Preparation precedes round 1; repeating controls sit below the readout.
  */
 export function RestTimerBar({
   view,
@@ -46,7 +47,6 @@ export function RestTimerBar({
   }
 
   const isRepeating = view.mode === 'repeating';
-  const isCompleted = view.mode === 'rest' && view.status === 'completed';
   const isPaused = isRepeating && view.isPaused;
   const stepSec = isRepeating ? REPEATING_TIMER_STEP_SEC : REST_TIMER_STEP_SEC;
 
@@ -71,36 +71,8 @@ export function RestTimerBar({
           tone="muted"
         />
       </View>
-      <View style={styles.actionRow}>
-        <View style={styles.readout}>
-          <Icon
-            color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
-            name={isCompleted ? 'success' : 'timer'}
-            size="sm"
-          />
-          <Text
-            allowFontScaling={false}
-            style={[styles.statusLabel, isCompleted ? styles.statusCompleted : null]}
-            testID={isRepeating ? 'repeating-timer-round' : 'rest-timer-status'}>
-            {isRepeating
-              ? `Round ${view.round}${isPaused ? ' · PAUSED' : ''}`
-              : isCompleted
-              ? 'Rest complete'
-              : 'Rest'}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            accessibilityLabel={
-              isRepeating
-                ? `Repeating timer round ${view.round}, ${view.formatted} remaining${isPaused ? ', paused' : ''}`
-                : `Rest timer ${view.formatted}`
-            }
-            accessibilityLiveRegion="polite"
-            style={styles.countdown}
-            testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
-            {view.formatted}
-          </Text>
-        </View>
+      <View style={[styles.actionRow, isRepeating ? styles.repeatingActionRow : null]}>
+        <TimerReadout view={view} />
         <View style={styles.controls}>
           <ActionButton
             accessibilityLabel={`Subtract ${stepSec} seconds`}
@@ -153,6 +125,43 @@ export function RestTimerBar({
   );
 }
 
+function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' }> }) {
+  const isRepeating = view.mode === 'repeating';
+  const isCompleted = view.mode === 'rest' && view.status === 'completed';
+  const isPaused = isRepeating && view.isPaused;
+  const isPreparing = isRepeating && view.round === 0;
+  const phase = isRepeating ? (isPreparing ? 'Get ready' : `Round ${view.round}`) : 'Rest';
+  const statusLabel = isCompleted ? 'Rest complete' : `${phase}${isPaused ? ' · PAUSED' : ''}`;
+  const accessiblePhase = isPreparing ? 'preparation' : phase.toLowerCase();
+  const countdownLabel = isRepeating
+    ? `Repeating timer ${accessiblePhase}, ${view.formatted} remaining${isPaused ? ', paused' : ''}`
+    : `Rest timer ${view.formatted}`;
+
+  return (
+    <View style={styles.readout}>
+      <Icon
+        color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
+        name={isCompleted ? 'success' : 'timer'}
+        size="sm"
+      />
+      <Text
+        allowFontScaling={false}
+        style={[styles.statusLabel, isCompleted ? styles.statusCompleted : null]}
+        testID={isRepeating ? 'repeating-timer-round' : 'rest-timer-status'}>
+        {statusLabel}
+      </Text>
+      <Text
+        allowFontScaling={false}
+        accessibilityLabel={countdownLabel}
+        accessibilityLiveRegion="polite"
+        style={styles.countdown}
+        testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
+        {view.formatted}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   bar: {
     backgroundColor: uiRoles.surface,
@@ -179,6 +188,10 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     flexShrink: 1,
   },
+  repeatingActionRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   statusLabel: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -201,6 +214,7 @@ const styles = StyleSheet.create({
   },
   controls: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: uiSpace.xs,
   },
