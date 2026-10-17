@@ -73,7 +73,6 @@ function MemberHeader({ member, testID }: { member: SessionSummaryRowMember; tes
 function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string }) {
   return (
     <View style={styles.recordLine} testID={`${testID}-record`}>
-      <Icon color={uiRoles.record} name="arrow-up" size="xs" />
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.recordText}>
         <Text allowFontScaling={false} style={todayText.record}>
           {line.kind === 'one' ? line.lead : line.count}

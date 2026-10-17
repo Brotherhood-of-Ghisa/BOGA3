@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { Icon } from '@/components/ui/icon';
 import { PageSheet } from '@/components/ui/page-sheet';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
@@ -121,12 +120,9 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
 
       {shareRecords.length > 0 ? (
         <View style={styles.records} testID="session-share-card-personal-records">
-          <View style={styles.recordsHeading}>
-            <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-            <Text allowFontScaling={false} style={styles.recordsTitle}>
-              {formatCount(shareRecords.length, 'new record')}
-            </Text>
-          </View>
+          <Text allowFontScaling={false} style={styles.recordsTitle}>
+            {formatCount(shareRecords.length, 'new record')}
+          </Text>
           {shareRecords.map(({ record, set }) => (
             <ShareRecordRow key={set.setId} record={record} set={set} />
           ))}
@@ -354,11 +350,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
-  },
-  recordsHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
   },
   recordsTitle: {
     ...microLabel,

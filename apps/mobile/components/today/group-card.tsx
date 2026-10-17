@@ -33,7 +33,6 @@ function BoardFigure({ value, record = false, testID }: { value: number; record?
   const showRecord = record && value > 0;
   return (
     <View style={styles.figureCell}>
-      {showRecord ? <Icon color={uiRoles.record} name="arrow-up" size="xs" /> : null}
       <Text allowFontScaling={false} style={[styles.boardFigure, showRecord ? todayText.record : null]} testID={testID}>
         {value}
       </Text>

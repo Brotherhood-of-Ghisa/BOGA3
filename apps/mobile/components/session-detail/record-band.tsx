@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 
@@ -21,7 +20,6 @@ export function RecordBand({ lines, placement, testID }: RecordBandProps) {
     <View style={[styles.band, placement === 'footer' ? styles.footer : styles.header]} testID={testID}>
       {lines.map((line, index) => (
         <View key={line.key} style={[styles.line, index > 0 ? styles.lineRuled : null]} testID={`${testID}-${index + 1}`}>
-          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
           <Text allowFontScaling={false} style={styles.label}>{line.label}</Text>
           {line.set ? (
             <Text allowFontScaling={false} numberOfLines={1} style={styles.set}>{line.set}</Text>
