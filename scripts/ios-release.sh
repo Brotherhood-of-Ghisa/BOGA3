@@ -14,9 +14,11 @@ Usage: ./boga ios release --at <UTC time|now> --profile <preview|prod>
 Example: ./boga ios release --at 2026-10-18T01:00:00Z --profile prod \
            --project-ref <your-project-ref>
 
-Pins the source now (default: freshly fetched origin/main), creates a detached
-release worktree, and starts a background job on this Mac. At the selected time:
-  1. Install isolated mobile dependencies and check the EAS/backend identity.
+Creates a detached release worktree and a background job on this Mac. At run time,
+the default origin/main is pulled with --ff-only; other --ref values stay pinned.
+If the tracked tree matches this Mac's last successful upload for the same profile
+and backend, skip the release. Otherwise:
+  1. Pin the source, install mobile dependencies, and check the EAS/backend identity.
   2. Apply migrations without seeds/reset; deploy every checked-in Edge Function.
   3. Configure group evaluation and notification invocation/registration.
   4. Build locally, inspect/checksum the IPA, and submit that IPA to Apple.
@@ -58,7 +60,7 @@ assert_source() {
   current_sha="$(git rev-parse HEAD)"
   state="$(git status --porcelain)"
   [[ "$current_sha" == "$sha" && -z "$state" ]] \
-    || fail 'release checkout changed after scheduling'
+    || fail 'release checkout changed unexpectedly'
 }
 
 check_migrations() {
@@ -143,6 +145,25 @@ run_release() {
   local candidate_lock="$(boga_config_root)/releases/locks/$project"
   mkdir "$candidate_lock" || fail 'another release holds this backend lock'
   lock="$candidate_lock"
+  stage=source-update
+  assert_source
+  local scheduled_sha="$sha" source_tree success_file
+  if [[ "$ref" == origin/main ]]; then
+    git pull --ff-only origin main
+    sha="$(git rev-parse HEAD)"
+    [[ "$sha" == "$(git rev-parse FETCH_HEAD)" ]] || fail 'origin/main moved behind this checkout; reschedule the release'
+    assert_source
+  fi
+  printf '%s\n' "$sha" > "$record/commit.txt"
+  source_tree="$(git rev-parse 'HEAD^{tree}')"
+  success_file="$(boga_config_root)/releases/last-uploaded-${project}-${profile}.tree"
+  if [[ -f "$success_file" && "$(cat "$success_file")" == "$source_tree" ]]; then
+    stage='skipped; tracked source unchanged since last successful upload'
+    echo "[ios-release] $stage. Commit: $sha"
+    return
+  fi
+  # Refresh generated config when the pull changed its checked-in template.
+  if [[ "$sha" != "$scheduled_sha" ]]; then ./boga worktree start; fi
   stage=preflight
   assert_source
   load_hosted_env
@@ -200,6 +221,8 @@ run_release() {
   stage=submission
   (cd apps/mobile && npx eas-cli submit --platform ios --profile "$profile" \
     --path "$record/app.ipa" --non-interactive --wait)
+  printf '%s\n' "$source_tree" > "$success_file.tmp"
+  mv "$success_file.tmp" "$success_file"
   stage='uploaded; Apple processing, tester availability, hosted smoke, and device verification pending'
   echo "[ios-release] $stage. Artifacts: $record"
 }
@@ -253,9 +276,9 @@ cd "$(dirname "$script")/.."
 source scripts/worktree-lib.sh
 if (( ! dry )); then git fetch --quiet origin; fi
 sha="$(git rev-parse --verify --end-of-options "$ref^{commit}")"
-printf '[ios-release] %s at %s; commit %s; backend %s\n' "$profile" "$at" "$sha" "$project"
+printf '[ios-release] %s at %s; starting commit %s; backend %s\n' "$profile" "$at" "$sha" "$project"
 if (( dry )); then
-  echo '[ios-release] Plan: migrate → deploy all functions → configure workers → local build → inspect IPA → submit. No gates. No job created.'
+  echo '[ios-release] Plan: pull origin/main at run time (other refs pinned) → skip unchanged source → migrate → deploy all functions → configure workers → local build → inspect IPA → submit. No gates. No job created.'
   exit
 fi
 [[ "$(uname -s)" == Darwin ]] || fail 'local iOS releases require macOS'
@@ -270,7 +293,7 @@ release_name="$(basename "$record")"
 release_root="$release_parent/$release_name"
 ./boga worktree create --detach --from "$sha" --root "$release_parent" --name "$release_name"
 cp "$script" "$record/runner.sh"
-for name in release_root sha profile project at_epoch; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
+for name in release_root sha ref profile project at_epoch; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
 printf 'scheduled\n' > "$record/status"
 # shortcut: a one-shot process cannot survive reboot/logout; use launchd if that becomes required.
 node - "$record" <<'JS'

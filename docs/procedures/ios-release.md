@@ -18,9 +18,13 @@ When the operator explicitly requests a scheduled release without gates, use
 # Remove --dry-run to create the one-time background job on this Mac.
 ```
 
-The script pins the ref when scheduled and keeps metadata unchanged. It deploys
-the Supabase backend and submits the inspected local IPA; it runs no lanes or
-sweep. The logged PID identifies a separate process group; cancel the whole job
+At execution, the default source pulls `origin/main` with `--ff-only`, then pins
+the resulting SHA in the artifact record. Other `--ref` values stay pinned when
+scheduled. A matching tracked-file tree from this Mac's last successful upload
+for the same profile and backend skips the entire release; the first run builds.
+Failed uploads never advance that baseline. Metadata stays unchanged. The script
+deploys the Supabase backend and submits the inspected local IPA; it runs no
+lanes or sweep. The logged PID identifies a separate process group; cancel the whole job
 with `kill -TERM -- -<PID>`. Logs, IPA, checksum, identity and stage status live
 outside the retained release checkout under the machine's BOGA config directory.
 No automatic retry follows a failure or uncertain upload. Inspect those records
@@ -28,7 +32,7 @@ and remote state before resuming manually from the first unfinished step.
 
 Keep the Mac on, logged in, lid open and signing credentials accessible; the
 background process prevents idle sleep but cannot survive logout/reboot. Source
-changes after scheduling do not change the release SHA. Schedule only reviewed,
+changes on `main` before execution enter default jobs. Schedule only reviewed,
 compatible migrations: deployment omits seeds, reset and history repair. This is
 an existing-project release, not initial hosted Auth/MCP provisioning.
 

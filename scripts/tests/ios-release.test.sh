@@ -37,6 +37,10 @@ boga_worktree_root() { echo "$FIXTURE/worktrees"; }
 EOF
 cat > "$FIXTURE/repo/boga" <<'EOF'
 #!/usr/bin/env bash
+if [[ "$*" == 'worktree start' ]]; then
+  echo 'boga worktree start' >> "$FIXTURE/calls"
+  exit
+fi
 while (( $# )); do
   case "$1" in --root) root="$2"; shift ;; --name) name="$2"; shift ;; esac
   shift
@@ -73,7 +77,10 @@ cat > "$FIXTURE/bin/docker" <<'EOF'
 EOF
 cat > "$FIXTURE/bin/git" <<'EOF'
 #!/usr/bin/env bash
-[[ "${1:-}" != fetch ]] || exit 0
+if [[ "${1:-}" == pull ]]; then
+  printf 'git %s\n' "$*" >> "$FIXTURE/calls"
+  [[ "${FAIL_STAGE:-}" != pull ]] || exit 12
+fi
 exec "$REAL_GIT" "$@"
 EOF
 cat > "$FIXTURE/bin/uname" <<'EOF'
@@ -118,17 +125,24 @@ esac
 EOF
 chmod +x "$FIXTURE/bin/"*
 export PATH="$FIXTURE/bin:$PATH"
-git -C "$FIXTURE/repo" init -q
+git -C "$FIXTURE/repo" init -q -b main
 git -C "$FIXTURE/repo" add .
 git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm fixture
+git init --bare -q "$FIXTURE/origin.git"
+git -C "$FIXTURE/repo" remote add origin "$FIXTURE/origin.git"
+git -C "$FIXTURE/repo" push -q origin HEAD:main
+git -C "$FIXTURE/repo" checkout -q --detach
 sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
+initial_sha="$sha"
+initial_tree="$(git -C "$FIXTURE/repo" rev-parse 'HEAD^{tree}')"
+success_file="$FIXTURE/config/releases/last-uploaded-abcdefghijklmnopqrst-prod.tree"
 
 worker() {
   local name="$1"
   mkdir "$FIXTURE/$name"
   : > "$FIXTURE/calls"
-  printf 'release_root=%q\nsha=%q\nprofile=prod\nproject=abcdefghijklmnopqrst\nat_epoch=0\n' \
-    "$FIXTURE/repo" "$sha" > "$FIXTURE/$name/job.env"
+  printf 'release_root=%q\nsha=%q\nref=%q\nprofile=%q\nproject=abcdefghijklmnopqrst\nat_epoch=0\n' \
+    "$FIXTURE/repo" "$sha" "${2:-HEAD}" "${3:-prod}" > "$FIXTURE/$name/job.env"
   bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/$name" > "$FIXTURE/$name/log" 2>&1
 }
 
@@ -139,6 +153,9 @@ worker success || { cat "$FIXTURE/success/log"; fail 'release failed'; }
 [[ "$(cat "$FIXTURE/configuration.sql")" == *notification_worker_key* ]] || fail 'worker not configured'
 [[ "$(cat "$FIXTURE/configuration.sql")" != *'sending_enabled=true'* ]] || fail 'sending enabled'
 [[ "$(cat "$FIXTURE/calls")" != *'db reset'* && "$(cat "$FIXTURE/calls")" != *'--include-seed'* ]] || fail 'destructive deployment'
+[[ "$(cat "$success_file")" == "$initial_tree" ]] || fail 'successful upload did not save source tree'
+[[ "$(cat "$FIXTURE/success/commit.txt")" == "$sha" ]] || fail 'release commit not recorded'
+assert_absent 'git pull' "$FIXTURE/calls" 'explicit ref was pulled'
 assert_absent 'credential-must-not-leak' "$FIXTURE/success" 'credential leaked to artifacts'
 node - "$FIXTURE/calls" <<'JS'
 const assert = require('node:assert/strict');
@@ -151,10 +168,31 @@ assert(!/boga (test|sweep)/.test(log));
 assert(log.includes('--path ' + process.argv[2].replace('/calls', '/success/app.ipa')));
 JS
 
+worker unchanged origin/main || fail 'unchanged release failed'
+[[ "$(cat "$FIXTURE/unchanged/status")" == 'skipped;'* ]] || fail 'unchanged source not skipped'
+[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'unchanged release ran deployment commands'
+export FAIL_STAGE=pull
+if worker failed-pull origin/main; then fail 'failed pull treated as unchanged'; fi
+unset FAIL_STAGE
+assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'failed pull started release'
+git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit --allow-empty -qm 'same files'
+empty_sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
+git -C "$FIXTURE/repo" push -q origin HEAD:main
+git -C "$FIXTURE/repo" checkout -q --detach "$sha"
+worker empty-commit origin/main || fail 'empty-commit release failed'
+[[ "$(cat "$FIXTURE/empty-commit/status")" == 'skipped;'* ]] || fail 'empty commit rebuilt identical files'
+[[ "$(cat "$FIXTURE/empty-commit/commit.txt")" == "$empty_sha" ]] || fail 'pull did not advance checkout'
+[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'empty commit started release'
+echo 'new source' > "$FIXTURE/repo/apps/mobile/release-input.txt"
+git -C "$FIXTURE/repo" add apps/mobile/release-input.txt
+git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm 'changed files'
+sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
+
 for failure in migrations functions build submission; do
   export FAIL_STAGE="$failure"
   if worker "$failure"; then fail "$failure did not stop release"; fi
   [[ "$(cat "$FIXTURE/$failure/status")" == "$failure "* ]] || fail 'failure stage not recorded'
+  [[ "$(cat "$success_file")" == "$initial_tree" ]] || fail 'failed release advanced successful source tree'
   if [[ "$failure" != submission ]]; then
     assert_absent 'eas-cli submit' "$FIXTURE/calls" 'submission continued after failure'
   fi
@@ -165,7 +203,7 @@ if worker history; then fail 'migration history mismatch accepted'; fi
 assert_absent 'db push|functions deploy|eas-cli build' "$FIXTURE/calls" 'deployment continued after history mismatch'
 unset FAIL_STAGE
 echo dirty >> "$FIXTURE/repo/apps/mobile/eas.json"
-if worker dirty; then fail 'dirty release source accepted'; fi
+if worker dirty origin/main; then fail 'dirty release source accepted'; fi
 [[ ! -s "$FIXTURE/calls" ]] || fail 'dirty release started external commands'
 git -C "$FIXTURE/repo" checkout -- apps/mobile/eas.json
 export FAKE_URL=https://different-project.supabase.co
@@ -180,6 +218,43 @@ if bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/success" >/dev/nu
   fail 'job ran twice'
 fi
 
+git -C "$FIXTURE/repo" push -q origin HEAD:main
+target_sha="$sha"
+git -C "$FIXTURE/repo" checkout -q --detach "$initial_sha"
+sha="$initial_sha"
+worker refreshed origin/main || { cat "$FIXTURE/refreshed/log"; fail 'refreshed release failed'; }
+[[ "$(cat "$FIXTURE/refreshed/commit.txt")" == "$target_sha" ]] || fail 'new main was not released'
+[[ "$(cat "$success_file")" == "$(git -C "$FIXTURE/repo" rev-parse 'HEAD^{tree}')" ]] || fail 'new source baseline missing'
+node - "$FIXTURE/calls" <<'JS'
+const assert = require('node:assert/strict');
+const log = require('node:fs').readFileSync(process.argv[2], 'utf8');
+assert(log.indexOf('boga worktree start') > log.indexOf('git pull --ff-only origin main'));
+assert(log.indexOf('npm ci') > log.indexOf('boga worktree start'));
+assert(log.includes('eas-cli submit'));
+JS
+sha="$target_sha"
+worker repeated origin/main || fail 'repeated release failed'
+[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'successful source rebuilt'
+export FAKE_BUNDLE=com.phano.boga3.dev
+worker preview HEAD preview || { cat "$FIXTURE/preview/log"; fail 'profile-specific first release failed'; }
+unset FAKE_BUNDLE
+[[ "$(cat "$FIXTURE/preview/status")" == 'uploaded;'* ]] || fail 'prod baseline skipped preview'
+[[ -f "$FIXTURE/config/releases/last-uploaded-abcdefghijklmnopqrst-preview.tree" ]] || fail 'preview baseline missing'
+git -C "$FIXTURE/repo" checkout -q --detach "$initial_sha"
+echo divergent > "$FIXTURE/repo/divergent.txt"
+git -C "$FIXTURE/repo" add divergent.txt
+git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm divergent
+sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
+if worker divergent origin/main; then fail 'divergent pull accepted'; fi
+assert_absent 'boga worktree start|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'divergent pull started release'
+git -C "$FIXTURE/repo" checkout -q --detach "$target_sha"
+sha="$target_sha"
+
+git -C "$FIXTURE/repo" push -q --force origin "$initial_sha:main"
+if worker rewound origin/main; then fail 'rewound main accepted'; fi
+assert_absent 'boga worktree start|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'rewound main started release'
+git -C "$FIXTURE/repo" push -q origin HEAD:main
+
 args=(--profile prod --project-ref abcdefghijklmnopqrst --ref HEAD --dry-run)
 "$FIXTURE/repo/scripts/ios-release.sh" --at 2099-10-18T01:00:00Z "${args[@]}" > "$FIXTURE/plan"
 [[ "$(cat "$FIXTURE/plan")" == *'No job created.'* ]] || fail 'dry-run scheduled a job'
@@ -189,15 +264,16 @@ for at in '' 2020-01-01T01:00:00Z 2099-02-31T01:00:00Z 2099-10-18T01:00:00; do
   fi
 done
 "$FIXTURE/repo/scripts/ios-release.sh" --at now --profile prod --project-ref abcdefghijklmnopqrst \
-  --ref HEAD > "$FIXTURE/scheduled"
+  > "$FIXTURE/scheduled"
 for attempt in {1..50}; do
   [[ ! -f "$FIXTURE/job-group" ]] || break
   sleep 0.02
 done
 record=("$FIXTURE/config/releases/"ios-*)
 [[ "$(cat "$FIXTURE/job-group")" == "$(cat "${record[0]}/pid")" ]] || fail 'job lacks its own process group'
-[[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled commit not pinned'
+[[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled starting commit not recorded'
+[[ "$(cat "${record[0]}/job.env")" == *'ref=origin/main'* ]] || fail 'main refresh not scheduled'
 cmp "$FIXTURE/repo/scripts/ios-release.sh" "${record[0]}/runner.sh" || fail 'runner not preserved'
 [[ "$(cat "$FIXTURE/job-argv")" == *'--run '* ]] || fail 'worker not scheduled'
 assert_absent 'credential-must-not-leak' "${record[0]}" 'schedule persisted credentials'
-echo 'ios-release: ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'
+echo 'ios-release: main refresh, unchanged-source skip, successful-upload baselines, ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'
