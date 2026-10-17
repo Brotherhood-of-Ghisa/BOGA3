@@ -49,6 +49,7 @@ import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
 import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
+import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
@@ -393,7 +394,9 @@ export function ExercisePageScreen({
                 pathname: '/exercise-history',
                 params: {
                   exerciseDefinitionId: exercise.exerciseDefinitionId,
-                  ...(currentGymId ? { currentGymId } : {}),
+                  // Three-state over the route: a session with no gym says so,
+                  // so its bucket survives the hop ([[gym.split]]).
+                  currentGymId: currentGymId ?? NO_GYM_ROUTE_PARAM,
                 },
               })
             }

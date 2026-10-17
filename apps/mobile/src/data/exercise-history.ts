@@ -159,10 +159,15 @@ export type ExerciseHistoryStore = {
     /** Only this session's blocks. */
     sessionId?: string;
   }): Promise<ExerciseHistorySessionRow[]>;
-  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
+  /**
+   * Both gyms are three-state: unset is every gym, `null` the sessions with no
+   * gym, an id that gym. `gymId` keeps only its sessions; `atGymId` is the gym
+   * the reader is at, which picks a split exercise's bucket ([[gym.split]]).
+   */
   loadAllTimeBest(input: {
     exerciseDefinitionId: string;
     gymId?: string | null;
+    atGymId?: string | null;
   }): Promise<ExerciseHistoryBest>;
   loadSetsForSessionExercises(input: {
     sessionExerciseIds: string[];
@@ -179,6 +184,12 @@ export type LoadExercisePerformanceHistoryOptions = {
   tagDefinitionId?: string | null;
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   gymId?: string | null;
+  /**
+   * The gym the reader is at — the session they opened this history from. It
+   * picks the bucket a split exercise's `All-time bests` report ([[gym.split]])
+   * and nothing else; `gymId` alone narrows the listed sessions.
+   */
+  atGymId?: string | null;
   now?: Date;
 };
 
@@ -455,8 +466,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         ...resolveWeight(row.startedAt),
       }));
   },
-  async loadAllTimeBest({ exerciseDefinitionId, gymId }) {
-    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId });
+  async loadAllTimeBest({ exerciseDefinitionId, gymId, atGymId }) {
+    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId, atGymId });
     return {
       estimatedOneRepMax: oneRepMax
         ? { value: oneRepMax.value, sessionId: oneRepMax.sessionId, completedAt: oneRepMax.completedAt }
@@ -563,6 +574,7 @@ export const createExerciseHistoryRepository = (
       store.loadAllTimeBest({
         exerciseDefinitionId: options.exerciseDefinitionId,
         ...(appliedGymId === undefined ? {} : { gymId: appliedGymId }),
+        ...(options.atGymId === undefined ? {} : { atGymId: options.atGymId }),
       }),
     ]);
 

@@ -203,8 +203,9 @@ one local orphan cannot wedge the backlog.
    column and the per-layer cursor depends on it. Every user owns their own
    `id` keyspace, so two users may hold the same `id` (the same seeded
    `exercise_definitions.id`, say) without conflict: cross-owner conflicts are
-   impossible by construction and the backend has no rejection path for one. Each user's seed catalog is per-user data from day one; no
-   shared or global catalog exists.
+   impossible by construction and the backend has no rejection path for one.
+   Each user's seed catalog is per-user data from day one; no shared or global
+   catalog exists.
 7. Gym coordinate metadata is private, user-owned data on `gyms`, not a shared
    or public location entity.
 

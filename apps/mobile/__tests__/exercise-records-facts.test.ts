@@ -323,6 +323,44 @@ describe('records of an exercise split per gym', () => {
   });
 });
 
+describe('exercise history all-time bests of a split exercise', () => {
+  beforeEach(() => {
+    insertSession('home-1', 1, bench(['150', '3']), 'home');
+    insertSession('club-1', 2, bench(['90', '3']), 'club');
+    insertSession('none-1', 3, bench(['70', '3']));
+    db().update(exerciseDefinitions).set({ splitByGym: true })
+      .where(eq(exerciseDefinitions.id, BENCH)).run();
+  });
+
+  const best = async (scope: { gymId?: string | null; atGymId?: string | null }) =>
+    (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all', ...scope }))!
+      .allTimeBest.topWeight;
+
+  it('reports the bucket of the gym the reader came from, not the newest one', async () => {
+    // `atGymId` alone picks the bucket; without it the most recently performed
+    // bucket answers, which is the no-gym one here.
+    expect(await best({ atGymId: 'home' })).toMatchObject({ sessionId: 'home-1', weight: 150 });
+    expect(await best({ atGymId: 'club' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
+    expect(await best({ atGymId: null })).toMatchObject({ sessionId: 'none-1', weight: 70 });
+    expect(await best({})).toMatchObject({ sessionId: 'none-1', weight: 70 });
+  });
+
+  it('agrees with the records panel of the session the reader came from', async () => {
+    for (const atGymId of ['home', 'club', null] as const) {
+      const panel = await loadExerciseBests({ exerciseDefinitionId: BENCH, atGymId });
+
+      expect(await best({ atGymId })).toMatchObject({
+        sessionId: panel.topWeight!.sessionId, weight: panel.topWeight!.weight,
+      });
+    }
+  });
+
+  it('keeps the gym filter narrowing the sessions, bucket and filter agreeing', async () => {
+    expect(await best({ gymId: 'club', atGymId: 'club' })).toMatchObject({ sessionId: 'club-1' });
+    expect(await best({ gymId: null, atGymId: null })).toMatchObject({ sessionId: 'none-1' });
+  });
+});
+
 describe('records from the facts equal the replay on a generated history', () => {
   // Deterministic generator (mulberry32) for a varied history.
   const random = (() => {

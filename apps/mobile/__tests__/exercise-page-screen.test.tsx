@@ -62,6 +62,7 @@ import {
 } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_PAGE_FIXTURE } from '@/src/maestro/exercise-page-fixture';
 import { updatePreferences } from '@/src/preferences/hooks';
+import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import {
   bootLocalApp,
   closeLocalData,
@@ -630,9 +631,11 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
     fireEvent.press(screen.getByTestId('exercise-records-history'));
+    // A session with no gym says so, so its bucket survives the hop
+    // ([[gym.split]]); an absent param would mean every gym.
     expect(mockRouter.push).toHaveBeenCalledWith({
       pathname: '/exercise-history',
-      params: { exerciseDefinitionId: BENCH_DEF },
+      params: { exerciseDefinitionId: BENCH_DEF, currentGymId: NO_GYM_ROUTE_PARAM },
     });
   });
 

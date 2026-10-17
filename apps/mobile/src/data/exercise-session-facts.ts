@@ -206,7 +206,7 @@ const writeFacts = (tx: FactsTx, scope: DefinitionScope): number => {
     { id: definitionId, splitByGym: splitByGym.get(definitionId) ?? false } satisfies FactsDefinitionInput,
     history,
   ));
-  // 15 columns a row: 60 rows stay under the bound-parameter limit.
+  // 14 columns a row: 60 rows stay under the bound-parameter limit.
   for (const batch of chunks(rows, 60)) {
     tx.insert(exerciseSessionFacts).values(batch).run();
   }
