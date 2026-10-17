@@ -27,6 +27,7 @@ TESTS=(
   "lane-timing.test.sh"
   "test-for.test.sh"
   "full-sweep.test.sh"
+  "ios-release.test.sh"
   "maestro-fixture-users.test.sh"
   "maestro-flow-lanes.test.sh"
   "maestro-testids.test.sh"
