@@ -69,16 +69,23 @@ un-splitting is a merge. Rejected.
   most recently performed bucket answers (the coaching default).
 - Lanes: `fast`, `backend` (sync path), `frontend-android` if flows touch
   record bands.
-- Gym-scoped APIs now use one three-state convention (unset = every gym,
-  `null` = the sessions with no gym, an id = that gym). PR 4 should follow it
-  for the aggregations, and the gym chips should carry
-  `NO_GYM_ROUTE_PARAM` (`app/exercise-history.tsx`) at the route boundary.
+- Gym-scoped APIs now use one three-state convention, stated in spec `09`
+  (`src/utils/gym-scope-route.ts`). The gym chips PR 4 adds carry
+  `NO_GYM_ROUTE_PARAM` at the route boundary. `Past records gym filter` stays
+  `Unchanged` per the Decisions table: a session with no gym has no current
+  gym to narrow to, so the filter is inert there (operator's call, after the
+  product review raised it).
 
 ### 4. Aggregations and labels
 
 - Stats / Progress exercise rows, catalog stats (`Last`, sessions, favourites),
   exercise history, heatmaps / progress history, 1RM curve (lock the picker to
   the bucket), Repeat last / plan prefill (`exercise-block-history.ts`).
+- The curve picker is the last gym filter off the three-state convention
+  (spec `09`, `gym-scope-route.ts`): drop `ALL_GYMS = '__all_gyms__'`
+  (`src/rm-curve/model.ts`) so unset is every gym, and resolve its "latest
+  trained gym" default to a concrete id before the scope is built. Operator's
+  call on 2026-10-17 to do it here, not in PR 3.
 - `gym.split-label` formatter, used only by the multi-gym lists.
 - Lanes: `fast`, `frontend-android`.
 

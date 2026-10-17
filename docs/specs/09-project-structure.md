@@ -194,6 +194,18 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/utils/local-time.ts`
   - canonical wall-clock labels (`HH:MM`, `M/D HH:MM`, `YYYY-MM-DD HH:MM`) read in the device's time zone from a stored instant.
   - stored timestamps (ISO strings, epoch ms) are UTC; never slice the clock out of an ISO string for display. Tests that assert a label build the instant from local fields (`new Date(y, m, d, h, min)`) so they hold in every `TZ`.
+- `apps/mobile/src/utils/gym-scope-route.ts`
+  - canonical **three-state gym scope**, the convention every API that
+    optionally filters by gym follows: **unset is every gym**, **`null` is the
+    sessions with no gym**, an **id is that gym**. Never a sentinel string and
+    never `null` for "no filter" — the two states must stay tellable apart, or
+    a screen silently answers for the wrong set of sessions.
+  - a route param or an HTTP query carries a value or nothing, so it cannot
+    express the third state: those boundaries alone encode the no-gym scope as
+    one reserved value (`NO_GYM_ROUTE_PARAM` here, `none` in the coaching API)
+    and decode it straight back.
+  - which bucket a split exercise reports from a scope is
+    `tech/training-metrics-contract.md` §3, not this file.
 - `apps/mobile/src/utils/local-calendar.ts`
   - canonical local calendar windows: Monday-start weeks and calendar months in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
   - Jest runs in `Europe/London` (pinned in `apps/mobile/jest.config.js`, locally and in CI), so calendar tests cover both DST changes.
