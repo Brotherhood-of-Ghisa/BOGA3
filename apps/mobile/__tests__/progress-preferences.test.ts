@@ -130,6 +130,10 @@ it('validates window limits, rest timer limits, RIR zero and the last visible gr
   expect(isPreferenceValue('restTimerDurationSec', 600)).toBe(true);
   expect(isPreferenceValue('restTimerDurationSec', 14)).toBe(false);
   expect(isPreferenceValue('restTimerDurationSec', 601)).toBe(false);
+  expect(isPreferenceValue('repeatingTimerIntervalSec', 15)).toBe(true);
+  expect(isPreferenceValue('repeatingTimerIntervalSec', 600)).toBe(true);
+  expect(isPreferenceValue('repeatingTimerIntervalSec', 14)).toBe(false);
+  expect(isPreferenceValue('repeatingTimerIntervalSec', 601)).toBe(false);
   expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
   // 1RM is the Exercise table's alone: the Muscle table's metric rejects it.

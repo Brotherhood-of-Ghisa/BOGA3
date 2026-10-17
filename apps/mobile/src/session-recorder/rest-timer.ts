@@ -1,29 +1,66 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { Vibration } from 'react-native';
 
-import { DEFAULT_REST_TIMER_SECONDS } from '../preferences/model';
+import {
+  DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
+  DEFAULT_REST_TIMER_SECONDS,
+  MAX_REPEATING_TIMER_INTERVAL_SECONDS,
+  MIN_REPEATING_TIMER_INTERVAL_SECONDS,
+} from '../preferences/model';
 
 export const REST_TIMER_STEP_SEC = 15;
+export const REPEATING_TIMER_STEP_SEC = 15;
+
+export type TimerMode = 'rest' | 'repeating';
 
 export type RestTimerEntry = {
+  mode: 'rest';
   sessionId: string;
   startedAtMs: number;
   endsAtMs: number;
   durationSec: number;
 };
 
+export type RepeatingTimerEntry = {
+  mode: 'repeating';
+  sessionId: string;
+  startedAtMs: number;
+  accumulatedMs: number;
+  pausedAtMs: number | null;
+  intervalSec: number;
+};
+
+export type WorkoutTimerEntry = RestTimerEntry | RepeatingTimerEntry;
+
+export type RestTimerModeView = {
+  mode: 'rest';
+  status: 'running' | 'completed';
+  sessionId: string;
+  remainingSec: number;
+  formatted: string;
+  durationSec: number;
+};
+
+export type RepeatingTimerModeView = {
+  mode: 'repeating';
+  status: 'running' | 'paused';
+  sessionId: string;
+  round: number;
+  remainingSec: number;
+  formatted: string;
+  intervalSec: number;
+  isPaused: boolean;
+};
+
 export type RestTimerView =
-  | { status: 'idle' }
-  | {
-      status: 'running' | 'completed';
-      sessionId: string;
-      remainingSec: number;
-      formatted: string;
-      durationSec: number;
-    };
+  | { status: 'idle'; mode?: TimerMode }
+  | RestTimerModeView
+  | RepeatingTimerModeView;
 
 const IDLE_REST_TIMER_VIEW: RestTimerView = { status: 'idle' };
 
-let activeEntry: RestTimerEntry | null = null;
+let activeEntry: WorkoutTimerEntry | null = null;
+let lastSignaledRound: number | null = null;
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -39,18 +76,69 @@ export const formatRestTimerSeconds = (seconds: number): string => {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 };
 
+export const triggerRoundBoundaryCue = (): void => {
+  try {
+    Vibration.vibrate(400);
+  } catch {
+    // Unsupported platform or headless runner.
+  }
+};
+
+export const checkAndTriggerRoundBoundary = (round: number): void => {
+  if (round <= 0) return;
+  if (lastSignaledRound === null) {
+    lastSignaledRound = round;
+    return;
+  }
+  if (round > lastSignaledRound) {
+    lastSignaledRound = round;
+    triggerRoundBoundaryCue();
+  }
+};
+
+export const deriveRepeatingTimerView = (
+  entry: RepeatingTimerEntry,
+  sessionId: string,
+  nowMs: number = Date.now(),
+): RepeatingTimerModeView => {
+  const isPaused = entry.pausedAtMs !== null;
+  const elapsedMs = isPaused
+    ? entry.accumulatedMs
+    : Math.max(0, nowMs - entry.startedAtMs + entry.accumulatedMs);
+  const intervalMs = Math.max(1, entry.intervalSec) * 1000;
+  const round = Math.floor(elapsedMs / intervalMs) + 1;
+  const roundElapsedMs = elapsedMs % intervalMs;
+  const remainingMs = intervalMs - roundElapsedMs;
+  const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
+
+  return {
+    mode: 'repeating',
+    status: isPaused ? 'paused' : 'running',
+    sessionId,
+    round,
+    remainingSec,
+    formatted: formatRestTimerSeconds(remainingSec),
+    intervalSec: entry.intervalSec,
+    isPaused,
+  };
+};
+
 export const deriveRestTimerView = (
-  entry: RestTimerEntry | null,
+  entry: WorkoutTimerEntry | null,
   sessionId: string | null,
   nowMs: number = Date.now(),
 ): RestTimerView => {
   if (!entry || !sessionId || entry.sessionId !== sessionId) {
     return IDLE_REST_TIMER_VIEW;
   }
+  if (entry.mode === 'repeating') {
+    return deriveRepeatingTimerView(entry, sessionId, nowMs);
+  }
   const remainingMs = Math.max(0, entry.endsAtMs - nowMs);
   const remainingSec = Math.ceil(remainingMs / 1000);
   if (remainingSec <= 0) {
     return {
+      mode: 'rest',
       status: 'completed',
       sessionId: entry.sessionId,
       remainingSec: 0,
@@ -59,6 +147,7 @@ export const deriveRestTimerView = (
     };
   }
   return {
+    mode: 'rest',
     status: 'running',
     sessionId: entry.sessionId,
     remainingSec,
@@ -67,7 +156,7 @@ export const deriveRestTimerView = (
   };
 };
 
-export const getRestTimerEntry = (): RestTimerEntry | null => activeEntry;
+export const getRestTimerEntry = (): WorkoutTimerEntry | null => activeEntry;
 
 export const subscribeRestTimer = (listener: () => void): (() => void) => {
   listeners.add(listener);
@@ -84,11 +173,13 @@ export const startRestTimer = (
   const normalizedDuration = Math.max(1, Math.round(durationSec));
   if (!sessionId || !Number.isFinite(normalizedDuration)) return;
   activeEntry = {
+    mode: 'rest',
     sessionId,
     startedAtMs: nowMs,
     endsAtMs: nowMs + normalizedDuration * 1000,
     durationSec: normalizedDuration,
   };
+  lastSignaledRound = null;
   emit();
 };
 
@@ -97,7 +188,12 @@ export const adjustRestTimer = (
   deltaSec: number,
   nowMs: number = Date.now(),
 ): void => {
-  if (!activeEntry || activeEntry.sessionId !== sessionId || !Number.isFinite(deltaSec)) {
+  if (
+    !activeEntry ||
+    activeEntry.sessionId !== sessionId ||
+    activeEntry.mode !== 'rest' ||
+    !Number.isFinite(deltaSec)
+  ) {
     return;
   }
   const currentRemainingMs = Math.max(0, activeEntry.endsAtMs - nowMs);
@@ -114,19 +210,165 @@ export const restartRestTimer = (
   durationSec?: number,
   nowMs: number = Date.now(),
 ): void => {
-  const targetDuration = durationSec ?? (activeEntry?.sessionId === sessionId ? activeEntry.durationSec : DEFAULT_REST_TIMER_SECONDS);
+  const targetDuration =
+    durationSec ??
+    (activeEntry?.sessionId === sessionId && activeEntry.mode === 'rest'
+      ? activeEntry.durationSec
+      : DEFAULT_REST_TIMER_SECONDS);
   startRestTimer(sessionId, targetDuration, nowMs);
+};
+
+export const startRepeatingTimer = (
+  sessionId: string,
+  intervalSec: number = DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
+  nowMs: number = Date.now(),
+): void => {
+  if (!sessionId || !Number.isFinite(intervalSec)) return;
+  const clampedInterval = Math.max(
+    MIN_REPEATING_TIMER_INTERVAL_SECONDS,
+    Math.min(MAX_REPEATING_TIMER_INTERVAL_SECONDS, Math.round(intervalSec)),
+  );
+  if (
+    activeEntry &&
+    activeEntry.sessionId === sessionId &&
+    activeEntry.mode === 'repeating' &&
+    activeEntry.pausedAtMs !== null
+  ) {
+    activeEntry = {
+      ...activeEntry,
+      startedAtMs: nowMs,
+      pausedAtMs: null,
+    };
+    emit();
+    return;
+  }
+  activeEntry = {
+    mode: 'repeating',
+    sessionId,
+    startedAtMs: nowMs,
+    accumulatedMs: 0,
+    pausedAtMs: null,
+    intervalSec: clampedInterval,
+  };
+  lastSignaledRound = 1;
+  emit();
+};
+
+export const stopRepeatingTimer = (
+  sessionId: string,
+  nowMs: number = Date.now(),
+): void => {
+  if (
+    !activeEntry ||
+    activeEntry.sessionId !== sessionId ||
+    activeEntry.mode !== 'repeating' ||
+    activeEntry.pausedAtMs !== null
+  ) {
+    return;
+  }
+  const elapsedSegment = Math.max(0, nowMs - activeEntry.startedAtMs);
+  activeEntry = {
+    ...activeEntry,
+    accumulatedMs: activeEntry.accumulatedMs + elapsedSegment,
+    pausedAtMs: nowMs,
+  };
+  emit();
+};
+
+export const toggleRepeatingTimer = (
+  sessionId: string,
+  nowMs: number = Date.now(),
+): void => {
+  if (!activeEntry || activeEntry.sessionId !== sessionId || activeEntry.mode !== 'repeating') {
+    startRepeatingTimer(sessionId, DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS, nowMs);
+    return;
+  }
+  if (activeEntry.pausedAtMs !== null) {
+    startRepeatingTimer(sessionId, activeEntry.intervalSec, nowMs);
+  } else {
+    stopRepeatingTimer(sessionId, nowMs);
+  }
+};
+
+export const resetRepeatingTimer = (
+  sessionId: string,
+  nowMs: number = Date.now(),
+): void => {
+  if (!activeEntry || activeEntry.sessionId !== sessionId || activeEntry.mode !== 'repeating') {
+    return;
+  }
+  const isPaused = activeEntry.pausedAtMs !== null;
+  activeEntry = {
+    ...activeEntry,
+    startedAtMs: nowMs,
+    accumulatedMs: 0,
+    pausedAtMs: isPaused ? nowMs : null,
+  };
+  lastSignaledRound = 1;
+  emit();
+};
+
+export const adjustRepeatingTimer = (
+  sessionId: string,
+  deltaSec: number,
+  nowMs: number = Date.now(),
+): void => {
+  if (
+    !activeEntry ||
+    activeEntry.sessionId !== sessionId ||
+    activeEntry.mode !== 'repeating' ||
+    !Number.isFinite(deltaSec)
+  ) {
+    return;
+  }
+  const nextInterval = Math.max(
+    MIN_REPEATING_TIMER_INTERVAL_SECONDS,
+    Math.min(MAX_REPEATING_TIMER_INTERVAL_SECONDS, activeEntry.intervalSec + Math.round(deltaSec)),
+  );
+  const isPaused = activeEntry.pausedAtMs !== null;
+  activeEntry = {
+    ...activeEntry,
+    intervalSec: nextInterval,
+    startedAtMs: nowMs,
+    accumulatedMs: 0,
+    pausedAtMs: isPaused ? nowMs : null,
+  };
+  lastSignaledRound = 1;
+  emit();
+};
+
+export const switchTimerMode = (
+  sessionId: string,
+  targetMode: TimerMode,
+  options: {
+    restDurationSec?: number;
+    repeatingIntervalSec?: number;
+    nowMs?: number;
+  } = {},
+): void => {
+  const nowMs = options.nowMs ?? Date.now();
+  if (targetMode === 'repeating') {
+    if (activeEntry?.sessionId === sessionId && activeEntry.mode === 'repeating') return;
+    const interval = options.repeatingIntervalSec ?? DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS;
+    startRepeatingTimer(sessionId, interval, nowMs);
+  } else {
+    if (activeEntry?.sessionId === sessionId && activeEntry.mode === 'rest') return;
+    const duration = options.restDurationSec ?? DEFAULT_REST_TIMER_SECONDS;
+    startRestTimer(sessionId, duration, nowMs);
+  }
 };
 
 export const dismissRestTimer = (sessionId?: string): void => {
   if (!activeEntry) return;
   if (sessionId !== undefined && activeEntry.sessionId !== sessionId) return;
   activeEntry = null;
+  lastSignaledRound = null;
   emit();
 };
 
 export const __resetRestTimerForTests = (): void => {
   activeEntry = null;
+  lastSignaledRound = null;
   listeners.clear();
 };
 
@@ -134,6 +376,7 @@ const systemNowMs = () => Date.now();
 
 export type UseSessionRestTimerOptions = {
   defaultDurationSec?: number;
+  defaultRepeatingIntervalSec?: number;
   autoStart?: boolean;
   isActiveSession?: boolean;
   now?: () => number;
@@ -145,33 +388,66 @@ export function useSessionRestTimer(
 ) {
   const {
     defaultDurationSec = DEFAULT_REST_TIMER_SECONDS,
+    defaultRepeatingIntervalSec = DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
     autoStart = true,
     isActiveSession = true,
     now = systemNowMs,
   } = options;
+
   const entry = useSyncExternalStore(subscribeRestTimer, getRestTimerEntry, getRestTimerEntry);
   const view = isActiveSession ? deriveRestTimerView(entry, sessionId, now()) : IDLE_REST_TIMER_VIEW;
-  const timerKey = entry && entry.sessionId === sessionId
-    ? `${entry.startedAtMs}:${entry.endsAtMs}`
-    : null;
+  const timerKey =
+    entry && entry.sessionId === sessionId
+      ? entry.mode === 'repeating'
+        ? `repeating:${entry.intervalSec}:${entry.startedAtMs}:${entry.accumulatedMs}:${entry.pausedAtMs}`
+        : `rest:${entry.startedAtMs}:${entry.endsAtMs}`
+      : null;
+
   const initialRemaining = view.status === 'idle' ? -1 : view.remainingSec;
-  const [observed, setObserved] = useState({ timerKey, remainingSec: initialRemaining });
+  const initialRound = view.status !== 'idle' && view.mode === 'repeating' ? view.round : -1;
+  const [observed, setObserved] = useState({
+    timerKey,
+    remainingSec: initialRemaining,
+    round: initialRound,
+  });
 
   if (observed.timerKey !== timerKey) {
-    setObserved({ timerKey, remainingSec: initialRemaining });
+    setObserved({ timerKey, remainingSec: initialRemaining, round: initialRound });
   }
-  const isRunningForSession = view.status === 'running';
+
+  const isRunningForSession =
+    view.status === 'running' &&
+    entry !== null &&
+    entry.sessionId === sessionId &&
+    (entry.mode === 'rest' || entry.pausedAtMs === null);
 
   useEffect(() => {
     if (!isRunningForSession) return;
     const interval = setInterval(() => {
-      const nextView = deriveRestTimerView(getRestTimerEntry(), sessionId, now());
+      const currentEntry = getRestTimerEntry();
+      const nextView = deriveRestTimerView(currentEntry, sessionId, now());
       const nextRemaining = nextView.status === 'idle' ? -1 : nextView.remainingSec;
+      const nextRound =
+        nextView.status !== 'idle' && nextView.mode === 'repeating' ? nextView.round : -1;
+
+      if (
+        currentEntry &&
+        currentEntry.sessionId === sessionId &&
+        currentEntry.mode === 'repeating' &&
+        currentEntry.pausedAtMs === null
+      ) {
+        checkAndTriggerRoundBoundary(nextRound);
+      }
+
       setObserved((prev) => {
-        if (prev.timerKey === timerKey && prev.remainingSec === nextRemaining) {
+        if (
+          prev.timerKey === timerKey &&
+          prev.remainingSec === nextRemaining &&
+          prev.round === nextRound
+        ) {
           return prev;
         }
-        return { timerKey, remainingSec: nextRemaining };
+        return { timerKey, remainingSec: nextRemaining, round: nextRound };
       });
     }, 1000);
     return () => clearInterval(interval);
@@ -187,15 +463,23 @@ export function useSessionRestTimer(
   const adjust = useCallback(
     (deltaSec: number) => {
       if (!isActiveSession || !sessionId) return;
-      adjustRestTimer(sessionId, deltaSec, now());
+      if (entry?.sessionId === sessionId && entry.mode === 'repeating') {
+        adjustRepeatingTimer(sessionId, deltaSec, now());
+      } else {
+        adjustRestTimer(sessionId, deltaSec, now());
+      }
     },
-    [isActiveSession, now, sessionId],
+    [entry, isActiveSession, now, sessionId],
   );
 
   const restart = useCallback(() => {
     if (!isActiveSession || !sessionId) return;
-    restartRestTimer(sessionId, defaultDurationSec, now());
-  }, [defaultDurationSec, isActiveSession, now, sessionId]);
+    if (entry?.sessionId === sessionId && entry.mode === 'repeating') {
+      resetRepeatingTimer(sessionId, now());
+    } else {
+      restartRestTimer(sessionId, defaultDurationSec, now());
+    }
+  }, [defaultDurationSec, entry, isActiveSession, now, sessionId]);
 
   const dismiss = useCallback(() => {
     if (!sessionId) return;
@@ -213,8 +497,44 @@ export function useSessionRestTimer(
 
   const onSetConfirmed = useCallback(() => {
     if (!isActiveSession || !sessionId || !autoStart) return;
+    const current = getRestTimerEntry();
+    if (current && current.sessionId === sessionId && current.mode === 'repeating') {
+      return;
+    }
     startRestTimer(sessionId, defaultDurationSec, now());
   }, [autoStart, defaultDurationSec, isActiveSession, now, sessionId]);
+
+  const startRepeating = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    startRepeatingTimer(sessionId, defaultRepeatingIntervalSec, now());
+  }, [defaultRepeatingIntervalSec, isActiveSession, now, sessionId]);
+
+  const stopRepeating = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    stopRepeatingTimer(sessionId, now());
+  }, [isActiveSession, now, sessionId]);
+
+  const toggleRepeating = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    toggleRepeatingTimer(sessionId, now());
+  }, [isActiveSession, now, sessionId]);
+
+  const resetRepeating = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    resetRepeatingTimer(sessionId, now());
+  }, [isActiveSession, now, sessionId]);
+
+  const switchMode = useCallback(
+    (mode: TimerMode) => {
+      if (!isActiveSession || !sessionId) return;
+      switchTimerMode(sessionId, mode, {
+        restDurationSec: defaultDurationSec,
+        repeatingIntervalSec: defaultRepeatingIntervalSec,
+        nowMs: now(),
+      });
+    },
+    [defaultDurationSec, defaultRepeatingIntervalSec, isActiveSession, now, sessionId],
+  );
 
   return {
     view,
@@ -226,5 +546,10 @@ export function useSessionRestTimer(
     toggle,
     toggleForSession: isActiveSession ? toggle : undefined,
     onSetConfirmed,
+    startRepeating,
+    stopRepeating,
+    toggleRepeating,
+    resetRepeating,
+    switchMode,
   };
 }

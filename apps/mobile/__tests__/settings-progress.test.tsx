@@ -144,6 +144,19 @@ it('edits rest timer auto-start and duration in Preferences and surfaces invalid
   editNumber('settings-rest-timer-duration', '90');
   expect(values().restTimerDurationSec).toBe(90);
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+
+  editNumber('settings-repeating-timer-interval', '45');
+  expect(values().repeatingTimerIntervalSec).toBe(45);
+
+  editNumber('settings-repeating-timer-interval', '5');
+  expect(values().repeatingTimerIntervalSec).toBe(45);
+  expect(screen.getByTestId('settings-repeating-timer-interval')).toHaveProp('value', '5');
+  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+    .toHaveTextContent(/from 15 to 600/);
+
+  editNumber('settings-repeating-timer-interval', '60');
+  expect(values().repeatingTimerIntervalSec).toBe(60);
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
 it('updates a mounted picker while keeping its hidden selected effort intact', async () => {
