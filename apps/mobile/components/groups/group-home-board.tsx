@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { todayText } from '@/components/today/text-styles';
-import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   GROUP_HOME_METRIC_COLUMN,
@@ -15,7 +14,6 @@ const VALUE_WIDTH = 40;
 function BoardValue({ record, testID, value }: { record: boolean; testID: string; value: string }) {
   return (
     <View style={[styles.valueCell, { width: VALUE_WIDTH }]}>
-      {record ? <Icon color={uiRoles.record} name="arrow-up" size="xs" /> : null}
       <Text allowFontScaling={false} style={[styles.value, record ? todayText.record : null]} testID={testID}>
         {value}
       </Text>
@@ -155,7 +153,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: uiSpace.xs,
   },
   value: {
     fontFamily: uiFonts.figure.family,

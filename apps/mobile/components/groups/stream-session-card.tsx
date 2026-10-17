@@ -26,7 +26,6 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
       onPress={onPress}
       style={({ pressed }) => [styles.recordLine, pressed ? styles.recordPressed : null]}
       testID={testID}>
-      <Icon color={uiRoles.record} name="arrow-up" size="xs" />
       <Text allowFontScaling={false} numberOfLines={1} style={styles.recordExercise}>
         {line.exercise}
       </Text>
