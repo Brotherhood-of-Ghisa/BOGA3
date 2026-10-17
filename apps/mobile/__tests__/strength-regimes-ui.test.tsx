@@ -3,6 +3,7 @@ import { RmCurveContent } from '@/components/rm-curve/content';
 import { periodLabel, selectedPeriod } from '@/components/rm-curve/regimes';
 import { curveGeometry } from '@/components/rm-curve/geometry';
 import { ALL_GYMS, buildRmCurveModel } from '@/src/rm-curve/model';
+import type { RmCurveRow } from '@/src/data/rm-curve';
 import { assessRegimes, assessSingleCurve } from '@/src/strength-regimes/assessment';
 import { fitStrengthRegimes, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
 import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
@@ -15,7 +16,7 @@ const model = () => buildRmCurveModel(graph, query);
 
 afterEach(() => jest.useRealTimers());
 
-it('pools gyms without duplicates, samples first working ordinal before effort selection, and never replaces missing effort', () => {
+it('pools gyms without duplicates and samples one qualifying set per visible session after effort selection', () => {
   const g = waveGraph(), first = g.rows.find(r => r.setOrder === 0 && r.completedAt >= query.start)!;
   g.rows.filter(r => r.sessionId === first.sessionId).forEach(r => { r.gymId = null; r.gymName = null; });
   first.setType = null;
@@ -23,12 +24,64 @@ it('pools gyms without duplicates, samples first working ordinal before effort s
   const one = buildRmCurveModel(g, { ...query, gymId: 'synthetic-gym' });
   expect(all.observations.length).toBeGreaterThan(one.observations.length);
   expect(new Set(all.observations.map(p => p.setId)).size).toBe(all.observations.length);
-  expect(all.inferenceSessions.find(s => s.sessionId === first.sessionId)?.firstWorkingSet).toBeNull();
+  expect(all.inferenceSessions.find(s => s.sessionId === first.sessionId)?.selectedSet?.setId).toBeDefined();
+  expect(one.inferenceSessions.some(s => s.sessionId === first.sessionId)).toBe(false);
   const filtered = buildRmCurveModel(g, { ...query, gymId: ALL_GYMS, rir: 0 });
+  expect(filtered.inferenceSessions).toHaveLength(new Set(filtered.observations.map(p => p.sessionId)).size);
   for (const s of filtered.inferenceSessions) {
-    const first = all.inferenceSessions.find(x => x.sessionId === s.sessionId)!;
-    expect(s.firstWorkingSet).toEqual(first.firstWorkingSet?.rir === 0 ? first.firstWorkingSet : null);
+    expect(s.selectedSet?.rir).toBe(0);
+    expect(filtered.observations.some(p => p.setId === s.selectedSet?.setId)).toBe(true);
   }
+});
+
+function selectionGraph(rows: Partial<RmCurveRow>[]) {
+  const base = graph.rows.find(r => r.completedAt >= query.start)!;
+  return { definition: graph.definition, rows: rows.map((row, i) => ({ ...base,
+    setId: `set-${i}`, blockOrder: 0, setOrder: i, weightValue: '100', repsValue: '1', setType: 'rir_0', ...row })) };
+}
+
+it('ranks by unrounded logged-rep 1RM rather than heaviest load or RIR-adjusted RM', () => {
+  const m = buildRmCurveModel(selectionGraph([
+    { weightValue: '100', setType: 'rir_4' },
+    { weightValue: '89.999', repsValue: '5' },
+    { weightValue: '90', repsValue: '5' },
+  ]), query);
+  expect(m.inferenceSessions[0].selectedSet).toEqual({ setId: 'set-2', reps: 5, rir: 0, load: 90 });
+  expect(m.observations[0].analyticalTotalRm).toBeGreaterThan(m.observations[1].analyticalTotalRm);
+  expect(m.observations).toHaveLength(3);
+});
+
+it('applies RIR before choosing the maximum across repeated exercise blocks', () => {
+  const g = selectionGraph([
+    { weightValue: '100', setType: 'rir_4' },
+    { weightValue: '90', repsValue: '5' },
+    { weightValue: '95', repsValue: '5', setType: 'rir_4', blockOrder: 1, setOrder: 0 },
+  ]);
+  expect(buildRmCurveModel(g, query).inferenceSessions[0].selectedSet?.setId).toBe('set-2');
+  expect(buildRmCurveModel(g, { ...query, rir: 0 }).inferenceSessions[0].selectedSet?.setId).toBe('set-1');
+  expect(buildRmCurveModel(g, { ...query, rir: 3 }).inferenceSessions).toEqual([]);
+});
+
+it('uses a later qualifying set when earlier sets are unusable and omits sessions without a qualifying set', () => {
+  const m = buildRmCurveModel(selectionGraph([
+    { weightValue: '1000', setType: null }, { weightValue: '1000', setType: 'unknown' },
+    { weightValue: 'bad' }, { weightValue: '1000', setType: 'warm_up' },
+    { performanceStatus: 'planned' }, { weightValue: '80' },
+    { sessionId: 'missing-only', setType: null },
+    { sessionId: 'future', completedAt: query.end },
+    { sessionId: 'prior', completedAt: new Date(query.start.getTime() - 1) },
+  ]), query);
+  expect(m.inferenceSessions).toHaveLength(1);
+  expect(m.inferenceSessions[0].selectedSet?.setId).toBe('set-5');
+});
+
+it('breaks exact 1RM ties by block, set order and binary set ID independently of input order', () => {
+  const g = selectionGraph([
+    { setId: 'later-block', blockOrder: 1, setOrder: 0 },
+    { setId: 'later-set', setOrder: 1 }, { setId: 'b', setOrder: 0 }, { setId: 'a', setOrder: 0 },
+  ]);
+  expect(buildRmCurveModel(g, query).inferenceSessions[0].selectedSet?.setId).toBe('a');
+  expect(buildRmCurveModel({ ...g, rows: g.rows.slice().reverse() }, query).inferenceSessions[0].selectedSet?.setId).toBe('a');
 });
 
 it.each(['fixed', 'joint'] as const)('preserves the reviewed %s fitter results across yielding boundaries and free strength increments', method => {
@@ -81,7 +134,7 @@ it('cancels queued fits and never exposes another snapshot or method result', ()
 it('contains fitting failure and retries on a new input snapshot without leaking an old curve', () => {
   jest.useFakeTimers();
   const m = model(), bad = { ...m, inferenceSessions: [{ sessionId: 'bad', time: 1,
-    firstWorkingSet: { setId: 'bad', reps: 1, rir: NaN, load: 10 } }] };
+    selectedSet: { setId: 'bad', reps: 1, rir: NaN, load: 10 } }] };
   const hook = renderHook(({current}: {current: ReturnType<typeof model>}) => useRegimeAssessment(current, 'one', 'fixed'), { initialProps: { current: bad } });
   act(() => { jest.runAllTimers(); });
   expect(hook.result.current?.error).toBe(true);
@@ -133,7 +186,7 @@ it('updates selected-set temporal identity on a changed boundary and removes inv
 
 it('yields within a long trajectory, caps work before the next evaluation, and closes cancelled work', () => {
   const sessions = Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
-    firstWorkingSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } }));
+    selectedSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } }));
   const points = prepareRegimePoints(sessions), budget = { remaining: 20_000 };
   const fit = iterateStrengthTrajectory(points, 'quadratic', { method: 'joint' }, undefined, budget);
   expect(fit.next().done).toBe(false);
@@ -161,7 +214,7 @@ it('bounds a thousand-session UI request, retains every plotted point, and recov
   jest.useFakeTimers();
   const m = model();
   const large = { ...m, inferenceSessions: Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
-    firstWorkingSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
+    selectedSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
   const props = { read: { status: 'ready' as const, data: large, retry: jest.fn() },
     scope: { exerciseId: 'curve', range: 'history' as const, rir: null }, onScope: jest.fn(),
     exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,

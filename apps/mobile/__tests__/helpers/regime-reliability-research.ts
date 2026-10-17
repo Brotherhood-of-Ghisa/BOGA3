@@ -33,7 +33,7 @@ export function generateRegimeHistory(scenario: RegimeScenario, seed: number) {
     if (scenario === 'rounding') load = Math.round(load / 2.5) * 2.5;
     if (scenario === 'sparse' && i % 3 === 0) continue;
     sessions.push({ sessionId: `s${i}`, time: i + (scenario === 'gap' && i >= cut ? 16 : 0),
-      firstWorkingSet: { setId: `set${i}`, reps, rir: scenario === 'missing' && i % 3 === 0 ? null : rir, load } });
+      selectedSet: { setId: `set${i}`, reps, rir: scenario === 'missing' && i % 3 === 0 ? null : rir, load } });
   }
   return { sessions, trueCut: cut, delta: scenario === 'late-break' ? 10 : delta,
     strengthBefore: 100, strengthAfter: 100 + (scenario === 'late-break' ? 10 : delta),

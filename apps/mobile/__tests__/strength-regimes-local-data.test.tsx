@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { periodColour } from '@/components/rm-curve/chart';
-import { setDescription } from '@/components/rm-curve/details';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
 import { loadRmCurve } from '@/src/rm-curve/repository';
 import { ALL_GYMS, rmCurveWindow } from '@/src/rm-curve/model';
@@ -28,8 +27,8 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   expect(screen.getByText('Exploratory fit')).toBeTruthy();
   const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: EXERCISE_PAGE_FIXTURE.benchExerciseId, gymId: ALL_GYMS }))!;
   const newer = model.observations.find(p => p.setId === 'maestro_regime_31_set_0')!;
-  fireEvent.press(screen.getByText('View sets'));
-  fireEvent.press(screen.getByLabelText(setDescription(newer, 'DD-MM-YYYY')));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  for (let i = 0; i < model.observations.indexOf(newer); i++) fireEvent.press(screen.getByLabelText('Previous set'));
   expect(screen.getByTestId('rm-selected-period').props.children).toMatch(/^From /);
   expect(screen.getByTestId('rm-selected-period').props.style).toContainEqual({ color: periodColour('newer') });
   fireEvent.press(screen.getByTestId('rm-method-joint'));

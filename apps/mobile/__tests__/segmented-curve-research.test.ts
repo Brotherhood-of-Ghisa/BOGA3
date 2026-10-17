@@ -6,7 +6,7 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 
 const sessions = (strength: (i: number) => number, n = 24): RegimeSession[] => Array.from({ length: n }, (_, i) => ({
   sessionId: `s${String(i).padStart(2, '0')}`, time: i,
-  firstWorkingSet: { setId: `set${i}`, reps: 1, rir: 0, load: strength(i) + (i % 2 ? 2 : -2) },
+  selectedSet: { setId: `set${i}`, reps: 1, rir: 0, load: strength(i) + (i % 2 ? 2 : -2) },
 }));
 
 describe('bounded research optimizer', () => {
@@ -40,14 +40,14 @@ describe('conditional strength trajectory likelihood', () => {
 
   it('selects first ordinals supplied by the caller and never substitutes missing effort', () => {
     const input = sessions(() => 100, 4);
-    input[0].firstWorkingSet!.rir = null; input[1].firstWorkingSet = null;
+    input[0].selectedSet!.rir = null; input[1].selectedSet = null;
     expect(prepareRegimePoints(input).map(p => p.setId)).toEqual(['set2', 'set3']);
     expect(() => prepareRegimePoints([input[2], input[2]])).toThrow();
     expect(() => prepareRegimePoints([{ ...input[2], time: NaN }])).toThrow();
-    expect(() => prepareRegimePoints([{ ...input[2], firstWorkingSet: { ...input[2].firstWorkingSet!, load: -1 } }])).toThrow();
-    const zero = { ...input[2], firstWorkingSet: { ...input[2].firstWorkingSet!, load: 0 } };
+    expect(() => prepareRegimePoints([{ ...input[2], selectedSet: { ...input[2].selectedSet!, load: -1 } }])).toThrow();
+    const zero = { ...input[2], selectedSet: { ...input[2].selectedSet!, load: 0 } };
     expect(prepareRegimePoints([zero])[0].load).toBe(0);
-    expect(() => prepareRegimePoints([{ ...zero, firstWorkingSet: { ...zero.firstWorkingSet, rir: Number.MAX_SAFE_INTEGER } }])).toThrow();
+    expect(() => prepareRegimePoints([{ ...zero, selectedSet: { ...zero.selectedSet, rir: Number.MAX_SAFE_INTEGER } }])).toThrow();
   });
 });
 
@@ -61,8 +61,8 @@ describe('direct segmented strength fitting', () => {
     expect(fit.candidate!.logLikelihood).toBeCloseTo(expected, 7);
     expect(fit.evidence).toBeGreaterThan(10);
     expect(fit.cutProfile).toHaveLength(9);
-    expect(fit.points.map(p => p.setId)).toEqual(input.map(s => s.firstWorkingSet!.setId));
-    expect(input[0].firstWorkingSet!.load).toBe(98);
+    expect(fit.points.map(p => p.setId)).toEqual(input.map(s => s.selectedSet!.setId));
+    expect(input[0].selectedSet!.load).toBe(98);
   });
 
   it('allows linear and smooth curved progress to explain apparent separation', () => {
@@ -85,7 +85,7 @@ describe('direct segmented strength fitting', () => {
     const random = seededRandom(37101);
     const input: RegimeSession[] = Array.from({ length: 24 }, (_, i) => {
       const rir = 1 + i % 3, r = latentRirFromRecorded(rir, 0.5, random.uniform());
-      return { sessionId: `session${i}`, time: i, firstWorkingSet: { setId: `set${i}`, reps: 6, rir,
+      return { sessionId: `session${i}`, time: i, selectedSet: { setId: `set${i}`, reps: 6, rir,
         load: (i < 12 ? 100 : 115) / estimateOneRepMax(1, 6 + r)! + 2.5 * random.normal() } };
     });
     const points = prepareRegimePoints(input), fit = fitStrengthTrajectory(points, 'step', { method: 'joint' }, 12);
@@ -109,9 +109,9 @@ describe('direct segmented strength fitting', () => {
     const input = sessions(i => i < 12 ? 250 : 270);
     const normalized = input.map(s => {
       const result = resolveCalculatedLoad({ policy: 'ordinary', bodyweightContribution: 0,
-        loadInputMode: 'per_side_load', weightValue: String(s.firstWorkingSet!.load / 2) });
+        loadInputMode: 'per_side_load', weightValue: String(s.selectedSet!.load / 2) });
       if (result.status !== 'known') throw new Error('invalid test load');
-      return { ...s, firstWorkingSet: { ...s.firstWorkingSet!, load: result.calculatedLoadKg } };
+      return { ...s, selectedSet: { ...s.selectedSet!, load: result.calculatedLoadKg } };
     });
     const expected = fitStrengthRegimes(input, { method: 'fixed' });
     expect(fitStrengthRegimes(normalized, { method: 'fixed' })).toEqual(expected);
@@ -128,13 +128,13 @@ describe('direct segmented strength fitting', () => {
     expect(rank.noBreakFits.find(f => f.kind === 'quadratic')!.converged).toBe(false);
     expect(rank.noBreakFits.find(f => f.kind === 'quadratic')!.rankDeficient).toBe(true);
     const vertex = sessions(() => 100, 25).map((s, i) => ({ ...s,
-      firstWorkingSet: { ...s.firstWorkingSet!, load: 100 * (i / 24 - 0.5) ** 2 } }));
+      selectedSet: { ...s.selectedSet!, load: 100 * (i / 24 - 0.5) ** 2 } }));
     const fit = fitStrengthRegimes(vertex, { method: 'fixed' });
     expect(fit.status).toBe('unresolved');
     expect(fit.noBreakFits.find(f => f.kind === 'quadratic')!.strengthBoundary).toBe(true);
     expect(fit.noBreakFits.every(f => Number.isFinite(f.logLikelihood))).toBe(true);
     const overflow = sessions(() => Number.MAX_VALUE, 16);
-    overflow[0].firstWorkingSet!.reps = 10;
+    overflow[0].selectedSet!.reps = 10;
     expect(() => fitStrengthRegimes(overflow, { method: 'fixed' })).toThrow('nonfinite');
   });
 
@@ -142,7 +142,7 @@ describe('direct segmented strength fitting', () => {
     expect(fitStrengthRegimes([], { method: 'fixed' }).status).toBe('insufficient');
     expect(fitStrengthRegimes(sessions(() => 100, 12), { method: 'fixed' }).candidate).toBeNull();
     expect(fitStrengthRegimes(sessions(i => i < 12 ? 100 : 110), { method: 'fixed', maxIterations: 1 }).status).toBe('unresolved');
-    const zeros = sessions(() => 0, 16).map(s => ({ ...s, firstWorkingSet: { ...s.firstWorkingSet!, load: 0 } }));
+    const zeros = sessions(() => 0, 16).map(s => ({ ...s, selectedSet: { ...s.selectedSet!, load: 0 } }));
     const fit = fitStrengthRegimes(zeros, { method: 'fixed' });
     expect(fit.status).toBe('unresolved'); expect(fit.candidate!.strengthBoundary).toBe(true);
     const tied = sessions(() => 100, 16).map(s => ({ ...s, time: 1 }));

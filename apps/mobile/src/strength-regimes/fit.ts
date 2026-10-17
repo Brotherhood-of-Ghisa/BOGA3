@@ -5,7 +5,7 @@ import { rirCurveMultipliers } from './multipliers';
 import { iterateBoundedSearch } from './bounded-search';
 
 export type RegimeSession = { sessionId: string; time: number;
-  firstWorkingSet: { setId: string; reps: number; rir: number | null; load: number } | null };
+  selectedSet: { setId: string; reps: number; rir: number | null; load: number } | null };
 export type RegimePoint = JointRirPoint & { sessionId: string; setId: string; time: number };
 export type RegimeOptions = { method: 'fixed' | 'joint'; minimumSegment?: number;
   correctProbability?: number; loadSd?: number; loadSdBounds?: [number, number]; maxIterations?: number; maxPointEvaluations?: number };
@@ -23,10 +23,10 @@ export function prepareRegimePoints(sessions: RegimeSession[]): RegimePoint[] {
     .flatMap(session => {
       if (!session.sessionId || ids.has(session.sessionId) || !Number.isFinite(session.time)) throw new Error('invalid regime session');
       ids.add(session.sessionId);
-      const s = session.firstWorkingSet;
+      const s = session.selectedSet;
       if (s === null) return [];
       if (!s || !s.setId || sets.has(s.setId) || !Number.isFinite(s.load) || s.load < 0 ||
-        !Number.isSafeInteger(s.reps) || s.reps < 1) throw new Error('invalid first working set');
+        !Number.isSafeInteger(s.reps) || s.reps < 1) throw new Error('invalid selected set');
       sets.add(s.setId);
       if (s.rir === null) return [];
       return [{ sessionId: session.sessionId, setId: s.setId, time: session.time, load: s.load,

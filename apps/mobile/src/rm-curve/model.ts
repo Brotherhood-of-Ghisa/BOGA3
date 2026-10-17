@@ -93,21 +93,19 @@ export function buildRmCurveModel(graph: RmCurveGraph, scope: RmCurveEvaluation)
   const maxReps = observations.reduce((max, row) => Math.max(max, row.equivalentReps), 20);
   return { definition: graph.definition, start: scope.start, end: scope.end, gymId, rir: scope.rir ?? null,
     gyms, effortOptions, reference, observations, excluded,
-    inferenceSessions: inferenceSessions(cohort, scope),
+    inferenceSessions: inferenceSessions(observations),
     curve: rmCurveKnots(reference.totalRm, graph.definition.loadInputMode, maxReps) };
 }
 
 export type RmCurveModel = ReturnType<typeof buildRmCurveModel>;
 
-/** First working ordinal is chosen before effort filtering; missing effort never substitutes a later set. */
-function inferenceSessions(cohort: ProjectedRow[], scope: RmCurveEvaluation): RegimeSession[] {
-  const first = new Map<string, ProjectedRow>();
-  for (const item of cohort) {
-    if (item.row.completedAt < scope.start || item.value === 'not_working') continue;
-    const previous = first.get(item.row.sessionId);
-    if (!previous || compareObservations(item.row, previous.row) < 0) first.set(item.row.sessionId, item);
+/** [[1rm.curve-fitting]]; observations are filtered and in session order, so ties keep the first. */
+function inferenceSessions(observations: RmCurveObservation[]): RegimeSession[] {
+  const bests = new Map<string, RmCurveObservation>();
+  for (const point of observations) {
+    const previous = bests.get(point.sessionId);
+    if (!previous || point.existingOneRepMax > previous.existingOneRepMax) bests.set(point.sessionId, point);
   }
-  return [...first.values()].map(({row, value}) => ({ sessionId: row.sessionId, time: row.completedAt.getTime(),
-    firstWorkingSet: typeof value === 'string' || (scope.rir !== null && scope.rir !== undefined && value.rir !== scope.rir)
-      ? null : { setId: row.setId, reps: value.reps, rir: value.rir, load: value.calculatedLoadKg } }));
+  return [...bests.values()].map(point => ({ sessionId: point.sessionId, time: point.completedAt.getTime(),
+    selectedSet: { setId: point.setId, reps: point.reps, rir: point.rir, load: point.calculatedLoadKg } }));
 }

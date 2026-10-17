@@ -2,7 +2,7 @@ import { generateRegimeHistory, likelihoodEmphasis, monteCarloRate, regimeScenar
 import { fitStrengthTrajectory, prepareRegimePoints } from './helpers/segmented-curve-research';
 
 describe('regime reliability experiment design', () => {
-  it('is seeded, validates all designs and preserves first-ordinal missingness and gaps', () => {
+  it('is seeded, validates all designs and preserves sampled-set missingness and gaps', () => {
     for (const scenario of regimeScenarios) {
       const generated = generateRegimeHistory(scenario, 37201);
       expect(generated).toEqual(generateRegimeHistory(scenario, 37201));
@@ -17,7 +17,7 @@ describe('regime reliability experiment design', () => {
   it('fits fractional and negative strength changes without a minimum gap', () => {
     for (const increment of [-7, 0.25, 3.7]) {
       const points = prepareRegimePoints(Array.from({ length: 24 }, (_, i) => ({
-        sessionId: `s${i}`, time: i, firstWorkingSet: { setId: `set${i}`, reps: 1, rir: 0,
+        sessionId: `s${i}`, time: i, selectedSet: { setId: `set${i}`, reps: 1, rir: 0,
           load: 100 + (i >= 12 ? increment : 0) + (i % 2 ? 2 : -2) },
       })));
       const fit = fitStrengthTrajectory(points, 'step', { method: 'fixed' }, 12);
