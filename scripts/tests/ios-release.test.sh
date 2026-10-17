@@ -8,6 +8,17 @@ trap 'rm -rf "$FIXTURE"' EXIT
 export FIXTURE
 export REAL_GIT="$(command -v git)"
 fail() { echo "ASSERT FAILED: $*" >&2; exit 1; }
+assert_absent() {
+  local result=0
+  grep -EqR -- "$1" "$2" || result=$?
+  [[ "$result" == 1 ]] || fail "$3 (grep exit $result)"
+}
+if (assert_absent 'set -euo pipefail' "${BASH_SOURCE[0]}" 'match') >/dev/null 2>&1; then
+  fail 'absence assertion accepted a match'
+fi
+if (assert_absent 'anything' "$FIXTURE/missing" 'read failure') >/dev/null 2>&1; then
+  fail 'absence assertion hid a search error'
+fi
 mkdir -p "$FIXTURE/bin" "$FIXTURE/repo/scripts" "$FIXTURE/repo/apps/mobile" \
   "$FIXTURE/repo/supabase/scripts" "$FIXTURE/repo/supabase/migrations" \
   "$FIXTURE/repo/supabase/functions/notification-worker" "$FIXTURE/repo/supabase/.temp"
@@ -72,7 +83,8 @@ EOF
 cat > "$FIXTURE/bin/caffeinate" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" > "$FIXTURE/job-argv"
-ps -o pgid= -p "$$" | tr -d ' ' > "$FIXTURE/job-group"
+ps -o pgid= -p "$$" | tr -d ' ' > "$FIXTURE/job-group.tmp"
+mv "$FIXTURE/job-group.tmp" "$FIXTURE/job-group"
 EOF
 cat > "$FIXTURE/bin/npx" <<'EOF'
 #!/usr/bin/env bash
@@ -127,7 +139,7 @@ worker success || { cat "$FIXTURE/success/log"; fail 'release failed'; }
 [[ "$(cat "$FIXTURE/configuration.sql")" == *notification_worker_key* ]] || fail 'worker not configured'
 [[ "$(cat "$FIXTURE/configuration.sql")" != *'sending_enabled=true'* ]] || fail 'sending enabled'
 [[ "$(cat "$FIXTURE/calls")" != *'db reset'* && "$(cat "$FIXTURE/calls")" != *'--include-seed'* ]] || fail 'destructive deployment'
-! rg -q 'credential-must-not-leak' "$FIXTURE/success" || fail 'credential leaked to artifacts'
+assert_absent 'credential-must-not-leak' "$FIXTURE/success" 'credential leaked to artifacts'
 node - "$FIXTURE/calls" <<'JS'
 const assert = require('node:assert/strict');
 const log = require('node:fs').readFileSync(process.argv[2], 'utf8');
@@ -144,13 +156,13 @@ for failure in migrations functions build submission; do
   if worker "$failure"; then fail "$failure did not stop release"; fi
   [[ "$(cat "$FIXTURE/$failure/status")" == "$failure "* ]] || fail 'failure stage not recorded'
   if [[ "$failure" != submission ]]; then
-    ! rg -q 'eas-cli submit' "$FIXTURE/calls" || fail 'submission continued after failure'
+    assert_absent 'eas-cli submit' "$FIXTURE/calls" 'submission continued after failure'
   fi
 done
 unset FAIL_STAGE
 export FAIL_STAGE=history
 if worker history; then fail 'migration history mismatch accepted'; fi
-! rg -q 'db push|functions deploy|eas-cli build' "$FIXTURE/calls" || fail 'deployment continued after history mismatch'
+assert_absent 'db push|functions deploy|eas-cli build' "$FIXTURE/calls" 'deployment continued after history mismatch'
 unset FAIL_STAGE
 echo dirty >> "$FIXTURE/repo/apps/mobile/eas.json"
 if worker dirty; then fail 'dirty release source accepted'; fi
@@ -158,11 +170,11 @@ if worker dirty; then fail 'dirty release source accepted'; fi
 git -C "$FIXTURE/repo" checkout -- apps/mobile/eas.json
 export FAKE_URL=https://different-project.supabase.co
 if worker mismatch; then fail 'backend mismatch accepted'; fi
-! rg -q 'supabase link|db push|eas-cli build' "$FIXTURE/calls" || fail 'side effects after identity mismatch'
+assert_absent 'supabase link|db push|eas-cli build' "$FIXTURE/calls" 'side effects after identity mismatch'
 unset FAKE_URL
 export FAKE_BUNDLE=com.wrong.app
 if worker wrong-ipa; then fail 'wrong IPA accepted'; fi
-! rg -q 'eas-cli submit' "$FIXTURE/calls" || fail 'wrong IPA submitted'
+assert_absent 'eas-cli submit' "$FIXTURE/calls" 'wrong IPA submitted'
 unset FAKE_BUNDLE
 if bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/success" >/dev/null 2>&1; then
   fail 'job ran twice'
@@ -187,5 +199,5 @@ record=("$FIXTURE/config/releases/"ios-*)
 [[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled commit not pinned'
 cmp "$FIXTURE/repo/scripts/ios-release.sh" "${record[0]}/runner.sh" || fail 'runner not preserved'
 [[ "$(cat "$FIXTURE/job-argv")" == *'--run '* ]] || fail 'worker not scheduled'
-! rg -q 'credential-must-not-leak' "${record[0]}" || fail 'schedule persisted credentials'
+assert_absent 'credential-must-not-leak' "${record[0]}" 'schedule persisted credentials'
 echo 'ios-release: ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'
