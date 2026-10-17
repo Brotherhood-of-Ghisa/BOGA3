@@ -1,11 +1,12 @@
 # Product review
 
-A prompt any agent runs on a change, checking it against the product decisions
-in this directory — not code quality (that is `/code-review`).
+Load when opening or reviewing a PR. A prompt any agent runs on a change,
+checking it against the product decisions in `docs/product/` — not code
+quality (that is `/code-review`).
 
 ## Inputs
 
-- Every `*.md` in `docs/product/` except this one: the facts.
+- Every `*.md` in `docs/product/` except `README.md`: the facts.
 - The change: a PR diff (`gh pr diff <n>`) or a branch diff against
   `origin/main`, plus the PR title and body if there is one.
 - The repository at the change's base, for context only.
@@ -60,7 +61,7 @@ Verdict: clean | needs decision | needs fix
 Run it after any PR changes a fact, to catch old wording elsewhere.
 
 - **Input:** every persistent doc (tracked `*.md` outside `docs/plans/**`,
-  `docs/brainstorms/**` and this directory) instead of a diff, plus the facts.
+  `docs/brainstorms/**` and `docs/product/`) instead of a diff, plus the facts.
 - **Classes:** only **restates**, **violates** (the doc contradicts an
   accepted fact) and **over-specified**. A spec describing how code
   implements a fact it cites is neither of the first two.

@@ -22,7 +22,7 @@ Link CI runs / artifacts / prior threads — do not paste them.
 
 Agreed with operator: <!-- yes, plus anything lowered or raised and why -->
 
-Product facts: <!-- ids touched (`set.eligibility`, …) | none --> — product review: <!-- verdict of docs/product/REVIEW.md on this diff -->
+Product facts: <!-- ids touched (`set.eligibility`, …) | none --> — product review: <!-- verdict of docs/procedures/product-review.md on this diff -->
 
 ## Review hard
 
