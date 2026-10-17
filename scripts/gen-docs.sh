@@ -32,7 +32,7 @@
 #      - every doc reachable from AGENTS.md fits its word budget, and each
 #        `corpus` directory fits its combined one
 #        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings),
-#      - product facts (docs/product/README.md): every fact heading parses,
+#      - product facts (docs/procedures/product-facts-authoring.md): every fact heading parses,
 #        IDs are unique, every `[[id]]` and fact-table marker names a fact,
 #        every fact's statement fits the per-fact word cap, and a fact's
 #        `Signature:` text appears outside docs/product/ only in a paragraph
@@ -571,7 +571,7 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
             problems.append(f"{prefix}: {words} words in {len(docs)} docs, over its {limit}-word corpus "
                             "budget — trim it; it is loaded whole (rules: docs/specs/README.md)")
 
-# 9. product facts (docs/product/README.md, "Fact format"). Every `### `
+# 9. product facts (docs/procedures/product-facts-authoring.md, "Fact format"). Every `### `
 #    heading in a subject file is a fact header `### <subject>.<slug> · <kind>
 #    · <status>` whose subject is the file's name, and IDs are unique. Every
 #    `[[id]]` and `<!-- fact-table: <id> -->` in a persistent doc names a fact.
@@ -586,7 +586,7 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
 #    cap is stating a screen rather than a decision — split it, or move the
 #    render detail to the component that owns it.
 PRODUCT_DIR = "docs/product/"
-PRODUCT_NON_FACT = {"README.md", "REVIEW.md"}
+PRODUCT_NON_FACT = {"README.md"}
 FACT_STATEMENT_WORDS = 130
 FACT_KINDS = {"definition", "calculation", "presentation", "principle"}
 FACT_HEADER = re.compile(r"^### (\S+) · (\S+) · (.+?)\s*$")
@@ -730,7 +730,7 @@ for fid, (rel, ln, status) in sorted(facts.items()):
         problems.append(f"{rel}:{ln}: fact '{fid}' states {words} words, over the "
                         f"{FACT_STATEMENT_WORDS}-word cap — state the decision, not the screen: split "
                         "it, or move render detail to the component that owns it "
-                        "(rules: docs/product/README.md)")
+                        "(rules: docs/procedures/product-facts-authoring.md)")
 for fid, (rel, ln, status) in sorted(facts.items()):
     target = status.split(": ", 1)[1] if status.startswith("superseded-by: ") else None
     if target is not None and target not in facts:

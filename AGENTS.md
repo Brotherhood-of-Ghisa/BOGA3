@@ -218,5 +218,5 @@ pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
 the lanes that ran, each with its result and an evidence link ("CI green" alone
 is not enough), and notes that the set was agreed with the operator, including
 any default lane skipped and the reason. Before opening it, run
-`docs/product/REVIEW.md` on the branch diff next to `/code-review`, and put
+`docs/procedures/product-review.md` on the branch diff next to `/code-review`, and put
 its verdict on the Tests section's `Product facts:` line.

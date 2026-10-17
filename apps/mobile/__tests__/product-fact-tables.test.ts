@@ -1,5 +1,5 @@
 /**
- * Product fact tables run against the real code (`docs/product/README.md`,
+ * Product fact tables run against the real code (`docs/procedures/product-facts-authoring.md`,
  * "Executable tables"). Every row of a table marked
  * `<!-- fact-table: <id> -->` is a test, so a fact and the code cannot drift.
  *

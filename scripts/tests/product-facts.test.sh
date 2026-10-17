@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Tests for the product-fact rules in scripts/gen-docs.sh `check`
-# (docs/product/README.md, "Fact format"), on a fixture repo (never the real
+# (docs/procedures/product-facts-authoring.md, "Fact format"), on a fixture repo (never the real
 # one): fact headers parse and live in their subject's file, IDs are unique,
 # kinds and statuses are known, `[[id]]` references and fact-table markers
 # name a fact, a `Signature:` outside docs/product/ needs a citation in its
@@ -25,10 +25,9 @@ printf '# Fixture\n\n> **Owns:** fixture.\n\n<!-- boga:gen:lane-matrix -->\n<!--
   > "${FIX}/docs/specs/02-quality-and-test-gates.md"
 printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t900\n' > "${FIX}/scripts/doc-budgets.tsv"
 printf 'Always load: `docs/product/README.md` and `docs/spec.md`.\n' > "${FIX}/AGENTS.md"
-# README and REVIEW hold format examples, never facts.
+# README holds format examples, never facts.
 printf '# Facts\n\n### Format\n\n```markdown\n### <subject>.<slug> · <kind> · <status>\nSignature: `<text>`\n```\n\nCite as `[[<id>]]`, tables as `<!-- fact-table: <id> -->`.\n' \
   > "${FIX}/docs/product/README.md"
-printf '# Review\n\n### Output\n\nReplace with `[[id]]`.\n' > "${FIX}/docs/product/REVIEW.md"
 cat > "${FIX}/docs/product/lift.md" <<'MD'
 # Lift
 
@@ -79,7 +78,7 @@ expect_fail() { # <what> <expected output fragment>...
 gd gen >/dev/null || fail "fixture gen must pass: $(gd gen)"
 gd check >/dev/null || fail "a well-formed corpus with cited signatures must pass: $(gd check)"
 out="$(gd budgets)"
-grep -q "corpus docs/product/: [0-9]* of 900 words in 3 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
+grep -q "corpus docs/product/: [0-9]* of 900 words in 2 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
 grep -q "3 product facts, [0-9]* statement words;.* cap 130" <<<"${out}" || fail "budgets must report fact sizes: ${out}"
 grep -qx "over the cap: none" <<<"${out}" || fail "budgets must report an empty over-cap list: ${out}"
 
@@ -156,7 +155,7 @@ restore; gd check >/dev/null || fail "restored facts must pass: $(gd check)"
 
 # Corpus budget: the directory's docs share one limit.
 printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t20\n' > "${FIX}/scripts/doc-budgets.tsv"
-expect_fail "a corpus over its budget" "docs/product/: " "words in 3 docs, over its 20-word corpus budget"
+expect_fail "a corpus over its budget" "docs/product/: " "words in 2 docs, over its 20-word corpus budget"
 printf 'corpus\tdocs/product\t20\n' >> "${FIX}/scripts/doc-budgets.tsv"
 expect_fail "a corpus row without a trailing slash" "malformed row: 'corpus\\tdocs/product\\t20'"
 
