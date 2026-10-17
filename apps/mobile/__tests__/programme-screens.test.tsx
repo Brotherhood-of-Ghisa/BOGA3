@@ -172,7 +172,11 @@ describe('programme screens', () => {
       render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Copy wave');
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
-      expect(screen.getByTestId('programme-child-plan-schedule-input')).toHaveProp('keyboardType', 'numbers-and-punctuation');
+      expect(screen.getByTestId('programme-child-plan-schedule-row')).toHaveTextContent(/Unscheduled/);
+      fireEvent.press(screen.getByTestId('programme-child-plan-schedule-row'));
+      fireEvent(screen.getByTestId('plan-schedule-picker-native'), 'onChange', { type: 'set' }, new Date(2026, 9, 12, 9, 0, 0));
+      fireEvent.press(screen.getByTestId('plan-schedule-confirm-button'));
+      expect(screen.getByTestId('programme-child-plan-schedule-row')).toHaveTextContent(/2026-10-12 09:00/);
       await pickExercise('Bench Press');
       expect(screen.getByTestId('plan-form-block-1-set-1-effort')).toHaveTextContent('EffortRIR 4');
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '40');

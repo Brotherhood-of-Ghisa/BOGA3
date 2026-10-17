@@ -279,3 +279,30 @@ jest.mock('@supabase/supabase-js', () => {
     createClient: jest.fn(() => inertClient),
   };
 });
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  const MockDateTimePicker = (props: any) => {
+    return React.createElement(View, {
+      testID: props.testID ?? 'mock-datetime-picker',
+      accessibilityLabel: 'mock-datetime-picker',
+      ...props,
+    });
+  };
+
+  return {
+    __esModule: true,
+    default: MockDateTimePicker,
+    DateTimePickerAndroid: {
+      open: jest.fn((options: any) => {
+        if (options && typeof options.onChange === 'function') {
+          options.onChange({ type: 'set' }, options.value ?? new Date());
+        }
+      }),
+      dismiss: jest.fn(async () => true),
+    },
+  };
+});
+

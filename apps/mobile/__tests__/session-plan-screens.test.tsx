@@ -57,6 +57,7 @@ import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/pl
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
+import { parseSessionDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetLocalData } from './helpers/local-data';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -124,7 +125,18 @@ const createPlanThroughRepository = async (overrides: {
 // ---- Form helpers
 
 const fillTitle = (title: string) => fireEvent.changeText(screen.getByTestId('plan-form-title'), title);
-const fillSchedule = (text: string) => fireEvent.changeText(screen.getByTestId('plan-form-schedule'), text);
+const fillSchedule = (text: string) => {
+  fireEvent.press(screen.getByTestId('plan-form-schedule'));
+  if (text.trim().length === 0) {
+    fireEvent.press(screen.getByTestId('plan-schedule-clear-button'));
+  } else {
+    const parsed = parseSessionDateTime(text);
+    if (parsed) {
+      fireEvent(screen.getByTestId('plan-schedule-picker-native'), 'onChange', { type: 'set' }, parsed);
+      fireEvent.press(screen.getByTestId('plan-schedule-confirm-button'));
+    }
+  }
+};
 const addExerciseBlock = async (name: string, mode: 'empty' | 'repeat' = 'empty') => {
   fireEvent.press(screen.getByTestId('plan-form-add-block'));
   fireEvent.changeText(await screen.findByTestId('plan-exercise-pick-search'), name);
@@ -327,7 +339,7 @@ describe('plan form: create', () => {
     expect((await planQueries.listUnscheduledPlans()).concat(await planQueries.listUpcomingPlans())).toHaveLength(0);
   });
 
-  it('a bad schedule stays on its field; a valid one schedules the plan', async () => {
+  it('schedules the plan when a schedule is picked', async () => {
     await seedCatalog();
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
@@ -349,7 +361,7 @@ describe('plan form: create', () => {
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={sourceId} />);
 
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Original');
-    expect(screen.getByTestId('plan-form-schedule')).toHaveProp('value', '2026-10-06 07:00');
+    expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/2026-10-06 07:00/);
 
     fillTitle('Duplicate of Original');
     fillSchedule('');
