@@ -45,8 +45,9 @@ Two create-only planning tools (require explicit plan permission, idempotent):
 
 `get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`
 for an exercise the user tracks separately per gym: a gym id, or `none` for the
-sessions with no gym. Without it they report that exercise's most recently
-performed bucket, never a pooled figure.
+sessions with no gym. Context never pools gyms — it reports each gym's own
+records in `gym_buckets` and its other figures for one bucket — while history
+pages across every gym with each set carrying its own.
 
 Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled

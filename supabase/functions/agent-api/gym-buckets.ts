@@ -4,7 +4,8 @@
 //
 // A split exercise reports one exercise per gym, with the sessions that had no
 // gym forming their own bucket, and is never pooled (docs/product/gym.md,
-// gym.split). Coaching therefore answers for one bucket at a time.
+// gym.split). So no coaching figure spans gyms: the context route states each
+// bucket's own records and computes its other figures for one of them.
 
 /** A bucket key: a gym id, or null for the no-gym bucket. */
 export type GymBucket = string | null;
@@ -31,7 +32,8 @@ export const gymBucketFromParam = (raw: string | null): GymBucket | undefined =>
 /**
  * Every bucket the given sessions performed the exercise in, most recently
  * performed first. A bucket's timestamp is its newest session, so the order is
- * the one a reader expects from `Last`.
+ * the one a reader expects from `Last`. Equal timestamps break on the bucket
+ * key, so the order never depends on the order the sessions arrived in.
  */
 export const rankGymBuckets = (
   sessions: ReadonlyArray<{ gym_id: string | null; completed_at: number }>,
@@ -46,6 +48,7 @@ export const rankGymBuckets = (
   }
   return Array.from(newest.values()).sort((left, right) =>
     right.lastPerformedAt - left.lastPerformedAt
+    || bucketKey(left.bucket).localeCompare(bucketKey(right.bucket))
   );
 };
 

@@ -46,6 +46,13 @@ describe('coaching gym buckets', () => {
     ]);
   });
 
+  it('breaks an equal last-performed tie on the bucket, not on arrival order', () => {
+    const ranked = rankGymBuckets([session('gym-b', 400), session(null, 400), session('gym-a', 400)]);
+    expect(ranked.map((entry) => entry.bucket)).toEqual(['gym-a', 'gym-b', null]);
+    expect(rankGymBuckets([session(null, 400), session('gym-a', 400), session('gym-b', 400)]))
+      .toEqual(ranked);
+  });
+
   it('folds repeat sessions in one gym into a single bucket', () => {
     expect(rankGymBuckets([session('gym-home', 1), session('gym-home', 2)]))
       .toEqual([{ bucket: 'gym-home', lastPerformedAt: 2 }]);

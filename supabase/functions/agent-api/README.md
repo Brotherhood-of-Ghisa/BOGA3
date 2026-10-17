@@ -202,8 +202,9 @@ parameters: `limit` (`1..100`, default `20`), opaque `cursor`, and `gym_bucket`
 (see [gym buckets](#gym-buckets)). Drains to exhaustion when analyzing complete
 training history. Paging never partitions by gym: a page is one page of sets
 across every gym, and a split exercise's sets each carry their own `gym` (`null`
-for a session with no gym), as a workout does. `gym_bucket` filters the stream
-to one bucket, and only then does the cursor pin it.
+for a session with no gym), as a workout does — group by it before comparing.
+`gym_bucket` filters the stream to one bucket, and only then does the cursor pin
+it and `exercise.gym` name it. Per-gym records are the context route's.
 
 ```json
 {
@@ -230,8 +231,8 @@ to one bucket, and only then does the cursor pin it.
 
 An exercise the user tracks separately per gym (`exercise.split_by_gym`) reports
 one exercise per gym, with the sessions that had no gym forming their own
-bucket; it is never pooled, so both exercise routes answer for one bucket at a
-time. Context computes its figures for one bucket — the most recently performed one
+bucket, and is never pooled: no figure ever spans gyms. Context computes its
+figures for one bucket — the most recently performed one
 unless `gym_bucket` names another — because no figure may span gyms. History
 instead returns every gym's sets and labels each one, so `gym_bucket` there is a
 filter rather than a default. Either way `gym_bucket` is a gym id, or `none` for
@@ -239,22 +240,23 @@ the sessions with no gym (so a gym whose own id is `none` cannot be named), and
 it is `400 INVALID_ARGUMENT` on an exercise that is not split, or empty, or
 against a cursor for another bucket, and `404` for a gym the user does not own.
 
-`exercise.gym_buckets` lists every bucket this response could see, most recently
-performed first (at most 50), each with its own `personal_records` and
-`session_count` on the context route, so one call compares the gyms without ever
-pooling them. `session_count` counts that bucket's sessions holding at least one
-[working set](#working-sets-only), so a bucket performed only as warm-ups counts
-zero and holds no record. The history route's entries carry `gym` and
-`last_performed_at` only; records are the context route's.
+The context route's `exercise.gym_buckets` lists every bucket it could see, most
+recently performed first, each with its own `personal_records` and
+`session_count`, so one call compares the gyms without ever pooling them. Past
+50 buckets it lists the 50 newest and sets `gym_buckets_truncated`. Buckets are
+ranked over the sessions those figures count — [working sets
+only](#working-sets-only) — so a bucket performed only as warm-ups is not listed
+and is never the reported one. The history route carries no inventory: every
+gym's sets are already in its pages, each naming its gym.
 
 `exercise.gym` appears only when one bucket owns the response: context's
 `personal_records`, `recent_performances`, `volume_series` and
 `last_performed_at`, or a filtered history stream. `null` there means the no-gym
 bucket, not an unknown gym.
-Both routes rank buckets over every session that performed a set of the
-exercise, warm-ups included, so they agree on the order; a truncated history
-(`history_truncated`) can still hide a bucket. An exercise that is not split
-carries `split_by_gym: false` and neither field.
+Equal `last_performed_at` values break on the bucket, so the order is stable; a
+truncated history (`history_truncated`) can still hide a bucket. An exercise
+that is not split carries `split_by_gym: false` and no gym field, and a cursor's
+filter lapses if the flag is turned off between pages.
 
 A filtered history's `next_cursor` carries its bucket, so draining it keeps the
 filter whether or not the caller repeats `gym_bucket`; an unfiltered cursor

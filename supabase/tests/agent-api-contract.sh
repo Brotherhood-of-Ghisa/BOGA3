@@ -719,7 +719,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 
 echo "[agent-api-test] verifying a split exercise reports one gym bucket at a time"
 GYM_SPLIT="agent-api-${RUN_TAG}-gym-split"
+GYM_SPLIT_WARMUP="agent-api-${RUN_TAG}-gym-warmup"
 EXERCISE_SPLIT="agent-api-${RUN_TAG}-exercise-split"
+SPLIT_WARMUP_SESSION="agent-api-${RUN_TAG}-split-warmup-session"
 SPLIT_HOME_SESSION="agent-api-${RUN_TAG}-split-home-session"
 SPLIT_NONE_SESSION="agent-api-${RUN_TAG}-split-none-session"
 SPLIT_AWAY_SESSION="agent-api-${RUN_TAG}-split-away-session"
@@ -729,7 +731,8 @@ run_psql "
     insert into app_public.gyms
       (owner_user_id,id,name,created_at,updated_at,client_updated_at_ms)
     values
-      ('${USER_A_UUID}'::uuid,'${GYM_SPLIT}','Agent A Away Gym',${NOW_MS},${NOW_MS},${NOW_MS});
+      ('${USER_A_UUID}'::uuid,'${GYM_SPLIT}','Agent A Away Gym',${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${GYM_SPLIT_WARMUP}','Agent A Warm-Up Gym',${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_definitions
       (owner_user_id,id,name,load_input_mode,split_by_gym,created_at,updated_at,client_updated_at_ms)
     values
@@ -746,7 +749,11 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}',null,'completed',
        $((NOW_MS - 6100000)),$((NOW_MS - 6000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}','${GYM_SPLIT}','completed',
-       $((NOW_MS - 3100000)),$((NOW_MS - 3000000)),600,${NOW_MS},${NOW_MS},${NOW_MS});
+       $((NOW_MS - 5100000)),$((NOW_MS - 5000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
+      -- This exercise's newest session, and warm-ups only: no stat footprint,
+      -- so its gym is neither listed as a bucket nor the reported one.
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}','${GYM_SPLIT_WARMUP}','completed',
+       $((NOW_MS - 4100000)),$((NOW_MS - 4000000)),600,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.session_exercises
       (owner_user_id,id,session_id,exercise_definition_id,order_index,name,machine_name,
        created_at,updated_at,client_updated_at_ms)
@@ -756,6 +763,8 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}-block','${SPLIT_NONE_SESSION}','${EXERCISE_SPLIT}',0,
        'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-block','${SPLIT_AWAY_SESSION}','${EXERCISE_SPLIT}',0,
+       'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}-block','${SPLIT_WARMUP_SESSION}','${EXERCISE_SPLIT}',0,
        'Agent A Split Row',null,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_sets
       (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
@@ -768,13 +777,16 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set','${SPLIT_AWAY_SESSION}-block',0,'100','5',null,
        null,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}-set-2','${SPLIT_AWAY_SESSION}-block',1,'95','5',null,
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}-set','${SPLIT_WARMUP_SESSION}-block',0,'250','3','warm_up',
        null,${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
 
 agent_get "exercises/${EXERCISE_SPLIT}/context"
 assert_status "200" "split exercise context"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" '
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" \
+  --arg warmup "${GYM_SPLIT_WARMUP}" '
   .data.exercise.split_by_gym == true
   and .data.exercise.gym.id == $away
   and .data.exercise.gym.name == "Agent A Away Gym"
@@ -783,6 +795,10 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${G
   # Every gym reports its own records in this one response, never a pooled one.
   and (.data.exercise.gym_buckets | map(.personal_records.top_weight.value)) == [100, 150, 200]
   and (.data.exercise.gym_buckets | map(.session_count)) == [1, 1, 1]
+  # The newest session is warm-ups only, so its gym is neither listed nor
+  # reported and its 250 kg never becomes a record.
+  and (.data.exercise.gym_buckets | map(.gym.id // null) | index($warmup)) == null
+  and (.data.exercise | has("gym_buckets_truncated") | not)
   and (.data.recent_performances | length) == 1
   and .data.recent_performances[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
   and .data.personal_records.top_weight.value == 100
@@ -806,12 +822,15 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 
 agent_get "exercises/${EXERCISE_SPLIT}/history"
 assert_status "200" "split exercise history"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" '
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" \
+  --arg warmup "${GYM_SPLIT_WARMUP}" '
   # Paging does not partition by gym: one page, every gym, each set labelled.
   (.data.exercise | has("gym") | not)
-  and (.data.exercise.gym_buckets | length) == 3
-  and (.data.sets | length) == 4
-  and (.data.sets | map(.gym.id // null)) == [$away, $away, null, $home]
+  and (.data.exercise | has("gym_buckets") | not)
+  and (.data.exercise | has("gym_buckets_truncated") | not)
+  and (.data.sets | length) == 5
+  # Raw history keeps every performed set, warm-up included, newest first.
+  and (.data.sets | map(.gym.id // null)) == [$warmup, $away, $away, null, $home]
   and .data.next_cursor == null
 ' >/dev/null || fail "split exercise history partitioned its page by gym"
 
@@ -829,11 +848,11 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "exercises/${EXERCISE_SPLIT}/history?limit=2"
 assert_status "200" "unfiltered history page 1"
 ALL_CURSOR="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.next_cursor')"
-[[ -n "${ALL_CURSOR}" && "${ALL_CURSOR}" != "null" ]] || fail "a four-set history returned no cursor"
-agent_get "exercises/${EXERCISE_SPLIT}/history?limit=2&cursor=${ALL_CURSOR}"
+[[ -n "${ALL_CURSOR}" && "${ALL_CURSOR}" != "null" ]] || fail "a five-set history returned no cursor"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=3&cursor=${ALL_CURSOR}"
 assert_status "200" "unfiltered history page 2"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg home "${GYM_A}" '
-  (.data.sets | map(.gym.id // null)) == [null, $home]
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" '
+  (.data.sets | map(.gym.id // null)) == [$away, null, $home]
   and .data.next_cursor == null
 ' >/dev/null || fail "an unfiltered cursor did not keep walking every gym"
 
