@@ -7,6 +7,40 @@ Use a Bash session for the fenced commands, including the sourced Supabase
 helpers. Enable `set -euo pipefail` so a failed check stops subsequent commands.
 Other worktrees can continue development.
 
+## Schedule without gates (explicit operator override)
+
+When the operator explicitly requests a scheduled release without gates, use
+`./boga ios release --help` for prerequisites and scheduling options, then:
+
+```bash
+./boga ios release --at 2026-10-18T01:00:00Z --profile prod \
+  --project-ref <agreed-project-ref> --dry-run
+# Remove --dry-run to create the one-time background job on this Mac.
+```
+
+The script pins the ref when scheduled and keeps metadata unchanged. It deploys
+the Supabase backend and submits the inspected local IPA; it runs no lanes or
+sweep. The logged PID identifies a separate process group; cancel the whole job
+with `kill -TERM -- -<PID>`. Logs, IPA, checksum, identity and stage status live
+outside the retained release checkout under the machine's BOGA config directory.
+No automatic retry follows a failure or uncertain upload. Inspect those records
+and remote state before resuming manually from the first unfinished step.
+
+Keep the Mac on, logged in, lid open and signing credentials accessible; the
+background process prevents idle sleep but cannot survive logout/reboot. Source
+changes after scheduling do not change the release SHA. Schedule only reviewed,
+compatible migrations: deployment omits seeds, reset and history repair. This is
+an existing-project release, not initial hosted Auth/MCP provisioning.
+
+When notification deployment needs explanation, load
+`docs/specs/tech/notification-delivery-contract.md` ("Rollout boundary"). The
+script configures the worker's Vault invocation and exact app environment;
+new sending defaults off, existing sending settings are retained, and a
+conflicting preview/production registration environment fails. Render and
+consent-site deployment, Apple processing/tester availability, hosted smoke and
+signed-device verification remain separate. After collecting the external
+artifacts, release the retained detached checkout as described in closeout below.
+
 ## Agree the release choices upfront
 
 Before changing metadata or starting a build, ask the operator together:
