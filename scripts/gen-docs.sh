@@ -562,9 +562,10 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
     elif mode != "gen":
         problems += stale
     # A corpus is a directory an agent loads whole, so its docs share one
-    # budget on top of their own.
+    # budget on top of their own. Its README is the index, read on its own
+    # and held to its own budget, so the corpus leaves it out.
     for prefix, limit in sorted(corpora.items()):
-        docs = [rel for rel in PERSISTENT_DOCS if rel.startswith(prefix)]
+        docs = [rel for rel in PERSISTENT_DOCS if rel.startswith(prefix) and rel != prefix + "README.md"]
         words = sum(len(open(os.path.join(root, rel), encoding="utf-8").read().split()) for rel in docs)
         corpus_rows.append((words, limit, prefix, len(docs)))
         if words > limit:

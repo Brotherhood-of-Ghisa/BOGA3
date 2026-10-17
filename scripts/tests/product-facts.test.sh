@@ -78,7 +78,7 @@ expect_fail() { # <what> <expected output fragment>...
 gd gen >/dev/null || fail "fixture gen must pass: $(gd gen)"
 gd check >/dev/null || fail "a well-formed corpus with cited signatures must pass: $(gd check)"
 out="$(gd budgets)"
-grep -q "corpus docs/product/: [0-9]* of 900 words in 2 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
+grep -q "corpus docs/product/: [0-9]* of 900 words in 1 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
 grep -q "3 product facts, [0-9]* statement words;.* cap 130" <<<"${out}" || fail "budgets must report fact sizes: ${out}"
 grep -qx "over the cap: none" <<<"${out}" || fail "budgets must report an empty over-cap list: ${out}"
 
@@ -155,7 +155,7 @@ restore; gd check >/dev/null || fail "restored facts must pass: $(gd check)"
 
 # Corpus budget: the directory's docs share one limit.
 printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t20\n' > "${FIX}/scripts/doc-budgets.tsv"
-expect_fail "a corpus over its budget" "docs/product/: " "words in 2 docs, over its 20-word corpus budget"
+expect_fail "a corpus over its budget" "docs/product/: " "words in 1 docs, over its 20-word corpus budget"
 printf 'corpus\tdocs/product\t20\n' >> "${FIX}/scripts/doc-budgets.tsv"
 expect_fail "a corpus row without a trailing slash" "malformed row: 'corpus\\tdocs/product\\t20'"
 
