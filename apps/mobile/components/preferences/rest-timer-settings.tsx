@@ -29,6 +29,7 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
   const { values, pending } = state;
   const autoStart = pending.restTimerAutoStart ?? values.restTimerAutoStart;
   const durationSec = pending.restTimerDurationSec ?? values.restTimerDurationSec;
+  const intervalSec = pending.repeatingTimerIntervalSec ?? values.repeatingTimerIntervalSec;
 
   return (
     <View style={styles.container} testID="settings-rest-timer">
@@ -49,6 +50,12 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
         onCommit={(restTimerDurationSec) => updatePreferences({ restTimerDurationSec })}
         testID="settings-rest-timer-duration"
         value={durationSec}
+      />
+      <PreferenceNumberField
+        label="Repeating interval (seconds)"
+        onCommit={(repeatingTimerIntervalSec) => updatePreferences({ repeatingTimerIntervalSec })}
+        testID="settings-repeating-timer-interval"
+        value={intervalSec}
       />
     </View>
   );

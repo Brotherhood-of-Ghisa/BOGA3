@@ -137,6 +137,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
   const restTimer = useSessionRestTimer(sessionId, {
     defaultDurationSec: trainingPreferences.restTimerDurationSec,
+    defaultRepeatingIntervalSec: trainingPreferences.repeatingTimerIntervalSec,
     autoStart: trainingPreferences.restTimerAutoStart,
     isActiveSession: isActiveSessionReady(state),
   });
@@ -420,7 +421,10 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       <RestTimerBar
         onAdjust={restTimer.adjust}
         onDismiss={restTimer.dismiss}
+        onResetRepeating={restTimer.resetRepeating}
         onRestart={restTimer.restart}
+        onSwitchMode={restTimer.switchMode}
+        onToggleRepeating={restTimer.toggleRepeating}
         view={restTimer.view}
       />
       {body}
