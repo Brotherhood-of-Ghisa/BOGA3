@@ -24,10 +24,11 @@ const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => P
 const mockStackScreen = jest.fn();
 const mockStack = jest.fn();
 const mockReportLaunchThemeProblem = jest.fn();
-const mockApplyThemeAppIcon = jest.fn();
+const mockStopThemeAppIcon = jest.fn();
+const mockStartThemeAppIcon = jest.fn();
 
 jest.mock('@/components/appearance/theme-app-icon', () => ({
-  applyThemeAppIcon: (...args: unknown[]) => mockApplyThemeAppIcon(...args),
+  startThemeAppIcon: (...args: unknown[]) => mockStartThemeAppIcon(...args),
 }));
 
 // Native notification routing has its own bridge and lifecycle suites.
@@ -153,7 +154,8 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockRegisterBackgroundSyncTask.mockReset();
     mockStackScreen.mockReset();
     mockReportLaunchThemeProblem.mockReset();
-    mockApplyThemeAppIcon.mockReset();
+    mockStartThemeAppIcon.mockReset().mockReturnValue(mockStopThemeAppIcon);
+    mockStopThemeAppIcon.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
   });
@@ -174,9 +176,15 @@ describe('RootLayout auth bootstrap wiring', () => {
 
     render(<RootLayout />);
 
-    expect(mockApplyThemeAppIcon).toHaveBeenCalledTimes(1);
-    expect(mockApplyThemeAppIcon).toHaveBeenCalledWith(preset);
+    expect(mockStartThemeAppIcon).toHaveBeenCalledTimes(1);
+    expect(mockStartThemeAppIcon).toHaveBeenCalledWith(preset);
     jest.restoreAllMocks();
+  });
+
+  it('stops icon recovery on unmount', () => {
+    const view = render(<RootLayout />);
+    view.unmount();
+    expect(mockStopThemeAppIcon).toHaveBeenCalledTimes(1);
   });
 
   it('boots the local data layer, the exercise catalog and auth on mount', async () => {

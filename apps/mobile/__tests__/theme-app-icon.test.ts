@@ -5,22 +5,50 @@ jest.mock('expo-alternate-app-icons', () => ({
   getAppIconName: jest.fn(),
   setAlternateAppIcon: jest.fn(),
 }));
+jest.mock('react-native/Libraries/AppState/AppState', () => ({
+  __esModule: true,
+  default: { currentState: 'active', addEventListener: jest.fn() },
+}));
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn() }));
+
+import { AppState, type AppStateStatus } from 'react-native';
 
 import * as appIcons from 'expo-alternate-app-icons';
 import { Storage } from 'expo-sqlite/kv-store';
 
-import { applyThemeAppIcon } from '@/components/appearance/theme-app-icon';
-import { readLaunchTheme } from '@/components/ui/theme-launch';
+import { startThemeAppIcon } from '@/components/appearance/theme-app-icon';
+import { readLaunchTheme, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { customTheme, getThemePreset, resolveThemePreset, type ThemePresetId } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
+const listeners = new Set<(state: AppStateStatus) => void>();
+let stops: (() => void)[] = [];
+const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
+function changeState(state: AppStateStatus) {
+  jest.replaceProperty(AppState, 'currentState', state);
+  for (const listener of listeners) listener(state);
+}
+async function applyThemeAppIcon(preset: Parameters<typeof startThemeAppIcon>[0]) {
+  stops.push(startThemeAppIcon(preset));
+  await settle();
+}
+
 beforeEach(() => {
+  jest.replaceProperty(AppState, 'currentState', 'active');
+  jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+    listeners.add(listener);
+    return { remove: () => { listeners.delete(listener); } };
+  });
   jest.mocked(appIcons.getAppIconName).mockReturnValue(null);
   jest.mocked(appIcons.setAlternateAppIcon).mockResolvedValue(null);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  stops.forEach((stop) => stop());
+  stops = [];
+  await settle();
+  expect(listeners.size).toBe(0);
+  Storage.removeItemSync(THEME_PRESET_STORAGE_KEY);
   jest.restoreAllMocks();
   jest.clearAllMocks();
 });
@@ -118,4 +146,100 @@ it.each([new Error('OS unavailable'), 'OS unavailable'])('logs a failed default 
   expect(logEvent).toHaveBeenCalledWith(expect.objectContaining({
     context: { presetId: 'slate', error: 'alternate icon missing', fallbackError: 'OS unavailable' },
   }));
+});
+
+it.each(['background', 'inactive', null] as const)('defers a launch in %s until active', async (state) => {
+  jest.replaceProperty(AppState, 'currentState', state);
+  await applyThemeAppIcon(getThemePreset('slate'));
+  expect(appIcons.setAlternateAppIcon).not.toHaveBeenCalled();
+  changeState('active');
+  await settle();
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith('Slate');
+});
+
+it.each([false, true])('recovers cancellation when foreground arrives before rejection: %s', async (foregroundFirst) => {
+  let reject!: (error: Error) => void;
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await applyThemeAppIcon(getThemePreset('forest'));
+  changeState('background');
+  Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
+  if (foregroundFirst) changeState('active');
+  reject(new Error('UIKit cancelled the request'));
+  await settle();
+  if (!foregroundFirst) {
+    expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Forest']]);
+    changeState('active');
+    await settle();
+  }
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Forest'], ['Forest']]);
+  expect(logEvent).not.toHaveBeenCalled();
+  changeState('inactive');
+  changeState('active');
+  changeState('background');
+  changeState('active');
+  await settle();
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledTimes(2);
+});
+
+it('rechecks the icon after cancellation rather than prompting for an already applied icon', async () => {
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementationOnce(async () => {
+    changeState('background');
+    jest.mocked(appIcons.getAppIconName).mockReturnValue('Rainbow');
+    throw new Error('interrupted after applying');
+  });
+  await applyThemeAppIcon(customTheme(200));
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Rainbow']]);
+});
+
+it('serializes foreground events and remounts while an icon request is pending', async () => {
+  let resolve!: (icon: string | null) => void;
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  await applyThemeAppIcon(getThemePreset('slate'));
+  stops[0]();
+  await applyThemeAppIcon(getThemePreset('slate'));
+  changeState('inactive');
+  changeState('active');
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledTimes(1);
+  jest.mocked(appIcons.getAppIconName).mockReturnValue('Slate');
+  resolve('Slate');
+  await settle();
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledTimes(1);
+});
+
+it('does not retry ordinary failures on every foreground', async () => {
+  jest.mocked(appIcons.setAlternateAppIcon).mockRejectedValueOnce(new Error('missing icon'));
+  await applyThemeAppIcon(getThemePreset('slate'));
+  changeState('background');
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Slate'], [null]]);
+});
+
+it('does not retry or fall back after recovery has stopped', async () => {
+  let reject!: (error: Error) => void;
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await applyThemeAppIcon(getThemePreset('plum'));
+  stops[0]();
+  reject(new Error('cancelled'));
+  await settle();
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Plum']]);
+  expect(logEvent).not.toHaveBeenCalled();
+});
+
+it('defers an interrupted Warm fallback and retries the launch theme after resuming', async () => {
+  jest.mocked(appIcons.setAlternateAppIcon)
+    .mockRejectedValueOnce(new Error('alternate icon refused'))
+    .mockImplementationOnce(async () => {
+      changeState('background');
+      throw new Error('fallback cancelled');
+    });
+  await applyThemeAppIcon(getThemePreset('plum'));
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Plum'], [null]]);
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Plum'], [null], ['Plum']]);
 });
