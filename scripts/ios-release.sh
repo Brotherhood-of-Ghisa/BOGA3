@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# One-shot local release; no test lanes or sweep. See --help before scheduling.
+# Local release scheduling; no test lanes or sweep. See --help before scheduling.
 set -euo pipefail
 umask 077
 
@@ -8,8 +8,9 @@ fail() { echo "[ios-release] $*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Usage: ./boga ios release --at <UTC time|now> --profile <preview|prod>
-                        --project-ref <Supabase ref> [--ref <git ref>] [--dry-run]
+Usage: ./boga ios release [--at <UTC time|now>] [--every <hours>h]
+                        --profile <preview|prod> --project-ref <Supabase ref>
+                        [--ref <git ref>] [--dry-run]
 
 Example: ./boga ios release --at 2026-10-18T01:00:00Z --profile prod \
            --project-ref <your-project-ref>
@@ -23,7 +24,13 @@ and backend, skip the release. Otherwise:
   3. Configure group evaluation and notification invocation/registration.
   4. Build locally, inspect/checksum the IPA, and submit that IPA to Apple.
 
-No gates, sweep, metadata changes, Git tags, or automatic retries.
+Without --every, --at is required and schedules one run. --every accepts any positive
+whole number of hours (e.g. 1h, 4h, 12h, 24h, 48h), starting now unless --at sets
+the first run. It reuses one checkout, retains a separate record per run, and stops
+on any failure. Extra missed intervals are skipped. Repetition stops on
+cancellation, logout or reboot.
+
+No gates, sweep, metadata changes, Git tags, or automatic retries after failure.
 Docker must be running for function bundling. Hosted credentials come from
 supabase/.env.hosted (the shared machine config):
 SUPABASE_PROJECT_REF, SUPABASE_URL, SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD.
@@ -36,7 +43,7 @@ with kill -TERM -- -<PID> (the entire job process group). It keeps the checkout
 on success/failure for inspection; run ./boga worktree release --force there
 after finishing with its external artifacts.
 The Mac must stay powered on, logged in, lid open, and able to access signing keys.
-This one-shot background job does not survive logout/reboot. No Render/consent-site
+The background job does not survive logout/reboot. No Render/consent-site
 deployments or hosted device tests. New notification config has sending disabled;
 existing configuration must match the selected app and keeps its sending setting.
 EOF
@@ -238,19 +245,54 @@ process.stdout.write(values[name] || '');
 JS
 }
 
+repeat_release() {
+  record="$1"
+  source "$record/job.env"
+  mkdir "$record/started" || fail 'job already started; inspect its status before retrying'
+  stage=recurring
+  trap 'result=$?; printf "%s (exit %s)\n" "$stage" "$result" > "$record/status"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  mkdir "$record/runs"
+  local run_dir name
+  while true; do
+    run_dir="$(mktemp -d "$record/runs/run.XXXXXX")"
+    for name in release_root sha ref profile project at_epoch; do
+      printf '%s=%q\n' "$name" "${!name}"
+    done > "$run_dir/job.env"
+    printf '%s\n' "$run_dir" > "$record/latest-run.txt"
+    stage="recurring; scheduled epoch $at_epoch; artifacts $run_dir"
+    printf '%s\n' "$stage" > "$record/status"
+    echo "[ios-release] Next run: $(node -p 'new Date(Number(process.argv[1])*1000).toISOString()' "$at_epoch"); artifacts: $run_dir"
+    # A separate shell preserves fail-fast behavior inside the conditional pipeline.
+    if /bin/bash "$record/runner.sh" --run "$run_dir" 2>&1 | tee "$run_dir/release.log"; then
+      sha="$(cat "$run_dir/commit.txt")"
+    else
+      stage="stopped after failed run; inspect $run_dir"
+      return 1
+    fi
+    at_epoch=$((at_epoch + repeat_seconds))
+    # Overruns never queue overlapping releases.
+    while (( at_epoch <= $(date +%s) )); do at_epoch=$((at_epoch + repeat_seconds)); done
+  done
+}
+
 if [[ "${1:-}" == --run ]]; then
   [[ $# == 2 ]] || fail 'invalid worker invocation'
-  run_release "$2"
+  # Child records omit repetition; never inherit the parent's exported interval.
+  repeat_seconds=0
+  source "$2/job.env"
+  if (( ${repeat_seconds:-0} > 0 )); then repeat_release "$2"; else run_release "$2"; fi
   exit
 fi
 
-at='' profile='' project='' ref=origin/main dry=0
+at='' every='' repeat_seconds=0 profile='' project='' ref=origin/main dry=0
 while (( $# )); do
   case "$1" in
-    --at|--profile|--project-ref|--ref)
+    --at|--every|--profile|--project-ref|--ref)
       [[ $# -ge 2 && -n "$2" ]] || fail "$1 requires a value"
       case "$1" in
-        --at) at="$2" ;; --profile) profile="$2" ;; --project-ref) project="$2" ;; --ref) ref="$2" ;;
+        --at) at="$2" ;; --every) every="$2" ;; --profile) profile="$2" ;; --project-ref) project="$2" ;; --ref) ref="$2" ;;
       esac
       shift 2 ;;
     --dry-run) dry=1; shift ;;
@@ -260,6 +302,7 @@ while (( $# )); do
 done
 [[ "$profile" == preview || "$profile" == prod ]] || fail '--profile must be preview or prod'
 [[ "$project" =~ ^[a-z0-9]{20}$ ]] || fail '--project-ref must be a 20-character hosted project ref'
+[[ -n "$at" || -z "$every" ]] || at=now
 at_epoch="$(node - "$at" <<'JS'
 const value = process.argv[2];
 if (value === 'now') { console.log(Math.floor(Date.now()/1000)); process.exit(); }
@@ -271,18 +314,35 @@ if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value) || !Number.isFinite(date.ge
 console.log(date.getTime()/1000);
 JS
 )"
+repeat_seconds="$(node - "$every" "$at_epoch" <<'JS'
+const [value, first] = process.argv.slice(2);
+if (!value) { console.log(0); process.exit(); }
+const match = /^([0-9]+)h$/.exec(value);
+const seconds = Number(match?.[1]) * 3600;
+if (!Number.isSafeInteger(seconds) || seconds <= 0) {
+  console.error('--every must be a positive whole number of hours, e.g. 4h, 12h or 24h');
+  process.exit(1);
+}
+if (!Number.isFinite(new Date((Number(first) + seconds) * 1000).getTime())) {
+  console.error('--every exceeds the supported date range'); process.exit(1);
+}
+console.log(seconds);
+JS
+)"
+
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$script")/.."
 source scripts/worktree-lib.sh
 if (( ! dry )); then git fetch --quiet origin; fi
 sha="$(git rev-parse --verify --end-of-options "$ref^{commit}")"
 printf '[ios-release] %s at %s; starting commit %s; backend %s\n' "$profile" "$at" "$sha" "$project"
+if (( repeat_seconds > 0 )); then echo "[ios-release] Repeats every $every; stops on failure or cancellation."; fi
 if (( dry )); then
   echo '[ios-release] Plan: pull origin/main at run time (other refs pinned) → skip unchanged source → migrate → deploy all functions → configure workers → local build → inspect IPA → submit. No gates. No job created.'
   exit
 fi
 [[ "$(uname -s)" == Darwin ]] || fail 'local iOS releases require macOS'
-for tool in caffeinate npm npx jq unzip shasum plutil; do command -v "$tool" >/dev/null || fail "missing $tool"; done
+for tool in caffeinate npm npx jq unzip shasum plutil tee; do command -v "$tool" >/dev/null || fail "missing $tool"; done
 load_hosted_env
 mkdir -p "$(boga_config_root)/releases"
 record="$(mktemp -d "$(boga_config_root)/releases/ios-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")"
@@ -293,9 +353,9 @@ release_name="$(basename "$record")"
 release_root="$release_parent/$release_name"
 ./boga worktree create --detach --from "$sha" --root "$release_parent" --name "$release_name"
 cp "$script" "$record/runner.sh"
-for name in release_root sha ref profile project at_epoch; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
+for name in release_root sha ref profile project at_epoch repeat_seconds; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
 printf 'scheduled\n' > "$record/status"
-# shortcut: a one-shot process cannot survive reboot/logout; use launchd if that becomes required.
+# shortcut: in-memory schedules cannot survive reboot/logout; use launchd if persistence is required.
 node - "$record" <<'JS'
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
