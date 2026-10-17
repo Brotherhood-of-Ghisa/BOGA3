@@ -7,6 +7,78 @@ Use a Bash session for the fenced commands, including the sourced Supabase
 helpers. Enable `set -euo pipefail` so a failed check stops subsequent commands.
 Other worktrees can continue development.
 
+## Schedule without gates (operator reference)
+
+For the human terminal command, use
+[Schedule an iOS build and submission](../runbook-scheduled-ios-release.md).
+This route requires an explicit choice to omit test lanes and the release sweep.
+It keeps app metadata unchanged and creates no Git tag.
+
+### Prerequisites
+
+`./boga ios release --help` lists the tools and options. The Mac needs Xcode,
+CocoaPods, Node/npm, running Docker, and EAS login/signing/submission credentials
+that work non-interactively.
+
+Configure `supabase/.env.hosted` with `SUPABASE_PROJECT_REF`, `SUPABASE_URL`,
+`SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. The URL must be
+`https://<project-ref>.supabase.co`, matching the explicit project ref. The EAS
+environment must contain readable `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` for that same project. Profile choices are below;
+the profile name alone does not select a database.
+
+### Source and scheduling behavior
+
+`--at` accepts a future UTC timestamp ending in `Z`, or `now`. `--dry-run` prints
+the plan and resolves the locally known ref without creating a job or validating
+credentials/connectivity. Each real invocation creates one job; changing its
+time means cancelling it and scheduling another. The job cannot survive
+logout/reboot; keep the Mac logged in, lid open and signing keys accessible.
+
+Default jobs pull `origin/main` with `--ff-only` at execution, then record the
+actual SHA. Other `--ref` values stay pinned when scheduled. Tracked files matching
+this Mac's last successful upload for the same profile/backend skip deployment,
+build and submission. The first run builds; failed uploads preserve the local
+success record under the BOGA config directory (default
+`~/.config/boga/releases/`). Schedule only reviewed, compatible migrations:
+deployment omits seeds, reset and history repair. This operates on an existing
+hosted project.
+
+### Logs, cancellation and closeout
+
+The command prints PID, checkout and artifact paths. Use its exact artifact path:
+
+```bash
+BOGA_RELEASE_RECORD='/paste/the/Artifacts-log/directory/here'
+tail -f "$BOGA_RELEASE_RECORD/release.log"
+# Ctrl-C stops watching; the release keeps running.
+cat "$BOGA_RELEASE_RECORD/status"
+```
+
+The log shows live progress. `status` starts as `scheduled`, then records the
+final stage/exit code when the worker ends. `commit.txt` appears after source
+selection. The IPA, identity and checksum remain in that artifact directory.
+Skipped/uploaded results exit 0; a nonzero exit needs investigation. Uploaded
+means the submission command completed; check Apple processing/tester availability
+separately. Inspect logs and remote state before retrying a failed or uncertain
+upload; there is no automatic retry.
+
+While the job is pending or running, cancel its whole process group:
+
+```bash
+kill -TERM -- "-$(cat "$BOGA_RELEASE_RECORD/pid")"
+```
+
+After collecting the external artifacts and finishing with a stopped job, release
+its retained detached checkout using "Apply the optional tag and close out" below.
+
+When notification deployment needs explanation, load
+`docs/specs/tech/notification-delivery-contract.md` ("Rollout boundary"). The
+script configures the worker's Vault invocation and exact app environment;
+new sending defaults off, existing sending settings are retained, and a
+conflicting preview/production registration environment fails. Render/consent-site
+deployment, hosted smoke and signed-device verification remain separate.
+
 ## Agree the release choices upfront
 
 Before changing metadata or starting a build, ask the operator together:

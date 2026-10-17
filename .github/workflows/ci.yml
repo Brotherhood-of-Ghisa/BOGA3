@@ -99,7 +99,8 @@ jobs:
       # timeout. Deliberately NOT `--forceExit`, which would hide the leak.
       - name: Test
         if: steps.changes.outputs.docs_only != 'true'
-        run: npm test
+        # Jest's default reserves a core, serializing the suite on two-core runners.
+        run: npm test -- --maxWorkers=2
         timeout-minutes: 5
 
       - name: Agent authorization web
