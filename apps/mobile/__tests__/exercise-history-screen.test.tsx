@@ -61,6 +61,7 @@ import {
   __resetExerciseListPreferencesForTests,
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
+import { NO_GYM_ROUTE_PARAM } from '@/src/utils/gym-scope-route';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -264,6 +265,20 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).not.toContain('history_elsewhere_squat');
   });
 
+  it('still lists every gym under Current gym only when the session had no gym', async () => {
+    // A session with no gym has no current gym to narrow to, so the filter is
+    // inert — it is the split that keys the records, not this preference.
+    act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
+
+    await openHistory(
+      { exerciseDefinitionId: SQUAT, currentGymId: NO_GYM_ROUTE_PARAM },
+      logSquatElsewhere
+    );
+
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    expect(screen.queryByTestId('exercise-history-empty-state')).toBeNull();
+  });
+
   it('opens the completed session from its card and from a best', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
@@ -401,30 +416,30 @@ describe('ExerciseHistoryScreenShell', () => {
   });
 
   // The gym scope is three-state: the prop absent is every gym, `null` is the
-  // sessions with no gym, an id is that gym. Both named states say "this gym".
-  it.each([['gym-westside'], [null]] as const)(
-    'renders empty state message tailored for gym filter when the gym scope is %p',
-    (appliedGymId) => {
-      render(
-        <ExerciseHistoryScreenShell
-          summary={buildSummary({ sessions: [] })}
-          period={7}
-          appliedTagDefinitionId={null}
-          appliedGymId={appliedGymId}
-          isLoading={false}
-          errorMessage={null}
-          onSelectPeriod={jest.fn()}
-          onSelectTag={jest.fn()}
-          onPressSession={jest.fn()}
-          onSelectMainTab={jest.fn()}
-        />
-      );
+  // sessions with no gym, an id is that gym. The empty state names the scope
+  // it actually applied, so the no-gym one never claims a gym.
+  it.each([
+    ['gym-westside' as string | null, /this gym/],
+    [null, /without a gym/],
+  ])('names the gym scope %p in the empty state', (appliedGymId, expected) => {
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary({ sessions: [] })}
+        period={7}
+        appliedTagDefinitionId={null}
+        appliedGymId={appliedGymId}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+      />
+    );
 
-      expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(
-        /this gym/
-      );
-    }
-  );
+    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(expected);
+    expect(screen.getByTestId('exercise-history-empty-state')).not.toHaveTextContent(/selected tag/);
+  });
 
 });
 

@@ -14,8 +14,13 @@ counts in its current gym's bucket.
 | Coaching | per bucket, with its gym |
 
 The setting is synced and retroactive: changing it recomputes history and PRs.
+Where a screen must report a split exercise with no gym in hand, it reports the
+most recently performed bucket, never a pooled one; coaching does the same for
+the figures it gives one bucket at a time.
 
-Why: one exercise on different gyms' equipment is not comparable. Approved 2026-10-17.
+Why: one exercise on different gyms' equipment is not comparable; a reader that
+cannot name a gym is still never shown two gyms added together. Approved
+2026-10-17.
 Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
 
 ### gym.split-label · presentation · accepted

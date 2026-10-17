@@ -201,7 +201,9 @@ export function ExerciseHistoryScreenShell({
               <Card>
                 <StatePanel
                   body={
-                    appliedGymId !== undefined
+                    appliedGymId === null
+                      ? 'No completed sessions without a gym in this period.'
+                      : appliedGymId !== undefined
                       ? 'No completed sessions for this gym in this period.'
                       : appliedTagDefinitionId
                         ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
@@ -388,10 +390,15 @@ export default function ExerciseHistoryRoute() {
   // and narrows the sessions too only under `Current gym only`.
   const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
   const atGymId = decodeGymRouteParam(coerceRouteParam(params.currentGymId));
+  // `Current gym only` is unchanged: a session with no gym has no current gym
+  // to narrow to, so it still lists every gym. The bucket is a separate
+  // question, and `atGymId` answers it on its own.
   const appliedGymId: string | null | undefined =
     routeGymId !== undefined
       ? routeGymId
-      : listPreferences.pastRecordsGymScope === 'current-gym' ? atGymId : undefined;
+      : listPreferences.pastRecordsGymScope === 'current-gym' && atGymId
+        ? atGymId
+        : undefined;
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
