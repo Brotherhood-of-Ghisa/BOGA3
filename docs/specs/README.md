@@ -39,8 +39,8 @@ and `docs/brainstorms/**`. `docs-check` (`scripts/gen-docs.sh`) enforces rules
    2,500 for each always-load spec, and 3,000 for the rest, counted as
    `wc -w` counts.
    `./boga docs budgets` prints every doc's count, its budget, and the doc
-   that first links to it. `docs/product/` is loaded whole, so its docs also
-   share one `corpus` budget (6,000 words).
+   that first links to it. The product review loads `docs/product/` whole, so
+   its docs also share one `corpus` budget.
 2. **Over budget: split or trim.** Ask of every section: does it repeat another
    doc, or repeat what the code already says? Does an agent need it at all?
    Does it need this level of detail? Cut what fails, or split the doc into

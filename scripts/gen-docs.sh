@@ -569,7 +569,7 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
         corpus_rows.append((words, limit, prefix, len(docs)))
         if words > limit:
             problems.append(f"{prefix}: {words} words in {len(docs)} docs, over its {limit}-word corpus "
-                            "budget — trim it; it is loaded whole (rules: docs/specs/README.md)")
+                            "budget — trim it; the product review loads it whole (rules: docs/specs/README.md)")
 
 # 9. product facts (docs/procedures/product-facts-authoring.md, "Fact format"). Every `### `
 #    heading in a subject file is a fact header `### <subject>.<slug> · <kind>
