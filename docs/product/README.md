@@ -17,6 +17,7 @@ Each question belongs to one subject/file. Add a new subject in its own PR.
 | `notifications` | `notifications.md` | Group alerts: recipients, defaults, batching, freshness |
 | `groups` | `groups.md` | Group competition: certification's scope and end |
 | `appearance` | `appearance.md` | App icon selection and the default fallback |
+| `gym` | `gym.md` | Per-gym exercise reporting |
 
 Facts govern app-wide rules; screen layout belongs in `docs/specs/ui/screen-map.md`,
 `docs/specs/ui/components-catalog.md`, component READMEs and tests.
@@ -47,13 +48,12 @@ Signature: `<text>`, `<text>`  (optional)
   asks), or `superseded-by: <id>`.
 - **Tables over prose** for rules with cases; every cell is a decision.
 - **Small**: a statement — the header down to `Why:`, examples excluded — is at
-  most 130 words. Longer means the fact is describing a screen instead of
-  deciding something: split it into the decisions it holds, or leave the render
-  detail to the component that owns it and the tests that pin it. The test for
-  a line is whether a builder changing it would need the product owner.
+  most 130 words. Longer usually describes a screen: split it into its
+  decisions, or leave render detail to its component and tests. Keep a line
+  only if changing it would need the product owner.
 - **Examples** for definitions and calculations are table rows a test can run.
-  A principle carries at most three: one bad, one good, one kept exception. Its
-  review verdicts are not logged here — git and the PR bodies hold those.
+  A principle carries at most three: one bad, one good, one kept exception;
+  review verdicts stay in git and PR bodies.
 - **Executable tables** carry `<!-- fact-table: <id> -->`; a Jest test
   (`apps/mobile/__tests__/product-fact-tables.test.ts`) runs every row through
   the real code. A row the `Pending:` line explains runs as an expected
@@ -62,11 +62,10 @@ Signature: `<text>`, `<text>`  (optional)
   contain (a formula constant, an exact label). Principles rarely have one.
 - **Reference** a fact from any doc as `[[set.eligibility]]`.
 
-`docs-check` enforces the format: a malformed header, a duplicate ID, an
-unknown kind or status, a `[[id]]` naming no fact, or a statement over the cap
-fails it. So does a signature outside this directory whose paragraph does not
-cite the fact — cite it, or remove the restatement. `./boga docs budgets`
-prints every fact's statement size against the cap.
+`docs-check` fails a malformed header, a duplicate ID, an unknown kind or
+status, a `[[id]]` naming no fact, a statement over the cap, and a signature
+outside this directory in a paragraph not citing its fact. `./boga docs
+budgets` prints statement sizes.
 
 ## Changing a fact
 
@@ -75,8 +74,6 @@ prints every fact's statement size against the cap.
    it changes.
 2. Implementation PRs cite the fact IDs they implement and remove its
    `Pending:` line when the code matches.
-3. A builder never changes an accepted fact or answers an open one without
-   the product owner's approval: stop and ask.
 
 ## Reviewing a change against the facts
 
