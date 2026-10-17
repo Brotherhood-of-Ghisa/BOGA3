@@ -3,79 +3,67 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
+import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { REST_TIMER_STEP_SEC, type RestTimerView } from '@/src/session-recorder/rest-timer';
+import {
+  REPEATING_TIMER_STEP_SEC,
+  REST_TIMER_STEP_SEC,
+  type RestTimerView,
+  type TimerMode,
+} from '@/src/session-recorder/rest-timer';
 
 export type RestTimerBarProps = {
   view: RestTimerView;
   onAdjust: (deltaSec: number) => void;
   onRestart: () => void;
   onDismiss: () => void;
+  onSwitchMode?: (mode: TimerMode) => void;
+  onToggleRepeating?: () => void;
+  onResetRepeating?: () => void;
 };
 
+const MODE_OPTIONS: readonly SegmentedControlOption<TimerMode>[] = [
+  { value: 'rest', label: 'Rest' },
+  { value: 'repeating', label: 'Repeating' },
+];
+
 /**
- * The active-session rest timer strip rendered directly below `ExerciseTopBar`
- * and `SessionTopBar`. Hidden while idle; shows the live `M:SS` countdown while
- * running and stops at `0:00` (`Rest complete`) when finished until dismissed,
- * restarted, or replaced by the next confirmed set.
+ * The active-session timer strip rendered directly below `ExerciseTopBar` and
+ * `SessionTopBar`. Supports both Rest timer (fixed countdown per set) and
+ * Repeating timer (generalised EMOM interval with drift-free round tracking).
  */
-export function RestTimerBar({ view, onAdjust, onRestart, onDismiss }: RestTimerBarProps) {
+export function RestTimerBar({
+  view,
+  onAdjust,
+  onRestart,
+  onDismiss,
+  onSwitchMode,
+  onToggleRepeating,
+  onResetRepeating,
+}: RestTimerBarProps) {
   if (view.status === 'idle') {
     return null;
   }
 
-  const isCompleted = view.status === 'completed';
+  const isRepeating = view.mode === 'repeating';
+  const isCompleted = view.mode === 'rest' && view.status === 'completed';
+  const isPaused = isRepeating && view.isPaused;
+  const stepSec = isRepeating ? REPEATING_TIMER_STEP_SEC : REST_TIMER_STEP_SEC;
 
   return (
     <View style={styles.bar} testID="rest-timer-bar">
-      <View style={styles.readout}>
-        <Icon
-          color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
-          name={isCompleted ? 'success' : 'timer'}
-          size="sm"
-        />
-        <Text
-          allowFontScaling={false}
-          style={[styles.statusLabel, isCompleted ? styles.statusCompleted : null]}
-          testID="rest-timer-status">
-          {isCompleted ? 'Rest complete' : 'Rest'}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          accessibilityLabel={`Rest timer ${view.formatted}`}
-          accessibilityLiveRegion="polite"
-          style={styles.countdown}
-          testID="rest-timer-countdown">
-          {view.formatted}
-        </Text>
-      </View>
-      <View style={styles.controls}>
-        <ActionButton
-          accessibilityLabel={`Subtract ${REST_TIMER_STEP_SEC} seconds from rest timer`}
-          label={`-${REST_TIMER_STEP_SEC}s`}
-          onPress={() => onAdjust(-REST_TIMER_STEP_SEC)}
-          size="compact"
-          testID="rest-timer-minus-15"
-          variant="outline"
-        />
-        <ActionButton
-          accessibilityLabel={`Add ${REST_TIMER_STEP_SEC} seconds to rest timer`}
-          label={`+${REST_TIMER_STEP_SEC}s`}
-          onPress={() => onAdjust(REST_TIMER_STEP_SEC)}
-          size="compact"
-          testID="rest-timer-plus-15"
-          variant="outline"
-        />
-        <ActionButton
-          accessibilityLabel="Restart rest timer"
-          label="Restart"
-          onPress={onRestart}
-          size="compact"
-          testID="rest-timer-restart"
-          variant="outline"
+      <View style={styles.headerRow}>
+        <SegmentedControl
+          accessibilityLabel="Timer mode"
+          density="compact"
+          layout="inline"
+          onChange={(nextMode) => onSwitchMode?.(nextMode)}
+          options={MODE_OPTIONS}
+          testIDPrefix="timer-mode-selector"
+          value={isRepeating ? 'repeating' : 'rest'}
         />
         <IconButton
-          accessibilityLabel="Dismiss rest timer"
+          accessibilityLabel="Dismiss timer"
           name="x"
           onPress={onDismiss}
           size="sm"
@@ -83,22 +71,107 @@ export function RestTimerBar({ view, onAdjust, onRestart, onDismiss }: RestTimer
           tone="muted"
         />
       </View>
+      <View style={styles.actionRow}>
+        <View style={styles.readout}>
+          <Icon
+            color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
+            name={isCompleted ? 'success' : 'timer'}
+            size="sm"
+          />
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusLabel, isCompleted ? styles.statusCompleted : null]}
+            testID={isRepeating ? 'repeating-timer-round' : 'rest-timer-status'}>
+            {isRepeating
+              ? `Round ${view.round}${isPaused ? ' · PAUSED' : ''}`
+              : isCompleted
+              ? 'Rest complete'
+              : 'Rest'}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            accessibilityLabel={
+              isRepeating
+                ? `Repeating timer round ${view.round}, ${view.formatted} remaining${isPaused ? ', paused' : ''}`
+                : `Rest timer ${view.formatted}`
+            }
+            accessibilityLiveRegion="polite"
+            style={styles.countdown}
+            testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
+            {view.formatted}
+          </Text>
+        </View>
+        <View style={styles.controls}>
+          <ActionButton
+            accessibilityLabel={`Subtract ${stepSec} seconds`}
+            label={`-${stepSec}s`}
+            onPress={() => onAdjust(-stepSec)}
+            size="compact"
+            testID={isRepeating ? 'repeating-timer-minus-15' : 'rest-timer-minus-15'}
+            variant="outline"
+          />
+          <ActionButton
+            accessibilityLabel={`Add ${stepSec} seconds`}
+            label={`+${stepSec}s`}
+            onPress={() => onAdjust(stepSec)}
+            size="compact"
+            testID={isRepeating ? 'repeating-timer-plus-15' : 'rest-timer-plus-15'}
+            variant="outline"
+          />
+          {isRepeating ? (
+            <>
+              <ActionButton
+                accessibilityLabel={isPaused ? 'Start repeating timer' : 'Stop repeating timer'}
+                label={isPaused ? 'Start' : 'Stop'}
+                onPress={onToggleRepeating ?? onRestart}
+                size="compact"
+                testID="repeating-timer-toggle"
+                variant="outline"
+              />
+              <ActionButton
+                accessibilityLabel="Reset repeating timer"
+                label="Reset"
+                onPress={onResetRepeating ?? onRestart}
+                size="compact"
+                testID="repeating-timer-reset"
+                variant="outline"
+              />
+            </>
+          ) : (
+            <ActionButton
+              accessibilityLabel="Restart rest timer"
+              label="Restart"
+              onPress={onRestart}
+              size="compact"
+              testID="rest-timer-restart"
+              variant="outline"
+            />
+          )}
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   bar: {
+    backgroundColor: uiRoles.surface,
+    borderBottomWidth: uiBorder.width,
+    borderBottomColor: uiRoles.rule,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.xs,
+    gap: uiSpace.xs,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
-    paddingLeft: uiSpace.md,
-    paddingRight: uiSpace.xs,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-    borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.rule,
   },
   readout: {
     flexDirection: 'row',

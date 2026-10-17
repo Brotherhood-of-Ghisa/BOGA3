@@ -152,6 +152,7 @@ export function ExercisePageScreen({
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
   const restTimer = useSessionRestTimer(sessionId, {
     defaultDurationSec: trainingPreferences.restTimerDurationSec,
+    defaultRepeatingIntervalSec: trainingPreferences.repeatingTimerIntervalSec,
     autoStart: trainingPreferences.restTimerAutoStart,
     isActiveSession: !isCompletedSession,
   });
@@ -415,7 +416,10 @@ export function ExercisePageScreen({
       <RestTimerBar
         onAdjust={restTimer.adjust}
         onDismiss={restTimer.dismiss}
+        onResetRepeating={restTimer.resetRepeating}
         onRestart={restTimer.restart}
+        onSwitchMode={restTimer.switchMode}
+        onToggleRepeating={restTimer.toggleRepeating}
         view={restTimer.view}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.body}>
