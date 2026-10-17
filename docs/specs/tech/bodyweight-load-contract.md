@@ -46,7 +46,8 @@ entered Weight distribution, not bodyweight semantics.
 All Weight values, planned Weight values, readings, group rules,
 imports/exports and coaching payloads are kg. Exactly `1 lb = 0.45359237 kg`
 for migration. Display formatting never mutates stored precision.
-Group competition results use the explicit units in §10; raw values
+Group competition results use the wire units in §10; labels follow
+[[copy.no-weight-unit]]. Raw values
 and private calculation inputs remain kg.
 
 ## 2. Calculation policies

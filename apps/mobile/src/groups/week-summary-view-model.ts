@@ -105,7 +105,7 @@ type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistory
 export const groupRecordBoards = (records: CompetitionEventWire[]): GroupRecordBoard[] =>
   records.flatMap((event) => event.values.filter((value) => value.role === 'record').map((value) => ({ event, value })));
 
-/** `Deadlift 1RM 213.3 kg · group record`; several are only counted. Historical values keep their unit and revision. */
+/** `Deadlift 1RM 213.3 · group record`; several are only counted. Historical values keep their unit and revision. */
 export const buildGroupRecordLine = (records: CompetitionEventWire[]): SessionRecordLine | null =>
   buildSessionRecordLine(
     groupRecordBoards(records),

@@ -178,9 +178,9 @@ describe('buildLatestActivity', () => {
       duration: '52m',
       gym: 'Iron Works',
       figures: '18 sets · 4 exercises',
-      record: { kind: 'one', lead: 'Deadlift 1RM 213.3 kg', note: 'group record' },
+      record: { kind: 'one', lead: 'Deadlift 1RM 213.3', note: 'group record' },
       accessibilityLabel:
-        'dave, completed session on 10/16 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 kg · group record',
+        'dave, completed session on 10/16 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
     });
 
     const ddMm = buildLatestActivity(
@@ -242,11 +242,11 @@ describe('formatting', () => {
     expect(buildGroupRecordLine([record('Squat', [])])).toBeNull();
     expect(buildGroupRecordLine([record('Bench', [{ metric: 'weight', value: 100, unit: 'kg' }])])).toEqual({
       kind: 'one',
-      lead: 'Bench Weight 100.0 kg',
+      lead: 'Bench Weight 100.0',
       note: 'group record',
     });
     expect(buildGroupRecordLine([record('Squat', []), record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }])]))
-      .toEqual({ kind: 'one', lead: 'Bench 1RM 120.0 kg', note: 'group record' });
+      .toEqual({ kind: 'one', lead: 'Bench 1RM 120.0', note: 'group record' });
     // One set #1 on Weight and on 1RM is two group records.
     expect(buildGroupRecordLine([record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }])]))
       .toEqual({ kind: 'many', count: '2 group records' });

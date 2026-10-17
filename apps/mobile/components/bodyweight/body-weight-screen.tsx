@@ -48,7 +48,7 @@ export function BodyWeightScreen() {
         action={{ label: 'Retry', onPress: () => void load() }} testID="body-weight-error" />
         : readings === null ? <StatePanel kind="loading" testID="body-weight-loading" /> : <>
           <Card><View style={styles.cardBody}>
-            <Stat label={currentValid ? 'Current body weight · kg' : 'Current body weight'}
+            <Stat label="Current body weight"
               value={currentValid ? displayKg(current.weightKg) : 'Unknown'} kind={currentValid ? 'figure' : 'text'}
               testID="body-weight-current" />
             <Text allowFontScaling={false} style={styles.body}>
@@ -64,10 +64,10 @@ export function BodyWeightScreen() {
               No readings yet. Weight is saved on this device even when you are offline.
             </Text> : <Card>{readings.map((reading, index) => <ListRow key={reading.id}
               divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
-              accessibilityLabel={`Edit ${displayKg(reading.weightKg)} kilograms, ${formatCurrentDateTime(reading.measuredAt)}`}
+              accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatCurrentDateTime(reading.measuredAt)}`}
               onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
               trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
-              <Stat label={`kg · ${formatCurrentDateTime(reading.measuredAt)}`} value={displayKg(reading.weightKg)}
+              <Stat label={formatCurrentDateTime(reading.measuredAt)} value={displayKg(reading.weightKg)}
                 rank="secondary" />
               {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={styles.body}>Needs review</Text> : null}
             </ListRow>)}</Card>}

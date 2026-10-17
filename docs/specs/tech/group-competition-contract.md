@@ -35,7 +35,7 @@ New comparisons default to 1RM. The cutover turned a legacy Weight default
 into Volume on a new revision; an existing 1RM default stayed 1RM. Retired
 rule defaults and their historic Weight values stay unchanged.
 
-Public labels are Volume / 1RM and kg·reps / kg / %BW·reps / %BW. There is no
+Public labels are Volume / 1RM; unit labels follow [[copy.no-weight-unit]]. There is no
 raw Weight, reps board or absolute bodyweight alternative in protocol 4. Raw
 workout values stay kg; percentages never replace them or occupy a kg field.
 The normalized numerator uses `estimatedTotalOneRepMaxKg`, not the personal

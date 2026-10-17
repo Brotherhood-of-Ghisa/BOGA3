@@ -186,8 +186,8 @@ describe('plan form: create', () => {
 
     fillTitle('Heavy Day');
     await addExerciseBlock('Barbell Squat');
-    expect(screen.getByText('Weight · kg')).toBeTruthy();
-    expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+    expect(screen.getByText('Weight')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 weight')).toBeTruthy();
     fillSet(1, 1, '100', '5');
     fireEvent.press(screen.getByTestId('plan-form-save'));
 
@@ -205,8 +205,8 @@ describe('plan form: create', () => {
     const first = 'plan-form-block-1-set-1';
     expect(screen.getByTestId(`${first}-effort`)).toHaveTextContent('EffortW-Up');
     expect(screen.queryByText('Work')).toBeNull();
-    expect(screen.getByText('Weight · kg')).toBeTruthy();
-    expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+    expect(screen.getByText('Weight')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 weight')).toBeTruthy();
     expect(screen.queryByText('Weight per side · kg')).toBeNull();
     expect(screen.queryByLabelText('Set 1 weight per side in kilograms')).toBeNull();
     expect(screen.getByTestId(`${first}-weight`)).toHaveProp('selectTextOnFocus', true);
@@ -244,7 +244,7 @@ describe('plan form: create', () => {
     mockParams = { planId: plan.id };
     render(<SessionPlanDetailRoute />);
     expect(await screen.findByTestId('plan-detail-block-1-targets')).toHaveTextContent(
-      '40.5 kg × 100 (W-Up) · 40.5 kg × 100 (RIR 3) · 45 kg × 101 (RIR 3)'
+      '40.5 × 100 (W-Up) · 40.5 × 100 (RIR 3) · 45 × 101 (RIR 3)'
     );
   });
 
@@ -441,7 +441,7 @@ describe('plan detail', () => {
     expect(screen.getByTestId('plan-detail-title')).toHaveTextContent('Heavy Day');
     expect(screen.getByTestId('plan-detail-schedule')).toHaveTextContent('Unscheduled');
     expect(screen.getByTestId('plan-detail-block-1-state')).toHaveTextContent('Ready · Block 1 of 1');
-    expect(screen.getByTestId('plan-detail-block-1-targets')).toHaveTextContent('100 kg × 5 · — × 8');
+    expect(screen.getByTestId('plan-detail-block-1-targets')).toHaveTextContent('100 × 5 · — × 8');
     // Deletable while nothing is consumed.
     expect(screen.getByTestId('plan-detail-delete')).toBeTruthy();
   });

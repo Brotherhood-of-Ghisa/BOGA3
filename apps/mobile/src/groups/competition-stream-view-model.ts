@@ -2,10 +2,10 @@ import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
-import { COMPETITION_UNIT_LABELS, describeCompetitionEvent, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { describeCompetitionEvent, formatCompetitionFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
 import type { CompetitionEventWire, CompetitionStreamItemWire,CompetitionHistoryValueWire,CompetitionHistoricalMetric,
   CompetitionStreamRecordWire } from './competition-wire';
-import { formatMemberName, formatMetricFigure, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
+import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
   formatExerciseCount, formatStreamStartedAt, type RecordCertificationStatus, type StreamMembershipViewModel } from './stream-view-model';
 
 /** A group record taken in a session, drawn inside that session's card. */
@@ -91,7 +91,7 @@ export type StreamRecordMetric = { metric: CompetitionHistoricalMetric; label: s
 export type StreamPreviousRecord = { metric: CompetitionHistoricalMetric; label: string; value: string; holder: string; set: string | null };
 
 const figure = (value: CompetitionHistoryValueWire): string => value.unavailable || value.value === null ? 'Score unavailable'
-  : `${formatMetricFigure('e1rm',value.value)} ${COMPETITION_UNIT_LABELS[value.unit as keyof typeof COMPETITION_UNIT_LABELS] ?? value.unit}`;
+  : formatCompetitionFigure(value.value,value.unit);
 const e1rmFirst = (a: { metric: string },b: { metric: string }) => (a.metric === 'e1rm' ? 0 : 1) - (b.metric === 'e1rm' ? 0 : 1);
 
 /**
@@ -113,7 +113,7 @@ export function buildStreamRecordSheet(event: CompetitionEventWire,record: Compe
     certification: event.voided ? null : setCertification(event),metrics,previous };
 }
 
-/** A record's one line inside its session card: `Deadlift · 1RM 213.3 kg`. */
+/** A record's one line inside its session card: `Deadlift · 1RM 213.3`. */
 function sessionRecordLine(key: string,event: CompetitionEventWire): CompetitionSessionRecordLine {
   const values = event.values.filter(value => value.role === 'record');
   const value = values.map(formatCompetitionHistoricalValue).join(' · ') || describeCompetitionEvent(event);

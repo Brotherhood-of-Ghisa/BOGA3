@@ -22,7 +22,7 @@ const blockStateWord = (block: PlanBlockView): string => {
 
 const blockTargetsLine = (block: PlanBlockView): string => {
   const parts = block.targets.map((target) => {
-    const weight = target.targetWeightValue !== null ? `${target.targetWeightValue} kg` : '—';
+    const weight = target.targetWeightValue !== null ? target.targetWeightValue : '—';
     const effort = formatSessionSetType(target.targetSetType);
     return `${weight} × ${target.targetReps}${effort ? ` (${effort})` : ''}`;
   });

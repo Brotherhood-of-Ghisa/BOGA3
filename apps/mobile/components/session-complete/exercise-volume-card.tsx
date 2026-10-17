@@ -14,8 +14,7 @@ type ExerciseVolumeCardProps = {
   testID?: string;
 };
 
-// The spoken form keeps the unit: a screen reader has no legend to lean on.
-const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable' : `${formatVolume(value)} kg reps`;
+const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable' : formatVolume(value);
 
 export const formatExerciseSetCount = (workingSetCount: number): string =>
   `${workingSetCount} ${workingSetCount === 1 ? 'set' : 'sets'}`;

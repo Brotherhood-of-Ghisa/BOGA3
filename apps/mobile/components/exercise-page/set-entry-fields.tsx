@@ -51,10 +51,10 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
         </View>
       </Pressable>
       <View style={[styles.field, styles.weightField, weightError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
+        <Text allowFontScaling={false} style={pageText.microLabel}>Weight</Text>
         <TextInput
           allowFontScaling={false}
-          accessibilityLabel={`Set ${number} weight in kilograms`}
+          accessibilityLabel={`Set ${number} weight`}
           keyboardType="decimal-pad"
           onChangeText={onChangeWeight}
           ref={weightInputRef}

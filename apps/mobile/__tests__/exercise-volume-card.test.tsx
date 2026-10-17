@@ -29,7 +29,7 @@ it.each([0, 1, 2, 3, 4, 5])('draws no distribution and no history label with %i 
   expect(screen.getByTestId('card-heading')).toHaveTextContent(/Bench Press.*2 sets/);
   expect(screen.queryByTestId('card-distribution')).toBeNull();
   expect(screen.queryByText(/Building history|prior|median|first comparable/i)).toBeNull();
-  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500 kg reps.')).toBeTruthy();
+  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500.')).toBeTruthy();
 });
 
 const distribution: ExerciseVolumeComparison = { ...comparison, historicalSessionCount: 6,
@@ -67,7 +67,7 @@ it.each(['app', 'share'] as const)('shows quartiles after six observations in th
   expect(screen.getByTestId('card-p75', { includeHiddenElements: true })).toHaveStyle({ left: '90%' });
   expect(screen.getByTestId('card-current', { includeHiddenElements: true })).toHaveStyle({ left: '70%', backgroundColor: uiRoles.ink, borderRadius: 999 });
   expect(screen.queryByText(/prior sessions|P5$|P95$|Below P|Above P/)).toBeNull();
-  expect(screen.getByLabelText(/twenty-fifth to seventy-fifth percentile 300 kg reps to 600 kg reps/)).toBeTruthy();
+  expect(screen.getByLabelText(/twenty-fifth to seventy-fifth percentile 300 to 600/)).toBeTruthy();
 });
 
 it.each([[0, '10%'], [1400, '90%']])('keeps the current dot visible outside the quartiles at volume %i', (currentVolume, left) => {
