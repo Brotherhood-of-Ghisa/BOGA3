@@ -11,6 +11,9 @@ import { effortPolicyKey } from '@/src/exercise-calculations/effort-policy';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
+  isPooledGymBucket, readableGymBuckets, type GymBucketKey,
+} from '@/src/exercise-calculations/gym-bucket';
+import {
   createRecordBook, type RecordBaseline, type RecordEntry, type WeightRecordValue,
 } from '@/src/exercise-calculations/records';
 import {
@@ -27,6 +30,7 @@ import {
   EXERCISE_SESSION_FACTS_RULES_VERSION,
   type ExerciseSessionFactRow,
   type FactsBlockInput,
+  type FactsDefinitionInput,
   type FactsSessionInput,
 } from './exercise-session-facts-derive';
 import {
@@ -73,6 +77,7 @@ type BlockRow = {
   orderIndex: number;
   completedAt: Date | null;
   startedAt: Date;
+  gymId: string | null;
 };
 
 const loadBlocks = (tx: FactsTx, definitionIds: readonly string[] | null): BlockRow[] => {
@@ -84,6 +89,7 @@ const loadBlocks = (tx: FactsTx, definitionIds: readonly string[] | null): Block
       orderIndex: sessionExercises.orderIndex,
       completedAt: sessions.completedAt,
       startedAt: sessions.startedAt,
+      gymId: sessions.gymId,
     })
     .from(sessionExercises)
     .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
@@ -146,6 +152,18 @@ const createLoadContextResolver = (tx: FactsTx, definitionIds: readonly string[]
     personalLoadContext(enabled, definitions.get(definitionId) ?? null, resolveWeight(startedAt), getPersonalEffortPolicy());
 };
 
+/**
+ * Whether each definition reports per gym. The derivation turns it into each
+ * row's bucket (`reportingBucket`); a missing definition cannot own a block.
+ */
+const loadSplitByGym = (tx: FactsTx, definitionIds: readonly string[]): Map<string, boolean> =>
+  new Map(chunks(definitionIds).flatMap((ids) => tx
+    .select({ id: exerciseDefinitions.id, splitByGym: exerciseDefinitions.splitByGym })
+    .from(exerciseDefinitions)
+    .where(inArray(exerciseDefinitions.id, ids))
+    .all()
+    .map((definition) => [definition.id, definition.splitByGym] as const)));
+
 /** Each definition's completed history, grouped by session. */
 const loadDefinitionHistories = (
   tx: FactsTx,
@@ -161,7 +179,7 @@ const loadDefinitionHistories = (
     const definitionId = block.exerciseDefinitionId as string;
     const byId = sessionsByDefinition.get(definitionId) ?? new Map<string, FactsSessionInput>();
     const session = byId.get(block.sessionId) ??
-      { sessionId: block.sessionId, completedAt: block.completedAt as Date, blocks: [] };
+      { sessionId: block.sessionId, completedAt: block.completedAt as Date, gymId: block.gymId, blocks: [] };
     session.blocks.push({
       id: block.id,
       orderIndex: block.orderIndex,
@@ -182,9 +200,13 @@ const writeFacts = (tx: FactsTx, scope: DefinitionScope): number => {
       tx.delete(exerciseSessionFacts).where(inArray(exerciseSessionFacts.exerciseDefinitionId, ids)).run();
     }
   }
-  const rows = [...loadDefinitionHistories(tx, scope)]
-    .flatMap(([definitionId, history]) => deriveExerciseSessionFacts(definitionId, history));
-  // 14 columns a row: 60 rows stay under the bound-parameter limit.
+  const histories = [...loadDefinitionHistories(tx, scope)];
+  const splitByGym = loadSplitByGym(tx, histories.map(([definitionId]) => definitionId));
+  const rows = histories.flatMap(([definitionId, history]) => deriveExerciseSessionFacts(
+    { id: definitionId, splitByGym: splitByGym.get(definitionId) ?? false } satisfies FactsDefinitionInput,
+    history,
+  ));
+  // 15 columns a row: 60 rows stay under the bound-parameter limit.
   for (const batch of chunks(rows, 60)) {
     tx.insert(exerciseSessionFacts).values(batch).run();
   }
@@ -247,6 +269,7 @@ export const clearExerciseSessionFacts = (tx: Pick<Transaction, 'delete'>): void
 const factColumns = {
   sessionId: exerciseSessionFacts.sessionId,
   exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId,
+  gymBucket: exerciseSessionFacts.gymBucket,
   achievedAt: exerciseSessionFacts.achievedAt,
   bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
   bestE1rmSetId: exerciseSessionFacts.bestE1rmSetId,
@@ -304,11 +327,21 @@ export const loadFlaggedExerciseSessionFacts = async (
     .all());
 };
 
-/** Which sessions count toward one exercise's all-time bests. */
+/**
+ * Which sessions count toward one exercise's all-time bests. Both gyms are
+ * three-state, the repository-wide convention: unset is every gym, `null` is
+ * the sessions with no gym, an id is that gym.
+ */
 export type ExerciseBestsScope = {
   exerciseDefinitionId: string;
-  /** Omitted: every gym. `null`: only sessions with no gym. */
+  /** Keep only this gym's sessions (the `Past records gym filter`). */
   gymId?: string | null;
+  /**
+   * The gym the reader is at, which picks the bucket a split exercise reports
+   * ([[gym.split]]). Unset, the exercise reports its most recently performed
+   * bucket; an unsplit exercise ignores it, having one pooled bucket.
+   */
+  atGymId?: string | null;
   /** Only the sessions before this completed session, in PR-history order. */
   beforeSessionId?: string | null;
 };
@@ -334,6 +367,7 @@ const topWeightSet = alias(exerciseSets, 'top_weight_set');
 
 const bestsColumns = {
   sessionId: exerciseSessionFacts.sessionId,
+  gymBucket: exerciseSessionFacts.gymBucket,
   completedAt: exerciseSessionFacts.achievedAt,
   gymId: sessions.gymId,
   gymName: gyms.name,
@@ -350,6 +384,7 @@ const bestsColumns = {
 type BestsRow = {
   exerciseDefinitionId: string;
   sessionId: string;
+  gymBucket: GymBucketKey;
   completedAt: Date;
   gymId: string | null;
   gymName: string | null;
@@ -380,6 +415,29 @@ const bestSetWeight = (weightValue: string | null, repsValue: string | null): nu
 const gymScope = (gymId: string | null | undefined) => {
   if (gymId === undefined) return undefined;
   return gymId === null ? isNull(sessions.gymId) : eq(sessions.gymId, gymId);
+};
+
+/**
+ * The buckets a scope can read, or undefined when it names no gym at all. A
+ * definition's rows all carry either the pooled bucket or a gym's, so naming
+ * both selects exactly one of them without reading the split flag.
+ */
+const bucketScope = (scope: Pick<ExerciseBestsScope, 'gymId' | 'atGymId'>) => {
+  const gymId = scope.gymId !== undefined ? scope.gymId : scope.atGymId;
+  return gymId === undefined
+    ? undefined
+    : inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(gymId));
+};
+
+/**
+ * One bucket's rows when the scope named no gym: a split exercise is never
+ * pooled, so it reports its most recently performed bucket — the last row in
+ * PR-history order — the way coaching does. Pooled rows are already one bucket.
+ */
+const inOneBucket = <Row extends { gymBucket: GymBucketKey }>(rows: Row[]): Row[] => {
+  const newest = rows.at(-1);
+  if (!newest || isPooledGymBucket(newest.gymBucket)) return rows;
+  return rows.filter((row) => row.gymBucket === newest.gymBucket);
 };
 
 /** Keeps the rows before `beforeSessionId` in PR-history order. */
@@ -432,7 +490,8 @@ const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
 /**
  * One exercise's all-time 1RM, top weight and best volume, each with
  * its session, gym and (for 1RM and top weight) the set that holds it, plus
- * the newest session in scope.
+ * the newest session in scope. A split exercise answers for one gym's bucket,
+ * never pooled ([[gym.split]]).
  */
 export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
   const database = await bootstrapLocalDataLayer();
@@ -440,15 +499,17 @@ export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<Exer
   const rows = selectBestsRows(database, and(
     eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
     gymScope(scope.gymId),
+    bucketScope(scope),
   ));
-  return pickBests(rowsBefore(database, rows, scope.beforeSessionId));
+  return pickBests(inOneBucket(rowsBefore(database, rows, scope.beforeSessionId)));
 };
 
 /**
- * Each listed definition's records over every gym's sessions before `target`
- * in PR-history order: the records the target's sets are compared with. The
- * same fold as `loadExerciseBests`; a definition with no earlier fact row is
- * absent.
+ * Each listed definition's records over the sessions before `target` in
+ * PR-history order: the records the target's sets are compared with. Every gym
+ * counts, except that a definition split per gym is compared only with
+ * `target`'s own gym bucket ([[gym.split]]). The same fold as
+ * `loadExerciseBests`; a definition with no earlier fact row is absent.
  */
 export const loadEarlierBestsByDefinition = async (
   target: { sessionId: string; completedAt: Date },
@@ -459,10 +520,14 @@ export const loadEarlierBestsByDefinition = async (
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
   const before = (row: BestsRow) => compareFactSessionOrder(row, target) < 0;
+  const targetGym = database.select({ gymId: sessions.gymId }).from(sessions)
+    .where(eq(sessions.id, target.sessionId)).get();
+  if (!targetGym) throw new Error(`session ${target.sessionId} is missing`);
   for (const ids of chunks(exerciseDefinitionIds)) {
     const rows = selectBestsRows(database, and(
       inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
       lte(exerciseSessionFacts.achievedAt, target.completedAt),
+      inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(targetGym.gymId)),
     )).filter(before);
     const rowsByDefinition = new Map<string, BestsRow[]>();
     for (const row of rows) {

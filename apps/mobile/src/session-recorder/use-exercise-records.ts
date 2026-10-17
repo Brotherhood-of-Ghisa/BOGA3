@@ -31,6 +31,7 @@ export type LoadExerciseRecords = typeof loadExerciseRecords;
 
 export type ExerciseRecordsGymFilter = {
   scope: PastRecordsGymScope;
+  /** The viewing session's gym; `null` when it has none. */
   currentGymId: string | null;
 };
 
@@ -38,6 +39,10 @@ export type ExerciseRecordsGymFilter = {
  * All-time records and the previous session for one exercise definition.
  * `beforeSessionId` names a completed session being edited: only the sessions
  * before it count, the session view's live record rule.
+ *
+ * The session's gym always reaches the reader as `atGymId`, so an exercise
+ * split per gym reports the gym being lifted at ([[gym.split]]); `scope` only
+ * decides whether an unsplit exercise is narrowed to it as well.
  */
 export const useExerciseRecords = (
   exerciseDefinitionId: string | null,
@@ -53,6 +58,8 @@ export const useExerciseRecords = (
   const datedWeightRevision = useBodyWeightContextRevision();
   const filterScope = gymFilter?.scope ?? 'all';
   const filterGymId = gymFilter?.currentGymId ?? null;
+  // No gym context at all (a caller with no session) leaves `atGymId` unset.
+  const hasGymContext = gymFilter !== undefined;
 
   useFocusEffect(useCallback(() => {
     if (!exerciseDefinitionId) return;
@@ -61,6 +68,7 @@ export const useExerciseRecords = (
     void load({
       exerciseDefinitionId,
       beforeSessionId,
+      ...(hasGymContext ? { atGymId: filterGymId } : {}),
       ...(filterScope === 'current-gym' && filterGymId ? { gymId: filterGymId } : {}),
     })
       .then((summary) => {
@@ -74,7 +82,7 @@ export const useExerciseRecords = (
     };
   // The explicit revision invalidates history after a saved-weight or load review.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey, datedWeightRevision]));
+  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, hasGymContext, load, refreshKey, datedWeightRevision]));
 
   return state;
 };

@@ -17,6 +17,16 @@ export const exerciseSessionFacts = sqliteTable(
   {
     sessionId: text('session_id').notNull(),
     exerciseDefinitionId: text('exercise_definition_id').notNull(),
+    /**
+     * The bucket this session's performance is folded in
+     * (`reportingBucket`, `exercise-calculations/gym-bucket.ts`): every gym
+     * pooled unless the definition is split per gym, when it is the session's
+     * own gym. Records, PR flags and `Last` are keyed on (definition, bucket),
+     * so a split exercise is never pooled. The default only carries rows
+     * written before the column existed; the rules-version bump that added it
+     * rebuilds every one of them.
+     */
+    gymBucket: text('gym_bucket').notNull().default('all'),
     /** The session's `completed_at`; ties are ordered by `session_id`. */
     achievedAt: integer('achieved_at', { mode: 'timestamp_ms' }).notNull(),
     bestE1rmKg: real('best_e1rm_kg'),
@@ -36,6 +46,11 @@ export const exerciseSessionFacts = sqliteTable(
     pk: primaryKey({ columns: [table.exerciseDefinitionId, table.sessionId] }),
     definitionAchievedAtIdx: index('exercise_session_facts_definition_achieved_at_idx').on(
       table.exerciseDefinitionId,
+      table.achievedAt,
+    ),
+    definitionBucketIdx: index('exercise_session_facts_definition_bucket_idx').on(
+      table.exerciseDefinitionId,
+      table.gymBucket,
       table.achievedAt,
     ),
     achievedAtIdx: index('exercise_session_facts_achieved_at_idx').on(table.achievedAt),

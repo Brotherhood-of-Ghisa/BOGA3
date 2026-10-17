@@ -54,7 +54,7 @@ un-splitting is a merge. Rejected.
 - Rollout: migration → `agent-api` → app release (`docs/procedures/rule-upgrade.md`).
 - Lanes: `fast`, `backend`, `mcp-smoke`.
 
-### 3. Personal facts and records
+### 3. Personal facts and records — shipped
 
 - One helper, `reportingBucket(definition, sessionGymId)`, in the calculation
   layer; a single-source test bans re-implementing it.
@@ -64,9 +64,15 @@ un-splitting is a merge. Rejected.
   `exercise_definitions.split_by_gym` update queue the definition(s).
 - Readers: `loadExerciseBests`, `loadEarlierBestsByDefinition`,
   `recordBaselinesOf`, flagged facts (Today PRs), session insights baselines,
-  record bands, share image (plain name).
+  record bands, share image (plain name). `loadExerciseBests` gained
+  `atGymId` — the gym the reader is at, which picks the bucket; unset, the
+  most recently performed bucket answers (the coaching default).
 - Lanes: `fast`, `backend` (sync path), `frontend-android` if flows touch
   record bands.
+- Gym-scoped APIs now use one three-state convention (unset = every gym,
+  `null` = the sessions with no gym, an id = that gym). PR 4 should follow it
+  for the aggregations, and the gym chips should carry
+  `NO_GYM_ROUTE_PARAM` (`app/exercise-history.tsx`) at the route boundary.
 
 ### 4. Aggregations and labels
 

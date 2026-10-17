@@ -60,6 +60,21 @@ const coerceRouteParam = (value: string | string[] | undefined): string | null =
   return value ?? null;
 };
 
+/**
+ * The gym scope travels as a route param, which can carry a value or nothing
+ * at all — not a third `null` state. So the no-gym bucket travels as this
+ * reserved value and `decodeGymRouteParam` restores the repository's
+ * three-state scope: unset is every gym, `null` is the sessions with no gym,
+ * an id is that gym. A gym whose own id collides is impossible: ids are
+ * generated hex.
+ */
+export const NO_GYM_ROUTE_PARAM = 'no-gym';
+
+const decodeGymRouteParam = (raw: string | null): string | null | undefined => {
+  if (raw === null) return undefined;
+  return raw === NO_GYM_ROUTE_PARAM ? null : raw;
+};
+
 const parsePeriodParam = (raw: string | null): ExerciseHistoryPeriod => {
   if (raw === 'all') return 'all';
   if (raw === '7') return 7;
@@ -93,6 +108,7 @@ export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   appliedGymId?: string | null;
   isLoading: boolean;
   errorMessage: string | null;
@@ -107,7 +123,7 @@ export function ExerciseHistoryScreenShell({
   summary,
   period,
   appliedTagDefinitionId,
-  appliedGymId = null,
+  appliedGymId,
   isLoading,
   errorMessage,
   onSelectPeriod,
@@ -199,7 +215,7 @@ export function ExerciseHistoryScreenShell({
               <Card>
                 <StatePanel
                   body={
-                    appliedGymId
+                    appliedGymId !== undefined
                       ? 'No completed sessions for this gym in this period.'
                       : appliedTagDefinitionId
                         ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
@@ -380,13 +396,18 @@ export default function ExerciseHistoryRoute() {
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
   const initialPeriod = parsePeriodParam(coerceRouteParam(params.period));
 
-  const routeGymId = coerceRouteParam(params.gymId);
+  // A URL cannot tell "every gym" from "the sessions with no gym", so the
+  // no-gym value travels as `NO_GYM_ROUTE_PARAM` and is decoded back into the
+  // repository's three-state gym scope: unset is every gym, `null` is the
+  // sessions with no gym, an id is that gym.
+  const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
   const routeCurrentGymId = coerceRouteParam(params.currentGymId);
-  const appliedGymId =
-    routeGymId ??
-    (listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
-      ? routeCurrentGymId
-      : null);
+  const appliedGymId: string | null | undefined =
+    routeGymId !== undefined
+      ? routeGymId
+      : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+        ? routeCurrentGymId
+        : undefined;
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -401,7 +422,7 @@ export default function ExerciseHistoryRoute() {
     async (
       nextPeriod: ExerciseHistoryPeriod,
       nextTagDefinitionId: string | null,
-      nextGymId: string | null
+      nextGymId: string | null | undefined
     ) => {
       if (!exerciseDefinitionId) {
         setSummary(null);
@@ -416,7 +437,7 @@ export default function ExerciseHistoryRoute() {
           exerciseDefinitionId,
           period: nextPeriod,
           tagDefinitionId: nextTagDefinitionId,
-          gymId: nextGymId,
+          ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
         });
         if (next === null) {
           setSummary(null);

@@ -9,6 +9,9 @@
  * - `isWorkingSetType` alone is for stored flags and projections of performed
  *   sets; every other caller uses `isWorkingSet`, which also checks the set
  *   was performed.
+ * - The reporting-bucket rule: nothing reads `split_by_gym` to decide which
+ *   bucket a session counts in; readers ask `reportingBucket`, or filter on the
+ *   bucket the facts already name.
  * - The Wathan 1RM constants appear only in `exercise-calculations/index.ts`.
  * - A figure's display precision lives in `format.ts`: `toFixed` outside it,
  *   bar the listed non-figure uses, is a second format.
@@ -86,6 +89,22 @@ describe('training-metric rules have one implementation', () => {
       // Not training figures: a body weight, chart coordinates and set counts.
       'apps/mobile/components/bodyweight/body-weight-screen.tsx',
       'apps/mobile/components/today/progress-format.ts',
+    ])).toEqual([]);
+  });
+
+  it('decides the reporting bucket in one place', () => {
+    expect(offenders(/\bsplitByGym\b|\bsplit_by_gym\b/, [
+      // The rule itself.
+      'apps/mobile/src/exercise-calculations/gym-bucket.ts',
+      // The column, its wire field, and the one read that feeds the rule.
+      'apps/mobile/src/data/schema/exercise-definitions.ts',
+      'apps/mobile/src/sync/cycle.ts',
+      'apps/mobile/src/data/exercise-session-facts.ts',
+      // Coaching reads the flag over SQL rows; its bucket keys are
+      // `agent-api/gym-buckets.ts` and its tool text describes them.
+      'supabase/functions/agent-api/index.ts',
+      'supabase/functions/agent-api/gym-buckets.ts',
+      'services/boga-mcp/src/tools.ts',
     ])).toEqual([]);
   });
 

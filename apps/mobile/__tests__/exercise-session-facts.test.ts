@@ -49,6 +49,7 @@ import {
   exerciseSessionFactsStale,
   exerciseSessionFactsState,
   exerciseSets,
+  gyms,
   muscleGroups,
   sessionExercises,
   sessions,
@@ -70,6 +71,8 @@ import { applyPullPage, entityToWire } from '@/src/sync/cycle';
 const BENCH = 'def-bench';
 const SQUAT = 'def-squat';
 const DIP = 'def-dip'; // bodyweight contribution 1
+const HOME = 'gym-home';
+const CLUB = 'gym-club';
 const day = (n: number, hour = 18) => new Date(Date.UTC(2026, 0, n, hour));
 
 type SetSpec = [weight: string, reps: string, setType?: string | null, status?: string | null];
@@ -83,7 +86,7 @@ const insertSession = (
   id: string,
   dayNumber: number,
   blocks: BlockSpec[],
-  options: { status?: 'active' | 'completed'; deletedAt?: Date } = {},
+  options: { status?: 'active' | 'completed'; deletedAt?: Date; gymId?: string | null } = {},
 ) => {
   const status = options.status ?? 'completed';
   db().insert(sessions).values({
@@ -92,6 +95,7 @@ const insertSession = (
     startedAt: day(dayNumber, 17),
     completedAt: status === 'completed' ? day(dayNumber) : null,
     deletedAt: options.deletedAt ?? null,
+    gymId: options.gymId ?? null,
   }).run();
   blocks.forEach((block, blockIndex) => {
     const blockId = block.id ?? `${id}-b${blockIndex}`;
@@ -141,6 +145,7 @@ beforeEach(() => {
   __resetClockForTests();
   fixture = createInMemoryDatabase();
   mockActiveDatabase = fixture.database;
+  db().insert(gyms).values([{ id: HOME, name: 'Home' }, { id: CLUB, name: 'Club' }]).run();
   db().insert(exerciseDefinitions).values([
     { id: BENCH, name: 'Bench Press' },
     { id: SQUAT, name: 'Squat' },
@@ -474,6 +479,98 @@ describe('exercise session facts — incremental maintenance equals a full rebui
     db().update(exerciseDefinitions).set({ name: 'Renamed' }).run();
 
     expect(queued()).toEqual([]);
+  });
+});
+
+describe('exercise session facts — reporting buckets over the database', () => {
+  beforeEach(() => {
+    insertSession('home-1', 1, [{ definitionId: BENCH, sets: [['100', '5']] }], { gymId: HOME });
+    insertSession('club-1', 2, [{ definitionId: BENCH, sets: [['60', '5']] }], { gymId: CLUB });
+    insertSession('club-2', 3, [{ definitionId: BENCH, sets: [['70', '5']] }], { gymId: CLUB });
+    insertSession('none-1', 4, [{ definitionId: BENCH, sets: [['40', '5']] }]);
+    drainExerciseSessionFacts(asLocal());
+    expect(queued()).toEqual([]);
+  });
+
+  const split = (on: boolean) => db().update(exerciseDefinitions)
+    .set({ splitByGym: on }).where(eq(exerciseDefinitions.id, BENCH)).run();
+
+  const buckets = async () => (await loadExerciseSessionFacts(BENCH))
+    .map((row) => [row.sessionId, row.gymBucket, row.prWeight] as const);
+
+  it('pools every gym until the flag is set, then keys each session on its own gym', async () => {
+    expect(await buckets()).toEqual([
+      ['home-1', 'all', false], ['club-1', 'all', false], ['club-2', 'all', false], ['none-1', 'all', false],
+    ]);
+
+    split(true);
+
+    expect(await buckets()).toEqual([
+      // Each bucket's first session is its own baseline, never a record.
+      ['home-1', 'gym:gym-home', false],
+      ['club-1', 'gym:gym-club', false],
+      ['club-2', 'gym:gym-club', true],
+      ['none-1', 'no-gym', false],
+    ]);
+  });
+
+  it('counts a split exercise\'s PRs per bucket wherever a window reads the flags', async () => {
+    const window = { from: day(0), to: day(9) };
+    // Pooled, only Home's first session is a bar and nothing beats 100 kg.
+    expect((await loadFlaggedExerciseSessionFacts(window)).map((row) => row.sessionId)).toEqual([]);
+
+    split(true);
+
+    // Club's second session beats Club's own bar, so Today counts its PRs.
+    expect((await loadFlaggedExerciseSessionFacts(window)).map((row) => [row.sessionId, row.gymBucket]))
+      .toEqual([['club-2', 'gym:gym-club']]);
+  });
+
+  it('queues the definition when the split is toggled, and the rebuild equals a full one', () => {
+    split(true);
+    expectIncrementalEqualsFullRebuild([BENCH]);
+
+    split(false);
+    const pooled = expectIncrementalEqualsFullRebuild([BENCH]);
+    expect(pooled.every((row) => row.gymBucket === 'all')).toBe(true);
+  });
+
+  it('queues a completed session\'s definitions when it moves to another gym', () => {
+    split(true);
+    drainExerciseSessionFacts(asLocal());
+
+    db().update(sessions).set({ gymId: CLUB }).where(eq(sessions.id, 'home-1')).run();
+
+    const rows = expectIncrementalEqualsFullRebuild([BENCH]);
+    expect(rows.map((row) => [row.sessionId, row.gymBucket]))
+      .toEqual([['home-1', 'gym:gym-club'], ['club-1', 'gym:gym-club'], ['club-2', 'gym:gym-club'], ['none-1', 'no-gym']]);
+  });
+
+  it('queues nothing when a session keeps the gym it already had', () => {
+    split(true);
+    drainExerciseSessionFacts(asLocal());
+
+    db().update(sessions).set({ gymId: HOME }).where(eq(sessions.id, 'home-1')).run();
+
+    expect(queued()).toEqual([]);
+  });
+
+  it('compares a session only with its own bucket\'s earlier records', async () => {
+    split(true);
+    const baselines = async (sessionId: string, completedAt: Date) =>
+      recordBaselinesOf(await loadEarlierBestsByDefinition({ sessionId, completedAt }, [BENCH]));
+
+    // Pooled, Home's 100 kg would be the bar for every later session.
+    expect((await baselines('club-2', day(3))).get(BENCH)).toMatchObject({ weight: { weight: 60, reps: 5 } });
+    expect((await baselines('none-1', day(4))).get(BENCH)).toBeUndefined();
+
+    split(false);
+    expect((await baselines('club-2', day(3))).get(BENCH)).toMatchObject({ weight: { weight: 100, reps: 5 } });
+  });
+
+  it('fails loudly when the session being compared is not in the store', async () => {
+    await expect(loadEarlierBestsByDefinition({ sessionId: 'missing', completedAt: day(3) }, [BENCH]))
+      .rejects.toThrow('session missing is missing');
   });
 });
 

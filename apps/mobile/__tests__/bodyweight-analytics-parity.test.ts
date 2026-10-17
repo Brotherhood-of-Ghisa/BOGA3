@@ -81,8 +81,8 @@ it.each([
   equalMetric(collectMuscleSetContributions(f.muscle)[0].weightedVolume, muscleVolume);
   equalMetric(deriveLastSession(f.history.sessions)?.volume, volume);
   // The records panel's volume record reads the facts' session volume.
-  const fact = summarizeFactSession('pull', { sessionId: 'session', completedAt: day,
-    blocks: [{ id: 'exercise', orderIndex: 0, loadContext: f.context, sets: [f.set] }] });
+  const fact = summarizeFactSession({ id: 'pull', splitByGym: false }, { sessionId: 'session', completedAt: day,
+    gymId: null, blocks: [{ id: 'exercise', orderIndex: 0, loadContext: f.context, sets: [f.set] }] });
   equalMetric(fact?.volumeKg, volume);
   expect(daily.estimatedRM1).toBe(entry.estimatedOneRepMax);
   expect(blocks.blocks[0].estimatedOneRepMax).toBe(entry.estimatedOneRepMax);

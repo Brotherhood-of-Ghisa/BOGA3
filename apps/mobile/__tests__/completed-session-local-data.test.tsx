@@ -857,6 +857,53 @@ describe('records, sharing and deleted sessions over real data', () => {
     );
   });
 
+  it('compares a split exercise with its own gym only, and shares its plain name', async () => {
+    await seedDesignSession();
+    // The day before, same gym: Bench 180 × 12 is this gym's bar to beat.
+    await seedEarlierDesignSession({
+      benchSets: [{ weight: '180', reps: '12', type: 'rir_0' }],
+      pulldownSets: [{ weight: '100', reps: '12', type: null }],
+    });
+    // Another gym, earlier still: far heavier, and pooled it would deny every
+    // bench record below ([[gym.split]]).
+    const otherGymAt = new Date(Date.now() - 49 * 60 * 60 * 1000);
+    await upsertLocalGym({ id: 'design_other_gym', name: 'Iron Temple', now: otherGymAt });
+    await persistSessionDraftSnapshot(
+      {
+        sessionId: 'design_other_gym_session',
+        gymId: 'design_other_gym',
+        startedAt: new Date(otherGymAt.getTime() - 45 * 60 * 1000),
+        exercises: [{
+          id: 'other_gym_bench',
+          exerciseDefinitionId: 'seed_barbell_bench_press',
+          name: 'Barbell Bench Press',
+          sets: toDraftSets('other_gym_bench', [{ weight: '250', reps: '10', type: 'rir_0' }]),
+        }],
+      },
+      { now: otherGymAt }
+    );
+    await completeSessionDraft('design_other_gym_session', { completedAt: otherGymAt, now: otherGymAt });
+    localDatabase().update(exerciseDefinitions).set({ splitByGym: true })
+      .where(eq(exerciseDefinitions.id, 'seed_barbell_bench_press')).run();
+    await bootLocalApp();
+    mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
+    render(<CompletedSessionDetailRoute />);
+
+    const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
+    // Exactly the records of the unpooled test below: the Iron Temple session
+    // is in another bucket, so it neither sets nor raises this gym's bar.
+    expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: new top weight 185.0 × 8; new volume record 3515')).toBeTruthy();
+    expect(label('session-completion-records')).toBe('Records 5');
+
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    // The share image never names a gym, split exercise or not.
+    const shared = screen.getByTestId('session-share-card-pr-seed_barbell_bench_press');
+    expect(shared).toHaveTextContent('Barbell Bench PressTop weight185.0 × 8  1RM 236.2');
+    for (const gymName of ['Westside Barbell Club', 'Iron Temple']) {
+      expect(screen.getByTestId('session-share-preview')).not.toHaveTextContent(gymName);
+    }
+  });
+
   it('shows a Weight record beside a 1RM record on completion, the share image and the set cards', async () => {
     await seedDesignSession();
     // The day before: Bench 180 × 12 (a higher 1RM, a lighter Weight), Pulldown 100 × 12.

@@ -16,7 +16,11 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { ordinaryLoadContext, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 
-const DEFINITION = 'bench';
+const DEFINITION_ID = 'bench';
+/** The ordinary exercise: every gym pools into one reporting bucket. */
+const DEFINITION = { id: DEFINITION_ID, splitByGym: false };
+/** The same exercise set to report each gym separately ([[gym.split]]). */
+const SPLIT = { id: DEFINITION_ID, splitByGym: true };
 
 type SetSpec = [weight: string, reps: string, setType?: string | null, status?: FactsSetInput['performanceStatus']];
 
@@ -39,9 +43,15 @@ const block = (
   })),
 });
 
-const session = (id: string, day: number, blocks: FactsBlockInput[]): FactsSessionInput => ({
+const session = (
+  id: string,
+  day: number,
+  blocks: FactsBlockInput[],
+  gymId: string | null = null,
+): FactsSessionInput => ({
   sessionId: id,
   completedAt: new Date(Date.UTC(2026, 0, day, 18)),
+  gymId,
   blocks,
 });
 
@@ -67,7 +77,8 @@ describe('exercise session facts — metrics', () => {
 
     expect(bests).toEqual({
       sessionId: 's1',
-      exerciseDefinitionId: DEFINITION,
+      exerciseDefinitionId: DEFINITION_ID,
+      gymBucket: 'all',
       achievedAt: new Date(Date.UTC(2026, 0, 1, 18)),
       bestE1rmKg: estimateOneRepMax(100, 5),
       bestE1rmSetId: 'b1-s1',
@@ -275,13 +286,74 @@ describe('exercise session facts — PR flags', () => {
   });
 });
 
+describe('exercise session facts — reporting bucket', () => {
+  const HOME = 'gym-home';
+  const CLUB = 'gym-club';
+
+  it('pools every gym into one bucket while the exercise is not split', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
+      session('s3', 3, [block('c1', 0, [['90', '5']])], null),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.gymBucket, row.prE1rm]))
+      .toEqual([['s1', 'all', false], ['s2', 'all', true], ['s3', 'all', false]]);
+  });
+
+  it('keys a split exercise on the session\'s gym, the no-gym sessions in their own bucket', () => {
+    const rows = deriveExerciseSessionFacts(SPLIT, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
+      session('s3', 3, [block('c1', 0, [['90', '5']])], null),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.gymBucket]))
+      .toEqual([['s1', 'gym:gym-home'], ['s2', 'gym:gym-club'], ['s3', 'no-gym']]);
+  });
+
+  it('folds each bucket on its own, so one gym never sets or raises another\'s records', () => {
+    const history = [
+      // Home's baseline, then a lighter Club session that is still Club's own
+      // baseline, then a Club session beating only Club, then a Home session
+      // beating only Home.
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('club-1', 2, [block('b1', 0, [['60', '5']])], CLUB),
+      session('club-2', 3, [block('c1', 0, [['70', '5']])], CLUB),
+      session('home-2', 4, [block('d1', 0, [['105', '5']])], HOME),
+      session('none-1', 5, [block('e1', 0, [['40', '5']])], null),
+    ];
+
+    expect(flags(deriveExerciseSessionFacts(SPLIT, history))).toEqual([
+      { sessionId: 'home-1', prE1rm: false, prWeight: false, prVolume: false },
+      { sessionId: 'club-1', prE1rm: false, prWeight: false, prVolume: false },
+      { sessionId: 'club-2', prE1rm: true, prWeight: true, prVolume: true },
+      { sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true },
+      { sessionId: 'none-1', prE1rm: false, prWeight: false, prVolume: false },
+    ]);
+    // Pooled, only the two heaviest sessions are records at all.
+    expect(flags(deriveExerciseSessionFacts(DEFINITION, history)).filter((row) => row.prE1rm))
+      .toEqual([{ sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true }]);
+  });
+
+  it('orders each bucket by the same record order, ties to the earlier session', () => {
+    const rows = deriveExerciseSessionFacts(SPLIT, [
+      // Same instant, so the order is by session id: 'a-home' then 'b-home'.
+      session('b-home', 1, [block('b1', 0, [['100', '5']])], HOME),
+      session('a-home', 1, [block('a1', 0, [['100', '5']])], HOME),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.prE1rm])).toEqual([['a-home', false], ['b-home', false]]);
+  });
+});
+
 describe('exercise session facts — rules version', () => {
   // Stored facts are rebuilt only when EXERCISE_SESSION_FACTS_RULES_VERSION
   // changes. These literals pin what today's rules derive, including the shared
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(8);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(9);
     expect(summarizeFactSession(DEFINITION, session('per-side', 1, [
       block('side', 0, [['10', '8']], ordinaryLoadContext('per_side_load')),
     ]))).toMatchObject({ volumeKg: 160, topWeightKg: 10, bestE1rmKg: estimateOneRepMax(10, 8), workingSets: 1 });
@@ -295,6 +367,7 @@ describe('exercise session facts — rules version', () => {
       session('s5', 5, [block('e1', 0, [['123', '1', 'rir_0']])]),
       // Version 7: a set whose load cannot be calculated is left out, and the
       // rest can take the Volume record ([[copy.no-inline-explanation]]).
+      // Version 9: every row names its reporting bucket; unsplit is `all`.
       session('s6', 6, [block('f1', 0, [['130', '10', 'rir_2']]), block('f2', 1, [['50', '5', 'rir_2']], corrupt)]),
     ]);
 
@@ -304,27 +377,27 @@ describe('exercise session facts — rules version', () => {
       volumeKg,
     }))).toEqual([
       {
-        sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
+        sessionId: 's1', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
         topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, workingSets: 2, volumeSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
       },
       {
-        sessionId: 's2', exerciseDefinitionId: DEFINITION, bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
+        sessionId: 's2', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
         topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: false,
       },
       {
-        sessionId: 's4', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
+        sessionId: 's4', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
         topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, workingSets: 1, volumeSets: 1,
         prE1rm: true, prWeight: true, prVolume: false,
       },
       {
-        sessionId: 's5', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
+        sessionId: 's5', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
         topWeightKg: 123, topWeightSetId: 'e1-s0', volumeKg: 123, workingSets: 1, volumeSets: 1,
         prE1rm: false, prWeight: true, prVolume: false,
       },
       {
-        sessionId: 's6', exerciseDefinitionId: DEFINITION, bestE1rmKg: 175.1707, bestE1rmSetId: 'f1-s0',
+        sessionId: 's6', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 175.1707, bestE1rmSetId: 'f1-s0',
         topWeightKg: 130, topWeightSetId: 'f1-s0', volumeKg: 1300, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: true,
       },
