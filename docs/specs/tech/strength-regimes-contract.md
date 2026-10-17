@@ -28,9 +28,8 @@ label, never claiming an exact physiological change time.
 
 ## Snapshot and execution
 
-The current SQLite graph supplies actual plotted coordinates and the first
-working-ordinal sample. Select the ordinal before known-RIR/effort filtering;
-omissions do not promote later sets. Keep gym and dated bodyweight/loading
+The current SQLite graph supplies actual plotted coordinates and the session
+sample of [[1rm.curve-fitting]], retaining gym and dated bodyweight/loading
 context. All gyms combines rows once within the other selected filters.
 
 `useRmCurve` scopes reads to account revision, exercise, gym, dates, effort and

@@ -20,6 +20,7 @@ import { PlanSetAddForm } from '@/components/session-planner/plan-set-add-form';
 import { EffortChoices } from '@/components/exercise-page/exercise-sheets';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanGymSheet, type SaveOutcome } from '@/components/session-planner/plan-form-screen';
+import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
 import {
   emptyProgrammeChildPlan,
   programmeFormErrors,
@@ -30,9 +31,11 @@ import {
   planFormBlockFromEmptySet,
   planFormBlockFromSuggestion,
   addPlanFormSets,
+  formatScheduleText,
   type PlanFormBlock,
   type PlanFormSet,
 } from '@/src/session-planner/plan-form-model';
+import { parseSessionDateTime } from '@/src/utils/local-time';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -109,6 +112,80 @@ type ProgrammeSessionEditSheetProps = {
   onUpdatePlan: (index: number, patch: Partial<ProgrammeChildPlanForm>) => void;
 };
 
+type ProgrammeChildPlanBlocksProps = {
+  blocks: PlanFormBlock[];
+  prefix: string;
+  errors: Map<string, string>;
+  displayEfforts: readonly EffortChoice[];
+  onAddBlock: () => void;
+  onAddSets: (blockId: string, countText: string) => void;
+  onChangeSet: (blockId: string, setId: string, patch: Partial<PlanFormSet>) => void;
+  onMoveBlock: (blockId: string, step: -1 | 1) => void;
+  onPickExercise: (id: string) => void;
+  onOpenEffort: (blockId: string, setId: string) => void;
+  onOpenAddSets: (blockId: string) => void;
+  onRemoveBlock: (blockId: string) => void;
+  onRemoveSet: (blockId: string, setId: string) => void;
+};
+
+function ProgrammeChildPlanBlocks({
+  blocks,
+  prefix,
+  errors,
+  displayEfforts,
+  onAddBlock,
+  onAddSets,
+  onChangeSet,
+  onMoveBlock,
+  onPickExercise,
+  onOpenEffort,
+  onOpenAddSets,
+  onRemoveBlock,
+  onRemoveSet,
+}: ProgrammeChildPlanBlocksProps) {
+  return (
+    <View style={styles.fieldBlock}>
+      <View style={styles.blocksHeader}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.fieldLabel}>
+          Exercise blocks
+        </Text>
+        <ActionButton
+          accessibilityLabel="Add exercise block"
+          label="+ Add exercise"
+          onPress={onAddBlock}
+          testID="programme-child-plan-add-block"
+          variant="outline"
+        />
+      </View>
+
+      {blocks.map((block, blockIdx) => (
+        <PlanBlockEditor
+          block={block}
+          count={blocks.length}
+          displayEfforts={displayEfforts}
+          errorPrefix={`${prefix}.exercises`}
+          errors={errors}
+          index={blockIdx}
+          key={block.id}
+          onAddSets={onAddSets}
+          onChangeSet={onChangeSet}
+          onMoveBlock={onMoveBlock}
+          onPickExercise={onPickExercise}
+          onOpenEffort={onOpenEffort}
+          onOpenAddSets={onOpenAddSets}
+          onRemoveBlock={onRemoveBlock}
+          onRemoveSet={onRemoveSet}
+        />
+      ))}
+      {blocks.length === 0 ? (
+        <Text allowFontScaling={false} style={styles.hint} testID="programme-child-plan-blocks-empty">
+          A session needs at least one exercise.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 /**
  * Child session editor sheet: isolates the full block/target set editor
  * to one child session at a time, avoiding an unbounded mega-form on mobile.
@@ -123,6 +200,7 @@ function ProgrammeSessionEditSheet({
 }: ProgrammeSessionEditSheetProps) {
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
+  const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
   const [pickBlockId, setPickBlockId] = useState<string | null>(null);
   const [isPickingNew, setIsPickingNew] = useState(false);
   const [effortRequest, setEffortRequest] = useState<{ blockId: string; setId: string } | null>(null);
@@ -156,6 +234,8 @@ function ProgrammeSessionEditSheet({
 
   const selectedGymName =
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
+  const childScheduleSummary =
+    plan.scheduleText.trim().length > 0 ? plan.scheduleText : 'Unscheduled';
 
   const { updateSet, addSets, removeSet, pickExercise, removeBlock, moveBlock } =
     childPlanBlockEdits(plan, planIndex, onUpdatePlan, trainingPreferences.displayEfforts);
@@ -221,18 +301,21 @@ function ProgrammeSessionEditSheet({
             value={plan.title}
           />
 
-          <FormField
-            accessibilityLabel="Schedule date and time"
-            error={errors.get(`${prefix}.scheduledFor`)}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
-            label="Schedule (optional)"
-            onChangeText={(text) => onUpdatePlan(planIndex, { scheduleText: text })}
-            placeholder="YYYY-MM-DD HH:mm"
-            testID="programme-child-plan-schedule-input"
-            value={plan.scheduleText}
-          />
+          <View style={styles.fieldBlock}>
+            <Text allowFontScaling={false} style={styles.fieldLabel}>
+              Schedule (optional)
+            </Text>
+            <Card>
+              <ListRow
+                accessibilityLabel={`Schedule: ${childScheduleSummary}`}
+                density="list"
+                divider={false}
+                label={childScheduleSummary}
+                onPress={() => setScheduleSheetVisible(true)}
+                testID="programme-child-plan-schedule-row"
+              />
+            </Card>
+          </View>
 
           <View style={styles.fieldBlock}>
             <Text allowFontScaling={false} style={styles.fieldLabel}>
@@ -250,45 +333,21 @@ function ProgrammeSessionEditSheet({
             </Card>
           </View>
 
-          <View style={styles.fieldBlock}>
-            <View style={styles.blocksHeader}>
-              <Text allowFontScaling={false} accessibilityRole="header" style={styles.fieldLabel}>
-                Exercise blocks
-              </Text>
-              <ActionButton
-                accessibilityLabel="Add exercise block"
-                label="+ Add exercise"
-                onPress={() => setIsPickingNew(true)}
-                testID="programme-child-plan-add-block"
-                variant="outline"
-              />
-            </View>
-
-            {plan.blocks.map((block, blockIdx) => (
-              <PlanBlockEditor
-                block={block}
-                count={plan.blocks.length}
-                displayEfforts={trainingPreferences.displayEfforts}
-                errorPrefix={`${prefix}.exercises`}
-                errors={errors}
-                index={blockIdx}
-                key={block.id}
-                onAddSets={addSets}
-                onChangeSet={updateSet}
-                onMoveBlock={moveBlock}
-                onPickExercise={(id) => setPickBlockId(id)}
-                onOpenEffort={(blockId, setId) => setEffortRequest({ blockId, setId })}
-                onOpenAddSets={setAddSetsBlockId}
-                onRemoveBlock={removeBlock}
-                onRemoveSet={removeSet}
-              />
-            ))}
-            {plan.blocks.length === 0 ? (
-              <Text allowFontScaling={false} style={styles.hint} testID="programme-child-plan-blocks-empty">
-                A session needs at least one exercise.
-              </Text>
-            ) : null}
-          </View>
+          <ProgrammeChildPlanBlocks
+            blocks={plan.blocks}
+            displayEfforts={trainingPreferences.displayEfforts}
+            errors={errors}
+            onAddBlock={() => setIsPickingNew(true)}
+            onAddSets={addSets}
+            onChangeSet={updateSet}
+            onMoveBlock={moveBlock}
+            onOpenAddSets={setAddSetsBlockId}
+            onOpenEffort={(blockId, setId) => setEffortRequest({ blockId, setId })}
+            onPickExercise={(id) => setPickBlockId(id)}
+            onRemoveBlock={removeBlock}
+            onRemoveSet={removeSet}
+            prefix={prefix}
+          />
 
           <ActionButton
             accessibilityLabel="Done editing session"
@@ -306,6 +365,15 @@ function ProgrammeSessionEditSheet({
               setGymSheetVisible(false);
             }}
             visible={gymSheetVisible}
+          />
+
+          <PlanScheduleSheet
+            currentSchedule={plan.scheduleText.trim().length > 0 ? parseSessionDateTime(plan.scheduleText) : null}
+            onConfirm={(date) => {
+              onUpdatePlan(planIndex, { scheduleText: date ? formatScheduleText(date) : '' });
+            }}
+            onDismiss={() => setScheduleSheetVisible(false)}
+            visible={scheduleSheetVisible}
           />
 
           <PlanExercisePickSheet

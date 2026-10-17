@@ -93,12 +93,12 @@ it('shows the set as logged and the group previous #1 from the record stream',as
       performance: { ...ordinary,set_id: 'set0',weight_value: '110' } }] } }] });
   await openRecord();
   expect(screen.getByTestId('group-metric-record-set')).toHaveTextContent('120.0 × 5');
-  expect(screen.getByTestId('group-metric-record-previous-e1rm')).toHaveTextContent(/1RM.*130\.0 kg.*Sam · 110\.0 × 5/);
+  expect(screen.getByTestId('group-metric-record-previous-e1rm')).toHaveTextContent(/1RM.*130\.0.*Sam · 110\.0 × 5/);
 });
 it('keeps historical kg values distinct from the current normalized standard',async()=>{
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,representation_version: 3,visibility: 'ordinary',rules_revision: 1,
     values: [{ ...competitionEvent.values[0],unit: 'kg',value: 112.5 }] }));
-  await openRecord();expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('112.5 kg');
+  await openRecord();expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('112.5');
   fireEvent.press(screen.getByTestId('group-metric-record-certify'));
   await waitFor(()=>expect(api.certifyCompetition).toHaveBeenCalledWith(expect.objectContaining({ revision: 2,token: competitionRow.write_token })));
 });

@@ -61,12 +61,13 @@ One curve + Parsimonious. One fits constant total 1RM; Two fits two free positiv
 total 1RMs and a complete-session boundary against constant/linear/quadratic
 no-break alternatives. Only 1RM changes amplitude; no minimum increment.
 
-Fit each completed session's first working ordinal, chosen before effort/residual
-inspection. Missing effort/unusable load omits the session; never substitute later
-sets. Independently plot all qualifying sets. Unavailable fits retain observations
-without historical fallback. Preserve logged metrics.
+Fit each completed session’s highest unrounded displayed 1RM
+([[1rm.formula]], logged reps) among qualifying sets after exercise/time/gym/RIR
+filters. Ties keep the first in session order (block, set, then set ID).
+Omit sessions without qualifying sets. Plot all qualifying sets.
+Unavailable fits retain observations without historical fallback. Keep logged metrics.
 
-Why: owner approved 2026-10-15; activation remains separate.
+Why: approved 2026-10-15; filtered maximum approved 2026-10-17; activation separate.
 Code: `apps/mobile/src/strength-regimes/`.
 
 ### 1rm.curve-uncertainty · calculation · accepted
@@ -85,10 +86,11 @@ Code: `apps/mobile/src/strength-regimes/assessment.ts`.
 
 Before/From dates, distinct markers and matching point/curve hues identify
 complete-session periods. Selected details use the current fitted period's
-label/hue; invalidated fits remove it. Selection follows point taps or View sets,
-persists while valid, and never automatically chooses a representative.
+label/hue; invalidated fits remove it. Selection follows chart activation and
+Previous/Next, persists while valid, and never automatically chooses a
+representative. No set-list popup.
 
-Why: owner approved 2026-10-15.
+Why: approved 2026-10-15; set-list removal approved 2026-10-17.
 Code: `apps/mobile/components/rm-curve/`.
 
 ### 1rm.curve-load · presentation · accepted

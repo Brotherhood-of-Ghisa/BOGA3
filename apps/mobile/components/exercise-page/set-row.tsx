@@ -42,7 +42,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
-  const meaning = 'Weight · kg';
+  const meaning = 'Weight';
   const glyph = performed ? 'set-done' : row.isCursor ? 'set-current' : 'set-planned';
   const statState = performed ? 'realised' : 'planned';
 

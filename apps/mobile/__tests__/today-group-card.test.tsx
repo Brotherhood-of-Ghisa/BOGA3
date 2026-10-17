@@ -248,7 +248,7 @@ describe('Today: the group card', () => {
     expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
     expect(screen.queryByTestId('today-group-latest-completed-training-now')).toBeNull();
     expect(byId('today-group-latest-completed-figures')).toHaveTextContent('18 sets · 4 exercises');
-    expect(byId('today-group-latest-completed-record')).toHaveTextContent('Deadlift 1RM 213.3 kg · group record');
+    expect(byId('today-group-latest-completed-record')).toHaveTextContent('Deadlift 1RM 213.3 · group record');
     view.unmount();
 
     // One set #1 on Weight and on 1RM: two group records, only counted.

@@ -61,25 +61,28 @@ describe('Icon', () => {
   });
 });
 
+const APP_ROOT = join(__dirname, '..');
+const UI_DIRS = ['app', 'components', 'src'];
+
+const sourceFiles = (dir: string): string[] =>
+  readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      return entry === '__tests__' || entry === 'node_modules' ? [] : sourceFiles(full);
+    }
+    return /\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) ? [full] : [];
+  });
+
+const uiSources = (): string[] => UI_DIRS.flatMap((dir) => sourceFiles(join(APP_ROOT, dir)));
+
 // The glyphs the icon set retired (2026-09-22) must not come back as `Text`
 // icons. `×` and `−` are not here: they are the multiplication and minus signs
 // inside figures ("100 kg × 5", "−12%"), not icons. Comments are skipped.
 describe('retired Unicode glyphs stay retired', () => {
   const RETIRED = /[›⋮▾▼★●○↗↑↓⚙✓≡]|👤/u;
-  const APP_ROOT = join(__dirname, '..');
-
-  const sourceFiles = (dir: string): string[] =>
-    readdirSync(dir).flatMap((entry) => {
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) {
-        return entry === '__tests__' || entry === 'node_modules' ? [] : sourceFiles(full);
-      }
-      return /\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) ? [full] : [];
-    });
 
   it('finds no retired glyph outside comments in app, components or src', () => {
-    const offenders = ['app', 'components', 'src']
-      .flatMap((dir) => sourceFiles(join(APP_ROOT, dir)))
+    const offenders = uiSources()
       .flatMap((file) =>
         readFileSync(file, 'utf8')
           .split('\n')
@@ -87,6 +90,30 @@ describe('retired Unicode glyphs stay retired', () => {
           .filter(({ line }) => !/^\s*(\/\/|\*|\/\*)/.test(line) && RETIRED.test(line))
           .map(({ line, index }) => `${relative(APP_ROOT, file)}:${index + 1}: ${line.trim()}`),
       );
+    expect(offenders).toEqual([]);
+  });
+});
+
+// design-language §"One superlative: `record`": a PR figure is carried by its
+// bold `record` colour (and the band on cards that have one), never by a mark
+// beside the number. The arrow the record surfaces used to draw was removed
+// (2026-10-17); `arrow-up` stays available for reordering controls and trends,
+// which are `ink`.
+describe('no record figure draws a mark beside the number', () => {
+  // Every `<Icon ... />` element, self-closing and possibly spanning lines.
+  const ICON_ELEMENT = /<Icon\b[\s\S]*?\/>/g;
+
+  // `name="arrow-up"` and `name={'arrow-up'}` both; `color` as the role or
+  // through the `record` text style.
+  const ARROW_NAME = /name=\{?['"]arrow-/;
+  const RECORD_COLOUR = /uiRoles\.record\b|record\.color\b/;
+
+  it('pairs a record colour with no arrow glyph in app, components or src', () => {
+    const offenders = uiSources().flatMap((file) =>
+      (readFileSync(file, 'utf8').match(ICON_ELEMENT) ?? [])
+        .filter((element) => RECORD_COLOUR.test(element) && ARROW_NAME.test(element))
+        .map((element) => `${relative(APP_ROOT, file)}: ${element.replace(/\s+/g, ' ')}`),
+    );
     expect(offenders).toEqual([]);
   });
 });

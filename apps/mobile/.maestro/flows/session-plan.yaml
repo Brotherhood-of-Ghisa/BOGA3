@@ -89,7 +89,7 @@ appId: com.dinoderek.mobile
     text: "Maestro Strength Plan"
 - assertVisible:
     id: "plan-detail-block-1-targets"
-    text: "100 kg × 5 \\(W-Up\\)"
+    text: "100 × 5 \\(W-Up\\)"
 - takeScreenshot: "02-plan-detail-ready"
 
 - tapOn:

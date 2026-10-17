@@ -7,11 +7,11 @@ import type { RecordLine } from '@/src/session-insights/record-band';
 import { formatBoardDate, YOU_LABEL } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import type { CompetitionSessionExerciseCard } from './competition-session-view-model';
-import { COMPETITION_UNIT_LABELS, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { formatCompetitionFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
 import type { CompetitionCertificationWire, CompetitionEventWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
   CompetitionSessionRecordWire, CompetitionSessionWire } from './competition-wire';
 import type { MetricCertificationTarget } from './metric-record-sheet-view-model';
-import { formatMemberName, formatMetricFigure } from './stream-view-model';
+import { formatMemberName } from './stream-view-model';
 import type { GroupMemberRef } from './types';
 
 export const GROUP_RECORD_LABEL = '#1 in group';
@@ -85,8 +85,7 @@ export function sessionSetPlaces(cards: readonly CompetitionSessionExerciseCard[
 const recordValue = (record: CompetitionSessionRecordWire, metric: CompetitionHistoricalMetric): string => {
   const value = record.event.values.find(entry => entry.role === 'record' && entry.metric === metric);
   if (!value || value.unavailable || value.value === null) return 'Score unavailable';
-  const unit = COMPETITION_UNIT_LABELS[value.unit as keyof typeof COMPETITION_UNIT_LABELS] ?? value.unit;
-  return `${formatMetricFigure('e1rm', value.value)} ${unit}`;
+  return formatCompetitionFigure(value.value, value.unit);
 };
 
 /** What certifying one metric of a record event needs; null when the current rules have no such board. */

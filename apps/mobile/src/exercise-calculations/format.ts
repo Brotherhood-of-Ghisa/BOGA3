@@ -1,7 +1,7 @@
 /**
  * The one display format of each training figure
  * (`training-metrics-contract.md` §4, `design-language.md` §6). Figures carry
- * no unit and no thousands separators; a sentence adds ` kg` itself.
+ * no unit and no thousands separators; labels follow [[copy.no-weight-unit]].
  */
 
 /** Weight as entered, one decimal on whole kg so a column reads alike: `60.0`, `82.5`, `2.25`. */

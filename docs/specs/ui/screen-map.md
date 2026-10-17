@@ -50,7 +50,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |
 | `/sessions` | The planning hub: **Active** (the live session's row), **Upcoming** (scheduled one-off plans, soonest first), **Unscheduled** (standalone plans and multi-session training programmes, most recently updated first) and the **Completed** history in the calendar weeks of [[comparison.window]], newest first, each with its own states, in one virtualized list; `?week=` / `?day=` open it at that week or day, scrolled only — nothing filtered; the header ⋮ holds `Show deleted sessions`; the quiet `Plan session` and `New programme` actions are the hub's persistent entries and the empty planning sections' inline action. Plans never affect the completed history's count, filters or row actions | `sessions.tsx`, `components/session-planner/plan-sections.tsx` |
-| `/session-plan/new` | The shared plan editor: title, optional schedule (`YYYY-MM-DD HH:mm`, blank = unscheduled) and gym, ordered exercise blocks with ordered target sets, inline field-addressable validation. Add set(s) asks how many exact copies of the last target to append. `?edit=<planId>` edits that plan in place (its guarded sync refuses to touch a consumed block, writing nothing); `?from=<planId>` prefills a duplicate and Save creates a new plan | `session-plan/new.tsx`, `components/session-planner/plan-form-screen.tsx` |
+| `/session-plan/new` | The shared plan editor: title, optional schedule (native date/time picker, cleared = unscheduled) and gym, ordered exercise blocks with ordered target sets, inline field-addressable validation. Add set(s) asks how many exact copies of the last target to append. `?edit=<planId>` edits that plan in place (its guarded sync refuses to touch a consumed block, writing nothing); `?from=<planId>` prefills a duplicate and Save creates a new plan | `session-plan/new.tsx`, `components/session-planner/plan-form-screen.tsx` |
 | `/session-plan/[planId]` | One plan: targets, derived progress, provenance; **Start all** (an active-session conflict offers one Resume and creates nothing), per-block **Add to session** (several compatible cards offer a choice sheet that writes nothing until one is picked), **Skip without doing it** on pending blocks, **Duplicate**, and confirmed **Delete** while no block pins the plan. Consumed blocks are read-only and link to their performed session | `session-plan/[planId].tsx` |
 | `/programme/new` | Multi-session training programme editor: name, description, ordered child sessions list with reorder/duplicate/remove controls, focused sub-sheet for editing child sessions including count-only Add set(s), atomic transactional save. `?edit=<programmeId>` edits the programme in place; `?from=<programmeId>` prefills a duplicate | `programme/new.tsx`, `components/session-planner/programme-form-screen.tsx` |
 | `/programme/[programmeId]` | Training programme detail: programme metadata, status badge, next unresolved block card (in programme then exercise order) with "Add to session" and "Skip", ordered list of child plans linking to `/session-plan/[planId]` with accessible reordering, duplicate, and contract-defined delete (detaches child plans as standalone plans without deleting workouts) | `programme/[programmeId].tsx`, `components/session-planner/use-programme-detail.ts` |
@@ -182,14 +182,13 @@ addressable, each resolving to a canonical owner for tab selection.
 
 - **Personal bodyweight calculations** (Settings On/Off): while enabled, the
   personal exercise editor adds only `Bodyweight contribution (%)`. Session and
-  exercise routes keep ordinary kg Weight / 1RM / Volume labels and never show
+  exercise routes keep ordinary Weight / 1RM / Volume labels ([[copy.no-weight-unit]]) and never show
   bodyweight context or entry actions. Reading or deletion changes recalculate
   affected projections silently.
 - **Group bodyweight calculations** (admin-only group toggle): while enabled,
   add/edit group exercise shows only the group's own independent
   `Bodyweight contribution (%)`; linking never changes personal settings or
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
-  boards and podiums then show explicit `kg·reps` / `kg` or `%BW·reps` / `%BW`
-  units; record detail and history retain public witness state and original
-  units, and normalized sessions omit raw loads and all session aggregate
+  boards and podiums follow [[copy.no-weight-unit]]; record detail and history
+  retain public witness state and original wire units, and normalized sessions omit raw loads and all session aggregate
   volume. See `docs/specs/tech/group-competition-contract.md`.

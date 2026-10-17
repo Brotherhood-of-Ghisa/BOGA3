@@ -23,7 +23,7 @@ it('shows original normalized units and the set with its one status, without raw
   expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');
 });
 it.each([
-  ['e1rm','kg',120,'1RM 120.0 kg'],['volume','kg_reps',600,'Volume 600.0 kg·reps'],
+  ['e1rm','kg',120,'1RM 120.0'],['volume','kg_reps',600,'Volume 600.0'],
   ['volume','percent_bw_reps',620,'Volume 620.0 %BW·reps'],
 ] as const)('keeps %s original unit %s', (metric,unit,value,line) => {
   const card=renderCard({ ...competitionEvent,metric,values: [{ ...competitionEvent.values[0],metric,unit,value }] });

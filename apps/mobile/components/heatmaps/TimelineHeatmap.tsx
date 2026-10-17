@@ -47,7 +47,7 @@ interface Props {
   testIDPrefix: string;
   formatValue: (value: number) => string;
   metricLabel: string;
-  /** The readout's unit word for a figure, e.g. `kg`, `1 set`/`2 sets`, `volume`. */
+  /** The readout's unit word for a figure, e.g. `1 set`/`2 sets`, `volume`; empty for none. */
   unitLabel: (value: number) => string;
   header?: ReactNode;
   children?: ReactNode;
@@ -73,7 +73,7 @@ const weekFigure = (week: TimelineWeek, metric: CalendarHeatmapMetric, formatVal
   return { value: formatValue(week.value), unit: unitLabel(week.value) };
 };
 
-// `Volume 100`, `Sets 6`, `1RM 112.5 kg`: a unit that repeats the metric is not spoken twice.
+// `Volume 100`, `Sets 6`, `1RM 112.5`: a unit that repeats the metric is not spoken twice.
 const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string) => {
   const unit = figure.unit && !metricLabel.toLowerCase().startsWith(figure.unit.toLowerCase()) ? ` ${figure.unit}` : '';
   // Spoken weeks always carry their year, whichever one it is.

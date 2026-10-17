@@ -9,26 +9,31 @@ import { formatMemberName, formatMetricFigure } from './stream-view-model';
 import type { GroupExercise } from './types';
 
 export const COMPETITION_LABELS = { volume: 'Volume', e1rm: '1RM' } as const;
-export const COMPETITION_UNIT_LABELS = { kg_reps: 'kg·reps', kg: 'kg', percent_bw_reps: '%BW·reps', percent_bw: '%BW' } as const;
+// Unit labels follow [[copy.no-weight-unit]]; wire units remain unchanged.
+export const COMPETITION_UNIT_LABELS = { kg_reps: '', kg: '', percent_bw_reps: '%BW·reps', percent_bw: '%BW' } as const;
+const withUnit = (text: string, unit: string): string => unit ? `${text} ${unit}` : text;
+/** A competition figure with its unit label: `213.3`, `142.5 %BW`. */
+export const formatCompetitionFigure = (value: number, unit: string): string =>
+  withUnit(formatMetricFigure('e1rm',value), COMPETITION_UNIT_LABELS[unit as keyof typeof COMPETITION_UNIT_LABELS] ?? unit);
 export const HISTORICAL_METRIC_LABELS: Record<CompetitionHistoricalMetric,string> = {
   weight: 'Weight',volume: 'Volume',e1rm: '1RM',bodyweight_reps: 'Bodyweight reps',
   relative_strength: 'Relative strength',absolute_strength: 'Absolute strength',
 };
 export function competitionViewLabel(metric: CompetitionMetric,rules: CompetitionRulesWire): string {
-  return `${COMPETITION_LABELS[metric]} ${COMPETITION_UNIT_LABELS[competitionUnit(metric,
-    rules.bodyweight_calculations_enabled && rules.bodyweight_contribution > 0)]}`;
+  return withUnit(COMPETITION_LABELS[metric], COMPETITION_UNIT_LABELS[competitionUnit(metric,
+    rules.bodyweight_calculations_enabled && rules.bodyweight_contribution > 0)]);
 }
 export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'unit'|'value'>): string {
   if (!Number.isFinite(score.value) || score.value <= 0) return 'Score unavailable';
-  return `${formatMetricFigure('e1rm',score.value)} ${COMPETITION_UNIT_LABELS[score.unit]}`;
+  return formatCompetitionFigure(score.value,score.unit);
 }
 export function formatCompetitionPerformance(performance: CompetitionPerformanceWire): string {
   if (performance.visibility === 'normalized') return `${performance.reps} reps`;
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
   const value = Number(performance.weight_value);
-  return `Weight ${Number.isFinite(value) ? formatWeight(value) : performance.weight_value} kg${distribution} × ${performance.reps}`;
+  return `Weight ${Number.isFinite(value) ? formatWeight(value) : performance.weight_value}${distribution} × ${performance.reps}`;
 }
-/** A performed set as the session cards show it: `120.0 × 5`, `20.0 × 5 per side`; `5 reps` where the group hides kg. */
+/** A performed set as the session cards show it: `120.0 × 5`, `20.0 × 5 per side`; `5 reps` where the group hides loads. */
 export function formatSetFigure(performance: CompetitionPerformanceWire): string {
   if (performance.visibility === 'normalized') return `${performance.reps} reps`;
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
@@ -74,7 +79,7 @@ export function describeCompetitionEvent(event: CompetitionEventWire,userId: str
   if (event.kind === 'link' || event.kind === 'unlink') return `${who} ${event.kind === 'link' ? 'linked' : 'unlinked'} an exercise to ${event.group_exercise.name}.`;
   const value=event.values.find(row => row.role === (event.kind === 'lead_change' ? 'leader' : 'record'));
   const figure=value?.value !== null && value?.value !== undefined && !value.unavailable
-    ? `${formatMetricFigure('e1rm',value.value)} ${COMPETITION_UNIT_LABELS[value.unit as keyof typeof COMPETITION_UNIT_LABELS] ?? value.unit}` : 'Score unavailable';
+    ? formatCompetitionFigure(value.value,value.unit) : 'Score unavailable';
   const label=value ? HISTORICAL_METRIC_LABELS[value.metric] : event.metric ? HISTORICAL_METRIC_LABELS[event.metric] : 'Score';
   const holder=value?.member?.user_id === userId ? 'You' : value?.member ? formatMemberName(value.member.username) : who;
   return event.kind === 'lead_change' ? `${holder} · #1 ${label} · ${figure}.` : `${who} · ${label} ${figure}${event.reps === null ? '' : ` · ${event.reps} reps`}.`;
@@ -82,7 +87,7 @@ export function describeCompetitionEvent(event: CompetitionEventWire,userId: str
 
 export function formatCompetitionHistoricalValue(value: CompetitionHistoryValueWire): string {
   if (value.unavailable || value.value === null) return 'Score unavailable';
-  return `${HISTORICAL_METRIC_LABELS[value.metric]} ${formatMetricFigure('e1rm',value.value)} ${COMPETITION_UNIT_LABELS[value.unit as keyof typeof COMPETITION_UNIT_LABELS] ?? value.unit}`;
+  return `${HISTORICAL_METRIC_LABELS[value.metric]} ${formatCompetitionFigure(value.value,value.unit)}`;
 }
 
 /** Linking consumes public catalogue identity; it never copies personal settings. */

@@ -49,8 +49,17 @@ Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/componen
 ### copy.set-entry · presentation · accepted
 
 Workout, session-plan and programme set entry follow the recorder's copy:
-`Effort`, `Weight · kg`, `Reps`. Weight entry uses the same label for total-load
-and per-side exercises; its accessible name is `Set N weight in kilograms`.
+`Effort`, `Weight`, `Reps`. Weight entry uses the same label for total-load
+and per-side exercises; its accessible name is `Set N weight`.
 
 Why: the recorder is the standard for entering sets, and planning follows it.
 Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`.
+
+### copy.no-weight-unit · presentation · accepted
+
+While kg is the only supported weight unit, visible and spoken labels omit
+kg and kilograms, including compound volume units. Keep `per side`, `%BW` and
+`%BW·reps`. Stored values, wire units and coaching/import payloads stay unchanged.
+
+Why: the sole weight unit adds no information. Approved 2026-10-17.
+Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.

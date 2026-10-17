@@ -70,16 +70,12 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "rm-curve-plot"
     point: "31%,22%"
-- assertVisible: { text: "Observed sets · newest first" }
-- tapOn:
-    text: ".*block 1, set 1\\..*Gym B\\."
-    index: 0
 - scrollUntilVisible:
     element: { id: "rm-curve-details" }
     direction: DOWN
     centerElement: true
 - assertVisible: { id: "rm-selected-period", text: "From .*" }
-- assertVisible: { text: "WEIGHT / 1RM · KG" }
+- assertVisible: { text: "WEIGHT / 1RM" }
 - takeScreenshot: "06-selected-set"
 - scrollUntilVisible:
     element: { id: "rm-method-fixed" }

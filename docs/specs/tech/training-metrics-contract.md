@@ -303,8 +303,8 @@ of Display (§1); zero working sets alone cannot establish Volume emptiness.
 No derived figure is written back to a set or session.
 
 **Display** (`format.ts`). Every figure has one format on every screen, the
-groups' included. Figures have no unit and no thousands separators; a sentence
-adds ` kg` itself.
+groups' included. Figures have no thousands separators; unit labels follow
+[[copy.no-weight-unit]].
 
 | Figure | Format | Example |
 | --- | --- | --- |
@@ -336,7 +336,7 @@ numerical diagnostics, cancellation and calibration limits, load
 view; activation and human implemented-UI acceptance remain separate gates.
 
 `src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives
-observations and prespecified session samples. `components/rm-curve/` renders it,
+observations and selected session samples. `components/rm-curve/` renders it,
 hosted by `app/rm-curve.tsx`. No derived figure writes back to workouts.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,

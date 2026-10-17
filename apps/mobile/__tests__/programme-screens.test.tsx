@@ -110,8 +110,8 @@ describe('programme screens', () => {
 
       // Pick exercise for block 1
       await pickExercise('Barbell Squat');
-      expect(screen.getByText('Weight · kg')).toBeTruthy();
-      expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+      expect(screen.getByText('Weight')).toBeTruthy();
+      expect(screen.getByLabelText('Set 1 weight')).toBeTruthy();
 
       // Target sets
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '140');
@@ -122,8 +122,8 @@ describe('programme screens', () => {
       fireEvent.press(screen.getByTestId('programme-form-plan-2-edit'));
       fireEvent.changeText(screen.getByTestId('programme-child-plan-title-input'), 'Day 2: Heavy Bench');
       await pickExercise('Bench Press');
-      expect(screen.getByText('Weight · kg')).toBeTruthy();
-      expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+      expect(screen.getByText('Weight')).toBeTruthy();
+      expect(screen.getByLabelText('Set 1 weight')).toBeTruthy();
       expect(screen.queryByText('Weight per side · kg')).toBeNull();
       expect(screen.queryByLabelText('Set 1 weight per side in kilograms')).toBeNull();
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '100');
@@ -172,7 +172,11 @@ describe('programme screens', () => {
       render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Copy wave');
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
-      expect(screen.getByTestId('programme-child-plan-schedule-input')).toHaveProp('keyboardType', 'numbers-and-punctuation');
+      expect(screen.getByTestId('programme-child-plan-schedule-row')).toHaveTextContent(/Unscheduled/);
+      fireEvent.press(screen.getByTestId('programme-child-plan-schedule-row'));
+      fireEvent(screen.getByTestId('plan-schedule-picker-native'), 'onChange', { type: 'set' }, new Date(2026, 9, 12, 9, 0, 0));
+      fireEvent.press(screen.getByTestId('plan-schedule-confirm-button'));
+      expect(screen.getByTestId('programme-child-plan-schedule-row')).toHaveTextContent(/2026-10-12 09:00/);
       await pickExercise('Bench Press');
       expect(screen.getByTestId('plan-form-block-1-set-1-effort')).toHaveTextContent('EffortRIR 4');
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '40');
@@ -504,7 +508,7 @@ describe('programme screens', () => {
 
       // Next block card highlights the Barbell Squat block
       expect(screen.getByTestId('programme-next-block-name')).toHaveTextContent('Barbell Squat');
-      expect(screen.getByTestId('programme-next-block-targets')).toHaveTextContent('5 reps @ 140 kg (RIR 2)');
+      expect(screen.getByTestId('programme-next-block-targets')).toHaveTextContent('5 reps @ 140 (RIR 2)');
 
       // Sessions list renders both sessions
       expect(screen.getByText('Lower A')).toBeTruthy();

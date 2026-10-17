@@ -723,7 +723,7 @@ describe('a session written through the app', () => {
     // The bench comparison reads the same working sets: 185×8 + 185×6 + 185×5.
     const bench = await screen.findByTestId(`session-completion-exercise-${DESIGN.bench}`);
     expect(bench.findByProps({ accessible: true }).props.accessibilityLabel).toMatch(
-      /Barbell Bench Press, 3 sets\. Session volume 3515 kg reps\..*above median.*twenty-fifth to seventy-fifth percentile/
+      /Barbell Bench Press, 3 sets\. Session volume 3515\..*above median.*twenty-fifth to seventy-fifth percentile/
     );
     expect(screen.getByTestId(`session-completion-exercise-${DESIGN.bench}-distribution`)).toBeTruthy();
 

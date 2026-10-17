@@ -80,8 +80,8 @@ const setCalculations = async (enabled: boolean) => {
 };
 
 const expectOrdinaryLogger = () => {
-  expect(screen.getByText('Weight · kg')).toBeTruthy();
-  expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
+  expect(screen.getByText('Weight')).toBeTruthy();
+  expect(screen.getByLabelText('Set 1 weight')).toBeTruthy();
   expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('0');
   expect(screen.queryByTestId('exercise-set-unit-lb')).toBeNull();
   // No calculation-only field, reading, or session prompt on the logger.

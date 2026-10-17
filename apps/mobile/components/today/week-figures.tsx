@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/ui/icon';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 
@@ -49,7 +48,6 @@ function WeekFigure({ label, current, previous, record = false, testID }: Figure
         {label}
       </Text>
       <View style={styles.valueRow}>
-        {showRecord ? <Icon color={uiRoles.record} name="arrow-up" size="sm" /> : null}
         <Text
           allowFontScaling={false}
           style={[todayText.headlineFigure, showRecord ? todayText.record : null]}
@@ -127,10 +125,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
+  // One child since the record mark went; `row` still sizes the figure to its
+  // content rather than stretching it.
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.xs,
   },
   track: {
     height: BAR_HEIGHT,
