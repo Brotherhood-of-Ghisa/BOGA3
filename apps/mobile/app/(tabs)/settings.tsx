@@ -8,6 +8,7 @@ import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
+import { RestTimerSettings } from '@/components/preferences/rest-timer-settings';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import {
   ActionButton,
@@ -261,6 +262,7 @@ export default function SettingsScreen() {
               value={listPreferences.pastRecordsGymScope}
             />
           </View>
+          <RestTimerSettings state={preferences} />
         </Card>
       </View>
 

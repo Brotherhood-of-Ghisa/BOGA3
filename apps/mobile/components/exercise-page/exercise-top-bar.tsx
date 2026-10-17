@@ -8,16 +8,33 @@ type ExerciseTopBarProps = {
   onBack: () => void;
   // Omitted while the page has no exercise to act on (loading, error).
   onOpenOptions?: () => void;
+  // Present on an active session: starts or dismisses the rest timer.
+  onToggleRestTimer?: () => void;
+  restTimerActive?: boolean;
 };
 
-// Back · exercise name · ⋮. No subtitle.
-export function ExerciseTopBar({ title, onBack, onOpenOptions }: ExerciseTopBarProps) {
+// Back · exercise name · timer · ⋮. No subtitle.
+export function ExerciseTopBar({
+  title,
+  onBack,
+  onOpenOptions,
+  onToggleRestTimer,
+  restTimerActive = false,
+}: ExerciseTopBarProps) {
   return (
     <View style={styles.bar}>
       <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
       <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
         {title}
       </Text>
+      {onToggleRestTimer ? (
+        <IconButton
+          accessibilityLabel={restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
+          name="timer"
+          onPress={onToggleRestTimer}
+          testID="exercise-page-rest-timer-button"
+        />
+      ) : null}
       {onOpenOptions ? (
         <IconButton
           accessibilityLabel="Exercise options"

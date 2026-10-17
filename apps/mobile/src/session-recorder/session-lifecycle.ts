@@ -19,6 +19,7 @@ import {
   toPersistCompletedExercises,
   toPersistDraftExercises,
 } from './session-model';
+import { dismissRestTimer } from './rest-timer';
 import type { SessionTimes } from './session-times';
 
 /**
@@ -42,6 +43,7 @@ export const completeActiveSession = async (input: {
   });
 
   await completeSessionDraft(persisted.sessionId);
+  dismissRestTimer(persisted.sessionId);
   return persisted.sessionId;
 };
 
@@ -49,8 +51,10 @@ export const completeActiveSession = async (input: {
  * Abandons an active session: the same soft delete the Sessions list's
  * "Delete active session" performs, so it syncs as a tombstone.
  */
-export const abandonActiveSession = (sessionId: string): Promise<void> =>
-  setSessionDeletedState(sessionId, true);
+export const abandonActiveSession = async (sessionId: string): Promise<void> => {
+  await setSessionDeletedState(sessionId, true);
+  dismissRestTimer(sessionId);
+};
 
 export type ActiveSessionGraph = {
   sessionId: string;

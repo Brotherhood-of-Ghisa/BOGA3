@@ -122,6 +122,30 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
+it('edits rest timer auto-start and duration in Preferences and surfaces invalid durations in the centralized error flow', async () => {
+  await openSettings();
+  expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
+  expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: false });
+
+  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start-off'));
+  expect(values().restTimerAutoStart).toBe(false);
+  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: true });
+
+  editNumber('settings-rest-timer-duration', '150');
+  expect(values().restTimerDurationSec).toBe(150);
+
+  editNumber('settings-rest-timer-duration', '10');
+  expect(values().restTimerDurationSec).toBe(150);
+  expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '10');
+  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+    .toHaveTextContent(/from 15 to 600/);
+
+  editNumber('settings-rest-timer-duration', '90');
+  expect(values().restTimerDurationSec).toBe(90);
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+});
+
 it('updates a mounted picker while keeping its hidden selected effort intact', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();

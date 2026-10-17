@@ -14,6 +14,9 @@ export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // its own metric, so switching back finds the figure you left on.
 export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
+export const MIN_REST_TIMER_SECONDS = 15;
+export const MAX_REST_TIMER_SECONDS = 600;
+export const DEFAULT_REST_TIMER_SECONDS = 90;
 export type AccountLocalPreferences = {
   sort: ExerciseListSort;
   showNeverDone: boolean;
@@ -29,6 +32,8 @@ export type AccountLocalPreferences = {
   progressBreakdown: ProgressBreakdown;
   progressMetric: ProgressMetric;
   progressExerciseMetric: ProgressExerciseMetric;
+  restTimerAutoStart: boolean;
+  restTimerDurationSec: number;
 };
 export type ExerciseListPreferences = Pick<AccountLocalPreferences, 'sort' | 'showNeverDone' | 'dateFormat' | 'pastRecordsGymScope'>;
 
@@ -51,6 +56,8 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   progressBreakdown: 'muscle',
   progressMetric: 'workingSetCount',
   progressExerciseMetric: 'workingSetCount',
+  restTimerAutoStart: true,
+  restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
 };
 
 export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFERENCES) as (keyof ExerciseListPreferences)[];
@@ -78,6 +85,8 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
+  restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
+  restTimerDurationSec: `Rest timer must be a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`,
 };
 
 export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
@@ -85,7 +94,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
 ): value is AccountLocalPreferences[K] {
   switch (field) {
     case 'sort': return value === 'name' || value === 'favourite';
-    case 'showNeverDone': return typeof value === 'boolean';
+    case 'showNeverDone':
+    case 'restTimerAutoStart': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
     case 'weeklyWorkingSetTarget': return isPositiveSafeInteger(value);
@@ -99,6 +109,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
+    case 'restTimerDurationSec':
+      return isPositiveSafeInteger(value) && value >= MIN_REST_TIMER_SECONDS && value <= MAX_REST_TIMER_SECONDS;
   }
   return false;
 }

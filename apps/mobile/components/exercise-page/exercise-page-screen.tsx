@@ -38,7 +38,9 @@ import {
   commitSet,
   describeCompleteExercisePlan,
   dropSet,
+   type ExercisePageSet,
   findCursorIndex,
+  isPerformed,
   loggerValuesFor,
   planCompleteExercise,
   recordBandFor,
@@ -46,10 +48,12 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
+import { useSessionRestTimer } from '@/src/session-recorder/rest-timer';
 import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
+import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
@@ -81,6 +85,19 @@ const isGymFiltered = (scope: string, gymId: string | null): boolean => scope ==
 /** A completed session is edited in place (history, not a draft). */
 const isCompletedEdit = (state: { status: string; sessionStatus?: string }): boolean =>
   state.status === 'ready' && state.sessionStatus === 'completed';
+
+const notifyIfSetConfirmed = (
+  previous: ExercisePageSet[],
+  next: ExercisePageSet[],
+  setId: string,
+  onConfirmed: () => void,
+): void => {
+  const before = previous.find((set) => set.id === setId);
+  const after = next.find((set) => set.id === setId);
+  if (before && after && !isPerformed(before) && isPerformed(after)) {
+    onConfirmed();
+  }
+};
 
 /** The inline words for one typed block-resolution result, against the
  * block state the page already knows. */
@@ -133,6 +150,11 @@ export function ExercisePageScreen({
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
+  const restTimer = useSessionRestTimer(sessionId, {
+    defaultDurationSec: trainingPreferences.restTimerDurationSec,
+    autoStart: trainingPreferences.restTimerAutoStart,
+    isActiveSession: !isCompletedSession,
+  });
   const isFilteredByGym = isGymFiltered(listPreferences.pastRecordsGymScope, currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
@@ -234,7 +256,9 @@ export function ExercisePageScreen({
   const onCommit = () => {
     if (!openSet || !loggerValues) return;
     Keyboard.dismiss();
-    updateSets((current) => commitSet(current, openSet.id, loggerValues), 'structural');
+    const next = commitSet(sets, openSet.id, loggerValues);
+    updateSets(() => next, 'structural');
+    notifyIfSetConfirmed(sets, next, openSet.id, restTimer.onSetConfirmed);
     setOpenSetId(null);
   };
 
@@ -245,6 +269,7 @@ export function ExercisePageScreen({
       return;
     }
     updateSets(() => next, 'structural');
+    notifyIfSetConfirmed(sets, next, setId, restTimer.onSetConfirmed);
     if (setId === openSet?.id) setOpenSetId(null);
   };
 
@@ -270,6 +295,7 @@ export function ExercisePageScreen({
     if (!target) return;
     const committed = commitSet(sets, setId, loggerValuesFor(target));
     if (committed === sets) return;
+    notifyIfSetConfirmed(sets, committed, setId, restTimer.onSetConfirmed);
     if (sets[sets.length - 1]?.id !== setId) {
       updateSets(() => committed, 'structural');
       if (isTargetOpen) setOpenSetId(null);
@@ -379,7 +405,19 @@ export function ExercisePageScreen({
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen} testID="exercise-page">
-      <ExerciseTopBar onBack={goBack} onOpenOptions={() => setOpenSheet('options')} title={exercise.name} />
+      <ExerciseTopBar
+        onBack={goBack}
+        onOpenOptions={() => setOpenSheet('options')}
+        onToggleRestTimer={restTimer.toggleForSession}
+        restTimerActive={restTimer.isActive}
+        title={exercise.name}
+      />
+      <RestTimerBar
+        onAdjust={restTimer.adjust}
+        onDismiss={restTimer.dismiss}
+        onRestart={restTimer.restart}
+        view={restTimer.view}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.body}>
         {/* Page gutter: the target's 14 snaps to `md` 12, the same inset as a
             card's content, so page and card share one rhythm. */}
