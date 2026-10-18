@@ -56,7 +56,7 @@ export const createDrizzleProgressSummaryStore = (
       .where(inArray(exerciseDefinitions.id, definitionIds))
       .all()
       .map((row) => [row.id, row.name]));
-    const weightSetIds = facts.flatMap((fact) => (fact.prWeight && fact.topWeightSetId ? [fact.topWeightSetId] : []));
+    const weightSetIds = facts.flatMap((fact) => (fact.ownPrWeight && fact.topWeightSetId ? [fact.topWeightSetId] : []));
     const reps = new Map(weightSetIds.length === 0 ? [] : database
       .select({ id: exerciseSets.id, repsValue: exerciseSets.repsValue })
       .from(exerciseSets)
@@ -99,8 +99,9 @@ export const createDrizzleProgressSummaryStore = (
   },
 });
 
+// A session's own PRs: on a split exercise, its gym's ([[gym.split]]).
 const factRecordKinds = (fact: ExerciseSessionFactRow): RecordKind[] =>
-  sessionRecordKinds({ oneRepMax: fact.prE1rm, weight: fact.prWeight, volume: fact.prVolume });
+  sessionRecordKinds({ oneRepMax: fact.ownPrE1rm, weight: fact.ownPrWeight, volume: fact.ownPrVolume });
 
 // A flag implies its value: nothing beats a missing or zero best (§3).
 const recordValue = (fact: ExerciseSessionFactRow, kind: RecordKind): number => {

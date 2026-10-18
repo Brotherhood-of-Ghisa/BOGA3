@@ -24,6 +24,8 @@ jest.mock('@/src/data/bootstrap', () => ({
   }),
 }));
 
+import { eq } from 'drizzle-orm';
+
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { __resetClockForTests } from '@/src/data/clock';
 import { loadExercisePerformanceHistory, type ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
@@ -234,15 +236,132 @@ describe('exercise history all-time bests from the facts', () => {
     db().insert(sessionExercises).values({ id: 'recent-b0', sessionId: 'recent', exerciseDefinitionId: BENCH, orderIndex: 0, name: 'Bench' }).run();
     db().insert(exerciseSets).values({ id: 'recent-s0', sessionExerciseId: 'recent-b0', orderIndex: 0, weightValue: '80', repsValue: '5', setType: 'rir_2' }).run();
 
-    const history = async (gymId?: string) =>
-      (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 7, ...(gymId ? { gymId } : {}) }))!;
+    const history = async (gymId?: string | null) =>
+      (await loadExercisePerformanceHistory({
+        exerciseDefinitionId: BENCH, period: 7, ...(gymId === undefined ? {} : { gymId }),
+      }))!;
 
     const all = await history();
     expect(all.sessions.map((entry) => entry.sessionId)).toEqual(['recent']);
     expect(all.allTimeBest.topWeight).toEqual({ weight: 150, reps: 3, sessionId: 'old-home', completedAt: day(1) });
     expect(all.allTimeBest.estimatedOneRepMax).toMatchObject({ sessionId: 'old-home', completedAt: day(1) });
-    expect((await history('no-gym')).allTimeBest.topWeight?.sessionId).toBe('old-none');
+    expect((await history(null)).allTimeBest.topWeight?.sessionId).toBe('old-none');
     expect((await history('club')).allTimeBest).toEqual({ estimatedOneRepMax: null, topWeight: null });
+  });
+});
+
+describe('records of an exercise split per gym', () => {
+  const split = () => db().update(exerciseDefinitions)
+    .set({ splitByGym: true }).where(eq(exerciseDefinitions.id, BENCH)).run();
+
+  beforeEach(() => {
+    insertSession('home-1', 1, bench(['100', '5']), 'home');
+    insertSession('club-1', 2, bench(['60', '5']), 'club');
+    insertSession('club-2', 3, bench(['70', '5']), 'club');
+    insertSession('none-1', 4, bench(['40', '5']));
+  });
+
+  it('answers a gym session with its gym\'s own records, a no-gym session with the whole exercise', async () => {
+    split();
+    const inSession = async (inSessionId: string) =>
+      await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId });
+
+    expect((await inSession('home-1')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
+    expect((await inSession('club-1')).topWeight).toMatchObject({ sessionId: 'club-2', weight: 70, gymName: 'Club' });
+    // No gym: usually a gym not worth recording, so it reads every gym.
+    expect((await inSession('none-1')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
+  });
+
+  it('reports nothing for a gym with no history of the exercise, never another gym\'s', async () => {
+    split();
+    db().insert(gyms).values({ id: 'annex', name: 'Annex' }).run();
+    insertSession('annex-1', 5, [{ definitionId: SQUAT, sets: [['50', '5']] }], 'annex');
+
+    expect(await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'annex-1' }))
+      .toEqual({ oneRepMax: null, topWeight: null, volume: null, latest: null });
+  });
+
+  it('keeps `Last` in the bucket', async () => {
+    split();
+    const last = async (inSessionId: string) =>
+      (await loadExerciseRecords({ exerciseDefinitionId: BENCH, inSessionId })).last;
+
+    expect((await last('home-1'))?.completedAt).toEqual(day(1));
+    expect((await last('club-1'))?.completedAt).toEqual(day(3));
+    // The whole exercise's newest session, wherever it was.
+    expect((await last('none-1'))?.completedAt).toEqual(day(4));
+  });
+
+  it('reads every gym with no session and no gym named, split or not', async () => {
+    // Unset is all gyms for a split exercise too: the whole exercise is
+    // always there beside the gyms' own books.
+    const whole = await loadExerciseBests({ exerciseDefinitionId: BENCH });
+    split();
+
+    expect(await loadExerciseBests({ exerciseDefinitionId: BENCH })).toEqual(whole);
+    expect(whole.topWeight).toMatchObject({ sessionId: 'home-1', weight: 100 });
+    expect(whole.latest?.sessionId).toBe('none-1');
+  });
+
+  it('ignores the session on screen while the exercise is not split', async () => {
+    const inSession = async (inSessionId: string) =>
+      (await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId })).topWeight;
+
+    for (const sessionId of ['home-1', 'club-1', 'none-1']) {
+      expect(await inSession(sessionId)).toMatchObject({ sessionId: 'home-1', weight: 100 });
+    }
+  });
+
+  it('lets `Current gym only` select exactly what the split already selects', async () => {
+    split();
+    const filtered = await loadExerciseBests({
+      exerciseDefinitionId: BENCH, gymId: 'club', inSessionId: 'club-1',
+    });
+
+    expect(filtered).toEqual(await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'club-1' }));
+    expect(filtered.topWeight).toMatchObject({ sessionId: 'club-2', weight: 70 });
+  });
+
+  it('fails loudly when the session on screen is not in the store', async () => {
+    split();
+    await expect(loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId: 'missing' }))
+      .rejects.toThrow('session missing is missing');
+  });
+
+  it('counts only the sessions before a completed session being edited, inside the bucket', async () => {
+    split();
+    insertSession('club-3', 5, bench(['200', '5']), 'club');
+
+    const bests = await loadExerciseBests({
+      exerciseDefinitionId: BENCH, inSessionId: 'club-1', beforeSessionId: 'club-2',
+    });
+
+    expect(bests.topWeight).toMatchObject({ sessionId: 'club-1', weight: 60 });
+  });
+});
+
+describe('exercise history all-time bests of a split exercise', () => {
+  beforeEach(() => {
+    insertSession('home-1', 1, bench(['150', '3']), 'home');
+    insertSession('club-1', 2, bench(['90', '3']), 'club');
+    insertSession('none-1', 3, bench(['70', '3']));
+    db().update(exerciseDefinitions).set({ splitByGym: true })
+      .where(eq(exerciseDefinitions.id, BENCH)).run();
+  });
+
+  const best = async (scope: { gymId?: string | null } = {}) =>
+    (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all', ...scope }))!
+      .allTimeBest.topWeight;
+
+  it('shows the whole exercise until a gym is chosen', async () => {
+    // History is a view, not a session: every gym by default, a split
+    // exercise included ([[gym.split]]).
+    expect(await best()).toMatchObject({ sessionId: 'home-1', weight: 150 });
+  });
+
+  it('narrows to the one gym the filter names, the sessions with no gym included', async () => {
+    expect(await best({ gymId: 'club' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
+    expect(await best({ gymId: null })).toMatchObject({ sessionId: 'none-1', weight: 70 });
   });
 });
 
@@ -347,5 +466,34 @@ describe('records from the facts equal the replay on a generated history', () =>
     }
     // The generated history is not trivially empty.
     expect(compared).toBeGreaterThan(10);
+  });
+
+  it('agrees with the replay of one gym once the exercise is split', async () => {
+    for (let index = 0; index < 36; index += 1) {
+      const blocks = Array.from({ length: 1 + Math.floor(random() * 3) }, () => ({
+        definitionId: pick([BENCH, BENCH, SQUAT, null]),
+        sets: Array.from({ length: Math.floor(random() * 4) }, generateSet),
+      }));
+      insertSession(`gen-${String(index).padStart(2, '0')}`, 1 + index, blocks, pick(['home', 'club', null]));
+    }
+    const history = (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all' }))!.sessions;
+    db().update(exerciseDefinitions).set({ splitByGym: true }).where(eq(exerciseDefinitions.id, BENCH)).run();
+
+    let compared = 0;
+    for (const gym of ['home', 'club', null] as const) {
+      // A gym session reads its gym's own sessions; a no-gym session reads the
+      // whole exercise, which is the replay over every completed session.
+      const entries = gym === null ? history : history.filter((entry) => (entry.gymId ?? null) === gym);
+      // Any session at that gym is a session in hand there; take the first.
+      const inSessionId = db().select().from(sessions).all()
+        .find((row) => (row.gymId ?? null) === gym)!.id;
+
+      const fromFacts = await loadExerciseRecords({ exerciseDefinitionId: BENCH, inSessionId });
+
+      expect(rounded({ gym, ...fromFacts }))
+        .toEqual(rounded({ gym, records: replayRecords(entries), last: deriveLastSession(entries) }));
+      compared += fromFacts.records.oneRepMax ? 1 : 0;
+    }
+    expect(compared).toBe(3);
   });
 });

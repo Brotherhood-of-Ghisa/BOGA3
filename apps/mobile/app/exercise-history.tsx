@@ -38,6 +38,7 @@ import {
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { decodeGymRouteParam } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
@@ -93,6 +94,7 @@ export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   appliedGymId?: string | null;
   isLoading: boolean;
   errorMessage: string | null;
@@ -107,7 +109,7 @@ export function ExerciseHistoryScreenShell({
   summary,
   period,
   appliedTagDefinitionId,
-  appliedGymId = null,
+  appliedGymId,
   isLoading,
   errorMessage,
   onSelectPeriod,
@@ -199,7 +201,9 @@ export function ExerciseHistoryScreenShell({
               <Card>
                 <StatePanel
                   body={
-                    appliedGymId
+                    appliedGymId === null
+                      ? 'No completed sessions without a gym in this period.'
+                      : appliedGymId !== undefined
                       ? 'No completed sessions for this gym in this period.'
                       : appliedTagDefinitionId
                         ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
@@ -380,13 +384,18 @@ export default function ExerciseHistoryRoute() {
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
   const initialPeriod = parsePeriodParam(coerceRouteParam(params.period));
 
-  const routeGymId = coerceRouteParam(params.gymId);
+  // One gym filter, three-state over the route boundary
+  // (`src/utils/gym-scope-route.ts`): the chip's gym, else the gym the reader
+  // came from under `Current gym only`, else every gym. A session with no gym
+  // has no current gym to narrow to, so the filter stays off there.
+  const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
   const routeCurrentGymId = coerceRouteParam(params.currentGymId);
-  const appliedGymId =
-    routeGymId ??
-    (listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
-      ? routeCurrentGymId
-      : null);
+  const appliedGymId: string | null | undefined =
+    routeGymId !== undefined
+      ? routeGymId
+      : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+        ? routeCurrentGymId
+        : undefined;
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -401,7 +410,7 @@ export default function ExerciseHistoryRoute() {
     async (
       nextPeriod: ExerciseHistoryPeriod,
       nextTagDefinitionId: string | null,
-      nextGymId: string | null
+      nextGymId: string | null | undefined
     ) => {
       if (!exerciseDefinitionId) {
         setSummary(null);
@@ -416,7 +425,7 @@ export default function ExerciseHistoryRoute() {
           exerciseDefinitionId,
           period: nextPeriod,
           tagDefinitionId: nextTagDefinitionId,
-          gymId: nextGymId,
+          ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
         });
         if (next === null) {
           setSummary(null);

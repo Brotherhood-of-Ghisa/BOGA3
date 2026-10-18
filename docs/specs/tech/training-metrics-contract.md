@@ -13,7 +13,8 @@ and owns the remaining session, record and total rules.
 `apps/mobile/__tests__/metrics-single-source.test.ts` fails when the rules
 below are re-implemented. It checks for an effort-label comparison outside
 the effort labels, `isWorkingSetType` read alone outside the settled-performance
-sites, and the Wathan constants outside the 1RM estimate.
+sites, a `split_by_gym` read outside the bucket rule and its one loader, and
+the Wathan constants outside the 1RM estimate.
 
 ## 1. Counted set
 
@@ -121,9 +122,10 @@ and gym chips count rows with a performed set.
 
 ## 3. Records
 
-A record is a lifter's all-time best for one exercise definition. Which sets
-can take each kind is [[set.eligibility]]; a Volume record may come from a
-session with zero working sets. There are three kinds:
+A record is a lifter's all-time best for one exercise definition in one
+reporting bucket (**Scope** below). Which sets can take each kind is
+[[set.eligibility]]; a Volume record may come from a session with zero working
+sets. There are three kinds:
 
 | Record | A session's value | Beats the record when |
 | --- | --- | --- |
@@ -141,10 +143,17 @@ session with zero working sets. There are three kinds:
   never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
   Volume that left out sets whose load cannot be calculated competes like
   any other (§4); one whose sum is not finite has no value.
-- **Scope.** By default every gym's sessions count. Where a screen offers the
-  current-gym filter (today only the exercise page), only that gym's sessions
-  count. A completed session being edited, and an active session, are compared
-  only with the sessions before it.
+- **Scope.** Which sessions a record is taken over, per exercise split per
+  gym or not, is [[gym.split]]. `reportingBucket`
+  (`exercise-calculations/gym-bucket.ts`) is its one implementation: it names
+  the book a session's own records come from. Each facts row keeps two flag
+  sets — `pr_*` against the whole exercise, `own_pr_*` against that book — so
+  views read the first and a session's own PRs (Today) the second. The book is
+  picked by the session in hand, so a reader takes the session
+  (`inSessionId`), never a second gym. The current-gym filter (today only the
+  exercise page) narrows to the session's gym, and is off when it has none. A
+  completed session being edited, and an active session, are compared only
+  with the sessions before it.
 - **A session's PRs** are one per record kind each exercise took, so one
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these
@@ -165,8 +174,8 @@ session with zero working sets. There are three kinds:
 
 - `beatsRecord` and `beatsWeightRecord` decide what beats a record (the zero
   rule included);
-- `createRecordBook` is the fold. It returns each session's flags and the
-  holders;
+- `createRecordBook` is the fold, one book per bucket. It returns each
+  session's flags and the holders;
 - `sessionRecordKinds` lists the PRs an exercise's flags make;
 - `deriveExercisePersonalRecord` (`session-insights`) takes a session's
   record sets and Volume;
@@ -189,7 +198,7 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 
 | Screen | Records shown |
 | --- | --- |
-| Exercise page records panel, exercise history `All-time bests` | All three holders, each with its session and gym |
+| Exercise page records panel, exercise history `All-time bests` | All three holders of the bucket, each with its session and gym |
 | Exercise page set list, session view, completed-session cards and completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`) |
 | Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
 | Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |

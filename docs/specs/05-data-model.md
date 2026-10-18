@@ -21,16 +21,15 @@ Code owns columns/checks/FKs; this doc owns layering, sync scope and invariants.
    under per-row last-write-wins. No projection function and no event log: the
    data is the event.
 
-Starter taxonomies sync as ordinary per-user entities.
-
-Group projections and calculated metrics stay outside the mirror: no derived
-Volume/1RM column is ever stored.
+Starter taxonomies sync as ordinary per-user entities. Group projections and
+calculated metrics stay outside the mirror: no derived Volume/1RM column is
+ever stored.
 
 Load [`tech/bodyweight-load-contract.md`](tech/bodyweight-load-contract.md)
 when changing bodyweight storage or policy. Its data-model consequence:
-sessions store no bodyweight tuple and no override — the latest valid reading
-at or before the exact start is selected on read, so preference, contribution
-and reading changes recalculate derived history without touching raw sets.
+sessions store no bodyweight tuple — the latest valid reading at or before the
+exact start is selected on read, so preference, contribution and reading
+changes recalculate derived history without touching raw sets.
 
 ## Scope classification
 
@@ -91,36 +90,39 @@ its personal-record flags (`apps/mobile/src/data/schema/exercise-session-facts.t
 rebuild, drain and reads in `apps/mobile/src/data/exercise-session-facts.ts`).
 Eligibility, 1RM and the record rules the flags encode are
 [`tech/training-metrics-contract.md`](tech/training-metrics-contract.md) §1–§3.
-Each device derives its own rows from its own synced raw rows, so devices on
-different rules versions never mix values.
+Each device derives its own rows, so devices on different rules versions never
+mix values.
 
 - **Grain.** Repeated blocks of one definition in a session fold into one row;
   unlinked legacy session exercises, active sessions and deleted sessions have
   none. A row with zero working sets may still hold a Volume record;
   `volume_kg` is the training-metrics §4 Volume, null only when its sum is
   not finite.
+- **Bucket.** `pr_*` flag records against the whole exercise; `own_pr_*`
+  against `gym_bucket`, the session's own book (training-metrics §3).
 - **Records are always read from strictly earlier sessions** — those before the
   viewed session's `completed_at`, or before now while it is active — so a
   session never counts toward its own markers and later sessions never count.
   Every reader obeys this, so an old session's live marker matches its stored
   `pr_e1rm` / `pr_weight` flags; without an earlier record there is no marker.
 - **Staleness.** SQLite triggers on the raw tables and on the policy inputs
-  (load mode, contribution, the bodyweight toggle, readings) queue affected
-  definition ids in `exercise_session_facts_stale` whatever path wrote the row,
+  (load mode, contribution, the bodyweight toggle, readings, the split flag, a
+  session's gym) queue affected definition ids in
+  `exercise_session_facts_stale` whatever path wrote the row,
   sync pull-apply and imports included; writes inside an active session queue
   nothing, and completing it queues its definitions. Every facts read drains
   the queue first in one transaction, rebuilding each queued definition's whole
-  history, so a read never returns stale rows.
-  `exercise_session_facts_state` holds the rules version and effort-policy key
-  the table was fully built under; a missing row, another version, or a
-  different active-account policy forces a full rebuild first.
+  history, so no read returns stale rows. `exercise_session_facts_state` holds
+  the rules version and effort-policy key the table was fully built under; a
+  missing row, another version, or a different active-account policy forces a
+  full rebuild.
 - **Changing any rule that feeds the derivation — including one in the shared
   calculation kernel or the working-set rule (`isWorkingSet`) — must bump
   `EXERCISE_SESSION_FACTS_RULES_VERSION`**, or rows built under the old rule
-  survive the change. A Jest fixture pins the values the current version
-  derives and fails when a rule moves under it.
-- **Oracle.** A full rebuild from the raw rows defines the truth; Jest asserts
-  the incremental drain equals it after each kind of write.
+  survive the change. A Jest fixture pins the current version's values and
+  fails when a rule moves under it.
+- **Oracle.** A full rebuild from the raw rows is the truth; Jest asserts the
+  incremental drain equals it after each kind of write.
 
 ## Sign-out / account-switch wipe
 
@@ -143,8 +145,8 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
   signed-in account, so the bootstrapper restores that account from scratch
   (logged as `sync.local_store_owner_mismatch_wipe`, unpushed rows discarded).
   It keys off the session the cycle syncs with, not an in-memory record of the
-  previous user, so it catches a switch the app never saw — a session that
-  expired or could not be read back, then a sign-in as someone else. An unowned
+  previous user, so it catches a switch the app never saw: a session that
+  expired, then a sign-in as someone else. An unowned
   store that never synced is simply stamped; one that *has* synced (written
   before the owner was recorded) is wiped when nothing waits to push, and
   otherwise kept with every pull cursor reset
@@ -156,9 +158,9 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
 
 Pull cursors are reset with the rows because they are positions in the server's
 change stream: kept over an emptied (or another account's) store they skip
-every older server row, so a child layer can return rows whose parents the
-parent layer skipped — a local FK failure on every retry. Every wipe runs under
-the sync cycle's lock, so it never lands between two pages of a pull.
+every older server row, so a child layer can return rows whose parents were
+skipped — a local FK failure on every retry. Every wipe runs under the sync
+cycle's lock, so it never lands between two pages of a pull.
 
 ## Local sync bookkeeping (Sync v2)
 
@@ -183,41 +185,41 @@ one local orphan cannot wedge the backlog.
    (`RLS`/constraints).
 2. Mobile clients never use `service_role` credentials.
 3. Sync transport must be idempotent for repeated delivery attempts. Under v2
-   this follows from per-row LWW: re-pushing a row with the same
-   `client_updated_at_ms` is a server no-op, and the ack still clears the dirty
-   bit.
+   that follows from per-row LWW: re-pushing a row with the same
+   `client_updated_at_ms` is a server no-op, and the ack still clears the
+   dirty bit.
 4. Concurrent multi-device writes are resolved by per-row LWW keyed on
    `client_updated_at_ms`. There is no central ordering authority, no
    per-device sequence and no event log. Acknowledged trade-off: a stale-clock
-   write can lose to a newer stored value (including the undelete-loses case in
-   `docs/specs/tech/sync-v2-server-contract.md`, "LWW and undelete").
-5. Diagnostic log rows are write-only from authenticated clients, inspected
-   through backend operator tooling.
+   write can lose to a newer stored value (the undelete-loses case in
+   `tech/sync-v2-server-contract.md`, "LWW and undelete", included).
+5. Diagnostic log rows are write-only from authenticated clients, read through
+   backend operator tooling.
 6. All sixteen mirror tables use composite primary key `(owner_user_id, id)` —
    **owner-first**. The order is load-bearing: the canonical pull query
    (`where owner_user_id = … order by server_received_at`) leads with the PK
    column and the per-layer cursor depends on it. Every user owns their own
-   `id` keyspace, so two users may legitimately hold the same `id` (the same
-   seeded `exercise_definitions.id`, say) without conflict — cross-owner row
-   conflicts are impossible by construction and the backend has no cross-owner
-   rejection path. Each user's seed catalog is per-user data from day one; no
-   shared or global catalog exists.
+   `id` keyspace, so two users may hold the same `id` (the same seeded
+   `exercise_definitions.id`, say) without conflict: cross-owner conflicts are
+   impossible by construction and the backend has no rejection path for one.
+   Each user's seed catalog is per-user data from day one; no shared or global
+   catalog exists.
 7. Gym coordinate metadata is private, user-owned data on `gyms`, not a shared
    or public location entity.
 
 ## Local integrity contract
 
-1. Local SQLite foreign-key enforcement is required for the production mobile
-   database connection. expo-sqlite does not enforce FKs by default, so the app
-   enables `PRAGMA foreign_keys = ON` at **connection-open** — before
-   migrations and seeding run, so enforcement covers both. Bootstrap then runs
+1. Local SQLite foreign-key enforcement is required on the production mobile
+   connection. expo-sqlite defaults to off, so the app enables
+   `PRAGMA foreign_keys = ON` at **connection-open** — before migrations and
+   seeding, so enforcement covers both. Bootstrap then runs
    `PRAGMA foreign_key_check`, so local graph violations surface at startup
    rather than during backend sync. Write paths assume enforcement is on, so
    invalid child rows fail at the local write or pull-apply boundary.
 2. **Client FKs only reference synced parents,** so a wiped or reinstalled
    client re-pulls the parent (its earlier topological layer) before the child
-   and the FK holds under enforcement. No local FK points at a static or
-   client-only table that could brick on a cross-version skew. Hence
+   and the FK holds. No local FK points at a static or client-only table that
+   could brick on a cross-version skew. Hence
    `muscle_groups` — the FK parent of
    `exercise_muscle_mappings.muscle_group_id` — is a synced entity rather than
    a version-bundled taxonomy, and `exercise_group_links` has an FK only to
@@ -226,10 +228,9 @@ one local orphan cannot wedge the backlog.
    for the same reason, and inner-joins the live rows instead.
 3. Bootstrap FK pragma/integrity failures are logged through `public.app_logs`
    with sanitized context, then rethrown; a logging failure must not mask the
-   original SQLite failure.
+   SQLite one.
 4. Tests asserting FK-sensitive data or sync behaviour must enable FK
-   enforcement in their SQLite fixture; SQLite defaults to FK-off per
-   connection.
+   enforcement in their SQLite fixture; SQLite defaults to off per connection.
 
 ## Sync v2 data-model contract
 
@@ -242,10 +243,9 @@ the data-model-level invariants.
 2. Row identity is the composite PK `(owner_user_id, id)`, and invariant 4's
    LWW rule is applied identically on both ends: the `sync_push` upsert
    predicate and the client pull-apply.
-3. Restore/bootstrap is a full `sync_pull` drain across all five
-   topological layers (first sign-in, or a wiped-client reinstall),
-   coherent across every user-owned entity, with parents draining before
-   children at each layer boundary.
+3. Restore/bootstrap is a full `sync_pull` drain across all five topological
+   layers (first sign-in, or a wiped-client reinstall), coherent across every
+   user-owned entity, parents draining before children at each layer.
 4. **Effort labels cost nothing to add.** `exercise_sets.set_type` and
    `planned_set_type` are nullable text in sync scope, so a new label needs no
    wire or server migration, and hidden historical or prescribed labels stay
@@ -270,7 +270,7 @@ the data-model-level invariants.
    rows are lossless drafts keeping their ids and order across save, hydration
    and navigation, and a blank `weight_value` with positive `reps_value`
    canonicalizes to `"0"` as a valid zero-load set — normalization inside
-   existing columns, no migration, no wire change.
+   existing columns, no migration or wire change.
 7. `gyms` coordinate metadata (`latitude`, `longitude`,
    `coordinate_accuracy_m`, `coordinates_updated_at`) is `in sync scope`,
    carried verbatim by the envelope, the first-full-pull bootstrap and
@@ -297,20 +297,20 @@ the data-model-level invariants.
 
 All sixteen entities move through that same typed-envelope LWW upsert path: no
 bespoke paths, no per-entity event types. Deletion is `deleted_at` going
-non-null and undelete is the same row with `deleted_at` back to null; reorder
-and complete are ordinary field changes; attach and link insert or undelete the
+non-null and undelete is the same row with it back to null; reorder and
+complete are ordinary field changes; attach and link insert or undelete the
 join or link row, and detach and unlink soft-delete it. The envelope,
 `sync_push` / `sync_pull` and their error tokens are owned by
-`docs/specs/tech/sync-v2-server-contract.md`.
+`tech/sync-v2-server-contract.md`.
 
 ## Sync impact gate (mandatory)
 
 Update this file in the same task/session that changes a schema entity, an
 ownership classification, a sync-scope boundary or an identity invariant. EVERY
 such change MUST record one explicit decision — `in sync scope` (with
-contract/mapping plus implementation and test updates) or `out of sync scope`
-(with rationale and guardrails). Never leave a data-model element with
-undefined sync behaviour.
+contract/mapping plus implementation and tests) or `out of sync scope` (with
+rationale and guardrails). Never leave a data-model element with undefined sync
+behaviour.
 
 ## Client schema drift rule (Sync v2)
 
@@ -320,16 +320,16 @@ under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be
 deployed to production before the client change ships**.
 
-Why server first: a client depending on a typed server column not yet deployed
-cannot round-trip it, because the server has nowhere typed to store it. An
+Why server first: a client cannot round-trip a typed server column that is not
+deployed yet — the server has nowhere to store it. An
 additive column never moves the protocol version: `sync_push` reads named keys
 only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a branch guarding on `_fields ? '<key>'` does, which a new column
 needs so an older writer cannot clear it.
 Server-first additions must also preserve old writers that omit new fields and
-keep unknown entity types out of old-reader pulls; adding columns alone is not
-a complete compatibility policy. The kg-only removal/rename was a protocol-3
-hard cutover, not an additive change.
+keep unknown entity types out of old-reader pulls: columns alone are not a
+compatibility policy. The kg-only rename was a protocol-3 cutover, not an
+additive change.
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, run by
 `npm run check:sync-drift` and gated by `./scripts/quality-slow.sh backend`)
@@ -349,6 +349,6 @@ every entity table carries a nullable `deleted_at` and an unchecked
 table.
 
 Adding a value to an existing column (a new enum literal) is out of scope: the
-column exists on both sides already and the server stores arbitrary text per
-the v2 no-server-validation policy
-(`docs/specs/tech/sync-v2-server-contract.md`, "Ground rules").
+column exists on both sides and the server stores arbitrary text per the v2
+no-server-validation policy (`tech/sync-v2-server-contract.md`,
+"Ground rules").

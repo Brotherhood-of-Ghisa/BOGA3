@@ -105,7 +105,8 @@ const buildInput = (
     exerciseDefinition,
     period: overrides.period ?? 30,
     appliedTagDefinitionId: overrides.appliedTagDefinitionId ?? null,
-    appliedGymId: overrides.appliedGymId ?? null,
+    // Three-state: left out unless an override names a gym (`null` included).
+    ...('appliedGymId' in overrides ? { appliedGymId: overrides.appliedGymId } : {}),
     sessionsInPeriod,
     allTimeBest: overrides.allTimeBest ?? NO_BEST,
     setsBySessionExerciseId: overrides.setsBySessionExerciseId ?? groupBy(setRows),
@@ -259,7 +260,7 @@ describe('aggregateExerciseHistory', () => {
     expect(summary.gymOptions).toEqual([
       { gymId: 'gym-a', name: 'Alpha Gym', occurrenceCount: 2 },
       { gymId: 'gym-b', name: 'Beta Gym', occurrenceCount: 1 },
-      { gymId: 'no-gym', name: 'No gym', occurrenceCount: 1 },
+      { gymId: null, name: 'No gym', occurrenceCount: 1 },
     ]);
   });
 
@@ -282,10 +283,10 @@ describe('aggregateExerciseHistory', () => {
     expect(summary.gymOptions).toHaveLength(2);
   });
 
-  it('filters sessions to unassigned gym when appliedGymId is no-gym', () => {
+  it('filters sessions to the sessions with no gym when appliedGymId is null', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
-        appliedGymId: 'no-gym',
+        appliedGymId: null,
         sessionsInPeriod: [
           sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
           sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-13T16:00:00.000Z'), gymId: null, gymName: null }),
@@ -450,7 +451,7 @@ describe('createExerciseHistoryRepository', () => {
 
     const summary = await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 7, tagDefinitionId: 'tag-a' });
     await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: 'gym-a' });
-    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: 'no-gym' });
+    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: null });
 
     expect(summary?.allTimeBest).toBe(best);
     expect(loadAllTimeBest.mock.calls.map(([input]) => input)).toEqual([

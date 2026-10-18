@@ -76,7 +76,6 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   bodyweightContribution: 0,
   period: 30,
   appliedTagDefinitionId: null,
-  appliedGymId: null,
   tagOptions: [
     {
       tagDefinitionId: 'tag-westside',
@@ -265,6 +264,17 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).not.toContain('history_elsewhere_squat');
   });
 
+  it('still lists every gym under Current gym only when the session had no gym', async () => {
+    // A session with no gym sends no `currentGymId`, so there is no gym to
+    // narrow to and the filter is inert.
+    act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
+
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
+
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    expect(screen.queryByTestId('exercise-history-empty-state')).toBeNull();
+  });
+
   it('opens the completed session from its card and from a best', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
@@ -336,7 +346,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -360,7 +369,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId="tag-westside"
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -389,7 +397,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary({ sessions: [] })}
         period={7}
         appliedTagDefinitionId="tag-westside"
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -404,13 +411,19 @@ describe('ExerciseHistoryScreenShell', () => {
     );
   });
 
-  it('renders empty state message tailored for gym filter when gym filter is active', () => {
+  // The gym scope is three-state: the prop absent is every gym, `null` is the
+  // sessions with no gym, an id is that gym. The empty state names the scope
+  // it actually applied, so the no-gym one never claims a gym.
+  it.each([
+    ['gym-westside' as string | null, /this gym/],
+    [null, /without a gym/],
+  ])('names the gym scope %p in the empty state', (appliedGymId, expected) => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
         period={7}
         appliedTagDefinitionId={null}
-        appliedGymId="gym-westside"
+        appliedGymId={appliedGymId}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -420,9 +433,8 @@ describe('ExerciseHistoryScreenShell', () => {
       />
     );
 
-    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(
-      /this gym/
-    );
+    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(expected);
+    expect(screen.getByTestId('exercise-history-empty-state')).not.toHaveTextContent(/selected tag/);
   });
 
 });
@@ -445,7 +457,6 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={summary}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -464,7 +475,6 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}

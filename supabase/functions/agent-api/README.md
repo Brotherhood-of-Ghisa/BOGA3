@@ -229,16 +229,18 @@ it and `exercise.gym` name it. Per-gym records are the context route's.
 
 ## Gym buckets
 
-An exercise the user tracks separately per gym (`exercise.split_by_gym`) reports
-one exercise per gym, with the sessions that had no gym forming their own
-bucket, and is never pooled: no figure ever spans gyms. Context computes its
-figures for one bucket — the most recently performed one
-unless `gym_bucket` names another — because no figure may span gyms. History
-instead returns every gym's sets and labels each one, so `gym_bucket` there is a
-filter rather than a default. Either way `gym_bucket` is a gym id, or `none` for
-the sessions with no gym (so a gym whose own id is `none` cannot be named), and
-it is `400 INVALID_ARGUMENT` on an exercise that is not split, or empty, or
-against a cursor for another bucket, and `404` for a gym the user does not own.
+An exercise the user tracks separately per gym (`exercise.split_by_gym`) is
+reported per gym here, with the sessions that had no gym as their own bucket,
+and no figure spans gyms. Context computes its figures for one bucket: the most
+recently performed one unless `gym_bucket` names another. History instead
+returns every gym's sets and labels each one, so `gym_bucket` there is a filter
+rather than a default. [[gym.split]] now makes the whole exercise the default
+and folds no-gym sessions into it; this route has not moved yet
+([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)). Either way
+`gym_bucket` is a gym id, or `none` for the sessions with no gym (so a gym whose
+own id is `none` cannot be named), and it is `400 INVALID_ARGUMENT` on an
+exercise that is not split, or empty, or against a cursor for another bucket,
+and `404` for a gym the user does not own.
 
 The context route's `exercise.gym_buckets` lists every bucket it could see, most
 recently performed first, each with its own `personal_records` and

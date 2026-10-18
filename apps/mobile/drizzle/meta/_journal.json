@@ -148,6 +148,13 @@
       "when": 1792243773148,
       "tag": "0020_exercise_split_by_gym",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792311405082,
+      "tag": "0021_facts_gym_bucket",
+      "breakpoints": true
     }
   ]
 }

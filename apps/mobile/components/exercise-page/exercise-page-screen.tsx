@@ -164,6 +164,8 @@ export function ExercisePageScreen({
     {
       scope: listPreferences.pastRecordsGymScope,
       currentGymId,
+      // Not a filter: this session's gym picks a split exercise's bucket.
+      sessionId,
     },
     JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode])
   );

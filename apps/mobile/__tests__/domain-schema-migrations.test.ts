@@ -137,8 +137,9 @@ describe('domain schema and runtime migrations', () => {
     // the local store's owning account (`account_user_id`) is m0015, and the
     // session planning schema (0016) plus pull-cursor reset (0017) append after it,
     // m0018 drops the facts' volume completeness flag, m0019 drops the plan
-    // block's machine snapshot, and m0020 adds the gym-split flag.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(21);
+    // block's machine snapshot, m0020 adds the gym-split flag, and m0021 adds
+    // the facts' reporting bucket with the triggers that keep it fresh.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(22);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -189,6 +190,7 @@ describe('domain schema and runtime migrations', () => {
       'm0018',
       'm0019',
       'm0020',
+      'm0021',
     ]);
   });
 
@@ -315,6 +317,19 @@ describe('domain schema and runtime migrations', () => {
     // schema drift rule"); it defaults off, so an upgrade changes no report.
     expect(localRuntimeMigrations.migrations.m0020)
       .toContain('ADD `split_by_gym` integer DEFAULT false NOT NULL');
+  });
+
+  it('adds the facts reporting bucket and refreshes its triggers in m0021', () => {
+    // The bucket is derived and local-only, so it pairs with no server column
+    // (spec 05, "Exercise session facts"). The triggers from m0012 are replaced
+    // whole — SQLite cannot alter one — so a session changing gym, or the flag
+    // being toggled, queues the definitions whose facts it restates.
+    const migration = localRuntimeMigrations.migrations.m0021;
+    expect(migration).toContain("ADD `gym_bucket` text DEFAULT 'all' NOT NULL");
+    expect(migration).toContain('DROP TRIGGER `exercise_session_facts_sessions_update`');
+    expect(migration).toContain('OR OLD.`gym_id` IS NOT NEW.`gym_id`');
+    expect(migration).toContain('DROP TRIGGER `exercise_session_facts_exercise_definitions_update`');
+    expect(migration).toContain('OR OLD.`split_by_gym` IS NOT NEW.`split_by_gym`');
   });
 });
 
