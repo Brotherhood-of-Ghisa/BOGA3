@@ -11,7 +11,9 @@ import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { loadExerciseSessionFacts } from './exercise-session-facts';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
+import { selectDatedInProgressSession } from './in-progress-session';
+import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from './schema';
+import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
 export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;
@@ -27,6 +29,9 @@ export type ExerciseRawSession = {
   /** The session's id; a day of history lists the sessions that made it. */
   id?: string;
   completedAt: Date;
+  /** Absent reads as no gym. */
+  gymId?: string | null;
+  gymName?: string | null;
   loadContext?: LoadContext;
   sets: ExerciseRawSet[];
 };
@@ -197,6 +202,10 @@ export type ComputeSelectedExerciseWeeklyEffortOptions = {
   start: Date;
   end: Date;
   timeZone?: string;
+  /** The read's clock: given, the workout in progress counts (§2). Its PRs do not: it has no facts. */
+  now?: Date;
+  /** The one gym filter, three-state (`src/utils/gym-scope-route.ts`): unset every gym. */
+  gymId?: string | null;
 };
 
 export type ComputeSelectedExerciseDailyEffortOptions = ComputeSelectedExerciseWeeklyEffortOptions;
@@ -213,8 +222,12 @@ const loadExerciseRawSessions = async (
     .get()?.enabled ?? false;
 
   const storedSessionRows = database
-    .select({ id: sessions.id, completedAt: sessions.completedAt, startedAt: sessions.startedAt })
+    .select({
+      id: sessions.id, completedAt: sessions.completedAt, startedAt: sessions.startedAt,
+      gymId: sessions.gymId, gymName: gyms.name,
+    })
     .from(sessions)
+    .leftJoin(gyms, eq(gyms.id, sessions.gymId))
     .where(
       and(
         eq(sessions.status, 'completed'),
@@ -224,8 +237,10 @@ const loadExerciseRawSessions = async (
       )
     )
     .all();
+  const inProgress = options.now ? selectDatedInProgressSession(database, { start: options.start, end: options.end, now: options.now }) : null;
+  if (inProgress) storedSessionRows.push(inProgress);
 
-    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
+  const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
   const sessionCompletedRows = sessionRows.filter(
     (row): row is typeof row & { completedAt: Date } => row.completedAt !== null
@@ -297,6 +312,8 @@ const loadExerciseRawSessions = async (
     rawSessions.push({
       id: session.id,
       completedAt: session.completedAt,
+      gymId: session.gymId,
+      gymName: session.gymName,
       loadContext: personalCalculationContext(bodyweightCalculationsEnabled, definition, session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
     });
@@ -305,33 +322,61 @@ const loadExerciseRawSessions = async (
   return rawSessions;
 };
 
+const inGymScope = (rawSessions: ExerciseRawSession[], gymId: string | null | undefined): ExerciseRawSession[] =>
+  gymId === undefined ? rawSessions : rawSessions.filter((session) => (session.gymId ?? null) === gymId);
+
+/** The gyms the exercise was trained at in the window, most recently first, with their session counts. */
+export const exerciseHistoryGymOptions = (rawSessions: ExerciseRawSession[]): GymScopeOption[] => {
+  const byGym = new Map<string | null, { option: GymScopeOption; sessionIds: Set<string>; latest: Date }>();
+  for (const session of rawSessions) {
+    const gymId = session.gymId ?? null;
+    const entry = byGym.get(gymId) ?? { option: { gymId, name: session.gymName ?? null }, sessionIds: new Set(), latest: session.completedAt };
+    entry.sessionIds.add(session.id ?? `${session.completedAt.getTime()}`);
+    if (session.completedAt > entry.latest) entry.latest = session.completedAt;
+    byGym.set(gymId, entry);
+  }
+  return [...byGym.values()]
+    .sort((left, right) => right.latest.getTime() - left.latest.getTime()
+      || (left.option.gymId ?? '').localeCompare(right.option.gymId ?? ''))
+    .map(({ option, sessionIds }) => ({ ...option, sessionCount: sessionIds.size }));
+};
+
 export const computeSelectedExerciseWeeklyEffort = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
 ): Promise<SelectedExerciseWeeklyEffort[]> => {
-  const rawSessions = await loadExerciseRawSessions(options);
+  const rawSessions = inGymScope(await loadExerciseRawSessions(options), options.gymId);
   return aggregateExerciseWeeklyEffort(rawSessions, options.timeZone);
 };
 
 export const computeSelectedExerciseDailyEffort = async (
   options: ComputeSelectedExerciseDailyEffortOptions
 ): Promise<DailyEffortMetrics[]> => {
-  const rawSessions = await loadExerciseRawSessions(options);
+  const rawSessions = inGymScope(await loadExerciseRawSessions(options), options.gymId);
   return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
 };
 
-/** Both chart views share one graph read and one daily aggregation. */
+/**
+ * Both chart views share one graph read and one daily aggregation. A day's PR
+ * marks are the whole exercise's (`pr_*`) while every gym is in view; with a
+ * gym chosen they are each session's own (`own_pr_*`) — on a split exercise
+ * that gym's book, and for no gym the whole exercise's ([[gym.split]],
+ * [[gym.split-progress-prs]]). `gyms` lists the window's choices, unfiltered.
+ */
 export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
-  const rawSessions = await loadExerciseRawSessions(options);
+  const allSessions = await loadExerciseRawSessions(options);
+  const rawSessions = inGymScope(allSessions, options.gymId);
   const facts = new Map((await loadExerciseSessionFacts(options.exerciseDefinitionId)).map(fact => [fact.sessionId, fact]));
+  const own = options.gymId !== undefined;
   const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone).map(day => {
     const personalRecordCounts = { totalVolume: 0, estimatedRM1: 0, highestWeight: 0 };
     for (const sessionId of day.sessionIds ?? []) {
       const fact = facts.get(sessionId);
-      if (fact?.prVolume) personalRecordCounts.totalVolume++;
-      if (fact?.prE1rm) personalRecordCounts.estimatedRM1++;
-      if (fact?.prWeight) personalRecordCounts.highestWeight++;
+      if (!fact) continue;
+      if (own ? fact.ownPrVolume : fact.prVolume) personalRecordCounts.totalVolume++;
+      if (own ? fact.ownPrE1rm : fact.prE1rm) personalRecordCounts.estimatedRM1++;
+      if (own ? fact.ownPrWeight : fact.prWeight) personalRecordCounts.highestWeight++;
     }
     return { ...day, personalRecordCounts };
   });
-  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily) };
+  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily), gyms: exerciseHistoryGymOptions(allSessions) };
 };

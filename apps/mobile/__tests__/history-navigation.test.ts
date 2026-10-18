@@ -29,6 +29,16 @@ describe('history hrefs', () => {
     expect(progressHistoryHref({ muscleGroupId: 'quads' })).toBe('/progress-history?muscleGroupId=quads');
   });
 
+  it.each([
+    ['gym a/b', 'gym%20a%2Fb'],
+    [null, 'no-gym'],
+  ])('carries gym %s together with the metric and history entry view', (gymId, encoded) => {
+    for (const view of ['timeline', 'daily', 'weekly'] as const) {
+      expect(progressHistoryHref({ exerciseDefinitionId: 'lift', gymId }, 'totalVolume', view))
+        .toBe(`/progress-history?exerciseDefinitionId=lift&metric=volume&gymId=${encoded}&view=${view}`);
+    }
+  });
+
   it('encodes what it carries', () => {
     expect(completedSessionHref('a/b c')).toBe('/completed-session/a%2Fb%20c');
     expect(sessionsWeekHref('2026-10-05')).toBe('/sessions?week=2026-10-05');

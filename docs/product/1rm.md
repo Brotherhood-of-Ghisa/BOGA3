@@ -33,7 +33,7 @@ with known canonical RIR; preserve numeric high RIR. Effort filters may narrow
 this population; sparse data never widens it. Missing/Unspecified and unknown
 labels remain distinct; neither supplies a normalized point or fit.
 Plot and fit within the selected exercise/time/effort/gym scope. All gyms pools
-including Unspecified; individual gyms remain selectable. Programme Technique/reset
+including No gym; individual gyms remain selectable. Programme Technique/reset
 recorded as RIR4 remains working, not a Technique/warm-up label.
 
 Why: compare efforts; reliability unproven. Approved 2026-10-13.
@@ -108,7 +108,7 @@ Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`
 ### 1rm.curve-scope · definition · accepted
 
 Default: latest 12 weeks through today, bounded by Settings' History look-back;
-selected exercise's latest trained gym, including Unspecified, stable gym ID
+selected exercise's latest trained gym, including No gym, stable gym ID
 tiebreak. Offer 4/12/24 weeks and configured History look-back, clamped to bounds.
 Effort follows [[1rm.curve-population]]. Exercise changes select its latest gym;
 range/gym/effort changes coherently recompute points and [[1rm.curve-fitting]].

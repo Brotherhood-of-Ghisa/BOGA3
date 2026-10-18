@@ -233,7 +233,11 @@ type PickerCallbacks = {
 let callbacks: PickerCallbacks;
 let unmountPicker: (() => void) | null = null;
 
-const renderPicker = async (seed: () => Promise<void>, expandFamilies = true) => {
+const renderPicker = async (
+  seed: () => Promise<void>,
+  expandFamilies = true,
+  props: Partial<mockReact.ComponentProps<typeof ExercisePicker>> = {},
+) => {
   await seed();
   await bootLocalApp();
   callbacks = {
@@ -243,7 +247,7 @@ const renderPicker = async (seed: () => Promise<void>, expandFamilies = true) =>
     onAddPlanBlock: jest.fn(),
     onOpenManage: jest.fn(),
   };
-  const result = render(<ExercisePicker {...callbacks} />);
+  const result = render(<ExercisePicker {...callbacks} {...props} />);
   unmountPicker = result.unmount;
   await act(async () => {});
   if (expandFamilies) {
@@ -521,6 +525,17 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     await waitForGone(() => screen.queryByTestId('exercise-picker-preselection-panel'));
     expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
     expect(onSelectExercise).not.toHaveBeenCalled();
+  });
+
+  it('asks Repeat last for the session the exercise joins, so a split exercise reads its gym\'s book', async () => {
+    const suggest = jest.spyOn(blockHistory, 'loadSuggestedExercisePlan').mockResolvedValue(null);
+    await renderPicker(async () => {
+      await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
+      await logSquatHistory();
+    }, true, { sessionId: 'session-in-hand' });
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await screen.findByTestId('exercise-picker-preselection-panel');
+    expect(suggest).toHaveBeenCalledWith({ exerciseDefinitionId: expect.any(String), inSessionId: 'session-in-hand' });
   });
 
   it('shows Repeat last disabled while the historical suggestion is loading (a pending read)', async () => {

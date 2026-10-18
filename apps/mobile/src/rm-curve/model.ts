@@ -6,11 +6,10 @@ import type { RegimeSession } from '@/src/strength-regimes/fit';
 import { MAX_HISTORY_LOOKBACK_WEEKS } from '@/src/preferences/model';
 import { historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
-export const ALL_GYMS = '__all_gyms__';
 export type RmCurveRange = 4 | 12 | 24 | 'history';
 export type RmCurveEvaluation = {
   start: Date; end: Date; historyLookbackWeeks: number;
-  /** Omitted selects the most recently trained gym; null is the Unspecified cohort. */
+  /** Three-state (`src/utils/gym-scope-route.ts`): unset every gym, `null` no gym, an id that gym. */
   gymId?: string | null; rir?: number | null;
 };
 export type RmCurveObservation = RmCurveRow & RmCurveValues & {
@@ -73,15 +72,29 @@ function priorReference(points: (RmCurveRow & RmCurveValues)[], start: Date, low
   return { totalRm, qualifyingSessions: ordered.length, selectedSessions, lowerBound: lower };
 }
 
+function projectRows(graph: RmCurveGraph, scope: RmCurveEvaluation): ProjectedRow[] {
+  const lower = rmCurvePriorStart(scope);
+  return graph.rows.filter(row => validSessionTime(row) && row.completedAt >= lower && row.completedAt < scope.end)
+    .map(row => ({ row, value: projectRmCurveSet({ ...row.loadContext, ...row,
+      performanceStatus: row.performanceStatus === null ? null : 'unperformed' }) }));
+}
+
+/**
+ * [[1rm.curve-scope]]'s default gym, resolved to a concrete scope before one is
+ * built: the most recently trained gym in the window, `null` when that is no
+ * gym or nothing was trained.
+ */
+export function rmCurveLatestGym(graph: RmCurveGraph, scope: Omit<RmCurveEvaluation, 'gymId'>): string | null {
+  return gymOptions(projectRows(graph, scope))[0]?.gymId ?? null;
+}
+
 /** One graph supplies observations and reference; no evaluated/future set enters the reference. */
 export function buildRmCurveModel(graph: RmCurveGraph, scope: RmCurveEvaluation) {
   const lower = rmCurvePriorStart(scope);
-  const projected = graph.rows.filter(row => validSessionTime(row) && row.completedAt >= lower && row.completedAt < scope.end)
-    .map(row => ({ row, value: projectRmCurveSet({ ...row.loadContext, ...row,
-      performanceStatus: row.performanceStatus === null ? null : 'unperformed' }) }));
+  const projected = projectRows(graph, scope);
   const gyms = gymOptions(projected);
-  const gymId = scope.gymId === undefined ? gyms[0]?.gymId ?? null : scope.gymId;
-  const cohort = projected.filter(({ row }) => (gymId === ALL_GYMS || row.gymId === gymId));
+  const gymId = scope.gymId;
+  const cohort = gymId === undefined ? projected : projected.filter(({ row }) => row.gymId === gymId);
   const effortOptions = [...new Set(cohort.flatMap(({ value }) => typeof value === 'string' ? [] : [value.rir]))].sort((a, b) => a - b);
   const points = cohort.flatMap(({ row, value }) => typeof value === 'string' || (scope.rir != null && value.rir !== scope.rir)
     ? [] : [{ ...row, ...value }]);

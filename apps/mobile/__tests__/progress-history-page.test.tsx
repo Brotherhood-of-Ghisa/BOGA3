@@ -567,6 +567,35 @@ describe('ProgressHistoryScreen', () => {
       .toHaveProp('accessibilityState', { selected: true }));
   });
 
+  it('combines gym and entry-view params, remounting either change without saving the view', async () => {
+    await act(async () => { updatePreferences({ heatmapView: 'weekly' }); });
+    mockSearchParams = { exerciseDefinitionId: 'ex1', gymId: 'gym-a', metric: 'volume', view: 'timeline' };
+    const page = render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-timeline'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.UNSAFE_getByType(HistoryView).props.timeline.weekSetsTarget)
+      .toEqual({ exerciseDefinitionId: 'ex1', gymId: 'gym-a' });
+    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'))
+      .toHaveProp('accessibilityState', { selected: true });
+
+    mockSearchParams = { ...mockSearchParams, view: 'daily' };
+    page.rerender(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-daily'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
+      .toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
+
+    mockSearchParams = { ...mockSearchParams, gymId: 'no-gym' };
+    page.rerender(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.UNSAFE_getByType(HistoryView).props.timeline.weekSetsTarget)
+      .toEqual({ exerciseDefinitionId: 'ex1', gymId: null });
+    expect(getAccountLocalPreferenceState().values.heatmapView).toBe('weekly');
+  });
+
   it('switching the view saves it, so the next history page opens in it', async () => {
     render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-daily'))

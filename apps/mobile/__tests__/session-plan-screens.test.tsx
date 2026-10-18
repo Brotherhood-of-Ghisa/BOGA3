@@ -61,6 +61,7 @@ import { parseSessionDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetLocalData } from './helpers/local-data';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { waitForGone } from './helpers/wait-for-gone';
+import * as blockHistory from '@/src/data/exercise-block-history';
 
 let alertSpy: jest.SpyInstance;
 
@@ -400,10 +401,13 @@ describe('plan form: create', () => {
     );
     await completeSessionDraft(historySessionId, { completedAt: historyDate, now: historyDate });
 
+    const suggest = jest.spyOn(blockHistory, 'loadSuggestedExercisePlan');
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     fillTitle('Repeat Plan');
     await addExerciseBlock('Barbell Squat', 'repeat');
+    // The plan's gym names the record book Repeat last reads ([[gym.split]]); this plan has none.
+    expect(suggest).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex-squat', gymId: null });
     fireEvent.press(screen.getByTestId('plan-form-save'));
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));

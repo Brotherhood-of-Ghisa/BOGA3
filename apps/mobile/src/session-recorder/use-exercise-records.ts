@@ -29,9 +29,18 @@ export const loadExerciseRecords = async (scope: ExerciseBestsScope): Promise<Ex
 
 export type LoadExerciseRecords = typeof loadExerciseRecords;
 
+/**
+ * Where the panel is being read from: the session on screen, that session's
+ * gym, and the account's gym-filter choice. The session is not a filter — its
+ * gym picks the bucket an exercise split per gym reports ([[gym.split]]) —
+ * while `scope` alone decides whether the one gym filter is on.
+ */
 export type ExerciseRecordsGymFilter = {
   scope: PastRecordsGymScope;
+  /** The viewing session's gym; `null` when it has none. */
   currentGymId: string | null;
+  /** The viewing session. Omitted by a caller reading outside one. */
+  sessionId?: string | null;
 };
 
 /**
@@ -53,6 +62,7 @@ export const useExerciseRecords = (
   const datedWeightRevision = useBodyWeightContextRevision();
   const filterScope = gymFilter?.scope ?? 'all';
   const filterGymId = gymFilter?.currentGymId ?? null;
+  const inSessionId = gymFilter?.sessionId ?? null;
 
   useFocusEffect(useCallback(() => {
     if (!exerciseDefinitionId) return;
@@ -61,6 +71,7 @@ export const useExerciseRecords = (
     void load({
       exerciseDefinitionId,
       beforeSessionId,
+      inSessionId,
       ...(filterScope === 'current-gym' && filterGymId ? { gymId: filterGymId } : {}),
     })
       .then((summary) => {
@@ -74,7 +85,7 @@ export const useExerciseRecords = (
     };
   // The explicit revision invalidates history after a saved-weight or load review.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey, datedWeightRevision]));
+  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, inSessionId, load, refreshKey, datedWeightRevision]));
 
   return state;
 };

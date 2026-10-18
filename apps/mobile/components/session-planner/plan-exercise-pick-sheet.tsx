@@ -28,6 +28,8 @@ export type PlanExercisePickSheetProps = {
   request: { blockId: string | null } | null;
   onPick: (blockId: string | null, result: PlanExercisePickResult) => void;
   onDismiss: () => void;
+  /** The plan's gym: on a split exercise, repeating prefers that gym's newest session ([[gym.split]]). */
+  gymId?: string | null;
 };
 
 /**
@@ -35,7 +37,7 @@ export type PlanExercisePickSheetProps = {
  * shares, in a sheet. A pick allows adding an empty set or repeating sets
  * from the last execution, and carries the exercise's load input mode.
  */
-export function PlanExercisePickSheet({ request, onPick, onDismiss }: PlanExercisePickSheetProps) {
+export function PlanExercisePickSheet({ request, onPick, onDismiss, gymId = null }: PlanExercisePickSheetProps) {
   const catalog = useExerciseCatalog();
   const [search, setSearch] = useState('');
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
@@ -96,7 +98,7 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss }: PlanExerci
     preselectionRequestKeyRef.current = requestKey;
     setPreselection({ exercise, status: 'loading', suggestion: null });
 
-    void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id })
+    void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id, gymId })
       .then((suggestion) => {
         if (!isMountedRef.current || preselectionRequestKeyRef.current !== requestKey) {
           return;

@@ -7,8 +7,8 @@ import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
 import {
-  NO_GYM_BUCKET, defaultGymBucket, gymBucketFromParam, rankGymBuckets,
-  type GymBucket, type GymBucketRank,
+  GymBucketError, gymBucketFromCursor, gymBucketFromParam, rankGymBuckets,
+  type GymBucketRank,
 } from './gym-buckets.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
@@ -968,10 +968,20 @@ const loadDefinitionsById = async (
   return new Map(rows.map(row => [row.id, row]));
 };
 
-/** The requested bucket, or undefined when the request named none. */
+/** Rethrows a gym-bucket rule's rejection as the API error it is. */
+const asApiError = <T>(read: () => T): T => {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof GymBucketError) throw new ApiError(400, error.code, error.message);
+    throw error;
+  }
+};
+
+/** The requested gym, or undefined when the request named none (the whole exercise). */
 const parseGymBucket = (
   url: URL, definition: ExerciseDefinitionRow,
-): GymBucket | undefined => {
+): string | undefined => {
   const raw = url.searchParams.get('gym_bucket');
   if (raw === null) return undefined;
   if (!definition.split_by_gym) {
@@ -983,44 +993,54 @@ const parseGymBucket = (
   }
   const value = parseOptionalText(raw, 200, 'gym_bucket');
   if (value === null) {
-    throw new ApiError(
-      400, 'INVALID_ARGUMENT', `gym_bucket must name a gym or "${NO_GYM_BUCKET}".`,
-    );
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'gym_bucket must name a gym.');
   }
-  return gymBucketFromParam(value);
+  return asApiError(() => gymBucketFromParam(value));
+};
+
+/** Gym names for a response's gym fields, and which named gyms the user owns. */
+type GymNamer = {
+  owns: (gymId: string) => boolean;
+  field: (gymId: string | null) => JsonObject | null;
+};
+
+const loadGymNamer = async (
+  client: SupabaseClient, userId: string, gymIds: Array<string | null | undefined>,
+): Promise<GymNamer> => {
+  const names = await loadGymNames(client, userId, uniqueStrings(gymIds, gymIds.length));
+  return {
+    owns: (gymId) => names.has(gymId),
+    // A null gym is a session with no gym, not an unknown one.
+    field: (gymId) => gymId === null ? null : { id: gymId, name: names.get(gymId) ?? null },
+  };
 };
 
 /**
- * The split fields on a split exercise: the reported bucket and every bucket.
- * `summarize` adds the figures a route can state per bucket, so one response
- * shows every gym side by side without ever pooling them.
+ * The split fields on a split exercise: the selected gym, if any, and every
+ * gym. `summarize` adds the figures a route can state per gym, so one response
+ * shows every gym side by side beside the whole exercise.
  */
-const gymBucketFields = async (
-  client: SupabaseClient, userId: string, selected: GymBucket | undefined,
+const gymBucketFields = (
+  namer: GymNamer, selected: string | undefined,
   ranked?: GymBucketRank[],
-  summarize?: (bucket: GymBucket) => JsonObject,
-): Promise<JsonObject> => {
-  const listed = (ranked ?? []).slice(0, MAX_GYM_BUCKETS);
-  const candidates = [...(selected === undefined ? [] : [selected]), ...listed.map((e) => e.bucket)];
-  const names = await loadGymNames(client, userId, uniqueStrings(candidates, candidates.length));
+  summarize?: (gymId: string) => JsonObject,
+): JsonObject => {
   // A named gym nobody owns and one owned by somebody else are the same 404,
   // as everywhere else in this API — and a 200 holding an empty bucket would
   // read as "trained there, nothing recorded".
-  if (selected !== undefined && selected !== null && !names.has(selected)) {
+  if (selected !== undefined && !namer.owns(selected)) {
     throw new ApiError(404, 'NOT_FOUND', 'Gym not found.');
   }
-  // A null gym is the no-gym bucket, not an unknown one.
-  const gymField = (bucket: GymBucket) =>
-    bucket === null ? null : { id: bucket, name: names.get(bucket) ?? null };
+  const listed = (ranked ?? []).slice(0, MAX_GYM_BUCKETS);
   return {
-    // Only a response whose figures or rows come from one bucket names it.
-    ...(selected === undefined ? {} : { gym: gymField(selected) }),
-    // Only the route that states per-bucket figures carries the inventory.
+    // Only a response whose figures or rows come from one gym names it.
+    ...(selected === undefined ? {} : { gym: namer.field(selected) }),
+    // Only the route that states per-gym figures carries the inventory.
     ...(ranked === undefined ? {} : {
       gym_buckets: listed.map((entry) => ({
-        gym: gymField(entry.bucket),
+        gym: namer.field(entry.gymId),
         last_performed_at: toIsoTimestamp(entry.lastPerformedAt),
-        ...(summarize ? summarize(entry.bucket) : {}),
+        ...(summarize ? summarize(entry.gymId) : {}),
       })),
       // Never drop buckets silently.
       ...(ranked.length > listed.length ? { gym_buckets_truncated: true } : {}),
@@ -1118,19 +1138,18 @@ const getExerciseContext = async (
     // A session with only warm-ups for this exercise has no stat footprint.
     .filter(row => row.workingSetCount > 0);
 
-  // A split exercise is never pooled: every figure below comes from one bucket.
-  // Buckets are ranked over the sessions these figures count — working sets
-  // only — so the default bucket is never one without a stat footprint and a
-  // listed bucket always holds the records beside it.
+  // A split exercise reports the whole exercise unless the request names a gym;
+  // then every figure below comes from that gym's sessions alone. Gyms are
+  // ranked over the sessions these figures count — working sets only — so a
+  // listed gym always holds the records beside it.
   const rankedBuckets = definition.split_by_gym
     ? rankGymBuckets(performanceRows.map((row) => row.session))
     : [];
-  const selectedBucket = definition.split_by_gym
-    ? (requestedBucket === undefined ? defaultGymBucket(rankedBuckets) : requestedBucket)
-    : undefined;
-  const bucketRows = selectedBucket === undefined
+  const bucketRows = requestedBucket === undefined
     ? performanceRows
-    : performanceRows.filter((row) => row.session.gym_id === selectedBucket);
+    : performanceRows.filter((row) => row.session.gym_id === requestedBucket);
+  const recentRows = bucketRows.slice(0, recentSessions);
+  const seriesRows = bucketRows.slice(0, 12).reverse();
   const historyIncomplete = historyTruncated || setResult.truncated;
 
   // The app's record book (`records.ts`): ties keep the earliest session and a
@@ -1162,13 +1181,22 @@ const getExerciseContext = async (
     };
   };
 
-  // Every bucket's records travel with the bucket list, so one call shows each
-  // gym beside the others; only the heavier per-session detail below is scoped
-  // to the reported bucket.
-  const splitFields = selectedBucket === undefined
+  // Every gym's records travel with the gym list, so one call shows each gym
+  // beside the others and the whole exercise. A split exercise's performances
+  // and volume points name their gym, since the whole exercise mixes them.
+  const namer = definition.split_by_gym
+    ? await loadGymNamer(client, userId, [
+      requestedBucket,
+      ...rankedBuckets.slice(0, MAX_GYM_BUCKETS).map((entry) => entry.gymId),
+      ...[...recentRows, ...seriesRows].map((row) => row.session.gym_id),
+    ])
+    : null;
+  const gymOf = (row: typeof performanceRows[number]): JsonObject =>
+    namer === null ? {} : { gym: namer.field(row.session.gym_id) };
+  const splitFields = namer === null
     ? {}
-    : await gymBucketFields(client, userId, selectedBucket, rankedBuckets, (bucket) => {
-      const rows = performanceRows.filter((row) => row.session.gym_id === bucket);
+    : gymBucketFields(namer, requestedBucket, rankedBuckets, (gymId) => {
+      const rows = performanceRows.filter((row) => row.session.gym_id === gymId);
       return { session_count: rows.length, personal_records: recordsOf(rows) };
     });
   return {
@@ -1182,8 +1210,9 @@ const getExerciseContext = async (
       split_by_gym: definition.split_by_gym,
       ...splitFields,
     },
-    recent_performances: bucketRows.slice(0, recentSessions).map((row) => ({
+    recent_performances: recentRows.map((row) => ({
       session_id: row.session.id,
+      ...gymOf(row),
       started_at: toIsoTimestamp(row.session.started_at),
       completed_at: toIsoTimestamp(row.session.completed_at),
       duration_seconds: row.session.duration_sec,
@@ -1198,8 +1227,9 @@ const getExerciseContext = async (
       history_truncated: historyIncomplete,
       excluded_incomplete_volume_sessions: bucketRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
     },
-    volume_series: bucketRows.slice(0, 12).reverse().map((row) => ({
+    volume_series: seriesRows.map((row) => ({
       completed_at: toIsoTimestamp(row.session.completed_at),
+      ...gymOf(row),
       ...volumePayload(row.volumeCoverage, historyIncomplete),
     })),
     last_performed_at: bucketRows.length > 0
@@ -1376,14 +1406,10 @@ const getExerciseHistory = async (
   // The cursor carries its own bucket, so draining it keeps paging that bucket
   // even when the caller does not repeat `gym_bucket` — otherwise page two
   // would silently switch buckets and apply page one's keyset filter to it.
-  const cursorBucket = ((): GymBucket | undefined => {
-    if (!cursor || cursor.gym_bucket === undefined) return undefined;
-    const value = cursor.gym_bucket;
-    if (value !== null && typeof value !== 'string') {
-      throw new ApiError(400, 'INVALID_CURSOR', 'Cursor is invalid.');
-    }
-    return value;
-  })();
+  // An unsplit exercise has no buckets, so its cursor's filter lapses unread.
+  const cursorBucket = cursor && definition.split_by_gym
+    ? asApiError(() => gymBucketFromCursor(cursor.gym_bucket))
+    : undefined;
   if (cursorBucket !== undefined && requestedBucket !== undefined
     && cursorBucket !== requestedBucket) {
     throw new ApiError(
@@ -1401,13 +1427,13 @@ const getExerciseHistory = async (
   // The exercise descriptor names the filtered bucket when there is one. The
   // per-bucket inventory is the context route's: here every gym's sets are in
   // the page already, each carrying its own gym.
-  const exerciseField = async (): Promise<JsonObject> => ({
+  const exerciseField = async (pageNamer?: GymNamer): Promise<JsonObject> => ({
     id: definition.id,
     name: definition.name,
     ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
     split_by_gym: definition.split_by_gym,
     ...(definition.split_by_gym
-      ? await gymBucketFields(client, userId, filterBucket)
+      ? gymBucketFields(pageNamer ?? await loadGymNamer(client, userId, [filterBucket]), filterBucket)
       : {}),
   });
 
@@ -1541,9 +1567,9 @@ const getExerciseHistory = async (
   );
   const contextSessionById = new Map(sessionsWithContext.map((s) => [s.id, s]));
 
-  const pageGymNames = definition.split_by_gym
-    ? await loadGymNames(client, userId, uniqueStrings(pageItems.map((item) => item.session.gym_id), 100))
-    : new Map<string, string>();
+  const pageNamer = definition.split_by_gym
+    ? await loadGymNamer(client, userId, [filterBucket, ...pageItems.map((item) => item.session.gym_id)])
+    : undefined;
 
   const projectedSets = pageItems.flatMap((item) => {
     const sessionWithContext = contextSessionById.get(item.session.id) ?? item.session;
@@ -1564,20 +1590,14 @@ const getExerciseHistory = async (
       equipment: item.block.machine_name,
       // A split exercise's sets carry the gym they belong to, so one page can
       // span gyms without the reader having to guess which is which.
-      ...(definition.split_by_gym
-        ? {
-          gym: item.session.gym_id === null
-            ? null
-            : { id: item.session.gym_id, name: pageGymNames.get(item.session.gym_id) ?? null },
-        }
-        : {}),
+      ...(pageNamer === undefined ? {} : { gym: pageNamer.field(item.session.gym_id) }),
     }];
   });
 
   const lastItem = pageItems[pageItems.length - 1];
   return {
     metric_revision: METRIC_REVISION,
-    exercise: await exerciseField(),
+    exercise: await exerciseField(pageNamer),
     sets: projectedSets,
     next_cursor: hasMore && lastItem
       ? encodeCursor({

@@ -39,9 +39,9 @@ describe('muscle volume comparisons', () => {
       historicalSessions: [],
     });
     // (100 + 50) × 10, halved per side; the 20 × 10 warm-up counts as a set only.
+    // Triceps is secondary here, so it has no comparison row at all.
     expect(rows).toEqual([
       expect.objectContaining({ exerciseDefinitionId: 'chest', workingSetCount: 2, currentVolume: 750 }),
-      expect.objectContaining({ exerciseDefinitionId: 'triceps', workingSetCount: 2, currentVolume: 375 }),
     ]);
   });
 
@@ -89,5 +89,47 @@ describe('muscle volume comparisons', () => {
     });
     expect(rows[0]).toMatchObject({ historicalSessionCount: 1, medianVolume: 250 });
     expect(deriveSessionMuscleVolumeComparisons({ ...catalog, muscleMappings: [], targetSession: target, historicalSessions: [prior] })).toEqual([]);
+  });
+
+  it('draws no distribution for a muscle trained only as a secondary, and takes no baseline from such a session', () => {
+    const squat = (sessionId: string, day: string, weightValue: string): PersonalRecordSessionInput => ({
+      sessionId, status: 'completed', completedAt: new Date(`2026-09-${day}T12:00:00Z`),
+      exercises: [{
+        id: `${sessionId}-squat`, exerciseDefinitionId: 'squat', exerciseName: 'Squat', orderIndex: 0,
+        sets: [set(`${sessionId}-squat-set`, weightValue)],
+      }],
+    });
+    const withSquat = {
+      exerciseDefinitions: [...catalog.exerciseDefinitions, { bodyweightContribution: 0, id: 'squat', loadInputMode: 'total_load' as const }],
+      muscleMappings: [...catalog.muscleMappings, { exerciseDefinitionId: 'squat', muscleGroupId: 'triceps', role: 'primary' as const }],
+      muscleGroups: catalog.muscleGroups,
+    };
+    // Bench is chest primary, triceps secondary: triceps gets no row.
+    const benchOnly = deriveSessionMuscleVolumeComparisons({
+      ...withSquat, targetSession: session('target', '25', [set('target-set', '100')]), historicalSessions: [],
+    });
+    expect(benchOnly.map((row) => row.exerciseDefinitionId)).toEqual(['chest']);
+
+    // Triceps is primary today (squat): its Volume adds the bench's secondary work at ½,
+    // 100 × 10 / 2 × ½ + 40 × 10 / 2. The bench-day prior trained it only as a secondary,
+    // so only the squat-day prior (60 × 10 / 2) is a baseline reading.
+    const target = {
+      ...session('target', '25', [set('bench-set', '100')]),
+      exercises: [...session('target', '25', [set('bench-set', '100')]).exercises, ...squat('target', '25', '40').exercises],
+    };
+    const rows = deriveSessionMuscleVolumeComparisons({
+      ...withSquat, targetSession: target,
+      historicalSessions: [session('bench-day', '24', [set('bench-day-set', '200')]), squat('squat-day', '23', '60')],
+    });
+    expect(rows.find((row) => row.exerciseDefinitionId === 'triceps')).toMatchObject({
+      currentVolume: 250 + 200, historicalSessionCount: 1, medianVolume: 300,
+    });
+  });
+
+  it('draws no comparison for a muscle whose only primary sets are warm-ups', () => {
+    const rows = deriveSessionMuscleVolumeComparisons({
+      ...catalog, targetSession: session('target', '25', [set('warm', '20', 'warm_up')]), historicalSessions: [],
+    });
+    expect(rows).toEqual([]);
   });
 });

@@ -9,7 +9,9 @@ import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
 import { localWeekBounds } from '@/src/utils/calendar-weeks';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
 
-import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { and, eq, gte, lt } from 'drizzle-orm';
+import { sessions } from '@/src/data/schema';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -100,6 +102,24 @@ describe('useWeekSets over local data', () => {
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: null });
     expect(result.current).toEqual({ groups: [], loading: false, error: null });
+  });
+
+  it('keeps an exercise week to its page\'s gym: every gym unset, no gym, or one gym', async () => {
+    await seed();
+    const midweek = and(gte(sessions.completedAt, local(7, 0)), lt(sessions.completedAt, local(8, 0)));
+    const gymId = localDatabase().select({ gymId: sessions.gymId }).from(sessions).where(midweek).get()?.gymId;
+    expect(gymId).toEqual(expect.any(String));
+    localDatabase().update(sessions).set({ gymId: null }).where(midweek).run();
+    const days = (groups: { title: string }[]) => groups.map(group => group.title);
+    const { result, rerender } = renderHook(({ target }: { target: WeekSetsTarget }) => useWeekSets(target, '2026-10-05'),
+      { initialProps: { target: { exerciseDefinitionId: 'seed_barbell_bench_press' } as WeekSetsTarget } });
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['Mon 5 Oct', 'Wed 7 Oct', 'Fri 9 Oct']));
+    expect(result.current.groups[1].detail).toBe('No gym');
+
+    rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press', gymId: null } });
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['Wed 7 Oct']));
+    rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press', gymId: gymId! } });
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['Mon 5 Oct', 'Fri 9 Oct']));
   });
 
   it('still lists the cards, without records, when the records read fails', async () => {

@@ -103,6 +103,30 @@ const logPulldown = async (daysAgo: number) => {
   await completeSessionDraft(sessionId, { completedAt, now: completedAt });
 };
 
+// A Lat Pulldown workout still in progress: one confirmed set, one planned.
+const startPulldown = async (startedDaysAgo: number) => {
+  const startedAt = new Date(Date.now() - startedDaysAgo * DAY_MS);
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: 'history_pulldown_in_progress',
+      gymId: null,
+      startedAt,
+      exercises: [
+        {
+          id: 'history_pulldown_in_progress_pulldown',
+          exerciseDefinitionId: PULLDOWN,
+          name: 'Lat Pulldown',
+          sets: [
+            { id: 'history_pulldown_in_progress_done', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: null },
+            { id: 'history_pulldown_in_progress_planned', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: 'planned' },
+          ],
+        },
+      ],
+    },
+    { now: startedAt }
+  );
+};
+
 /** Opens the page exactly as Progress pushes it: one id, no name. */
 const openHistory = async (params: Record<string, string>) => {
   mockSearchParams = params;
@@ -157,6 +181,21 @@ describe('The history page over real data', () => {
     expect(history.daily.length).toBeGreaterThan(0);
   });
 
+  it.each([
+    ['exercise', { exerciseDefinitionId: PULLDOWN }],
+    ['muscle', { muscleGroupId: 'back_lats' }],
+  ] as const)('counts the workout in progress on today, by its confirmed sets, on %s history', async (subject, params) => {
+    await loadMaestroFixture('exercise-block-history');
+    // Started last week: only the date finishing it now would give puts it on today.
+    await startPulldown(8);
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    await openHistory({ ...params, metric: 'sets' });
+    await waitForGone(() => screen.queryByTestId(`stats-${subject}-history-loading`));
+
+    expect(renderedDailySample(subject).filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
+      .toEqual([[localDateKey(new Date()), 1]]);
+  });
+
   it('titles an exercise page with its name and offers all four metrics in both views', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'daily' }));
@@ -177,6 +216,42 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.queryByText('Weekly training load')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('opens an exercise on the gym its link names, and the gym picker changes the days counted', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const noGymSession = 'maestro_exercise_block_history_squat_2';
+    localDataClient().prepare('UPDATE sessions SET gym_id = NULL WHERE id = ?').run(noGymSession);
+    // The fixture places that session four days before it was loaded.
+    const noGymDay = localDateKey(new Date(Date.now() - 4 * DAY_MS));
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    await openHistory({ exerciseDefinitionId: SQUAT, gymId: 'no-gym' });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    const trainingDays = () => renderedDailySample().filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
+    expect(trainingDays()).toEqual([noGymDay]);
+    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('No gym');
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    await waitFor(() => expect(trainingDays().length).toBeGreaterThan(1));
+    expect(trainingDays()).not.toContain(noGymDay);
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym-option-all'));
+    await waitFor(() => expect(trainingDays()).toContain(noGymDay));
+    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('All gyms');
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    // `All gyms` counts every session of the window, each gym's own beside it.
+    expect(screen.getByTestId('stats-exercise-history-gym-option-all').props.accessibilityLabel)
+      .toMatch(/^All gyms, \d+ sessions$/);
+  });
+
+  it('draws no gym filter for an exercise with no gym to choose', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare('UPDATE sessions SET gym_id = NULL').run();
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    expect(screen.queryByTestId('stats-exercise-history-gym')).toBeNull();
   });
 
   it('retries a failed exercise history read for the same definition, staying on the page', async () => {
@@ -340,7 +415,7 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    await act(async () => initial.resolve({ weekly: [], daily: [] }));
+    await act(async () => initial.resolve({ weekly: [], daily: [], gyms: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
     act(() => updatePreferences({ historyLookbackWeeks: 4 }));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
@@ -348,7 +423,7 @@ describe('The history page over real data', () => {
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
     // Pending with no data mounts no chart at all, in either view.
     expect(screen.queryAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(0);
-    await act(async () => reload.resolve({ weekly: [], daily: [] }));
+    await act(async () => reload.resolve({ weekly: [], daily: [], gyms: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
   });
 

@@ -290,6 +290,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       />
 
       <PlanExercisePickSheet
+        gymId={form.gymId}
         onDismiss={() => setPickRequest(null)}
         onPick={handlePickResult}
         request={pickRequest}

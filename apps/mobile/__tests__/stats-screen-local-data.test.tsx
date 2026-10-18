@@ -165,6 +165,30 @@ const logPulldown = async (daysAgo: number) => {
   await completeSessionDraft(sessionId, { completedAt, now: completedAt });
 };
 
+// A Lat Pulldown workout still in progress: one confirmed set, one planned.
+const startPulldown = async (startedDaysAgo: number) => {
+  const startedAt = new Date(Date.now() - startedDaysAgo * DAY_MS);
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: 'stats_pulldown_in_progress',
+      gymId: null,
+      startedAt,
+      exercises: [
+        {
+          id: 'stats_pulldown_in_progress_pulldown',
+          exerciseDefinitionId: PULLDOWN,
+          name: 'Lat Pulldown',
+          sets: [
+            { id: 'stats_pulldown_in_progress_done', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: null },
+            { id: 'stats_pulldown_in_progress_planned', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: 'planned' },
+          ],
+        },
+      ],
+    },
+    { now: startedAt }
+  );
+};
+
 beforeEach(() => {
   resetLocalData();
   mockUserId = null;
@@ -255,6 +279,53 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('11'));
   });
 
+  it('filters the exercise rows by the chosen gym, every gym by default, and opens history on that gym', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id = 'maestro_exercise_block_history_squat_2'").run();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    const squatNow = () => screen.getByTestId(`stats-exercise-row-${SQUAT}-now`);
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('All gyms');
+    expect(squatNow()).toHaveTextContent(/^7$/);
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).toContain(`exerciseDefinitionId=${SQUAT}`);
+    expect(String(mockPush.mock.lastCall?.[0])).toContain(`gymId=${gym}`);
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^2$/));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).toContain('gymId=no-gym');
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^7$/));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).not.toContain('gymId=');
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
+    // Both muscle layouts keep the whole exercise despite the Exercise gym filter.
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.queryByTestId('stats-gym')).toBeNull();
+    expect(await screen.findByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/);
+    showHeatmap();
+    expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/);
+    fireEvent.press(screen.getByTestId('stats-muscle-tile-quads'));
+    expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^7$/);
+    fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
+    chooseFilter('view-mode', 'Exercise');
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+  });
+
   it('shows the empty state on an empty database', async () => {
     await renderStats();
 
@@ -324,6 +395,27 @@ describe('Stats over real data', () => {
     await replayFocus();
 
     expect(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`)).toBeTruthy();
+  });
+
+  it.each(['Sets', 'Volume'] as const)('counts confirmed in-progress %s in both muscle layouts, dated now', async metric => {
+    await loadMaestroFixture('exercise-block-history');
+    // Started last week: only the date finishing it now would give puts it in this one.
+    await startPulldown(8);
+    await renderStats();
+
+    expect(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}-now`)).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId(`stats-exercise-row-${PULLDOWN}-previous`)).toHaveTextContent(/^0$/);
+    chooseFilter('view-mode', 'Muscle');
+    chooseFilter('metric', metric);
+    const now = metric === 'Sets' ? /^1$/ : /^300$/;
+    expect(await screen.findByTestId('stats-muscle-row-back_lats-now')).toHaveTextContent(now);
+    expect(screen.getByTestId('stats-muscle-row-back_lats-previous')).toHaveTextContent(/^0$/);
+    showHeatmap();
+    expect(screen.getByTestId('stats-muscle-row-back_lats-now')).toHaveTextContent(now);
+    fireEvent.press(screen.getByTestId('stats-muscle-tile-back_lats'));
+    expect(screen.getByTestId(`stats-contribution-${PULLDOWN}-now`)).toHaveTextContent(now);
+    fireEvent.press(screen.getByRole('link', { name: 'Open Lat Pulldown history' }));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${PULLDOWN}&metric=${metric === 'Sets' ? 'sets' : 'volume'}&view=timeline`);
   });
 
   it('opens the Sessions list from the Sessions card', async () => {

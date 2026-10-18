@@ -15,7 +15,9 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
+import { inProgressSessionDate, selectInProgressSessionRow } from './in-progress-session';
+import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from './schema';
+import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 
@@ -49,7 +51,14 @@ export type ExerciseCatalogStats = {
 
 export type ExerciseCatalogStatsRawHistory = {
   effortPolicy?: EffortCalculationPolicy;
-  sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
+  /** `gymId` / `gymName` absent read as a session with no gym. */
+  sessions: ({ id: string; completedAt: Date; gymId?: string | null; gymName?: string | null } & SessionWeightContext)[];
+  /**
+   * The workout in progress, undated. Its exercises and sets are in the lists
+   * below, but no figure counts them until `withInProgressSession` dates it:
+   * only Progress does (§2); the catalogue and pickers read completed history.
+   */
+  inProgressSession?: ({ id: string; gymId?: string | null; gymName?: string | null } & SessionWeightContext) | null;
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: { id: string; bodyweightContribution: number; loadInputMode: LoadInputMode }[];
   sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
@@ -81,10 +90,14 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
         id: sessions.id,
         completedAt: sessions.completedAt,
         startedAt: sessions.startedAt,
+        gymId: sessions.gymId,
+        gymName: gyms.name,
       })
       .from(sessions)
+      .leftJoin(gyms, eq(gyms.id, sessions.gymId))
       .where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt)))
       .all();
+    const inProgressRow = selectInProgressSessionRow(database);
 
     const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
@@ -92,7 +105,10 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
       .map((row) => ({ ...row, completedAt: row.completedAt }));
 
-    const sessionIds = sessionsCompleted.map((row) => row.id);
+    const inProgressSession = inProgressRow ? {
+      id: inProgressRow.id, gymId: inProgressRow.gymId, gymName: inProgressRow.gymName, ...resolveWeight(inProgressRow.startedAt),
+    } : null;
+    const sessionIds = [...sessionsCompleted.map((row) => row.id), ...(inProgressSession ? [inProgressSession.id] : [])];
     const sessionExerciseRows =
       sessionIds.length > 0
         ? database
@@ -142,6 +158,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       effortPolicy: getPersonalEffortPolicy(),
       exerciseDefinitions: definitions,
       sessions: sessionsCompleted,
+      inProgressSession,
       sessionExercises: sessionExerciseRows,
       exerciseSets: exerciseSetRows.map((row) => ({
         sessionExerciseId: row.sessionExerciseId,
@@ -153,6 +170,15 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
     };
   },
 });
+
+/** The history with its workout in progress counted, dated for a read at `now` (§2). */
+export const withInProgressSession = (
+  raw: ExerciseCatalogStatsRawHistory,
+  now: Date
+): ExerciseCatalogStatsRawHistory => {
+  if (!raw.inProgressSession) return raw;
+  return { ...raw, sessions: [...raw.sessions, { ...raw.inProgressSession, completedAt: inProgressSessionDate(now) }] };
+};
 
 type PeriodWindow = { start: Date | null; end: Date | null };
 
@@ -223,6 +249,31 @@ const addWorkingSetToAggregate = (
 };
 
 /**
+ * The one gym filter, three-state (`src/utils/gym-scope-route.ts`): unset every
+ * gym, `null` the sessions with no gym, an id that gym. Every figure — counts,
+ * `Last:`, favourite recency and never-done — counts only the sessions in scope.
+ */
+export type ExerciseCatalogStatsGymScope = { gymId?: string | null };
+
+const inGymScope = (session: { gymId?: string | null }, scope: ExerciseCatalogStatsGymScope): boolean =>
+  scope.gymId === undefined || (session.gymId ?? null) === scope.gymId;
+
+/** The gyms the history was trained at, the most recently trained first; `null` for no gym. */
+export const exerciseCatalogStatsGymOptions = (raw: ExerciseCatalogStatsRawHistory): GymScopeOption[] => {
+  const latest = new Map<string | null, { option: GymScopeOption; completedAt: Date }>();
+  for (const session of raw.sessions) {
+    const gymId = session.gymId ?? null;
+    const previous = latest.get(gymId);
+    if (previous && previous.completedAt >= session.completedAt) continue;
+    latest.set(gymId, { option: { gymId, name: session.gymName ?? null }, completedAt: session.completedAt });
+  }
+  return [...latest.values()]
+    .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime()
+      || (left.option.gymId ?? '').localeCompare(right.option.gymId ?? ''))
+    .map(({ option }) => option);
+};
+
+/**
  * Working sets settle (`training-metrics-contract.md` "Counted set") "done", `Last:`,
  * favourite recency, session count and 1RM. Volume independently includes
  * selected performed efforts, even when there are no working sets.
@@ -230,7 +281,8 @@ const addWorkingSetToAggregate = (
 export const aggregateExerciseCatalogStats = (
   raw: ExerciseCatalogStatsRawHistory,
   period: ExerciseCatalogStatsPeriod,
-  now: Date = new Date()
+  now: Date = new Date(),
+  scope: ExerciseCatalogStatsGymScope = {}
 ): ExerciseCatalogStats => {
   const window = resolvePeriodWindow(period, now);
 
@@ -250,7 +302,7 @@ export const aggregateExerciseCatalogStats = (
     if (!link || link.exerciseDefinitionId === null) continue;
     const defId = link.exerciseDefinitionId;
     const session = sessionById.get(link.sessionId);
-    if (!session) continue;
+    if (!session || !inGymScope(session, scope)) continue;
     // Working sets settle recency/counts/strength; volume is independent.
     const values = {
       reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus, setType: set.setType,

@@ -17,6 +17,14 @@ export const exerciseSessionFacts = sqliteTable(
   {
     sessionId: text('session_id').notNull(),
     exerciseDefinitionId: text('exercise_definition_id').notNull(),
+    /**
+     * The record book this session's own PR flags come from (`reportingBucket`,
+     * `exercise-calculations/gym-bucket.ts`, [[gym.split]]): `all` for the whole
+     * exercise, `gym:<id>` for a split exercise's session at a gym. The default
+     * only carries rows written before the column existed; the rules-version
+     * bump that added it rebuilds every one of them.
+     */
+    gymBucket: text('gym_bucket').notNull().default('all'),
     /** The session's `completed_at`; ties are ordered by `session_id`. */
     achievedAt: integer('achieved_at', { mode: 'timestamp_ms' }).notNull(),
     bestE1rmKg: real('best_e1rm_kg'),
@@ -28,14 +36,28 @@ export const exerciseSessionFacts = sqliteTable(
     volumeKg: real('volume_kg'),
     workingSets: integer('working_sets').notNull(),
     volumeSets: integer('volume_sets').notNull().default(0),
+    /** PRs against the whole exercise: what a view with no gym chosen shows. */
     prE1rm: integer('pr_e1rm', { mode: 'boolean' }).notNull(),
     prWeight: integer('pr_weight', { mode: 'boolean' }).notNull(),
     prVolume: integer('pr_volume', { mode: 'boolean' }).notNull(),
+    /**
+     * The session's own PRs, against its `gym_bucket` book: what counts as the
+     * session's PRs (Today). Equal to `pr_*` unless the session is at a gym on
+     * a split exercise.
+     */
+    ownPrE1rm: integer('own_pr_e1rm', { mode: 'boolean' }).notNull().default(false),
+    ownPrWeight: integer('own_pr_weight', { mode: 'boolean' }).notNull().default(false),
+    ownPrVolume: integer('own_pr_volume', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.exerciseDefinitionId, table.sessionId] }),
     definitionAchievedAtIdx: index('exercise_session_facts_definition_achieved_at_idx').on(
       table.exerciseDefinitionId,
+      table.achievedAt,
+    ),
+    definitionBucketIdx: index('exercise_session_facts_definition_bucket_idx').on(
+      table.exerciseDefinitionId,
+      table.gymBucket,
       table.achievedAt,
     ),
     achievedAtIdx: index('exercise_session_facts_achieved_at_idx').on(table.achievedAt),

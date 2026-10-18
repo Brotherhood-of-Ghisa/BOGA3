@@ -67,3 +67,16 @@ and its scroll. Approved 2026-10-18.
 Why: the list is the familiar default; the map is available by choice.
 Code: `apps/mobile/app/(tabs)/progress.tsx` and
 `apps/mobile/components/stats/progress-muscle-view.tsx`.
+
+### muscle.comparison-primary-only · presentation · accepted
+
+A session's by-muscle volume comparison covers only muscles the session worked
+as **primary**. A muscle trained only as a secondary has no comparison, and a
+past session that trained it only as a secondary adds no baseline reading. A
+primary muscle's Volume still includes its secondary work at ½
+([[muscle.set-count]]). Decided 2026-10-18.
+
+Why: a secondary mapping is real work but not the muscle the lift is for, so
+comparing it against sessions that targeted it misleads.
+Code: `deriveSessionMuscleVolumeComparisons` in
+`apps/mobile/src/session-insights/calculations.ts`.

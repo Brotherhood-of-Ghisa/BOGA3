@@ -11,6 +11,9 @@ import { effortPolicyKey } from '@/src/exercise-calculations/effort-policy';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
+  isPooledGymBucket, POOLED_GYM_BUCKET, reportingBucket, type GymBucketKey,
+} from '@/src/exercise-calculations/gym-bucket';
+import {
   createRecordBook, type RecordBaseline, type RecordEntry, type WeightRecordValue,
 } from '@/src/exercise-calculations/records';
 import {
@@ -27,6 +30,7 @@ import {
   EXERCISE_SESSION_FACTS_RULES_VERSION,
   type ExerciseSessionFactRow,
   type FactsBlockInput,
+  type FactsDefinitionInput,
   type FactsSessionInput,
 } from './exercise-session-facts-derive';
 import {
@@ -73,6 +77,7 @@ type BlockRow = {
   orderIndex: number;
   completedAt: Date | null;
   startedAt: Date;
+  gymId: string | null;
 };
 
 const loadBlocks = (tx: FactsTx, definitionIds: readonly string[] | null): BlockRow[] => {
@@ -84,6 +89,7 @@ const loadBlocks = (tx: FactsTx, definitionIds: readonly string[] | null): Block
       orderIndex: sessionExercises.orderIndex,
       completedAt: sessions.completedAt,
       startedAt: sessions.startedAt,
+      gymId: sessions.gymId,
     })
     .from(sessionExercises)
     .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
@@ -146,6 +152,18 @@ const createLoadContextResolver = (tx: FactsTx, definitionIds: readonly string[]
     personalLoadContext(enabled, definitions.get(definitionId) ?? null, resolveWeight(startedAt), getPersonalEffortPolicy());
 };
 
+/**
+ * Whether each definition reports per gym. The derivation turns it into each
+ * row's bucket (`reportingBucket`); a missing definition cannot own a block.
+ */
+const loadSplitByGym = (tx: Pick<FactsTx, 'select'>, definitionIds: readonly string[]): Map<string, boolean> =>
+  new Map(chunks(definitionIds).flatMap((ids) => tx
+    .select({ id: exerciseDefinitions.id, splitByGym: exerciseDefinitions.splitByGym })
+    .from(exerciseDefinitions)
+    .where(inArray(exerciseDefinitions.id, ids))
+    .all()
+    .map((definition) => [definition.id, definition.splitByGym] as const)));
+
 /** Each definition's completed history, grouped by session. */
 const loadDefinitionHistories = (
   tx: FactsTx,
@@ -161,7 +179,7 @@ const loadDefinitionHistories = (
     const definitionId = block.exerciseDefinitionId as string;
     const byId = sessionsByDefinition.get(definitionId) ?? new Map<string, FactsSessionInput>();
     const session = byId.get(block.sessionId) ??
-      { sessionId: block.sessionId, completedAt: block.completedAt as Date, blocks: [] };
+      { sessionId: block.sessionId, completedAt: block.completedAt as Date, gymId: block.gymId, blocks: [] };
     session.blocks.push({
       id: block.id,
       orderIndex: block.orderIndex,
@@ -182,10 +200,14 @@ const writeFacts = (tx: FactsTx, scope: DefinitionScope): number => {
       tx.delete(exerciseSessionFacts).where(inArray(exerciseSessionFacts.exerciseDefinitionId, ids)).run();
     }
   }
-  const rows = [...loadDefinitionHistories(tx, scope)]
-    .flatMap(([definitionId, history]) => deriveExerciseSessionFacts(definitionId, history));
-  // 14 columns a row: 60 rows stay under the bound-parameter limit.
-  for (const batch of chunks(rows, 60)) {
+  const histories = [...loadDefinitionHistories(tx, scope)];
+  const splitByGym = loadSplitByGym(tx, histories.map(([definitionId]) => definitionId));
+  const rows = histories.flatMap(([definitionId, history]) => deriveExerciseSessionFacts(
+    { id: definitionId, splitByGym: splitByGym.get(definitionId) ?? false } satisfies FactsDefinitionInput,
+    history,
+  ));
+  // 17 columns a row: 50 rows stay under the bound-parameter limit.
+  for (const batch of chunks(rows, 50)) {
     tx.insert(exerciseSessionFacts).values(batch).run();
   }
   return rows.length;
@@ -247,6 +269,7 @@ export const clearExerciseSessionFacts = (tx: Pick<Transaction, 'delete'>): void
 const factColumns = {
   sessionId: exerciseSessionFacts.sessionId,
   exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId,
+  gymBucket: exerciseSessionFacts.gymBucket,
   achievedAt: exerciseSessionFacts.achievedAt,
   bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
   bestE1rmSetId: exerciseSessionFacts.bestE1rmSetId,
@@ -258,6 +281,9 @@ const factColumns = {
   prE1rm: exerciseSessionFacts.prE1rm,
   prWeight: exerciseSessionFacts.prWeight,
   prVolume: exerciseSessionFacts.prVolume,
+  ownPrE1rm: exerciseSessionFacts.ownPrE1rm,
+  ownPrWeight: exerciseSessionFacts.ownPrWeight,
+  ownPrVolume: exerciseSessionFacts.ownPrVolume,
 };
 
 // Rows are FK-free: reads inner-join the live, completed, non-deleted session.
@@ -284,7 +310,11 @@ export const loadExerciseSessionFacts = async (
     .all());
 };
 
-/** Facts carrying any PR flag with `from <= completed_at < to`, in PR-history order. */
+/**
+ * Facts whose session set any PR of its own (`own_pr_*`, [[gym.split]]) with
+ * `from <= completed_at < to`, in PR-history order: the PRs a session is
+ * credited with, which on a split exercise are its gym's.
+ */
 export const loadFlaggedExerciseSessionFacts = async (
   window: { from: Date; to: Date },
 ): Promise<ExerciseSessionFactRow[]> => {
@@ -296,19 +326,33 @@ export const loadFlaggedExerciseSessionFacts = async (
       gte(exerciseSessionFacts.achievedAt, window.from),
       lt(exerciseSessionFacts.achievedAt, window.to),
       or(
-        eq(exerciseSessionFacts.prE1rm, true),
-        eq(exerciseSessionFacts.prWeight, true),
-        eq(exerciseSessionFacts.prVolume, true),
+        eq(exerciseSessionFacts.ownPrE1rm, true),
+        eq(exerciseSessionFacts.ownPrWeight, true),
+        eq(exerciseSessionFacts.ownPrVolume, true),
       ),
     ))
     .all());
 };
 
-/** Which sessions count toward one exercise's all-time bests. */
+/**
+ * Which sessions count toward one exercise's all-time bests.
+ *
+ * There is exactly one gym filter, `gymId`, on the repository-wide three-state
+ * convention: unset is every gym, `null` is the sessions with no gym, an id is
+ * that gym — for a split exercise too. Reading a session's own records is a
+ * different question, and `inSessionId` answers it with the session rather
+ * than a second gym.
+ */
 export type ExerciseBestsScope = {
   exerciseDefinitionId: string;
-  /** Omitted: every gym. `null`: only sessions with no gym. */
+  /** The gym filter (the `Past records gym filter`). */
   gymId?: string | null;
+  /**
+   * The session being recorded or viewed. On a split exercise its gym's own
+   * book answers ([[gym.split]]); with no gym, or on an unsplit exercise, the
+   * whole exercise does. Unset, the whole exercise answers.
+   */
+  inSessionId?: string | null;
   /** Only the sessions before this completed session, in PR-history order. */
   beforeSessionId?: string | null;
 };
@@ -334,6 +378,7 @@ const topWeightSet = alias(exerciseSets, 'top_weight_set');
 
 const bestsColumns = {
   sessionId: exerciseSessionFacts.sessionId,
+  gymBucket: exerciseSessionFacts.gymBucket,
   completedAt: exerciseSessionFacts.achievedAt,
   gymId: sessions.gymId,
   gymName: gyms.name,
@@ -350,6 +395,7 @@ const bestsColumns = {
 type BestsRow = {
   exerciseDefinitionId: string;
   sessionId: string;
+  gymBucket: GymBucketKey;
   completedAt: Date;
   gymId: string | null;
   gymName: string | null;
@@ -381,6 +427,27 @@ const gymScope = (gymId: string | null | undefined) => {
   if (gymId === undefined) return undefined;
   return gymId === null ? isNull(sessions.gymId) : eq(sessions.gymId, gymId);
 };
+
+/** One session's gym, or undefined when the scope named no session. */
+const sessionGym = (
+  database: LocalDatabase,
+  inSessionId: string | null | undefined,
+): string | null | undefined => {
+  if (!inSessionId) return undefined;
+  const row = database.select({ gymId: sessions.gymId }).from(sessions)
+    .where(eq(sessions.id, inSessionId)).get();
+  if (!row) throw new Error(`session ${inSessionId} is missing`);
+  return row.gymId;
+};
+
+/**
+ * The rows a session's records are read from: its own gym's book when the
+ * exercise is split and the session has a gym, the whole exercise otherwise
+ * (`reportingBucket`). A gym session's row names its gym's book, so the
+ * filter is exact; the whole exercise keeps every row.
+ */
+const inBookOf = <Row extends { gymBucket: GymBucketKey }>(rows: Row[], book: GymBucketKey): Row[] =>
+  isPooledGymBucket(book) ? rows : rows.filter((row) => row.gymBucket === book);
 
 /** Keeps the rows before `beforeSessionId` in PR-history order. */
 const rowsBefore = (database: LocalDatabase, rows: BestsRow[], beforeSessionId: string | null | undefined) => {
@@ -432,7 +499,8 @@ const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
 /**
  * One exercise's all-time 1RM, top weight and best volume, each with
  * its session, gym and (for 1RM and top weight) the set that holds it, plus
- * the newest session in scope.
+ * the newest session in scope. Every gym by default, a split exercise
+ * included; a session in hand reads its own book ([[gym.split]]).
  */
 export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
   const database = await bootstrapLocalDataLayer();
@@ -441,14 +509,21 @@ export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<Exer
     eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
     gymScope(scope.gymId),
   ));
-  return pickBests(rowsBefore(database, rows, scope.beforeSessionId));
+  const gym = sessionGym(database, scope.inSessionId);
+  const definitionId = scope.exerciseDefinitionId;
+  const book = gym === undefined
+    ? POOLED_GYM_BUCKET
+    : reportingBucket({ splitByGym: loadSplitByGym(database, [definitionId]).get(definitionId) ?? false }, gym);
+  return pickBests(rowsBefore(database, inBookOf(rows, book), scope.beforeSessionId));
 };
 
 /**
- * Each listed definition's records over every gym's sessions before `target`
- * in PR-history order: the records the target's sets are compared with. The
- * same fold as `loadExerciseBests`; a definition with no earlier fact row is
- * absent.
+ * Each listed definition's records over the sessions before `target` in
+ * PR-history order: the records the target's sets are compared with. Every gym
+ * counts, except that on a definition split per gym a target at a gym is
+ * compared only with that gym's own book ([[gym.split]]); a target with no gym
+ * is compared with the whole exercise. The same fold as `loadExerciseBests`; a
+ * definition with no earlier row in its book is absent.
  */
 export const loadEarlierBestsByDefinition = async (
   target: { sessionId: string; completedAt: Date },
@@ -459,6 +534,8 @@ export const loadEarlierBestsByDefinition = async (
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
   const before = (row: BestsRow) => compareFactSessionOrder(row, target) < 0;
+  const targetGym = sessionGym(database, target.sessionId) as string | null;
+  const splitByGym = loadSplitByGym(database, exerciseDefinitionIds);
   for (const ids of chunks(exerciseDefinitionIds)) {
     const rows = selectBestsRows(database, and(
       inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
@@ -470,9 +547,41 @@ export const loadEarlierBestsByDefinition = async (
       group.push(row);
       rowsByDefinition.set(row.exerciseDefinitionId, group);
     }
-    for (const [definitionId, group] of rowsByDefinition) bests.set(definitionId, pickBests(group));
+    for (const [definitionId, group] of rowsByDefinition) {
+      const book = reportingBucket({ splitByGym: splitByGym.get(definitionId) ?? false }, targetGym);
+      const inBook = inBookOf(group, book);
+      if (inBook.length > 0) bests.set(definitionId, pickBests(inBook));
+    }
   }
   return bests;
+};
+
+/** Where a block is being planned: in a session (its gym), or at a plan's gym. */
+export type GymBookContext = { inSessionId: string } | { gymId: string | null };
+
+/**
+ * The sessions in the record book a block planned in `at` reads
+ * ([[gym.split]]): on a split exercise at a gym, that gym's sessions; `null`
+ * when the book is the whole exercise — an unsplit exercise, or no gym — so
+ * every session is in it. Repeat last and plan prefill prefer its newest.
+ */
+export const loadGymBookSessionIds = async (
+  exerciseDefinitionId: string,
+  at: GymBookContext,
+): Promise<ReadonlySet<string> | null> => {
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  const gymId = 'inSessionId' in at ? sessionGym(database, at.inSessionId) ?? null : at.gymId;
+  const splitByGym = loadSplitByGym(database, [exerciseDefinitionId]).get(exerciseDefinitionId) ?? false;
+  const book = reportingBucket({ splitByGym }, gymId);
+  if (isPooledGymBucket(book)) return null;
+  return new Set(database.select({ sessionId: exerciseSessionFacts.sessionId }).from(exerciseSessionFacts)
+    .where(and(
+      eq(exerciseSessionFacts.exerciseDefinitionId, exerciseDefinitionId),
+      eq(exerciseSessionFacts.gymBucket, book),
+    ))
+    .all()
+    .map((row) => row.sessionId));
 };
 
 /**

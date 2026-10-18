@@ -30,6 +30,7 @@ import {
   type SessionSetTypeValue,
 } from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
+import { NO_GYM_LABEL, SELECTED_GYM_LABEL } from '@/src/utils/gym-scope-route';
 
 export type ExerciseHistoryPeriod = 'all' | StatsPeriodDays;
 
@@ -65,7 +66,8 @@ export type ExerciseHistoryTagOption = {
 };
 
 export type ExerciseHistoryGymOption = {
-  gymId: string;
+  /** `null` is the sessions with no gym, the repository-wide convention. */
+  gymId: string | null;
   name: string;
   occurrenceCount: number;
 };
@@ -91,7 +93,8 @@ export type ExerciseHistorySummary = {
   bodyweightContribution: number;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
-  appliedGymId: string | null;
+  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
+  appliedGymId?: string | null;
   tagOptions: ExerciseHistoryTagOption[];
   gymOptions: ExerciseHistoryGymOption[];
   sessions: ExerciseHistorySessionEntry[];
@@ -137,7 +140,10 @@ export type ExerciseHistoryAggregationInput = {
   exerciseDefinition: ExerciseHistoryDefinitionRow;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   appliedGymId?: string | null;
+  /** The applied gym's name, so its chip reads it even with no session in the period. */
+  appliedGymName?: string | null;
   sessionsInPeriod: ExerciseHistorySessionRow[];
   /** All-time, gym-scoped like the sessions, never by tag or period. */
   allTimeBest: ExerciseHistoryBest;
@@ -156,7 +162,14 @@ export type ExerciseHistoryStore = {
     /** Only this session's blocks. */
     sessionId?: string;
   }): Promise<ExerciseHistorySessionRow[]>;
-  /** `gymId` omitted: every gym; `null`: sessions with no gym. */
+  /**
+   * `gymId` is the one gym filter, three-state: unset every gym, `null` the
+   * sessions with no gym, an id that gym. A split exercise reads the same way:
+   * history is a view, so it shows the whole exercise until a gym is chosen
+   * ([[gym.split]]).
+   */
+  /** A gym's name; null when it no longer exists or has none. */
+  loadGymName(input: { gymId: string }): Promise<string | null>;
   loadAllTimeBest(input: {
     exerciseDefinitionId: string;
     gymId?: string | null;
@@ -174,6 +187,7 @@ export type LoadExercisePerformanceHistoryOptions = {
   /** Period window. Defaults to 30 days when omitted. */
   period?: ExerciseHistoryPeriod;
   tagDefinitionId?: string | null;
+  /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   gymId?: string | null;
   now?: Date;
 };
@@ -302,10 +316,10 @@ const buildTagOptions = (
 const buildGymOptions = (
   sessionsInPeriod: ExerciseHistorySessionRow[]
 ): ExerciseHistoryGymOption[] => {
-  const optionByGymId = new Map<string, ExerciseHistoryGymOption>();
+  const optionByGymId = new Map<string | null, ExerciseHistoryGymOption>();
   for (const sessionRow of sessionsInPeriod) {
-    const gymId = sessionRow.gymId ?? 'no-gym';
-    const name = sessionRow.gymName?.trim() ? sessionRow.gymName : 'No gym';
+    const gymId = sessionRow.gymId ?? null;
+    const name = sessionRow.gymName?.trim() ? sessionRow.gymName : NO_GYM_LABEL;
     const existing = optionByGymId.get(gymId);
     if (existing) {
       existing.occurrenceCount += 1;
@@ -329,7 +343,7 @@ const buildGymOptions = (
 export const aggregateExerciseHistory = (
   input: ExerciseHistoryAggregationInput
 ): ExerciseHistorySummary => {
-  const appliedGymId = input.appliedGymId ?? null;
+  const appliedGymId = input.appliedGymId;
   // A chip counts the cards it shows: rows with at least one performed set.
   const listedRows = input.sessionsInPeriod.filter((row) =>
     (input.setsBySessionExerciseId[row.sessionExerciseId] ?? []).some((set) => isConfirmedPerformedSet({
@@ -337,6 +351,14 @@ export const aggregateExerciseHistory = (
     })));
   const tagOptions = buildTagOptions(listedRows, input.tagsBySessionExerciseId);
   const gymOptions = buildGymOptions(listedRows);
+  // The gym in force keeps its chip when the period holds none of its sessions.
+  if (appliedGymId !== undefined && !gymOptions.some((option) => option.gymId === appliedGymId)) {
+    gymOptions.push({
+      gymId: appliedGymId,
+      name: appliedGymId === null ? NO_GYM_LABEL : input.appliedGymName?.trim() || SELECTED_GYM_LABEL,
+      occurrenceCount: 0,
+    });
+  }
 
   let filteredSessionRows = input.appliedTagDefinitionId
     ? input.sessionsInPeriod.filter((row) =>
@@ -346,10 +368,8 @@ export const aggregateExerciseHistory = (
       )
     : input.sessionsInPeriod;
 
-  if (appliedGymId) {
-    filteredSessionRows = filteredSessionRows.filter((row) =>
-      appliedGymId === 'no-gym' ? (!row.gymId || row.gymId === null) : row.gymId === appliedGymId
-    );
+  if (appliedGymId !== undefined) {
+    filteredSessionRows = filteredSessionRows.filter((row) => (row.gymId ?? null) === appliedGymId);
   }
 
   const orderedSessionRows = [...filteredSessionRows].sort(compareCompletedDesc);
@@ -453,6 +473,10 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         ...resolveWeight(row.startedAt),
       }));
   },
+  async loadGymName({ gymId }) {
+    const database = await bootstrapLocalDataLayer();
+    return database.select({ name: gyms.name }).from(gyms).where(eq(gyms.id, gymId)).get()?.name ?? null;
+  },
   async loadAllTimeBest({ exerciseDefinitionId, gymId }) {
     const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId });
     return {
@@ -535,7 +559,7 @@ export const createExerciseHistoryRepository = (
   async load(options: LoadExercisePerformanceHistoryOptions): Promise<ExerciseHistorySummary | null> {
     const period: ExerciseHistoryPeriod = options.period ?? 30;
     const appliedTagDefinitionId = options.tagDefinitionId ?? null;
-    const appliedGymId = options.gymId ?? null;
+    const appliedGymId = options.gymId;
     const now = options.now ?? new Date();
     ensureValidDate(now, 'now');
 
@@ -552,7 +576,7 @@ export const createExerciseHistoryRepository = (
       end = bounds.end;
     }
 
-    const [sessionsInPeriod, allTimeBest] = await Promise.all([
+    const [sessionsInPeriod, allTimeBest, appliedGymName] = await Promise.all([
       store.loadSessionsForExercise({
         exerciseDefinitionId: options.exerciseDefinitionId,
         start,
@@ -560,8 +584,9 @@ export const createExerciseHistoryRepository = (
       }),
       store.loadAllTimeBest({
         exerciseDefinitionId: options.exerciseDefinitionId,
-        ...(appliedGymId ? { gymId: appliedGymId === 'no-gym' ? null : appliedGymId } : {}),
+        ...(appliedGymId === undefined ? {} : { gymId: appliedGymId }),
       }),
+      typeof appliedGymId === 'string' ? store.loadGymName({ gymId: appliedGymId }) : null,
     ]);
 
     const sessionExerciseIds = sessionsInPeriod.map((row) => row.sessionExerciseId);
@@ -575,6 +600,7 @@ export const createExerciseHistoryRepository = (
       period,
       appliedTagDefinitionId,
       appliedGymId,
+      appliedGymName,
       sessionsInPeriod,
       allTimeBest,
       setsBySessionExerciseId: groupBySessionExerciseId(setRows),

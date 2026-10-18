@@ -16,7 +16,11 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { ordinaryLoadContext, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 
-const DEFINITION = 'bench';
+const DEFINITION_ID = 'bench';
+/** The ordinary exercise: every gym pools into one reporting bucket. */
+const DEFINITION = { id: DEFINITION_ID, splitByGym: false };
+/** The same exercise set to report each gym separately ([[gym.split]]). */
+const SPLIT = { id: DEFINITION_ID, splitByGym: true };
 
 type SetSpec = [weight: string, reps: string, setType?: string | null, status?: FactsSetInput['performanceStatus']];
 
@@ -39,9 +43,15 @@ const block = (
   })),
 });
 
-const session = (id: string, day: number, blocks: FactsBlockInput[]): FactsSessionInput => ({
+const session = (
+  id: string,
+  day: number,
+  blocks: FactsBlockInput[],
+  gymId: string | null = null,
+): FactsSessionInput => ({
   sessionId: id,
   completedAt: new Date(Date.UTC(2026, 0, day, 18)),
+  gymId,
   blocks,
 });
 
@@ -53,6 +63,11 @@ const HUGE = `1${'0'.repeat(306)}`;
 
 const flags = (rows: ReturnType<typeof deriveExerciseSessionFacts>) =>
   rows.map(({ sessionId, prE1rm, prWeight, prVolume }) => ({ sessionId, prE1rm, prWeight, prVolume }));
+
+/** The session's own PRs: on a split exercise at a gym, that gym's book. */
+const own = (rows: ReturnType<typeof deriveExerciseSessionFacts>) =>
+  rows.map(({ sessionId, ownPrE1rm, ownPrWeight, ownPrVolume }) =>
+    ({ sessionId, prE1rm: ownPrE1rm, prWeight: ownPrWeight, prVolume: ownPrVolume }));
 
 describe('exercise session facts — metrics', () => {
   it('takes 1RM, top weight, volume and working sets from working sets only', () => {
@@ -67,7 +82,8 @@ describe('exercise session facts — metrics', () => {
 
     expect(bests).toEqual({
       sessionId: 's1',
-      exerciseDefinitionId: DEFINITION,
+      exerciseDefinitionId: DEFINITION_ID,
+      gymBucket: 'all',
       achievedAt: new Date(Date.UTC(2026, 0, 1, 18)),
       bestE1rmKg: estimateOneRepMax(100, 5),
       bestE1rmSetId: 'b1-s1',
@@ -275,13 +291,109 @@ describe('exercise session facts — PR flags', () => {
   });
 });
 
+describe('exercise session facts — reporting bucket', () => {
+  const HOME = 'gym-home';
+  const CLUB = 'gym-club';
+
+  it('pools every gym into one bucket while the exercise is not split', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
+      session('s3', 3, [block('c1', 0, [['90', '5']])], null),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.gymBucket, row.prE1rm]))
+      .toEqual([['s1', 'all', false], ['s2', 'all', true], ['s3', 'all', false]]);
+  });
+
+  it('keys a split exercise\'s gym sessions on their gym, and its no-gym sessions on the whole exercise', () => {
+    const rows = deriveExerciseSessionFacts(SPLIT, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
+      session('s3', 3, [block('c1', 0, [['90', '5']])], null),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.gymBucket]))
+      .toEqual([['s1', 'gym:gym-home'], ['s2', 'gym:gym-club'], ['s3', 'all']]);
+  });
+
+  it('folds each gym on its own, so one gym never sets or raises another\'s records', () => {
+    const history = [
+      // Home's baseline, then a lighter Club session that is still Club's own
+      // baseline, then a Club session beating only Club, then a Home session
+      // beating only Home.
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('club-1', 2, [block('b1', 0, [['60', '5']])], CLUB),
+      session('club-2', 3, [block('c1', 0, [['70', '5']])], CLUB),
+      session('home-2', 4, [block('d1', 0, [['105', '5']])], HOME),
+    ];
+
+    const rows = deriveExerciseSessionFacts(SPLIT, history);
+    expect(own(rows)).toEqual([
+      { sessionId: 'home-1', prE1rm: false, prWeight: false, prVolume: false },
+      { sessionId: 'club-1', prE1rm: false, prWeight: false, prVolume: false },
+      { sessionId: 'club-2', prE1rm: true, prWeight: true, prVolume: true },
+      { sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true },
+    ]);
+    // The whole exercise is still there beside them: only the heaviest session
+    // is a whole-exercise record, exactly as when the exercise is not split.
+    expect(flags(rows)).toEqual(flags(deriveExerciseSessionFacts(DEFINITION, history)));
+    expect(flags(rows).filter((row) => row.prE1rm))
+      .toEqual([{ sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true }]);
+  });
+
+  it('keeps the whole-exercise flags of an unsplit exercise as its own', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
+    ]);
+
+    expect(own(rows)).toEqual(flags(rows));
+  });
+
+  it('measures a no-gym session against the whole exercise, every gym included', () => {
+    const rows = own(deriveExerciseSessionFacts(SPLIT, [
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('club-1', 2, [block('b1', 0, [['60', '5']])], CLUB),
+      // 80 kg would be Club's record, but a no-gym session is compared with
+      // every gym, and Home's 100 kg stands.
+      session('none-1', 3, [block('c1', 0, [['80', '5']])], null),
+      session('none-2', 4, [block('d1', 0, [['110', '5']])], null),
+    ]));
+
+    expect(rows.find((row) => row.sessionId === 'none-1')).toMatchObject({ prE1rm: false, prWeight: false });
+    expect(rows.find((row) => row.sessionId === 'none-2')).toMatchObject({ prE1rm: true, prWeight: true });
+  });
+
+  it('never lets a no-gym session set or raise a gym\'s own records', () => {
+    const rows = own(deriveExerciseSessionFacts(SPLIT, [
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('none-1', 2, [block('b1', 0, [['150', '5']])], null),
+      // Home's own bar is still 100 kg: 105 kg is a Home PR.
+      session('home-2', 3, [block('c1', 0, [['105', '5']])], HOME),
+    ]));
+
+    expect(rows.find((row) => row.sessionId === 'home-2')).toMatchObject({ prE1rm: true, prWeight: true });
+  });
+
+  it('orders each bucket by the same record order, ties to the earlier session', () => {
+    const rows = deriveExerciseSessionFacts(SPLIT, [
+      // Same instant, so the order is by session id: 'a-home' then 'b-home'.
+      session('b-home', 1, [block('b1', 0, [['100', '5']])], HOME),
+      session('a-home', 1, [block('a1', 0, [['100', '5']])], HOME),
+    ]);
+
+    expect(rows.map((row) => [row.sessionId, row.prE1rm])).toEqual([['a-home', false], ['b-home', false]]);
+  });
+});
+
 describe('exercise session facts — rules version', () => {
   // Stored facts are rebuilt only when EXERCISE_SESSION_FACTS_RULES_VERSION
   // changes. These literals pin what today's rules derive, including the shared
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(8);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(9);
     expect(summarizeFactSession(DEFINITION, session('per-side', 1, [
       block('side', 0, [['10', '8']], ordinaryLoadContext('per_side_load')),
     ]))).toMatchObject({ volumeKg: 160, topWeightKg: 10, bestE1rmKg: estimateOneRepMax(10, 8), workingSets: 1 });
@@ -295,6 +407,8 @@ describe('exercise session facts — rules version', () => {
       session('s5', 5, [block('e1', 0, [['123', '1', 'rir_0']])]),
       // Version 7: a set whose load cannot be calculated is left out, and the
       // rest can take the Volume record ([[copy.no-inline-explanation]]).
+      // Version 9: every row names its own record book (unsplit: `all`) and
+      // keeps that book's flags beside the whole exercise's.
       session('s6', 6, [block('f1', 0, [['130', '10', 'rir_2']]), block('f2', 1, [['50', '5', 'rir_2']], corrupt)]),
     ]);
 
@@ -304,29 +418,34 @@ describe('exercise session facts — rules version', () => {
       volumeKg,
     }))).toEqual([
       {
-        sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
+        sessionId: 's1', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
         topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, workingSets: 2, volumeSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
+        ownPrE1rm: false, ownPrWeight: false, ownPrVolume: false,
       },
       {
-        sessionId: 's2', exerciseDefinitionId: DEFINITION, bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
+        sessionId: 's2', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
         topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: false,
+        ownPrE1rm: true, ownPrWeight: true, ownPrVolume: false,
       },
       {
-        sessionId: 's4', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
+        sessionId: 's4', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
         topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, workingSets: 1, volumeSets: 1,
         prE1rm: true, prWeight: true, prVolume: false,
+        ownPrE1rm: true, ownPrWeight: true, ownPrVolume: false,
       },
       {
-        sessionId: 's5', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
+        sessionId: 's5', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
         topWeightKg: 123, topWeightSetId: 'e1-s0', volumeKg: 123, workingSets: 1, volumeSets: 1,
         prE1rm: false, prWeight: true, prVolume: false,
+        ownPrE1rm: false, ownPrWeight: true, ownPrVolume: false,
       },
       {
-        sessionId: 's6', exerciseDefinitionId: DEFINITION, bestE1rmKg: 175.1707, bestE1rmSetId: 'f1-s0',
+        sessionId: 's6', exerciseDefinitionId: DEFINITION_ID, gymBucket: 'all', bestE1rmKg: 175.1707, bestE1rmSetId: 'f1-s0',
         topWeightKg: 130, topWeightSetId: 'f1-s0', volumeKg: 1300, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: true,
+        ownPrE1rm: true, ownPrWeight: true, ownPrVolume: true,
       },
     ]);
   });

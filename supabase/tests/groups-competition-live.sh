@@ -75,6 +75,7 @@ echo "[${LANE_LABEL}] running the protocol-4 client suite against ${API_URL}"
   export GROUPS_LIVE_MEMBER_EMAIL="${FIXTURE_EMAIL_PREFIX}-member-${RUN_TAG}@example.test"
   export GROUPS_LIVE_PASSWORD="${PASSWORD}"
   export GROUPS_LIVE_RUN_TAG="${RUN_TAG}"
+  export GROUPS_LIVE_DB_CONTAINER="${DB_CONTAINER}"
   npm run --silent test:groups:competition-live
 )
 COMPLETED=1

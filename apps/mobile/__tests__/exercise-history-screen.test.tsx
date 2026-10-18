@@ -15,6 +15,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -25,14 +26,15 @@ const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 let mockCanGoBack = true;
-let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement } = {};
+let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement; headerRight?: () => mockReact.ReactElement } = {};
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   Stack: {
+    // The header's right items are mounted in place, so the gym button is reachable.
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
       mockScreenOptions = options;
-      return null;
+      return mockReact.createElement(mockReact.Fragment, null, options.headerRight?.());
     },
   },
   useRouter: () => ({
@@ -76,7 +78,6 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   bodyweightContribution: 0,
   period: 30,
   appliedTagDefinitionId: null,
-  appliedGymId: null,
   tagOptions: [
     {
       tagDefinitionId: 'tag-westside',
@@ -265,6 +266,46 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).not.toContain('history_elsewhere_squat');
   });
 
+  it('lists every gym until a gym is chosen, then that gym\'s sessions and bests', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('All gyms');
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent(/^All-time bests$/);
+    expect(sessionCards()).toHaveLength(10);
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('exercise-history-gym-option-gym-elsewhere'));
+    await waitFor(() => expect(sessionCards()).toEqual(['history_elsewhere_squat']));
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Canal Street Gym');
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('exercise-history-gym-option-all'));
+    await waitFor(() => expect(sessionCards()).toHaveLength(10));
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('275.0 × 5');
+  });
+
+  it('opens on the gym its link names, keeping it by name when the period holds none of it', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT, period: '7', gymId: 'gym-quiet' },
+      () => upsertLocalGym({ id: 'gym-quiet', name: 'Quiet Gym' }).then(() => undefined));
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Quiet Gym');
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    expect(screen.getByRole('radio', { name: 'Quiet Gym, 0 sessions' })).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Quiet Gym');
+    expect(screen.getByTestId('exercise-history-empty-state')).toBeTruthy();
+  });
+
+  it('still lists every gym under Current gym only when the session had no gym', async () => {
+    // A session with no gym sends no `currentGymId`, so there is no gym to
+    // narrow to and the filter is inert.
+    act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
+
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
+
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    expect(screen.queryByTestId('exercise-history-empty-state')).toBeNull();
+  });
+
   it('opens the completed session from its card and from a best', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
@@ -336,7 +377,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -353,6 +393,26 @@ describe('ExerciseHistoryScreenShell', () => {
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
   });
 
+  it('names no gym on the all-time bests, and keeps the tag row as tall as its chips', () => {
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary({ gymOptions: [{ gymId: null, name: 'No gym', occurrenceCount: 2 }] })}
+        period={30}
+        appliedTagDefinitionId={null}
+        appliedGymId={null}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+      />
+    );
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · No gym');
+    // The tag row is as tall as its chips: a growing ScrollView stretched them into circles on device.
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-history-tag-row').props.style)).toMatchObject({ flexGrow: 0 });
+  });
+
   it('invokes onSelectTag with tagDefinitionId and toggles back to null', () => {
     const onSelectTag = jest.fn();
     render(
@@ -360,7 +420,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId="tag-westside"
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -389,7 +448,6 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary({ sessions: [] })}
         period={7}
         appliedTagDefinitionId="tag-westside"
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -404,13 +462,19 @@ describe('ExerciseHistoryScreenShell', () => {
     );
   });
 
-  it('renders empty state message tailored for gym filter when gym filter is active', () => {
+  // The gym scope is three-state: the prop absent is every gym, `null` is the
+  // sessions with no gym, an id is that gym. The empty state names the scope
+  // it actually applied, so the no-gym one never claims a gym.
+  it.each([
+    ['gym-westside' as string | null, /this gym/],
+    [null, /without a gym/],
+  ])('names the gym scope %p in the empty state', (appliedGymId, expected) => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
         period={7}
         appliedTagDefinitionId={null}
-        appliedGymId="gym-westside"
+        appliedGymId={appliedGymId}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -420,9 +484,8 @@ describe('ExerciseHistoryScreenShell', () => {
       />
     );
 
-    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(
-      /this gym/
-    );
+    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(expected);
+    expect(screen.getByTestId('exercise-history-empty-state')).not.toHaveTextContent(/selected tag/);
   });
 
 });
@@ -445,7 +508,6 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={summary}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -464,7 +526,6 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
         period={30}
         appliedTagDefinitionId={null}
-        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
