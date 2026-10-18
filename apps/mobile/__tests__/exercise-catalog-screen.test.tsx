@@ -160,7 +160,7 @@ describe('ExerciseCatalogScreen', () => {
     await createExercise('Incline Press');
     fireEvent.press(screen.getByLabelText('Per side weight entry'));
     fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-    fireEvent.press(await screen.findByLabelText('Select primary muscle Chest'));
+    fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
     fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
     fireEvent.press(await screen.findByLabelText('Select secondary muscle Triceps'));
     fireEvent.press(screen.getByLabelText('Save exercise definition'));
@@ -203,7 +203,7 @@ describe('ExerciseCatalogScreen', () => {
       { muscleGroupId: 'delts_front', role: 'secondary', weight: 0.5 },
     ]);
     expect(await screen.findByLabelText('Edit exercise definition Bench Press')).toHaveTextContent(
-      /Chest · Front Delts \(s\)/
+      /Pectoralis · Front Delts \(s\)/
     );
 
     fireEvent.press(screen.getByLabelText('Edit exercise definition Bench Press'));
@@ -296,10 +296,10 @@ describe('ExerciseCatalogScreen', () => {
 
     await createExercise('Press Variation');
     fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-    fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
+    fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
 
     fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
-    expect(screen.queryByLabelText('Select secondary muscle Chest')).toBeNull();
+    expect(screen.queryByLabelText('Select secondary muscle Pectoralis')).toBeNull();
     fireEvent.press(screen.getByLabelText('Select secondary muscle Triceps'));
 
     fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
@@ -469,7 +469,7 @@ describe('ExerciseCatalogScreen', () => {
 
       // The chosen primary is marked in the list when it opens again.
       fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-      fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
+      fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
       fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
       expect(screen.getByTestId('exercise-editor-muscle-option-chest').props.accessibilityState).toMatchObject({
         selected: true,
@@ -546,7 +546,7 @@ describe('ExerciseCatalogScreen', () => {
 
       await createExercise('Cable Fly Variation');
       fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-      fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
+      fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
 
       const notice = await screen.findByTestId('exercise-editor-save-error');

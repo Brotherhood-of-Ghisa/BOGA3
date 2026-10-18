@@ -155,6 +155,12 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
       repo.reviseMuscleGroupName('back_upper', 'Upper Back (Rhomboids + Mid Traps)', 'Upper back');
     },
   },
+  {
+    appVersion: 6,
+    apply(repo) {
+      repo.reviseMuscleGroupName('chest', 'Chest', 'Pectoralis');
+    },
+  },
 ];
 
 /**

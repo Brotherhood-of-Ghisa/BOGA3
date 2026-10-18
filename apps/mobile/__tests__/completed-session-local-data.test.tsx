@@ -652,7 +652,7 @@ describe('a session written through the app', () => {
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     expect(label('session-completion-breakdown-muscle-chest'))
-      .toBe('Chest, 3 primary, 0 secondary; volume 1758; 0 records');
+      .toBe('Pectoralis, 3 primary, 0 secondary; volume 1758; 0 records');
     // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
     expect(label('session-completion-breakdown-muscle-triceps'))
       .toBe('Triceps, 0 primary, 3 secondary; volume 879; 0 records');
@@ -688,7 +688,7 @@ describe('a session written through the app', () => {
     // so an edited set changes a card that is actually drawn.
     await openDesignSession({}, { priorBenchSessions: 6 });
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    const chestBefore = (await screen.findByLabelText(/^Chest,.*Session volume \d+/)).props.accessibilityLabel;
+    const chestBefore = (await screen.findByLabelText(/^Pectoralis,.*Session volume \d+/)).props.accessibilityLabel;
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
     expect(mockPush).toHaveBeenCalledWith(`/session/${DESIGN.sessionId}`);
@@ -713,7 +713,7 @@ describe('a session written through the app', () => {
     fireEvent.press(screen.getByTestId('view-session-section-summary'));
     expect(screen.getByTestId('session-insight-mode-muscle')).toHaveProp('accessibilityState', { selected: true });
     await waitFor(() =>
-      expect(screen.getByLabelText(/^Chest,.*Session volume \d+/).props.accessibilityLabel).not.toBe(chestBefore)
+      expect(screen.getByLabelText(/^Pectoralis,.*Session volume \d+/).props.accessibilityLabel).not.toBe(chestBefore)
     );
   });
 

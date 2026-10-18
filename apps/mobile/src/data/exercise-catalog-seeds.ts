@@ -33,7 +33,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 5;
+export const CURRENT_APP_VERSION = 6;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -154,7 +154,7 @@ const createGranularWeightKey = (exerciseDefinitionId: string, muscleGroupId: st
   `${exerciseDefinitionId}::${muscleGroupId}::${weight}`;
 
 export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
-  { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, isEditable: 0 },
+  { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, isEditable: 0 },
   { id: 'serratus_anterior', displayName: 'Serratus Anterior', familyName: 'Chest', sortOrder: 0, isEditable: 0 },
   { id: 'delts_front', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 1, isEditable: 0 },
   { id: 'delts_lateral', displayName: 'Lateral Delts', familyName: 'Shoulders', sortOrder: 2, isEditable: 0 },

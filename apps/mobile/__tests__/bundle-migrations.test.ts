@@ -98,28 +98,39 @@ describe('bundle-migration runtime loop', () => {
   });
 
   it('ships the load-mode, bodyweight and muscle migrations in order', () => {
-    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4, 5]);
+    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4, 5, 6]);
   });
 
   describe('shipped migration behaviour', () => {
-    it('renames the existing upper-back row for sync and is idempotent on repeat upgrades', () => {
+    it.each([
+      {
+        id: 'back_upper', displayName: 'Upper Back (Rhomboids + Mid Traps)',
+        familyName: 'Back', renamed: 'Upper back', fromVersion: 4,
+      },
+      {
+        id: 'chest', displayName: 'Chest', familyName: 'Chest',
+        renamed: 'Pectoralis', fromVersion: 5,
+      },
+    ])('renames $id for sync and is idempotent on repeat upgrades', ({
+      id, displayName, familyName, renamed, fromVersion,
+    }) => {
       fixture.database.insert(muscleGroups).values({
-        id: 'back_upper',
-        displayName: 'Upper Back (Rhomboids + Mid Traps)',
-        familyName: 'Back',
+        id,
+        displayName,
+        familyName,
         sortOrder: 5,
         localDirty: false,
         localUpdatedAtMs: 123,
       }).run();
       const before = fixture.database.select().from(muscleGroups).get();
-      setMarker(fixture, 4);
+      setMarker(fixture, fromVersion);
 
       runBundleMigrations(asLocalDatabase(fixture));
 
       const after = fixture.database.select().from(muscleGroups).get();
       expect(after).toEqual({
         ...before,
-        displayName: 'Upper back',
+        displayName: renamed,
         updatedAt: expect.any(Date),
         localDirty: true,
         localUpdatedAtMs: expect.any(Number),
@@ -127,25 +138,35 @@ describe('bundle-migration runtime loop', () => {
       expect(after?.localUpdatedAtMs).toBeGreaterThan(123);
       expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
 
-      setMarker(fixture, 4);
+      setMarker(fixture, fromVersion);
       runBundleMigrations(asLocalDatabase(fixture));
 
       expect(fixture.database.select().from(muscleGroups).all()).toEqual([after]);
     });
 
     it.each([
-      { id: 'back_upper', displayName: 'My upper back', deletedAt: null },
-      { id: 'back_upper', displayName: 'Upper back', deletedAt: null },
+      { id: 'back_upper', displayName: 'My upper back', familyName: 'Back', deletedAt: null },
+      { id: 'back_upper', displayName: 'Upper back', familyName: 'Back', deletedAt: null },
       {
         id: 'back_upper',
         displayName: 'Upper Back (Rhomboids + Mid Traps)',
+        familyName: 'Back',
         deletedAt: new Date('2026-10-01T12:00:00.000Z'),
       },
-      { id: 'custom_upper_back', displayName: 'Upper Back (Rhomboids + Mid Traps)', deletedAt: null },
+      {
+        id: 'custom_upper_back', displayName: 'Upper Back (Rhomboids + Mid Traps)',
+        familyName: 'Back', deletedAt: null,
+      },
+      { id: 'chest', displayName: 'My chest', familyName: 'Chest', deletedAt: null },
+      { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', deletedAt: null },
+      {
+        id: 'chest', displayName: 'Chest', familyName: 'Chest',
+        deletedAt: new Date('2026-10-01T12:00:00.000Z'),
+      },
+      { id: 'custom_chest', displayName: 'Chest', familyName: 'Chest', deletedAt: null },
     ])('preserves $id named $displayName with deletedAt=$deletedAt', (muscle) => {
       fixture.database.insert(muscleGroups).values({
         ...muscle,
-        familyName: 'Back',
         localDirty: false,
         localUpdatedAtMs: 123,
       }).run();
