@@ -66,6 +66,19 @@ let lastSignaledRestEndsAtMs: number | null = null;
 let roundBoundaryTimeout: ReturnType<typeof setTimeout> | null = null;
 let restCompletionTimeout: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
+const suppressedAutoStartSessionIds = new Set<string>();
+
+export const isRestTimerAutoStartSuppressed = (sessionId: string): boolean => {
+  return suppressedAutoStartSessionIds.has(sessionId);
+};
+
+export const clearRestTimerAutoStartSuppression = (sessionId?: string): void => {
+  if (sessionId !== undefined) {
+    suppressedAutoStartSessionIds.delete(sessionId);
+  } else {
+    suppressedAutoStartSessionIds.clear();
+  }
+};
 
 const emit = () => {
   scheduleRoundBoundaryCue();
@@ -246,6 +259,7 @@ export const startRestTimer = (
 ): void => {
   const normalizedDuration = Math.max(1, Math.round(durationSec));
   if (!sessionId || !Number.isFinite(normalizedDuration)) return;
+  suppressedAutoStartSessionIds.delete(sessionId);
   activeEntry = {
     mode: 'rest',
     sessionId,
@@ -299,6 +313,7 @@ export const startRepeatingTimer = (
   nowMs: number = Date.now(),
 ): void => {
   if (!sessionId || !Number.isFinite(intervalSec)) return;
+  suppressedAutoStartSessionIds.delete(sessionId);
   const clampedInterval = Math.max(
     MIN_REPEATING_TIMER_INTERVAL_SECONDS,
     Math.min(MAX_REPEATING_TIMER_INTERVAL_SECONDS, Math.round(intervalSec)),
@@ -434,7 +449,14 @@ export const switchTimerMode = (
   }
 };
 
-export const dismissRestTimer = (sessionId?: string): void => {
+export const dismissRestTimer = (
+  sessionId?: string,
+  options: { suppressAutoStart?: boolean } = {},
+): void => {
+  const { suppressAutoStart = true } = options;
+  if (sessionId !== undefined && suppressAutoStart) {
+    suppressedAutoStartSessionIds.add(sessionId);
+  }
   if (!activeEntry) return;
   if (sessionId !== undefined && activeEntry.sessionId !== sessionId) return;
   activeEntry = null;
@@ -447,6 +469,7 @@ export const __resetRestTimerForTests = (): void => {
   activeEntry = null;
   lastSignaledRound = null;
   lastSignaledRestEndsAtMs = null;
+  suppressedAutoStartSessionIds.clear();
   scheduleRoundBoundaryCue();
   scheduleRestCompletionCue();
   listeners.clear();
@@ -568,6 +591,7 @@ export function useSessionRestTimer(
 
   const onSetConfirmed = useCallback(() => {
     if (!isActiveSession || !sessionId || !autoStart) return;
+    if (isRestTimerAutoStartSuppressed(sessionId)) return;
     const current = getRestTimerEntry();
     if (current && current.sessionId === sessionId && current.mode === 'repeating') {
       return;

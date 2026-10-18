@@ -19,7 +19,7 @@ import {
   toPersistCompletedExercises,
   toPersistDraftExercises,
 } from './session-model';
-import { dismissRestTimer } from './rest-timer';
+import { clearRestTimerAutoStartSuppression, dismissRestTimer } from './rest-timer';
 import type { SessionTimes } from './session-times';
 
 /**
@@ -43,7 +43,8 @@ export const completeActiveSession = async (input: {
   });
 
   await completeSessionDraft(persisted.sessionId);
-  dismissRestTimer(persisted.sessionId);
+  dismissRestTimer(persisted.sessionId, { suppressAutoStart: false });
+  clearRestTimerAutoStartSuppression(persisted.sessionId);
   return persisted.sessionId;
 };
 
@@ -53,7 +54,8 @@ export const completeActiveSession = async (input: {
  */
 export const abandonActiveSession = async (sessionId: string): Promise<void> => {
   await setSessionDeletedState(sessionId, true);
-  dismissRestTimer(sessionId);
+  dismissRestTimer(sessionId, { suppressAutoStart: false });
+  clearRestTimerAutoStartSuppression(sessionId);
 };
 
 export type ActiveSessionGraph = {
