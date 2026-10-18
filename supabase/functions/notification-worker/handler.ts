@@ -12,6 +12,13 @@ type ReceiptJob = { id: number; receipt_claim_id: string; ticket_id: string; pro
 type WorkoutJob = { member_user_id: string; session_id: string; generation: number; targets: WorkoutTarget[] };
 const json = (status: number, body: unknown): Response => Response.json(body, { status });
 
+export const notificationServiceKeys = (legacyKey = '', secretKeysJson = '{}'): string[] => {
+  try {
+    const keys = JSON.parse(secretKeysJson) as { default?: unknown } | null;
+    return [keys?.default, legacyKey].filter((key): key is string => typeof key === 'string' && key.length > 0);
+  } catch { return []; }
+};
+
 const equalSecret = (a: string, b: string): boolean => {
   let difference = a.length ^ b.length;
   for (let index = 0; index < b.length; index += 1) difference |= (a.charCodeAt(index) || 0) ^ b.charCodeAt(index);
@@ -48,12 +55,13 @@ const processReceipt = async (rpc: Rpc, job: ReceiptJob, accessToken?: string): 
 };
 
 export const handleNotificationRequest = async (request: Request, dependencies: {
-  serviceKey: string; rpc: Rpc; accessToken?: string;
+  serviceKeys: readonly string[]; rpc: Rpc; accessToken?: string;
 }): Promise<Response> => {
-  if (request.method !== 'POST') return json(405, { error: 'METHOD_NOT_ALLOWED' });
-  if (!dependencies.serviceKey || !equalSecret(request.headers.get('apikey') ?? '', dependencies.serviceKey)) {
+  if (request.method !== 'POST' && request.method !== 'GET') return json(405, { error: 'METHOD_NOT_ALLOWED' });
+  if (!dependencies.serviceKeys.some(key => key.length > 0 && equalSecret(request.headers.get('apikey') ?? '', key))) {
     return json(401, { error: 'UNAUTHORIZED' });
   }
+  if (request.method === 'GET') return json(200, { ok: true });
   const outcomes: Record<string, number> = {};
   const record = (outcome: string) => { outcomes[outcome] = (outcomes[outcome] ?? 0) + 1; };
   try {

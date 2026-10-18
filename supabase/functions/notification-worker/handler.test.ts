@@ -11,11 +11,11 @@ Deno.test('service auth fails closed before any privileged RPC', async () => {
     const rpc: Rpc = async <T>() => { calls += 1; return null as T; };
     const response = await handleNotificationRequest(new Request('https://local/worker', {
       method: 'POST', headers: { apikey },
-    }), { serviceKey: 'service-key', rpc });
+    }), { serviceKeys: ['service-key'], rpc });
     equal(response.status, 401); equal(calls, 0);
   }
-  const response = await handleNotificationRequest(new Request('https://local/worker'), {
-    serviceKey: 'service-key', rpc: async <T>() => null as T,
+  const response = await handleNotificationRequest(new Request('https://local/worker', { method: 'PUT' }), {
+    serviceKeys: ['service-key'], rpc: async <T>() => null as T,
   });
   equal(response.status, 405);
 });
@@ -71,7 +71,7 @@ Deno.test('worker bounds work, reports only outcomes and persists accepted ticke
   };
   const response = await handleNotificationRequest(new Request('https://local/worker', {
     method: 'POST', headers: { apikey: 'service-key' },
-  }), { serviceKey: 'service-key', rpc });
+  }), { serviceKeys: ['service-key'], rpc });
   equal(response.status,200);
   const body = await response.text(); assert(!body.includes('SECRET')); assert(!body.includes('LocalPushToken'));
   assert(calls.some(([name,args]) => name === 'notification_send_result' && args?.p_outcome === 'ticket'));
@@ -91,13 +91,13 @@ Deno.test('real worker uses the portable final-outcome calculation and isolates 
     return {jobs:[],disabled:false} as T;
   };
   const request = () => new Request('https://local/worker',{method:'POST',headers:{apikey:'service-key'}});
-  equal((await handleNotificationRequest(request(),{serviceKey:'service-key',rpc})).status,200);
+  equal((await handleNotificationRequest(request(),{serviceKeys:['service-key'],rpc})).status,200);
   equal(contribution,[{group_id:'group',best_count:2,rank_count:3}]);
   const broken: Rpc = <T>(name: string,args?: Record<string,unknown>): Promise<T> => {
     if (name === 'notification_workout_prepare') throw new Error('PRIVATE SOURCE VALUES');
     return rpc<T>(name,args);
   };
-  const response=await handleNotificationRequest(request(),{serviceKey:'service-key',rpc:broken});
+  const response=await handleNotificationRequest(request(),{serviceKeys:['service-key'],rpc:broken});
   equal(response.status,200); assert(!(await response.text()).includes('PRIVATE')); equal(sends,2);
 });
 
@@ -163,7 +163,7 @@ Deno.test('fresh bounded claims do not waste send or receipt leases on slow prov
   try {
     const response = await handleNotificationRequest(new Request('https://local/worker',{
       method:'POST',headers:{apikey:'service-key'},
-    }),{serviceKey:'service-key',rpc});
+    }),{serviceKeys:['service-key'],rpc});
     equal(response.status,200); equal(accepted,20); equal(collected,20);
     const result = await response.json(); equal(result.claimed,20); equal(result.receipts,20);
   } finally { Date.now=realNow; globalThis.fetch=realFetch; }

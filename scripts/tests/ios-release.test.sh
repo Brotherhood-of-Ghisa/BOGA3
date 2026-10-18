@@ -59,7 +59,10 @@ run_supabase() {
   printf 'supabase %s\n' "$*" >> "$FIXTURE/calls"
   case "$*" in
     'link '*) echo abcdefghijklmnopqrst > supabase/.temp/project-ref ;;
-    'projects api-keys '*) echo '[{"name":"service_role","api_key":"credential-must-not-leak"}]' ;;
+    'projects api-keys '*)
+      if [[ "${FAIL_STAGE:-}" == keys ]]; then echo '[]';
+      elif [[ "${LEGACY_ONLY:-}" == 1 ]]; then echo '[{"name":"service_role","api_key":"credential-must-not-leak"}]';
+      else echo '[{"name":"service_role","api_key":"credential-must-not-leak"},{"name":"default","type":"publishable","api_key":"sb_publishable_wrong"},{"name":"other","type":"secret","api_key":"sb_secret_wrong"},{"name":"default","type":"secret","api_key":"sb_secret_credential-must-not-leak"}]'; fi ;;
     'db push --linked --include-all --yes') [[ "${FAIL_STAGE:-}" != migrations ]] || return 7 ;;
     'db query --linked do '*) [[ "${FAIL_STAGE:-}" != history ]] || return 11 ;;
     'functions deploy '*) [[ "${FAIL_STAGE:-}" != functions ]] || return 8 ;;
@@ -74,6 +77,13 @@ EOF
 cat > "$FIXTURE/bin/docker" <<'EOF'
 #!/usr/bin/env bash
 [[ "$*" == info ]]
+EOF
+cat > "$FIXTURE/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf 'curl %s\n' "$*" >> "$FIXTURE/calls"
+cat > "$FIXTURE/worker-request"
+[[ "$*" == *'--request GET'* ]] || exit 23
+[[ "${FAIL_STAGE:-}" != worker-auth ]] || exit 22
 EOF
 cat > "$FIXTURE/bin/git" <<'EOF'
 #!/usr/bin/env bash
@@ -152,6 +162,10 @@ worker success || { cat "$FIXTURE/success/log"; fail 'release failed'; }
 [[ -f "$FIXTURE/success/app.ipa.sha256" ]] || fail 'missing IPA checksum'
 [[ "$(cat "$FIXTURE/success/ipa.txt")" == *'Build: 42'* ]] || fail 'missing binary identity'
 [[ "$(cat "$FIXTURE/configuration.sql")" == *notification_worker_key* ]] || fail 'worker not configured'
+[[ "$(cat "$FIXTURE/configuration.sql")" == *"'sb_secret_credential-must-not-leak'"* ]] || fail 'default secret key not selected'
+assert_absent 'sb_publishable_wrong|sb_secret_wrong' "$FIXTURE/configuration.sql" 'wrong worker credential selected'
+[[ "$(cat "$FIXTURE/worker-request")" == *'apikey: sb_secret_credential-must-not-leak'* ]] || fail 'worker verification uses a different key'
+[[ "$(cat "$FIXTURE/calls")" == *'--reveal -o json'* ]] || fail 'secret key not revealed for private configuration'
 [[ "$(cat "$FIXTURE/configuration.sql")" != *'sending_enabled=true'* ]] || fail 'sending enabled'
 [[ "$(cat "$FIXTURE/calls")" != *'db reset'* && "$(cat "$FIXTURE/calls")" != *'--include-seed'* ]] || fail 'destructive deployment'
 [[ "$(cat "$success_file")" == "$initial_tree" ]] || fail 'successful upload did not save source tree'
@@ -163,11 +177,19 @@ const assert = require('node:assert/strict');
 const log = require('node:fs').readFileSync(process.argv[2], 'utf8');
 const steps = ['eas-cli env:pull', 'supabase link', 'db push --linked --include-all --dry-run',
   'db push --linked --include-all --yes', 'functions deploy', 'db query --linked --file',
-  'eas-cli build', 'eas-cli submit'];
+  'curl --config -', 'eas-cli build', 'eas-cli submit'];
 steps.slice(1).forEach((step, i) => assert(log.indexOf(step) > log.indexOf(steps[i]), step));
 assert(!/boga (test|sweep)/.test(log));
 assert(log.includes('--path ' + process.argv[2].replace('/calls', '/success/app.ipa')));
 JS
+
+export LEGACY_ONLY=1
+rm "$success_file"
+worker legacy || { cat "$FIXTURE/legacy/log"; fail 'legacy-only release failed'; }
+unset LEGACY_ONLY
+[[ "$(cat "$FIXTURE/configuration.sql")" == *"'credential-must-not-leak'"* ]] || fail 'legacy fallback missing'
+[[ "$(cat "$FIXTURE/worker-request")" == *'apikey: credential-must-not-leak'* ]] || fail 'legacy worker not verified'
+assert_absent 'credential-must-not-leak' "$FIXTURE/legacy" 'legacy credential leaked to artifacts'
 
 worker unchanged origin/main || fail 'unchanged release failed'
 [[ "$(cat "$FIXTURE/unchanged/status")" == 'skipped;'* ]] || fail 'unchanged source not skipped'
@@ -197,6 +219,14 @@ for failure in migrations functions build submission; do
   if [[ "$failure" != submission ]]; then
     assert_absent 'eas-cli submit' "$FIXTURE/calls" 'submission continued after failure'
   fi
+done
+unset FAIL_STAGE
+for failure in worker-auth keys; do
+  export FAIL_STAGE="$failure"
+  if worker "$failure"; then fail "$failure did not stop release"; fi
+  [[ "$(cat "$FIXTURE/$failure/status")" == 'backend-configuration '* ]] || fail 'worker failure stage not recorded'
+  assert_absent 'eas-cli build|eas-cli submit' "$FIXTURE/calls" 'release continued with broken worker authentication'
+  assert_absent 'credential-must-not-leak' "$FIXTURE/$failure" 'failed verification leaked credentials'
 done
 unset FAIL_STAGE
 export FAIL_STAGE=history

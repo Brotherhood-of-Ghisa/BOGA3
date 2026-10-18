@@ -217,8 +217,10 @@ The deterministic sink is enabled only by the local configuration and handles
 synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
 Provider sending defaults off. The five-minute backstop uses Vault entries
 `notification_worker_url` and `notification_worker_key`; absent entries do
-nothing. The key is the service-only project credential; configure it only
-under explicit hosted rollout authority. Tests use real sync intake, confirmation,
+nothing. The key matches the runtime's default secret API key, with legacy
+service-role fallback for projects without one. The worker accepts both runtime
+credentials. Releases authenticate a read-only worker probe before building. Configure
+credentials only under explicit hosted rollout authority. Tests use real sync intake, confirmation,
 publication and service boundaries, with synthetic local registrations.
 Use `./boga test fast` plus the operator-agreed backend lane set; registration,
 claims and the sink contract live in `supabase/tests/notification-delivery.sh`;

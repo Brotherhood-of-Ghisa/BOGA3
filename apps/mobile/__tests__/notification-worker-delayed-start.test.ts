@@ -37,10 +37,10 @@ describe('worker after an admitted start has already completed', () => {
       if (name === 'notification_send_result') results.push(args!);
       return true as T;
     };
-    const first = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    const first = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(await first.json()).toMatchObject({ outcomes: { cancelled_or_waiting: 1, ticket: 1 } });
     expect(results.map(result => result.p_delivery_id)).toEqual([1]);
-    const second = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    const second = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(await second.json()).toMatchObject({ outcomes: { ticket: 1 } });
     expect(results.map(result => [result.p_delivery_id, result.p_outcome])).toEqual([[1, 'ticket'], [2, 'ticket']]);
     expect(jest.mocked(encryptProjection).mock.calls.map(call => call[2])).toEqual([{ kind: 'start' }, { kind: 'completion' }]);
@@ -61,7 +61,7 @@ describe('worker after an admitted start has already completed', () => {
       if (name === 'notification_send_result') results.push(args!);
       return true as T;
     };
-    await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(sendPush).not.toHaveBeenCalled();
     expect(encryptProjection).not.toHaveBeenCalled();
     expect(results).toEqual([{ p_delivery_id: 1, p_claim_id: 'claim-1', p_outcome: 'failed',
@@ -81,10 +81,10 @@ describe('worker after an admitted start has already completed', () => {
       if (name === 'notification_send_result') results.push(args!);
       return true as T;
     };
-    const first = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    const first = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(await first.json()).toMatchObject({ outcomes: { retry: 1 } });
     jest.setSystemTime(completedAt + 7200000);
-    const second = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    const second = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(await second.json()).toMatchObject({ outcomes: { ticket: 1 } });
     expect(results.map(result => [result.p_claim_id, result.p_outcome])).toEqual([
       ['claim-1', 'retry'], ['retry-claim', 'ticket'],
@@ -106,9 +106,9 @@ describe('worker after an admitted start has already completed', () => {
       if (name === 'notification_workout_enqueue') { saved.push(args!); return true as T; }
       return { jobs: [], disabled: false } as T;
     };
-    await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(saved).toEqual([]);
-    const ready = await handleNotificationRequest(request(), { serviceKey: 'service-key', rpc });
+    const ready = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
     expect(await ready.json()).toMatchObject({ outcomes: { workout_ready: 1 } });
     expect(saved).toEqual([{ p_member: 'lifter', p_session: 'completed-source', p_generation: 3,
       p_contributions: [{ group_id: 'linked-group', best_count: 2, rank_count: 0 }] }]);
