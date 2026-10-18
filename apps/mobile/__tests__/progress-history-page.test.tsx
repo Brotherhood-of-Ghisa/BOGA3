@@ -530,6 +530,43 @@ describe('ProgressHistoryScreen', () => {
     expect(stats.computeSelectedMuscleHistoryEffort).not.toHaveBeenCalled();
   });
 
+  it.each(['daily', 'weekly'] as const)('opens the Timeline override without changing saved %s, then lets the selector work', async saved => {
+    await act(async () => { updatePreferences({ heatmapView: saved }); });
+    mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets', view: ['timeline'] };
+    render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-timeline'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+    expect(getAccountLocalPreferenceState().values.heatmapView).toBe(saved);
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-weekly'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(getAccountLocalPreferenceState().values.heatmapView).toBe('weekly');
+  });
+
+  it.each(['daily', 'weekly'] as const)('opens the %s override with Volume without writing the saved view', async view => {
+    const saved = view === 'daily' ? 'weekly' : 'daily';
+    await act(async () => { updatePreferences({ heatmapView: saved }); });
+    mockSearchParams = { muscleGroupId: 'front_delts', metric: 'volume', view };
+    render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId(`stats-muscle-history-view-chip-${view}`))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toHaveProp('accessibilityState', { selected: true });
+    expect(getAccountLocalPreferenceState().values.heatmapView).toBe(saved);
+  });
+
+  it('applies the exercise Timeline override and resolves a mounted link without an override back to the saved view', async () => {
+    mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume', view: 'timeline' };
+    const page = render(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-timeline'))
+      .toHaveProp('accessibilityState', { selected: true }));
+    expect(getAccountLocalPreferenceState().values.heatmapView).toBe('daily');
+    mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume', view: 'invalid' };
+    page.rerender(<ProgressHistoryRoute />);
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-daily'))
+      .toHaveProp('accessibilityState', { selected: true }));
+  });
+
   it('switching the view saves it, so the next history page opens in it', async () => {
     render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-daily'))

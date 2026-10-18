@@ -161,15 +161,17 @@ export type ProgressHistoryScreenProps = {
   subject: HistorySubject | null;
   /** The metric the link opens on; Volume without one. */
   initialMetric?: ProgressMetric | null;
+  initialView?: HeatmapView | null;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
   todayDateKey?: string;
 };
 
-export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: ProgressHistoryScreenProps) {
+export function ProgressHistoryScreen({ subject, initialMetric, initialView, todayDateKey }: ProgressHistoryScreenProps) {
   const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
   const router = useRouter();
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
+  const [entryView, setEntryView] = useState<HeatmapView | null>(initialView ?? null);
   const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>(initialMetric ?? 'totalVolume');
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
   // The Timeline's focused week, reported by the chart: the ⋮ opens its sessions.
@@ -248,7 +250,10 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     isLoading: history.loading,
     lookbackWeeks: values.historyLookbackWeeks,
     onRetry: history.retry,
-    onSelectView: (view: HeatmapView) => updatePreferences({ heatmapView: view }),
+    onSelectView: (view: HeatmapView) => {
+      setEntryView(null);
+      updatePreferences({ heatmapView: view });
+    },
     onOpenDay: openDay,
     onOpenWeek: openWeek,
     onFocusWeek: setFocusedWeek,
@@ -256,7 +261,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     todayDateKey,
     // A view whose save failed stays the chosen one here, as a draft the
     // preference store will retry; the band below says it is not saved yet.
-    view: pending.heatmapView ?? values.heatmapView,
+    view: entryView ?? pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
     timeline: {
       weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
@@ -316,13 +321,16 @@ export default function ProgressHistoryRoute() {
     exerciseDefinitionId?: string | string[];
     muscleGroupId?: string | string[];
     metric?: string | string[];
+    view?: string | string[];
   }>();
   const subject = resolveHistorySubject(params);
   const metric = resolveHistoryMetric(params.metric);
+  const entryView = Array.isArray(params.view) ? params.view[0] : params.view;
+  const view = entryView === 'timeline' || entryView === 'daily' || entryView === 'weekly' ? entryView : null;
   // Progress pushes a fresh page each time, but a link can reach this route
   // while it is mounted: new params are a new page, opening on their own
   // metric and week rather than keeping the last link's.
-  return <ProgressHistoryScreen initialMetric={metric} key={`${subject?.kind}:${subject?.id}:${metric}`} subject={subject} />;
+  return <ProgressHistoryScreen initialMetric={metric} initialView={view} key={`${subject?.kind}:${subject?.id}:${metric}:${view}`} subject={subject} />;
 }
 
 const styles = StyleSheet.create({

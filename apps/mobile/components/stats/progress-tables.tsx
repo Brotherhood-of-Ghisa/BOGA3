@@ -2,7 +2,7 @@ import { Fragment, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
-import type { ProgressMetric } from '@/src/preferences/model';
+import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
   ComparisonHeaders, ComparisonValues, hasComparisonMetric, resolveComparisonLayout,
   type ComparisonLayout,
@@ -13,10 +13,10 @@ import { StatsTable, StatsTableHeaderLabel, statsTableStyles } from './stats-tab
 // muscle has no 1RM, so the Muscle table offers Progress's two metrics only.
 export type ProgressTableMetric = ProgressMetric;
 
-type Props = {
+export type ProgressTablesProps = {
   muscles: ProgressMuscleComparison[]; metric: ProgressTableMetric; selectedId: string | null;
   onSelect: (id: string) => void;
-  onMuscleHistory: (row: ProgressMuscleComparison, target: ComponentRef<typeof View> | null) => void;
+  onMuscleHistory: (row: ProgressMuscleComparison, target: ComponentRef<typeof View> | number | null, view?: HeatmapView) => void;
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
 };
 
@@ -29,7 +29,7 @@ type Props = {
 // row is drawn. A family is an inert band above its muscles, never a figure of
 // its own: a set mapped to two muscles of one family counts in both rows, so a
 // family sum would overstate the work ([[muscle.set-count]]).
-export function ProgressTables(props: Props) {
+export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
@@ -47,15 +47,25 @@ export function ProgressTables(props: Props) {
           onSelect={onSelect} onHistory={onMuscleHistory} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
-          <Headers name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
-          {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
-            body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map(row =>
-            <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout}
-              onHistory={onExerciseHistory} />)}
+          <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
       </View>
     </Fragment>)}
   </StatsTable>;
+}
+
+// Both presentations keep one contribution-row and empty-state implementation.
+export function ProgressContributionRows({ muscle, metric, layout, onHistory }: {
+  muscle: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout;
+  onHistory: ProgressTablesProps['onExerciseHistory'];
+}) {
+  const exercises = muscle.exercises.filter(row => hasComparisonMetric(row, metric));
+  return <>
+    <Headers name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
+    {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
+      body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : exercises.map(row =>
+        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} />)}
+  </>;
 }
 
 // The Muscle table's headers are plain spoken labels: it has no sort.
@@ -68,7 +78,7 @@ function Headers({ name, layout, metric, testID }: {
 
 function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
   row: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout; selected: boolean;
-  onSelect: Props['onSelect']; onHistory: Props['onMuscleHistory'];
+  onSelect: ProgressTablesProps['onSelect']; onHistory: ProgressTablesProps['onMuscleHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
@@ -88,7 +98,7 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
 }
 
 function ExerciseRow({ row, metric, layout, onHistory }: {
-  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: Props['onExerciseHistory'];
+  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-contribution-${row.exerciseDefinitionId}`;

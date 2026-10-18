@@ -691,6 +691,23 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('last');
   });
 
+  it('reuses filter segments as repeatable links and returns the native launcher', () => {
+    const onNavigate = jest.fn();
+    const target = { nativeTag: 88 };
+    const page = render(<SegmentedControl onNavigate={onNavigate} options={OPTIONS} testIDPrefix="link" density="compact" layout="inline" />);
+    const link = screen.getByTestId('link-records');
+    expect(link.props.accessibilityRole).toBe('link');
+    expect(link.props.accessibilityState?.selected).toBeUndefined();
+    fireEvent.press(link, { currentTarget: target });
+    fireEvent.press(link, { currentTarget: target });
+    expect(onNavigate).toHaveBeenCalledTimes(2);
+    expect(onNavigate).toHaveBeenLastCalledWith('records', target);
+    page.rerender(<SegmentedControl onNavigate={onNavigate} options={OPTIONS} testIDPrefix="link" disabled />);
+    fireEvent.press(screen.getByTestId('link-records'));
+    expect(onNavigate).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('link-records').props.accessibilityState).toEqual({ disabled: true });
+  });
+
   it('fills the row with equal segments unless inline', () => {
     const { rerender } = render(<SegmentedControl onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBe(1);

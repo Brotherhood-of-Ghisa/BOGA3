@@ -8,13 +8,25 @@ import {
   parseHistoryJump,
   type SessionListItem,
 } from '@/components/session-list';
-import { completedSessionHref, historyDayHref, sessionsDayHref, sessionsWeekHref } from '@/src/navigation/routes';
+import { completedSessionHref, historyDayHref, sessionsDayHref, sessionsWeekHref, progressHistoryHref } from '@/src/navigation/routes';
 
 describe('history hrefs', () => {
   it('opens a day with one session on that session, several on Sessions at the day, and none nowhere', () => {
     expect(historyDayHref('2026-10-07', ['session-a'])).toBe('/completed-session/session-a');
     expect(historyDayHref('2026-10-07', ['session-a', 'session-b'])).toBe('/sessions?day=2026-10-07');
     expect(historyDayHref('2026-10-07', [])).toBeNull();
+  });
+
+  it('adds the optional history entry override only when requested', () => {
+    expect(progressHistoryHref({ muscleGroupId: 'quads' }, 'workingSetCount', 'timeline'))
+      .toBe('/progress-history?muscleGroupId=quads&metric=sets&view=timeline');
+    expect(progressHistoryHref({ exerciseDefinitionId: 'a/b c' }, 'totalVolume', 'timeline'))
+      .toBe('/progress-history?exerciseDefinitionId=a%2Fb%20c&metric=volume&view=timeline');
+    for (const view of ['daily', 'weekly'] as const) {
+      expect(progressHistoryHref({ muscleGroupId: 'quads' }, 'totalVolume', view))
+        .toBe(`/progress-history?muscleGroupId=quads&metric=volume&view=${view}`);
+    }
+    expect(progressHistoryHref({ muscleGroupId: 'quads' })).toBe('/progress-history?muscleGroupId=quads');
   });
 
   it('encodes what it carries', () => {
