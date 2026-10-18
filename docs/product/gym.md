@@ -2,21 +2,31 @@
 
 ### gym.split · definition · accepted
 
-An exercise set to `Track each gym separately` (exercise editor) reports one
-exercise per gym; sessions without a gym form a `No gym` bucket. A session
-counts in its current gym's bucket.
+An exercise set to `Track each gym separately` (exercise editor) keeps its
+whole-exercise figures and adds one set per gym. A session counts in its
+current gym; a session with no gym counts only in the whole exercise.
 
 | Figure | Split exercise |
 | --- | --- |
-| Records, PRs, comparisons, counts, `Last`, history, Progress rows, 1RM curve | per bucket |
-| Repeat last and plan prefill | newest session in the same bucket |
+| A session's records and PRs: recorder, completion, share image, Today | its gym's; no gym: the whole exercise's |
+| Repeat last and plan prefill | newest session at the same gym; no gym: the whole exercise's newest |
+| Progress, exercise history, catalog stats, heatmaps, 1RM curve | the whole exercise until a gym is chosen |
 | Session, muscle and period totals; groups | the whole exercise |
-| Coaching | per bucket, with its gym |
+| Coaching | the whole exercise by default, or one gym |
 
 The setting is synced and retroactive: changing it recomputes history and PRs.
 
-Why: one exercise on different gyms' equipment is not comparable. Approved 2026-10-17.
+Why: one exercise on different gyms' equipment is not comparable, yet the whole
+exercise stays the default so a split never multiplies rows. A session with no
+gym is usually a gym not worth recording, so it is compared with everything.
+Approved 2026-10-18.
 Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
+
+### gym.split-progress-prs · presentation · open
+
+How a split exercise's gym PRs show in Progress. Wanted visible, probably
+behind a setting; mock first. Showing gym PRs and whole-exercise PRs side by
+side is parked.
 
 ### gym.split-label · presentation · accepted
 
