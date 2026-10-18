@@ -15,7 +15,7 @@ product owner on 2026-10-17.
 | PRs | A split exercise's records and PRs are per gym wherever *a session's* PRs show: recorder, completion, share image, Today. A no-gym session's are the whole exercise's. Gym PRs and global PRs side by side: **parked** (operator, 2026-10-18). |
 | `Past records gym filter` | Unchanged. On a split exercise `Current gym only` selects what the split already selects; in a session with no gym it is off (all gyms). |
 | Groups | Links and figures stay on the whole definition. |
-| Coaching | Applies the split; returns the bucket's gym. Bumps `METRIC_REVISION`. Shipped in PR 2 with the old model — default = most recent bucket, no gym its own bucket — so it needs the follow-up below. |
+| Coaching | Applies the split; returns the bucket's gym. Bumps `METRIC_REVISION`. PR 2 shipped the old model; 3b moved it to the whole-exercise default, and `gym_bucket=none` is now `400` (operator, 2026-10-18). |
 | Labels | `gym.split-label` is superseded by `gym.split` (operator, 2026-10-18): no list mixes per-gym rows, so there is nothing to label. How a chosen gym is named is PR 4's design call. |
 | Sync | Additive column, **no protocol bump**. `sync_push` writes the column only when the key is present, so a writer that omits it keeps the stored value. Migration deploys before the app release. |
 
@@ -76,7 +76,7 @@ un-splitting is a merge. Rejected.
   PR 4 adds carries `NO_GYM_ROUTE_PARAM` at the route boundary; a session
   context takes a session id, never a second gym.
 
-### 3b. Coaching follow-up (agent-api)
+### 3b. Coaching follow-up (agent-api) — shipped
 
 - PR 2 shipped the old model. Move it to the new one: a split exercise's
   default is the whole exercise, `gym_bucket` selects one gym, and a no-gym

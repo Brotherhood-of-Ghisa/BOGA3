@@ -44,18 +44,17 @@ Two create-only planning tools (require explicit plan permission, idempotent):
 - `create_training_programme` — create a multi-session programme with pending blocks.
 
 `get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`
-for an exercise the user tracks separately per gym: a gym id, or `none` for the
-sessions with no gym. Context reports each gym's own records in `gym_buckets`
-and its other figures for the most recently performed bucket, while history
-pages across every gym with each set carrying its own. These tools still
-predate [[gym.split]]'s whole-exercise default
-([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
+(a gym id) for an exercise the user tracks separately per gym ([[gym.split]]).
+Unset, context reports the whole exercise, sessions with no gym included, and
+each gym's own records in `gym_buckets`; history pages across every gym with
+each set carrying its own. A named gym narrows either to that gym. The API
+rejects `none`: sessions with no gym are never a bucket of their own.
 
 Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v6"` pass through
+Training projections with `metric_revision: "working_sets_v7"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a set that is not a working set ([[set.eligibility]]) is listed with its own per-set figures but feeds no record,

@@ -207,8 +207,8 @@ Define the canonical repository structure, path ownership, and placement convent
     `tech/training-metrics-contract.md` §3.
   - a route param or an HTTP query carries a value or nothing, so it cannot
     express the third state: those boundaries alone encode the no-gym scope as
-    one reserved value (`NO_GYM_ROUTE_PARAM` here, `none` in the coaching API)
-    and decode it straight back.
+    one reserved value (`NO_GYM_ROUTE_PARAM`) and decode it straight back. The
+    coaching API has no no-gym scope ([[gym.split]]) and rejects `none`.
 - `apps/mobile/src/utils/local-calendar.ts`
   - canonical local calendar windows: Monday-start weeks and calendar months in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
   - Jest runs in `Europe/London` (pinned in `apps/mobile/jest.config.js`, locally and in CI), so calendar tests cover both DST changes.
