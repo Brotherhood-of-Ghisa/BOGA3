@@ -36,14 +36,14 @@ type RecordsPanelProps = {
   onToggleExpanded: () => void;
   // Choosing a view leaves the panel expanded or collapsed as it was.
   onSelectView: (view: RecordsView) => void;
-  onOpenHistory: () => void;
+  onOpenProgress: () => void;
   now?: Date;
 };
 
 const DASH = '—';
 
 // The collapsible records panel: the `Records` | `Last` selector and the
-// `History` link are present in both states.
+// `Progress` link are present in both states.
 export function RecordsPanel({
   state,
   view,
@@ -52,7 +52,7 @@ export function RecordsPanel({
   isFilteredByGym = false,
   onToggleExpanded,
   onSelectView,
-  onOpenHistory,
+  onOpenProgress,
   now,
 }: RecordsPanelProps) {
   return (
@@ -77,13 +77,13 @@ export function RecordsPanel({
         />
         <View style={styles.spacer} />
         <Pressable
-          accessibilityLabel="Open exercise history"
+          accessibilityLabel="Open exercise progress"
           accessibilityRole="link"
           hitSlop={uiSpace.sm}
-          onPress={onOpenHistory}
-          style={styles.historyLink}
-          testID="exercise-records-history">
-          <Text allowFontScaling={false} style={[pageText.microLabel, styles.historyLabel]}>History</Text>
+          onPress={onOpenProgress}
+          style={styles.progressLink}
+          testID="exercise-records-progress">
+          <Text allowFontScaling={false} style={[pageText.microLabel, styles.progressLabel]}>Progress</Text>
           <Icon color={uiRoles.accent} name="chevron-right" size="xs" />
         </Pressable>
       </View>
@@ -314,12 +314,12 @@ const styles = StyleSheet.create({
   spacer: {
     flex: 1,
   },
-  historyLink: {
+  progressLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-  historyLabel: {
+  progressLabel: {
     color: uiRoles.accent,
   },
   collapsed: {

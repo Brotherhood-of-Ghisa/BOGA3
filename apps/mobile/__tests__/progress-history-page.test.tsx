@@ -427,6 +427,7 @@ describe('ProgressHistoryScreen', () => {
     // A muscle's own page links to no other muscle.
     expect(screen.queryByTestId(/^progress-history-muscle-/)).toBeNull();
     expect(screen.queryByTestId('progress-history-rm-curve')).toBeNull();
+    expect(screen.queryByTestId('progress-history-exercise-history')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
     expect(mockPush).toHaveBeenLastCalledWith('/sessions?week=2026-06-01');
     // Closed by the choice it answered.
@@ -519,6 +520,7 @@ describe('ProgressHistoryScreen', () => {
     ['no id', {}],
     ['both ids', { exerciseDefinitionId: 'ex1', muscleGroupId: 'front_delts' }],
     ['an id the catalogue does not hold', { muscleGroupId: 'gone' }],
+    ['an exercise the catalogue does not hold', { exerciseDefinitionId: 'gone' }],
   ])('renders the unavailable state in route for %s', async (_case, params) => {
     mockSearchParams = params;
     render(<ProgressHistoryRoute />);
@@ -527,6 +529,7 @@ describe('ProgressHistoryScreen', () => {
     // The chrome of the subject that vanished goes with it, rather than being
     // merged through: no stale name or live options button.
     expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
+    expect(screen.queryByTestId('progress-history-exercise-history')).toBeNull();
     expect(stats.computeSelectedMuscleHistoryEffort).not.toHaveBeenCalled();
   });
 

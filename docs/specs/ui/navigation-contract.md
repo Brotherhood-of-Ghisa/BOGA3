@@ -150,9 +150,9 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>` | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
 | `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
-| `/session/<id>/exercise/<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the records panel's `History` (`push`) |
+| `/session/<id>/exercise/<id>` | `/progress-history?exerciseDefinitionId=<id>` | the records panel's `Progress` (`progressHistoryHref`, `push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
-| `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's names |
+| `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the header ⋮'s `History` (`exerciseHistoryHref`, `push`), carrying the chosen gym; Back preserves Progress |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise → saved view with gym; all carry `metric` (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle's card progress button opens its catalogued exercise, metric carried |

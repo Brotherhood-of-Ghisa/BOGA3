@@ -6,8 +6,8 @@ appId: com.dinoderek.mobile
 # records panel (ios-exercise-page lane, infra-free).
 #
 # Proves:
-#   1. the records panel's `History` pushes Exercise history, which lists the
-#      newer fixture session, and the native back returns to the page;
+#   1. the records panel's `Progress` pushes exercise Progress, whose ⋮ History
+#      lists the newer fixture session; Back returns through Progress to the page;
 #   2. the logger takes reps on the keyboard, commits set 3 as `82.5 × 5`, and
 #      marks it performed;
 #   3. the ⋮ menu (a `Sheet`) springs back from a short drag of its title row
@@ -40,11 +40,23 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - takeScreenshot: "exercise-page-v5-quiet"
 
-# --- 1. Records → History → back ---
+# --- 1. Records → Progress → ⋮ History → back through Progress ---
 - waitForAnimationToEnd:
     timeout: 4000
 - tapOn:
-    id: "exercise-records-history"
+    id: "exercise-records-progress"
+- extendedWaitUntil:
+    visible:
+      id: "progress-history-options-button"
+    timeout: 10000
+- takeScreenshot: "exercise-progress"
+- tapOn:
+    id: "progress-history-options-button"
+- assertVisible:
+    id: "progress-history-exercise-history"
+- takeScreenshot: "exercise-progress-options"
+- tapOn:
+    id: "progress-history-exercise-history"
 - extendedWaitUntil:
     visible:
       id: "exercise-history-session-card-maestro_exercise_page_history_2_bench"
@@ -53,6 +65,12 @@ appId: com.dinoderek.mobile
 # The screen draws its own back arrow (the native item can stop dispatching).
 - tapOn:
     id: "exercise-history-back"
+- extendedWaitUntil:
+    visible:
+      id: "progress-history-screen"
+    timeout: 10000
+- tapOn:
+    id: "BackButton"
 - extendedWaitUntil:
     visible:
       id: "exercise-page"

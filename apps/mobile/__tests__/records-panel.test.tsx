@@ -3,7 +3,7 @@
  * loading and unavailable (which real data cannot hold still), the collapsed
  * Records / Last summaries, the expanded record lines, the last session's
  * detail, and both empty messages. The screen-level journey (switching views,
- * the History link, the gym filter) is in `exercise-page-screen.test.tsx`.
+ * the Progress link, the gym filter) is in `exercise-page-screen.test.tsx`.
  */
 
 import { render, screen, within } from '@testing-library/react-native';
@@ -51,7 +51,7 @@ const renderPanel = (
       expanded={expanded}
       isFilteredByGym={isFilteredByGym}
       now={NOW}
-      onOpenHistory={jest.fn()}
+      onOpenProgress={jest.fn()}
       onSelectView={jest.fn()}
       onToggleExpanded={jest.fn()}
       state={state}
