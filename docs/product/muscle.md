@@ -58,15 +58,16 @@ Code: `apps/mobile/components/stats/muscle-map.tsx`.
 
 ### muscle.progress-layout · presentation · accepted
 
-Progress's Muscle breakdown starts with the muscle list. A List / Heatmap
-filter opts into the boxed map and switches back without changing period,
-metric or muscle selection. This choice lasts for the current visit; a fresh
-launch starts with the list. Returning from history retains the chosen layout
-and its scroll. Approved 2026-10-18.
+Both Progress breakdowns use Settings → Progress → Progress view, offering
+List / Map and defaulting to List. The choice is remembered per account on this
+device, including new launches. Exercise Sets/Volume and Muscle share it;
+Exercise 1RM uses List without changing the saved choice. Progress has no layout
+selector. Changing the choice keeps period, metric and selection. Returning from
+history retains the chosen layout and scroll. Approved 2026-10-18.
 
-Why: the list is the familiar default; the map is available by choice.
-Code: `apps/mobile/app/(tabs)/progress.tsx` and
-`apps/mobile/components/stats/progress-muscle-view.tsx`.
+Why: keep the optional map in Settings and the Progress controls focused on filters.
+Code: `apps/mobile/components/preferences/progress-settings.tsx`,
+`apps/mobile/src/preferences/model.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
 
 ### muscle.comparison-primary-only · presentation · accepted
 

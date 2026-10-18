@@ -6,11 +6,10 @@ import { MuscleMap } from './muscle-map';
 import { HISTORY_VIEW_OPTIONS } from './history-view';
 import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } from './progress-tables';
 
-export type ProgressMuscleLayout = 'list' | 'heatmap';
+import type { ProgressMuscleLayout } from '@/src/preferences/model';
 type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; workingSetTarget: number };
 
-// The visit starts with the existing list. The filter opts into the map;
-// both use the same contribution rows and retain the selected muscle.
+// Settings chooses the layout; both share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
   const { muscles, metric, selectedId, muscleLayout, workingSetTarget, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { EffortSettings } from './effort-settings';
@@ -10,6 +10,14 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
   return <View style={styles.section} testID="settings-section-progress">
     <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>Progress</Text>
     <Card style={styles.card}>
+      <View style={styles.preference}>
+        <Text allowFontScaling={false} style={styles.label}>Progress view</Text>
+        <SegmentedControl accessibilityLabel="Progress view"
+          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Map' }]}
+          value={pending.progressMuscleLayout ?? values.progressMuscleLayout}
+          onChange={progressMuscleLayout => updatePreferences({ progressMuscleLayout })}
+          testIDPrefix="settings-muscle-view" />
+      </View>
       <PreferenceNumberField label="Weekly working sets per muscle" testID="settings-weekly-working-set-target"
         value={pending.weeklyWorkingSetTarget ?? values.weeklyWorkingSetTarget}
         onCommit={weeklyWorkingSetTarget => updatePreferences({ weeklyWorkingSetTarget })} />
@@ -26,7 +34,8 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
 
 const styles = StyleSheet.create({
   section: { gap: uiSpace.sm },
+  preference: { gap: uiSpace.sm },
   card: { padding: uiSpace.md, gap: uiSpace.md },
   heading: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted, textTransform: 'uppercase' },
-  label: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
+  label: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
 });

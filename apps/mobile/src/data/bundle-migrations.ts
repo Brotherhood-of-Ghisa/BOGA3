@@ -63,6 +63,7 @@ const PRIMARY_RUNTIME_STATE_ID = 'primary';
  */
 export interface BundleMigrationRepo {
   reviseUntouchedBodyweightSeed(id: string, expectedName: string, contribution: number): void;
+  reviseMuscleGroupName(id: string, fromName: string, toName: string): void;
   /**
    * Rewrites the `name` of the exercise definition with the given id from
    * `fromName` to `toName`, but ONLY when the row still holds `fromName` — the
@@ -148,6 +149,12 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
       }
     },
   },
+  {
+    appVersion: 5,
+    apply(repo) {
+      repo.reviseMuscleGroupName('back_upper', 'Upper Back (Rhomboids + Mid Traps)', 'Upper back');
+    },
+  },
 ];
 
 /**
@@ -197,6 +204,19 @@ export const __setCurrentAppVersionForTests = (version: number | null): void => 
  * rows commit atomically with the marker advance and ride the next sync push.
  */
 const createBundleMigrationRepo = (tx: Transaction): BundleMigrationRepo => ({
+  reviseMuscleGroupName(id, fromName, toName) {
+    tx.update(muscleGroups)
+      .set({
+        displayName: toName,
+        updatedAt: new Date(),
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      // Preserve renamed and deleted rows; repeat runs leave the row untouched.
+      .where(and(eq(muscleGroups.id, id), eq(muscleGroups.displayName, fromName),
+        isNull(muscleGroups.deletedAt)))
+      .run();
+  },
   insertMuscleGroupIfAbsent(values) {
     const stampMs = nowMonotonic(tx);
     const now = new Date();
