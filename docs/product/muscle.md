@@ -80,3 +80,31 @@ Why: a secondary mapping is real work but not the muscle the lift is for, so
 comparing it against sessions that targeted it misleads.
 Code: `deriveSessionMuscleVolumeComparisons` in
 `apps/mobile/src/session-insights/calculations.ts`.
+
+
+### muscle.exercise-map-area · presentation · accepted
+
+Progress Exercise's heatmap keeps the muscle map's fixed family frames
+([[muscle.map-area]]). Within each family, an exercise's area is proportional
+to its full current-period Volume or working-set count. Membership requires
+at least one current primary muscle in that family. Multiple primary muscles
+in one family produce one exercise tile; primary muscles in several families
+repeat its full value once in each. Zero or unavailable values take no area;
+readable detail rows retain those exercises. Approved 2026-10-18.
+
+Why: exercise size shows its work while primary mappings place it in the familiar family map.
+Code: `apps/mobile/components/stats/exercise-map-data.ts`.
+
+### muscle.exercise-map-colour · presentation · accepted
+
+Progress exercise-map Volume colours follow each exercise's own previous-period
+comparison. Sets colours inherit target attainment from its primary muscles
+within that family: cap each muscle's attainment at target, then average.
+Those muscle counts follow [[muscle.set-count]] over every gym, unaffected by
+exercise search or gym filters. The target is Settings' weekly target times
+the selected calendar weeks, including the unfinished week in full. Readable
+Sets rows also show and announce attainment. Approved 2026-10-18.
+
+Why: exercises for the same primary muscle show the same progress toward its target.
+Code: `apps/mobile/components/stats/exercise-map-data.ts` and
+`apps/mobile/src/preferences/targets.ts`.
