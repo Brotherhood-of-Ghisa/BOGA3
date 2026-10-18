@@ -137,7 +137,6 @@ describe('loadTodayProgress', () => {
     ]);
     insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('80', 2)]); // no PR
     insertSession('oct-13-deleted', { completedAt: local(2026, 10, 13, 19), deletedAt: local(2026, 10, 13, 20) }, [bench('200', 5)]);
-    insertSession('oct-14-active', { completedAt: local(2026, 10, 14, 9), status: 'active' }, [bench('200', 5)]);
 
     const { week, month } = ready(await loadTodayProgress(NOW));
 
@@ -147,6 +146,23 @@ describe('loadTodayProgress', () => {
     expect(month.cumulativeWorkingSets).toEqual([0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 6, 8, 8]);
     expect(month.previous.toSameDay).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
     expect(month.previous.total).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
+  });
+
+  it('counts the workout in progress where finishing it now would: its confirmed sets, and no PR', async () => {
+    insertSession('oct-6', { completedAt: local(2026, 10, 6, 18) }, [bench('95', 3)]); // first bench: no PR
+    // Started last week, so only its date of now puts it in this week.
+    insertSession('in-progress', { startedAt: local(2026, 10, 11, 23), completedAt: NOW, status: 'active' }, [
+      { definitionId: BENCH, sets: [['200', '5'], ['200', '5'], ['200', '5', 'rir_1', 'planned'], ['200', '']] },
+    ]);
+    insertSession('in-progress-deleted', { completedAt: NOW, status: 'active', deletedAt: NOW }, [bench('200', 5)]);
+
+    const { week, month, latest } = ready(await loadTodayProgress(NOW));
+
+    expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
+    expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 0 });
+    expect(month.toDate).toEqual({ sessions: 2, workingSets: 5, prs: 0 });
+    // The latest-session card lists completed sessions only.
+    expect(latest.id).toBe('oct-6');
   });
 
   it('matches aggregateStats over the same calendar week', async () => {

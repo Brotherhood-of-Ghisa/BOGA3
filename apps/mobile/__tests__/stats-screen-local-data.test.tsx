@@ -159,6 +159,30 @@ const logPulldown = async (daysAgo: number) => {
   await completeSessionDraft(sessionId, { completedAt, now: completedAt });
 };
 
+// A Lat Pulldown workout still in progress: one confirmed set, one planned.
+const startPulldown = async (startedDaysAgo: number) => {
+  const startedAt = new Date(Date.now() - startedDaysAgo * DAY_MS);
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: 'stats_pulldown_in_progress',
+      gymId: null,
+      startedAt,
+      exercises: [
+        {
+          id: 'stats_pulldown_in_progress_pulldown',
+          exerciseDefinitionId: PULLDOWN,
+          name: 'Lat Pulldown',
+          sets: [
+            { id: 'stats_pulldown_in_progress_done', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: null },
+            { id: 'stats_pulldown_in_progress_planned', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: 'planned' },
+          ],
+        },
+      ],
+    },
+    { now: startedAt }
+  );
+};
+
 beforeEach(() => {
   resetLocalData();
   mockUserId = null;
@@ -265,6 +289,19 @@ describe('Stats over real data', () => {
     await replayFocus();
 
     expect(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`)).toBeTruthy();
+  });
+
+  it('counts the workout in progress in both breakdowns, dated now, by its confirmed sets only', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    // Started last week: only the date finishing it now would give puts it in this one.
+    await startPulldown(8);
+    await renderStats();
+
+    expect(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}-now`)).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId(`stats-exercise-row-${PULLDOWN}-previous`)).toHaveTextContent(/^0$/);
+    chooseFilter('view-mode', 'Muscle');
+    expect(await screen.findByTestId('stats-muscle-row-back_lats-now')).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId('stats-muscle-row-back_lats-previous')).toHaveTextContent(/^0$/);
   });
 
   it('opens the Sessions list from the Sessions card', async () => {

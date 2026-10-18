@@ -3,6 +3,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
   aggregateExerciseCatalogStats,
   loadExerciseCatalogStatsRawHistory,
+  withInProgressSession,
   type ExerciseCatalogStats,
   type ExerciseCatalogStatsPeriod,
   type ExerciseCatalogStatsRawHistory,
@@ -186,9 +187,10 @@ export const useExerciseCatalogComparison = (weeks: number): UseExerciseCatalogC
   }, []);
 
   const periods = useMemo(() => {
-    const raw = snapshot.rawHistory ?? EMPTY_RAW_HISTORY;
     // Measured to when the history loaded, like `useExerciseCatalogStats`.
     const now = new Date(snapshot.loadedAt);
+    // Progress counts the workout in progress; the catalogue and pickers do not.
+    const raw = withInProgressSession(snapshot.rawHistory ?? EMPTY_RAW_HISTORY, now);
     const windows = progressComparisonWindows(weeks, now);
     return {
       current: aggregateExerciseCatalogStats(raw, windows.current, now),

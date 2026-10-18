@@ -128,7 +128,8 @@ export const createTodayProgressRepository = (
 
     const range = todayProgressLoadWindow(now);
     const [aggregation, recordFacts] = await Promise.all([
-      store.loadAggregationInput(range),
+      // The workout in progress counts in this week and month (§2).
+      store.loadAggregationInput({ ...range, now }),
       store.loadRecordFacts(range),
     ]);
     const sessionsInRange = workingSetsBySession(aggregation);
