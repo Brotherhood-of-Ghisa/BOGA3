@@ -729,10 +729,13 @@ export const deriveSessionMuscleVolumeComparisons = (
     return [];
 
   const groupById = new Map(muscleGroups.map((group) => [group.id, group]));
-  // A muscle is observed when it has a valid mapped working set, even when its
-  // volume is zero; its volume uses the independent selection. The positive-only
-  // muscle-load bars are a separate presentation and cannot supply a
-  // distribution's observations or counts.
+  // A muscle is observed when it has a valid mapped working set at its primary
+  // role, even when its volume is zero. A muscle only ever trained as a
+  // secondary has no distribution, in this session or in the baseline; a
+  // primary muscle's volume still counts secondary work at half weight and uses
+  // the independent selection. The positive-only muscle-load bars are a
+  // separate presentation and cannot supply a distribution's observations or
+  // counts.
   const observe = (session: PersonalRecordSessionInput) => {
     const contributions = collectMuscleSetContributions(
       adaptCurrentSessionToMuscleAnalyticsInput({
@@ -748,22 +751,28 @@ export const deriveSessionMuscleVolumeComparisons = (
     const byMuscle = new Map<string, {
       weightedVolume: number | null;
       workingSetIds: Set<string>;
+      primary: boolean;
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
         workingSetIds: new Set<string>(),
+        primary: false,
       };
       byMuscle.set(contribution.muscleGroupId, observation);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume ?? 0);
-      if (contribution.working !== false) observation.workingSetIds.add(contribution.setIdentity);
+      if (contribution.working !== false) {
+        observation.workingSetIds.add(contribution.setIdentity);
+        if (contribution.role === 'primary') observation.primary = true;
+      }
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
       weightedVolume: observation.weightedVolume,
       workingSetCount: observation.workingSetIds.size,
-    })).filter((muscle) => muscle.workingSetCount > 0).sort((left, right) =>
+      primary: observation.primary,
+    })).filter((muscle) => muscle.primary).sort((left, right) =>
       (right.weightedVolume ?? -1) - (left.weightedVolume ?? -1) ||
       left.sortOrder - right.sortOrder ||
       left.displayName.localeCompare(right.displayName) ||

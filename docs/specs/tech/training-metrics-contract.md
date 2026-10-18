@@ -104,6 +104,10 @@ History and quartiles derive in
 `apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
 the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.
 
+The by-muscle comparison covers only muscles the session worked as primary
+([[muscle.comparison-primary-only]]), and baseline sessions are read the same
+way.
+
 **Counted-session statistics.**
 
 | Figure | Scope |
