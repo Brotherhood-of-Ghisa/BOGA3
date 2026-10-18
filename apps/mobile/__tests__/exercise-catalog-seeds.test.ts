@@ -174,6 +174,7 @@ describe('exercise catalog seeds', () => {
   });
 
   it.each([
+    { id: 'back_upper', displayName: 'Upper back', familyName: 'Back' },
     { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs' },
     { id: 'rotator_cuff', displayName: 'Rotator Cuff', familyName: 'Shoulders' },
     { id: 'serratus_anterior', displayName: 'Serratus Anterior', familyName: 'Chest' },

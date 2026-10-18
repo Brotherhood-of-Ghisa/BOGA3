@@ -33,7 +33,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 4;
+export const CURRENT_APP_VERSION = 5;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -161,7 +161,7 @@ export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'delts_rear', displayName: 'Rear Delts', familyName: 'Shoulders', sortOrder: 3, isEditable: 0 },
   { id: 'rotator_cuff', displayName: 'Rotator Cuff', familyName: 'Shoulders', sortOrder: 3, isEditable: 0 },
   { id: 'back_lats', displayName: 'Lats', familyName: 'Back', sortOrder: 4, isEditable: 0 },
-  { id: 'back_upper', displayName: 'Upper Back (Rhomboids + Mid Traps)', familyName: 'Back', sortOrder: 5, isEditable: 0,  },
+  { id: 'back_upper', displayName: 'Upper back', familyName: 'Back', sortOrder: 5, isEditable: 0 },
   { id: 'traps_upper', displayName: 'Upper Traps', familyName: 'Back', sortOrder: 6, isEditable: 0 },
   { id: 'traps_lower', displayName: 'Lower Traps', familyName: 'Back', sortOrder: 7, isEditable: 0 },
   { id: 'spinal_erectors', displayName: 'Spinal Erectors', familyName: 'Back', sortOrder: 7, isEditable: 0 },

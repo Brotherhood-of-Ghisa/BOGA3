@@ -98,10 +98,66 @@ describe('bundle-migration runtime loop', () => {
   });
 
   it('ships the load-mode, bodyweight and muscle migrations in order', () => {
-    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4]);
+    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4, 5]);
   });
 
   describe('shipped migration behaviour', () => {
+    it('renames the existing upper-back row for sync and is idempotent on repeat upgrades', () => {
+      fixture.database.insert(muscleGroups).values({
+        id: 'back_upper',
+        displayName: 'Upper Back (Rhomboids + Mid Traps)',
+        familyName: 'Back',
+        sortOrder: 5,
+        localDirty: false,
+        localUpdatedAtMs: 123,
+      }).run();
+      const before = fixture.database.select().from(muscleGroups).get();
+      setMarker(fixture, 4);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      const after = fixture.database.select().from(muscleGroups).get();
+      expect(after).toEqual({
+        ...before,
+        displayName: 'Upper back',
+        updatedAt: expect.any(Date),
+        localDirty: true,
+        localUpdatedAtMs: expect.any(Number),
+      });
+      expect(after?.localUpdatedAtMs).toBeGreaterThan(123);
+      expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
+
+      setMarker(fixture, 4);
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      expect(fixture.database.select().from(muscleGroups).all()).toEqual([after]);
+    });
+
+    it.each([
+      { id: 'back_upper', displayName: 'My upper back', deletedAt: null },
+      { id: 'back_upper', displayName: 'Upper back', deletedAt: null },
+      {
+        id: 'back_upper',
+        displayName: 'Upper Back (Rhomboids + Mid Traps)',
+        deletedAt: new Date('2026-10-01T12:00:00.000Z'),
+      },
+      { id: 'custom_upper_back', displayName: 'Upper Back (Rhomboids + Mid Traps)', deletedAt: null },
+    ])('preserves $id named $displayName with deletedAt=$deletedAt', (muscle) => {
+      fixture.database.insert(muscleGroups).values({
+        ...muscle,
+        familyName: 'Back',
+        localDirty: false,
+        localUpdatedAtMs: 123,
+      }).run();
+      const before = fixture.database.select().from(muscleGroups).all();
+      setMarker(fixture, 4);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      expect(fixture.database.select().from(muscleGroups).all()).toEqual(before);
+      expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
+    });
+
     it('advances a never-seeded marker (0) up to the current generation', () => {
       // A returning account whose first pull restored server rows: the seeder
       // no-op'd so the marker is still 0. The loop must carry it to current so a
