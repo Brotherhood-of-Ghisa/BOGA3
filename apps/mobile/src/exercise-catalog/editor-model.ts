@@ -119,12 +119,13 @@ export const editorOpenState = (
     };
   }
   if (prefill) {
+    const prefilled = prefillAsExercise(prefill);
     return {
       name: prefill.name,
       loadInputMode: prefill.loadInputMode,
-      ...buildEditorMuscleSelectionsFromExercise(prefillAsExercise(prefill)),
+      ...buildEditorMuscleSelectionsFromExercise(prefilled),
       contributionPercentage,
-      splitByGym: prefill.splitByGym ?? false,
+      splitByGym: prefilled.splitByGym,
     };
   }
   return {

@@ -101,12 +101,11 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/sync/cycle.ts',
       'apps/mobile/src/data/exercise-session-facts.ts',
       // The exercise editor's setting: loaded, edited and saved, never turned
-      // into a bucket. The exercise page reloads its records when it changes.
+      // into a bucket.
       'apps/mobile/src/data/exercise-catalog.ts',
       'apps/mobile/src/exercise-catalog/editor-model.ts',
       'apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx',
       'apps/mobile/components/exercise-catalog/use-exercise-editor-form.ts',
-      'apps/mobile/components/exercise-page/exercise-page-screen.tsx',
       // Coaching reads the flag over SQL rows; its bucket keys are
       // `agent-api/gym-buckets.ts` and its tool text describes them.
       'supabase/functions/agent-api/index.ts',

@@ -209,7 +209,6 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
   const contributionUpdate = checkedContribution?.ok
     ? { bodyweightContribution: checkedContribution.value }
     : {};
-  const splitUpdate = input.splitByGym === undefined ? {} : { splitByGym: input.splitByGym };
   const existing = tx
     .select({ id: exerciseDefinitions.id })
     .from(exerciseDefinitions)
@@ -220,7 +219,8 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
     tx.update(exerciseDefinitions)
       .set({
         ...contributionUpdate,
-        ...splitUpdate,
+        // Undefined keeps the stored value: Drizzle drops undefined keys.
+        splitByGym: input.splitByGym,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -235,7 +235,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
       .values({
         id: exerciseId,
         ...contributionUpdate,
-        ...splitUpdate,
+        splitByGym: input.splitByGym,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -483,7 +483,7 @@ export const normalizeExerciseGraphInput = (
     mappings,
     now,
     ...(checkedContribution?.ok ? { bodyweightContribution: checkedContribution.value } : {}),
-    ...(input.splitByGym === undefined ? {} : { splitByGym: input.splitByGym }),
+    splitByGym: input.splitByGym,
   };
 };
 

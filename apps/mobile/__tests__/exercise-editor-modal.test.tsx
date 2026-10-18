@@ -220,12 +220,17 @@ describe('Track each gym separately', () => {
     expect(onSave.mock.calls[0][0].splitByGym).toBe(true);
   });
 
-  it('opens with the setting of the exercise it is reopened for', () => {
-    const view = renderEditor({ editingExercise: exercise({ splitByGym: true }) });
-    view.rerender(
-      <ExerciseEditorModal editingExercise={exercise({ id: 'row', splitByGym: false })} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible />,
+  it('drops an unsaved change when closed, and reopens on the stored setting', () => {
+    const split = exercise({ splitByGym: true });
+    const editor = (visible: boolean) => (
+      <ExerciseEditorModal editingExercise={split} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible={visible} />
     );
+    const view = render(editor(true));
+    fireEvent.press(splitSwitch());
     expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: false });
+    view.rerender(editor(false));
+    view.rerender(editor(true));
+    expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: true });
   });
 });
 
