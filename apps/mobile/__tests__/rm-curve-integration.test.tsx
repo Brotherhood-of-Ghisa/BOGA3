@@ -110,8 +110,8 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
 function PrefixPreview({ name, week }: { name: keyof typeof wave.scenarios; week: number }) {
   const read = useRmCurve({ exerciseDefinitionId: 'curve', start: new Date(wave.scenarios[name][0].startedAt),
     end: new Date(wave.scenarios[name][week * 3 - 1].completedAt + 1), historyLookbackWeeks: 52, accountRevision: 0, gym: 'latest' });
-  return <RmCurveContent read={read} scope={{ exerciseId: 'curve', range: 24, gym: 'latest', rir: null }} onScope={() => undefined}
-    exercises={[{ id: 'curve', name: 'Synthetic exercise' }]} catalogStatus="ready" retryCatalog={() => undefined} dateFormat="YYYY-MM-DD" historyWeeks={52} />;
+  return <RmCurveContent read={read} scope={{ range: 24, gym: 'latest', rir: null }} onScope={() => undefined}
+    dateFormat="YYYY-MM-DD" historyWeeks={52} />;
 }
 
 it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to real SQLite while fitting the current scope and preserving actual set details', async name => {

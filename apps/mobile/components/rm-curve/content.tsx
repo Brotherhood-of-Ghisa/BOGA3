@@ -12,15 +12,13 @@ import { periodLabel, RmRegimes, selectedPeriod } from './regimes';
 import { RmCurveDetails, setDescription } from './details';
 import { curveStyles as styles } from './styles';
 
-export type CurveScope = { exerciseId: string; range: RmCurveRange; gym: RmCurveGym; rir: number | null };
+export type CurveScope = { range: RmCurveRange; gym: RmCurveGym; rir: number | null };
 export type RmCurveContentProps = {
   read: { status: 'loading' | 'ready' | 'error'; data: RmCurveModel | null; retry: () => void };
   scope: CurveScope; onScope: (scope: CurveScope) => void;
-  exercises: { id: string; name: string }[];
-  catalogStatus: 'idle' | 'loading' | 'ready' | 'error'; retryCatalog: () => void;
   dateFormat: ExerciseDateFormat; historyWeeks: number;
 };
-type Picker = 'exercise' | 'gym' | 'range' | 'effort';
+type Picker = 'gym' | 'range' | 'effort';
 type Choice = { id: string; label: string; checked?: boolean; choose: () => void };
 
 function excludedMessage(model: RmCurveModel) {
@@ -33,11 +31,11 @@ function excludedMessage(model: RmCurveModel) {
 const rangeLabel = (range: RmCurveRange, historyWeeks: number) => range === 'history'
   ? `History look-back (${historyWeeks} weeks)` : `${Math.min(range, historyWeeks)} weeks${range > historyWeeks ? ' (History limit)' : ''}`;
 
-/** Reusable page body: scope is controlled, selection is local. No production route.
+/** Page body: the host fixes the exercise; filters are controlled, selection is local.
  * Error/loading hides retained read data; only a resolved scope can prune selection.
  * Chart activation opens inline details; Previous/Next reaches overlapping sets.
  */
-export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus, retryCatalog, dateFormat, historyWeeks }: RmCurveContentProps) {
+export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks }: RmCurveContentProps) {
   const [mode, setMode] = useState<CurveMode>('one');
   const [method, setMethod] = useState<UncertaintyMethod>('fixed');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,7 +56,6 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
     if (typeof handle === 'number') AccessibilityInfo.setAccessibilityFocus(handle);
   };
   const apply = (patch: Partial<CurveScope>) => {
-    if (patch.exerciseId !== undefined && patch.exerciseId !== scope.exerciseId) setSelectedId(null);
     onScope({ ...scope, ...patch }); close();
   };
   const filter = (kind: Picker, label: string, full = false) => <Card style={full ? styles.full : styles.filter} key={kind}>
@@ -68,8 +65,6 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
     </ListRow>
   </Card>;
   const choices: Record<Picker, Choice[]> = {
-    exercise: exercises.map(e => ({ id: e.id, label: e.name, checked: e.id === scope.exerciseId,
-      choose: () => apply({ exerciseId: e.id, gym: 'latest' }) })),
     gym: [{ id: 'all-gyms', label: ALL_GYMS_LABEL, checked: model !== null && model.gymId === undefined, choose: () => apply({ gym: {} }) },
       ...(model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'no-gym', label: gymOptionLabel(g), checked: g.gymId === model?.gymId,
         choose: () => apply({ gym: { gymId: g.gymId } }) }))],
@@ -86,7 +81,6 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
     : gymScopeLabel(scope.gym.gymId, labelModel?.gyms ?? []);
   return <>
     <ScreenScroll testID="rm-curve-content">
-      {filter('exercise', exercises.find(e => e.id === scope.exerciseId)?.name ?? model?.definition.name ?? 'Selected exercise', true)}
       <View style={styles.filters}>{filter('gym', gymLabel)}{filter('range', rangeLabel(scope.range, historyWeeks))}
         {filter('effort', scope.rir === null ? 'All known RIR' : `RIR ${scope.rir}`, true)}</View>
       <SegmentedControl testIDPrefix="rm-mode" accessibilityLabel="Curves" value={mode} onChange={setMode}
@@ -98,28 +92,23 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
           action={{ label: 'Retry', onPress: read.retry }} fill={false} />
           : model ? <CurveResult mode={mode} method={method} model={model} pointId={point?.setId ?? null} dateFormat={dateFormat} onSelect={setSelectedId}
             onPick={ids => { if (ids.length) setSelectedId(ids[0]); }} onFilters={() => open('effort')} />
-            : <StatePanel title="This exercise isn’t available" body="Choose another exercise or return to History." fill={false}
-              action={{ label: 'Choose exercise', onPress: () => open('exercise') }} />}
+            : <StatePanel title="This exercise isn’t available" body="Return to History and choose an exercise." fill={false} />}
     </ScreenScroll>
-    <CurveChoices picker={picker} choices={picker ? choices[picker] : []} catalogStatus={catalogStatus}
-      retryCatalog={retryCatalog} close={close} restoreFocus={restoreFocus} />
+    <CurveChoices picker={picker} choices={picker ? choices[picker] : []} close={close} restoreFocus={restoreFocus} />
   </>;
 }
 
-function CurveChoices({ picker, choices, catalogStatus, retryCatalog, close, restoreFocus }: {
-  picker: Picker | null; choices: Choice[]; catalogStatus: RmCurveContentProps['catalogStatus'];
-  retryCatalog: () => void; close: () => void; restoreFocus: () => void;
+function CurveChoices({ picker, choices, close, restoreFocus }: {
+  picker: Picker | null; choices: Choice[];
+  close: () => void; restoreFocus: () => void;
 }) {
   return <Sheet visible={picker !== null} title={picker ? picker[0].toUpperCase() + picker.slice(1) : ''}
     dismissLabel="Dismiss choices" onDismiss={close} onDismissed={restoreFocus} testID="rm-curve-sheet">
-      {picker === 'exercise' && catalogStatus !== 'ready' ? <StatePanel fill={false}
-        kind={catalogStatus === 'error' ? 'error' : 'loading'} title={catalogStatus === 'error' ? 'Couldn’t load exercises' : 'Loading exercises'}
-        action={catalogStatus === 'error' ? { label: 'Retry', onPress: retryCatalog } : undefined} />
-        : <FlatList data={choices} keyExtractor={choice => choice.id} renderItem={({ item: choice }) => <ListRow checked={choice.checked}
+      <FlatList data={choices} keyExtractor={choice => choice.id} renderItem={({ item: choice }) => <ListRow checked={choice.checked}
           onPress={choice.choose} accessibilityLabel={choice.label}
           leading={choice.checked !== undefined ? <Icon name={choice.checked ? 'radio-on' : 'radio-off'} /> : undefined}>
           <Text allowFontScaling={false} style={styles.body}>{choice.label}</Text>
-        </ListRow>} />}
+        </ListRow>} />
     </Sheet>;
 }
 

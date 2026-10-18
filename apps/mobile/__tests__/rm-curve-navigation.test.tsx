@@ -63,7 +63,7 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   fireEvent.press(screen.getByTestId('progress-history-rm-curve'));
   await screen.findByTestId('rm-curve-plot');
   expect(route.getPathname()).toBe('/rm-curve');
-  expect(screen.getByLabelText('exercise: Synthetic exercise')).toBeTruthy();
+  expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
   expect(screen.getByText('36 sets · 12 sessions')).toBeTruthy();
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
@@ -87,6 +87,8 @@ it.each([
   const route = await open(href);
   await screen.findByText('This exercise isn’t available');
   expect(screen.queryByTestId('rm-curve-plot')).toBeNull();
+  expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Choose exercise' })).toBeNull();
   fireEvent.press(screen.getByTestId('rm-curve-back'));
   await screen.findByTestId('returned-progress');
   expect(route.getPathname()).toBe('/progress');
@@ -96,7 +98,8 @@ it('encodes the canonical ID and resolves repeated parameters using the existing
   expect(rmCurveHref('exercise /?&=+')).toBe('/rm-curve?exerciseDefinitionId=exercise%20%2F%3F%26%3D%2B');
   await open('/rm-curve?exerciseDefinitionId=curve&exerciseDefinitionId=missing');
   await screen.findByTestId('rm-curve-plot');
-  expect(screen.getByLabelText('exercise: Synthetic exercise')).toBeTruthy();
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  expect(screen.getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
 });
 
 it('resets the selected chart when a new exercise link reaches the mounted route', async () => {
@@ -105,10 +108,14 @@ it('resets the selected chart when a new exercise link reaches the mounted route
   await open(String(rmCurveHref('curve')));
   await screen.findByTestId('rm-curve-plot');
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  fireEvent.press(screen.getByLabelText('range: 12 weeks'));
+  fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
+  await screen.findByText('12 sets · 4 sessions');
   await act(async () => navigate.setParams({ exerciseDefinitionId: 'other' }));
   await screen.findByText('No completed sets');
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
-  expect(screen.getByLabelText('exercise: Another exercise')).toBeTruthy();
+  expect(screen.getByLabelText('range: 12 weeks')).toBeTruthy();
+  expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
 });
 
 it('removes a live History action when its exercise is deleted while Options is open', async () => {
