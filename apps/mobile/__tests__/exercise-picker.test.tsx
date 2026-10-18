@@ -685,7 +685,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
 
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Custom Press');
     fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-    fireEvent.press(await screen.findByLabelText('Select primary muscle Chest'));
+    fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
     });
