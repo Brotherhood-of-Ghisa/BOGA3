@@ -151,10 +151,12 @@ appId: com.dinoderek.mobile
 # on the breakdown this step starts from rather than on whatever the last run
 # of this lane left stored: Done has already mounted Progress, and a deep link
 # that changes its breakdown re-enters it, overriding the remembered filter.
+# Settings preserves List / Map across data resets; wait for the breakdown
+# chip rather than either layout before switching to Exercise.
 - openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:
     visible:
-      id: "stats-muscle-table"
+      id: "stats-view-mode-chip-muscle"
     timeout: 15000
 - tapOn:
     id: "stats-view-mode-chip"
