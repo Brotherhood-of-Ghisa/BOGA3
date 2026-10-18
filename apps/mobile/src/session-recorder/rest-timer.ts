@@ -62,11 +62,14 @@ const IDLE_REST_TIMER_VIEW: RestTimerView = { status: 'idle' };
 
 let activeEntry: WorkoutTimerEntry | null = null;
 let lastSignaledRound: number | null = null;
+let lastSignaledRestEndsAtMs: number | null = null;
 let roundBoundaryTimeout: ReturnType<typeof setTimeout> | null = null;
+let restCompletionTimeout: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 const emit = () => {
   scheduleRoundBoundaryCue();
+  scheduleRestCompletionCue();
   for (const listener of listeners) {
     listener();
   }
@@ -84,6 +87,27 @@ export const triggerRoundBoundaryCue = (): void => {
     Vibration.vibrate(400);
   } catch {
     // Unsupported platform or headless runner.
+  }
+};
+
+export const triggerRestCompletionCue = (): void => {
+  try {
+    Vibration.vibrate(400);
+  } catch {
+    // Unsupported platform or headless runner.
+  }
+};
+
+export const checkAndTriggerRestCompletion = (
+  entry: WorkoutTimerEntry | null,
+  nowMs: number = Date.now(),
+): void => {
+  if (!entry || entry.mode !== 'rest') return;
+  if (nowMs >= entry.endsAtMs) {
+    if (lastSignaledRestEndsAtMs !== entry.endsAtMs) {
+      lastSignaledRestEndsAtMs = entry.endsAtMs;
+      triggerRestCompletionCue();
+    }
   }
 };
 
@@ -146,6 +170,33 @@ function scheduleRoundBoundaryCue(): void {
   }, remainingMs);
 }
 
+function scheduleRestCompletionCue(): void {
+  if (restCompletionTimeout !== null) {
+    clearTimeout(restCompletionTimeout);
+    restCompletionTimeout = null;
+  }
+  if (!activeEntry || activeEntry.mode !== 'rest') {
+    lastSignaledRestEndsAtMs = null;
+    return;
+  }
+
+  const targetEndsAtMs = activeEntry.endsAtMs;
+  const remainingMs = Math.max(0, targetEndsAtMs - Date.now());
+  if (remainingMs <= 0) {
+    checkAndTriggerRestCompletion(activeEntry, Date.now());
+    return;
+  }
+
+  restCompletionTimeout = setTimeout(() => {
+    if (activeEntry?.mode === 'rest' && activeEntry.endsAtMs === targetEndsAtMs) {
+      checkAndTriggerRestCompletion(activeEntry, targetEndsAtMs);
+      for (const listener of listeners) {
+        listener();
+      }
+    }
+  }, remainingMs);
+}
+
 export const deriveRestTimerView = (
   entry: WorkoutTimerEntry | null,
   sessionId: string | null,
@@ -203,6 +254,7 @@ export const startRestTimer = (
     durationSec: normalizedDuration,
   };
   lastSignaledRound = null;
+  lastSignaledRestEndsAtMs = null;
   emit();
 };
 
@@ -387,13 +439,16 @@ export const dismissRestTimer = (sessionId?: string): void => {
   if (sessionId !== undefined && activeEntry.sessionId !== sessionId) return;
   activeEntry = null;
   lastSignaledRound = null;
+  lastSignaledRestEndsAtMs = null;
   emit();
 };
 
 export const __resetRestTimerForTests = (): void => {
   activeEntry = null;
   lastSignaledRound = null;
+  lastSignaledRestEndsAtMs = null;
   scheduleRoundBoundaryCue();
+  scheduleRestCompletionCue();
   listeners.clear();
 };
 
