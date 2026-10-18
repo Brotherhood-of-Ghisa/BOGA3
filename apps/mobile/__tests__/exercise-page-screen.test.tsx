@@ -938,13 +938,17 @@ describe('ExercisePageScreen', () => {
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
 
     // Toggling an already-performed set back to unperformed does NOT start the timer,
-    // while toggling a planned set (set 4) to performed DOES auto-start it.
+    // and toggling set 4 to performed does NOT auto-start it because dismissal is global for the session.
     fireEvent.press(screen.getByTestId('exercise-set-1-toggle'));
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-set-4-toggle'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Top-bar timer button manually restarts the timer and clears suppression.
+    fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
 
-    // Top-bar timer button toggles the timer off and back on with the configured duration.
+    // Top-bar timer button toggles the timer off; update preferences to 120s and auto-start off.
     act(() => updatePreferences({ restTimerDurationSec: 120, restTimerAutoStart: false }));
     fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();

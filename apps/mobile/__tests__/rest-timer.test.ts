@@ -7,11 +7,13 @@ import {
   adjustRestTimer,
   checkAndTriggerRestCompletion,
   checkAndTriggerRoundBoundary,
+  clearRestTimerAutoStartSuppression,
   deriveRepeatingTimerView,
   deriveRestTimerView,
   dismissRestTimer,
   formatRestTimerSeconds,
   getRestTimerEntry,
+  isRestTimerAutoStartSuppressed,
   REPEATING_TIMER_STEP_SEC,
   REST_TIMER_STEP_SEC,
   resetRepeatingTimer,
@@ -522,8 +524,15 @@ describe('rest-timer store and pure rules', () => {
     });
     expect(result.current.view).toEqual({ status: 'idle' });
 
+    // Explicit dismissal suppresses subsequent onSetConfirmed auto-starts
     act(() => {
       result.current.onSetConfirmed();
+    });
+    expect(result.current.view).toEqual({ status: 'idle' });
+
+    // Manual toggle restarts the timer and clears suppression
+    act(() => {
+      result.current.toggle();
     });
     expect(result.current.view).toMatchObject({
       mode: 'rest',
@@ -700,5 +709,114 @@ describe('rest-timer store and pure rules', () => {
       jest.advanceTimersByTime(1000);
     });
     expect(result.current.view).toMatchObject({ mode: 'rest', status: 'running', remainingSec: 89 });
+  });
+
+  it('globally suppresses auto-start across exercises within the session upon dismissal until manually toggled', () => {
+    jest.useFakeTimers();
+    let nowMs = 0;
+    const now = () => nowMs;
+
+    // Simulate Exercise A
+    const exerciseA = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 60,
+        autoStart: true,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    // Set 1 in Exercise A auto-starts timer
+    act(() => {
+      exerciseA.result.current.onSetConfirmed();
+    });
+    expect(exerciseA.result.current.view).toMatchObject({ status: 'running', remainingSec: 60 });
+
+    // User closes the timer bar in Exercise A
+    act(() => {
+      exerciseA.result.current.dismiss();
+    });
+    expect(exerciseA.result.current.view).toEqual({ status: 'idle' });
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(true);
+
+    // Set 2 in Exercise A does NOT auto-start
+    act(() => {
+      exerciseA.result.current.onSetConfirmed();
+    });
+    expect(exerciseA.result.current.view).toEqual({ status: 'idle' });
+
+    // User navigates to Exercise B (new hook instance for same session)
+    const exerciseB = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 60,
+        autoStart: true,
+        isActiveSession: true,
+        now,
+      }),
+    );
+    expect(exerciseB.result.current.view).toEqual({ status: 'idle' });
+
+    // Set 1 in Exercise B also does NOT auto-start because dismissal is global for the session
+    act(() => {
+      exerciseB.result.current.onSetConfirmed();
+    });
+    expect(exerciseB.result.current.view).toEqual({ status: 'idle' });
+
+    // User manually toggles timer back on in top bar
+    act(() => {
+      exerciseB.result.current.toggle();
+    });
+    expect(exerciseB.result.current.view).toMatchObject({ status: 'running', remainingSec: 60 });
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(false);
+
+    // Subsequent set in Exercise B auto-starts again
+    act(() => {
+      nowMs = 10_000;
+      exerciseB.result.current.onSetConfirmed();
+    });
+    expect(exerciseB.result.current.view).toMatchObject({ status: 'running', remainingSec: 60 });
+  });
+
+  it('natural countdown completion (reaching 0:00) does not suppress subsequent auto-start', () => {
+    jest.useFakeTimers();
+    let nowMs = 0;
+    const now = () => nowMs;
+
+    const hook = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 30,
+        autoStart: true,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    act(() => {
+      hook.result.current.onSetConfirmed();
+    });
+    expect(hook.result.current.view).toMatchObject({ status: 'running' });
+
+    // Advance clock past expiration
+    act(() => {
+      nowMs = 31_000;
+      jest.advanceTimersByTime(31_000);
+    });
+    expect(hook.result.current.view).toMatchObject({ status: 'completed' });
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(false);
+
+    // Confirming next set without explicit dismissal auto-starts the timer
+    act(() => {
+      hook.result.current.onSetConfirmed();
+    });
+    expect(hook.result.current.view).toMatchObject({ status: 'running', remainingSec: 30 });
+  });
+
+  it('scopes auto-start suppression per session and supports clearing', () => {
+    dismissRestTimer('session-1');
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(true);
+    expect(isRestTimerAutoStartSuppressed('session-2')).toBe(false);
+
+    clearRestTimerAutoStartSuppression('session-1');
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(false);
   });
 });
