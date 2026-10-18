@@ -11,7 +11,7 @@ import { effortPolicyKey } from '@/src/exercise-calculations/effort-policy';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
-  isPooledGymBucket, readableGymBuckets, type GymBucketKey,
+  isPooledGymBucket, POOLED_GYM_BUCKET, reportingBucket, type GymBucketKey,
 } from '@/src/exercise-calculations/gym-bucket';
 import {
   createRecordBook, type RecordBaseline, type RecordEntry, type WeightRecordValue,
@@ -156,7 +156,7 @@ const createLoadContextResolver = (tx: FactsTx, definitionIds: readonly string[]
  * Whether each definition reports per gym. The derivation turns it into each
  * row's bucket (`reportingBucket`); a missing definition cannot own a block.
  */
-const loadSplitByGym = (tx: FactsTx, definitionIds: readonly string[]): Map<string, boolean> =>
+const loadSplitByGym = (tx: Pick<FactsTx, 'select'>, definitionIds: readonly string[]): Map<string, boolean> =>
   new Map(chunks(definitionIds).flatMap((ids) => tx
     .select({ id: exerciseDefinitions.id, splitByGym: exerciseDefinitions.splitByGym })
     .from(exerciseDefinitions)
@@ -332,8 +332,8 @@ export const loadFlaggedExerciseSessionFacts = async (
  *
  * There is exactly one gym filter, `gymId`, on the repository-wide three-state
  * convention: unset is every gym, `null` is the sessions with no gym, an id is
- * that gym. Picking a split exercise's bucket is a different question, and
- * `inSessionId` answers it with the session the reader is looking at rather
+ * that gym — for a split exercise too. Reading a session's own records is a
+ * different question, and `inSessionId` answers it with the session rather
  * than a second gym.
  */
 export type ExerciseBestsScope = {
@@ -341,10 +341,9 @@ export type ExerciseBestsScope = {
   /** The gym filter (the `Past records gym filter`). */
   gymId?: string | null;
   /**
-   * The session being viewed. Its own gym picks the bucket a split exercise
-   * reports ([[gym.split]]); an unsplit exercise has one pooled bucket and
-   * ignores it. Unset (no session in hand), a split exercise reports its most
-   * recently performed bucket, so no reader ever pools one.
+   * The session being recorded or viewed. On a split exercise its gym's own
+   * book answers ([[gym.split]]); with no gym, or on an unsplit exercise, the
+   * whole exercise does. Unset, the whole exercise answers.
    */
   inSessionId?: string | null;
   /** Only the sessions before this completed session, in PR-history order. */
@@ -435,25 +434,13 @@ const sessionGym = (
 };
 
 /**
- * The buckets a scope can read, or undefined when it has neither a gym filter
- * nor a session. A definition's rows all carry either the pooled bucket or a
- * gym's, so naming both selects exactly one without reading the split flag.
+ * The rows a session's records are read from: its own gym's book when the
+ * exercise is split and the session has a gym, the whole exercise otherwise
+ * (`reportingBucket`). A gym session's row names its gym's book, so the
+ * filter is exact; the whole exercise keeps every row.
  */
-const bucketScope = (gymId: string | null | undefined) =>
-  gymId === undefined
-    ? undefined
-    : inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(gymId));
-
-/**
- * One bucket's rows when the scope named no gym: a split exercise is never
- * pooled, so it reports its most recently performed bucket — the last row in
- * PR-history order — the way coaching does. Pooled rows are already one bucket.
- */
-const inOneBucket = <Row extends { gymBucket: GymBucketKey }>(rows: Row[]): Row[] => {
-  const newest = rows.at(-1);
-  if (!newest || isPooledGymBucket(newest.gymBucket)) return rows;
-  return rows.filter((row) => row.gymBucket === newest.gymBucket);
-};
+const inBookOf = <Row extends { gymBucket: GymBucketKey }>(rows: Row[], book: GymBucketKey): Row[] =>
+  isPooledGymBucket(book) ? rows : rows.filter((row) => row.gymBucket === book);
 
 /** Keeps the rows before `beforeSessionId` in PR-history order. */
 const rowsBefore = (database: LocalDatabase, rows: BestsRow[], beforeSessionId: string | null | undefined) => {
@@ -505,29 +492,31 @@ const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
 /**
  * One exercise's all-time 1RM, top weight and best volume, each with
  * its session, gym and (for 1RM and top weight) the set that holds it, plus
- * the newest session in scope. A split exercise answers for one gym's bucket,
- * never pooled ([[gym.split]]).
+ * the newest session in scope. Every gym by default, a split exercise
+ * included; a session in hand reads its own book ([[gym.split]]).
  */
 export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
-  // The filter names a gym when it is on; otherwise the viewed session's gym
-  // picks the bucket, which is not a filter and narrows nothing on its own.
-  const bucketGym = scope.gymId !== undefined ? scope.gymId : sessionGym(database, scope.inSessionId);
   const rows = selectBestsRows(database, and(
     eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
     gymScope(scope.gymId),
-    bucketScope(bucketGym),
   ));
-  return pickBests(inOneBucket(rowsBefore(database, rows, scope.beforeSessionId)));
+  const gym = sessionGym(database, scope.inSessionId);
+  const definitionId = scope.exerciseDefinitionId;
+  const book = gym === undefined
+    ? POOLED_GYM_BUCKET
+    : reportingBucket({ splitByGym: loadSplitByGym(database, [definitionId]).get(definitionId) ?? false }, gym);
+  return pickBests(rowsBefore(database, inBookOf(rows, book), scope.beforeSessionId));
 };
 
 /**
  * Each listed definition's records over the sessions before `target` in
  * PR-history order: the records the target's sets are compared with. Every gym
- * counts, except that a definition split per gym is compared only with
- * `target`'s own gym bucket ([[gym.split]]). The same fold as
- * `loadExerciseBests`; a definition with no earlier fact row is absent.
+ * counts, except that on a definition split per gym a target at a gym is
+ * compared only with that gym's own book ([[gym.split]]); a target with no gym
+ * is compared with the whole exercise. The same fold as `loadExerciseBests`; a
+ * definition with no earlier row in its book is absent.
  */
 export const loadEarlierBestsByDefinition = async (
   target: { sessionId: string; completedAt: Date },
@@ -539,11 +528,11 @@ export const loadEarlierBestsByDefinition = async (
   drainExerciseSessionFacts(database);
   const before = (row: BestsRow) => compareFactSessionOrder(row, target) < 0;
   const targetGym = sessionGym(database, target.sessionId) as string | null;
+  const splitByGym = loadSplitByGym(database, exerciseDefinitionIds);
   for (const ids of chunks(exerciseDefinitionIds)) {
     const rows = selectBestsRows(database, and(
       inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
       lte(exerciseSessionFacts.achievedAt, target.completedAt),
-      inArray(exerciseSessionFacts.gymBucket, readableGymBuckets(targetGym)),
     )).filter(before);
     const rowsByDefinition = new Map<string, BestsRow[]>();
     for (const row of rows) {
@@ -551,7 +540,11 @@ export const loadEarlierBestsByDefinition = async (
       group.push(row);
       rowsByDefinition.set(row.exerciseDefinitionId, group);
     }
-    for (const [definitionId, group] of rowsByDefinition) bests.set(definitionId, pickBests(group));
+    for (const [definitionId, group] of rowsByDefinition) {
+      const book = reportingBucket({ splitByGym: splitByGym.get(definitionId) ?? false }, targetGym);
+      const inBook = inBookOf(group, book);
+      if (inBook.length > 0) bests.set(definitionId, pickBests(inBook));
+    }
   }
   return bests;
 };

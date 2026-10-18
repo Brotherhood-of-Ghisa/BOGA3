@@ -161,14 +161,13 @@ export type ExerciseHistoryStore = {
   }): Promise<ExerciseHistorySessionRow[]>;
   /**
    * `gymId` is the one gym filter, three-state: unset every gym, `null` the
-   * sessions with no gym, an id that gym. `inSessionId` is not a filter — it
-   * names the session the reader came from, whose gym picks a split exercise's
-   * bucket ([[gym.split]]).
+   * sessions with no gym, an id that gym. A split exercise reads the same way:
+   * history is a view, so it shows the whole exercise until a gym is chosen
+   * ([[gym.split]]).
    */
   loadAllTimeBest(input: {
     exerciseDefinitionId: string;
     gymId?: string | null;
-    inSessionId?: string | null;
   }): Promise<ExerciseHistoryBest>;
   loadSetsForSessionExercises(input: {
     sessionExerciseIds: string[];
@@ -185,12 +184,6 @@ export type LoadExercisePerformanceHistoryOptions = {
   tagDefinitionId?: string | null;
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
   gymId?: string | null;
-  /**
-   * The session this history was opened from. Not a filter: its gym picks the
-   * bucket a split exercise's `All-time bests` report ([[gym.split]]).
-   * `gymId` alone narrows the listed sessions.
-   */
-  inSessionId?: string | null;
   now?: Date;
 };
 
@@ -467,8 +460,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         ...resolveWeight(row.startedAt),
       }));
   },
-  async loadAllTimeBest({ exerciseDefinitionId, gymId, inSessionId }) {
-    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId, inSessionId });
+  async loadAllTimeBest({ exerciseDefinitionId, gymId }) {
+    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId });
     return {
       estimatedOneRepMax: oneRepMax
         ? { value: oneRepMax.value, sessionId: oneRepMax.sessionId, completedAt: oneRepMax.completedAt }
@@ -575,7 +568,6 @@ export const createExerciseHistoryRepository = (
       store.loadAllTimeBest({
         exerciseDefinitionId: options.exerciseDefinitionId,
         ...(appliedGymId === undefined ? {} : { gymId: appliedGymId }),
-        ...(options.inSessionId ? { inSessionId: options.inSessionId } : {}),
       }),
     ]);
 

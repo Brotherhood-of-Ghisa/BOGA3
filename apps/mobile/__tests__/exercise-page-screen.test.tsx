@@ -630,11 +630,11 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
     fireEvent.press(screen.getByTestId('exercise-records-history'));
-    // The session travels so its gym can pick a split exercise's bucket
-    // ([[gym.split]]); with no gym there is no `currentGymId` to filter by.
+    // History is a view: no session travels, and with no gym there is no
+    // `currentGymId` to filter by.
     expect(mockRouter.push).toHaveBeenCalledWith({
       pathname: '/exercise-history',
-      params: { exerciseDefinitionId: BENCH_DEF, fromSessionId: SESSION },
+      params: { exerciseDefinitionId: BENCH_DEF },
     });
   });
 
@@ -645,7 +645,7 @@ describe('ExercisePageScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-records-history'));
     expect(mockRouter.push).toHaveBeenCalledWith({
       pathname: '/exercise-history',
-      params: { exerciseDefinitionId: BENCH_DEF, fromSessionId: SESSION, currentGymId: 'gym-downtown' },
+      params: { exerciseDefinitionId: BENCH_DEF, currentGymId: 'gym-downtown' },
     });
   });
 

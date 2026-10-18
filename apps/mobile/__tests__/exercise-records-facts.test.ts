@@ -261,14 +261,15 @@ describe('records of an exercise split per gym', () => {
     insertSession('none-1', 4, bench(['40', '5']));
   });
 
-  it('answers for the bucket of the session on screen, never pooling the gyms', async () => {
+  it('answers a gym session with its gym\'s own records, a no-gym session with the whole exercise', async () => {
     split();
     const inSession = async (inSessionId: string) =>
       await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId });
 
     expect((await inSession('home-1')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
     expect((await inSession('club-1')).topWeight).toMatchObject({ sessionId: 'club-2', weight: 70, gymName: 'Club' });
-    expect((await inSession('none-1')).topWeight).toMatchObject({ sessionId: 'none-1', weight: 40, gymId: null });
+    // No gym: usually a gym not worth recording, so it reads every gym.
+    expect((await inSession('none-1')).topWeight).toMatchObject({ sessionId: 'home-1', weight: 100, gymName: 'Home' });
   });
 
   it('reports nothing for a gym with no history of the exercise, never another gym\'s', async () => {
@@ -287,18 +288,19 @@ describe('records of an exercise split per gym', () => {
 
     expect((await last('home-1'))?.completedAt).toEqual(day(1));
     expect((await last('club-1'))?.completedAt).toEqual(day(3));
+    // The whole exercise's newest session, wherever it was.
     expect((await last('none-1'))?.completedAt).toEqual(day(4));
   });
 
-  it('reports the most recently performed bucket with no session and no gym named', async () => {
+  it('reads every gym with no session and no gym named, split or not', async () => {
+    // Unset is all gyms for a split exercise too: the whole exercise is
+    // always there beside the gyms' own books.
+    const whole = await loadExerciseBests({ exerciseDefinitionId: BENCH });
     split();
-    expect((await loadExerciseBests({ exerciseDefinitionId: BENCH })).topWeight)
-      .toMatchObject({ sessionId: 'none-1', weight: 40 });
 
-    // Home performed last, so it answers; the heavier 100 kg is Home's own.
-    insertSession('home-2', 5, bench(['90', '5']), 'home');
-    expect((await loadExerciseBests({ exerciseDefinitionId: BENCH })).topWeight)
-      .toMatchObject({ sessionId: 'home-1', weight: 100 });
+    expect(await loadExerciseBests({ exerciseDefinitionId: BENCH })).toEqual(whole);
+    expect(whole.topWeight).toMatchObject({ sessionId: 'home-1', weight: 100 });
+    expect(whole.latest?.sessionId).toBe('none-1');
   });
 
   it('ignores the session on screen while the exercise is not split', async () => {
@@ -347,32 +349,19 @@ describe('exercise history all-time bests of a split exercise', () => {
       .where(eq(exerciseDefinitions.id, BENCH)).run();
   });
 
-  const best = async (scope: { gymId?: string | null; inSessionId?: string | null }) =>
+  const best = async (scope: { gymId?: string | null } = {}) =>
     (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all', ...scope }))!
       .allTimeBest.topWeight;
 
-  it('reports the bucket of the session the reader came from, not the newest one', async () => {
-    // The session alone picks the bucket; without one the most recently
-    // performed bucket answers, which is the no-gym one here.
-    expect(await best({ inSessionId: 'home-1' })).toMatchObject({ sessionId: 'home-1', weight: 150 });
-    expect(await best({ inSessionId: 'club-1' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
-    expect(await best({ inSessionId: 'none-1' })).toMatchObject({ sessionId: 'none-1', weight: 70 });
-    expect(await best({})).toMatchObject({ sessionId: 'none-1', weight: 70 });
+  it('shows the whole exercise until a gym is chosen', async () => {
+    // History is a view, not a session: every gym by default, a split
+    // exercise included ([[gym.split]]).
+    expect(await best()).toMatchObject({ sessionId: 'home-1', weight: 150 });
   });
 
-  it('agrees with the records panel of the session the reader came from', async () => {
-    for (const inSessionId of ['home-1', 'club-1', 'none-1']) {
-      const panel = await loadExerciseBests({ exerciseDefinitionId: BENCH, inSessionId });
-
-      expect(await best({ inSessionId })).toMatchObject({
-        sessionId: panel.topWeight!.sessionId, weight: panel.topWeight!.weight,
-      });
-    }
-  });
-
-  it('keeps the one gym filter narrowing the sessions, bucket and filter agreeing', async () => {
-    expect(await best({ gymId: 'club', inSessionId: 'club-1' })).toMatchObject({ sessionId: 'club-1' });
-    expect(await best({ gymId: null, inSessionId: 'none-1' })).toMatchObject({ sessionId: 'none-1' });
+  it('narrows to the one gym the filter names, the sessions with no gym included', async () => {
+    expect(await best({ gymId: 'club' })).toMatchObject({ sessionId: 'club-1', weight: 90 });
+    expect(await best({ gymId: null })).toMatchObject({ sessionId: 'none-1', weight: 70 });
   });
 });
 
@@ -492,15 +481,15 @@ describe('records from the facts equal the replay on a generated history', () =>
 
     let compared = 0;
     for (const gym of ['home', 'club', null] as const) {
-      const entries = history.filter((entry) => (entry.gymId ?? null) === gym);
-      // Any session at that gym names the bucket; take the first.
+      // A gym session reads its gym's own sessions; a no-gym session reads the
+      // whole exercise, which is the replay over every completed session.
+      const entries = gym === null ? history : history.filter((entry) => (entry.gymId ?? null) === gym);
+      // Any session at that gym is a session in hand there; take the first.
       const inSessionId = db().select().from(sessions).all()
         .find((row) => (row.gymId ?? null) === gym)!.id;
 
       const fromFacts = await loadExerciseRecords({ exerciseDefinitionId: BENCH, inSessionId });
 
-      // The split narrows the exercise to one gym, which is exactly what the
-      // replay over that gym's completed sessions derives.
       expect(rounded({ gym, ...fromFacts }))
         .toEqual(rounded({ gym, records: replayRecords(entries), last: deriveLastSession(entries) }));
       compared += fromFacts.records.oneRepMax ? 1 : 0;

@@ -98,10 +98,9 @@ mix values.
   none. A row with zero working sets may still hold a Volume record;
   `volume_kg` is the training-metrics §4 Volume, null only when its sum is
   not finite.
-- **Bucket.** `gym_bucket` names the bucket a row was folded in: every gym
-  pooled, or the session's own gym for a definition split per gym
-  (`reportingBucket`, training-metrics §3). Records and flags are per
-  (definition, bucket): no reader pools a split exercise.
+- **Bucket.** `gym_bucket` names the record book a row's PR flags came from:
+  the whole exercise, or the session's gym on a definition split per gym
+  (`reportingBucket`, training-metrics §3).
 - **Records are always read from strictly earlier sessions** — those before the
   viewed session's `completed_at`, or before now while it is active — so a
   session never counts toward its own markers and later sessions never count.

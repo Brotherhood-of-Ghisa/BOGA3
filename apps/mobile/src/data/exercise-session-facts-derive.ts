@@ -3,10 +3,12 @@
 // out, each with the session's bests and personal-record flags. A row can
 // carry volume with zero working sets when the two policies differ.
 //
-// Records are folded per (definition, reporting bucket), so an exercise split
-// per gym keeps each gym's records and PR flags to themselves ([[gym.split]]).
+// An exercise split per gym keeps each gym's records and PR flags to itself,
+// beside the whole-exercise book every exercise has ([[gym.split]]).
 
-import { reportingBucket, type GymBucketKey, type GymSplitDefinition } from '@/src/exercise-calculations/gym-bucket';
+import {
+  isPooledGymBucket, reportingBucket, type GymBucketKey, type GymSplitDefinition,
+} from '@/src/exercise-calculations/gym-bucket';
 import { summarizeSessionBests } from '@/src/exercise-calculations/best-set';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { compareRecordOrder, createRecordBook } from '@/src/exercise-calculations/records';
@@ -83,30 +85,38 @@ export const summarizeFactSession = (
 
 /**
  * Facts for one definition across its completed history, in PR-history order.
- * The PR flags are the record book's (`records.ts`), one book per reporting
- * bucket: a split exercise's gyms never raise each other's records, and an
- * unsplit one has a single pooled book. A Volume that left out a set whose
- * load cannot be calculated competes like any other.
+ * The PR flags are the record book's (`records.ts`). Every session feeds the
+ * whole-exercise book; on a split exercise a session at a gym also feeds that
+ * gym's own book, and its row takes that book's flags — so one gym never sets
+ * or raises another's records, while a session with no gym is measured
+ * against the whole exercise. A Volume that left out a set whose load cannot
+ * be calculated competes like any other.
  */
 export const deriveExerciseSessionFacts = (
   definition: FactsDefinitionInput,
   sessions: FactsSessionInput[],
 ): ExerciseSessionFactRow[] => {
-  const books = new Map<GymBucketKey, ReturnType<typeof createRecordBook>>();
+  const pooled = createRecordBook();
+  const gymBooks = new Map<GymBucketKey, ReturnType<typeof createRecordBook>>();
   return [...sessions]
     .sort(compareFactSessionOrder)
     .flatMap((session) => {
       const summary = summarizeFactSession(definition, session);
       if (!summary) return [];
       const { topWeightReps, ...bests } = summary;
-      const book = books.get(bests.gymBucket) ?? createRecordBook();
-      books.set(bests.gymBucket, book);
-      const flags = book.add({
+      const entry = {
         oneRepMax: bests.bestE1rmKg === null ? null : { value: bests.bestE1rmKg },
         weight: bests.topWeightKg === null || topWeightReps === null
           ? null : { weight: bests.topWeightKg, reps: topWeightReps },
         volume: bests.volumeKg === null ? null : { value: bests.volumeKg },
-      });
+      };
+      const pooledFlags = pooled.add(entry);
+      let flags = pooledFlags;
+      if (!isPooledGymBucket(bests.gymBucket)) {
+        const book = gymBooks.get(bests.gymBucket) ?? createRecordBook();
+        gymBooks.set(bests.gymBucket, book);
+        flags = book.add(entry);
+      }
       return [{ ...bests, prE1rm: flags.oneRepMax, prWeight: flags.weight, prVolume: flags.volume }];
     });
 };

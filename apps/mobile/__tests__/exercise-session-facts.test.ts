@@ -506,11 +506,12 @@ describe('exercise session facts — reporting buckets over the database', () =>
     split(true);
 
     expect(await buckets()).toEqual([
-      // Each bucket's first session is its own baseline, never a record.
+      // Each gym's first session is its own baseline, never a record.
       ['home-1', 'gym:gym-home', false],
       ['club-1', 'gym:gym-club', false],
       ['club-2', 'gym:gym-club', true],
-      ['none-1', 'no-gym', false],
+      // No gym: measured against the whole exercise, where Home's 100 kg stands.
+      ['none-1', 'all', false],
     ]);
   });
 
@@ -543,7 +544,7 @@ describe('exercise session facts — reporting buckets over the database', () =>
 
     const rows = expectIncrementalEqualsFullRebuild([BENCH]);
     expect(rows.map((row) => [row.sessionId, row.gymBucket]))
-      .toEqual([['home-1', 'gym:gym-club'], ['club-1', 'gym:gym-club'], ['club-2', 'gym:gym-club'], ['none-1', 'no-gym']]);
+      .toEqual([['home-1', 'gym:gym-club'], ['club-1', 'gym:gym-club'], ['club-2', 'gym:gym-club'], ['none-1', 'all']]);
   });
 
   it('queues nothing when a session keeps the gym it already had', () => {
@@ -555,14 +556,16 @@ describe('exercise session facts — reporting buckets over the database', () =>
     expect(queued()).toEqual([]);
   });
 
-  it('compares a session only with its own bucket\'s earlier records', async () => {
+  it('compares a gym session with its gym\'s own records, a no-gym session with the whole exercise', async () => {
     split(true);
     const baselines = async (sessionId: string, completedAt: Date) =>
       recordBaselinesOf(await loadEarlierBestsByDefinition({ sessionId, completedAt }, [BENCH]));
 
-    // Pooled, Home's 100 kg would be the bar for every later session.
+    // Unsplit, Home's 100 kg would be the bar for every later session.
     expect((await baselines('club-2', day(3))).get(BENCH)).toMatchObject({ weight: { weight: 60, reps: 5 } });
-    expect((await baselines('none-1', day(4))).get(BENCH)).toBeUndefined();
+    expect((await baselines('none-1', day(4))).get(BENCH)).toMatchObject({ weight: { weight: 100, reps: 5 } });
+    // Club's first session has no earlier row in its own book.
+    expect((await baselines('club-1', day(2))).get(BENCH)).toBeUndefined();
 
     split(false);
     expect((await baselines('club-2', day(3))).get(BENCH)).toMatchObject({ weight: { weight: 100, reps: 5 } });

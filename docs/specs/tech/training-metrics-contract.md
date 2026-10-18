@@ -143,20 +143,18 @@ sets. There are three kinds:
   never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
   Volume that left out sets whose load cannot be calculated competes like
   any other (§4); one whose sum is not finite has no value.
-- **Scope.** A record belongs to one *reporting bucket*: every gym pooled, or —
-  for an exercise set to report each gym separately ([[gym.split]]) — the
-  session's own gym, the sessions with no gym forming their own bucket.
-  `reportingBucket` (`exercise-calculations/gym-bucket.ts`) is the one
-  implementation; the fold runs once per bucket, so one gym never sets or
-  raises another's record and a split exercise is never pooled. A reader
-  viewing a session reports that session's gym's bucket; one with no session
-  and no gym named reports the most recently performed bucket. Which bucket to
-  report is not a gym filter and narrows nothing on its own, so a reader takes
-  the session, never a second gym. Within the bucket every gym's sessions count by default, and
-  where a screen offers the current-gym filter (today only the exercise page)
-  only that gym's do — on a split exercise that selects what the split already
-  selected. A completed session being edited, and an active session, are
-  compared only with the sessions before it.
+- **Scope.** Every exercise has its whole-exercise records, every gym pooled.
+  An exercise set to report each gym separately ([[gym.split]]) also keeps one
+  record book per gym. A session at a gym takes its records and PR flags from
+  that gym's book, so one gym never sets or raises another's; a session with
+  no gym takes them from the whole exercise. `reportingBucket`
+  (`exercise-calculations/gym-bucket.ts`) is the one implementation. The
+  session in hand picks the book, so a reader takes the session
+  (`inSessionId`), never a second gym. A view with no session — exercise
+  history, Progress — reads the whole exercise until a gym is chosen. The
+  current-gym filter (today only the exercise page) narrows to the session's
+  gym; with no gym it is off. A completed session being edited, and an active
+  session, are compared only with the sessions before it.
 - **A session's PRs** are one per record kind each exercise took, so one
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these

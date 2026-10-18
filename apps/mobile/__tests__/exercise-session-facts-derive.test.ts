@@ -301,7 +301,7 @@ describe('exercise session facts — reporting bucket', () => {
       .toEqual([['s1', 'all', false], ['s2', 'all', true], ['s3', 'all', false]]);
   });
 
-  it('keys a split exercise on the session\'s gym, the no-gym sessions in their own bucket', () => {
+  it('keys a split exercise\'s gym sessions on their gym, and its no-gym sessions on the whole exercise', () => {
     const rows = deriveExerciseSessionFacts(SPLIT, [
       session('s1', 1, [block('a1', 0, [['100', '5']])], HOME),
       session('s2', 2, [block('b1', 0, [['105', '5']])], CLUB),
@@ -309,10 +309,10 @@ describe('exercise session facts — reporting bucket', () => {
     ]);
 
     expect(rows.map((row) => [row.sessionId, row.gymBucket]))
-      .toEqual([['s1', 'gym:gym-home'], ['s2', 'gym:gym-club'], ['s3', 'no-gym']]);
+      .toEqual([['s1', 'gym:gym-home'], ['s2', 'gym:gym-club'], ['s3', 'all']]);
   });
 
-  it('folds each bucket on its own, so one gym never sets or raises another\'s records', () => {
+  it('folds each gym on its own, so one gym never sets or raises another\'s records', () => {
     const history = [
       // Home's baseline, then a lighter Club session that is still Club's own
       // baseline, then a Club session beating only Club, then a Home session
@@ -321,7 +321,6 @@ describe('exercise session facts — reporting bucket', () => {
       session('club-1', 2, [block('b1', 0, [['60', '5']])], CLUB),
       session('club-2', 3, [block('c1', 0, [['70', '5']])], CLUB),
       session('home-2', 4, [block('d1', 0, [['105', '5']])], HOME),
-      session('none-1', 5, [block('e1', 0, [['40', '5']])], null),
     ];
 
     expect(flags(deriveExerciseSessionFacts(SPLIT, history))).toEqual([
@@ -329,11 +328,35 @@ describe('exercise session facts — reporting bucket', () => {
       { sessionId: 'club-1', prE1rm: false, prWeight: false, prVolume: false },
       { sessionId: 'club-2', prE1rm: true, prWeight: true, prVolume: true },
       { sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true },
-      { sessionId: 'none-1', prE1rm: false, prWeight: false, prVolume: false },
     ]);
-    // Pooled, only the two heaviest sessions are records at all.
+    // Unsplit, only the heaviest session is a record at all.
     expect(flags(deriveExerciseSessionFacts(DEFINITION, history)).filter((row) => row.prE1rm))
       .toEqual([{ sessionId: 'home-2', prE1rm: true, prWeight: true, prVolume: true }]);
+  });
+
+  it('measures a no-gym session against the whole exercise, every gym included', () => {
+    const rows = flags(deriveExerciseSessionFacts(SPLIT, [
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('club-1', 2, [block('b1', 0, [['60', '5']])], CLUB),
+      // 80 kg would be Club's record, but a no-gym session is compared with
+      // every gym, and Home's 100 kg stands.
+      session('none-1', 3, [block('c1', 0, [['80', '5']])], null),
+      session('none-2', 4, [block('d1', 0, [['110', '5']])], null),
+    ]));
+
+    expect(rows.find((row) => row.sessionId === 'none-1')).toMatchObject({ prE1rm: false, prWeight: false });
+    expect(rows.find((row) => row.sessionId === 'none-2')).toMatchObject({ prE1rm: true, prWeight: true });
+  });
+
+  it('never lets a no-gym session set or raise a gym\'s own records', () => {
+    const rows = flags(deriveExerciseSessionFacts(SPLIT, [
+      session('home-1', 1, [block('a1', 0, [['100', '5']])], HOME),
+      session('none-1', 2, [block('b1', 0, [['150', '5']])], null),
+      // Home's own bar is still 100 kg: 105 kg is a Home PR.
+      session('home-2', 3, [block('c1', 0, [['105', '5']])], HOME),
+    ]));
+
+    expect(rows.find((row) => row.sessionId === 'home-2')).toMatchObject({ prE1rm: true, prWeight: true });
   });
 
   it('orders each bucket by the same record order, ties to the earlier session', () => {

@@ -266,14 +266,10 @@ describe('ExerciseHistoryRoute over real data', () => {
 
   it('still lists every gym under Current gym only when the session had no gym', async () => {
     // A session with no gym sends no `currentGymId`, so there is no gym to
-    // narrow to and the filter is inert. `fromSessionId` is not a filter: it
-    // only lets a split exercise's bests pick that session's bucket.
+    // narrow to and the filter is inert.
     act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
 
-    await openHistory(
-      { exerciseDefinitionId: SQUAT, fromSessionId: EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId },
-      logSquatElsewhere
-    );
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
 
     expect(sessionCards()).toContain('history_elsewhere_squat');
     expect(screen.queryByTestId('exercise-history-empty-state')).toBeNull();

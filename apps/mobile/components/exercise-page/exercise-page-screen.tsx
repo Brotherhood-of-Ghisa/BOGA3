@@ -395,9 +395,6 @@ export function ExercisePageScreen({
                 pathname: '/exercise-history',
                 params: {
                   exerciseDefinitionId: exercise.exerciseDefinitionId,
-                  // The session carries the bucket over the hop ([[gym.split]]);
-                  // `currentGymId` stays the gym filter's input alone.
-                  fromSessionId: sessionId,
                   ...(currentGymId ? { currentGymId } : {}),
                 },
               })
