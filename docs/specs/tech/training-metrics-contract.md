@@ -143,18 +143,17 @@ sets. There are three kinds:
   never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
   Volume that left out sets whose load cannot be calculated competes like
   any other (§4); one whose sum is not finite has no value.
-- **Scope.** Every exercise has its whole-exercise records, every gym pooled.
-  An exercise set to report each gym separately ([[gym.split]]) also keeps one
-  record book per gym. A session at a gym takes its records and PR flags from
-  that gym's book, so one gym never sets or raises another's; a session with
-  no gym takes them from the whole exercise. `reportingBucket`
-  (`exercise-calculations/gym-bucket.ts`) is the one implementation. The
-  session in hand picks the book, so a reader takes the session
-  (`inSessionId`), never a second gym. A view with no session — exercise
-  history, Progress — reads the whole exercise until a gym is chosen. The
-  current-gym filter (today only the exercise page) narrows to the session's
-  gym; with no gym it is off. A completed session being edited, and an active
-  session, are compared only with the sessions before it.
+- **Scope.** Which sessions a record is taken over, per exercise split per
+  gym or not, is [[gym.split]]. `reportingBucket`
+  (`exercise-calculations/gym-bucket.ts`) is its one implementation: it names
+  the book a session's own records come from. Each facts row keeps two flag
+  sets — `pr_*` against the whole exercise, `own_pr_*` against that book — so
+  views read the first and a session's own PRs (Today) the second. The book is
+  picked by the session in hand, so a reader takes the session
+  (`inSessionId`), never a second gym. The current-gym filter (today only the
+  exercise page) narrows to the session's gym, and is off when it has none. A
+  completed session being edited, and an active session, are compared only
+  with the sessions before it.
 - **A session's PRs** are one per record kind each exercise took, so one
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these

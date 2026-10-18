@@ -52,7 +52,10 @@ export type FactsDefinitionInput = GymSplitDefinition & { id: string };
 
 export type ExerciseSessionFactRow = ExerciseSessionFact;
 
-type SessionBests = Omit<ExerciseSessionFactRow, 'prE1rm' | 'prWeight' | 'prVolume'> & { topWeightReps: number | null };
+type SessionBests = Omit<
+  ExerciseSessionFactRow,
+  'prE1rm' | 'prWeight' | 'prVolume' | 'ownPrE1rm' | 'ownPrWeight' | 'ownPrVolume'
+> & { topWeightReps: number | null };
 
 /** The order PR history uses: the record order (`compareRecordOrder`). */
 export const compareFactSessionOrder = compareRecordOrder;
@@ -86,17 +89,17 @@ export const summarizeFactSession = (
 /**
  * Facts for one definition across its completed history, in PR-history order.
  * The PR flags are the record book's (`records.ts`). Every session feeds the
- * whole-exercise book; on a split exercise a session at a gym also feeds that
- * gym's own book, and its row takes that book's flags — so one gym never sets
- * or raises another's records, while a session with no gym is measured
- * against the whole exercise. A Volume that left out a set whose load cannot
- * be calculated competes like any other.
+ * whole-exercise book, whose flags are `pr_*`. On a split exercise a session
+ * at a gym also feeds that gym's own book, and its `own_pr_*` are that book's,
+ * so one gym never sets or raises another's records; everywhere else
+ * `own_pr_*` are the whole exercise's. A Volume that left out a set whose load
+ * cannot be calculated competes like any other.
  */
 export const deriveExerciseSessionFacts = (
   definition: FactsDefinitionInput,
   sessions: FactsSessionInput[],
 ): ExerciseSessionFactRow[] => {
-  const pooled = createRecordBook();
+  const whole = createRecordBook();
   const gymBooks = new Map<GymBucketKey, ReturnType<typeof createRecordBook>>();
   return [...sessions]
     .sort(compareFactSessionOrder)
@@ -110,13 +113,17 @@ export const deriveExerciseSessionFacts = (
           ? null : { weight: bests.topWeightKg, reps: topWeightReps },
         volume: bests.volumeKg === null ? null : { value: bests.volumeKg },
       };
-      const pooledFlags = pooled.add(entry);
-      let flags = pooledFlags;
+      const flags = whole.add(entry);
+      let own = flags;
       if (!isPooledGymBucket(bests.gymBucket)) {
         const book = gymBooks.get(bests.gymBucket) ?? createRecordBook();
         gymBooks.set(bests.gymBucket, book);
-        flags = book.add(entry);
+        own = book.add(entry);
       }
-      return [{ ...bests, prE1rm: flags.oneRepMax, prWeight: flags.weight, prVolume: flags.volume }];
+      return [{
+        ...bests,
+        prE1rm: flags.oneRepMax, prWeight: flags.weight, prVolume: flags.volume,
+        ownPrE1rm: own.oneRepMax, ownPrWeight: own.weight, ownPrVolume: own.volume,
+      }];
     });
 };

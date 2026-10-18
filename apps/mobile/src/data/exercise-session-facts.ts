@@ -206,8 +206,8 @@ const writeFacts = (tx: FactsTx, scope: DefinitionScope): number => {
     { id: definitionId, splitByGym: splitByGym.get(definitionId) ?? false } satisfies FactsDefinitionInput,
     history,
   ));
-  // 14 columns a row: 60 rows stay under the bound-parameter limit.
-  for (const batch of chunks(rows, 60)) {
+  // 17 columns a row: 50 rows stay under the bound-parameter limit.
+  for (const batch of chunks(rows, 50)) {
     tx.insert(exerciseSessionFacts).values(batch).run();
   }
   return rows.length;
@@ -281,6 +281,9 @@ const factColumns = {
   prE1rm: exerciseSessionFacts.prE1rm,
   prWeight: exerciseSessionFacts.prWeight,
   prVolume: exerciseSessionFacts.prVolume,
+  ownPrE1rm: exerciseSessionFacts.ownPrE1rm,
+  ownPrWeight: exerciseSessionFacts.ownPrWeight,
+  ownPrVolume: exerciseSessionFacts.ownPrVolume,
 };
 
 // Rows are FK-free: reads inner-join the live, completed, non-deleted session.
@@ -307,7 +310,11 @@ export const loadExerciseSessionFacts = async (
     .all());
 };
 
-/** Facts carrying any PR flag with `from <= completed_at < to`, in PR-history order. */
+/**
+ * Facts whose session set any PR of its own (`own_pr_*`, [[gym.split]]) with
+ * `from <= completed_at < to`, in PR-history order: the PRs a session is
+ * credited with, which on a split exercise are its gym's.
+ */
 export const loadFlaggedExerciseSessionFacts = async (
   window: { from: Date; to: Date },
 ): Promise<ExerciseSessionFactRow[]> => {
@@ -319,9 +326,9 @@ export const loadFlaggedExerciseSessionFacts = async (
       gte(exerciseSessionFacts.achievedAt, window.from),
       lt(exerciseSessionFacts.achievedAt, window.to),
       or(
-        eq(exerciseSessionFacts.prE1rm, true),
-        eq(exerciseSessionFacts.prWeight, true),
-        eq(exerciseSessionFacts.prVolume, true),
+        eq(exerciseSessionFacts.ownPrE1rm, true),
+        eq(exerciseSessionFacts.ownPrWeight, true),
+        eq(exerciseSessionFacts.ownPrVolume, true),
       ),
     ))
     .all());

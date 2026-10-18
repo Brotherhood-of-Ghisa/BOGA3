@@ -495,8 +495,9 @@ describe('exercise session facts — reporting buckets over the database', () =>
   const split = (on: boolean) => db().update(exerciseDefinitions)
     .set({ splitByGym: on }).where(eq(exerciseDefinitions.id, BENCH)).run();
 
+  /** Each row's book and its own Weight PR (what Today credits the session with). */
   const buckets = async () => (await loadExerciseSessionFacts(BENCH))
-    .map((row) => [row.sessionId, row.gymBucket, row.prWeight] as const);
+    .map((row) => [row.sessionId, row.gymBucket, row.ownPrWeight] as const);
 
   it('pools every gym until the flag is set, then keys each session on its own gym', async () => {
     expect(await buckets()).toEqual([
@@ -513,6 +514,9 @@ describe('exercise session facts — reporting buckets over the database', () =>
       // No gym: measured against the whole exercise, where Home's 100 kg stands.
       ['none-1', 'all', false],
     ]);
+    // The whole exercise's own flags are untouched by the split: Club's 70 kg
+    // never beat Home's 100 kg, so no session is a whole-exercise record.
+    expect((await loadExerciseSessionFacts(BENCH)).map((row) => row.prWeight)).toEqual([false, false, false, false]);
   });
 
   it('counts a split exercise\'s PRs per bucket wherever a window reads the flags', async () => {
@@ -525,6 +529,19 @@ describe('exercise session facts — reporting buckets over the database', () =>
     // Club's second session beats Club's own bar, so Today counts its PRs.
     expect((await loadFlaggedExerciseSessionFacts(window)).map((row) => [row.sessionId, row.gymBucket]))
       .toEqual([['club-2', 'gym:gym-club']]);
+  });
+
+  it('marks whole-exercise PRs in Progress while Today credits the gym\'s own', async () => {
+    split(true);
+    const options = { exerciseDefinitionId: BENCH, start: day(0, 0), end: day(9, 0), timeZone: 'UTC' };
+
+    // Progress shows the whole exercise until a gym is chosen ([[gym.split]]):
+    // Club's 70 kg never beat Home's 100 kg, so no day carries a Weight PR.
+    const history = await computeSelectedExerciseHistoryEffort(options);
+    expect(history.daily.map((entry) => entry.personalRecordCounts.highestWeight)).toEqual([0, 0, 0, 0]);
+    // Today counts the session's own PRs: club-2 beat Club's own bar.
+    expect((await loadFlaggedExerciseSessionFacts({ from: day(0), to: day(9) })).map((row) => row.sessionId))
+      .toEqual(['club-2']);
   });
 
   it('queues the definition when the split is toggled, and the rebuild equals a full one', () => {

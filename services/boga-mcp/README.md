@@ -44,10 +44,12 @@ Two create-only planning tools (require explicit plan permission, idempotent):
 - `create_training_programme` — create a multi-session programme with pending blocks.
 
 `get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`
-for an exercise the user tracks separately per gym ([[gym.split]]): a gym id, or
-`none` for the sessions with no gym. Context reports each gym's own records in
-`gym_buckets` and its other figures for the fact's bucket, while history pages
-across every gym with each set carrying its own.
+for an exercise the user tracks separately per gym: a gym id, or `none` for the
+sessions with no gym. Context reports each gym's own records in `gym_buckets`
+and its other figures for the most recently performed bucket, while history
+pages across every gym with each set carrying its own. These tools still
+predate [[gym.split]]'s whole-exercise default
+([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
 
 Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled

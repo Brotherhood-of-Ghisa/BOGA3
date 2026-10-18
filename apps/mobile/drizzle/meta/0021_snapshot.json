@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bbf18175-ce3f-434e-b447-138972967c53",
+  "id": "4d1066a6-3d8d-4995-baa5-8829453bd99f",
   "prevId": "5995a146-b6f6-4f20-a5cf-f1dd30516706",
   "tables": {
     "body_weight_measurements": {
@@ -573,6 +573,30 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "own_pr_e1rm": {
+          "name": "own_pr_e1rm",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "own_pr_weight": {
+          "name": "own_pr_weight",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "own_pr_volume": {
+          "name": "own_pr_volume",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {

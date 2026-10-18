@@ -230,10 +230,13 @@ it and `exercise.gym` name it. Per-gym records are the context route's.
 ## Gym buckets
 
 An exercise the user tracks separately per gym (`exercise.split_by_gym`) is
-bucketed and never pooled as [[gym.split]] says, so no figure here spans gyms.
-Context computes its figures for one bucket, the fact's default unless
-`gym_bucket` names another. History instead returns every gym's sets and labels
-each one, so `gym_bucket` there is a filter rather than a default. Either way
+reported per gym here, with the sessions that had no gym as their own bucket,
+and no figure spans gyms. Context computes its figures for one bucket: the most
+recently performed one unless `gym_bucket` names another. History instead
+returns every gym's sets and labels each one, so `gym_bucket` there is a filter
+rather than a default. [[gym.split]] now makes the whole exercise the default
+and folds no-gym sessions into it; this route has not moved yet
+([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)). Either way
 `gym_bucket` is a gym id, or `none` for the sessions with no gym (so a gym whose
 own id is `none` cannot be named), and it is `400 INVALID_ARGUMENT` on an
 exercise that is not split, or empty, or against a cursor for another bucket,

@@ -135,7 +135,7 @@ export const generatedMigrationBundle = {
   },
   {
     idx: 21,
-    when: 1792263111718,
+    when: 1792311405082,
     tag: "0021_facts_gym_bucket",
     breakpoints: true,
   },
@@ -804,12 +804,14 @@ ALTER TABLE \`exercise_session_facts\` DROP COLUMN \`volume_complete\`;
 `,
   m0019: `ALTER TABLE \`session_plan_exercises\` DROP COLUMN \`machine_name\`;`,
   m0020: `ALTER TABLE \`exercise_definitions\` ADD \`split_by_gym\` integer DEFAULT false NOT NULL;`,
-  m0021: `-- Records, PR flags and \`Last\` are keyed on (definition, reporting bucket)
--- ([[gym.split]]): every gym pooled, unless the definition is split per gym,
--- when the bucket is the session's own gym. The rules-version bump in
--- exercise-session-facts-derive.ts rebuilds every row, so the column default
--- never stands in for a real bucket.
+  m0021: `-- Each fact row names the record book its own PR flags come from, and keeps
+-- both flag sets: \`pr_*\` against the whole exercise, \`own_pr_*\` against that
+-- book (exercise-session-facts-derive.ts). The rules-version bump rebuilds
+-- every row, so the column defaults never stand in for a real value.
 ALTER TABLE \`exercise_session_facts\` ADD \`gym_bucket\` text DEFAULT 'all' NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_session_facts\` ADD \`own_pr_e1rm\` integer DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_session_facts\` ADD \`own_pr_weight\` integer DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_session_facts\` ADD \`own_pr_volume\` integer DEFAULT false NOT NULL;--> statement-breakpoint
 CREATE INDEX \`exercise_session_facts_definition_bucket_idx\` ON \`exercise_session_facts\` (\`exercise_definition_id\`,\`gym_bucket\`,\`achieved_at\`);
 --> statement-breakpoint
 -- A session's gym now selects its bucket, so moving a completed session to
