@@ -25,6 +25,7 @@ import {
   nextExerciseSortMode,
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
+import { comparisonFigures } from '@/components/stats/comparison-columns';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
 import ProgressRoute from '../app/(tabs)/progress';
@@ -205,8 +206,7 @@ const buildShellProps = (
   isLoading: false,
   errorMessage: null,
   viewMode: 'muscle',
-  muscleLayout: 'heatmap',
-  onSelectMuscleLayout: jest.fn(),
+  muscleLayout: overrides.viewMode === 'exercise' ? 'list' : 'heatmap',
   onSelectViewMode: jest.fn(),
   tableMetric: 'workingSetCount',
   onSelectTableMetric: jest.fn(),
@@ -274,6 +274,21 @@ describe('formatCountDelta', () => {
   it('renders positive and negative count deltas without percentages', () => {
     expect(formatCountDelta(8, 6)).toEqual({ text: '+2', tone: 'positive' });
     expect(formatCountDelta(3, 6)).toEqual({ text: '−3', tone: 'negative' });
+  });
+});
+
+describe('working-count comparison figures', () => {
+  const figures = (now: number, previous: number) => comparisonFigures({
+    current: { workingSetCount: now, totalVolume: 0 }, previous: { workingSetCount: previous, totalVolume: 0 },
+  }, 'workingSetCount');
+  it('keeps finite weighted half-counts numeric and signed', () => {
+    expect(figures(2.5, 1)).toEqual({ now: '2.5', previous: '1', change: { text: '+1.5', tone: 'positive' } });
+  });
+  it.each([[Infinity, 1], [.5, NaN], [Infinity, Infinity]])('keeps unavailable current/previous counts neutral (%s, %s)', (now, previous) => {
+    const result = figures(now, previous);
+    expect(result.now).toBe(Number.isFinite(now) ? String(now) : '—');
+    expect(result.previous).toBe(Number.isFinite(previous) ? String(previous) : '—');
+    expect(result.change).toEqual({ text: '—', tone: 'neutral' });
   });
 });
 
@@ -467,20 +482,31 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('offers the heatmap through the presentation filter and hides that filter for exercises', () => {
+  it('uses the same supplied layout for Exercise and Muscle, keeping 1RM in List without changing that choice', () => {
+    const props = buildShellProps({ viewMode: 'exercise', muscleLayout: 'heatmap' });
+    const view = render(<StatsScreenShell {...props} />);
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+    view.rerender(<StatsScreenShell {...props} viewMode="muscle" />);
+    expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="estimatedOneRepMax" />);
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="totalVolume" />);
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    view.rerender(<StatsScreenShell {...props} muscleLayout="list" />);
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  });
+
+  it('uses the Settings layout without offering a presentation filter in Progress', () => {
     const props = buildShellProps({ muscleLayout: 'list' });
     const view = render(<StatsScreenShell {...props} />);
     expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-map')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-view-chip')).toHaveProp('accessibilityLabel', 'Muscle view: List. Activate to show Heatmap.');
-    fireEvent.press(screen.getByTestId('stats-muscle-view-chip'));
-    expect(props.onSelectMuscleLayout).toHaveBeenLastCalledWith('heatmap');
+    expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
     view.rerender(<StatsScreenShell {...props} muscleLayout="heatmap" />);
     expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-muscle-view-chip'));
-    expect(props.onSelectMuscleLayout).toHaveBeenLastCalledWith('list');
-    view.rerender(<StatsScreenShell {...props} viewMode="exercise" />);
     expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
   });
 

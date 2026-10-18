@@ -8,6 +8,7 @@ export type HeatmapView = 'daily' | 'weekly' | 'timeline';
 // breakdown's metric. The period is not one of them: every visit opens on
 // Settings' Progress period ([[comparison.window]]).
 export type ProgressBreakdown = 'exercise' | 'muscle';
+export type ProgressMuscleLayout = 'list' | 'heatmap';
 export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // The Exercise breakdown offers one more: a 1RM estimate is a figure only an
 // exercise has, so the Muscle table never shows it. Each breakdown remembers
@@ -33,6 +34,7 @@ export type AccountLocalPreferences = {
   historyLookbackWeeks: number;
   heatmapView: HeatmapView;
   progressBreakdown: ProgressBreakdown;
+  progressMuscleLayout: ProgressMuscleLayout;
   progressMetric: ProgressMetric;
   progressExerciseMetric: ProgressExerciseMetric;
   restTimerAutoStart: boolean;
@@ -58,6 +60,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   historyLookbackWeeks: 52,
   heatmapView: 'daily',
   progressBreakdown: 'muscle',
+  progressMuscleLayout: 'list',
   progressMetric: 'workingSetCount',
   progressExerciseMetric: 'workingSetCount',
   restTimerAutoStart: true,
@@ -69,7 +72,7 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 // Stored as their own text, not JSON: every other non-boolean field is written
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
-  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMetric', 'progressExerciseMetric',
+  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
 export const isNonNegativeSafeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -88,6 +91,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
   heatmapView: 'Choose Grid, Weekly or Timeline for history.',
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
+  progressMuscleLayout: 'Choose List or Map for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
@@ -112,6 +116,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'historyLookbackWeeks': return isPositiveSafeInteger(value) && value <= MAX_HISTORY_LOOKBACK_WEEKS;
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
+    case 'progressMuscleLayout': return value === 'list' || value === 'heatmap';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';

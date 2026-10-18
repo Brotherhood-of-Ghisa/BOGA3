@@ -44,6 +44,21 @@ it.each([null, 'monthly', '"weekly"', 'null', ''])('uses Daily for missing or in
   expect(Storage.getItemSync(key)).toBe(raw);
 });
 
+it.each(['list', 'heatmap'] as const)('remembers the %s Progress layout per account without changing history view', async layout => {
+  await account();
+  expect(values().progressMuscleLayout).toBe('list');
+  setAccountLocalPreferences({ progressMuscleLayout: layout, heatmapView: 'weekly' });
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressMuscleLayout'))).toBe(layout);
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values().progressMuscleLayout).toBe(layout);
+  expect(values().heatmapView).toBe('weekly');
+  await account('B');
+  expect(values().progressMuscleLayout).toBe('list');
+  await account('A');
+  expect(values().progressMuscleLayout).toBe(layout);
+});
+
 it.each(['daily', 'weekly'] as const)('preserves the saved %s view across relaunch and account switches', async view => {
   const key = preferenceKey('account:A', 'heatmapView');
   Storage.setItemSync(key, view);
@@ -107,7 +122,7 @@ it('restores the remembered Progress filters after relaunch, per account, as pla
   expect(values().progressMetric).toBe('totalVolume');
 });
 
-it.each(['progressBreakdown', 'progressMetric', 'progressExerciseMetric'] as const)(
+it.each(['progressBreakdown', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric'] as const)(
   'keeps the stored %s when an unreadable value is offered, and reports why', async field => {
     Storage.setItemSync(preferenceKey('account:A', field), '"muscle"');
     await account();
