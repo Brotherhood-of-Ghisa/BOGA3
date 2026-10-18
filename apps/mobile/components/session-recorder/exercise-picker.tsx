@@ -54,6 +54,8 @@ export type ExercisePickerProps = {
   onOpenManage: () => void;
   // The host's failed add, shown above the list.
   notice?: string | null;
+  /** The session the exercise joins: Repeat last reads its gym's book ([[gym.split]]). */
+  sessionId?: string | null;
 };
 
 function GroupsOnlyBody({
@@ -88,6 +90,7 @@ export function ExercisePicker({
   onOpenManage,
   notice = null,
   plannerEnabled = true,
+  sessionId = null,
 }: ExercisePickerProps) {
   const groupLinkingUserId = useGroupLinkingUserId();
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
@@ -183,7 +186,9 @@ export function ExercisePicker({
     preselectionRequestKeyRef.current = requestKey;
     setPreselection({ exercise, status: 'loading', suggestion: null });
 
-    void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id })
+    void loadSuggestedExercisePlan(sessionId
+      ? { exerciseDefinitionId: exercise.id, inSessionId: sessionId }
+      : { exerciseDefinitionId: exercise.id })
       .then((suggestion) => {
         if (!isMountedRef.current || preselectionRequestKeyRef.current !== requestKey) {
           return;

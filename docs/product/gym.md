@@ -9,8 +9,9 @@ current gym; a session with no gym counts only in the whole exercise.
 | Figure | Split exercise |
 | --- | --- |
 | A session's records and PRs: recorder, completion, share image, Today | its gym's; no gym: the whole exercise's |
-| Repeat last and plan prefill | newest session at the same gym; no gym: the whole exercise's newest |
-| Progress, exercise history, catalog stats, heatmaps, 1RM curve | the whole exercise until a gym is chosen |
+| Repeat last and plan prefill | newest session at the same gym, else the whole exercise's newest |
+| Progress, exercise history, catalog stats, heatmaps | the whole exercise until a gym is chosen |
+| 1RM curve | [[1rm.curve-scope]] |
 | Session, muscle and period totals; groups | the whole exercise |
 | Share image name | plain, never a gym |
 | Coaching | the whole exercise by default, or one named gym |
@@ -23,11 +24,16 @@ gym is usually a gym not worth recording, so it is compared with everything.
 Approved 2026-10-18.
 Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
 
-### gym.split-progress-prs · presentation · open
+### gym.split-progress-prs · presentation · accepted
 
-How a split exercise's gym PRs show in Progress. Wanted visible, probably
-behind a setting; mock first. Showing gym PRs and whole-exercise PRs side by
-side is parked.
+A split exercise's gym PRs show in Progress when that gym is chosen: a view
+with a gym chosen marks each session's own PRs — that gym's — and a view of
+every gym marks the whole exercise's. No setting. Showing gym PRs and
+whole-exercise PRs side by side is parked.
+
+Why: choosing the gym is the question "what are my PRs here", so no second
+switch is needed. Approved 2026-10-18 (mock option A).
+Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`.
 
 ### gym.split-label · presentation · superseded-by: gym.split
 

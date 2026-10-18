@@ -15,6 +15,7 @@ import {
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 import { normalizeSessionSetType } from './set-types';
+import { loadGymBookSessionIds, type GymBookContext } from './exercise-session-facts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -94,6 +95,11 @@ export type ExerciseBlockHistoryStore = {
   loadSetsForSessionExercises(input: {
     sessionExerciseIds: string[];
   }): Promise<ExerciseBlockHistorySetRow[]>;
+  /** `loadGymBookSessionIds`: the sessions of the book the block reads, or null for every session. */
+  loadGymBookSessionIds(input: {
+    exerciseDefinitionId: string;
+    at: GymBookContext;
+  }): Promise<ReadonlySet<string> | null>;
 };
 
 export type LoadRecentExerciseBlocksOptions = {
@@ -102,9 +108,16 @@ export type LoadRecentExerciseBlocksOptions = {
   now?: Date;
 };
 
-export type LoadSuggestedExercisePlanOptions = {
-  exerciseDefinitionId: string;
-};
+/**
+ * Where the block is planned names the record book whose newest session comes
+ * first ([[gym.split]]); it is not a filter. A session in hand is named by its
+ * id, never its gym (`src/utils/gym-scope-route.ts`); a plan, which is not a
+ * session, by its gym. Neither, or no gym, reads the whole exercise.
+ */
+export type LoadSuggestedExercisePlanOptions = { exerciseDefinitionId: string } & (
+  | { inSessionId?: string; gymId?: never }
+  | { gymId?: string | null; inSessionId?: never }
+);
 
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
 
@@ -238,11 +251,26 @@ export const aggregateExerciseBlockHistory = (
   };
 };
 
+/**
+ * The newest session with a performed set to repeat. Sessions in
+ * `preferredSessionIds` (a split exercise's gym book) come first; with none of
+ * them qualifying, the whole exercise's newest does ([[gym.split]]).
+ */
 export const selectSuggestedExercisePlanFromHistory = (input: {
   sessions: ExerciseBlockHistorySessionRow[];
   sessionExercises: ExerciseBlockHistorySessionExerciseRow[];
   setsBySessionExerciseId: Record<string, ExerciseBlockHistorySetRow[]>;
+  preferredSessionIds?: ReadonlySet<string> | null;
 }): ExerciseBlockHistorySuggestedPlan | null => {
+  const preferred = input.preferredSessionIds;
+  if (preferred) {
+    const inBook = selectSuggestedExercisePlanFromHistory({
+      ...input,
+      sessions: input.sessions.filter((session) => preferred.has(session.sessionId)),
+      preferredSessionIds: null,
+    });
+    if (inBook) return inBook;
+  }
   const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
   const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
 
@@ -370,6 +398,9 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       orderIndex: row.orderIndex,
     }));
   },
+  loadGymBookSessionIds({ exerciseDefinitionId, at }) {
+    return loadGymBookSessionIds(exerciseDefinitionId, at);
+  },
   async loadSetsForSessionExercises({ sessionExerciseIds }) {
     if (sessionExerciseIds.length === 0) return [];
     const database = await bootstrapLocalDataLayer();
@@ -467,12 +498,19 @@ export const createExerciseBlockHistoryRepository = (
       sessionIds,
     });
     const sessionExerciseIds = sessionExerciseRows.map((row) => row.sessionExerciseId);
-    const setRows = await store.loadSetsForSessionExercises({ sessionExerciseIds });
+    const [setRows, preferredSessionIds] = await Promise.all([
+      store.loadSetsForSessionExercises({ sessionExerciseIds }),
+      store.loadGymBookSessionIds({
+        exerciseDefinitionId: options.exerciseDefinitionId,
+        at: options.inSessionId ? { inSessionId: options.inSessionId } : { gymId: options.gymId ?? null },
+      }),
+    ]);
 
     return selectSuggestedExercisePlanFromHistory({
       sessions: recentSessions,
       sessionExercises: sessionExerciseRows,
       setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
+      preferredSessionIds,
     });
   },
 });

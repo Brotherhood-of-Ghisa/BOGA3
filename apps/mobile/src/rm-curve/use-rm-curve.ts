@@ -11,7 +11,7 @@ type Options = RmCurveQuery & { accountRevision: number; refreshRevision?: numbe
 /** Supply the account preference revision; foreign-account/filter results are never exposed. */
 export function useRmCurve(options: Options, load: typeof loadRmCurve = loadRmCurve) {
   const key = JSON.stringify([options.accountRevision, options.exerciseDefinitionId, options.start.getTime(), options.end.getTime(),
-    options.historyLookbackWeeks, options.gymId === undefined ? 'default' : options.gymId, options.rir ?? null]);
+    options.historyLookbackWeeks, options.gym === 'latest' ? 'latest' : ['scope', options.gym.gymId ?? (options.gym.gymId === null ? null : 'all')], options.rir ?? null]);
   const bodyRevision = useBodyWeightContextRevision();
   const [sourceRevision, setSourceRevision] = useState(0);
   const [retryRevision, setRetryRevision] = useState(0);

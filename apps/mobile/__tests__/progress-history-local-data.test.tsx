@@ -218,6 +218,30 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
   });
 
+  it('opens an exercise on the gym its link names, and the gym picker changes the days counted', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const noGymSession = 'maestro_exercise_block_history_squat_2';
+    localDataClient().prepare('UPDATE sessions SET gym_id = NULL WHERE id = ?').run(noGymSession);
+    // The fixture places that session four days before it was loaded.
+    const noGymDay = localDateKey(new Date(Date.now() - 4 * DAY_MS));
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    await openHistory({ exerciseDefinitionId: SQUAT, gymId: 'no-gym' });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    const trainingDays = () => renderedDailySample().filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
+    expect(trainingDays()).toEqual([noGymDay]);
+    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('No gym');
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    await waitFor(() => expect(trainingDays().length).toBeGreaterThan(1));
+    expect(trainingDays()).not.toContain(noGymDay);
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym-option-all'));
+    await waitFor(() => expect(trainingDays()).toContain(noGymDay));
+    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('All gyms');
+  });
+
   it('retries a failed exercise history read for the same definition, staying on the page', async () => {
     jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort').mockRejectedValueOnce(new Error('DB error'));
     await loadMaestroFixture('exercise-block-history');
@@ -379,7 +403,7 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
-    await act(async () => initial.resolve({ weekly: [], daily: [] }));
+    await act(async () => initial.resolve({ weekly: [], daily: [], gyms: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
     act(() => updatePreferences({ historyLookbackWeeks: 4 }));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
@@ -387,7 +411,7 @@ describe('The history page over real data', () => {
     expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
     // Pending with no data mounts no chart at all, in either view.
     expect(screen.queryAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(0);
-    await act(async () => reload.resolve({ weekly: [], daily: [] }));
+    await act(async () => reload.resolve({ weekly: [], daily: [], gyms: [] }));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
   });
 

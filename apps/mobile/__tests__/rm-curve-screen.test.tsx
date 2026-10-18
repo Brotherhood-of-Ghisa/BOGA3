@@ -47,7 +47,7 @@ it('labels dated bodyweight-inclusive per-side Load separately from raw Weight a
   db.insert(bodyWeightMeasurements).values({ id: 'bodyweight', measuredAt: new Date(2025, 0, 1), weightKg: 80 }).run();
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot'); expect(screen.getByText('LOAD (WITH DATED BODYWEIGHT) · PER SIDE')).toBeTruthy();
-  const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve' }))!;
+  const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve', gym: 'latest' }))!;
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByText('WEIGHT / 1RM · PER SIDE')).toBeTruthy();
   act(() => updatePreferences({ dateFormat: 'YYYY-MM-DD' }));

@@ -38,7 +38,12 @@ import {
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import { decodeGymRouteParam } from '@/src/utils/gym-scope-route';
+import {
+  ALL_GYMS_LABEL,
+  decodeGymRouteParam,
+  encodeGymRouteParam,
+  gymScopeLabel,
+} from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
@@ -53,6 +58,9 @@ const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string; accessibili
 
 // The tag filter's "no filter" chip. Tag ids are generated, never this.
 const ALL_TAGS = 'all';
+// The gym filter's "every gym" chip. The other chips carry the route encoding
+// (`encodeGymRouteParam`), so the no-gym chip is the reserved value.
+const ALL_GYMS = 'all-gyms';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -100,6 +108,8 @@ export type ExerciseHistoryScreenShellProps = {
   errorMessage: string | null;
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
   onSelectTag: (tagDefinitionId: string | null) => void;
+  /** Three-state, as `appliedGymId`. */
+  onSelectGym?: (gymId: string | null | undefined) => void;
   onPressSession: (sessionId: string) => void;
   activeMainTab?: MainTabKey;
   onSelectMainTab: (tab: MainTabKey) => void;
@@ -114,6 +124,7 @@ export function ExerciseHistoryScreenShell({
   errorMessage,
   onSelectPeriod,
   onSelectTag,
+  onSelectGym,
   onPressSession,
   activeMainTab = 'progress',
   onSelectMainTab,
@@ -131,6 +142,23 @@ export function ExerciseHistoryScreenShell({
     ],
     [tagOptions]
   );
+  const gymOptions = useMemo(() => summary?.gymOptions ?? [], [summary]);
+  const gymChips = useMemo<ChipOption<string>[]>(
+    () => [
+      { value: ALL_GYMS, label: ALL_GYMS_LABEL },
+      ...gymOptions.map((option) => ({
+        value: encodeGymRouteParam(option.gymId) as string,
+        label: `${option.name} · ${option.occurrenceCount}`,
+        accessibilityLabel: `Filter by gym ${option.name}, ${option.occurrenceCount} sessions`,
+      })),
+    ],
+    [gymOptions]
+  );
+  // A gym chip row needs a gym to tell apart (as `GymPicker`).
+  const showGyms = onSelectGym !== undefined && gymOptions.some((option) => option.gymId !== null);
+  const gymLabel = appliedGymId === undefined
+    ? null
+    : gymScopeLabel(appliedGymId, gymOptions.map((option) => ({ gymId: option.gymId, name: option.name })));
 
   return (
     <Screen testID="exercise-history-screen">
@@ -142,6 +170,25 @@ export function ExerciseHistoryScreenShell({
           testIDPrefix="exercise-history-period-chip"
           value={period}
         />
+
+        {summary && showGyms ? (
+          <ScrollView
+            contentContainerStyle={styles.tagRowContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            testID="exercise-history-gym-row">
+            <ChipGroup
+              accessibilityLabel="Filter by gym"
+              clearValue={ALL_GYMS}
+              mode="single"
+              onChange={(next) => onSelectGym?.(next === ALL_GYMS ? undefined : decodeGymRouteParam(next))}
+              options={gymChips}
+              style={styles.tagChips}
+              testIDPrefix="exercise-history-gym-chip"
+              value={encodeGymRouteParam(appliedGymId) ?? ALL_GYMS}
+            />
+          </ScrollView>
+        ) : null}
 
         {summary && tagOptions.length > 0 ? (
           <ScrollView
@@ -195,7 +242,7 @@ export function ExerciseHistoryScreenShell({
               />
             ) : null}
 
-            <BestCard best={summary.allTimeBest} onPressSession={onPressSession} />
+            <BestCard best={summary.allTimeBest} gymLabel={gymLabel} onPressSession={onPressSession} />
 
             {summary.sessions.length === 0 ? (
               <Card>
@@ -234,19 +281,24 @@ export function ExerciseHistoryScreenShell({
 }
 
 // The exercise's all-time bests: two rows that open the session holding each.
-// The figures are in `record`, the one superlative.
+// The figures are in `record`, the one superlative. With a gym chosen they are
+// that gym's, and the label names it.
 function BestCard({
   best,
+  gymLabel,
   onPressSession,
 }: {
   best: ExerciseHistorySummary['allTimeBest'];
+  gymLabel: string | null;
   onPressSession: (sessionId: string) => void;
 }) {
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
   return (
     <Card testID="exercise-history-best-card">
-      <Text allowFontScaling={false} style={styles.cardLabel}>All-time bests</Text>
+      <Text allowFontScaling={false} style={styles.cardLabel} testID="exercise-history-best-label">
+        {gymLabel ? `All-time bests · ${gymLabel}` : 'All-time bests'}
+      </Text>
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
@@ -388,14 +440,18 @@ export default function ExerciseHistoryRoute() {
   // (`src/utils/gym-scope-route.ts`): the chip's gym, else the gym the reader
   // came from under `Current gym only`, else every gym. A session with no gym
   // has no current gym to narrow to, so the filter stays off there.
+  // A chip the reader picks here wins over all three.
   const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
   const routeCurrentGymId = coerceRouteParam(params.currentGymId);
+  const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
   const appliedGymId: string | null | undefined =
-    routeGymId !== undefined
-      ? routeGymId
-      : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
-        ? routeCurrentGymId
-        : undefined;
+    chosenGym !== null
+      ? chosenGym.gymId
+      : routeGymId !== undefined
+        ? routeGymId
+        : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+          ? routeCurrentGymId
+          : undefined;
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -465,6 +521,14 @@ export default function ExerciseHistoryRoute() {
     [loadSummary, period, appliedGymId]
   );
 
+  const handleSelectGym = useCallback(
+    (next: string | null | undefined) => {
+      setChosenGym({ gymId: next });
+      void loadSummary(period, appliedTagDefinitionId, next);
+    },
+    [loadSummary, period, appliedTagDefinitionId]
+  );
+
   const title = summary?.exerciseName ?? 'Exercise History';
 
   return (
@@ -497,6 +561,7 @@ export default function ExerciseHistoryRoute() {
         errorMessage={errorMessage}
         onSelectPeriod={handleSelectPeriod}
         onSelectTag={handleSelectTag}
+        onSelectGym={handleSelectGym}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
         onSelectMainTab={openMainTab}
       />

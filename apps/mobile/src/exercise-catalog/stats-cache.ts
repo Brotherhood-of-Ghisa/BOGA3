@@ -2,6 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import {
   aggregateExerciseCatalogStats,
+  exerciseCatalogStatsGymOptions,
   loadExerciseCatalogStatsRawHistory,
   withInProgressSession,
   type ExerciseCatalogStats,
@@ -9,6 +10,7 @@ import {
   type ExerciseCatalogStatsRawHistory,
 } from '@/src/data/exercise-catalog-stats';
 import { progressComparisonWindows } from '@/src/data/stats';
+import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 import { isDevMode } from '@/src/utils/isDevMode';
 
@@ -153,9 +155,14 @@ export const __resetExerciseCatalogStatsCacheForTests = (): void => {
   maestroNextRead = null;
 };
 
+const useGymOptions = (raw: ExerciseCatalogStatsRawHistory | null): GymScopeOption[] =>
+  useMemo(() => exerciseCatalogStatsGymOptions(raw ?? EMPTY_RAW_HISTORY), [raw]);
+
 export type UseExerciseCatalogStatsResult = {
   status: ExerciseCatalogStatsCacheStatus;
   stats: ExerciseCatalogStats;
+  /** The gyms the history was trained at, for the host's gym picker. */
+  gymOptions: GymScopeOption[];
   rawHistory: ExerciseCatalogStatsRawHistory | null;
   lastError: string | null;
   reload: () => void;
@@ -166,6 +173,7 @@ export type UseExerciseCatalogComparisonResult = {
   /** The period in force, and the one before it ([[comparison.window]]). */
   current: ExerciseCatalogStats;
   previous: ExerciseCatalogStats;
+  gymOptions: GymScopeOption[];
   lastError: string | null;
   reload: () => void;
 };
@@ -173,9 +181,13 @@ export type UseExerciseCatalogComparisonResult = {
 /**
  * One exercise's two periods, for Progress's exercise breakdown: both windows
  * are derived from the same clock and the same loaded history, so a row's Now,
- * Prev and Change can never come from different reads.
+ * Prev and Change can never come from different reads. `gymId` is the one gym
+ * filter, three-state (`src/utils/gym-scope-route.ts`); unset is every gym.
  */
-export const useExerciseCatalogComparison = (weeks: number): UseExerciseCatalogComparisonResult => {
+export const useExerciseCatalogComparison = (
+  weeks: number,
+  gymId?: string | null
+): UseExerciseCatalogComparisonResult => {
   const snapshot = useSyncExternalStore(
     subscribeToExerciseCatalogStats,
     getExerciseCatalogStatsSnapshot,
@@ -186,29 +198,37 @@ export const useExerciseCatalogComparison = (weeks: number): UseExerciseCatalogC
     void ensureExerciseCatalogStatsLoaded();
   }, []);
 
+  // Measured to when the history loaded, like `useExerciseCatalogStats`.
+  // Progress counts the workout in progress — its gym included; the catalogue
+  // and pickers do not.
+  const raw = useMemo(
+    () => withInProgressSession(snapshot.rawHistory ?? EMPTY_RAW_HISTORY, new Date(snapshot.loadedAt)),
+    [snapshot.rawHistory, snapshot.loadedAt]
+  );
   const periods = useMemo(() => {
-    // Measured to when the history loaded, like `useExerciseCatalogStats`.
     const now = new Date(snapshot.loadedAt);
-    // Progress counts the workout in progress; the catalogue and pickers do not.
-    const raw = withInProgressSession(snapshot.rawHistory ?? EMPTY_RAW_HISTORY, now);
     const windows = progressComparisonWindows(weeks, now);
     return {
-      current: aggregateExerciseCatalogStats(raw, windows.current, now),
-      previous: aggregateExerciseCatalogStats(raw, windows.previous, now),
+      current: aggregateExerciseCatalogStats(raw, windows.current, now, { gymId }),
+      previous: aggregateExerciseCatalogStats(raw, windows.previous, now, { gymId }),
     };
-  }, [snapshot.rawHistory, snapshot.loadedAt, weeks]);
+  }, [raw, snapshot.loadedAt, weeks, gymId]);
+  const gymOptions = useGymOptions(raw);
 
   return {
     status: snapshot.status,
     current: periods.current,
     previous: periods.previous,
+    gymOptions,
     lastError: snapshot.lastError,
     reload: refreshExerciseCatalogStats,
   };
 };
 
+/** `gymId` is the one gym filter, as `useExerciseCatalogComparison`'s. */
 export const useExerciseCatalogStats = (
-  period: ExerciseCatalogStatsPeriod
+  period: ExerciseCatalogStatsPeriod,
+  gymId?: string | null
 ): UseExerciseCatalogStatsResult => {
   const current = useSyncExternalStore(
     subscribeToExerciseCatalogStats,
@@ -224,13 +244,15 @@ export const useExerciseCatalogStats = (
   // an empty history aggregates to nothing whatever the date.
   const stats = useMemo(
     () =>
-      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt)),
-    [current.rawHistory, current.loadedAt, period]
+      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt), { gymId }),
+    [current.rawHistory, current.loadedAt, period, gymId]
   );
+  const gymOptions = useGymOptions(current.rawHistory);
 
   return {
     status: current.status,
     stats,
+    gymOptions,
     rawHistory: current.rawHistory,
     lastError: current.lastError,
     reload: refreshExerciseCatalogStats,

@@ -264,6 +264,30 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).not.toContain('history_elsewhere_squat');
   });
 
+  it('lists every gym until a gym chip is chosen, then that gym\'s sessions and bests', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
+    expect(screen.getByTestId('exercise-history-gym-chip-all-gyms')).toHaveProp('accessibilityState', expect.objectContaining({ selected: true }));
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent(/^All-time bests$/);
+    expect(sessionCards()).toHaveLength(10);
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym-chip-gym-elsewhere'));
+    await waitFor(() => expect(sessionCards()).toEqual(['history_elsewhere_squat']));
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym-chip-all-gyms'));
+    await waitFor(() => expect(sessionCards()).toHaveLength(10));
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('275.0 × 5');
+  });
+
+  it('opens on the gym its link names, keeping that chip by name when the period holds none of it', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT, period: '7', gymId: 'gym-quiet' },
+      () => upsertLocalGym({ id: 'gym-quiet', name: 'Quiet Gym' }).then(() => undefined));
+    expect(screen.getByTestId('exercise-history-gym-chip-gym-quiet')).toHaveTextContent('Quiet Gym · 0');
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Quiet Gym');
+    expect(screen.getByTestId('exercise-history-empty-state')).toBeTruthy();
+  });
+
   it('still lists every gym under Current gym only when the session had no gym', async () => {
     // A session with no gym sends no `currentGymId`, so there is no gym to
     // narrow to and the filter is inert.

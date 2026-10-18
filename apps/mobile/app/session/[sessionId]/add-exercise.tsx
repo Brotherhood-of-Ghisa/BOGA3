@@ -124,6 +124,7 @@ export function AddExerciseScreen({ sessionId }: AddExerciseScreenProps) {
     <>
       <ExercisePicker
         notice={notice}
+        sessionId={sessionId}
         plannerEnabled={plannerEnabled}
         onAddPlanBlock={(planExerciseId) => {
           void addPlanBlock(planExerciseId);

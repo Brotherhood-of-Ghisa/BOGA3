@@ -377,6 +377,7 @@ function ProgrammeSessionEditSheet({
           />
 
           <PlanExercisePickSheet
+            gymId={plan.gymId}
             onDismiss={() => {
               setPickBlockId(null);
               setIsPickingNew(false);

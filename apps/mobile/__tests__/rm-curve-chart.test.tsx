@@ -19,8 +19,8 @@ import oracle from './fixtures/rm-curve-weekly-wave-oracle.json';
 let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
 const query = { exerciseDefinitionId: 'curve', start: new Date(wave.scenarios.plateau[0].startedAt),
-  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52 };
-const scope: CurveScope = { exerciseId: 'curve', range: 24, rir: null };
+  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52, gym: 'latest' as const };
+const scope: CurveScope = { exerciseId: 'curve', range: 24, gym: 'latest', rir: null };
 const props = { scope, onScope: jest.fn(), exercises: [{ id: 'curve', name: 'Synthetic exercise' }],
   catalogStatus: 'ready' as const, retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
 const read = (data: Awaited<ReturnType<typeof loadRmCurve>>) => ({ status: 'ready' as const, data, retry: jest.fn() });
@@ -104,10 +104,10 @@ it('uses viewport mouse coordinates after document scrolling instead of shifted 
 it('retains named gym labels on read failure and distinguishes an empty RIR filter from missing effort', async () => {
   mockFixture.database.update(exerciseSets).set({ setType: null }).where(eq(exerciseSets.id, 'week-24:1')).run();
   const model = (await loadRmCurve({ ...query, rir: 12 }))!;
-  const component = render(<RmCurveContent {...props} scope={{ ...scope, gymId: 'synthetic-gym', rir: 12 }} read={read(model)} />);
+  const component = render(<RmCurveContent {...props} scope={{ ...scope, gym: { gymId: 'synthetic-gym' }, rir: 12 }} read={read(model)} />);
   expect(screen.getByText('No sets match these filters')).toBeTruthy();
-  component.rerender(<RmCurveContent {...props} scope={{ ...scope, gymId: 'synthetic-gym', rir: 12 }} read={{ status: 'error', data: model, retry: jest.fn() }} />);
-  expect(screen.getByLabelText('gym: Synthetic gym')).toBeTruthy(); expect(screen.queryByLabelText('gym: Unspecified gym')).toBeNull();
+  component.rerender(<RmCurveContent {...props} scope={{ ...scope, gym: { gymId: 'synthetic-gym' }, rir: 12 }} read={{ status: 'error', data: model, retry: jest.fn() }} />);
+  expect(screen.getByLabelText('gym: Synthetic gym')).toBeTruthy(); expect(screen.queryByLabelText('gym: No gym')).toBeNull();
 });
 
 it('preserves still-visible selection, clears removed IDs, and never resurrects them or stale details', async () => {

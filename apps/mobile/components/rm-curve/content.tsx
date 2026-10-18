@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, FlatList, Platform, Text, View, type ViewInstance } from 'react-native';
 import { Card, Icon, ListRow, ScreenScroll, SegmentedControl, Sheet, StatePanel } from '@/components/ui';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
-import { ALL_GYMS } from '@/src/rm-curve/model';
 import type { CurveMode, UncertaintyMethod } from '@/src/strength-regimes/assessment';
 import type { RmCurveModel, RmCurveRange } from '@/src/rm-curve/model';
+import type { RmCurveGym } from '@/src/rm-curve/repository';
+import { ALL_GYMS_LABEL, gymOptionLabel, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { formatShortDate } from '@/src/utils/local-time';
 import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { periodLabel, RmRegimes, selectedPeriod } from './regimes';
 import { RmCurveDetails, setDescription } from './details';
 import { curveStyles as styles } from './styles';
 
-export type CurveScope = { exerciseId: string; range: RmCurveRange; gymId?: string | null; rir: number | null };
+export type CurveScope = { exerciseId: string; range: RmCurveRange; gym: RmCurveGym; rir: number | null };
 export type RmCurveContentProps = {
   read: { status: 'loading' | 'ready' | 'error'; data: RmCurveModel | null; retry: () => void };
   scope: CurveScope; onScope: (scope: CurveScope) => void;
@@ -68,9 +69,10 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
   </Card>;
   const choices: Record<Picker, Choice[]> = {
     exercise: exercises.map(e => ({ id: e.id, label: e.name, checked: e.id === scope.exerciseId,
-      choose: () => apply({ exerciseId: e.id, gymId: undefined }) })),
-    gym: [{ id: ALL_GYMS, label: 'All gyms', checked: scope.gymId === ALL_GYMS, choose: () => apply({ gymId: ALL_GYMS }) }, ...(model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'unspecified', label: g.name ?? 'Unspecified gym', checked: g.gymId === model?.gymId,
-      choose: () => apply({ gymId: g.gymId }) }))],
+      choose: () => apply({ exerciseId: e.id, gym: 'latest' }) })),
+    gym: [{ id: 'all-gyms', label: ALL_GYMS_LABEL, checked: model !== null && model.gymId === undefined, choose: () => apply({ gym: {} }) },
+      ...(model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'no-gym', label: gymOptionLabel(g), checked: g.gymId === model?.gymId,
+        choose: () => apply({ gym: { gymId: g.gymId } }) }))],
     range: ([4, 12, 24, 'history'] as const).map(r => ({ id: String(r),
       label: r === 'history' ? rangeLabel(r, historyWeeks) : `${r} weeks${r > historyWeeks ? ' (limited to History)' : ''}`,
       checked: r === scope.range, choose: () => apply({ range: r }) })),
@@ -78,8 +80,10 @@ export function RmCurveContent({ read, scope, onScope, exercises, catalogStatus,
       checked: r === scope.rir, choose: () => apply({ rir: r }) })),
   };
   const labelModel = read.data;
-  const gymLabel = scope.gymId === undefined ? labelModel ? labelModel.gyms.find(g => g.gymId === labelModel.gymId)?.name ?? 'Unspecified gym' : 'Latest trained gym'
-    : scope.gymId === ALL_GYMS ? 'All gyms' : scope.gymId === null ? 'Unspecified gym' : labelModel?.gyms.find(g => g.gymId === scope.gymId)?.name ?? 'Selected gym';
+  // The default names the gym it resolved to once a read lands.
+  const gymLabel = scope.gym === 'latest'
+    ? labelModel ? gymScopeLabel(labelModel.gymId, labelModel.gyms) : 'Latest trained gym'
+    : gymScopeLabel(scope.gym.gymId, labelModel?.gyms ?? []);
   return <>
     <ScreenScroll testID="rm-curve-content">
       {filter('exercise', exercises.find(e => e.id === scope.exerciseId)?.name ?? model?.definition.name ?? 'Selected exercise', true)}

@@ -55,6 +55,7 @@ const groupBySessionExerciseId = (
 
 const buildStore = (overrides: Partial<ExerciseBlockHistoryStore> = {}): ExerciseBlockHistoryStore => ({
   loadRecentCompletedSessionsForExercise: jest.fn().mockResolvedValue([]),
+  loadGymBookSessionIds: jest.fn().mockResolvedValue(null),
   loadSessionExercisesForSessions: jest.fn().mockResolvedValue([]),
   loadSetsForSessionExercises: jest.fn().mockResolvedValue([]),
   ...overrides,
