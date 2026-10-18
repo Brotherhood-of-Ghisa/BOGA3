@@ -679,7 +679,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v6"
+  .data.metric_revision == "working_sets_v7"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -705,7 +705,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v6"
+  .data.metric_revision == "working_sets_v7"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -717,7 +717,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   and .data.workouts[0].exercises[1].volume.value == 0
 ' >/dev/null || fail "warm-ups leaked into workout counts or volume"
 
-echo "[agent-api-test] verifying a split exercise reports one gym bucket at a time"
+echo "[agent-api-test] verifying a split exercise reports the whole exercise unless a gym is named"
 GYM_SPLIT="agent-api-${RUN_TAG}-gym-split"
 GYM_SPLIT_WARMUP="agent-api-${RUN_TAG}-gym-warmup"
 EXERCISE_SPLIT="agent-api-${RUN_TAG}-exercise-split"
@@ -742,8 +742,8 @@ run_psql "
       (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,
        created_at,updated_at,client_updated_at_ms)
     values
-      -- The heaviest history is the oldest bucket, so a pooled reader would
-      -- report 200 kg for every bucket.
+      -- The heaviest history is the oldest gym, so a reader that pooled its
+      -- gyms' records would report 200 kg for every gym.
       ('${USER_A_UUID}'::uuid,'${SPLIT_HOME_SESSION}','${GYM_A}','completed',
        $((NOW_MS - 9100000)),$((NOW_MS - 9000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SPLIT_NONE_SESSION}',null,'completed',
@@ -751,7 +751,7 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${SPLIT_AWAY_SESSION}','${GYM_SPLIT}','completed',
        $((NOW_MS - 5100000)),$((NOW_MS - 5000000)),600,${NOW_MS},${NOW_MS},${NOW_MS}),
       -- This exercise's newest session, and warm-ups only: no stat footprint,
-      -- so its gym is neither listed as a bucket nor the reported one.
+      -- so its gym is not listed as a bucket.
       ('${USER_A_UUID}'::uuid,'${SPLIT_WARMUP_SESSION}','${GYM_SPLIT_WARMUP}','completed',
        $((NOW_MS - 4100000)),$((NOW_MS - 4000000)),600,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.session_exercises
@@ -788,37 +788,52 @@ assert_status "200" "split exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${GYM_A}" \
   --arg warmup "${GYM_SPLIT_WARMUP}" '
   .data.exercise.split_by_gym == true
-  and .data.exercise.gym.id == $away
-  and .data.exercise.gym.name == "Agent A Away Gym"
-  and (.data.exercise.gym_buckets | length) == 3
-  and (.data.exercise.gym_buckets | map(.gym.id // null)) == [$away, null, $home]
-  # Every gym reports its own records in this one response, never a pooled one.
-  and (.data.exercise.gym_buckets | map(.personal_records.top_weight.value)) == [100, 150, 200]
-  and (.data.exercise.gym_buckets | map(.session_count)) == [1, 1, 1]
-  # The newest session is warm-ups only, so its gym is neither listed nor
-  # reported and its 250 kg never becomes a record.
-  and (.data.exercise.gym_buckets | map(.gym.id // null) | index($warmup)) == null
+  # Unset gym_bucket is the whole exercise, so no single gym owns the response.
+  and (.data.exercise | has("gym") | not)
+  and (.data.exercise.gym_buckets | length) == 2
+  # No-gym sessions are never a bucket: they count only in the whole exercise.
+  and (.data.exercise.gym_buckets | map(.gym.id)) == [$away, $home]
+  and (.data.exercise.gym_buckets[0].gym.name == "Agent A Away Gym")
+  # Every gym reports its own records beside the whole exercise.
+  and (.data.exercise.gym_buckets | map(.personal_records.top_weight.value)) == [100, 200]
+  and (.data.exercise.gym_buckets | map(.session_count)) == [1, 1]
+  # The newest session is warm-ups only, so its gym is not listed and its
+  # 250 kg never becomes a record.
+  and (.data.exercise.gym_buckets | map(.gym.id) | index($warmup)) == null
   and (.data.exercise | has("gym_buckets_truncated") | not)
-  and (.data.recent_performances | length) == 1
-  and .data.recent_performances[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
-  and .data.personal_records.top_weight.value == 100
-  and (.data.volume_series | length) == 1
-' >/dev/null || fail "split exercise context pooled its gyms or missed a bucket's records"
+  # The whole exercise holds every gym and the no-gym session, each labelled.
+  and (.data.recent_performances | map(.session_id)) == [
+    "'"${SPLIT_AWAY_SESSION}"'", "'"${SPLIT_NONE_SESSION}"'", "'"${SPLIT_HOME_SESSION}"'"]
+  and (.data.recent_performances | map(.gym.id // null)) == [$away, null, $home]
+  and (.data.recent_performances | map(has("gym")) | all)
+  and .data.personal_records.top_weight.value == 200
+  and (.data.volume_series | length) == 3
+' >/dev/null || fail "split exercise context did not report the whole exercise beside each gym"
 
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=${GYM_A}"
-assert_status "200" "split exercise context for a named bucket"
+assert_status "200" "split exercise context for a named gym"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg home "${GYM_A}" '
   .data.exercise.gym.id == $home
-  and (.data.recent_performances | length) == 1
+  and (.data.exercise.gym_buckets | length) == 2
+  and (.data.recent_performances | map(.gym.id)) == [$home]
   and .data.personal_records.top_weight.value == 200
 ' >/dev/null || fail "gym_bucket did not select the named gym"
 
+agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=${GYM_SPLIT}"
+assert_status "200" "split exercise context for the newest gym"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
+  .data.exercise.gym.id == $away
+  and (.data.recent_performances | length) == 1
+  and .data.personal_records.top_weight.value == 100
+' >/dev/null || fail "gym_bucket pooled another gym into the named one"
+
+# The sessions with no gym are no longer a bucket, so the old selector fails
+# loud instead of returning figures a caller would misread.
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=none"
-assert_status "200" "split exercise context for the no-gym bucket"
+assert_status "400" "gym_bucket=none on split exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.exercise.gym == null
-  and .data.personal_records.top_weight.value == 150
-' >/dev/null || fail "gym_bucket=none did not select the sessions with no gym"
+  .error.code == "INVALID_ARGUMENT" and (.error.message | test("whole exercise"))
+' >/dev/null || fail "gym_bucket=none did not explain that no-gym sessions count in the whole exercise"
 
 agent_get "exercises/${EXERCISE_SPLIT}/history"
 assert_status "200" "split exercise history"
@@ -835,13 +850,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${G
 ' >/dev/null || fail "split exercise history partitioned its page by gym"
 
 agent_get "exercises/${EXERCISE_SPLIT}/history?gym_bucket=none"
-assert_status "200" "split exercise history filtered to the no-gym bucket"
-printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.exercise.gym == null
-  and (.data.sets | length) == 1
-  and .data.sets[0].session_id == "'"${SPLIT_NONE_SESSION}"'"
-  and .data.sets[0].gym == null
-' >/dev/null || fail "gym_bucket=none did not filter the history stream"
+assert_status "400" "gym_bucket=none on split exercise history"
 
 # An unfiltered drain walks every gym in one chronological stream; a filtered
 # one keeps its filter even when the caller stops repeating gym_bucket.
@@ -870,8 +879,18 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" '
   and (.data.sets | map(.gym.id)) == [$away]
   and .data.sets[0].session_id == "'"${SPLIT_AWAY_SESSION}"'"
 ' >/dev/null || fail "following a filtered cursor left its gym"
-agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}&gym_bucket=none"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${AWAY_CURSOR}&gym_bucket=${GYM_A}"
 assert_status "400" "cursor and gym_bucket naming different buckets"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.error.message | test("does not match the cursor")' >/dev/null ||
+  fail "a cursor for one gym and gym_bucket for another did not conflict"
+# A cursor pinned to the old no-gym bucket (gym_bucket: null) names a bucket
+# that no longer exists; it is rejected, never widened to every gym.
+NO_GYM_CURSOR="$(printf '%s' "${AWAY_CURSOR}" | tr '_-' '/+' | awk '{ while (length($0) % 4) $0 = $0 "="; print }' |
+  jq -Rr '@base64d | fromjson | .gym_bucket = null | tojson | @base64' | tr '+/' '-_' | tr -d '=')"
+agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${NO_GYM_CURSOR}"
+assert_status "400" "a cursor pinned to the no-gym bucket"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_CURSOR" ]] ||
+  fail "a cursor pinned to the no-gym bucket was not an invalid cursor"
 
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=agent-api-${RUN_TAG}-gym-absent"
 assert_status "404" "gym_bucket naming a gym the user does not own"
@@ -884,6 +903,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   .data.exercise.split_by_gym == false
   and (.data.exercise | has("gym") | not)
   and (.data.exercise | has("gym_buckets") | not)
+  and (.data.recent_performances[0] | has("gym") | not)
   and (.data.recent_performances[0].sets[0] | has("gym") | not)
 ' >/dev/null || fail "an unsplit exercise carries gym-bucket fields"
 
@@ -912,7 +932,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v6"
+  .data.metric_revision == "working_sets_v7"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
