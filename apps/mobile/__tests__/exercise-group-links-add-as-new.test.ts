@@ -111,6 +111,12 @@ describe('createExerciseWithGroupLink', () => {
     expect(invalidations).toHaveBeenCalledTimes(1);
   });
 
+  it('creates the exercise split by gym when the editor asks', async () => {
+    expect((await createExerciseWithGroupLink(INPUT, LINK)).exercise.splitByGym).toBe(false);
+    const { exercise } = await createExerciseWithGroupLink({ ...INPUT, splitByGym: true }, { ...LINK, groupExerciseId: 'gx-other' });
+    expect(exercise.splitByGym).toBe(true);
+  });
+
   it('a failure in the link write leaves no definition, mapping, or link row', async () => {
     fixture.client.exec(
       `CREATE TRIGGER t07_fail_link BEFORE INSERT ON exercise_group_links BEGIN SELECT RAISE(ABORT, 'forced link failure'); END;`,

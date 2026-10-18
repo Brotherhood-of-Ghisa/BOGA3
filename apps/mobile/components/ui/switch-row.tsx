@@ -11,8 +11,8 @@ export type SwitchRowProps = {
 };
 
 /**
- * A sheet row that turns one view option on or off: the label across the
- * row, the native switch at its end. The whole row is the target and one
+ * A sheet or card row that turns one option or setting on or off: the label
+ * across the row, the native switch at its end. The whole row is the target and one
  * accessible switch; the drawn switch is its glyph.
  */
 export function SwitchRow({ disabled = false, label, value, onValueChange, testID }: SwitchRowProps) {

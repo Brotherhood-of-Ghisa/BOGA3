@@ -22,7 +22,7 @@ Why: one exercise on different gyms' equipment is not comparable, yet the whole
 exercise stays the default so a split never multiplies rows. A session with no
 gym is usually a gym not worth recording, so it is compared with everything.
 Approved 2026-10-18; Repeat last's fallback and the 1RM curve row the same day.
-Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
+Code: `GymSplitField` in `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`.
 
 ### gym.view-filter · definition · accepted
 
