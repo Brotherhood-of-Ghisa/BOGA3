@@ -67,7 +67,11 @@ failure never changes personal sync's converged outcome.
 The publisher captures a full actual rank baseline before a workout's first
 affected comparison publication, outside its member loop. Baseline capture and
 publication commit atomically; failure retries asynchronous publication without
-failing personal sync. Final net movements are intersected with a same-direction
+failing personal sync. Each capture pass reuses its evaluated source graph for
+all workouts, revalidates raw sources at both boundaries, and rechecks live
+disclosure per workout and at the final boundary; a mismatch rolls back the
+pass. Standalone rank/capture helpers still resolve current sources.
+Final net movements are intersected with a same-direction
 causal comparison that restores its original published contribution while
 keeping other workouts and control eligibility current. Four private original
 source best/tie rows cover a workout below its member's board winner. Up to four
