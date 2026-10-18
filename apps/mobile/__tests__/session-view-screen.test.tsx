@@ -1208,7 +1208,7 @@ describe('Session vs history', () => {
     );
     expect(screen.queryByTestId(`session-insight-exercise-${BENCH}`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Chest/);
+    expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Pectoralis/);
   });
 
   it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {

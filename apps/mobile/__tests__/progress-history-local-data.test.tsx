@@ -517,7 +517,7 @@ describe('The history page over real data', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-error'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
-    expect(mockScreenOptions.title).toBe('Chest');
+    expect(mockScreenOptions.title).toBe('Pectoralis');
   });
 
   it('renders the unavailable state for a muscle the catalogue no longer holds', async () => {

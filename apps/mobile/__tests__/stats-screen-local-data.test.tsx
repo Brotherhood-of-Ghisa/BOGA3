@@ -455,7 +455,7 @@ describe('Stats over real data', () => {
       expect(screen.queryAllByLabelText(/Colour:/)).toEqual([]);
     }
     fireEvent.press(screen.getByTestId('stats-muscle-tile-chest'));
-    expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Chest/);
+    expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Pectoralis/);
     expect(screen.getByTestId('stats-muscle-tile-chest')).toHaveProp('accessibilityState', { selected: true, expanded: true });
   });
 
@@ -641,7 +641,7 @@ describe('Stats over real data', () => {
     expect(StyleSheet.flatten(map.props.style)).toEqual(size);
     select('chest');
     expect(screen.getByTestId('stats-muscle-tile-quads')).toHaveProp('accessibilityState', { selected: false, expanded: false });
-    expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Chest/);
+    expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Pectoralis/);
     select('chest');
     expect(mockPush).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-contributions-view-timeline'));
