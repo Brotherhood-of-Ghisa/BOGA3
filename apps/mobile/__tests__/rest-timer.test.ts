@@ -5,6 +5,7 @@ import {
   __resetRestTimerForTests,
   adjustRepeatingTimer,
   adjustRestTimer,
+  checkAndTriggerRestCompletion,
   checkAndTriggerRoundBoundary,
   deriveRepeatingTimerView,
   deriveRestTimerView,
@@ -20,6 +21,7 @@ import {
   stopRepeatingTimer,
   switchTimerMode,
   toggleRepeatingTimer,
+  triggerRestCompletionCue,
   triggerRoundBoundaryCue,
   useSessionRestTimer,
 } from '@/src/session-recorder/rest-timer';
@@ -348,6 +350,82 @@ describe('rest-timer store and pure rules', () => {
       throw new Error('Native vibration unavailable');
     });
     expect(() => triggerRoundBoundaryCue()).not.toThrow();
+  });
+
+  it('triggers vibration cue when rest timer countdown reaches 0 and deduplicates', () => {
+    startRestTimer('session-1', 90, 0);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(89_999);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).toHaveBeenCalledWith(400);
+
+    // Remaining in completed status does not re-trigger vibration
+    jest.advanceTimersByTime(10_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reschedules rest timer completion cue when adjusted', () => {
+    startRestTimer('session-1', 60, 0);
+
+    // Advance 30s, then add 15s (new target is 75s)
+    jest.advanceTimersByTime(30_000);
+    adjustRestTimer('session-1', 15, 30_000);
+
+    jest.advanceTimersByTime(30_000); // at 60s total
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(15_000); // at 75s total
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).toHaveBeenCalledWith(400);
+  });
+
+  it.each(['dismiss', 'replace'] as const)('cancels rest timer completion cues on %s', (action) => {
+    startRestTimer('session-1', 30, 0);
+    if (action === 'dismiss') dismissRestTimer('session-1');
+    if (action === 'replace') startRestTimer('session-2', 60, 0);
+
+    jest.advanceTimersByTime(30_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(0);
+
+    if (action === 'replace') {
+      jest.advanceTimersByTime(30_000); // at 60s total for session-2
+      expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('cancels rest timer completion cue when switching to repeating mode', () => {
+    startRestTimer('session-1', 30, 0);
+    switchTimerMode('session-1', 'repeating');
+    // Repeating timer signals round 1 after 15s preparation
+    jest.advanceTimersByTime(15_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+
+    // At 30s (when original rest timer would have completed), no second cue fires
+    jest.advanceTimersByTime(15_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers rest completion cue even after screen hook unmounts', () => {
+    const hook = renderHook(() => useSessionRestTimer('session-1'));
+    act(() => {
+      hook.result.current.start();
+    });
+    hook.unmount();
+
+    jest.advanceTimersByTime(90_000);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).toHaveBeenCalledWith(400);
+  });
+
+  it('handles vibration errors gracefully in triggerRestCompletionCue', () => {
+    jest.mocked(Vibration.vibrate).mockImplementationOnce(() => {
+      throw new Error('Native vibration error');
+    });
+    expect(() => triggerRestCompletionCue()).not.toThrow();
   });
 
   it('isolates set logging from repeating mode: onSetConfirmed neither restarts nor interrupts repeating timer', () => {
