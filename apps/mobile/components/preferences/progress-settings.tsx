@@ -13,7 +13,7 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
       <View style={styles.preference}>
         <Text allowFontScaling={false} style={styles.label}>Progress view</Text>
         <SegmentedControl accessibilityLabel="Progress view"
-          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Map' }]}
+          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Map' }, { value: '3d', label: '3D' }]}
           value={pending.progressMuscleLayout ?? values.progressMuscleLayout}
           onChange={progressMuscleLayout => updatePreferences({ progressMuscleLayout })}
           testIDPrefix="settings-muscle-view" />

@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { hasComparisonMetric, resolveComparisonLayout } from './comparison-columns';
 import { StatsTable } from './stats-table';
+import { MuscleBodyCard } from './muscle-body-card';
 import { MuscleMap } from './muscle-map';
 import { HISTORY_VIEW_OPTIONS } from './history-view';
 import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } from './progress-tables';
@@ -9,7 +10,7 @@ import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } fr
 import type { ProgressMuscleLayout } from '@/src/preferences/model';
 type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; workingSetTarget: number };
 
-// Settings chooses the layout; both share contribution rows and selection.
+// Settings chooses the layout; all three share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
   const { muscles, metric, selectedId, muscleLayout, workingSetTarget, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
@@ -18,7 +19,9 @@ export function ProgressMuscleView(props: Props) {
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, exercises, metric);
   return <View style={styles.body}>
-    <MuscleMap muscles={muscles} metric={metric} selectedId={selectedId} workingSetTarget={workingSetTarget} onSelect={onSelect} />
+    {muscleLayout === '3d'
+      ? <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} />
+      : <MuscleMap muscles={muscles} metric={metric} selectedId={selectedId} workingSetTarget={workingSetTarget} onSelect={onSelect} />}
     {selected ? <StatsTable testID="stats-contributions">
       <View style={styles.contributionHeader}>
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selected.displayName}</Text>

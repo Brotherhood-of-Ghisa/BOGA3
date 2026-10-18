@@ -18,6 +18,12 @@ export type ExerciseMapEntry = { item: ExerciseMapItem; targetAttainment: number
 export type ExerciseMapSecondary = ComparisonRow & { exercises: ExerciseMapEntry[]; targetAttainment: number };
 export type ExerciseMapTile = ExerciseMapEntry | ExerciseMapSecondary;
 export type ExerciseMapFamily = { name: MuscleMapFamily; exercises: ExerciseMapEntry[]; secondary: ExerciseMapSecondary | null };
+export type ExerciseBodyMuscleDetail = {
+  muscleGroupId: string;
+  displayName: string;
+  exercises: ExerciseMapEntry[];
+  secondary: ExerciseMapSecondary | null;
+};
 
 type Input = {
   items: readonly ExerciseMapItem[];
@@ -67,15 +73,62 @@ export function buildExerciseMapFamilies({ items, exercises, muscles, workingSet
   });
 }
 
+/** Shades the 3D body in Exercise view from the filtered exercises (primary = 1, secondary = 0.5). */
+export function buildExerciseBodyMuscles({ items, exercises, muscles }: Omit<Input, 'workingSetTarget'>): ProgressMuscleComparison[] {
+  const definitions = new Map(exercises.map(exercise => [exercise.id, exercise]));
+  return muscles.map(muscle => {
+    const currentPeriods: ComparisonPeriodFigures[] = [];
+    const previousPeriods: ComparisonPeriodFigures[] = [];
+    for (const item of items) {
+      const exercise = definitions.get(item.id);
+      if (!exercise) continue;
+      const mapping = exerciseCountedMuscles(exercise).find(entry => entry.muscleGroupId === muscle.muscleGroupId);
+      if (!mapping) continue;
+      currentPeriods.push(mapping.role === 'primary' ? item.current : halfPeriod(item.current));
+      previousPeriods.push(mapping.role === 'primary' ? item.previous : halfPeriod(item.previous));
+    }
+    return { ...muscle, current: sumPeriods(currentPeriods), previous: sumPeriods(previousPeriods) };
+  });
+}
+
+/** Scopes the Exercise list to a selected muscle on the 3D body, preserving primary and half-weight secondary work. */
+export function buildExerciseBodyMuscle({
+  muscleGroupId, items, exercises, muscles, workingSetTarget,
+}: Input & { muscleGroupId: string | null }): ExerciseBodyMuscleDetail | null {
+  if (!muscleGroupId) return null;
+  const muscle = muscles.find(row => row.muscleGroupId === muscleGroupId);
+  if (!muscle) return null;
+  const definitions = new Map(exercises.map(exercise => [exercise.id, exercise]));
+  const counts = Object.fromEntries(muscles.map(row => [row.muscleGroupId, row.current.workingSetCount]));
+  const attainment = groupedTargetAttainment([muscle.muscleGroupId], counts, workingSetTarget);
+  const primary: ExerciseMapEntry[] = [];
+  const secondaryItems: ExerciseMapEntry[] = [];
+  for (const item of items) {
+    const exercise = definitions.get(item.id);
+    if (!exercise) continue;
+    const mapping = exerciseCountedMuscles(exercise).find(entry => entry.muscleGroupId === muscle.muscleGroupId);
+    if (mapping?.role === 'primary') primary.push({ item, targetAttainment: attainment });
+    else if (mapping?.role === 'secondary') secondaryItems.push({
+      item: { ...item, current: halfPeriod(item.current), previous: halfPeriod(item.previous) }, targetAttainment: 0,
+    });
+  }
+  const secondary: ExerciseMapSecondary | null = secondaryItems.length > 0 ? {
+    exercises: secondaryItems, targetAttainment: attainment,
+    current: sumPeriods(secondaryItems.map(entry => entry.item.current)),
+    previous: sumPeriods(secondaryItems.map(entry => entry.item.previous)),
+  } : null;
+  return { muscleGroupId: muscle.muscleGroupId, displayName: muscle.displayName, exercises: primary, secondary };
+}
+
 const halfPeriod = (period: ComparisonPeriodFigures): ComparisonPeriodFigures => ({
   workingSetCount: period.workingSetCount * .5,
   totalVolume: period.totalVolume === null || !Number.isFinite(period.totalVolume) ? null : period.totalVolume * .5,
   volumeSetCount: period.volumeSetCount,
 });
-const sumPeriods = (periods: ComparisonPeriodFigures[]): ComparisonPeriodFigures => periods.reduce((sum, period) => ({
+const sumPeriods = (periods: ComparisonPeriodFigures[]): ComparisonPeriodFigures & { volumeSetCount: number } => periods.reduce<ComparisonPeriodFigures & { volumeSetCount: number }>((sum, period) => ({
   workingSetCount: sum.workingSetCount + period.workingSetCount,
   totalVolume: addFiniteVolume(sum.totalVolume, period.totalVolume),
-  volumeSetCount: (sum.volumeSetCount ?? 0) + (period.volumeSetCount ?? 0),
+  volumeSetCount: sum.volumeSetCount + (period.volumeSetCount ?? 0),
 }), { workingSetCount: 0, totalVolume: 0, volumeSetCount: 0 });
 
 export const exerciseMapTileRow = (entry: ExerciseMapTile): ComparisonRow => 'item' in entry ? entry.item : entry;

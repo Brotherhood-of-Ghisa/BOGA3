@@ -3,9 +3,21 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { StatePanel, changeToneColour, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { withAlpha } from '@/components/ui/lch';
 import { HEAT_RAMP } from '@/components/heatmaps/heatmap-metric';
+import type { ProgressMuscleComparison } from '@/src/data';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { comparisonFigures } from './comparison-columns';
-import { exerciseMapLayout, exerciseMapTileRects, exerciseMapTileKey, exerciseMapTileRow, type ExerciseMapEntry, type ExerciseMapFamily, type ExerciseMapSecondary, type ExerciseMapTile } from './exercise-map-data';
+import {
+  exerciseMapLayout,
+  exerciseMapTileRects,
+  exerciseMapTileKey,
+  exerciseMapTileRow,
+  type ExerciseBodyMuscleDetail,
+  type ExerciseMapEntry,
+  type ExerciseMapFamily,
+  type ExerciseMapSecondary,
+  type ExerciseMapTile,
+} from './exercise-map-data';
+import { MuscleBodyCard } from './muscle-body-card';
 import { MUSCLE_MAP_HEADER, MUSCLE_MAP_INSET, type MapRect } from './muscle-map-layout';
 import type { MuscleMapFamily } from './muscle-map-reference';
 
@@ -52,6 +64,34 @@ export function ExerciseMap({ families, metric, selectedFamily, onSelectFamily, 
       {selected.exercises.length > 0 || !selected.secondary ? renderDetail(selected.exercises) : null}
       {selected.secondary ? renderDetail(selected.secondary.exercises, selected.secondary) : null}
     </View> : null}
+  </View>;
+}
+
+/** 3D anatomical exercise explorer: shades muscles from filtered exercises and scopes the exercise table on muscle tap. */
+export function ExerciseBodyView({
+  muscles,
+  metric,
+  selectedMuscleId,
+  selectedMuscle,
+  onSelectMuscle,
+  renderAll,
+  renderDetail,
+}: {
+  muscles: readonly ProgressMuscleComparison[];
+  metric: ProgressMetric;
+  selectedMuscleId: string | null;
+  selectedMuscle: ExerciseBodyMuscleDetail | null;
+  onSelectMuscle: (muscleGroupId: string) => void;
+  renderAll: () => ReactNode;
+  renderDetail: (entries: ExerciseMapEntry[], secondary?: ExerciseMapSecondary) => ReactNode;
+}) {
+  return <View style={styles.body}>
+    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} />
+    {selectedMuscle ? <View testID="stats-exercise-body-detail" style={styles.detail}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selectedMuscle.displayName}</Text>
+      {selectedMuscle.exercises.length > 0 || !selectedMuscle.secondary ? renderDetail(selectedMuscle.exercises) : null}
+      {selectedMuscle.secondary ? renderDetail(selectedMuscle.secondary.exercises, selectedMuscle.secondary) : null}
+    </View> : renderAll()}
   </View>;
 }
 

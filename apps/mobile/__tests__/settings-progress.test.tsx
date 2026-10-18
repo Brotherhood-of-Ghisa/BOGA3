@@ -43,20 +43,29 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('shares Progress view with Exercise, keeps 1RM in List, and restores Map on a fresh visit', async () => {
+it('shares Progress view with Exercise, keeps 1RM in List, and restores Map and 3D on a fresh visit', async () => {
   const page = await openSettingsAndProgress();
   expect(screen.getByText('Progress view')).toBeTruthy();
   const layout = screen.getByTestId('settings-muscle-view-row');
   expect(layout).toHaveProp('accessibilityRole', 'tablist');
   expect(layout).toHaveProp('accessibilityLabel', 'Progress view');
   expect(within(layout).getByRole('tab', { name: 'List' })).toHaveProp('accessibilityState', { selected: true });
+  expect(within(layout).getByRole('tab', { name: '3D' })).toHaveProp('accessibilityState', { selected: false });
   expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
   expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
+  expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(values().progressMuscleLayout).toBe('3d');
   fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
   expect(await screen.findByTestId('stats-muscle-map')).toBeTruthy();
   expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveTextContent('Map');
   expect(values().progressMuscleLayout).toBe('heatmap');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
+  expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
   expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));

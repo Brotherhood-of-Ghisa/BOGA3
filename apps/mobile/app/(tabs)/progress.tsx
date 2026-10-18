@@ -26,11 +26,16 @@ import {
   uiRoles,
   uiSpace,
 } from '@/components/ui';
-import { type ProgressComparisons } from '@/src/data';
+import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { ExerciseMap } from '@/components/stats/exercise-map';
-import { buildExerciseMapFamilies, type ExerciseMapSecondary } from '@/components/stats/exercise-map-data';
+import { ExerciseBodyView, ExerciseMap } from '@/components/stats/exercise-map';
+import {
+  buildExerciseBodyMuscle,
+  buildExerciseBodyMuscles,
+  buildExerciseMapFamilies,
+  type ExerciseMapSecondary,
+} from '@/components/stats/exercise-map-data';
 import type { MuscleMapFamily } from '@/components/stats/muscle-map-reference';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -279,7 +284,7 @@ export function StatsScreenShell({
     DEFAULT_EXERCISE_SORT_MODE
   );
   const [exerciseFamily, setExerciseFamily] = useState<MuscleMapFamily | null>(null);
-  const exerciseHeatmap = muscleLayout === 'heatmap' && exerciseMetric !== 'estimatedOneRepMax';
+  const exerciseSpatial = muscleLayout !== 'list' && exerciseMetric !== 'estimatedOneRepMax';
   const [contributionId, setContributionId] = useState<string | null>(null);
   // The row whose history was opened, held only until the return it is for:
   // any other way back to Progress (a tab, the Sessions link) leaves the
@@ -305,7 +310,7 @@ export function StatsScreenShell({
     if (row) focus(row);
   }, [focus, isFocused]);
   const showContributions = (id: string) => {
-    setContributionId(current => muscleLayout === 'list' && current === id ? null : id);
+    setContributionId(current => muscleLayout !== 'heatmap' && current === id ? null : id);
   };
   // The press that opens history: the keyboard goes, the row is remembered for
   // the return, and any pending focus request for an earlier row is dropped.
@@ -333,17 +338,15 @@ export function StatsScreenShell({
   }, []);
 
   const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
-  const mapActive = viewMode === 'exercise' && exerciseHeatmap;
+  const mapActive = viewMode === 'exercise' && exerciseSpatial;
   const { activeError, mapReady, pending } = progressPresentationState({ mapActive, summary, isLoading,
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
-  const mapFamilies = useMemo(() => buildExerciseMapFamilies({ items: filteredExerciseListItems, exercises: exerciseMappings,
-    muscles: summary?.muscles ?? [], workingSetTarget: weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks) }),
-  [filteredExerciseListItems, exerciseMappings, summary, weeklyWorkingSetTarget, period, targetWindowWeeks]);
-  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary) => <ExerciseListView items={items} metric={exerciseMetric}
+  const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
+  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string) => <ExerciseListView items={items} metric={exerciseMetric}
     targetAttainmentById={targetAttainmentById} secondary={secondary}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
-    emptyBody={mapActive && items.length === 0 ? 'No exercises for this family.' : exerciseEmptyBody(exerciseListItems, exerciseMetric)}
+    emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
     sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />;
 
   return (
@@ -375,15 +378,17 @@ export function StatsScreenShell({
           </View>
         ) : null}
       </View>
-      <ScreenScroll key={viewMode === 'exercise' ? `exercise-${exerciseHeatmap}` : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <ScreenScroll key={viewMode === 'exercise' ? `exercise-${exerciseSpatial}` : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {activeError ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {showLoading ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
-        {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} heatmap={exerciseHeatmap} ready={mapReady}
-          families={mapFamilies} items={filteredExerciseListItems} allItems={exerciseListItems}
-          selectedFamily={exerciseFamily} onSelectFamily={setExerciseFamily} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
-          workingSetTarget={weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks)}
+        {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={mapReady}
+          exercises={exerciseMappings} muscles={summary?.muscles ?? []} workingSetTarget={workingSetTarget}
+          items={filteredExerciseListItems} allItems={exerciseListItems}
+          selectedFamily={exerciseFamily} onSelectFamily={setExerciseFamily}
+          selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
+          workingSetTarget={workingSetTarget}
           onSelect={showContributions}
           onMuscleHistory={(row, target, view) => openHistory(muscle => onOpenMuscleHistory(muscle, view), { muscleGroupId: row.muscleGroupId }, target)}
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
@@ -406,17 +411,44 @@ function progressPresentationState({ mapActive, summary, isLoading, errorMessage
   return { activeError, mapReady, pending };
 }
 
-function ExerciseBreakdown({ metric, heatmap, ready, families, items, allItems, selectedFamily, onSelectFamily, renderList }: {
-  metric: ProgressExerciseMetric; heatmap: boolean; ready: boolean;
-  families: ReturnType<typeof buildExerciseMapFamilies>; items: ExerciseListItem[]; allItems: ExerciseListItem[];
+function ExerciseBreakdown({
+  metric, muscleLayout, ready, exercises, muscles, workingSetTarget, items, allItems,
+  selectedFamily, onSelectFamily, selectedMuscleId, onSelectMuscle, renderList,
+}: {
+  metric: ProgressExerciseMetric; muscleLayout: ProgressMuscleLayout; ready: boolean;
+  exercises: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
+  muscles: readonly ProgressMuscleComparison[]; workingSetTarget: number;
+  items: ExerciseListItem[]; allItems: ExerciseListItem[];
   selectedFamily: MuscleMapFamily | null; onSelectFamily: (family: MuscleMapFamily) => void;
-  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary) => ReactNode;
+  selectedMuscleId: string | null; onSelectMuscle: (id: string) => void;
+  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string) => ReactNode;
 }) {
-  if (!heatmap || metric === 'estimatedOneRepMax') return renderList(items);
+  const families = useMemo(
+    () => buildExerciseMapFamilies({ items, exercises, muscles, workingSetTarget }),
+    [items, exercises, muscles, workingSetTarget]
+  );
+  const bodyMuscles = useMemo(
+    () => buildExerciseBodyMuscles({ items, exercises, muscles }),
+    [items, exercises, muscles]
+  );
+  const selectedMuscle = useMemo(
+    () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, workingSetTarget }),
+    [selectedMuscleId, items, exercises, muscles, workingSetTarget]
+  );
+  if (muscleLayout === 'list' || metric === 'estimatedOneRepMax') return renderList(items);
   if (!ready) return null;
+  if (muscleLayout === '3d') {
+    return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
+      selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
+      renderAll={() => renderList(items)}
+      renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
+        new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
+        entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
+  }
   return <ExerciseMap families={families} metric={metric} selectedFamily={selectedFamily} onSelectFamily={onSelectFamily}
     renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
-      new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary)}
+      new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
+      entries.length === 0 ? 'No exercises for this family.' : undefined)}
     emptyBody={items.length > 0 ? 'No exercises with muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
 }
 
