@@ -280,9 +280,8 @@ export function StatsScreenShell({
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
-  const [exerciseLayout, setExerciseLayout] = useState<'list' | 'heatmap'>('list');
   const [exerciseFamily, setExerciseFamily] = useState<MuscleMapFamily | null>(null);
-  const exerciseHeatmap = exerciseLayout === 'heatmap' && exerciseMetric !== 'estimatedOneRepMax';
+  const exerciseHeatmap = muscleLayout === 'heatmap' && exerciseMetric !== 'estimatedOneRepMax';
   const [contributionId, setContributionId] = useState<string | null>(null);
   // The row whose history was opened, held only until the return it is for:
   // any other way back to Progress (a tab, the Sessions link) leaves the
@@ -368,9 +367,6 @@ export function StatsScreenShell({
         {viewMode === 'muscle' ? <ToggleChip accessibilityLabel="Muscle view"
           options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Heatmap' }]}
           value={muscleLayout} onChange={onSelectMuscleLayout} testID="stats-muscle-view-chip" style={styles.muscleViewChip} /> : null}
-        {viewMode === 'exercise' && exerciseMetric !== 'estimatedOneRepMax' ? <ToggleChip accessibilityLabel="Exercise view"
-          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Heatmap' }]}
-          value={exerciseLayout} onChange={setExerciseLayout} testID="stats-exercise-view-chip" style={styles.muscleViewChip} /> : null}
         {/* The gym pill sits beside the search: the three chips fill the row
             above. Exercise view only — muscle totals are the whole exercise
             ([[gym.split]]). */}

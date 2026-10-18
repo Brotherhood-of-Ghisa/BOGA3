@@ -137,6 +137,13 @@ const chooseFilter = (filter: 'view-mode' | 'period' | 'metric', label: string) 
   expect(chipValue(filter)).toBe(label);
 };
 
+// The shared layout is currently supplied through Muscle; its Settings provider is integrated separately.
+const showExerciseHeatmap = () => {
+  chooseFilter('view-mode', 'Muscle');
+  showHeatmap();
+  chooseFilter('view-mode', 'Exercise');
+};
+
 const exerciseOrder = () =>
   screen
     .getAllByTestId(/^stats-exercise-name-/)
@@ -208,10 +215,10 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('offers exercise Heatmap by family, keeps the detail through history, and restores it after 1RM List', async () => {
+  it('uses the shared layout for exercise families, keeps history detail, and restores it after 1RM List', async () => {
     await renderSeededStats();
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     expect(screen.getAllByTestId(/^stats-exercise-family-/)).toHaveLength(7);
     const family = screen.getByTestId('stats-exercise-family-Legs');
@@ -240,10 +247,11 @@ describe('Stats over real data', () => {
     chooseFilter('metric', 'Sets');
     await screen.findByTestId('stats-exercise-map-detail');
     expect(screen.getByTestId('stats-exercise-family-Legs')).toHaveProp('accessibilityState', { selected: true, expanded: true });
-    screen.unmount();
-    await renderStats();
-    await screen.findByTestId('stats-exercise-list');
-    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
+    chooseFilter('view-mode', 'Exercise');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
   });
 
   it('keeps exercise map figures and history gym-scoped, with its independent Volume metric', async () => {
@@ -252,7 +260,7 @@ describe('Stats over real data', () => {
     localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id = 'maestro_exercise_block_history_squat_2'").run();
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
@@ -281,7 +289,7 @@ describe('Stats over real data', () => {
     await bootLocalApp();
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
     expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^4$/);
@@ -319,7 +327,7 @@ describe('Stats over real data', () => {
     await renderSeededStats();
     localDataClient().prepare("UPDATE exercise_sets SET set_type = 'warm_up' WHERE id = 'maestro_exercise_block_history_bench_1_a_work_1'").run();
     await act(async () => updatePreferences({ volumeEfforts: ['warm_up'] }));
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
     await waitFor(() => expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^0$/));
@@ -346,7 +354,7 @@ describe('Stats over real data', () => {
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     chooseFilter('metric', 'Volume');
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
     expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent('—');
@@ -362,7 +370,7 @@ describe('Stats over real data', () => {
     interceptReads({ 1: [() => pending.promise] });
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     await screen.findByTestId('stats-loading-state');
     await act(async () => pending.reject(new Error('muscle read failed')));
@@ -376,7 +384,7 @@ describe('Stats over real data', () => {
 
   it('waits for fresh exercise figures when the effort policy changes even after the muscle source is ready', async () => {
     await renderSeededStats();
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     const real = exerciseCatalogStats.loadExerciseCatalogStatsRawHistory;
     const pending = deferred<Awaited<ReturnType<typeof real>>>();
@@ -393,7 +401,7 @@ describe('Stats over real data', () => {
     await loadMaestroFixture('exercise-block-history');
     const read = jest.spyOn(exerciseCatalogStats, 'loadExerciseCatalogStatsRawHistory').mockRejectedValue(new Error('exercise read failed'));
     await renderStats();
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-error-state');
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-map-empty')).toBeNull();
@@ -409,7 +417,7 @@ describe('Stats over real data', () => {
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     chooseFilter('metric', 'Volume');
-    fireEvent.press(screen.getByTestId('stats-exercise-view-chip'));
+    showExerciseHeatmap();
     await screen.findByTestId('stats-exercise-map');
     expect(screen.queryByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true })).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
@@ -534,6 +542,8 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
     chooseFilter('view-mode', 'Exercise');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
     expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
   });
@@ -752,7 +762,7 @@ describe('Stats over real data', () => {
       if (muscle) expect(controls.queryByTestId('stats-search-input')).toBeNull();
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(
-        /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
+        /^stats-(muscle-table|exercise-list|exercise-list-empty|exercise-map|exercise-map-empty|sessions-link)$/
       );
       expect(content.at(-1)).toHaveProp('testID', 'stats-sessions-link');
     };
@@ -760,7 +770,8 @@ describe('Stats over real data', () => {
     chooseFilter('view-mode', 'Exercise');
     assertPinned('stats-exercise-list-scroll');
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'no matching exercise');
-    expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-map-empty')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
     assertPinned('stats-exercise-list-scroll');
     fireEvent.press(screen.getByTestId('stats-sessions-link'));
     expect(mockPush).toHaveBeenCalledWith('/sessions');
@@ -1150,6 +1161,7 @@ describe('Stats over real data', () => {
       + '(SELECT id FROM session_exercises WHERE exercise_definition_id = ?)').run(huge, SQUAT);
     await replayFocus();
     chooseFilter('view-mode', 'Exercise');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     chooseFilter('metric', 'Volume');
     await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('—'));
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-change`)).toHaveTextContent('—');
