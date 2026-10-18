@@ -790,7 +790,7 @@ assert_sql 'raced confirmation seals only declared rows and remains unready for 
 confirm "${B_TOKEN}" "${EVIDENCE_SESSION}" "$(manifest "${B_UID}" "${EVIDENCE_SESSION}")"; check 'full graph reconfirmed' '.confirmed==true'
 drain_eval
 assert_sql 'client proof and evaluation of the full added-set graph become ready' "select app_public.notification_workout_ready('${B_UID}','${EVIDENCE_SESSION}');"
-# One publication cannot capture different safe actual boards for two workouts when unrelated normalized-link disclosure moves.
+# Source and unrelated disclosure changes between two captures must abort the whole publication.
 rpc "${A_TOKEN}" group_update "$(jq -nc --arg g "${G1}" \
   '{p_group_id:$g,p_name:"Current group name",p_description:null,p_bodyweight_calculations_enabled:true}')"
 expect_ok 'enable bodyweight disclosure fixture'
@@ -814,6 +814,9 @@ run_psql "select app_public.notification_recover_workouts(20);
   select app_public.group_metric_eval_enqueue('${G1}','${X1}','set');
   update app_public.group_metric_eval_queue set available_at=now()+interval '1 hour' where group_exercise_id='${X2}';
   alter table app_public.group_eval_queue add constraint notification_test_disclosure check(member_user_id<>'${C_UID}'::uuid) not valid;" >/dev/null
+for race_kind in disclosure source; do
+run_psql "update app_public.group_metric_eval_queue set available_at=now(),claimed_until=null,claim_id=null
+  where group_exercise_id='${X1}';" >/dev/null
 BENCH_DIGEST="$(run_psql "select app_public.notification_comparison_digest('${G1}','${X1}');")"
 rm -rf "${RACE_DIR}"
 RACE_DIR="$(mktemp -d)"
@@ -840,22 +843,33 @@ while [[ "$(run_psql "select exists(select 1 from pg_stat_activity a join pg_loc
   [[ ${SECONDS} -lt ${BARRIER_DEADLINE} ]] || fail 'publication did not reach the second held workout'
 done
 NORMALIZED_LINK="extra-normalized-link-${RUN_TAG}"
+if [[ "${race_kind}" == disclosure ]]; then
 next_cuam
 bounded_rpc "${C_TOKEN}" sync_push "$(e_link "def-C-${RUN_TAG}" "${G1}" "${NORMALIZED_EXERCISE}" "${CUAM}" null "${NORMALIZED_LINK}" | jq '{entities:[.]}')"
 expect_ok 'normalized link commits between common-board captures'; check 'normalized link acknowledged' '.ok==true'
 assert_sql 'normalized link changed disclosure without changing the accepted ordinary graph' "select
   app_public.notification_comparison_digest('${G1}','${X1}')='${BENCH_DIGEST}'
   and app_public.group_competition_redacts_exercise(array['${G1}'::uuid],'${C_UID}','def-C-${RUN_TAG}');"
+else
+run_psql "begin; select set_config('request.jwt.claim.sub','${C_UID}',true);
+  update app_public.exercise_sets set weight_value='201' where owner_user_id='${C_UID}' and id='set-C-${RUN_TAG}'; commit;" >/dev/null
+assert_sql 'raw source commits while the second capture is blocked' "select
+  app_public.notification_comparison_digest('${G1}','${X1}')<>'${BENCH_DIGEST}';"
+fi
 printf 'rollback;\n\\q\n' >&9
 exec 9>&- 10<&-
 wait "${HOLDER_PID}"; HOLDER_PID=""
 wait "${HANDOFF_PID}"; HANDOFF_PID=""
 IFS= read -r STATUS <"${RACE_DIR}/result"
 BODY="$(tail -n +2 "${RACE_DIR}/result")"
-expect_ok 'disclosure-raced evaluator returns safely'; check 'disclosure race publication fails atomically' '.failed>=1'
+expect_ok "${race_kind}-raced evaluator returns safely"; check "${race_kind} race publication fails atomically" '.failed>=1'
 assert_sql 'no divergent ordinary baselines escaped the failed publication' "select not exists(select 1 from app_public.notification_workout_targets
   where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}') and group_exercise_id='${X1}')
   and exists(select 1 from app_public.group_metric_eval_queue where group_exercise_id='${X1}' and last_sqlstate='P0001');"
+run_psql "delete from app_public.exercise_group_links where owner_user_id='${C_UID}' and id='${NORMALIZED_LINK}';
+  begin; select set_config('request.jwt.claim.sub','${C_UID}',true);
+  update app_public.exercise_sets set weight_value='200' where owner_user_id='${C_UID}' and id='set-C-${RUN_TAG}'; commit;" >/dev/null
+done
 run_psql "alter table app_public.group_eval_queue drop constraint notification_test_disclosure;
   delete from app_public.exercise_group_links where owner_user_id='${C_UID}' and id='${NORMALIZED_LINK}';
   update app_public.group_eval_queue set available_at=now() where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}');

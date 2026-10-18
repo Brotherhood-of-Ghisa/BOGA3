@@ -1,4 +1,7 @@
 /* eslint-disable import/first */
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /** Actual protocol-4 client RPCs and guards against this worktree's leased local
  * stack (supabase/tests/groups-competition-live.sh, lane groups-api-live), whose
  * baseline runs protocol 4. Server arithmetic/privacy vectors remain in
@@ -35,6 +38,19 @@ beforeAll(async () => {
   owner=await signInLiveClient(env,env.ownerEmail);member=await signInLiveClient(env,env.memberEmail);
 });
 afterAll(async () => { await owner?.teardown();await member?.teardown(); });
+
+it('reuses capture graphs without accepting stale sources or exposing private helpers', () => {
+  const container=process.env.GROUPS_LIVE_DB_CONTAINER;
+  if (!container) throw new Error('Run through ./boga test groups-api-live for the leased database container');
+  const output=execFileSync('docker',['exec','-i',container,'psql','-X','-U','postgres','-d','postgres','-Atq','-v','check_reuse=1'],{
+    input: readFileSync(resolve(__dirname,'../../../supabase/tests/notification-capture-benchmark.sql')),
+    encoding: 'utf8',timeout: 60000,
+  });
+  const [benchmark,checks]=output.trim().split('\n').map(line => JSON.parse(line));
+  expect(benchmark).toMatchObject({ workouts: 8,sets: 1080,samples: 5,graph_calls_min: 4,graph_calls_max: 4 });
+  expect(checks).toEqual({ stale_rejections: 2,midpass_rejections: 2,atomic_rejection: true,
+    standalone_rejection: true,single_workout_graph_calls: 4,helpers_private: true });
+},60000);
 
 async function pushPerformance(groupId: string,exerciseId: string,startedAt: number) {
   const stamp=Date.now();const sessionId=`competition-live-${env.runTag}`;
