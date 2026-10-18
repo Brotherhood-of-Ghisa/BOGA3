@@ -1,6 +1,6 @@
 # Split exercise by gym (#707)
 
-Facts: `docs/product/gym.md` (`gym.split`, `gym.split-label`). Decided with the
+Facts: `docs/product/gym.md` (`gym.split`; `gym.split-progress-prs` is open; `gym.split-label` is superseded). Decided with the
 product owner on 2026-10-17.
 
 ## Decisions
@@ -16,7 +16,7 @@ product owner on 2026-10-17.
 | `Past records gym filter` | Unchanged. On a split exercise `Current gym only` selects what the split already selects; in a session with no gym it is off (all gyms). |
 | Groups | Links and figures stay on the whole definition. |
 | Coaching | Applies the split; returns the bucket's gym. Bumps `METRIC_REVISION`. Shipped in PR 2 with the old model — default = most recent bucket, no gym its own bucket — so it needs the follow-up below. |
-| Labels | `gym.split-label` was written for per-gym rows in mixed lists. With a gym picker instead, revisit it in PR 4. |
+| Labels | `gym.split-label` is superseded by `gym.split` (operator, 2026-10-18): no list mixes per-gym rows, so there is nothing to label. How a chosen gym is named is PR 4's design call. |
 | Sync | Additive column, **no protocol bump**. `sync_push` writes the column only when the key is present, so a writer that omits it keeps the stored value. Migration deploys before the app release. |
 
 ## Why not a physical split
@@ -101,7 +101,7 @@ un-splitting is a merge. Rejected.
   (`src/rm-curve/model.ts`) so unset is every gym, and resolve its "latest
   trained gym" default to a concrete id before the scope is built. Operator's
   call on 2026-10-17 to do it here, not in PR 3.
-- `gym.split-label` formatter, used only by the multi-gym lists.
+- How the chosen gym is named in a view (picker, header) — a design call for the mock, not a fact.
 - Lanes: `fast`, `frontend-android`.
 
 ### 5. Editor toggle

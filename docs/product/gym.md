@@ -12,7 +12,8 @@ current gym; a session with no gym counts only in the whole exercise.
 | Repeat last and plan prefill | newest session at the same gym; no gym: the whole exercise's newest |
 | Progress, exercise history, catalog stats, heatmaps, 1RM curve | the whole exercise until a gym is chosen |
 | Session, muscle and period totals; groups | the whole exercise |
-| Coaching | the whole exercise by default, or one gym |
+| Share image name | plain, never a gym |
+| Coaching | the whole exercise by default, or one named gym |
 
 The setting is synced and retroactive: changing it recomputes history and PRs.
 
@@ -28,12 +29,9 @@ How a split exercise's gym PRs show in Progress. Wanted visible, probably
 behind a setting; mock first. Showing gym PRs and whole-exercise PRs side by
 side is parked.
 
-### gym.split-label · presentation · accepted
+### gym.split-label · presentation · superseded-by: gym.split
 
-A split exercise's name carries its gym (`Bench Press · Home`,
-`Bench Press · No gym`) only in lists mixing gyms: Progress, catalog,
-exercise history, heatmaps. Screens already showing the gym keep it plain;
-the share image never shows a gym; coaching returns it as a field.
-
-Why: the gym is repeated only where it tells two rows apart. Approved 2026-10-17.
-Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
+Replaced by [[gym.split]] with owner approval on 2026-10-18: views show the
+whole exercise until a gym is chosen, so no list mixes per-gym rows to label.
+Its share-image and coaching rules moved there; how a chosen gym is named is
+left to the design.
