@@ -32,6 +32,7 @@ import {
   aggregateExerciseCatalogStats,
   exerciseCatalogStatsGymOptions,
   loadExerciseCatalogStatsRawHistory,
+  withInProgressSession,
 } from '@/src/data/exercise-catalog-stats';
 import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
 import { loadGymBookSessionIds } from '@/src/data/exercise-session-facts';
@@ -198,8 +199,27 @@ describe('catalog stats and Progress rows', () => {
   });
 });
 
-describe('exercise history\'s gym chips', () => {
-  it('keep the chosen gym\'s chip, by name, when the period holds none of its sessions', async () => {
+describe('the workout in progress', () => {
+  it('counts at its own gym, in the heatmap and in Progress rows, and offers that gym', async () => {
+    insertSession('active-annex', 9, BENCH, [['90', '5']], 'annex', 'active');
+    db().update(exerciseSets).set({ performanceStatus: 'performed' }).where(eq(exerciseSets.id, 'active-annex-b0-s0')).run();
+    const now = day(9, 19);
+    const window = { start: day(1, 0), end: day(10, 0), timeZone: 'UTC', exerciseDefinitionId: BENCH, now };
+    const sessionsAt = async (gymId?: string | null) =>
+      (await computeSelectedExerciseHistoryEffort({ ...window, ...(gymId === undefined ? {} : { gymId }) }))
+        .daily.flatMap((entry) => entry.sessionIds ?? []);
+    expect(await sessionsAt('annex')).toEqual(['active-annex']);
+    expect(await sessionsAt(null)).toEqual(['none-1']);
+    expect(await sessionsAt()).toContain('active-annex');
+
+    const raw = withInProgressSession(await loadExerciseCatalogStatsRawHistory(), now);
+    expect(aggregateExerciseCatalogStats(raw, 'all', now, { gymId: 'annex' }).aggregatesById.get(BENCH)?.sessionCount).toBe(1);
+    expect(exerciseCatalogStatsGymOptions(raw)[0]).toEqual({ gymId: 'annex', name: 'Annex' });
+  });
+});
+
+describe('exercise history\'s gym options', () => {
+  it('keep the chosen gym, by name, when the period holds none of its sessions', async () => {
     const summary = (await loadExercisePerformanceHistory({
       exerciseDefinitionId: BENCH, period: 'all', gymId: 'annex', now: day(10),
     }))!;
