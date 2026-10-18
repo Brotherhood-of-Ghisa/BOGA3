@@ -30,7 +30,7 @@ import { type ProgressComparisons } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { ExerciseMap } from '@/components/stats/exercise-map';
-import { buildExerciseMapFamilies } from '@/components/stats/exercise-map-data';
+import { buildExerciseMapFamilies, type ExerciseMapSecondary } from '@/components/stats/exercise-map-data';
 import type { MuscleMapFamily } from '@/components/stats/muscle-map-reference';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -343,8 +343,8 @@ export function StatsScreenShell({
   const mapFamilies = useMemo(() => buildExerciseMapFamilies({ items: filteredExerciseListItems, exercises: exerciseMappings,
     muscles: summary?.muscles ?? [], workingSetTarget: weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks) }),
   [filteredExerciseListItems, exerciseMappings, summary, weeklyWorkingSetTarget, period, targetWindowWeeks]);
-  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
-    targetAttainmentById={targetAttainmentById}
+  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary) => <ExerciseListView items={items} metric={exerciseMetric}
+    targetAttainmentById={targetAttainmentById} secondary={secondary}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={mapActive && items.length === 0 ? 'No exercises for this family.' : exerciseEmptyBody(exerciseListItems, exerciseMetric)}
     sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />;
@@ -419,14 +419,14 @@ function ExerciseBreakdown({ metric, heatmap, ready, families, items, allItems, 
   metric: ProgressExerciseMetric; heatmap: boolean; ready: boolean;
   families: ReturnType<typeof buildExerciseMapFamilies>; items: ExerciseListItem[]; allItems: ExerciseListItem[];
   selectedFamily: MuscleMapFamily | null; onSelectFamily: (family: MuscleMapFamily) => void;
-  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>) => ReactNode;
+  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary) => ReactNode;
 }) {
   if (!heatmap || metric === 'estimatedOneRepMax') return renderList(items);
   if (!ready) return null;
   return <ExerciseMap families={families} metric={metric} selectedFamily={selectedFamily} onSelectFamily={onSelectFamily}
-    renderDetail={entries => renderList(entries.map(entry => entry.item),
-      new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])))}
-    emptyBody={items.length > 0 ? 'No exercises with primary muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
+    renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
+      new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary)}
+    emptyBody={items.length > 0 ? 'No exercises with muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
 }
 
 // An empty table says which of the three it is: no history at all, nothing
@@ -452,9 +452,11 @@ function ExerciseListView({
   sortMode,
   onPressSortHeader,
   targetAttainmentById,
+  secondary,
 }: {
   items: ExerciseListItem[];
   targetAttainmentById?: ReadonlyMap<string, number>;
+  secondary?: ExerciseMapSecondary;
   metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
   emptyBody: string;
@@ -473,7 +475,7 @@ function ExerciseListView({
 
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
-  const layout = resolveComparisonLayout(width, items, metric, false, true);
+  const layout = resolveComparisonLayout(width, secondary ? [...items, secondary] : items, metric, false, true);
   return (
     <StatsTable testID="stats-exercise-list">
       <ComparisonHeaders
@@ -503,8 +505,9 @@ function ExerciseListView({
         }
         testID="stats-exercise-table-header"
       />
+      {secondary ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
       {items.map((item) => {
-        const attainment = metric === 'workingSetCount' ? targetAttainmentById?.get(item.id) : undefined;
+        const attainment = metric === 'workingSetCount' ? secondary?.targetAttainment ?? targetAttainmentById?.get(item.id) : undefined;
         const target = attainment === undefined ? null : Math.round(attainment * 100);
         const values = (
           <ComparisonValues
@@ -519,7 +522,7 @@ function ExerciseListView({
           <ListRow
             key={item.id}
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
-            accessibilityLabel={`${exerciseRowLabel(item, metric)}${target === null ? '' : ` Primary muscle target ${target}%.`}`}
+            accessibilityLabel={`${secondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}${target === null ? '' : ` ${secondary ? 'Secondary' : 'Primary'} muscle target ${target}%.`}`}
             density="list"
             meta={layout.stacked ? undefined : values}
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
@@ -535,6 +538,22 @@ function ExerciseListView({
       })}
     </StatsTable>
   );
+}
+
+// This aggregate is read-only; only its real contributors below open full exercise history.
+function SecondarySummary({ secondary, metric, layout }: {
+  secondary: ExerciseMapSecondary; metric: ProgressExerciseMetric; layout: ReturnType<typeof resolveComparisonLayout>;
+}) {
+  const figures = comparisonFigures(secondary, metric);
+  const target = metric === 'workingSetCount' ? Math.round(secondary.targetAttainment * 100) : null;
+  const values = <ComparisonValues row={secondary} metric={metric} layout={layout} prefix="stats-exercise-secondary-summary" speak={false} />;
+  return <ListRow accessible accessibilityLabel={`Secondary contribution. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.${target === null ? '' : ` Secondary muscle target ${target}%.`}`}
+    meta={layout.stacked ? undefined : values} testID="stats-exercise-secondary-summary">
+    <Text allowFontScaling={false} accessibilityRole="header" style={statsTableStyles.name}>Secondary</Text>
+    {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
+      testID="stats-exercise-secondary-target">{target}% target</Text> : null}
+    {layout.stacked ? values : null}
+  </ListRow>;
 }
 
 // The whole row is one target, so it speaks its own figures; the cells inside

@@ -11,7 +11,7 @@ const entry = (id: string, now: number, previous: number | null, targetAttainmen
     previous: { workingSetCount: previous ?? 0, totalVolume: previous, volumeSetCount: previous === 0 ? 0 : 1 }, lastCompletedAt: null }, targetAttainment,
 });
 const draw = (metric: ProgressMetric, exercises: ExerciseMapEntry[], family: ExerciseMapFamily['name'] = 'Legs') => render(
-  <ExerciseMap families={[{ name: family, exercises }]} metric={metric} selectedFamily={null}
+  <ExerciseMap families={[{ name: family, exercises, secondary: null }]} metric={metric} selectedFamily={null}
     onSelectFamily={jest.fn()} renderDetail={() => null} emptyBody="Empty" />
 );
 const tile = (id: string, family = 'Legs') => screen.getByTestId(`stats-exercise-tile-${family}-${id}`, { includeHiddenElements: true });
@@ -40,4 +40,27 @@ it('shows current figures in compact proportional boxes and leaves too-small box
   expect(screen.queryByTestId('stats-exercise-tile-Chest-tiny-now', { includeHiddenElements: true })).toBeNull();
   expect(tile('tiny', 'Chest')).toBeTruthy();
   expect(screen.getByTestId('stats-exercise-family-Chest')).toHaveProp('accessibilityRole', 'button');
+});
+
+it.each([
+  ['increase', 200, 100, withAlpha(uiRoles.gain, .16)],
+  ['decrease', 50, 100, withAlpha(uiRoles.loss, .16)],
+  ['neutral', 100, 100, uiRoles.ruleSoft],
+  ['new', 100, 0, withAlpha(uiRoles.gain, .16)],
+  ['unavailable', 100, null, uiRoles.ruleSoft],
+] as const)('renders the Secondary aggregate Volume comparison as %s', (_state, now, previous, fill) => {
+  const secondary = { current: entry('ignored', now, previous).item.current,
+    previous: entry('ignored', now, previous).item.previous, exercises: [entry('bench', 1, 1), entry('row', 1, 1)], targetAttainment: .25 };
+  render(<ExerciseMap families={[{ name: 'Arms', exercises: [entry('direct', 3, 3)], secondary }]} metric="totalVolume"
+    selectedFamily="Arms" onSelectFamily={jest.fn()} renderDetail={() => null} emptyBody="Empty" />);
+  expect(screen.getByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toHaveStyle({ backgroundColor: fill });
+  expect(screen.getByTestId('stats-exercise-family-Arms')).toHaveProp('accessibilityLabel', 'Show Arms exercises. 3 exercises. Includes secondary contributions.');
+});
+
+it('inherits the Secondary Sets target even when its own set delta falls', () => {
+  const secondary = { current: entry('ignored', 4, 20).item.current,
+    previous: entry('ignored', 4, 20).item.previous, exercises: [entry('bench', 4, 20)], targetAttainment: .25 };
+  render(<ExerciseMap families={[{ name: 'Arms', exercises: [], secondary }]} metric="workingSetCount"
+    selectedFamily="Arms" onSelectFamily={jest.fn()} renderDetail={() => null} emptyBody="Empty" />);
+  expect(screen.getByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toHaveStyle({ backgroundColor: HEAT_RAMP[1] });
 });

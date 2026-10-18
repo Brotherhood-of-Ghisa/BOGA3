@@ -84,27 +84,31 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 
 ### muscle.exercise-map-area · presentation · accepted
 
-Progress Exercise's heatmap keeps the muscle map's fixed family frames
-([[muscle.map-area]]). Within each family, an exercise's area is proportional
-to its full current-period Volume or working-set count. Membership requires
-at least one current primary muscle in that family. Multiple primary muscles
-in one family produce one exercise tile; primary muscles in several families
-repeat its full value once in each. Zero or unavailable values take no area;
-readable detail rows retain those exercises. Approved 2026-10-18.
+Progress Exercise's heatmap keeps the fixed family frames ([[muscle.map-area]]).
+Within each family, named primary exercises get full current-period Volume or
+working-set area, once per exercise. Each primary family repeats that value.
+One Secondary aggregate sums half the full exercise values for exercises with
+secondary mappings and no primary anywhere in that family, once per exercise
+regardless of mapped muscle count. Both use the same exercise units and
+independent metric eligibility ([[set.eligibility]]). Zero/unavailable values
+have no area; detail rows retain them. Secondary contributor rows show weighted
+figures but open full exercise history. Approved 2026-10-18.
 
-Why: exercise size shows its work while primary mappings place it in the familiar family map.
+Why: exercise size shows its work while secondary work remains visible without duplicating primary work within a family.
 Code: `apps/mobile/components/stats/exercise-map-data.ts`.
 
 ### muscle.exercise-map-colour · presentation · accepted
 
-Progress exercise-map Volume colours follow each exercise's own previous-period
-comparison. Sets colours inherit target attainment from its primary muscles
-within that family: cap each muscle's attainment at target, then average.
-Those muscle counts follow [[muscle.set-count]] over every gym, unaffected by
-exercise search or gym filters. The target is Settings' weekly target times
-the selected calendar weeks, including the unfinished week in full. Readable
-Sets rows also show and announce attainment. Approved 2026-10-18.
+Exercise-map Volume colours compare each primary exercise's own periods and
+Secondary's combined weighted periods. Unavailable operands or overflow keep
+an aggregate unavailable. Sets colours average capped muscle target attainment:
+primary tiles use their primary muscles in that family; Secondary uses muscles
+reached by secondary-only exercises with working sets in either period,
+selected before search/gym filtering. Muscle counts follow [[muscle.set-count]]
+over all gyms. Neither search nor gym changes target colour. Settings' weekly
+target multiplies by selected calendar weeks, including the unfinished week
+in full. Readable Sets rows show and announce target attainment. Approved 2026-10-18.
 
-Why: exercises for the same primary muscle show the same progress toward its target.
+Why: target colour describes the represented muscles while Volume compares the work shown.
 Code: `apps/mobile/components/stats/exercise-map-data.ts` and
 `apps/mobile/src/preferences/targets.ts`.

@@ -56,7 +56,7 @@ const metricValue = (period: ComparisonPeriodFigures, metric: ComparisonMetric):
       : period.estimatedOneRepMax ?? null;
 
 const metricFigure = (period: ComparisonPeriodFigures, metric: ComparisonMetric): string => {
-  if (metric === 'workingSetCount') return String(period.workingSetCount);
+  if (metric === 'workingSetCount') return Number.isFinite(period.workingSetCount) ? String(period.workingSetCount) : '—';
   if (metric === 'totalVolume') return formatVolumeFigure(period.totalVolume);
   const estimate = period.estimatedOneRepMax ?? null;
   return estimate !== null && Number.isFinite(estimate) ? formatOneRepMax(estimate) : '—';

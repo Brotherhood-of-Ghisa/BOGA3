@@ -25,6 +25,7 @@ import {
   nextExerciseSortMode,
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
+import { comparisonFigures } from '@/components/stats/comparison-columns';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
 import ProgressRoute from '../app/(tabs)/progress';
@@ -274,6 +275,21 @@ describe('formatCountDelta', () => {
   it('renders positive and negative count deltas without percentages', () => {
     expect(formatCountDelta(8, 6)).toEqual({ text: '+2', tone: 'positive' });
     expect(formatCountDelta(3, 6)).toEqual({ text: '−3', tone: 'negative' });
+  });
+});
+
+describe('working-count comparison figures', () => {
+  const figures = (now: number, previous: number) => comparisonFigures({
+    current: { workingSetCount: now, totalVolume: 0 }, previous: { workingSetCount: previous, totalVolume: 0 },
+  }, 'workingSetCount');
+  it('keeps finite weighted half-counts numeric and signed', () => {
+    expect(figures(2.5, 1)).toEqual({ now: '2.5', previous: '1', change: { text: '+1.5', tone: 'positive' } });
+  });
+  it.each([[Infinity, 1], [.5, NaN], [Infinity, Infinity]])('keeps unavailable current/previous counts neutral (%s, %s)', (now, previous) => {
+    const result = figures(now, previous);
+    expect(result.now).toBe(Number.isFinite(now) ? String(now) : '—');
+    expect(result.previous).toBe(Number.isFinite(previous) ? String(previous) : '—');
+    expect(result.change).toEqual({ text: '—', tone: 'neutral' });
   });
 });
 
