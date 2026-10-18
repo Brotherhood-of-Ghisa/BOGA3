@@ -30,8 +30,8 @@ import { type ProgressComparisons } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { HeatmapView, ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
-import { ProgressMuscleView, type ProgressMuscleLayout } from '@/components/stats/progress-muscle-view';
+import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
+import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import {
   COLUMN_KEYS,
   COLUMN_NAMES,
@@ -222,7 +222,6 @@ export type StatsScreenShellProps = {
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
   muscleLayout: ProgressMuscleLayout;
-  onSelectMuscleLayout: (layout: ProgressMuscleLayout) => void;
   tableMetric: ProgressMetric;
   onSelectTableMetric: (metric: ProgressMetric) => void;
   // The Exercise table's own metric, which may be one the Muscle table cannot show.
@@ -254,7 +253,6 @@ export function StatsScreenShell({
   viewMode,
   onSelectViewMode,
   muscleLayout,
-  onSelectMuscleLayout,
   tableMetric,
   onSelectTableMetric,
   exerciseMetric,
@@ -341,9 +339,6 @@ export function StatsScreenShell({
               value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
           )}
         </View>
-        {viewMode === 'muscle' ? <ToggleChip accessibilityLabel="Muscle view"
-          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Heatmap' }]}
-          value={muscleLayout} onChange={onSelectMuscleLayout} testID="stats-muscle-view-chip" style={styles.muscleViewChip} /> : null}
         {/* The gym pill sits beside the search: the three chips fill the row
             above. Exercise view only — muscle totals are the whole exercise
             ([[gym.split]]). */}
@@ -583,7 +578,6 @@ function StatsContent() {
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload);
   const [searchQuery, setSearchQuery] = useState('');
-  const [muscleLayout, setMuscleLayout] = useState<ProgressMuscleLayout>('list');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
@@ -604,7 +598,7 @@ function StatsContent() {
       { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : undefined }, filters.metric,
       filters.breakdown === 'muscle' ? 'timeline' : undefined))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
-    muscleLayout={muscleLayout} onSelectMuscleLayout={setMuscleLayout}
+    muscleLayout={values.progressMuscleLayout}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
@@ -633,8 +627,6 @@ const RECENCY_INDICATOR_WIDTH = 64;
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
-  // Keep the compact rows’ expanded tap targets apart.
-  muscleViewChip: { flex: 0, alignSelf: 'flex-start', marginTop: uiSpace.xs },
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   search: { flex: 1 },

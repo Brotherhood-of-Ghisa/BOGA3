@@ -5,6 +5,7 @@ jest.mock('@/src/data/bootstrap', () =>
 jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: { id: 'A' } }) }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }), useLocalSearchParams: () => ({}),
+  useIsFocused: () => true,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- native navigation boundary.
   useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
 }));
@@ -12,10 +13,11 @@ jest.mock('expo-router', () => ({
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 import SettingsRoute from '../app/(tabs)/settings';
+import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
-import { ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
-import { closeLocalData, resetLocalData } from './helpers/local-data';
+import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 
 const values = () => getAccountLocalPreferenceState().values;
 const openSettings = async () => {
@@ -30,6 +32,51 @@ const editNumber = (id: string, value: string) => {
 };
 beforeEach(() => resetLocalData());
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
+
+const openSettingsAndProgress = async () => {
+  await loadMaestroFixture('exercise-block-history');
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  const page = render(<><SettingsRoute /><ProgressRoute /></>);
+  await screen.findByTestId('stats-muscle-table');
+  return page;
+};
+
+it('chooses List / Map in Settings and restores the choice on a fresh Progress visit', async () => {
+  const page = await openSettingsAndProgress();
+  expect(screen.getByTestId('settings-muscle-view-list')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
+  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
+  expect(await screen.findByTestId('stats-muscle-map')).toBeTruthy();
+  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveTextContent('Map');
+  expect(values().progressMuscleLayout).toBe('heatmap');
+
+  page.unmount();
+  __resetAccountLocalPreferencesForTests();
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<><SettingsRoute /><ProgressRoute /></>);
+  expect(await screen.findByTestId('stats-muscle-map')).toBeTruthy();
+  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveProp('accessibilityState', { selected: true });
+  fireEvent.press(screen.getByTestId('settings-muscle-view-list'));
+  expect(await screen.findByTestId('stats-muscle-table')).toBeTruthy();
+  expect(values().progressMuscleLayout).toBe('list');
+});
+
+it('keeps an unsaved Map choice as a Settings draft and applies it to Progress after Refresh', async () => {
+  await openSettingsAndProgress();
+  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
+  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
+  expect(values().progressMuscleLayout).toBe('list');
+  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
+  write.mockRestore();
+  fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+  expect(await screen.findByTestId('stats-muscle-map')).toBeTruthy();
+  expect(values().progressMuscleLayout).toBe('heatmap');
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+});
 
 it('saves both window settings, and retains invalid numeric drafts in the centralized error flow', async () => {
   await openSettings();

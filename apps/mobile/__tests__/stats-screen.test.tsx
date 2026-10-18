@@ -206,7 +206,6 @@ const buildShellProps = (
   errorMessage: null,
   viewMode: 'muscle',
   muscleLayout: 'heatmap',
-  onSelectMuscleLayout: jest.fn(),
   onSelectViewMode: jest.fn(),
   tableMetric: 'workingSetCount',
   onSelectTableMetric: jest.fn(),
@@ -467,20 +466,15 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('offers the heatmap through the presentation filter and hides that filter for exercises', () => {
+  it('uses the Settings layout without offering a presentation filter in Progress', () => {
     const props = buildShellProps({ muscleLayout: 'list' });
     const view = render(<StatsScreenShell {...props} />);
     expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-map')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-view-chip')).toHaveProp('accessibilityLabel', 'Muscle view: List. Activate to show Heatmap.');
-    fireEvent.press(screen.getByTestId('stats-muscle-view-chip'));
-    expect(props.onSelectMuscleLayout).toHaveBeenLastCalledWith('heatmap');
+    expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
     view.rerender(<StatsScreenShell {...props} muscleLayout="heatmap" />);
     expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-muscle-view-chip'));
-    expect(props.onSelectMuscleLayout).toHaveBeenLastCalledWith('list');
-    view.rerender(<StatsScreenShell {...props} viewMode="exercise" />);
     expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
   });
 
