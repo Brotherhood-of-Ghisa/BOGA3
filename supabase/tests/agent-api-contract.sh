@@ -807,7 +807,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg away "${GYM_SPLIT}" --arg home "${G
   and (.data.recent_performances | map(.gym.id // null)) == [$away, null, $home]
   and (.data.recent_performances | map(has("gym")) | all)
   and .data.personal_records.top_weight.value == 200
-  and (.data.volume_series | length) == 3
+  # The volume series runs oldest first and names the gym of each point too.
+  and (.data.volume_series | map(.gym.id // null)) == [$home, null, $away]
+  and (.data.volume_series | map(has("gym")) | all)
 ' >/dev/null || fail "split exercise context did not report the whole exercise beside each gym"
 
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=${GYM_A}"
@@ -889,8 +891,9 @@ NO_GYM_CURSOR="$(printf '%s' "${AWAY_CURSOR}" | tr '_-' '/+' | awk '{ while (len
   jq -Rr '@base64d | fromjson | .gym_bucket = null | tojson | @base64' | tr '+/' '-_' | tr -d '=')"
 agent_get "exercises/${EXERCISE_SPLIT}/history?limit=1&cursor=${NO_GYM_CURSOR}"
 assert_status "400" "a cursor pinned to the no-gym bucket"
-[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_CURSOR" ]] ||
-  fail "a cursor pinned to the no-gym bucket was not an invalid cursor"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .error.code == "INVALID_CURSOR" and (.error.message | test("sessions with no gym"))
+' >/dev/null || fail "a cursor pinned to the no-gym bucket was not rejected for its bucket"
 
 agent_get "exercises/${EXERCISE_SPLIT}/context?gym_bucket=agent-api-${RUN_TAG}-gym-absent"
 assert_status "404" "gym_bucket naming a gym the user does not own"
@@ -904,6 +907,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   and (.data.exercise | has("gym") | not)
   and (.data.exercise | has("gym_buckets") | not)
   and (.data.recent_performances[0] | has("gym") | not)
+  and (.data.volume_series[0] | has("gym") | not)
   and (.data.recent_performances[0].sets[0] | has("gym") | not)
 ' >/dev/null || fail "an unsplit exercise carries gym-bucket fields"
 

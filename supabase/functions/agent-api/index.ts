@@ -1149,6 +1149,7 @@ const getExerciseContext = async (
     ? performanceRows
     : performanceRows.filter((row) => row.session.gym_id === requestedBucket);
   const recentRows = bucketRows.slice(0, recentSessions);
+  const seriesRows = bucketRows.slice(0, 12).reverse();
   const historyIncomplete = historyTruncated || setResult.truncated;
 
   // The app's record book (`records.ts`): ties keep the earliest session and a
@@ -1182,14 +1183,16 @@ const getExerciseContext = async (
 
   // Every gym's records travel with the gym list, so one call shows each gym
   // beside the others and the whole exercise. A split exercise's performances
-  // name their gym, since the whole exercise mixes them.
+  // and volume points name their gym, since the whole exercise mixes them.
   const namer = definition.split_by_gym
     ? await loadGymNamer(client, userId, [
       requestedBucket,
       ...rankedBuckets.slice(0, MAX_GYM_BUCKETS).map((entry) => entry.gymId),
-      ...recentRows.map((row) => row.session.gym_id),
+      ...[...recentRows, ...seriesRows].map((row) => row.session.gym_id),
     ])
     : null;
+  const gymOf = (row: typeof performanceRows[number]): JsonObject =>
+    namer === null ? {} : { gym: namer.field(row.session.gym_id) };
   const splitFields = namer === null
     ? {}
     : gymBucketFields(namer, requestedBucket, rankedBuckets, (gymId) => {
@@ -1209,7 +1212,7 @@ const getExerciseContext = async (
     },
     recent_performances: recentRows.map((row) => ({
       session_id: row.session.id,
-      ...(namer === null ? {} : { gym: namer.field(row.session.gym_id) }),
+      ...gymOf(row),
       started_at: toIsoTimestamp(row.session.started_at),
       completed_at: toIsoTimestamp(row.session.completed_at),
       duration_seconds: row.session.duration_sec,
@@ -1224,8 +1227,9 @@ const getExerciseContext = async (
       history_truncated: historyIncomplete,
       excluded_incomplete_volume_sessions: bucketRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
     },
-    volume_series: bucketRows.slice(0, 12).reverse().map((row) => ({
+    volume_series: seriesRows.map((row) => ({
       completed_at: toIsoTimestamp(row.session.completed_at),
+      ...gymOf(row),
       ...volumePayload(row.volumeCoverage, historyIncomplete),
     })),
     last_performed_at: bucketRows.length > 0
@@ -1402,7 +1406,8 @@ const getExerciseHistory = async (
   // The cursor carries its own bucket, so draining it keeps paging that bucket
   // even when the caller does not repeat `gym_bucket` — otherwise page two
   // would silently switch buckets and apply page one's keyset filter to it.
-  const cursorBucket = cursor
+  // An unsplit exercise has no buckets, so its cursor's filter lapses unread.
+  const cursorBucket = cursor && definition.split_by_gym
     ? asApiError(() => gymBucketFromCursor(cursor.gym_bucket))
     : undefined;
   if (cursorBucket !== undefined && requestedBucket !== undefined
@@ -1422,13 +1427,13 @@ const getExerciseHistory = async (
   // The exercise descriptor names the filtered bucket when there is one. The
   // per-bucket inventory is the context route's: here every gym's sets are in
   // the page already, each carrying its own gym.
-  const exerciseField = async (): Promise<JsonObject> => ({
+  const exerciseField = async (pageNamer?: GymNamer): Promise<JsonObject> => ({
     id: definition.id,
     name: definition.name,
     ...exerciseLoadPayload(definition, bodyweightCalculationsEnabled),
     split_by_gym: definition.split_by_gym,
     ...(definition.split_by_gym
-      ? gymBucketFields(await loadGymNamer(client, userId, [filterBucket]), filterBucket)
+      ? gymBucketFields(pageNamer ?? await loadGymNamer(client, userId, [filterBucket]), filterBucket)
       : {}),
   });
 
@@ -1562,9 +1567,9 @@ const getExerciseHistory = async (
   );
   const contextSessionById = new Map(sessionsWithContext.map((s) => [s.id, s]));
 
-  const pageGymNames = definition.split_by_gym
-    ? await loadGymNames(client, userId, uniqueStrings(pageItems.map((item) => item.session.gym_id), 100))
-    : new Map<string, string>();
+  const pageNamer = definition.split_by_gym
+    ? await loadGymNamer(client, userId, [filterBucket, ...pageItems.map((item) => item.session.gym_id)])
+    : undefined;
 
   const projectedSets = pageItems.flatMap((item) => {
     const sessionWithContext = contextSessionById.get(item.session.id) ?? item.session;
@@ -1585,20 +1590,14 @@ const getExerciseHistory = async (
       equipment: item.block.machine_name,
       // A split exercise's sets carry the gym they belong to, so one page can
       // span gyms without the reader having to guess which is which.
-      ...(definition.split_by_gym
-        ? {
-          gym: item.session.gym_id === null
-            ? null
-            : { id: item.session.gym_id, name: pageGymNames.get(item.session.gym_id) ?? null },
-        }
-        : {}),
+      ...(pageNamer === undefined ? {} : { gym: pageNamer.field(item.session.gym_id) }),
     }];
   });
 
   const lastItem = pageItems[pageItems.length - 1];
   return {
     metric_revision: METRIC_REVISION,
-    exercise: await exerciseField(),
+    exercise: await exerciseField(pageNamer),
     sets: projectedSets,
     next_cursor: hasMore && lastItem
       ? encodeCursor({

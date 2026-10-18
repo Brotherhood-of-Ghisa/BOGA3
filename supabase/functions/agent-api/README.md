@@ -237,7 +237,7 @@ split, when empty, or against a cursor for another gym, and `404` for a gym the
 user does not own. `none` once selected the no-gym sessions; it is now `400
 INVALID_ARGUMENT`, saying they count in the whole exercise (so a gym whose own
 id is `none` cannot be named), and a history cursor pinned to them is `400
-INVALID_CURSOR`.
+INVALID_CURSOR` while the exercise is split.
 
 The context route's `exercise.gym_buckets` lists every gym it could see, most
 recently performed first, each with its own `personal_records` and
@@ -245,8 +245,8 @@ recently performed first, each with its own `personal_records` and
 50 gyms it lists the 50 newest and sets `gym_buckets_truncated`. Gyms are
 ranked over the sessions those figures count — [working sets
 only](#working-sets-only) — so a gym performed only as warm-ups is not listed.
-Each of a split exercise's `recent_performances` names its `gym` (`null` for no
-gym). The history route carries no inventory: every gym's sets are already in
+Each of a split exercise's `recent_performances` and `volume_series` points
+names its `gym` (`null` for no gym). The history route carries no inventory: every gym's sets are already in
 its pages, each naming its gym.
 
 `exercise.gym` appears only when one gym owns the response: a context or

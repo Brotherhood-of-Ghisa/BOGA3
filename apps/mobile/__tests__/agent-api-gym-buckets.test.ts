@@ -9,7 +9,7 @@
  */
 
 import {
-  GymBucketError, NO_GYM_BUCKET, gymBucketFromCursor, gymBucketFromParam, rankGymBuckets,
+  GymBucketError, NO_GYM_BUCKET, NO_GYM_CURSOR_MESSAGE, gymBucketFromCursor, gymBucketFromParam, rankGymBuckets,
 } from '../../../supabase/functions/agent-api/gym-buckets.ts';
 
 const session = (gymId: string | null, completedAt: number) => ({
@@ -48,8 +48,17 @@ describe('coaching gym buckets', () => {
   });
 
   it('rejects a cursor pinned to the no-gym bucket rather than widening it', () => {
-    expect(rejection(() => gymBucketFromCursor(null)).code).toBe('INVALID_CURSOR');
-    expect(rejection(() => gymBucketFromCursor(7)).code).toBe('INVALID_CURSOR');
+    const error = rejection(() => gymBucketFromCursor(null));
+    expect(error.code).toBe('INVALID_CURSOR');
+    expect(error.message).toBe(NO_GYM_CURSOR_MESSAGE);
+  });
+
+  it('rejects a cursor whose gym is not a gym id as malformed', () => {
+    for (const value of [7, '', {}]) {
+      const error = rejection(() => gymBucketFromCursor(value));
+      expect(error.code).toBe('INVALID_CURSOR');
+      expect(error.message).not.toBe(NO_GYM_CURSOR_MESSAGE);
+    }
   });
 
   it('ranks every performed gym by its newest session, most recent first', () => {

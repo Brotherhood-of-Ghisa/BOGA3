@@ -37,6 +37,10 @@ export const gymBucketFromParam = (value: string | null): string | undefined => 
   return value;
 };
 
+export const NO_GYM_CURSOR_MESSAGE =
+  'Cursor pages the sessions with no gym, which are no longer a bucket: they count only'
+  + ' in the whole exercise. Restart without the cursor.';
+
 /**
  * The gym a history cursor is pinned to; undefined for an unfiltered cursor.
  * A cursor pinned to the no-gym bucket (`null`) predates the rule and pages a
@@ -44,7 +48,10 @@ export const gymBucketFromParam = (value: string | null): string | undefined => 
  */
 export const gymBucketFromCursor = (value: unknown): string | undefined => {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string') throw new GymBucketError('INVALID_CURSOR', 'Cursor is invalid.');
+  if (value === null) throw new GymBucketError('INVALID_CURSOR', NO_GYM_CURSOR_MESSAGE);
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new GymBucketError('INVALID_CURSOR', 'Cursor is invalid.');
+  }
   return value;
 };
 
