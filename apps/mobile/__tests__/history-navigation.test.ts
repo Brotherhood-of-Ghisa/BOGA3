@@ -8,9 +8,15 @@ import {
   parseHistoryJump,
   type SessionListItem,
 } from '@/components/session-list';
-import { completedSessionHref, historyDayHref, sessionsDayHref, sessionsWeekHref, progressHistoryHref } from '@/src/navigation/routes';
+import { completedSessionHref, exerciseHistoryHref, historyDayHref, sessionsDayHref, sessionsWeekHref, progressHistoryHref } from '@/src/navigation/routes';
 
 describe('history hrefs', () => {
+  it('opens exercise session history with the selected gym, including no gym', () => {
+    expect(exerciseHistoryHref('a/b c')).toBe('/exercise-history?exerciseDefinitionId=a%2Fb%20c');
+    expect(exerciseHistoryHref('lift', 'gym a/b')).toBe('/exercise-history?exerciseDefinitionId=lift&gymId=gym%20a%2Fb');
+    expect(exerciseHistoryHref('lift', null)).toBe('/exercise-history?exerciseDefinitionId=lift&gymId=no-gym');
+  });
+
   it('opens a day with one session on that session, several on Sessions at the day, and none nowhere', () => {
     expect(historyDayHref('2026-10-07', ['session-a'])).toBe('/completed-session/session-a');
     expect(historyDayHref('2026-10-07', ['session-a', 'session-b'])).toBe('/sessions?day=2026-10-07');

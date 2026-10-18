@@ -629,24 +629,17 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-0')).toHaveTextContent(/^W-Up60\.0 × 10/);
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
-    fireEvent.press(screen.getByTestId('exercise-records-history'));
-    // History is a view: no session travels, and with no gym there is no
-    // `currentGymId` to filter by.
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      pathname: '/exercise-history',
-      params: { exerciseDefinitionId: BENCH_DEF },
-    });
+    fireEvent.press(screen.getByRole('link', { name: 'Open exercise progress' }));
+    expect(screen.getByTestId('exercise-records-progress')).toHaveTextContent('Progress');
+    expect(mockRouter.push).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${BENCH_DEF}`);
   });
 
-  it('forwards currentGymId to exercise-history when the active session has a gym', async () => {
+  it('opens Progress on all gyms even when the active session has a gym', async () => {
     await seedPage(() => atGym('gym-downtown', 'Downtown', [SESSION]));
     await renderPage();
 
-    fireEvent.press(screen.getByTestId('exercise-records-history'));
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      pathname: '/exercise-history',
-      params: { exerciseDefinitionId: BENCH_DEF, currentGymId: 'gym-downtown' },
-    });
+    fireEvent.press(screen.getByTestId('exercise-records-progress'));
+    expect(mockRouter.push).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${BENCH_DEF}`);
   });
 
   it('leaves the records panel collapsed or expanded when switching Records and Last', async () => {

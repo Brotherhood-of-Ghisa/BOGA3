@@ -254,6 +254,35 @@ describe('The history page over real data', () => {
     expect(screen.queryByTestId('stats-exercise-history-gym')).toBeNull();
   });
 
+  it('opens session history from exercise Options and carries the current gym choice', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+
+    const openSessionHistory = () => {
+      fireEvent.press(screen.getByTestId('progress-history-options-button'));
+      fireEvent.press(screen.getByRole('button', { name: 'History' }));
+      expect(screen.queryByTestId('progress-history-options-sheet')).toBeNull();
+    };
+    openSessionHistory();
+    expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${SQUAT}`);
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    openSessionHistory();
+    expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${SQUAT}&gymId=${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`);
+  });
+
+  it('keeps session history reachable when the Progress read fails', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort').mockRejectedValueOnce(new Error('DB error'));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    expect(await screen.findByTestId('stats-exercise-history-error')).toHaveTextContent(/DB error/);
+    fireEvent.press(screen.getByTestId('progress-history-options-button'));
+    fireEvent.press(screen.getByTestId('progress-history-exercise-history'));
+    expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${SQUAT}`);
+  });
+
   it('retries a failed exercise history read for the same definition, staying on the page', async () => {
     jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseHistoryEffort').mockRejectedValueOnce(new Error('DB error'));
     await loadMaestroFixture('exercise-block-history');

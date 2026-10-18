@@ -18,6 +18,12 @@ export const THEME_COLOUR_ROUTE = '/theme-colour';
 /** One muscle's or one exercise's effort history, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
 
+/** Session-by-session exercise history, carrying Progress's selected gym. */
+export const exerciseHistoryHref = (exerciseDefinitionId: string, gymId?: string | null): Href => {
+  const gym = encodeGymRouteParam(gymId);
+  return `/exercise-history?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}` as Href;
+};
+
 /** The selected exercise's descriptive RM chart, pushed from History. */
 export const rmCurveHref = (exerciseDefinitionId: string): Href =>
   `/rm-curve?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;

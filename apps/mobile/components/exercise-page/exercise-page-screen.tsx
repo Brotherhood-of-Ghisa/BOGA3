@@ -30,7 +30,7 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { exerciseLinkHref } from '@/src/navigation/routes';
+import { exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
@@ -432,14 +432,8 @@ export function ExercisePageScreen({
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
             isFilteredByGym={isFilteredByGym}
-            onOpenHistory={() =>
-              router.push({
-                pathname: '/exercise-history',
-                params: {
-                  exerciseDefinitionId: exercise.exerciseDefinitionId,
-                  ...(currentGymId ? { currentGymId } : {}),
-                },
-              })
+            onOpenProgress={() =>
+              router.push(progressHistoryHref({ exerciseDefinitionId: exercise.exerciseDefinitionId }))
             }
             onSelectView={setRecordsView}
             onToggleExpanded={() => setRecordsExpanded((current) => !current)}

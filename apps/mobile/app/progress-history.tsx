@@ -20,7 +20,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
 import { exerciseCountedMuscles } from '@/src/exercise-catalog/exercise-muscles';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
@@ -29,7 +29,7 @@ import { updatePreferences, useAccountLocalPreferenceState } from '@/src/prefere
 // One exercise's or one muscle's history, pushed from Progress. The subject is
 // the page's native title, and the view and metric selectors sit in one row
 // above the chart. The header's ⋮ holds the Timeline's focused week's sessions
-// and, for an exercise, its RM curve and each counted muscle’s history. The
+// and, for an exercise, its session history, RM curve and counted muscles. The
 // params carry an id, never a name: the page resolves the name from the
 // exercise catalogue cache, which also decides the unavailable state
 // (`navigation-contract.md`: a bad id renders in route).
@@ -90,12 +90,13 @@ type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChang
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
 // An exercise's gym button sits beside it, so no row is added for it.
-function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenCurve, gym }: {
+function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, gym }: {
   title: string;
   week: FocusedTimelineWeek | null;
   muscles: readonly HistoryMuscleLink[];
   onOpenWeek: (weekStartDateKey: string) => void;
   onOpenMuscle: (muscleGroupId: string) => void;
+  onOpenHistory?: () => void;
   onOpenCurve?: () => void;
   gym?: HistoryGymChoice;
 }) {
@@ -111,7 +112,7 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenC
     setOptionsVisible(false);
     onOpenMuscle(muscleGroupId);
   };
-  const hasOptions = sessionsWeek !== null || muscles.length > 0 || onOpenCurve !== undefined;
+  const hasOptions = sessionsWeek !== null || muscles.length > 0 || onOpenHistory !== undefined || onOpenCurve !== undefined;
   return (
     <>
       <Stack.Screen
@@ -144,6 +145,15 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenC
         testID="progress-history-options-sheet"
         title={title}
         visible={optionsVisible}>
+        {onOpenHistory ? (
+          <ListRow
+            label="History"
+            leading={<Icon color={uiRoles.inkMuted} name="list" size="md" />}
+            onPress={() => { setOptionsVisible(false); onOpenHistory(); }}
+            testID="progress-history-exercise-history"
+            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+          />
+        ) : null}
         {onOpenCurve ? (
           <ListRow
             label="RM curve"
@@ -303,6 +313,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     <Screen testID="progress-history-screen">
       <HistoryHeader
         muscles={muscleLinks}
+        onOpenHistory={exercise ? () => router.push(exerciseHistoryHref(exercise.id, gymId)) : undefined}
         onOpenCurve={exercise && !exercise.deletedAt ? () => router.push(rmCurveHref(exercise.id)) : undefined}
         onOpenMuscle={openMuscle}
         onOpenWeek={openWeek}
