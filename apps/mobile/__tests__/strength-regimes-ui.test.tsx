@@ -150,9 +150,8 @@ it('defaults to One curve and Parsimonious, keeps controls on failure, and offer
   jest.useFakeTimers();
   const onScope = jest.fn();
   const props = { read: { status: 'ready' as const, data: model(), retry: jest.fn() },
-    scope: { exerciseId: 'curve', range: 24 as const, gym: 'latest' as const, rir: null }, onScope,
-    exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,
-    retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
+    scope: { range: 24 as const, gym: 'latest' as const, rir: null }, onScope,
+    dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
   const component = render(<RmCurveContent {...props} />);
   expect(screen.getByTestId('rm-mode-one').props.accessibilityState.selected).toBe(true);
   expect(screen.getByTestId('rm-method-fixed').props.accessibilityState.selected).toBe(true);
@@ -217,9 +216,8 @@ it('bounds a thousand-session UI request, retains every plotted point, and recov
   const large = { ...m, inferenceSessions: Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
     selectedSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
   const props = { read: { status: 'ready' as const, data: large, retry: jest.fn() },
-    scope: { exerciseId: 'curve', range: 'history' as const, gym: 'latest' as const, rir: null }, onScope: jest.fn(),
-    exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,
-    retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 520 };
+    scope: { range: 'history' as const, gym: 'latest' as const, rir: null }, onScope: jest.fn(),
+    dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 520 };
   const view = render(<RmCurveContent {...props} />);
   fireEvent.press(screen.getByTestId('rm-mode-two'));
   act(() => { jest.runAllTimers(); });

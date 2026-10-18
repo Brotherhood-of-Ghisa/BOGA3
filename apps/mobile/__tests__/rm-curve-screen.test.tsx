@@ -2,8 +2,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
 import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, userSettings } from '@/src/data/schema';
-import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
-import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { loadRmCurve } from '@/src/rm-curve/repository';
@@ -16,13 +14,15 @@ import wave from './fixtures/rm-curve-weekly-wave.json';
 let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
 const now = new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1);
-beforeEach(() => { mockFixture = createInMemoryDatabase(); seedWaveHistory(mockFixture.database); __resetExerciseCatalogCacheForTests(); });
+beforeEach(() => { mockFixture = createInMemoryDatabase(); seedWaveHistory(mockFixture.database); });
 afterEach(() => mockFixture.close());
 
-it('uses the real read hook/catalogue for default scope, effort/range/exercise changes and deletion refresh', async () => {
+it('keeps the route exercise without a picker through effort/range changes and deletion refresh', async () => {
   mockFixture.database.insert(exerciseDefinitions).values({ id: 'empty', name: 'No history exercise' }).run();
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot');
+  expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
+  expect(screen.queryByText('No history exercise')).toBeNull();
   expect(screen.getByLabelText('range: 12 weeks')).toBeTruthy(); expect(screen.queryByTestId('rm-curve-details')).toBeNull();
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
@@ -30,14 +30,16 @@ it('uses the real read hook/catalogue for default scope, effort/range/exercise c
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
   await screen.findByTestId('rm-curve-plot');
   fireEvent.press(screen.getByLabelText('range: 12 weeks')); fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
-  await screen.findByTestId('rm-curve-plot');
-  fireEvent.press(screen.getByLabelText('exercise: Synthetic exercise')); fireEvent.press(screen.getByRole('radio', { name: 'No history exercise' }));
-  await screen.findByText('No sets match these filters');
+  await screen.findByText('3 sets · 1 session');
+  expect(screen.getByTestId('rm-curve-plot')).toBeTruthy();
   act(() => {
-    mockFixture.database.update(exerciseDefinitions).set({ deletedAt: now }).where(eq(exerciseDefinitions.id, 'empty')).run();
-    invalidateExerciseCatalogCache(); notifyLocalWrite();
+    mockFixture.database.update(exerciseDefinitions).set({ deletedAt: now }).where(eq(exerciseDefinitions.id, 'curve')).run();
+    notifyLocalWrite();
   });
   await screen.findByText('This exercise isn’t available'); expect(screen.queryByTestId('rm-curve-plot')).toBeNull();
+  expect(screen.getByText('Return to History and choose an exercise.')).toBeTruthy();
+  expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Choose exercise' })).toBeNull();
 });
 
 it('labels dated bodyweight-inclusive per-side Load separately from raw Weight and ordinary 1RM', async () => {
