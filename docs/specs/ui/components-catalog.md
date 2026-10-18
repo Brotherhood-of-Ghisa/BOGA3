@@ -45,7 +45,7 @@ Two standing rules:
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
 | One filter of two values where a row of them cannot afford both labels | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap swaps it |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
-| One view option on or off, in a sheet (`Show deleted sessions`) or on a card (`Allow this coach to create plans`) | `SwitchRow` (`switch-row.tsx`) |
+| One option or setting on or off, in a sheet (`Show deleted sessions`) or on a card (`Allow this coach to create plans`, `Track each gym separately`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |

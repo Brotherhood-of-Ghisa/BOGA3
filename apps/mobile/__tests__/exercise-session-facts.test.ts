@@ -553,6 +553,20 @@ describe('exercise session facts — reporting buckets over the database', () =>
     expect(pooled.every((row) => row.gymBucket === 'all')).toBe(true);
   });
 
+  it('splits and pools through the exercise editor\'s save, and a save without the flag keeps it', async () => {
+    db().insert(muscleGroups).values({ id: 'chest', displayName: 'Chest', familyName: 'Chest' }).run();
+    const edit = { id: BENCH, name: 'Bench Press', mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' as const }] };
+
+    expect(await saveExerciseCatalogExercise({ ...edit, splitByGym: true, now: day(10) })).toMatchObject({ splitByGym: true });
+    expect((await buckets()).map(([, bucket]) => bucket)).toEqual(['gym:gym-home', 'gym:gym-club', 'gym:gym-club', 'all']);
+
+    // A writer that omits the flag (an older caller, the import CLI's edits) keeps it.
+    expect(await saveExerciseCatalogExercise({ ...edit, name: 'Bench', now: day(11) })).toMatchObject({ splitByGym: true });
+
+    expect(await saveExerciseCatalogExercise({ ...edit, splitByGym: false, now: day(12) })).toMatchObject({ splitByGym: false });
+    expect((await buckets()).every(([, bucket]) => bucket === 'all')).toBe(true);
+  });
+
   it('queues a completed session\'s definitions when it moves to another gym', () => {
     split(true);
     drainExerciseSessionFacts(asLocal());

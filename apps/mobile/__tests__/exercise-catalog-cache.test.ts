@@ -28,6 +28,7 @@ const exerciseFixture = (overrides: Partial<ExerciseCatalogExercise> = {}): Exer
   id: 'exercise-bench',
   name: 'Bench Press',
   bodyweightContribution: 0,
+  splitByGym: false,
   deletedAt: null,
   mappings: [{ id: 'map-1', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
   ...overrides,

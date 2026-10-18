@@ -21,7 +21,7 @@ If the tracked tree matches this Mac's last successful upload for the same profi
 and backend, skip the release. Otherwise:
   1. Pin the source, install mobile dependencies, and check the EAS/backend identity.
   2. Apply migrations without seeds/reset; deploy every checked-in Edge Function.
-  3. Configure group evaluation and notification invocation/registration.
+  3. Configure group evaluation and notification invocation/registration; verify the worker.
   4. Build locally, inspect/checksum the IPA, and submit that IPA to Apple.
 
 Without --every, --at is required and schedules one run. --every accepts any positive
@@ -89,11 +89,12 @@ configure_backend() (
   local config_sql
   config_sql="$(mktemp)"
   trap 'rm -f "$config_sql"' EXIT
-  # Read the project's actual worker credential; never put it in argv or logs.
+  # Match the runtime's default secret key; legacy keys remain usable on older projects.
   if [[ -f supabase/functions/notification-worker/index.ts ]]; then
-    SUPABASE_SERVICE_ROLE_KEY="$(run_supabase projects api-keys --project-ref "$project" -o json \
-      | jq -er '.[] | select(.name == "service_role") | .api_key')"
-    export SUPABASE_SERVICE_ROLE_KEY
+    BOGA_NOTIFICATION_WORKER_KEY="$(run_supabase projects api-keys --project-ref "$project" --reveal -o json \
+      | jq -er '([.[] | select(.name == "default" and .type == "secret") | .api_key][0]
+        // [.[] | select(.name == "service_role") | .api_key][0]) | select(type == "string" and length > 0)')"
+    export BOGA_NOTIFICATION_WORKER_KEY
   fi
   node - "$project" "$profile" "$bundle" "$record/identity.json" > "$config_sql" <<'JS'
 const fs = require('node:fs');
@@ -115,7 +116,7 @@ do $$ begin
 end $$;`);
 for (const [name, value] of Object.entries({
   notification_worker_url: url + 'notification-worker',
-  notification_worker_key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  notification_worker_key: process.env.BOGA_NOTIFICATION_WORKER_KEY,
 })) {
   console.log(`do $$ declare secret_id uuid; begin
     select id into secret_id from vault.secrets where name=${q(name)} order by created_at desc limit 1;
@@ -129,6 +130,12 @@ console.log('commit;');
 JS
   run_supabase db query --linked --file "$config_sql" >/dev/null 2>&1 \
     || fail 'backend configuration failed; credential-bearing SQL output withheld'
+  if [[ -f supabase/functions/notification-worker/index.ts ]]; then
+    printf 'url = "https://%s.supabase.co/functions/v1/notification-worker"\nheader = "apikey: %s"\n' \
+      "$project" "$BOGA_NOTIFICATION_WORKER_KEY" \
+      | curl --config - --request GET --silent --show-error --fail --max-time 10 --output /dev/null \
+      || fail 'notification worker verification failed; release stopped before build'
+  fi
 )
 
 run_release() {

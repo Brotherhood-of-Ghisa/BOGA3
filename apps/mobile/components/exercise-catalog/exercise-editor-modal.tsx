@@ -10,6 +10,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { Notice } from '@/components/ui/notice';
 import { PageSheet } from '@/components/ui/page-sheet';
 import { StatePanel } from '@/components/ui/state-panel';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
@@ -122,6 +123,7 @@ function EditorBody({ form }: { form: EditorForm }) {
             onChangeName={form.changeName}
             testIDPrefix="exercise-editor"
           />
+          <GymSplitField onChange={form.setSplitByGym} value={form.splitByGym} />
           <PrimaryMuscleField
             error={form.validation.primaryMuscleError}
             muscleGroupById={muscleGroupById}
@@ -167,6 +169,25 @@ function FieldError({ message }: { message: string | null }) {
       {message}
     </Text>
   ) : null;
+}
+
+/** `Track each gym separately` ([[gym.split]]): a personal setting, so not one of the shared core fields. */
+function GymSplitField({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <View style={styles.group}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+        Gyms
+      </Text>
+      <Card>
+        <SwitchRow
+          label="Track each gym separately"
+          onValueChange={onChange}
+          testID="exercise-editor-split-by-gym"
+          value={value}
+        />
+      </Card>
+    </View>
+  );
 }
 
 function PrimaryMuscleField({ primaryMuscleGroupId, muscleGroupById, error, onOpen }: {

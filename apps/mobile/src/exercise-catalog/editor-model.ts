@@ -25,6 +25,7 @@ export type ExerciseEditorPrefill = {
   bodyweightContribution?: number;
   name: string;
   loadInputMode: EditorLoadInputMode;
+  splitByGym?: boolean;
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
 };
 
@@ -35,6 +36,7 @@ export const buildDuplicateExercisePrefill = (
   name: `${exercise.name} (Copy)`,
   loadInputMode: exercise.loadInputMode ?? 'total_load',
   bodyweightContribution: exercise.bodyweightContribution,
+  splitByGym: exercise.splitByGym,
   mappings: exercise.mappings.map((mapping) => ({
     muscleGroupId: mapping.muscleGroupId,
     weight: mapping.weight,
@@ -87,6 +89,7 @@ export type EditorOpenState = {
   primaryMuscleGroupId: string | null;
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   contributionPercentage: string;
+  splitByGym: boolean;
 };
 
 const prefillAsExercise = (prefill: ExerciseEditorPrefill): ExerciseCatalogExercise => ({
@@ -94,6 +97,7 @@ const prefillAsExercise = (prefill: ExerciseEditorPrefill): ExerciseCatalogExerc
   name: prefill.name,
   loadInputMode: prefill.loadInputMode,
   bodyweightContribution: 0,
+  splitByGym: prefill.splitByGym ?? false,
   deletedAt: null,
   mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
 });
@@ -111,17 +115,27 @@ export const editorOpenState = (
       loadInputMode: editingExercise.loadInputMode ?? 'total_load',
       ...buildEditorMuscleSelectionsFromExercise(editingExercise),
       contributionPercentage,
+      splitByGym: editingExercise.splitByGym,
     };
   }
   if (prefill) {
+    const prefilled = prefillAsExercise(prefill);
     return {
       name: prefill.name,
       loadInputMode: prefill.loadInputMode,
-      ...buildEditorMuscleSelectionsFromExercise(prefillAsExercise(prefill)),
+      ...buildEditorMuscleSelectionsFromExercise(prefilled),
       contributionPercentage,
+      splitByGym: prefilled.splitByGym,
     };
   }
-  return { name: '', loadInputMode: 'total_load', primaryMuscleGroupId: null, secondaryMuscleRows: [], contributionPercentage };
+  return {
+    name: '',
+    loadInputMode: 'total_load',
+    primaryMuscleGroupId: null,
+    secondaryMuscleRows: [],
+    contributionPercentage,
+    splitByGym: false,
+  };
 };
 
 /** The muscles the selector offers: the current primary or any unchosen muscle; for secondaries, only unchosen ones. */

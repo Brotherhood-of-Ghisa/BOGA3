@@ -22,6 +22,7 @@ describe('exercise catalog repository', () => {
     ]);
     store.saveExercise.mockResolvedValue({
       bodyweightContribution: 0,
+      splitByGym: false,
       id: 'exercise-1',
       name: 'Custom Press',
       loadInputMode: 'per_side_load',
@@ -61,7 +62,7 @@ describe('exercise catalog repository', () => {
     const store = createMockStore();
     const repository = createExerciseCatalogRepository(store);
     store.listMuscleGroups.mockResolvedValue([{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 }]);
-    store.saveExercise.mockResolvedValue({ bodyweightContribution: 0, id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
+    store.saveExercise.mockResolvedValue({ bodyweightContribution: 0, splitByGym: false, id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
     const mappings = [{ muscleGroupId: 'chest', weight: 1 }];
 
     await expect(repository.saveExercise({ name: ' \t\u00a0', mappings })).rejects.toThrow('Exercise name is required');

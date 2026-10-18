@@ -21,6 +21,7 @@ export type ExerciseEditorSaveInput = {
   bodyweightContribution?: number;
   name: string;
   loadInputMode: EditorLoadInputMode;
+  splitByGym: boolean;
   mappings: EditorMapping[];
 };
 
@@ -45,6 +46,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
   const [bodyweightContributionField, setBodyweightContributionField] = useState<BodyweightContributionFieldValue>({ percentage: '0' });
   const [bodyweightContributionError, setBodyweightContributionError] = useState<string | null>(null);
   const [loadInputMode, setLoadInputMode] = useState<EditorLoadInputMode>('total_load');
+  const [splitByGym, setSplitByGym] = useState(false);
   const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
   const [validation, setValidation] = useState<EditorValidationState>(createBlankValidationState);
@@ -66,6 +68,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
       const open = editorOpenState(editingExercise, prefill);
       setExerciseName(open.name);
       setLoadInputMode(open.loadInputMode);
+      setSplitByGym(open.splitByGym);
       setPrimaryMuscleGroupId(open.primaryMuscleGroupId);
       setSecondaryMuscleRows(open.secondaryMuscleRows);
       setBodyweightContributionField({ percentage: open.contributionPercentage });
@@ -146,7 +149,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
     Keyboard.dismiss();
     setIsSaving(true);
     try {
-      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, mappings: checked.mappings };
+      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, splitByGym, mappings: checked.mappings };
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
@@ -165,12 +168,14 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
     bodyweightContributionField,
     bodyweightContributionError,
     loadInputMode,
+    splitByGym,
     primaryMuscleGroupId,
     secondaryMuscleRows,
     selectedSecondaryMuscleIds,
     validation,
     saveError,
     setLoadInputMode,
+    setSplitByGym,
     changeName,
     changeContribution,
     openMuscleSelector,

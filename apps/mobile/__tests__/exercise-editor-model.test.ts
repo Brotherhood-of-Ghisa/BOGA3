@@ -13,6 +13,7 @@ describe('exercise-editor-model', () => {
         name: 'Barbell Bench Press',
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
+        splitByGym: false,
         deletedAt: null,
         mappings: [
           { id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -26,6 +27,7 @@ describe('exercise-editor-model', () => {
         name: 'Barbell Bench Press (Copy)',
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
+        splitByGym: false,
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -38,6 +40,7 @@ describe('exercise-editor-model', () => {
         id: 'squat-1',
         name: 'Bodyweight Squat',
         bodyweightContribution: 1,
+        splitByGym: false,
         deletedAt: null,
         mappings: [{ id: 'm3', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
       };
@@ -55,6 +58,7 @@ describe('exercise-editor-model', () => {
         name: 'Dumbbell Curl',
         loadInputMode: 'per_side_load',
         bodyweightContribution: 0,
+        splitByGym: false,
         deletedAt: null,
         mappings: [{ id: 'm4', muscleGroupId: 'biceps', weight: 1, role: 'primary' }],
       };
@@ -70,6 +74,7 @@ describe('exercise-editor-model', () => {
         name: 'Overhead Press',
         loadInputMode: 'total_load',
         bodyweightContribution: 0.2,
+        splitByGym: false,
         deletedAt: null,
         mappings: [
           { id: 'm5', muscleGroupId: 'shoulders', weight: 1, role: 'primary' },
@@ -86,6 +91,28 @@ describe('exercise-editor-model', () => {
       expect(state.secondaryMuscleRows).toHaveLength(1);
       expect(state.secondaryMuscleRows[0].muscleGroupId).toBe('triceps');
       expect(state.contributionPercentage).toBe('20');
+      expect(state.splitByGym).toBe(false);
+    });
+  });
+
+  describe('Track each gym separately', () => {
+    const split: ExerciseCatalogExercise = {
+      id: 'bench-1',
+      name: 'Bench Press',
+      bodyweightContribution: 0,
+      splitByGym: true,
+      deletedAt: null,
+      mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    };
+
+    it('opens with the edited exercise\'s setting, and a duplicate keeps it', () => {
+      expect(editorOpenState(split, null).splitByGym).toBe(true);
+      expect(editorOpenState(null, buildDuplicateExercisePrefill(split)).splitByGym).toBe(true);
+    });
+
+    it('opens off for a new exercise and a prefill that does not set it (Add as new)', () => {
+      expect(editorOpenState(null, null).splitByGym).toBe(false);
+      expect(editorOpenState(null, { name: 'Bench', loadInputMode: 'total_load', mappings: [] }).splitByGym).toBe(false);
     });
   });
 });
