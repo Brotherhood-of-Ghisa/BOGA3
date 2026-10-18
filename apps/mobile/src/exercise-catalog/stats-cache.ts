@@ -9,6 +9,7 @@ import {
   type ExerciseCatalogStatsPeriod,
   type ExerciseCatalogStatsRawHistory,
 } from '@/src/data/exercise-catalog-stats';
+import { getBodyWeightContextRevision } from '@/src/bodyweight/invalidation';
 import { progressComparisonWindows } from '@/src/data/stats';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
@@ -22,6 +23,7 @@ export type ExerciseCatalogStatsCacheSnapshot = {
   status: ExerciseCatalogStatsCacheStatus;
   rawHistory: ExerciseCatalogStatsRawHistory | null;
   loadedAt: number;
+  contextRevision: number;
   lastError: string | null;
 };
 
@@ -37,6 +39,7 @@ const EMPTY_SNAPSHOT: ExerciseCatalogStatsCacheSnapshot = {
   status: 'idle',
   rawHistory: null,
   loadedAt: 0,
+  contextRevision: -1,
   lastError: null,
 };
 
@@ -74,11 +77,15 @@ const reload = async (): Promise<void> => {
       await new Promise((resolve) => setTimeout(resolve, 2500));
       if (fault === 'fail-once') throw new Error('Maestro exercise history read failure');
     }
+    const contextRevision = getBodyWeightContextRevision();
     const rawHistory = await loadExerciseCatalogStatsRawHistory();
+    // A policy/bodyweight edit can invalidate a read already in flight.
+    if (contextRevision !== getBodyWeightContextRevision()) { pendingReload = true; return; }
     setSnapshot({
       status: 'ready',
       rawHistory,
       loadedAt: Date.now(),
+      contextRevision,
       lastError: null,
     });
   } catch (error) {
@@ -170,6 +177,8 @@ export type UseExerciseCatalogStatsResult = {
 
 export type UseExerciseCatalogComparisonResult = {
   status: ExerciseCatalogStatsCacheStatus;
+  /** A successful read of the active calculation context survives warm refreshes. */
+  hasSnapshot: boolean;
   /** The period in force, and the one before it ([[comparison.window]]). */
   current: ExerciseCatalogStats;
   previous: ExerciseCatalogStats;
@@ -219,6 +228,7 @@ export const useExerciseCatalogComparison = (
     status: snapshot.status,
     current: periods.current,
     previous: periods.previous,
+    hasSnapshot: snapshot.rawHistory !== null && snapshot.contextRevision === getBodyWeightContextRevision(),
     gymOptions,
     lastError: snapshot.lastError,
     reload: refreshExerciseCatalogStats,

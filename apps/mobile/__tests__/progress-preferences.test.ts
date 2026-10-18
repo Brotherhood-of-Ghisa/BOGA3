@@ -44,7 +44,7 @@ it.each([null, 'monthly', '"weekly"', 'null', ''])('uses Daily for missing or in
   expect(Storage.getItemSync(key)).toBe(raw);
 });
 
-it.each(['list', 'heatmap'] as const)('remembers the %s muscle layout per account without changing history view', async layout => {
+it.each(['list', 'heatmap'] as const)('remembers the %s Progress layout per account without changing history view', async layout => {
   await account();
   expect(values().progressMuscleLayout).toBe('list');
   setAccountLocalPreferences({ progressMuscleLayout: layout, heatmapView: 'weekly' });

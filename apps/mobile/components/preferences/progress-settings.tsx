@@ -11,8 +11,8 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
     <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>Progress</Text>
     <Card style={styles.card}>
       <View style={styles.preference}>
-        <Text allowFontScaling={false} style={styles.label}>Muscle view</Text>
-        <SegmentedControl accessibilityLabel="Muscle view"
+        <Text allowFontScaling={false} style={styles.label}>Progress view</Text>
+        <SegmentedControl accessibilityLabel="Progress view"
           options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Map' }]}
           value={pending.progressMuscleLayout ?? values.progressMuscleLayout}
           onChange={progressMuscleLayout => updatePreferences({ progressMuscleLayout })}

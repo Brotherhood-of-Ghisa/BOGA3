@@ -13,6 +13,7 @@ const signed = (difference: number, magnitude: string): DeltaDisplay => ({
 
 export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
   const difference = current - previous;
+  if (!Number.isFinite(difference)) return { text: '—', tone: 'neutral' };
   if (difference === 0) return { text: '±0', tone: 'neutral' };
   return signed(difference, String(Math.abs(difference)));
 };

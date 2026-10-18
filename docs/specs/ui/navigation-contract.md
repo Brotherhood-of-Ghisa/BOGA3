@@ -153,7 +153,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>` | `/exercise-history?exerciseDefinitionId=<id>` | the records panel's `History` (`push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's names |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise → saved view with gym; all carry `metric` (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise list or map-detail row → saved view with its exercise metric and gym; all carry `metric` (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle's card progress button opens its catalogued exercise, metric carried |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
@@ -191,10 +191,10 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | `View groups`, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
-Progress’s frozen controls change content in-route, with Sessions last. Muscle
-layouts follow [[muscle.progress-layout]]: chevrons disclose inline contributors;
-map tiles select contributors below without scrolling. Layout changes start at
-the top. History uses `/progress-history`.
+Progress filters stay in-route; Sessions last. [[muscle.progress-layout]]
+governs both layouts. Exercise families disclose contributions
+([[muscle.exercise-map-area]]); their links open full history at the selected
+metric/gym. 1RM uses List; layout switches reset scroll.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

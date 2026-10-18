@@ -61,6 +61,7 @@ import {
   ensureAccountLocalPreferencesLoaded,
   setAccountLocalPreferenceAccount,
 } from '@/src/preferences/account-local';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
@@ -70,7 +71,7 @@ import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/se
 import * as statsRepository from '@/src/data/stats';
 import * as exerciseCatalogStats from '@/src/data/exercise-catalog-stats';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
-import { closeLocalData, loadMaestroFixture, resetLocalData, localDataClient } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData, localDataClient } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 
 const SQUAT = EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId;
@@ -205,6 +206,218 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
+  it('uses the shared layout for exercise families, keeps history detail, and restores it after 1RM List', async () => {
+    await renderSeededStats();
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    expect(screen.getAllByTestId(/^stats-exercise-family-/)).toHaveLength(7);
+    const family = screen.getByTestId('stats-exercise-family-Legs');
+    fireEvent.press(family);
+    expect(family).toHaveProp('accessibilityState', { selected: true, expanded: true });
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
+    const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
+    const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
+    expect(screen.getByTestId(`stats-exercise-target-${SQUAT}`)).toHaveTextContent('88% target');
+    expect(screen.getByTestId(SQUAT_ROW)).toHaveProp('accessibilityLabel', expect.stringContaining('Primary muscle target 88%.'));
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+    expect(tile()).toHaveStyle({ backgroundColor: fill });
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets`);
+    mockIsFocused = false;
+    screen.rerender(<StatsRoute />);
+    mockIsFocused = true;
+    screen.rerender(<StatsRoute />);
+    await screen.findByTestId('stats-exercise-map-detail');
+    expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
+    chooseFilter('metric', 'Volume');
+    chooseFilter('metric', '1RM');
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+    chooseFilter('metric', 'Sets');
+    await screen.findByTestId('stats-exercise-map-detail');
+    expect(screen.getByTestId('stats-exercise-family-Legs')).toHaveProp('accessibilityState', { selected: true, expanded: true });
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
+    chooseFilter('view-mode', 'Exercise');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  });
+
+  it('keeps exercise map figures and history gym-scoped, with its independent Volume metric', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id = 'maestro_exercise_block_history_squat_2'").run();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
+    const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
+    const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^5$/);
+    expect(tile()).toHaveStyle({ backgroundColor: fill });
+    chooseFilter('metric', 'Volume');
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=volume&gymId=${gym}`);
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=volume&gymId=no-gym`);
+  });
+
+  it('weights Secondary exercise rows, keeps its unfiltered target under search/gym, and opens full history with the selected metric', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
+    localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id IN ('maestro_exercise_block_history_squat_2', 'maestro_exercise_block_history_bench_1')").run();
+    // Full per-side exercise Volume is twice its per-muscle Volume, so summing muscle rows would be wrong.
+    localDataClient().prepare("UPDATE exercise_definitions SET load_input_mode = 'per_side_load' WHERE id = ?").run(BENCH);
+    await act(async () => invalidateExerciseCatalogCache());
+    await bootLocalApp();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^4$/);
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^3.5$/);
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-now`)).toHaveTextContent(/^0.5$/);
+    expect(screen.getByTestId('stats-exercise-secondary-target')).toHaveTextContent('25% target');
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}`)).toHaveProp('accessibilityLabel', expect.stringContaining('Secondary muscle target 25%.'));
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}`)).toHaveProp('accessibilityLabel', expect.stringContaining('Secondary contribution.'));
+    expect(screen.getByTestId('stats-exercise-secondary-summary').props.onPress).toBeUndefined();
+    expect(screen.queryByTestId('stats-exercise-row-Secondary')).toBeNull();
+    const tile = () => screen.getByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true });
+    const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^3.5$/);
+    expect(tile()).toHaveStyle({ backgroundColor: fill });
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), '');
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^2.5$/);
+    expect(tile()).toHaveStyle({ backgroundColor: fill });
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Bench');
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^0$/);
+    expect(screen.getByTestId('stats-exercise-secondary-target')).toHaveTextContent('25% target');
+    expect(screen.queryByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^0.5$/);
+    fireEvent.press(screen.getByTestId(`stats-exercise-row-${BENCH}`));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${BENCH}&metric=sets&gymId=${gym}`);
+    chooseFilter('metric', 'Volume');
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^1450$/);
+    fireEvent.press(screen.getByTestId(`stats-exercise-row-${BENCH}`));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${BENCH}&metric=volume&gymId=${gym}`);
+  });
+
+  it('uses independent working/Volume eligibility for Secondary and keeps a zero Volume contribution readable', async () => {
+    await renderSeededStats();
+    localDataClient().prepare("UPDATE exercise_sets SET set_type = 'warm_up' WHERE id = 'maestro_exercise_block_history_bench_1_a_work_1'").run();
+    await act(async () => updatePreferences({ volumeEfforts: ['warm_up'] }));
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^0$/));
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^0.5$/);
+    chooseFilter('metric', 'Volume');
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^620$/);
+    expect(screen.getByTestId('stats-exercise-secondary-summary-change')).toHaveTextContent('new');
+    expect(screen.getByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toHaveStyle({ backgroundColor: withAlpha(uiRoles.gain, .16) });
+    localDataClient().prepare("UPDATE exercise_sets SET weight_value = '0' WHERE set_type = 'warm_up'").run();
+    await replayFocus();
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^0$/));
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-now`)).toHaveTextContent(/^0$/);
+    expect(screen.queryByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('keeps unavailable Secondary aggregate Volume instead of a complete-looking partial sum', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
+    const huge = '9' + '0'.repeat(307);
+    localDataClient().prepare("UPDATE exercise_sets SET weight_value = ?, reps_value = '1' WHERE id = 'maestro_exercise_block_history_bench_1_a_work_1'").run(huge);
+    localDataClient().prepare("INSERT INTO exercise_sets (id, session_exercise_id, order_index, weight_value, reps_value, set_type) SELECT 'secondary_overflow_extra', session_exercise_id, 1, weight_value, reps_value, set_type FROM exercise_sets WHERE id = 'maestro_exercise_block_history_bench_1_a_work_1'").run();
+    await act(async () => invalidateExerciseCatalogCache());
+    await bootLocalApp();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    chooseFilter('metric', 'Volume');
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Arms'));
+    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent('—');
+    expect(screen.getByTestId('stats-exercise-secondary-summary-change')).toHaveTextContent('—');
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}-now`)).toHaveTextContent('—');
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).not.toHaveTextContent('—');
+    expect(screen.queryByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('waits for the muscle source, reports its failure, and retries before drawing an exercise map', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const pending = deferred<Awaited<ReturnType<typeof statsRepository.computeProgressComparisons>>>();
+    interceptReads({ 1: [() => pending.promise] });
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    await showHeatmap();
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    await screen.findByTestId('stats-loading-state');
+    await act(async () => pending.reject(new Error('muscle read failed')));
+    await screen.findByTestId('stats-error-state');
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-map-empty')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-retry'));
+    await screen.findByTestId('stats-exercise-map');
+    await waitForGone(() => screen.queryByTestId('stats-error-state'));
+  });
+
+  it('waits for fresh exercise figures when the effort policy changes even after the muscle source is ready', async () => {
+    await renderSeededStats();
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    const real = exerciseCatalogStats.loadExerciseCatalogStatsRawHistory;
+    const pending = deferred<Awaited<ReturnType<typeof real>>>();
+    jest.spyOn(exerciseCatalogStats, 'loadExerciseCatalogStatsRawHistory').mockImplementationOnce(() => pending.promise);
+    await act(async () => updatePreferences({ workingSetEfforts: [] }));
+    await waitForGone(() => screen.queryByTestId('stats-exercise-map'));
+    await screen.findByTestId('stats-loading-state');
+    await act(async () => pending.resolve(await real()));
+    await screen.findByTestId('stats-exercise-map');
+    expect(screen.getByTestId('stats-exercise-map-empty')).toHaveTextContent('No exercises with working sets in either period.');
+  });
+
+  it('does not fabricate an empty map on an exercise-history read failure and retries the source', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const read = jest.spyOn(exerciseCatalogStats, 'loadExerciseCatalogStatsRawHistory').mockRejectedValue(new Error('exercise read failed'));
+    await renderStats();
+    await showHeatmap();
+    await screen.findByTestId('stats-error-state');
+    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-map-empty')).toBeNull();
+    read.mockRestore();
+    fireEvent.press(screen.getByTestId('stats-retry'));
+    await screen.findByTestId('stats-exercise-map');
+    await waitForGone(() => screen.queryByTestId('stats-error-state'));
+  });
+
+  it('keeps known zero-volume exercises readable without a fabricated area', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare("UPDATE exercise_sets SET weight_value = '0'").run();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    chooseFilter('metric', 'Volume');
+    await showHeatmap();
+    await screen.findByTestId('stats-exercise-map');
+    expect(screen.queryByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true })).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^0$/);
+    expect(screen.getByTestId(SQUAT_ROW)).toHaveProp('accessibilityLabel', expect.stringContaining('Now 0'));
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Core'));
+    expect(screen.getByTestId('stats-exercise-list-empty')).toHaveTextContent('No exercises for this family.');
+  });
+
   it('uses the saved Settings layout, retains filters and selection, and restores Map on a new visit', async () => {
     mockSearchParams = { period: '7', breakdown: 'muscle' };
     await loadMaestroFixture('exercise-block-history');
@@ -320,6 +533,8 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
     chooseFilter('view-mode', 'Exercise');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
     expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
   });
@@ -538,7 +753,7 @@ describe('Stats over real data', () => {
       if (muscle) expect(controls.queryByTestId('stats-search-input')).toBeNull();
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(
-        /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
+        /^stats-(muscle-table|exercise-list|exercise-list-empty|exercise-map|exercise-map-empty|sessions-link)$/
       );
       expect(content.at(-1)).toHaveProp('testID', 'stats-sessions-link');
     };
@@ -546,7 +761,8 @@ describe('Stats over real data', () => {
     chooseFilter('view-mode', 'Exercise');
     assertPinned('stats-exercise-list-scroll');
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'no matching exercise');
-    expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-map-empty')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
     assertPinned('stats-exercise-list-scroll');
     fireEvent.press(screen.getByTestId('stats-sessions-link'));
     expect(mockPush).toHaveBeenCalledWith('/sessions');
@@ -566,7 +782,7 @@ describe('Stats over real data', () => {
     screen.unmount();
     __resetAccountLocalPreferencesForTests();
     await renderStats();
-    await screen.findByTestId(SQUAT_ROW);
+    await screen.findByTestId('stats-exercise-map');
     expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
     // The period is not remembered: every visit opens on Settings' Progress
     // period, so the week chosen above is gone.
@@ -579,7 +795,7 @@ describe('Stats over real data', () => {
     __resetAccountLocalPreferencesForTests();
     mockSearchParams = { breakdown: 'exercise', period: '7' };
     await renderStats();
-    await screen.findByTestId(SQUAT_ROW);
+    await screen.findByTestId('stats-exercise-map');
     expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
     chooseFilter('view-mode', 'Muscle');
@@ -936,6 +1152,7 @@ describe('Stats over real data', () => {
       + '(SELECT id FROM session_exercises WHERE exercise_definition_id = ?)').run(huge, SQUAT);
     await replayFocus();
     chooseFilter('view-mode', 'Exercise');
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     chooseFilter('metric', 'Volume');
     await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('—'));
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-change`)).toHaveTextContent('—');

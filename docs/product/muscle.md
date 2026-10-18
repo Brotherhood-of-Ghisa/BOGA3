@@ -58,11 +58,12 @@ Code: `apps/mobile/components/stats/muscle-map.tsx`.
 
 ### muscle.progress-layout · presentation · accepted
 
-Progress's Muscle breakdown uses Settings → Progress → Muscle view, offering
+Both Progress breakdowns use Settings → Progress → Progress view, offering
 List / Map and defaulting to List. The choice is remembered per account on this
-device, including new launches. Progress has no layout selector. Changing the
-choice keeps period, metric and muscle selection. Returning from history retains
-the chosen layout and scroll. Approved 2026-10-18.
+device, including new launches. Exercise Sets/Volume and Muscle share it;
+Exercise 1RM uses List without changing the saved choice. Progress has no layout
+selector. Changing the choice keeps period, metric and selection. Returning from
+history retains the chosen layout and scroll. Approved 2026-10-18.
 
 Why: keep the optional map in Settings and the Progress controls focused on filters.
 Code: `apps/mobile/components/preferences/progress-settings.tsx`,
@@ -80,3 +81,35 @@ Why: a secondary mapping is real work but not the muscle the lift is for, so
 comparing it against sessions that targeted it misleads.
 Code: `deriveSessionMuscleVolumeComparisons` in
 `apps/mobile/src/session-insights/calculations.ts`.
+
+
+### muscle.exercise-map-area · presentation · accepted
+
+Progress Exercise's heatmap keeps the fixed family frames ([[muscle.map-area]]).
+Within each family, named primary exercises get full current-period Volume or
+working-set area, once per exercise. Each primary family repeats that value.
+One Secondary aggregate sums half the full exercise values for exercises with
+secondary mappings and no primary anywhere in that family, once per exercise
+regardless of mapped muscle count. Both use the same exercise units and
+independent metric eligibility ([[set.eligibility]]). Zero/unavailable values
+have no area; detail rows retain them. Secondary contributor rows show weighted
+figures but open full exercise history. Approved 2026-10-18.
+
+Why: exercise size shows its work while secondary work remains visible without duplicating primary work within a family.
+Code: `apps/mobile/components/stats/exercise-map-data.ts`.
+
+### muscle.exercise-map-colour · presentation · accepted
+
+Exercise-map Volume colours compare each primary exercise's own periods and
+Secondary's combined weighted periods. Unavailable operands or overflow keep
+an aggregate unavailable. Sets colours average capped muscle target attainment:
+primary tiles use their primary muscles in that family; Secondary uses muscles
+reached by secondary-only exercises with working sets in either period,
+selected before search/gym filtering. Muscle counts follow [[muscle.set-count]]
+over all gyms. Neither search nor gym changes target colour. Settings' weekly
+target multiplies by selected calendar weeks, including the unfinished week
+in full. Readable Sets rows show and announce target attainment. Approved 2026-10-18.
+
+Why: target colour describes the represented muscles while Volume compares the work shown.
+Code: `apps/mobile/components/stats/exercise-map-data.ts` and
+`apps/mobile/src/preferences/targets.ts`.
