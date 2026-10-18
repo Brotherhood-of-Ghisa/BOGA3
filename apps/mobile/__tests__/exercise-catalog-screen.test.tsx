@@ -501,6 +501,28 @@ describe('ExerciseCatalogScreen', () => {
     });
   });
 
+  describe('choosing a gym (the exercise-browser fixture)', () => {
+    it('counts only the chosen gym\'s sessions, every gym until one is chosen', async () => {
+      await openCatalog({ fixture: 'exercise-browser' });
+      fireEvent.press(screen.getByLabelText('Show never-done'));
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'bench');
+      // The session fixture's bench was at a gym; last year's Cable Bench Press had none.
+      expect(await screen.findByLabelText('Exercise actions Barbell Bench Press')).toBeTruthy();
+      expect(screen.getByLabelText('Exercise actions Cable Bench Press')).toBeTruthy();
+      expect(screen.getByLabelText('Gym: All gyms')).toBeTruthy();
+
+      fireEvent.press(screen.getByLabelText('Gym: All gyms'));
+      fireEvent.press(screen.getByRole('radio', { name: 'Maestro Block History Gym' }));
+      await waitForGone(() => screen.queryByLabelText('Exercise actions Cable Bench Press'));
+      expect(screen.getByLabelText('Exercise actions Barbell Bench Press')).toBeTruthy();
+
+      fireEvent.press(screen.getByLabelText('Gym: Maestro Block History Gym'));
+      fireEvent.press(screen.getByRole('radio', { name: 'No gym' }));
+      await waitForGone(() => screen.queryByLabelText('Exercise actions Barbell Bench Press'));
+      expect(screen.getByLabelText('Exercise actions Cable Bench Press')).toBeTruthy();
+    });
+  });
+
   describe('failures (forced on the real modules)', () => {
     it('does not label failed history as Never done and can retry with never-done off', async () => {
       jest

@@ -220,6 +220,40 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent('11'));
   });
 
+  it('filters the exercise rows by the chosen gym, every gym by default, and opens history on that gym', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id = 'maestro_exercise_block_history_squat_2'").run();
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    const squatNow = () => screen.getByTestId(`stats-exercise-row-${SQUAT}-now`);
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('All gyms');
+    expect(squatNow()).toHaveTextContent(/^7$/);
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).toContain(`exerciseDefinitionId=${SQUAT}`);
+    expect(String(mockPush.mock.lastCall?.[0])).toContain(`gymId=${gym}`);
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^2$/));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).toContain('gymId=no-gym');
+
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    await waitFor(() => expect(squatNow()).toHaveTextContent(/^7$/));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(String(mockPush.mock.lastCall?.[0])).not.toContain('gymId=');
+    // Muscle totals are the whole exercise ([[gym.split]]): no gym pill there.
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.queryByTestId('stats-gym')).toBeNull();
+  });
+
   it('shows the empty state on an empty database', async () => {
     await renderStats();
 

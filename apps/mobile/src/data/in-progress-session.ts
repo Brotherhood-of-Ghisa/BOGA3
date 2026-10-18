@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 
 import type { Transaction } from './clock';
-import { sessions } from './schema';
+import { gyms, sessions } from './schema';
 
 type ReadTx = Pick<Transaction, 'select'>;
 
@@ -10,10 +10,13 @@ type ReadTx = Pick<Transaction, 'select'>;
  * one the recorder opens. Should sync leave a second active row, only this one
  * is read.
  */
-export const selectInProgressSessionRow = (database: ReadTx): { id: string; startedAt: Date } | null =>
+export const selectInProgressSessionRow = (
+  database: ReadTx
+): { id: string; startedAt: Date; gymId: string | null; gymName: string | null } | null =>
   database
-    .select({ id: sessions.id, startedAt: sessions.startedAt })
+    .select({ id: sessions.id, startedAt: sessions.startedAt, gymId: sessions.gymId, gymName: gyms.name })
     .from(sessions)
+    .leftJoin(gyms, eq(gyms.id, sessions.gymId))
     .where(and(eq(sessions.status, 'active'), isNull(sessions.deletedAt)))
     .orderBy(desc(sessions.updatedAt), desc(sessions.createdAt), desc(sessions.startedAt), asc(sessions.id))
     .limit(1)
@@ -34,7 +37,7 @@ export const inProgressSessionDate = (now: Date): Date => new Date(now.getTime()
 export const selectDatedInProgressSession = (
   database: ReadTx,
   { start, end, now }: { start: Date; end: Date; now: Date }
-): { id: string; startedAt: Date; completedAt: Date } | null => {
+): { id: string; startedAt: Date; completedAt: Date; gymId: string | null; gymName: string | null } | null => {
   const completedAt = inProgressSessionDate(now);
   if (completedAt < start || completedAt >= end) return null;
   const row = selectInProgressSessionRow(database);

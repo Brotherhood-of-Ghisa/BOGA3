@@ -4,10 +4,15 @@ import {
   type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
+import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
-/** What one history page is about: one exercise definition or one muscle group. */
+/**
+ * What one history page is about: one exercise definition — at one gym scope,
+ * three-state (`src/utils/gym-scope-route.ts`), unset every gym — or one
+ * muscle group, whose totals are the whole exercise's ([[gym.split]]).
+ */
 export type HistorySubject =
-  | { kind: 'exercise'; id: string }
+  | { kind: 'exercise'; id: string; gymId?: string | null }
   | { kind: 'muscle'; id: string };
 
 const historySubjectId = (subject: HistorySubject | null): string | null => {
@@ -15,13 +20,18 @@ const historySubjectId = (subject: HistorySubject | null): string | null => {
   return id ? id : null;
 };
 
-const loadHistory = async (kind: HistorySubject['kind'], id: string, weeks: number) => {
+const NO_GYMS: GymScopeOption[] = [];
+
+const loadHistory = async (subject: HistorySubject, id: string, weeks: number) => {
   // One clock for the window and the workout in progress, which counts here.
   const now = new Date();
   const bounds = { ...historyWeekBounds(weeks, now), now };
-  return kind === 'muscle'
-    ? computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id] })
-    : computeSelectedExerciseHistoryEffort({ ...bounds, exerciseDefinitionId: id });
+  if (subject.kind === 'muscle') {
+    return { ...await computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id] }), gyms: NO_GYMS };
+  }
+  return computeSelectedExerciseHistoryEffort({
+    ...bounds, exerciseDefinitionId: id, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
+  });
 };
 
 /**
@@ -33,21 +43,26 @@ const loadHistory = async (kind: HistorySubject['kind'], id: string, weeks: numb
 export function useHistory(subject: HistorySubject | null, weeks: number, revision: number, accountRevision: number) {
   const kind = subject?.kind ?? null;
   const id = historySubjectId(subject);
-  const context = `${kind ?? ''}:${id ?? ''}:${weeks}:${revision}:${accountRevision}`;
+  const gymId = subject?.kind === 'exercise' ? subject.gymId : undefined;
+  const gymKey = encodeGymRouteParam(gymId) ?? '';
+  const subjectKey = `${kind ?? ''}:${id ?? ''}:${accountRevision}`;
+  const context = `${subjectKey}:${gymKey}:${weeks}:${revision}`;
   const [loading, setLoading] = useState(id !== null);
-  const [loaded, setLoaded] = useState<{ context: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[] } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    context: string; subjectKey: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
+  } | null>(null);
   const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
   const [retryRevision, setRetryRevision] = useState(0);
   useEffect(() => {
-    if (kind === null || id === null) return;
+    if (subject === null || id === null) return;
     let active = true;
     const read = async () => {
       setLoading(true);
       setFailure(null);
       try {
-        const next = await loadHistory(kind, id, weeks);
+        const next = await loadHistory(subject, id, weeks);
         if (!active) return;
-        setLoaded({ context, daily: next.daily, weekly: next.weekly });
+        setLoaded({ context, subjectKey, daily: next.daily, weekly: next.weekly, gyms: next.gyms });
       } catch (cause) {
         if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
       } finally {
@@ -63,12 +78,15 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
       cancelAnimationFrame(frame);
       if (timer !== undefined) clearTimeout(timer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read.
-  }, [kind, id, weeks, revision, accountRevision, retryRevision]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read; `subject` is read through kind, id and gym.
+  }, [kind, id, gymKey, weeks, revision, accountRevision, retryRevision]);
   const current = loaded?.context === context ? loaded : null;
   const error = failure?.context === context ? failure.message : null;
   return {
     daily: current?.daily ?? [], weekly: current?.weekly ?? [],
+    // The gym choices outlive a gym change on the same subject, so the picker
+    // stays put while the newly chosen gym loads.
+    gyms: loaded?.subjectKey === subjectKey ? loaded.gyms : NO_GYMS,
     loading: id !== null && (loading || (!current && !error)),
     error,
     retry: () => setRetryRevision(value => value + 1),

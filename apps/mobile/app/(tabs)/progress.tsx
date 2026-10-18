@@ -56,6 +56,8 @@ import { useStatsSummary } from '@/components/stats/use-summary';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
+import { GymPicker } from '@/components/gyms/gym-picker';
+import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 export type MuscleHistoryTarget = { muscleGroupId: string };
 export type ExerciseHeatmapTarget = { exerciseDefinitionId: string };
@@ -228,6 +230,10 @@ export type StatsScreenShellProps = {
   isFocused?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  /** The Exercise table's gym filter, three-state (`src/utils/gym-scope-route.ts`). */
+  gymId?: string | null;
+  gymOptions?: readonly GymScopeOption[];
+  onSelectGym?: (gymId: string | null | undefined) => void;
 };
 
 export function StatsScreenShell({
@@ -251,6 +257,9 @@ export function StatsScreenShell({
   isFocused = true,
   searchQuery,
   onSearchQueryChange,
+  gymId,
+  gymOptions = [],
+  onSelectGym,
 }: StatsScreenShellProps) {
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
@@ -326,9 +335,17 @@ export function StatsScreenShell({
               value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
           )}
         </View>
+        {/* The gym pill sits beside the search: the three chips fill the row
+            above. Exercise view only — muscle totals are the whole exercise
+            ([[gym.split]]). */}
         {viewMode === 'exercise' ? (
-          <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
-            onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+          <View style={styles.searchRow}>
+            <View style={styles.search}>
+              <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
+                onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+            </View>
+            {onSelectGym ? <GymPicker onChange={onSelectGym} options={gymOptions} testID="stats-gym" value={gymId} /> : null}
+          </View>
         ) : null}
       </View>
       <ScreenScroll contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
@@ -550,7 +567,9 @@ function StatsContent() {
   const filters = useProgressFilters(params);
   const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalog = useExerciseCatalog();
-  const { current: thisPeriod, previous: lastPeriod, reload } = useExerciseCatalogComparison(weeks);
+  // The Exercise table's gym ([[gym.view-filter]]); this visit's choice only.
+  const [gymId, setGymId] = useState<string | null | undefined>(undefined);
+  const { current: thisPeriod, previous: lastPeriod, gymOptions, reload } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload);
   const [searchQuery, setSearchQuery] = useState('');
@@ -568,12 +587,15 @@ function StatsContent() {
   return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
     onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle, filters.metric))}
-    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(exercise, filters.metric))}
+    // The Exercise table's gym carries over; the Muscle table has none.
+    onOpenExerciseHistory={exercise => router.push(progressHistoryHref(
+      { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : undefined }, filters.metric))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
-    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
+    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
+    gymId={gymId} gymOptions={gymOptions} onSelectGym={setGymId} />;
 }
 
 // A period the exercise has no aggregate for is a genuine nothing: zero sets,
@@ -598,6 +620,8 @@ const RECENCY_INDICATOR_WIDTH = 64;
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
+  search: { flex: 1 },
   // The page's last row clears the display's rounded corner above the tab bar,
   // which otherwise clips it: one more step of the spacing scale than the
   // gutter `ScreenScroll` already applies.

@@ -408,6 +408,7 @@ describe('createExerciseHistoryRepository', () => {
     loadSetsForSessionExercises: jest.fn().mockResolvedValue([]),
     loadTagsForSessionExercises: jest.fn().mockResolvedValue([]),
     loadAllTimeBest: jest.fn().mockResolvedValue(NO_BEST),
+    loadGymName: jest.fn().mockResolvedValue(null),
     ...overrides,
   });
 

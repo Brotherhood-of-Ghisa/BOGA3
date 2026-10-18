@@ -18,7 +18,7 @@ let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
 const start = new Date(wave.scenarios.plateau[0].startedAt);
 const query = { exerciseDefinitionId: 'curve', start,
-  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52 };
+  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52, gym: 'latest' as const };
 
 const seed = (scenario: keyof typeof wave.scenarios = 'plateau') => seedWaveHistory(mockFixture.database, scenario);
 beforeEach(() => { mockFixture = createInMemoryDatabase(); configurePersonalEffortPolicy(DEFAULT_PERSONAL_EFFORT_POLICY); });

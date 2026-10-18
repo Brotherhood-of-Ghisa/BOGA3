@@ -15,6 +15,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -25,14 +26,15 @@ const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 let mockCanGoBack = true;
-let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement } = {};
+let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement; headerRight?: () => mockReact.ReactElement } = {};
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   Stack: {
+    // The header's right items are mounted in place, so the gym button is reachable.
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
       mockScreenOptions = options;
-      return null;
+      return mockReact.createElement(mockReact.Fragment, null, options.headerRight?.());
     },
   },
   useRouter: () => ({
@@ -264,6 +266,35 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).not.toContain('history_elsewhere_squat');
   });
 
+  it('lists every gym until a gym is chosen, then that gym\'s sessions and bests', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, logSquatElsewhere);
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('All gyms');
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent(/^All-time bests$/);
+    expect(sessionCards()).toHaveLength(10);
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('exercise-history-gym-option-gym-elsewhere'));
+    await waitFor(() => expect(sessionCards()).toEqual(['history_elsewhere_squat']));
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Canal Street Gym');
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
+
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    fireEvent.press(screen.getByTestId('exercise-history-gym-option-all'));
+    await waitFor(() => expect(sessionCards()).toHaveLength(10));
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('275.0 × 5');
+  });
+
+  it('opens on the gym its link names, keeping it by name when the period holds none of it', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT, period: '7', gymId: 'gym-quiet' },
+      () => upsertLocalGym({ id: 'gym-quiet', name: 'Quiet Gym' }).then(() => undefined));
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Quiet Gym');
+    fireEvent.press(screen.getByTestId('exercise-history-gym'));
+    expect(screen.getByRole('radio', { name: 'Quiet Gym, 0 sessions' })).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Quiet Gym');
+    expect(screen.getByTestId('exercise-history-empty-state')).toBeTruthy();
+  });
+
   it('still lists every gym under Current gym only when the session had no gym', async () => {
     // A session with no gym sends no `currentGymId`, so there is no gym to
     // narrow to and the filter is inert.
@@ -360,6 +391,26 @@ describe('ExerciseHistoryScreenShell', () => {
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/2026-05-18/);
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
+  });
+
+  it('names no gym on the all-time bests, and keeps the tag row as tall as its chips', () => {
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary({ gymOptions: [{ gymId: null, name: 'No gym', occurrenceCount: 2 }] })}
+        period={30}
+        appliedTagDefinitionId={null}
+        appliedGymId={null}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+      />
+    );
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · No gym');
+    // The tag row is as tall as its chips: a growing ScrollView stretched them into circles on device.
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-history-tag-row').props.style)).toMatchObject({ flexGrow: 0 });
   });
 
   it('invokes onSelectTag with tagDefinitionId and toggles back to null', () => {

@@ -84,7 +84,7 @@ un-splitting is a merge. Rejected.
 - Ships before PR 5, so nothing can turn the split on first.
 - Lanes: `fast`, `backend`, `mcp-smoke`.
 
-### 4. Aggregations and labels
+### 4. Aggregations and labels — shipped
 
 - **A gym picker, defaulting to all gyms** — not one row per gym — in Stats /
   Progress exercise rows, catalog stats (`Last`, sessions, favourites),

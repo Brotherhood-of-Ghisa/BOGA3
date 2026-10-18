@@ -21,12 +21,12 @@ export function RmCurveScreen({ exerciseDefinitionId, now }: { exerciseDefinitio
 function CurvePage({ initialExerciseId, preferences, now }: {
   initialExerciseId: string; preferences: ReturnType<typeof useAccountLocalPreferenceState>; now: Date;
 }) {
-  const [scope, setScope] = useState<CurveScope>({ exerciseId: initialExerciseId, range: 12, rir: null });
+  const [scope, setScope] = useState<CurveScope>({ exerciseId: initialExerciseId, range: 12, gym: 'latest', rir: null });
   const catalog = useExerciseCatalog();
   const { historyLookbackWeeks, dateFormat } = preferences.values;
   const instant = now.getTime();
   const window = useMemo(() => rmCurveWindow(historyLookbackWeeks, new Date(instant), scope.range), [historyLookbackWeeks, instant, scope.range]);
-  const read = useRmCurve({ ...window, exerciseDefinitionId: scope.exerciseId, gymId: scope.gymId,
+  const read = useRmCurve({ ...window, exerciseDefinitionId: scope.exerciseId, gym: scope.gym,
     rir: scope.rir, accountRevision: preferences.accountRevision });
   return <RmCurveContent read={read} scope={scope} onScope={setScope} dateFormat={dateFormat} historyWeeks={historyLookbackWeeks}
     exercises={catalog.exercises.filter(e => !e.deletedAt)} catalogStatus={catalog.status} retryCatalog={() => { void ensureExerciseCatalogLoaded(); }} />;

@@ -9,6 +9,7 @@ import {
   ExerciseListPreferenceControls,
   useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
+import { GymPicker } from '@/components/gyms/gym-picker';
 import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
@@ -88,8 +89,10 @@ export default function ExerciseCatalogScreen() {
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
 
-  const statsResult = useExerciseCatalogStats('all');
-  const { stats, reload: reloadStats } = statsResult;
+  // The row stats' gym ([[gym.view-filter]]).
+  const [gymId, setGymId] = useState<string | null | undefined>(undefined);
+  const statsResult = useExerciseCatalogStats('all', gymId);
+  const { stats, gymOptions, reload: reloadStats } = statsResult;
 
   useFocusEffect(
     useCallback(() => {
@@ -296,7 +299,9 @@ export default function ExerciseCatalogScreen() {
             testID="exercise-catalog-options-button"
           />
         </View>
-        <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences} />
+        <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>
+          <GymPicker onChange={setGymId} options={gymOptions} testID="exercise-catalog-gym" value={gymId} />
+        </ExerciseListPreferenceControls>
         {saveFeedback ? <Notice icon="success" live message={saveFeedback} testID="exercise-catalog-feedback" /> : null}
         {saveError ? <Notice live message={saveError} testID="exercise-catalog-error" tone="danger" /> : null}
       </View>

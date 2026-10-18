@@ -556,6 +556,34 @@ export const loadEarlierBestsByDefinition = async (
   return bests;
 };
 
+/** Where a block is being planned: in a session (its gym), or at a plan's gym. */
+export type GymBookContext = { inSessionId: string } | { gymId: string | null };
+
+/**
+ * The sessions in the record book a block planned in `at` reads
+ * ([[gym.split]]): on a split exercise at a gym, that gym's sessions; `null`
+ * when the book is the whole exercise — an unsplit exercise, or no gym — so
+ * every session is in it. Repeat last and plan prefill prefer its newest.
+ */
+export const loadGymBookSessionIds = async (
+  exerciseDefinitionId: string,
+  at: GymBookContext,
+): Promise<ReadonlySet<string> | null> => {
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  const gymId = 'inSessionId' in at ? sessionGym(database, at.inSessionId) ?? null : at.gymId;
+  const splitByGym = loadSplitByGym(database, [exerciseDefinitionId]).get(exerciseDefinitionId) ?? false;
+  const book = reportingBucket({ splitByGym }, gymId);
+  if (isPooledGymBucket(book)) return null;
+  return new Set(database.select({ sessionId: exerciseSessionFacts.sessionId }).from(exerciseSessionFacts)
+    .where(and(
+      eq(exerciseSessionFacts.exerciseDefinitionId, exerciseDefinitionId),
+      eq(exerciseSessionFacts.gymBucket, book),
+    ))
+    .all()
+    .map((row) => row.sessionId));
+};
+
 /**
  * The records a session is compared with (`deriveExercisePersonalRecords`,
  * `pickSessionRecordSet`), per definition, from `loadEarlierBestsByDefinition`.

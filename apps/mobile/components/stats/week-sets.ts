@@ -14,6 +14,7 @@ import { loadCompletedSessionCards } from '@/src/session-recorder/completed-sess
 import type { CompletedSessionDetailCard } from '@/src/session-recorder/completed-session-detail-model';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 import { localWeekBounds } from '@/src/utils/calendar-weeks';
+import { encodeGymRouteParam, NO_GYM_LABEL } from '@/src/utils/gym-scope-route';
 
 export type WeekSetGroup = {
   key: string;
@@ -37,7 +38,8 @@ export type WeekBlock = {
   exerciseDefinitionId?: string;
 };
 
-export type WeekSetsTarget = { exerciseDefinitionId: string } | { muscleGroupIds: string[] };
+/** An exercise's list follows its page's gym scope, three-state (`src/utils/gym-scope-route.ts`). */
+export type WeekSetsTarget = { exerciseDefinitionId: string; gymId?: string | null } | { muscleGroupIds: string[] };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -53,7 +55,7 @@ export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[]): Week
     sessionExerciseId: entry.sessionExerciseId,
     completedAt: entry.completedAt,
     title: formatWeekDay(entry.completedAt),
-    detail: entry.gymName?.trim() ? entry.gymName : 'No gym',
+    detail: entry.gymName?.trim() ? entry.gymName : NO_GYM_LABEL,
   }));
 
 /** The blocks that worked a muscle, titled by their exercise, with their day. */
@@ -96,7 +98,9 @@ export const weekSetGroups = (
 const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string): Promise<WeekBlock[]> => {
   const bounds = localWeekBounds(weekKey);
   if ('exerciseDefinitionId' in target) {
-    return exerciseWeekBlocks(await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId }));
+    const entries = await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId });
+    const { gymId } = target;
+    return exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId));
   }
   const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds });
   return muscleWeekBlocks(days.flatMap((day) => day.contributions));
@@ -115,7 +119,8 @@ export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: s
 export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0): WeekSetsState {
   // The last read and the request it answered; a newer request is loading until its read lands.
   const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null }>({ groups: [], error: null, for: null });
-  const targetKey = target === null ? null : 'exerciseDefinitionId' in target ? target.exerciseDefinitionId : target.muscleGroupIds.join(',');
+  const targetKey = target === null ? null : 'exerciseDefinitionId' in target
+    ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : target.muscleGroupIds.join(',');
   const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;

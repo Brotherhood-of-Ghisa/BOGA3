@@ -6,7 +6,7 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 // Only impossible-to-seed read timing/failure is injected; happy-path hooks use real SQLite elsewhere.
 const query = { exerciseDefinitionId: 'curve', start: new Date(2026, 0, 5, 12),
-  end: new Date(2026, 5, 16), historyLookbackWeeks: 52, accountRevision: 0 };
+  end: new Date(2026, 5, 16), historyLookbackWeeks: 52, accountRevision: 0, gym: 'latest' as const };
 const model = (name: string) => buildRmCurveModel({ ...waveGraph(), definition: {
   id: 'curve', name, loadInputMode: 'total_load',
 } }, query);
@@ -31,7 +31,7 @@ it('hides stale data immediately and ignores older exercise/gym/effort/account r
   const load = jest.fn(() => new Promise<RmCurveModel>(resolve => pending.push(resolve)));
   const props = { exercise: 'curve', gym: 'synthetic-gym' as string | null, rir: null as number | null, account: 0 };
   const hook = renderHook(({ exercise, gym, rir, account }: typeof props) => useRmCurve({ ...query,
-    exerciseDefinitionId: exercise, gymId: gym, rir, accountRevision: account }, load), { initialProps: props });
+    exerciseDefinitionId: exercise, gym: { gymId: gym }, rir, accountRevision: account }, load), { initialProps: props });
   await waitFor(() => expect(pending).toHaveLength(1));
   await act(async () => pending[0](model('Initial')));
   expect(hook.result.current.data?.definition.name).toBe('Initial');

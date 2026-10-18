@@ -11,6 +11,8 @@ import {
 } from '@/components/stats/history-view';
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
+import { GymPickerButton, GymPickerSheet, type GymPickerSheetProps } from '@/components/gyms/gym-picker';
+import { decodeGymRouteParam, encodeGymRouteParam, showsGymPicker } from '@/src/utils/gym-scope-route';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
 } from '@/components/ui';
@@ -48,11 +50,16 @@ const firstRouteParam = (value: string | string[] | undefined): string | null =>
 export const resolveHistorySubject = (params: {
   exerciseDefinitionId?: string | string[];
   muscleGroupId?: string | string[];
+  gymId?: string | string[];
 }): HistorySubject | null => {
   const exerciseDefinitionId = firstRouteParam(params.exerciseDefinitionId);
   const muscleGroupId = firstRouteParam(params.muscleGroupId);
   if (exerciseDefinitionId && muscleGroupId) return null;
-  if (exerciseDefinitionId) return { kind: 'exercise', id: exerciseDefinitionId };
+  if (exerciseDefinitionId) {
+    // An exercise opens on the gym its link names (`src/utils/gym-scope-route.ts`).
+    const gymId = decodeGymRouteParam(firstRouteParam(params.gymId));
+    return gymId === undefined ? { kind: 'exercise', id: exerciseDefinitionId } : { kind: 'exercise', id: exerciseDefinitionId, gymId };
+  }
   if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId };
   return null;
 };
@@ -77,17 +84,24 @@ type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondar
 
 const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary' } as const;
 
+/** An exercise page's gym ([[gym.view-filter]]), chosen from the header. */
+type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChange' | 'allSessionCount'>;
+
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenCurve }: {
+// An exercise's gym button sits beside it, so no row is added for it.
+function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenCurve, gym }: {
   title: string;
   week: FocusedTimelineWeek | null;
   muscles: readonly HistoryMuscleLink[];
   onOpenWeek: (weekStartDateKey: string) => void;
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenCurve?: () => void;
+  gym?: HistoryGymChoice;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [gymVisible, setGymVisible] = useState(false);
+  const showsGym = gym !== undefined && showsGymPicker(gym.value, gym.options);
   const sessionsWeek = week?.hasTraining ? week : null;
   const openWeek = () => {
     setOptionsVisible(false);
@@ -105,17 +119,25 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenC
           title,
           // Named either way — options are merged across renders, so leaving
           // the key out would keep the last button on screen.
-          headerRight: hasOptions ? () => (
-            <IconButton
-              nativeHeader
-              accessibilityLabel="Options"
-              name="more-vertical"
-              onPress={() => setOptionsVisible(true)}
-              testID="progress-history-options-button"
-            />
+          headerRight: hasOptions || showsGym ? () => (
+            <View style={styles.headerItems}>
+              {gym ? <GymPickerButton onPress={() => setGymVisible(true)} options={gym.options} size="compact"
+                testID="stats-exercise-history-gym" value={gym.value} /> : null}
+              {hasOptions ? (
+                <IconButton
+                  nativeHeader
+                  accessibilityLabel="Options"
+                  name="more-vertical"
+                  onPress={() => setOptionsVisible(true)}
+                  testID="progress-history-options-button"
+                />
+              ) : null}
+            </View>
           ) : undefined,
         }}
       />
+      {gym ? <GymPickerSheet {...gym} onClose={() => setGymVisible(false)}
+        testID="stats-exercise-history-gym" visible={gymVisible} /> : null}
       <Sheet
         dismissLabel="Dismiss history options"
         onDismiss={() => setOptionsVisible(false)}
@@ -165,7 +187,7 @@ export type ProgressHistoryScreenProps = {
   todayDateKey?: string;
 };
 
-export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: ProgressHistoryScreenProps) {
+export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, todayDateKey }: ProgressHistoryScreenProps) {
   const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
   const router = useRouter();
   const catalog = useExerciseCatalog();
@@ -174,6 +196,13 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
   // The Timeline's focused week, reported by the chart: the ⋮ opens its sessions.
   const [focusedWeek, setFocusedWeek] = useState<FocusedTimelineWeek | null>(null);
+  // An exercise's gym: the one it was opened on, until the picker changes it.
+  const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
+  const subject = useMemo<HistorySubject | null>(
+    () => routeSubject?.kind === 'exercise' && chosenGym !== null ? { ...routeSubject, gymId: chosenGym.gymId } : routeSubject,
+    [routeSubject, chosenGym]
+  );
+  const gymId = subject?.kind === 'exercise' ? subject.gymId : undefined;
 
   // The catalogue is the one name source for both kinds, and it is already
   // loaded by boot. Until it is, the page keeps its declared title; once it is
@@ -259,7 +288,7 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
     view: pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
     timeline: {
-      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
+      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id, gymId },
       onOpenSession: openSession,
       exerciseLink,
     },
@@ -274,6 +303,12 @@ export function ProgressHistoryScreen({ subject, initialMetric, todayDateKey }: 
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}
         week={focusedWeek}
+        gym={subject.kind === 'exercise' ? {
+          value: gymId,
+          options: history.gyms,
+          onChange: next => setChosenGym({ gymId: next }),
+          allSessionCount: history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0),
+        } : undefined}
       />
       {/* The view selector writes a preference; this is the only screen that
           now offers it, so a failed save says so here, with its Retry. */}
@@ -316,15 +351,18 @@ export default function ProgressHistoryRoute() {
     exerciseDefinitionId?: string | string[];
     muscleGroupId?: string | string[];
     metric?: string | string[];
+    gymId?: string | string[];
   }>();
   const subject = resolveHistorySubject(params);
   const metric = resolveHistoryMetric(params.metric);
   // Progress pushes a fresh page each time, but a link can reach this route
   // while it is mounted: new params are a new page, opening on their own
   // metric and week rather than keeping the last link's.
-  return <ProgressHistoryScreen initialMetric={metric} key={`${subject?.kind}:${subject?.id}:${metric}`} subject={subject} />;
+  const gym = subject?.kind === 'exercise' ? encodeGymRouteParam(subject.gymId) ?? '' : '';
+  return <ProgressHistoryScreen initialMetric={metric} key={`${subject?.kind}:${subject?.id}:${metric}:${gym}`} subject={subject} />;
 }
 
 const styles = StyleSheet.create({
+  headerItems: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   notice: { paddingHorizontal: uiSpace.lg, paddingBottom: uiSpace.md },
 });

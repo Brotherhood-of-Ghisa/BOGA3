@@ -38,7 +38,8 @@ import {
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import { decodeGymRouteParam } from '@/src/utils/gym-scope-route';
+import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
+import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
@@ -131,6 +132,8 @@ export function ExerciseHistoryScreenShell({
     ],
     [tagOptions]
   );
+  const gymOptions = summary?.gymOptions ?? [];
+  const gymLabel = appliedGymId === undefined ? null : gymScopeLabel(appliedGymId, gymOptions);
 
   return (
     <Screen testID="exercise-history-screen">
@@ -146,6 +149,7 @@ export function ExerciseHistoryScreenShell({
         {summary && tagOptions.length > 0 ? (
           <ScrollView
             contentContainerStyle={styles.tagRowContent}
+            style={styles.chipScroll}
             horizontal
             showsHorizontalScrollIndicator={false}
             testID="exercise-history-tag-row">
@@ -195,7 +199,7 @@ export function ExerciseHistoryScreenShell({
               />
             ) : null}
 
-            <BestCard best={summary.allTimeBest} onPressSession={onPressSession} />
+            <BestCard best={summary.allTimeBest} gymLabel={gymLabel} onPressSession={onPressSession} />
 
             {summary.sessions.length === 0 ? (
               <Card>
@@ -234,19 +238,24 @@ export function ExerciseHistoryScreenShell({
 }
 
 // The exercise's all-time bests: two rows that open the session holding each.
-// The figures are in `record`, the one superlative.
+// The figures are in `record`, the one superlative. With a gym chosen they are
+// that gym's, and the label names it.
 function BestCard({
   best,
+  gymLabel,
   onPressSession,
 }: {
   best: ExerciseHistorySummary['allTimeBest'];
+  gymLabel: string | null;
   onPressSession: (sessionId: string) => void;
 }) {
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
   return (
     <Card testID="exercise-history-best-card">
-      <Text allowFontScaling={false} style={styles.cardLabel}>All-time bests</Text>
+      <Text allowFontScaling={false} style={styles.cardLabel} testID="exercise-history-best-label">
+        {gymLabel ? `All-time bests · ${gymLabel}` : 'All-time bests'}
+      </Text>
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
@@ -388,14 +397,18 @@ export default function ExerciseHistoryRoute() {
   // (`src/utils/gym-scope-route.ts`): the chip's gym, else the gym the reader
   // came from under `Current gym only`, else every gym. A session with no gym
   // has no current gym to narrow to, so the filter stays off there.
+  // A chip the reader picks here wins over all three.
   const routeGymId = decodeGymRouteParam(coerceRouteParam(params.gymId));
   const routeCurrentGymId = coerceRouteParam(params.currentGymId);
+  const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
   const appliedGymId: string | null | undefined =
-    routeGymId !== undefined
-      ? routeGymId
-      : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
-        ? routeCurrentGymId
-        : undefined;
+    chosenGym !== null
+      ? chosenGym.gymId
+      : routeGymId !== undefined
+        ? routeGymId
+        : listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+          ? routeCurrentGymId
+          : undefined;
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -465,6 +478,21 @@ export default function ExerciseHistoryRoute() {
     [loadSummary, period, appliedGymId]
   );
 
+  const handleSelectGym = useCallback(
+    (next: string | null | undefined) => {
+      setChosenGym({ gymId: next });
+      void loadSummary(period, appliedTagDefinitionId, next);
+    },
+    [loadSummary, period, appliedTagDefinitionId]
+  );
+
+  const [gymSheetVisible, setGymSheetVisible] = useState(false);
+  const gymOptions = useMemo(() => (summary?.gymOptions ?? []).map((option) => ({
+    gymId: option.gymId,
+    name: option.gymId === null ? null : option.name,
+    sessionCount: option.occurrenceCount,
+  })), [summary]);
+
   const title = summary?.exerciseName ?? 'Exercise History';
 
   return (
@@ -486,8 +514,16 @@ export default function ExerciseHistoryRoute() {
               testID="exercise-history-back"
             />
           ),
+          // The gym button ([[gym.view-filter]]) lives in the header, so the
+          // page adds no row for it. Named either way: options merge across renders.
+          headerRight: summary ? () => (
+            <GymPickerButton onPress={() => setGymSheetVisible(true)} options={gymOptions} size="compact"
+              testID="exercise-history-gym" value={appliedGymId} />
+          ) : undefined,
         }}
       />
+      <GymPickerSheet onChange={handleSelectGym} onClose={() => setGymSheetVisible(false)} options={gymOptions}
+        testID="exercise-history-gym" value={appliedGymId} visible={gymSheetVisible} />
       <ExerciseHistoryScreenShell
         summary={summary}
         period={period}
@@ -505,6 +541,11 @@ export default function ExerciseHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
+  // A chip row is as tall as its chips: a ScrollView grows by default, and
+  // inside the page's scroll that stretched them into circles.
+  chipScroll: {
+    flexGrow: 0,
+  },
   tagRowContent: {
     paddingRight: uiSpace.sm,
   },

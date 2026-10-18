@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { RmCurveContent } from '@/components/rm-curve/content';
 import { periodLabel, selectedPeriod } from '@/components/rm-curve/regimes';
 import { curveGeometry } from '@/components/rm-curve/geometry';
-import { ALL_GYMS, buildRmCurveModel } from '@/src/rm-curve/model';
+import { buildRmCurveModel, rmCurveLatestGym } from '@/src/rm-curve/model';
 import type { RmCurveRow } from '@/src/data/rm-curve';
 import { assessRegimes, assessSingleCurve } from '@/src/strength-regimes/assessment';
 import { fitStrengthRegimes, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
@@ -12,7 +12,8 @@ import { waveGraph } from './helpers/rm-curve-history';
 
 const graph = waveGraph();
 const query = { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1), historyLookbackWeeks: 52 };
-const model = () => buildRmCurveModel(graph, query);
+// The screen's default: the most recently trained gym, resolved before the scope is built.
+const model = () => buildRmCurveModel(graph, { ...query, gymId: rmCurveLatestGym(graph, query) });
 
 afterEach(() => jest.useRealTimers());
 
@@ -20,13 +21,13 @@ it('pools gyms without duplicates and samples one qualifying set per visible ses
   const g = waveGraph(), first = g.rows.find(r => r.setOrder === 0 && r.completedAt >= query.start)!;
   g.rows.filter(r => r.sessionId === first.sessionId).forEach(r => { r.gymId = null; r.gymName = null; });
   first.setType = null;
-  const all = buildRmCurveModel(g, { ...query, gymId: ALL_GYMS });
+  const all = buildRmCurveModel(g, query);
   const one = buildRmCurveModel(g, { ...query, gymId: 'synthetic-gym' });
   expect(all.observations.length).toBeGreaterThan(one.observations.length);
   expect(new Set(all.observations.map(p => p.setId)).size).toBe(all.observations.length);
   expect(all.inferenceSessions.find(s => s.sessionId === first.sessionId)?.selectedSet?.setId).toBeDefined();
   expect(one.inferenceSessions.some(s => s.sessionId === first.sessionId)).toBe(false);
-  const filtered = buildRmCurveModel(g, { ...query, gymId: ALL_GYMS, rir: 0 });
+  const filtered = buildRmCurveModel(g, { ...query, rir: 0 });
   expect(filtered.inferenceSessions).toHaveLength(new Set(filtered.observations.map(p => p.sessionId)).size);
   for (const s of filtered.inferenceSessions) {
     expect(s.selectedSet?.rir).toBe(0);
@@ -149,7 +150,7 @@ it('defaults to One curve and Parsimonious, keeps controls on failure, and offer
   jest.useFakeTimers();
   const onScope = jest.fn();
   const props = { read: { status: 'ready' as const, data: model(), retry: jest.fn() },
-    scope: { exerciseId: 'curve', range: 24 as const, rir: null }, onScope,
+    scope: { exerciseId: 'curve', range: 24 as const, gym: 'latest' as const, rir: null }, onScope,
     exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,
     retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
   const component = render(<RmCurveContent {...props} />);
@@ -160,7 +161,7 @@ it('defaults to One curve and Parsimonious, keeps controls on failure, and offer
   expect(screen.queryByText(/Reference/)).toBeNull();
   fireEvent.press(screen.getByLabelText('gym: Synthetic gym'));
   fireEvent.press(screen.getByRole('radio', { name: 'All gyms' }));
-  expect(onScope).toHaveBeenCalledWith(expect.objectContaining({ gymId: ALL_GYMS }));
+  expect(onScope).toHaveBeenCalledWith(expect.objectContaining({ gym: {} }));
   fireEvent.press(screen.getByTestId('rm-mode-two'));
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   expect(screen.queryByTestId('rm-fit-all')).toBeNull();
@@ -216,7 +217,7 @@ it('bounds a thousand-session UI request, retains every plotted point, and recov
   const large = { ...m, inferenceSessions: Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
     selectedSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
   const props = { read: { status: 'ready' as const, data: large, retry: jest.fn() },
-    scope: { exerciseId: 'curve', range: 'history' as const, rir: null }, onScope: jest.fn(),
+    scope: { exerciseId: 'curve', range: 'history' as const, gym: 'latest' as const, rir: null }, onScope: jest.fn(),
     exercises: [{ id: 'curve', name: 'Synthetic exercise' }], catalogStatus: 'ready' as const,
     retryCatalog: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 520 };
   const view = render(<RmCurveContent {...props} />);

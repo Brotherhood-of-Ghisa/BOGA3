@@ -101,7 +101,7 @@ describe('the workout in progress', () => {
 
     const earlier = new Date(NOW.getTime() - 24 * HOUR_MS);
     expect(selectDatedInProgressSession(db(), { start: earlier, end: NOW, now: NOW }))
-      .toEqual({ id: 'active', startedAt: new Date(NOW.getTime() - HOUR_MS), completedAt: date });
+      .toEqual({ id: 'active', startedAt: new Date(NOW.getTime() - HOUR_MS), completedAt: date, gymId: null, gymName: null });
     expect(selectDatedInProgressSession(db(), { start: NOW, end: new Date(NOW.getTime() + HOUR_MS), now: NOW })).toBeNull();
     expect(selectDatedInProgressSession(db(), { start: earlier, end: date, now: NOW })).toBeNull();
   });

@@ -219,7 +219,7 @@ Decided with the one-off planner. `/sessions` owns queue management: planned
 rows never enter, nor are affected by, the completed history's count, filters,
 row actions or deleted toggle; a schedule is optional and Unscheduled is never
 disguised as "today". The picker's completed-history action is **Repeat last**
-(yesterday's session, appended as planned sets) and is separate from **From
+(the newest session, [[gym.split]], appended as planned sets) and is separate from **From
 planner**, which offers authored one-off blocks and available programme blocks
 still available (pending, definition-bearing, target-bearing). A block attaches
 to the active session's unsourced card of the same exercise: one match attaches,

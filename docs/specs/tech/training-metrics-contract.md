@@ -159,7 +159,8 @@ sets. There are three kinds:
   (`exercise-calculations/gym-bucket.ts`) is its one implementation: it names
   the book a session's own records come from. Each facts row keeps two flag
   sets — `pr_*` against the whole exercise, `own_pr_*` against that book — so
-  views read the first and a session's own PRs (Today) the second. The book is
+  a view of every gym reads the first, and a session's own PRs (Today) and a
+  view with a gym chosen ([[gym.split-progress-prs]]) the second. The book is
   picked by the session in hand, so a reader takes the session
   (`inSessionId`), never a second gym. The current-gym filter (today only the
   exercise page) narrows to the session's gym, and is off when it has none. A
