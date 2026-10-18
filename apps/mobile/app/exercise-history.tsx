@@ -38,13 +38,8 @@ import {
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import {
-  ALL_GYMS_LABEL,
-  decodeGymRouteParam,
-  encodeGymRouteParam,
-  gymScopeLabel,
-  showsGymPicker,
-} from '@/src/utils/gym-scope-route';
+import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
+import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
@@ -59,9 +54,6 @@ const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string; accessibili
 
 // The tag filter's "no filter" chip. Tag ids are generated, never this.
 const ALL_TAGS = 'all';
-// The gym filter's "every gym" chip. The other chips carry the route encoding
-// (`encodeGymRouteParam`), so the no-gym chip is the reserved value.
-const ALL_GYMS = 'all-gyms';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -109,8 +101,6 @@ export type ExerciseHistoryScreenShellProps = {
   errorMessage: string | null;
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
   onSelectTag: (tagDefinitionId: string | null) => void;
-  /** Three-state, as `appliedGymId`. */
-  onSelectGym?: (gymId: string | null | undefined) => void;
   onPressSession: (sessionId: string) => void;
   activeMainTab?: MainTabKey;
   onSelectMainTab: (tab: MainTabKey) => void;
@@ -125,7 +115,6 @@ export function ExerciseHistoryScreenShell({
   errorMessage,
   onSelectPeriod,
   onSelectTag,
-  onSelectGym,
   onPressSession,
   activeMainTab = 'progress',
   onSelectMainTab,
@@ -156,10 +145,6 @@ export function ExerciseHistoryScreenShell({
           testIDPrefix="exercise-history-period-chip"
           value={period}
         />
-
-        {summary && onSelectGym ? (
-          <GymChipRow appliedGymId={appliedGymId} onSelectGym={onSelectGym} options={gymOptions} />
-        ) : null}
 
         {summary && tagOptions.length > 0 ? (
           <ScrollView
@@ -249,47 +234,6 @@ export function ExerciseHistoryScreenShell({
 
       <MainTabBar activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </Screen>
-  );
-}
-
-// The gym filter ([[gym.view-filter]]): single-choice chips like the tags',
-// `All gyms` first; drawn as `showsGymPicker` says.
-function GymChipRow({
-  options,
-  appliedGymId,
-  onSelectGym,
-}: {
-  options: ExerciseHistorySummary['gymOptions'];
-  appliedGymId: string | null | undefined;
-  onSelectGym: (gymId: string | null | undefined) => void;
-}) {
-  if (!showsGymPicker(appliedGymId, options)) return null;
-  const chips: ChipOption<string>[] = [
-    { value: ALL_GYMS, label: ALL_GYMS_LABEL },
-    ...options.map((option) => ({
-      value: encodeGymRouteParam(option.gymId) as string,
-      label: `${option.name} · ${option.occurrenceCount}`,
-      accessibilityLabel: `Filter by gym ${option.name}, ${option.occurrenceCount} sessions`,
-    })),
-  ];
-  return (
-    <ScrollView
-      contentContainerStyle={styles.tagRowContent}
-      style={styles.chipScroll}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      testID="exercise-history-gym-row">
-      <ChipGroup
-        accessibilityLabel="Filter by gym"
-        clearValue={ALL_GYMS}
-        mode="single"
-        onChange={(next) => onSelectGym(next === ALL_GYMS ? undefined : decodeGymRouteParam(next))}
-        options={chips}
-        style={styles.tagChips}
-        testIDPrefix="exercise-history-gym-chip"
-        value={encodeGymRouteParam(appliedGymId) ?? ALL_GYMS}
-      />
-    </ScrollView>
   );
 }
 
@@ -542,6 +486,13 @@ export default function ExerciseHistoryRoute() {
     [loadSummary, period, appliedTagDefinitionId]
   );
 
+  const [gymSheetVisible, setGymSheetVisible] = useState(false);
+  const gymOptions = useMemo(() => (summary?.gymOptions ?? []).map((option) => ({
+    gymId: option.gymId,
+    name: option.gymId === null ? null : option.name,
+    sessionCount: option.occurrenceCount,
+  })), [summary]);
+
   const title = summary?.exerciseName ?? 'Exercise History';
 
   return (
@@ -563,8 +514,16 @@ export default function ExerciseHistoryRoute() {
               testID="exercise-history-back"
             />
           ),
+          // The gym button ([[gym.view-filter]]) lives in the header, so the
+          // page adds no row for it. Named either way: options merge across renders.
+          headerRight: summary ? () => (
+            <GymPickerButton onPress={() => setGymSheetVisible(true)} options={gymOptions} size="compact"
+              testID="exercise-history-gym" value={appliedGymId} />
+          ) : undefined,
         }}
       />
+      <GymPickerSheet onChange={handleSelectGym} onClose={() => setGymSheetVisible(false)} options={gymOptions}
+        testID="exercise-history-gym" value={appliedGymId} visible={gymSheetVisible} />
       <ExerciseHistoryScreenShell
         summary={summary}
         period={period}
@@ -574,7 +533,6 @@ export default function ExerciseHistoryRoute() {
         errorMessage={errorMessage}
         onSelectPeriod={handleSelectPeriod}
         onSelectTag={handleSelectTag}
-        onSelectGym={handleSelectGym}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
         onSelectMainTab={openMainTab}
       />
@@ -584,7 +542,7 @@ export default function ExerciseHistoryRoute() {
 
 const styles = StyleSheet.create({
   // A chip row is as tall as its chips: a ScrollView grows by default, and
-  // inside the page's scroll that stretched the chips into circles.
+  // inside the page's scroll that stretched them into circles.
   chipScroll: {
     flexGrow: 0,
   },

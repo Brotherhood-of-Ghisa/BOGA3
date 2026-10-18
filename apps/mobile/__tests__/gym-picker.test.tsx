@@ -54,6 +54,15 @@ describe('GymPicker', () => {
     expect(onChange).toHaveBeenCalledTimes(3);
   });
 
+  it('draws the same button at the compact size, for a row it shares with a segmented control', () => {
+    const onChange = jest.fn();
+    render(<GymPicker onChange={onChange} options={OPTIONS} size="compact" testID="gym" value="home" />);
+    expect(screen.getByLabelText('Gym: Home')).toHaveProp('hitSlop', 8);
+    fireEvent.press(screen.getByTestId('gym'));
+    fireEvent.press(screen.getByTestId('gym-option-all'));
+    expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
   it('keeps a chosen gym the options no longer list among its rows', () => {
     renderPicker('annex');
     expect(screen.getByTestId('gym')).toHaveTextContent('Selected gym');

@@ -269,8 +269,6 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   // The Timeline's focused week, for the page's ⋮; `null` while
   // another view shows, or when no chart does.
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
-  // The page's own filter (an exercise's gym picker), on a row above the selectors.
-  filter?: ReactNode;
 };
 
 export function HistoryView<TMetric extends CalendarHeatmapMetric>({
@@ -293,7 +291,6 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   todayDateKey,
   timeline,
   onFocusWeek,
-  filter,
 }: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
@@ -328,7 +325,6 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
 
   return (
     <View style={styles.body} testID={`${prefix}-overlay`}>
-      {filter ? <View style={styles.filter}>{filter}</View> : null}
       {/* Both selectors in one row: the view as icons, so the metric names —
           up to four, `Top weight` the widest — keep the rest of the row. */}
       <View style={styles.controls}>
@@ -394,12 +390,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.md,
-  },
-  filter: {
-    flexDirection: 'row',
-    paddingHorizontal: uiSpace.lg,
-    paddingTop: uiSpace.md,
-    marginBottom: -uiSpace.xs,
   },
   metricControl: {
     flex: 1,
