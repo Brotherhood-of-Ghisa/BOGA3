@@ -15,6 +15,7 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { inProgressSessionDate, selectInProgressSessionRow } from './in-progress-session';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
@@ -50,6 +51,12 @@ export type ExerciseCatalogStats = {
 export type ExerciseCatalogStatsRawHistory = {
   effortPolicy?: EffortCalculationPolicy;
   sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
+  /**
+   * The workout in progress, undated. Its exercises and sets are in the lists
+   * below, but no figure counts them until `withInProgressSession` dates it:
+   * only Progress does (§2); the catalogue and pickers read completed history.
+   */
+  inProgressSession?: ({ id: string } & SessionWeightContext) | null;
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: { id: string; bodyweightContribution: number; loadInputMode: LoadInputMode }[];
   sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
@@ -85,6 +92,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       .from(sessions)
       .where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt)))
       .all();
+    const inProgressRow = selectInProgressSessionRow(database);
 
     const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
@@ -92,7 +100,8 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
       .map((row) => ({ ...row, completedAt: row.completedAt }));
 
-    const sessionIds = sessionsCompleted.map((row) => row.id);
+    const inProgressSession = inProgressRow ? { id: inProgressRow.id, ...resolveWeight(inProgressRow.startedAt) } : null;
+    const sessionIds = [...sessionsCompleted.map((row) => row.id), ...(inProgressSession ? [inProgressSession.id] : [])];
     const sessionExerciseRows =
       sessionIds.length > 0
         ? database
@@ -142,6 +151,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       effortPolicy: getPersonalEffortPolicy(),
       exerciseDefinitions: definitions,
       sessions: sessionsCompleted,
+      inProgressSession,
       sessionExercises: sessionExerciseRows,
       exerciseSets: exerciseSetRows.map((row) => ({
         sessionExerciseId: row.sessionExerciseId,
@@ -153,6 +163,15 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
     };
   },
 });
+
+/** The history with its workout in progress counted, dated for a read at `now` (§2). */
+export const withInProgressSession = (
+  raw: ExerciseCatalogStatsRawHistory,
+  now: Date
+): ExerciseCatalogStatsRawHistory => {
+  if (!raw.inProgressSession) return raw;
+  return { ...raw, sessions: [...raw.sessions, { ...raw.inProgressSession, completedAt: inProgressSessionDate(now) }] };
+};
 
 type PeriodWindow = { start: Date | null; end: Date | null };
 

@@ -183,7 +183,10 @@ it('loads both periods once, including the previous weekend', async () => {
   const result = await createStatsRepository(store).computeProgressComparisons({ periodWeeks: 1, now: periods.current.end });
   expect(store.loadAggregationInput).toHaveBeenCalledTimes(1);
   // London calendar Mondays are at 23:00 UTC during British Summer Time.
-  expect(store.loadAggregationInput).toHaveBeenCalledWith({ start: new Date('2026-05-10T23:00:00Z'), end: periods.current.end });
+  // The window's own clock dates the workout in progress, so it lands in the current period.
+  expect(store.loadAggregationInput).toHaveBeenCalledWith({
+    start: new Date('2026-05-10T23:00:00Z'), end: periods.current.end, now: periods.current.end,
+  });
   expect(result.current.totals.workingSetCount).toBe(2);
   expect(result.previous.totals.workingSetCount).toBe(2);
   // Back: the weekend `lift` set at its secondary half plus the primary `old-set`.

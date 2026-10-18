@@ -11,6 +11,7 @@ import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { loadExerciseSessionFacts } from './exercise-session-facts';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
+import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
@@ -197,6 +198,8 @@ export type ComputeSelectedExerciseWeeklyEffortOptions = {
   start: Date;
   end: Date;
   timeZone?: string;
+  /** The read's clock: given, the workout in progress counts (§2). Its PRs do not: it has no facts. */
+  now?: Date;
 };
 
 export type ComputeSelectedExerciseDailyEffortOptions = ComputeSelectedExerciseWeeklyEffortOptions;
@@ -224,8 +227,10 @@ const loadExerciseRawSessions = async (
       )
     )
     .all();
+  const inProgress = options.now ? selectDatedInProgressSession(database, { start: options.start, end: options.end, now: options.now }) : null;
+  if (inProgress) storedSessionRows.push(inProgress);
 
-    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
+  const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
   const sessionCompletedRows = sessionRows.filter(
     (row): row is typeof row & { completedAt: Date } => row.completedAt !== null

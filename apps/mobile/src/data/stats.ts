@@ -4,6 +4,7 @@ import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { selectDatedInProgressSession } from './in-progress-session';
 import {
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
@@ -77,7 +78,11 @@ export type ProgressComparisons = StatsSummary & { muscles: ProgressMuscleCompar
 export type StatsAggregationInput = MuscleAnalyticsInput;
 
 export type StatsStore = {
-  loadAggregationInput(input: { start: Date; end: Date }): Promise<StatsAggregationInput>;
+  /**
+   * The completed sessions in `[start, end)`. Given `now`, also the workout in
+   * progress, dated where finishing it now would date it (§2).
+   */
+  loadAggregationInput(input: { start: Date; end: Date; now?: Date }): Promise<StatsAggregationInput>;
   loadMuscleGroupTaxonomy(): Promise<StatsAggregationInput['muscleGroups']>;
 };
 
@@ -91,6 +96,8 @@ export type ComputeSelectedMuscleDailyEffortOptions =
   AggregateSelectedMuscleDailyEffortOptions & {
     start: Date;
     end: Date;
+    /** The read's clock: given, the workout in progress counts (§2). */
+    now?: Date;
   };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -136,11 +143,11 @@ const comparisonPeriods = (options: ComputeStatsSummaryOptions) => {
   const now = options.now ?? new Date();
   if (options.periodWeeks === undefined) {
     const current = computePeriodBounds(options.periodDays, now);
-    return { current, previous: computePreviousPeriodBounds(current) };
+    return { now, current, previous: computePreviousPeriodBounds(current) };
   }
   const days = options.periodWeeks * 7;
   const windows = progressComparisonWindows(options.periodWeeks, now);
-  return { current: { days, ...windows.current }, previous: { days, ...windows.previous } };
+  return { now, current: { days, ...windows.current }, previous: { days, ...windows.previous } };
 };
 
 const inputInPeriod = (input: StatsAggregationInput, period: StatsPeriodBounds): StatsAggregationInput => ({
@@ -230,7 +237,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 };
 
 export const createDrizzleStatsStore = (): StatsStore => ({
-  async loadAggregationInput({ start, end }) {
+  async loadAggregationInput({ start, end, now }) {
     const database = await bootstrapLocalDataLayer();
     return database.transaction((transaction) => {
       const database = transaction;
@@ -257,6 +264,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           )
         )
         .all();
+      const inProgress = now ? selectDatedInProgressSession(database, { start, end, now }) : null;
+      if (inProgress) storedSessionRows.push(inProgress);
 
       const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
@@ -409,7 +418,9 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const periods = comparisonPeriods(options);
     // One awaited read, then synchronous derivation: edits, mappings, dated
     // weight context and the active durable effort policy cannot split periods.
-    const input = await store.loadAggregationInput({ start: periods.previous.start, end: periods.current.end });
+    const input = await store.loadAggregationInput({
+      start: periods.previous.start, end: periods.current.end, now: periods.now,
+    });
     return {
       current: { period: periods.current, totals: aggregateStats(inputInPeriod(input, periods.current)) },
       previous: { period: periods.previous, totals: aggregateStats(inputInPeriod(input, periods.previous)) },
@@ -425,6 +436,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const input = await store.loadAggregationInput({
       start: options.start,
       end: options.end,
+      now: options.now,
     });
     return aggregateSelectedMuscleDailyEffort(input, options);
   },
@@ -437,6 +449,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const input = await store.loadAggregationInput({
       start: options.start,
       end: options.end,
+      now: options.now,
     });
     const daily = aggregateSelectedMuscleDailyEffort(input, options);
     return aggregateSelectedMuscleWeeklyEffort(daily);
@@ -444,7 +457,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
   async computeSelectedMuscleHistoryEffort(options: ComputeSelectedMuscleDailyEffortOptions) {
     ensureDate(options.start, 'start');
     ensureDate(options.end, 'end');
-    const input = await store.loadAggregationInput({ start: options.start, end: options.end });
+    const input = await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now });
     const effort = aggregateSelectedMuscleDailyEffort(input, options);
     return {
       daily: aggregateSelectedMuscleDailyEffortMetrics(effort),
@@ -460,6 +473,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const input = await store.loadAggregationInput({
       start: options.start,
       end: options.end,
+      now: options.now,
     });
     const daily = aggregateSelectedMuscleDailyEffort(input, options);
     return aggregateSelectedMuscleDailyEffortMetrics(daily);

@@ -16,7 +16,9 @@ const historySubjectId = (subject: HistorySubject | null): string | null => {
 };
 
 const loadHistory = async (kind: HistorySubject['kind'], id: string, weeks: number) => {
-  const bounds = historyWeekBounds(weeks);
+  // One clock for the window and the workout in progress, which counts here.
+  const now = new Date();
+  const bounds = { ...historyWeekBounds(weeks, now), now };
   return kind === 'muscle'
     ? computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id] })
     : computeSelectedExerciseHistoryEffort({ ...bounds, exerciseDefinitionId: id });

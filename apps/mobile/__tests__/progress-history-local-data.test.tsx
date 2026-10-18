@@ -103,6 +103,30 @@ const logPulldown = async (daysAgo: number) => {
   await completeSessionDraft(sessionId, { completedAt, now: completedAt });
 };
 
+// A Lat Pulldown workout still in progress: one confirmed set, one planned.
+const startPulldown = async (startedDaysAgo: number) => {
+  const startedAt = new Date(Date.now() - startedDaysAgo * DAY_MS);
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: 'history_pulldown_in_progress',
+      gymId: null,
+      startedAt,
+      exercises: [
+        {
+          id: 'history_pulldown_in_progress_pulldown',
+          exerciseDefinitionId: PULLDOWN,
+          name: 'Lat Pulldown',
+          sets: [
+            { id: 'history_pulldown_in_progress_done', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: null },
+            { id: 'history_pulldown_in_progress_planned', weightValue: '60', repsValue: '10', setType: 'rir_2', performanceStatus: 'planned' },
+          ],
+        },
+      ],
+    },
+    { now: startedAt }
+  );
+};
+
 /** Opens the page exactly as Progress pushes it: one id, no name. */
 const openHistory = async (params: Record<string, string>) => {
   mockSearchParams = params;
@@ -155,6 +179,21 @@ describe('The history page over real data', () => {
       .toEqual(await exerciseAnalytics.computeSelectedExerciseDailyEffort(options));
     expect(history.weekly).toEqual(await exerciseAnalytics.computeSelectedExerciseWeeklyEffort(options));
     expect(history.daily.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['exercise', { exerciseDefinitionId: PULLDOWN }],
+    ['muscle', { muscleGroupId: 'back_lats' }],
+  ] as const)('counts the workout in progress on today, by its confirmed sets, on %s history', async (subject, params) => {
+    await loadMaestroFixture('exercise-block-history');
+    // Started last week: only the date finishing it now would give puts it on today.
+    await startPulldown(8);
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    await openHistory({ ...params, metric: 'sets' });
+    await waitForGone(() => screen.queryByTestId(`stats-${subject}-history-loading`));
+
+    expect(renderedDailySample(subject).filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
+      .toEqual([[localDateKey(new Date()), 1]]);
   });
 
   it('titles an exercise page with its name and offers all four metrics in both views', async () => {
