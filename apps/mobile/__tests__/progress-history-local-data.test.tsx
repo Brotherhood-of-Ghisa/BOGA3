@@ -240,6 +240,18 @@ describe('The history page over real data', () => {
     fireEvent.press(screen.getByTestId('stats-exercise-history-gym-option-all'));
     await waitFor(() => expect(trainingDays()).toContain(noGymDay));
     expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('All gyms');
+    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    // `All gyms` counts every session of the window, each gym's own beside it.
+    expect(screen.getByTestId('stats-exercise-history-gym-option-all').props.accessibilityLabel)
+      .toMatch(/^All gyms, \d+ sessions$/);
+  });
+
+  it('draws no gym filter for an exercise with no gym to choose', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare('UPDATE sessions SET gym_id = NULL').run();
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    expect(screen.queryByTestId('stats-exercise-history-gym')).toBeNull();
   });
 
   it('retries a failed exercise history read for the same definition, staying on the page', async () => {

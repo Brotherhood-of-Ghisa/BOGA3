@@ -567,7 +567,7 @@ function StatsContent() {
   const filters = useProgressFilters(params);
   const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalog = useExerciseCatalog();
-  // Every gym until one is chosen; this visit's choice only.
+  // The Exercise table's gym ([[gym.view-filter]]); this visit's choice only.
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
   const { current: thisPeriod, previous: lastPeriod, gymOptions, reload } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();

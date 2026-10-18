@@ -61,10 +61,12 @@ describe('GymPicker', () => {
     expect(screen.getByTestId('gym-option-annex')).toHaveProp('accessibilityState', { checked: true });
   });
 
-  it('is not drawn with no gym to tell apart', () => {
+  it('is not drawn with no gym to tell apart, unless a choice is in force to clear', () => {
     renderPicker(undefined, []);
     expect(screen.queryByTestId('gym')).toBeNull();
     renderPicker(undefined, [{ gymId: null, name: null }]);
     expect(screen.queryByTestId('gym')).toBeNull();
+    renderPicker(null, [{ gymId: null, name: null }]);
+    expect(screen.getByTestId('gym')).toHaveTextContent('No gym');
   });
 });

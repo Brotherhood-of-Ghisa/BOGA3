@@ -15,6 +15,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -384,6 +385,32 @@ describe('ExerciseHistoryScreenShell', () => {
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/2026-05-18/);
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
+  });
+
+  it('keeps the gym chips while no gym is chosen, so it can be cleared, and hides them with no gym to choose', () => {
+    const noGymOnly = buildSummary({ gymOptions: [{ gymId: null, name: 'No gym', occurrenceCount: 2 }] });
+    const shell = (appliedGymId: string | null | undefined) => (
+      <ExerciseHistoryScreenShell
+        summary={noGymOnly}
+        period={30}
+        appliedTagDefinitionId={null}
+        appliedGymId={appliedGymId}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onSelectGym={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+      />
+    );
+    const { rerender } = render(shell(undefined));
+    expect(screen.queryByTestId('exercise-history-gym-row')).toBeNull();
+    rerender(shell(null));
+    expect(screen.getByTestId('exercise-history-gym-chip-all-gyms')).toBeTruthy();
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · No gym');
+    // As tall as its chips: a growing ScrollView stretched them into circles on device.
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-history-gym-row').props.style)).toMatchObject({ flexGrow: 0 });
   });
 
   it('invokes onSelectTag with tagDefinitionId and toggles back to null', () => {

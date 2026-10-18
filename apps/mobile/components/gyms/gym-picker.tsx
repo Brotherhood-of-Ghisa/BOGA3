@@ -11,6 +11,7 @@ import {
   SELECTED_GYM_LABEL,
   gymOptionLabel,
   gymScopeLabel,
+  showsGymPicker,
   type GymScopeOption,
 } from '@/src/utils/gym-scope-route';
 
@@ -27,12 +28,11 @@ export type GymPickerProps = {
 type Choice = { key: string; gymId: string | null | undefined; label: string; count?: number };
 
 /**
- * A view's gym filter: one pill naming the scope in force, which opens a sheet
- * of radio rows: `All gyms`, then each option. A view opens on every gym, and
- * the pill fills while a gym is chosen. With no gym among the options, the
- * pill is not drawn.
- * A chosen gym the options no longer list stays offered, so the choice in
- * force is always one of the rows.
+ * A view's gym filter ([[gym.view-filter]]): one pill naming the scope in
+ * force, which opens a sheet of radio rows: `All gyms`, then each option. The
+ * pill fills while a gym is chosen, and is drawn only as `showsGymPicker`
+ * says. A chosen gym the options no longer list stays offered, so the choice
+ * in force is always one of the rows.
  */
 export function GymPicker({ value, options, onChange, allSessionCount, testID }: GymPickerProps) {
   const [open, setOpen] = useState(false);
@@ -40,8 +40,7 @@ export function GymPicker({ value, options, onChange, allSessionCount, testID }:
   const offered = value === undefined || options.some((option) => option.gymId === value)
     ? options
     : [...options, { gymId: value, name: value === null ? null : SELECTED_GYM_LABEL }];
-  // No gym to tell apart: every session would be in `All gyms` and `No gym` alike.
-  if (!offered.some((option) => option.gymId !== null)) return null;
+  if (!showsGymPicker(value, offered)) return null;
   const label = gymScopeLabel(value, offered);
   const choices: Choice[] = [
     { key: 'all', gymId: undefined, label: ALL_GYMS_LABEL, count: allSessionCount },

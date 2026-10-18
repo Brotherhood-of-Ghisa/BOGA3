@@ -43,6 +43,7 @@ import {
   decodeGymRouteParam,
   encodeGymRouteParam,
   gymScopeLabel,
+  showsGymPicker,
 } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
@@ -142,23 +143,8 @@ export function ExerciseHistoryScreenShell({
     ],
     [tagOptions]
   );
-  const gymOptions = useMemo(() => summary?.gymOptions ?? [], [summary]);
-  const gymChips = useMemo<ChipOption<string>[]>(
-    () => [
-      { value: ALL_GYMS, label: ALL_GYMS_LABEL },
-      ...gymOptions.map((option) => ({
-        value: encodeGymRouteParam(option.gymId) as string,
-        label: `${option.name} · ${option.occurrenceCount}`,
-        accessibilityLabel: `Filter by gym ${option.name}, ${option.occurrenceCount} sessions`,
-      })),
-    ],
-    [gymOptions]
-  );
-  // A gym chip row needs a gym to tell apart (as `GymPicker`).
-  const showGyms = onSelectGym !== undefined && gymOptions.some((option) => option.gymId !== null);
-  const gymLabel = appliedGymId === undefined
-    ? null
-    : gymScopeLabel(appliedGymId, gymOptions.map((option) => ({ gymId: option.gymId, name: option.name })));
+  const gymOptions = summary?.gymOptions ?? [];
+  const gymLabel = appliedGymId === undefined ? null : gymScopeLabel(appliedGymId, gymOptions);
 
   return (
     <Screen testID="exercise-history-screen">
@@ -171,28 +157,14 @@ export function ExerciseHistoryScreenShell({
           value={period}
         />
 
-        {summary && showGyms ? (
-          <ScrollView
-            contentContainerStyle={styles.tagRowContent}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            testID="exercise-history-gym-row">
-            <ChipGroup
-              accessibilityLabel="Filter by gym"
-              clearValue={ALL_GYMS}
-              mode="single"
-              onChange={(next) => onSelectGym?.(next === ALL_GYMS ? undefined : decodeGymRouteParam(next))}
-              options={gymChips}
-              style={styles.tagChips}
-              testIDPrefix="exercise-history-gym-chip"
-              value={encodeGymRouteParam(appliedGymId) ?? ALL_GYMS}
-            />
-          </ScrollView>
+        {summary && onSelectGym ? (
+          <GymChipRow appliedGymId={appliedGymId} onSelectGym={onSelectGym} options={gymOptions} />
         ) : null}
 
         {summary && tagOptions.length > 0 ? (
           <ScrollView
             contentContainerStyle={styles.tagRowContent}
+            style={styles.chipScroll}
             horizontal
             showsHorizontalScrollIndicator={false}
             testID="exercise-history-tag-row">
@@ -277,6 +249,47 @@ export function ExerciseHistoryScreenShell({
 
       <MainTabBar activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </Screen>
+  );
+}
+
+// The gym filter ([[gym.view-filter]]): single-choice chips like the tags',
+// `All gyms` first; drawn as `showsGymPicker` says.
+function GymChipRow({
+  options,
+  appliedGymId,
+  onSelectGym,
+}: {
+  options: ExerciseHistorySummary['gymOptions'];
+  appliedGymId: string | null | undefined;
+  onSelectGym: (gymId: string | null | undefined) => void;
+}) {
+  if (!showsGymPicker(appliedGymId, options)) return null;
+  const chips: ChipOption<string>[] = [
+    { value: ALL_GYMS, label: ALL_GYMS_LABEL },
+    ...options.map((option) => ({
+      value: encodeGymRouteParam(option.gymId) as string,
+      label: `${option.name} · ${option.occurrenceCount}`,
+      accessibilityLabel: `Filter by gym ${option.name}, ${option.occurrenceCount} sessions`,
+    })),
+  ];
+  return (
+    <ScrollView
+      contentContainerStyle={styles.tagRowContent}
+      style={styles.chipScroll}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      testID="exercise-history-gym-row">
+      <ChipGroup
+        accessibilityLabel="Filter by gym"
+        clearValue={ALL_GYMS}
+        mode="single"
+        onChange={(next) => onSelectGym(next === ALL_GYMS ? undefined : decodeGymRouteParam(next))}
+        options={chips}
+        style={styles.tagChips}
+        testIDPrefix="exercise-history-gym-chip"
+        value={encodeGymRouteParam(appliedGymId) ?? ALL_GYMS}
+      />
+    </ScrollView>
   );
 }
 
@@ -570,6 +583,11 @@ export default function ExerciseHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
+  // A chip row is as tall as its chips: a ScrollView grows by default, and
+  // inside the page's scroll that stretched the chips into circles.
+  chipScroll: {
+    flexGrow: 0,
+  },
   tagRowContent: {
     paddingRight: uiSpace.sm,
   },

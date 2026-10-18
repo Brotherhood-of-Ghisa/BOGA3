@@ -89,8 +89,7 @@ export default function ExerciseCatalogScreen() {
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
 
-  // Every gym until one is chosen: `Last`, sessions, favourites and
-  // never-done then count that gym's sessions only.
+  // The row stats' gym ([[gym.view-filter]]).
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
   const statsResult = useExerciseCatalogStats('all', gymId);
   const { stats, gymOptions, reload: reloadStats } = statsResult;

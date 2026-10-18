@@ -34,6 +34,16 @@ export const NO_GYM_LABEL = 'No gym';
 /** A chosen gym whose name the view cannot read. */
 export const SELECTED_GYM_LABEL = 'Selected gym';
 
+/**
+ * Whether a view draws its gym filter: while a gym (or no gym) is chosen, so it
+ * can always be cleared, or when the options hold a gym to tell apart — with
+ * none, every session is in `All gyms` and `No gym` alike.
+ */
+export const showsGymPicker = (
+  gymId: string | null | undefined,
+  options: readonly Pick<GymScopeOption, 'gymId'>[],
+): boolean => gymId !== undefined || options.some((option) => option.gymId !== null);
+
 /** How a picker names one of its choices. */
 export const gymOptionLabel = (option: GymScopeOption): string =>
   option.gymId === null ? NO_GYM_LABEL : option.name?.trim() || 'Unnamed gym';

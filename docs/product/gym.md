@@ -21,8 +21,20 @@ The setting is synced and retroactive: changing it recomputes history and PRs.
 Why: one exercise on different gyms' equipment is not comparable, yet the whole
 exercise stays the default so a split never multiplies rows. A session with no
 gym is usually a gym not worth recording, so it is compared with everything.
-Approved 2026-10-18.
+Approved 2026-10-18; Repeat last's fallback and the 1RM curve row the same day.
 Pending: not implemented ([#707](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/707)).
+
+### gym.view-filter · definition · accepted
+
+Progress's exercise table, exercise history, catalog stats and the exercise
+heatmap offer a gym picker for every exercise, split or not, opening on all
+gyms. A chosen gym counts only its sessions; no gym is a choice of its own.
+Muscle totals have none.
+
+Why: the 1RM curve already offered a gym for every exercise, so one behaviour
+everywhere; being split only changes which PRs a chosen gym shows
+([[gym.split-progress-prs]]). Approved 2026-10-18.
+Code: `GymPicker` in `apps/mobile/components/gyms/gym-picker.tsx`.
 
 ### gym.split-progress-prs · presentation · accepted
 

@@ -12,7 +12,7 @@ import {
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
 import { GymPicker } from '@/components/gyms/gym-picker';
-import { decodeGymRouteParam, encodeGymRouteParam } from '@/src/utils/gym-scope-route';
+import { decodeGymRouteParam, encodeGymRouteParam, showsGymPicker } from '@/src/utils/gym-scope-route';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
 } from '@/components/ui';
@@ -315,8 +315,10 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, to
       ) : (
         <HistoryView
           {...shared}
-          filter={<GymPicker onChange={next => setChosenGym({ gymId: next })} options={history.gyms}
-            testID="stats-exercise-history-gym" value={gymId} />}
+          filter={showsGymPicker(gymId, history.gyms) ? <GymPicker
+            allSessionCount={history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0)}
+            onChange={next => setChosenGym({ gymId: next })} options={history.gyms}
+            testID="stats-exercise-history-gym" value={gymId} /> : undefined}
           kind="exercise"
           metric={exerciseMetric}
           metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
