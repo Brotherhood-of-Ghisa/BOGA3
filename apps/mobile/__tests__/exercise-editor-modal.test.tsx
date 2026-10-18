@@ -45,6 +45,7 @@ const exercise = (over: Partial<ExerciseCatalogExercise> = {}): ExerciseCatalogE
   name: 'Bench Press',
   loadInputMode: 'total_load',
   bodyweightContribution: 0,
+  splitByGym: false,
   deletedAt: null,
   mappings: [
     { id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -92,6 +93,7 @@ describe('editing an existing exercise', () => {
       bodyweightContribution: 0.25,
       name: 'Bench Press',
       loadInputMode: 'total_load',
+      splitByGym: false,
       mappings: [
         { muscleGroupId: 'chest', weight: 1, role: 'primary' },
         { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -195,6 +197,35 @@ describe('inline errors', () => {
     await save();
     expect(screen.getByTestId('exercise-editor-save-error')).toHaveTextContent(message);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe('Track each gym separately', () => {
+  const splitSwitch = () => screen.getByTestId('exercise-editor-split-by-gym');
+
+  it('opens on for a split exercise, and switching it off saves the exercise whole', async () => {
+    renderEditor({ editingExercise: exercise({ splitByGym: true }) });
+    expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: true });
+    fireEvent.press(splitSwitch());
+    expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: false });
+    await save();
+    expect(onSave.mock.calls[0][0].splitByGym).toBe(false);
+  });
+
+  it('opens off for a new exercise, and switching it on saves it split', async () => {
+    renderEditor({ prefill: { name: 'Bench', loadInputMode: 'total_load', mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }] } });
+    expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: false });
+    fireEvent.press(splitSwitch());
+    await save();
+    expect(onSave.mock.calls[0][0].splitByGym).toBe(true);
+  });
+
+  it('opens with the setting of the exercise it is reopened for', () => {
+    const view = renderEditor({ editingExercise: exercise({ splitByGym: true }) });
+    view.rerender(
+      <ExerciseEditorModal editingExercise={exercise({ id: 'row', splitByGym: false })} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible />,
+    );
+    expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: false });
   });
 });
 

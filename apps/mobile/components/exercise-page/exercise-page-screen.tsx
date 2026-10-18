@@ -167,7 +167,7 @@ export function ExercisePageScreen({
       // Not a filter: this session's gym picks a split exercise's bucket.
       sessionId,
     },
-    JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode])
+    JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode, editingExercise?.splitByGym])
   );
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);

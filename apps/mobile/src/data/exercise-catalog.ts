@@ -27,6 +27,8 @@ export type ExerciseCatalogExercise = {
   id: string;
   name: string;
   loadInputMode?: LoadInputMode;
+  /** `Track each gym separately` ([[gym.split]]). */
+  splitByGym: boolean;
   deletedAt: Date | null;
   mappings: ExerciseCatalogExerciseMuscleMapping[];
 };
@@ -41,6 +43,8 @@ export type SaveExerciseCatalogExerciseInput = {
   id?: string;
   name: string;
   loadInputMode?: LoadInputMode;
+  /** Omission preserves the stored value (a new exercise starts whole). */
+  splitByGym?: boolean;
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -60,6 +64,7 @@ type DrizzleExerciseRow = {
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
+  splitByGym: boolean;
   deletedAt: Date | null;
 };
 
@@ -71,6 +76,7 @@ export type ExerciseCatalogStore = {
     id?: string;
     name: string;
     loadInputMode?: LoadInputMode;
+    splitByGym?: boolean;
     mappings: {
       muscleGroupId: string;
       weight: number;
@@ -107,6 +113,7 @@ const mapExerciseGraph = (
     name: exerciseRow.name,
     loadInputMode: exerciseRow.loadInputMode,
     bodyweightContribution: exerciseRow.bodyweightContribution,
+    splitByGym: exerciseRow.splitByGym,
     deletedAt: exerciseRow.deletedAt,
     mappings: mappingRows
       .filter((mapping) => mapping.exerciseDefinitionId === exerciseRow.id)
@@ -129,6 +136,7 @@ const listExerciseGraphs = async (
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
+      splitByGym: exerciseDefinitions.splitByGym,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions);
@@ -173,6 +181,8 @@ export type ExerciseGraphWrite = {
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
+  /** Omission preserves the stored value. */
+  splitByGym?: boolean;
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -199,6 +209,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
   const contributionUpdate = checkedContribution?.ok
     ? { bodyweightContribution: checkedContribution.value }
     : {};
+  const splitUpdate = input.splitByGym === undefined ? {} : { splitByGym: input.splitByGym };
   const existing = tx
     .select({ id: exerciseDefinitions.id })
     .from(exerciseDefinitions)
@@ -209,6 +220,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
     tx.update(exerciseDefinitions)
       .set({
         ...contributionUpdate,
+        ...splitUpdate,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -223,6 +235,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
       .values({
         id: exerciseId,
         ...contributionUpdate,
+        ...splitUpdate,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -311,6 +324,7 @@ export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): 
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
+      splitByGym: exerciseDefinitions.splitByGym,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions)
@@ -367,6 +381,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         name: input.name,
         loadInputMode: input.loadInputMode ?? 'total_load',
         bodyweightContribution: input.bodyweightContribution,
+        splitByGym: input.splitByGym,
         mappings: input.mappings,
         now: input.now,
       });
@@ -468,6 +483,7 @@ export const normalizeExerciseGraphInput = (
     mappings,
     now,
     ...(checkedContribution?.ok ? { bodyweightContribution: checkedContribution.value } : {}),
+    ...(input.splitByGym === undefined ? {} : { splitByGym: input.splitByGym }),
   };
 };
 
