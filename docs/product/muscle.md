@@ -26,6 +26,48 @@ Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
 the session summary, Progress, the muscle heatmaps and Stats.
 Signature: `primary + ½ secondary`
 
+### muscle.map-area · presentation · accepted
+
+Progress muscle-map area represents fixed reference anatomy, independent of
+training, period and metric. Each family's outer area is proportional to its
+sum of reference muscle volumes; readability adjustments stay inside that
+family. Zero-activity muscles remain represented. Approved 2026-10-17.
+
+The reference uses published MRI means, estimated deltoid/trapezius
+subdivisions and an external-oblique-only proxy for Obliques. It represents
+the mapped anatomy, not personal measurements or percentages of all body muscle.
+
+Why: a muscle must remain findable when no work was recorded for it.
+Code: `apps/mobile/components/stats/muscle-map-reference.ts` and
+`apps/mobile/components/stats/muscle-map-layout.ts`.
+
+### muscle.map-colour · presentation · accepted
+
+Progress muscle-map Sets fills grade each muscle's current working-set count
+against Settings' weekly working-set target multiplied by the number of
+calendar weeks selected; an unfinished week still has its full weekly target.
+Active Sets tiles use the existing target ramp, capped at target attainment.
+Volume fills follow the reference-period comparison. Tiles with no contributing
+sets for the selected metric use the loss fill regardless of the reference
+period. Volume uses volume-included-set count, so a recorded zero-load set
+still counts as activity. Change values retain [[comparison.change-display]].
+Approved 2026-10-18.
+
+Why: Sets shows progress toward the configured target; unused muscles remain visible.
+Code: `apps/mobile/components/stats/muscle-map.tsx`.
+
+### muscle.progress-layout · presentation · accepted
+
+Progress's Muscle breakdown starts with the muscle list. A List / Heatmap
+filter opts into the boxed map and switches back without changing period,
+metric or muscle selection. This choice lasts for the current visit; a fresh
+launch starts with the list. Returning from history retains the chosen layout
+and its scroll. Approved 2026-10-18.
+
+Why: the list is the familiar default; the map is available by choice.
+Code: `apps/mobile/app/(tabs)/progress.tsx` and
+`apps/mobile/components/stats/progress-muscle-view.tsx`.
+
 ### muscle.comparison-primary-only · presentation · accepted
 
 A session's by-muscle volume comparison covers only muscles the session worked

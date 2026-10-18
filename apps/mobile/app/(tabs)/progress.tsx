@@ -30,8 +30,8 @@ import { type ProgressComparisons } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
-import { ProgressTables } from '@/components/stats/progress-tables';
+import type { HeatmapView, ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
+import { ProgressMuscleView, type ProgressMuscleLayout } from '@/components/stats/progress-muscle-view';
 import {
   COLUMN_KEYS,
   COLUMN_NAMES,
@@ -210,16 +210,19 @@ export type StatsScreenShellProps = {
   onRetry?: () => void;
   period: ProgressPeriod;
   targetWindowWeeks?: number;
+  weeklyWorkingSetTarget: number;
   onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
   // A muscle or exercise name opens its history page; Progress keeps its own
   // state and scroll behind it.
-  onOpenMuscleHistory: (muscle: MuscleHistoryTarget) => void;
+  onOpenMuscleHistory: (muscle: MuscleHistoryTarget, view?: HeatmapView) => void;
   onOpenExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   isLoading: boolean;
   errorMessage: string | null;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
+  muscleLayout: ProgressMuscleLayout;
+  onSelectMuscleLayout: (layout: ProgressMuscleLayout) => void;
   tableMetric: ProgressMetric;
   onSelectTableMetric: (metric: ProgressMetric) => void;
   // The Exercise table's own metric, which may be one the Muscle table cannot show.
@@ -241,6 +244,7 @@ export function StatsScreenShell({
   onRetry,
   period,
   targetWindowWeeks = 4,
+  weeklyWorkingSetTarget,
   onSelectPeriod,
   onPressSessionsCard,
   onOpenMuscleHistory,
@@ -249,6 +253,8 @@ export function StatsScreenShell({
   errorMessage,
   viewMode,
   onSelectViewMode,
+  muscleLayout,
+  onSelectMuscleLayout,
   tableMetric,
   onSelectTableMetric,
   exerciseMetric,
@@ -268,10 +274,10 @@ export function StatsScreenShell({
   // The row whose history was opened, held only until the return it is for:
   // any other way back to Progress (a tab, the Sessions link) leaves the
   // reader where it landed.
-  const launchTarget = useRef<ComponentRef<typeof View> | null>(null);
+  const launchTarget = useRef<ComponentRef<typeof View> | number | null>(null);
   const focusRequest = useRef(0);
   useEffect(() => () => { focusRequest.current += 1; }, []);
-  const focus = useCallback((target: ComponentRef<typeof View> | null) => {
+  const focus = useCallback((target: ComponentRef<typeof View> | number | null) => {
     const request = ++focusRequest.current;
     void AccessibilityInfo.isScreenReaderEnabled().then(enabled => {
       if (request !== focusRequest.current) return;
@@ -289,12 +295,12 @@ export function StatsScreenShell({
     if (row) focus(row);
   }, [focus, isFocused]);
   const showContributions = (id: string) => {
-    setContributionId(current => current === id ? null : id);
+    setContributionId(current => muscleLayout === 'list' && current === id ? null : id);
   };
   // The press that opens history: the keyboard goes, the row is remembered for
   // the return, and any pending focus request for an earlier row is dropped.
   const openHistory = useCallback(
-    <T,>(open: (target: T) => void, target: T, row: ComponentRef<typeof View> | null) => {
+    <T,>(open: (target: T) => void, target: T, row: ComponentRef<typeof View> | number | null) => {
       focusRequest.current += 1;
       Keyboard.dismiss();
       launchTarget.current = row;
@@ -335,6 +341,9 @@ export function StatsScreenShell({
               value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
           )}
         </View>
+        {viewMode === 'muscle' ? <ToggleChip accessibilityLabel="Muscle view"
+          options={[{ value: 'list', label: 'List' }, { value: 'heatmap', label: 'Heatmap' }]}
+          value={muscleLayout} onChange={onSelectMuscleLayout} testID="stats-muscle-view-chip" style={styles.muscleViewChip} /> : null}
         {/* The gym pill sits beside the search: the three chips fill the row
             above. Exercise view only — muscle totals are the whole exercise
             ([[gym.split]]). */}
@@ -348,7 +357,7 @@ export function StatsScreenShell({
           </View>
         ) : null}
       </View>
-      <ScreenScroll contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <ScreenScroll key={muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {showLoading ? <StatePanel body="Loading progress…" fill={false}
@@ -358,9 +367,10 @@ export function StatsScreenShell({
             onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
             emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
             sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
-        ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
+        ) : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
+          workingSetTarget={weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks)}
           onSelect={showContributions}
-          onMuscleHistory={(row, target) => openHistory(onOpenMuscleHistory, { muscleGroupId: row.muscleGroupId }, target)}
+          onMuscleHistory={(row, target, view) => openHistory(muscle => onOpenMuscleHistory(muscle, view), { muscleGroupId: row.muscleGroupId }, target)}
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
@@ -573,6 +583,7 @@ function StatsContent() {
   const revision = useBodyWeightContextRevision();
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload);
   const [searchQuery, setSearchQuery] = useState('');
+  const [muscleLayout, setMuscleLayout] = useState<ProgressMuscleLayout>('list');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
@@ -585,12 +596,15 @@ function StatsContent() {
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   return <StatsScreenShell {...summary} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
+    weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
-    onOpenMuscleHistory={muscle => router.push(progressHistoryHref(muscle, filters.metric))}
-    // The Exercise table's gym carries over; the Muscle table has none.
+    onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref(muscle, filters.metric, view))}
+    // Exercise browsing carries its gym; muscle contributors open all-gyms Timeline.
     onOpenExerciseHistory={exercise => router.push(progressHistoryHref(
-      { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : undefined }, filters.metric))}
+      { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : undefined }, filters.metric,
+      filters.breakdown === 'muscle' ? 'timeline' : undefined))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
+    muscleLayout={muscleLayout} onSelectMuscleLayout={setMuscleLayout}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
@@ -619,6 +633,8 @@ const RECENCY_INDICATOR_WIDTH = 64;
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
+  // Keep the compact rows’ expanded tap targets apart.
+  muscleViewChip: { flex: 0, alignSelf: 'flex-start', marginTop: uiSpace.xs },
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   search: { flex: 1 },
