@@ -1,8 +1,8 @@
 # Brainstorm — Agents editing existing plans and programmes
 
 - Date: 2026-10-14
-- Status: `draft — proposal, not approved`. Nothing here is decided. The
-  decisions to confirm are listed in §9; the spec/product gates are in §7.
+- Status: `approved — adopted into milestone M38 (docs/plans/milestones/M38-agent-programme-and-plan-edits.md)`.
+  All open decisions from §9 confirmed.
 - Branch: `docs/agent-programme-edit-proposal`
 - Author: OpenCode (DeepSeek V4.1 Flash).
 - Not source-of-truth. Adopted content graduates into
@@ -320,3 +320,11 @@ Migration sketch (one new migration, no change to applied ones):
 | 8 | 2026-10-15 | Version tokens must cover the full graph (root plan + child blocks + sets) because Sync v2 updates child rows independently. |
 | 9 | 2026-10-15 | `remove_plan_block` enforces a minimum of 1 live block remaining per plan. |
 | 10 | 2026-10-15 | `last_modified_by` (if adopted) requires full mobile Drizzle + `cycle.ts` + sync projection + store wiring. |
+| 11 | 2026-10-19 | Proposal approved and adopted into milestone M38 (`docs/plans/milestones/M38-agent-programme-and-plan-edits.md`). |
+| 12 | 2026-10-19 | Q1: Separate edit consent (`plan_edit_enabled`), separate toggle in Connected Agents. |
+| 13 | 2026-10-19 | Q2: Provenance tracked via `last_modified_by` column on the 4 authored tables + receipts row audit trail. |
+| 14 | 2026-10-19 | Q3: Full-graph version token derived from max(`server_received_at`) covering root plan, blocks, and target sets. |
+| 15 | 2026-10-19 | Q4: Window-2 LWW residual accepted for v1. |
+| 16 | 2026-10-19 | Q5: Wire-stable token `PLAN_EDIT_PERMISSION_REQUIRED` (403) and `PLAN_CONCURRENT_MODIFICATION` (409). |
+| 17 | 2026-10-19 | Q6: `scheduled_for` is editable in `update_plan_meta`. |
+| 18 | 2026-10-19 | Q7: Agents can edit both agent-authored and human-authored plans (pending, unattached blocks only) when edit permission is enabled. |
