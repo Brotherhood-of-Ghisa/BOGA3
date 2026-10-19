@@ -95,11 +95,13 @@ const createLocalId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
- * The id a new muscle link takes: derived from its pair, so two writers adding
- * the same link (another device, or a server-side agent write) produce one row
- * under LWW instead of two rows colliding on the device's unique
- * `(exercise_definition_id, muscle_group_id)` index at pull apply. The agent
- * API's writer uses the same shape.
+ * The id a new muscle link takes: derived from its pair, so two writers that
+ * each add the same link (another device, or a server-side writer) produce one
+ * row under LWW instead of two rows colliding on the device's unique
+ * `(exercise_definition_id, muscle_group_id)` index at pull apply. Any
+ * server-side writer must mint the same shape and revive an existing row for
+ * the pair, whatever its id. Rows minted before this (random or seed ids) keep
+ * their ids; writers revive them by pair.
  */
 export const exerciseMuscleMappingId = (exerciseDefinitionId: string, muscleGroupId: string) =>
   `map_${exerciseDefinitionId}__${muscleGroupId}`;

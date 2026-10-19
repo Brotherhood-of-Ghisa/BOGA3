@@ -159,12 +159,28 @@ describe('applyPullPage advances the local clock past pulled stamps', () => {
       .insert(gyms)
       .values({ id: 'gym-1', name: 'Local', localDirty: true, localUpdatedAtMs: ahead + 10 })
       .run();
+    // The losing row carries the page's newest stamp; the applied one is older.
     database.transaction((tx) =>
-      applyPullPage(tx as Transaction, [gymWire('gym-2', ahead, 'Remote'), gymWire('gym-1', ahead, 'Old')], 'gyms'),
+      applyPullPage(
+        tx as Transaction,
+        [gymWire('gym-2', ahead - 30_000, 'Remote'), gymWire('gym-1', ahead, 'Old')],
+        'gyms',
+      ),
     );
 
     const nextLocal = database.transaction((tx) => nowMonotonic(tx as Transaction));
     expect(nextLocal).toBeGreaterThan(ahead);
+  });
+
+  it('rejects a page whose stamp is not an integer instead of stamping local edits with it', () => {
+    // An existing row makes the NaN lose LWW silently; only the clock sees it.
+    database.insert(gyms).values({ id: 'gym-1', name: 'Local', localDirty: false, localUpdatedAtMs: 100 }).run();
+    const malformed = { ...gymWire('gym-1', 100, 'Bad'), client_updated_at_ms: Number.NaN };
+    expect(() =>
+      database.transaction((tx) => applyPullPage(tx as Transaction, [malformed], 'gyms')),
+    ).toThrow('Pulled client_updated_at_ms is not an integer: NaN');
+    __resetClockForTests();
+    expect(Number.isSafeInteger(database.transaction((tx) => nowMonotonic(tx as Transaction)))).toBe(true);
   });
 });
 

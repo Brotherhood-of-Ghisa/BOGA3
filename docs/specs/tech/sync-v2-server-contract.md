@@ -397,15 +397,16 @@ does not reject.
 1. Active `session_exercises` never share `(session_id, order_index)`.
 2. Active `exercise_sets` never share `(session_exercise_id, order_index)`.
 3. `exercise_muscle_mappings` has no duplicate
-   `(exercise_definition_id, muscle_group_id)`; a new link's id is
-   `map_<exercise>__<muscle>`, so writers converge on one row.
+   `(exercise_definition_id, muscle_group_id)`; new links take the id
+   `map_<exercise>__<muscle>`.
 4. Active `exercise_tag_definitions` has no duplicate
    `(exercise_definition_id, normalized_name)`.
 5. `session_exercise_tags` has no duplicate
    `(session_exercise_id, exercise_tag_definition_id)`.
 6. No orphan-child push (the topological batch builder).
 7. `exercise_group_links` has at most one row per
-   `(group_id, exercise_definition_id)`, through its deterministic id.
+   `(group_id, exercise_definition_id)`, through its deterministic id; relink
+   reuses that id.
 
 ## Out of scope
 
