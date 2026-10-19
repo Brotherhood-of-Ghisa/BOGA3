@@ -84,7 +84,7 @@ function ConnectedAgentCard({
       <View style={styles.permission}>
         <SwitchRow
           disabled={isSwitchDisabled}
-          label="Allow this coach to create plans"
+          label="Allow this coach to make changes"
           onValueChange={(value) => {
             onTogglePlanAccess(agent, value);
           }}
@@ -96,14 +96,14 @@ function ConnectedAgentCard({
             allowFontScaling={false}
             style={styles.permissionUnavailable}
             testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
-            Plan access settings are temporarily unavailable for this coach.
+            Change settings are temporarily unavailable for this coach.
           </Text>
         ) : null}
         <Text
           allowFontScaling={false}
           style={styles.permissionDisclosure}
           testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
-          {`Lets ${agent.name} read your upcoming and unscheduled plans and create new plans and programmes. It can never edit or delete plans, start a workout, or change your workout history.`}
+          {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never edit or delete plans, start a workout, or change your logged sets.`}
         </Text>
       </View>
       {/* An outline in `danger`, behind the unchanged Alert confirm. */}
@@ -233,7 +233,7 @@ export default function ConnectedAgentsScreen() {
       setError(
         toggleError instanceof Error
           ? toggleError.message
-          : 'Unable to update plan access right now.',
+          : 'Unable to update access for this coach right now.',
       );
     } finally {
       setSavingClientIds((current) => {

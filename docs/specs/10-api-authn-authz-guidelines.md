@@ -31,10 +31,10 @@ This is the shortest operational summary. Use the "Further reading" section when
 10. Normal app access uses `anon` key + user JWT; never use `service_role` from mobile/client code.
 11. `service_role` is server-only/admin-only (provisioning, maintenance, tightly scoped backend tasks).
 12. API changes must include negative-path tests for unauthorized and cross-user access denial.
-13. Supabase OAuth tokens carry `client_id`. Agent tokens are read-only:
-    direct domain-table access and sync/profile/log writes require
-    `client_id IS NULL`; agent training reads go only through the dedicated
-    BoGa3 agent API.
+13. Supabase OAuth tokens carry `client_id`. Agent tokens never reach a
+    domain table: direct domain-table access and sync/profile/log writes
+    require `client_id IS NULL`; agent reads and permitted writes go only
+    through the dedicated BoGa3 agent API.
 14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
     developer helpers, must independently reject non-null OAuth `client_id`
     claims before executing any read or write body.
@@ -108,13 +108,16 @@ direct-table denial and existing MCP tools remain enforced. Full response
 semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
 The base OAuth grant stays read-only. A coaching client may read the upcoming
-plan queue and create new plans/programmes only while an app-owned,
-default-denied `public.agent_plan_permissions` row matches the live grant
-timestamp; a missing, false or grant-mismatched row returns `403
-PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. Agent
-writes go through service-role-only atomic RPCs and can never touch performed
-sessions, exercises or sets. Details in
-[`session-planning-contract.md`](tech/session-planning-contract.md) §6.
+plan queue, create new plans/programmes and edit exercises only while an
+app-owned, default-denied `public.agent_plan_permissions` row (the app's one
+write-access switch) matches the live grant timestamp; a missing, false or
+grant-mismatched row returns `403 PLAN_PERMISSION_REQUIRED` before any
+referenced resource is resolved. Agent writes go through service-role-only
+atomic RPCs: they create plans, and create, edit, soft delete and restore
+exercise definitions and muscle mappings under a revision check. They never
+touch performed sessions, session exercises or sets. Details in
+[`session-planning-contract.md`](tech/session-planning-contract.md) §6 and the
+[agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing).
 
 ## Practical guidance for API consumers (mobile/app)
 

@@ -27,8 +27,8 @@ block lifecycle, or the agent plan-write API and MCP tools.
 5. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
    stays strictly read-only. Coaching agents read upcoming plans and create new
    plans/programmes only under explicit per-client permission in
-   `public.agent_plan_permissions`; they can never edit or delete plans, start
-   workouts, or mutate performed history.
+   `public.agent_plan_permissions` (which also gates exercise editing); they
+   can never edit or delete plans, start workouts, or mutate performed history.
 6. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
    via stable keyset cursors to exhaustion. Silent row caps and unpaginated
    truncation are prohibited.
@@ -378,7 +378,8 @@ owns the per-client toggle.
 
 ### 6.2 MCP Tool Surface (`services/boga-mcp/`)
 
-Nine tools. Seven read-only: `get_training_profile`, `search_exercises`
+The planning tools below; `services/boga-mcp/README.md` lists every tool.
+Seven read-only: `get_training_profile`, `search_exercises`
 (database filtering, no preselection cap), `get_exercise_context` (lifetime
 PRs/totals), `get_recent_workouts` (exact workout counts/volume),
 `get_exercise_history` (pageable performed sets), `get_workout_detail` (header

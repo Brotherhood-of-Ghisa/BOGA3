@@ -24,6 +24,20 @@ gym is usually a gym not worth recording, so it is compared with everything.
 Approved 2026-10-18; Repeat last's fallback and the 1RM curve row the same day.
 Code: `GymSplitField` in `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`.
 
+### gym.split-choice · principle · accepted
+
+Which exercises a coach tracks per gym ([[gym.split]]): an exercise on a
+machine or station, which differs from gym to gym, is split; free weights
+(dumbbells, barbells, kettlebells) and bodyweight exercises, the same
+everywhere, stay whole.
+
+- **Test:** would the same load feel different on another gym's equipment?
+- **Good:** `Leg Press` split; `Dumbbell Curl` whole.
+
+Why: machines change a lot between gyms; dumbbells are always the same.
+Approved 2026-10-19.
+Code: `EXERCISE_WRITE_RULES` in `services/boga-mcp/src/tools.ts`.
+
 ### gym.view-filter · definition · accepted
 
 Progress's exercise table, exercise history, catalog stats and the exercise

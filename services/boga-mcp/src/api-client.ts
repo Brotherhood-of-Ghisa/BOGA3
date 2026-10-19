@@ -67,6 +67,15 @@ const parseSession = (value: unknown): AgentSession => {
   return value as AgentSession;
 };
 
+/** The exercise fields an agent may write; create needs name and muscles. */
+export type ExerciseFields = {
+  bodyweight_contribution?: number;
+  load_input_mode?: 'per_side_load' | 'total_load';
+  muscles?: Array<{ muscle_id: string; role: 'primary' | 'secondary' }>;
+  name?: string;
+  split_by_gym?: boolean;
+};
+
 export class BogaAgentApi {
   readonly #baseUrl: URL;
   readonly #fetch: typeof fetch;
@@ -91,12 +100,49 @@ export class BogaAgentApi {
     input: {
       cursor?: string;
       equipment?: string;
+      include_deleted?: boolean;
       limit?: number;
       muscle?: string;
       query?: string;
     },
   ): Promise<Record<string, unknown>> {
     return this.#getObject('v1/agent/exercises', accessToken, input);
+  }
+
+  async listMuscles(accessToken: string): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/muscles', accessToken);
+  }
+
+  async createExercise(
+    accessToken: string,
+    input: { idempotency_key: string; exercise: ExerciseFields & Pick<Required<ExerciseFields>, 'muscles' | 'name'> },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject('v1/agent/exercises', accessToken, input.idempotency_key, input.exercise);
+  }
+
+  async updateExercise(
+    accessToken: string,
+    input: { idempotency_key: string; exercise_id: string; expected_revision: number; changes: ExerciseFields },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      `v1/agent/exercises/${encodeURIComponent(input.exercise_id)}`,
+      accessToken,
+      input.idempotency_key,
+      { ...input.changes, expected_revision: input.expected_revision },
+    );
+  }
+
+  async setExerciseDeleted(
+    accessToken: string,
+    input: { idempotency_key: string; exercise_id: string; expected_revision: number },
+    deleted: boolean,
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      `v1/agent/exercises/${encodeURIComponent(input.exercise_id)}/${deleted ? 'delete' : 'restore'}`,
+      accessToken,
+      input.idempotency_key,
+      { expected_revision: input.expected_revision },
+    );
   }
 
   async getExerciseContext(
