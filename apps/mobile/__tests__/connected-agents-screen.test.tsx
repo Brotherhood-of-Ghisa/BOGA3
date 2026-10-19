@@ -90,7 +90,7 @@ describe('Connected agents screen', () => {
     expect(screen.getByText('Retry')).toBeTruthy();
   });
 
-  it('shows plan creation off by default with the client named in the disclosure', async () => {
+  it('shows change access off by default with the client named in the disclosure', async () => {
     render(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
@@ -101,6 +101,8 @@ describe('Connected agents screen', () => {
     expect(String(disclosure.props.children)).toContain('Coach Agent');
     expect(String(disclosure.props.children)).toMatch(/upcoming and unscheduled plans/);
     expect(String(disclosure.props.children)).toMatch(/create new plans and programmes/);
+    expect(String(disclosure.props.children)).toMatch(/add, edit, delete or restore exercises and their muscles/);
+    expect(String(disclosure.props.children)).toMatch(/recalculate your past figures/);
   });
 
   it('enables plan access optimistically and persists it for the live grant', async () => {
@@ -125,7 +127,7 @@ describe('Connected agents screen', () => {
 
   it('reverts the toggle and shows a retryable error when the write fails', async () => {
     mockSetAgentPlanPermission.mockRejectedValue(
-      new Error('Unable to update plan access right now.'),
+      new Error('Unable to update access for this coach right now.'),
     );
     render(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
@@ -135,7 +137,7 @@ describe('Connected agents screen', () => {
     });
 
     expect(await screen.findByTestId('connected-agents-error')).toBeTruthy();
-    expect(screen.getByText('Unable to update plan access right now.')).toBeTruthy();
+    expect(screen.getByText('Unable to update access for this coach right now.')).toBeTruthy();
     expect(
       screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
     ).toEqual({ checked: false });
@@ -152,7 +154,7 @@ describe('Connected agents screen', () => {
     expect(switchComponent.props.accessibilityState).toEqual({ checked: false, disabled: true });
     expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toBeTruthy();
     expect(
-      screen.getByText('Plan access settings are temporarily unavailable for this coach.'),
+      screen.getByText('Change settings are temporarily unavailable for this coach.'),
     ).toBeTruthy();
 
     // Pressing it does not invoke setAgentPlanPermission

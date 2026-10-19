@@ -7,6 +7,9 @@ import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
 import {
+  ExerciseEditError, normalizeExerciseCreate, normalizeExerciseRevision, normalizeExerciseUpdate,
+} from './exercise-edit.ts';
+import {
   GymBucketError, gymBucketFromCursor, gymBucketFromParam, rankGymBuckets,
   type GymBucketRank,
 } from './gym-buckets.ts';
@@ -73,6 +76,12 @@ type ExerciseDefinitionRow = ExerciseLoadRow & {
   split_by_gym: boolean;
 };
 
+/** The revision an exercise edit must quote is the definition's LWW stamp. */
+type CatalogExerciseRow = ExerciseDefinitionRow & {
+  client_updated_at_ms: number;
+  deleted_at: number | null;
+};
+
 type MappingRow = {
   exercise_definition_id: string;
   muscle_group_id: string;
@@ -106,6 +115,8 @@ type SessionRow = SessionWeightRow & {
 type SetRow = EnteredSetRow & { session_exercise_id: string };
 
 const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution,split_by_gym';
+/** Catalog reads add what an exercise edit needs: its revision and deleted state. */
+const CATALOG_EXERCISE_COLUMNS = `${EXERCISE_COLUMNS},client_updated_at_ms,deleted_at`;
 const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec';
 
 class ApiError extends Error {
@@ -121,6 +132,9 @@ class ApiError extends Error {
 
 const rateWindows = new Map<string, RateWindow>();
 const writeRateWindows = new Map<string, RateWindow>();
+// Exercise edits count apart from plan writes, so curating a catalog does not
+// use up a coach's plan-writing allowance (and the reverse).
+const exerciseWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -312,7 +326,13 @@ const canonicalAgentPath = (url: URL): string => {
 const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/session') return 'mcp_session';
   if (path === '/v1/agent/profile') return 'get_training_profile';
-  if (path === '/v1/agent/exercises') return 'search_exercises';
+  if (path === '/v1/agent/exercises') {
+    return method === 'POST' ? 'create_exercise' : 'search_exercises';
+  }
+  if (path === '/v1/agent/muscles') return 'list_muscles';
+  if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+\/delete$/.test(path)) return 'delete_exercise';
+  if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+\/restore$/.test(path)) return 'restore_exercise';
+  if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+$/.test(path)) return 'update_exercise';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
@@ -377,6 +397,9 @@ const enforceReadRateLimit = (agent: AuthenticatedAgent): void =>
 
 const enforceWriteRateLimit = (agent: AuthenticatedAgent): void =>
   enforceRateLimit(writeRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+
+const enforceExerciseWriteRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(exerciseWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
 
 const parseBoundedInteger = (
   raw: string | null,
@@ -700,14 +723,64 @@ const getTrainingProfile = async (
   };
 };
 
+/**
+ * The catalog view of exercises: what coaching reads plus what an edit needs —
+ * the per-gym split flag, the revision to quote and the deleted state.
+ */
+const projectCatalogExercises = async (
+  client: SupabaseClient,
+  userId: string,
+  rows: CatalogExerciseRow[],
+  bodyweightCalculationsEnabled: boolean,
+): Promise<JsonObject[]> => {
+  const exerciseIds = rows.map((row) => row.id);
+  const [mappings, equipmentByExercise] = await Promise.all([
+    loadMappings(client, userId, exerciseIds),
+    loadEquipmentByExercise(client, userId, exerciseIds),
+  ]);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    ...exerciseLoadPayload(row, bodyweightCalculationsEnabled),
+    split_by_gym: row.split_by_gym === true,
+    deleted: row.deleted_at !== null,
+    revision: Number(row.client_updated_at_ms),
+    muscles: mappings.get(row.id) ?? [],
+    equipment: equipmentByExercise.get(row.id) ?? [],
+  }));
+};
+
+/** The owner's muscle taxonomy: the ids an exercise's muscles must name. */
+const listMuscles = async (client: SupabaseClient, userId: string): Promise<JsonObject> => {
+  const { data, error } = await client
+    .schema('app_public')
+    .from('muscle_groups')
+    .select('id,display_name,family_name,sort_order')
+    .eq('owner_user_id', userId)
+    .is('deleted_at', null)
+    .order('sort_order')
+    .order('id')
+    .limit(500)
+    .returns<Array<MuscleGroupRow & { sort_order: number }>>();
+  throwDatabaseError(error);
+  return {
+    muscles: (data ?? []).map((row) => ({
+      id: row.id,
+      name: row.display_name,
+      family: row.family_name,
+    })),
+  };
+};
+
 const searchExercises = async (
   client: SupabaseClient,
   userId: string,
   url: URL,
   bodyweightCalculationsEnabled: boolean,
 ): Promise<JsonObject> => {
-  rejectUnexpectedQuery(url, new Set(['query', 'muscle', 'equipment', 'limit', 'cursor']));
+  rejectUnexpectedQuery(url, new Set(['query', 'muscle', 'equipment', 'limit', 'cursor', 'include_deleted']));
   const query = parseOptionalText(url.searchParams.get('query'), 120, 'query');
+  const includeDeleted = parseOptionalBoolean(url.searchParams.get('include_deleted'), false, 'include_deleted');
   const muscle = parseOptionalText(url.searchParams.get('muscle'), 80, 'muscle');
   const equipment = parseOptionalText(url.searchParams.get('equipment'), 80, 'equipment');
   const limit = parseBoundedInteger(
@@ -778,12 +851,14 @@ const searchExercises = async (
   let definitionsQuery = client
     .schema('app_public')
     .from('exercise_definitions')
-    .select(EXERCISE_COLUMNS)
+    .select(CATALOG_EXERCISE_COLUMNS)
     .eq('owner_user_id', userId)
-    .is('deleted_at', null)
     .order('name')
     .order('id')
     .limit(limit + 1);
+  if (!includeDeleted) {
+    definitionsQuery = definitionsQuery.is('deleted_at', null);
+  }
   if (query) {
     definitionsQuery = definitionsQuery.ilike('name', `%${query.replace(/[%_]/g, '\\$&')}%`);
   }
@@ -799,25 +874,14 @@ const searchExercises = async (
     );
   }
 
-  const { data, error } = await definitionsQuery.returns<ExerciseDefinitionRow[]>();
+  const { data, error } = await definitionsQuery.returns<CatalogExerciseRow[]>();
   throwDatabaseError(error);
   const rows = data ?? [];
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit);
-  const exerciseIds = page.map((row) => row.id);
-  const [mappings, equipmentByExercise] = await Promise.all([
-    loadMappings(client, userId, exerciseIds),
-    loadEquipmentByExercise(client, userId, exerciseIds),
-  ]);
 
   return {
-    exercises: page.map((row) => ({
-      id: row.id,
-      name: row.name,
-      ...exerciseLoadPayload(row, bodyweightCalculationsEnabled),
-      muscles: mappings.get(row.id) ?? [],
-      equipment: equipmentByExercise.get(row.id) ?? [],
-    })),
+    exercises: await projectCatalogExercises(client, userId, page, bodyweightCalculationsEnabled),
     next_cursor: hasMore && page.length > 0
       ? encodeCursor({
         kind: 'exercise',
@@ -1142,9 +1206,8 @@ const getExerciseContext = async (
   // then every figure below comes from that gym's sessions alone. Gyms are
   // ranked over the sessions these figures count — working sets only — so a
   // listed gym always holds the records beside it.
-  const rankedBuckets = definition.split_by_gym
-    ? rankGymBuckets(performanceRows.map((row) => row.session))
-    : [];
+  const rankedGyms = rankGymBuckets(performanceRows.map((row) => row.session));
+  const rankedBuckets = definition.split_by_gym ? rankedGyms : [];
   const bucketRows = requestedBucket === undefined
     ? performanceRows
     : performanceRows.filter((row) => row.session.gym_id === requestedBucket);
@@ -1184,15 +1247,25 @@ const getExerciseContext = async (
   // Every gym's records travel with the gym list, so one call shows each gym
   // beside the others and the whole exercise. A split exercise's performances
   // and volume points name their gym, since the whole exercise mixes them.
-  const namer = definition.split_by_gym
-    ? await loadGymNamer(client, userId, [
-      requestedBucket,
-      ...rankedBuckets.slice(0, MAX_GYM_BUCKETS).map((entry) => entry.gymId),
-      ...[...recentRows, ...seriesRows].map((row) => row.session.gym_id),
-    ])
-    : null;
+  const gymNamer = await loadGymNamer(client, userId, [
+    requestedBucket,
+    ...rankedGyms.slice(0, MAX_GYM_BUCKETS).map((entry) => entry.gymId),
+    ...[...recentRows, ...seriesRows].map((row) => row.session.gym_id),
+  ]);
+  const namer = definition.split_by_gym ? gymNamer : null;
   const gymOf = (row: typeof performanceRows[number]): JsonObject =>
     namer === null ? {} : { gym: namer.field(row.session.gym_id) };
+  // Where the exercise is trained, split or not, so a coach can judge whether
+  // it should be tracked per gym: sessions holding a working set, per gym.
+  const gymUsage = {
+    gyms: rankedGyms.slice(0, MAX_GYM_BUCKETS).map((entry) => ({
+      gym: gymNamer.field(entry.gymId),
+      session_count: performanceRows.filter((row) => row.session.gym_id === entry.gymId).length,
+      last_performed_at: toIsoTimestamp(entry.lastPerformedAt),
+    })),
+    no_gym_session_count: performanceRows.filter((row) => row.session.gym_id === null).length,
+    complete: !historyIncomplete && rankedGyms.length <= MAX_GYM_BUCKETS,
+  };
   const splitFields = namer === null
     ? {}
     : gymBucketFields(namer, requestedBucket, rankedBuckets, (gymId) => {
@@ -1208,6 +1281,7 @@ const getExerciseContext = async (
       muscles: mappings.get(exerciseId) ?? [],
       equipment: equipmentByExercise.get(exerciseId) ?? [],
       split_by_gym: definition.split_by_gym,
+      gym_usage: gymUsage,
       ...splitFields,
     },
     recent_performances: recentRows.map((row) => ({
@@ -1865,7 +1939,11 @@ const loadPlanPermission = async (
     && Number.isFinite(storedGrant)
     && liveGrant === storedGrant;
   if (!allowed) {
-    throw new ApiError(403, 'PLAN_PERMISSION_REQUIRED', 'Plan creation is not enabled for this coach.');
+    throw new ApiError(
+      403,
+      'PLAN_PERMISSION_REQUIRED',
+      'Write access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
+    );
   }
 };
 
@@ -2023,11 +2101,11 @@ const throwPlanWriteError = (error: { message?: string } | null): void => {
   throwDatabaseError(error);
 };
 
-const parseOptionalBoolean = (raw: string | null, fallback: boolean): boolean => {
+const parseOptionalBoolean = (raw: string | null, fallback: boolean, label: string): boolean => {
   if (raw === null || raw === '') return fallback;
   if (raw === 'true' || raw === '1') return true;
   if (raw === 'false' || raw === '0') return false;
-  throw new ApiError(400, 'INVALID_ARGUMENT', 'include_unscheduled must be true or false.');
+  throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be true or false.`);
 };
 
 type PlanRow = {
@@ -2099,6 +2177,148 @@ const createTrainingProgramme = async (
   return data as JsonObject;
 };
 
+const throwExerciseWriteError = (error: { message?: string } | null): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('REVISION_CONFLICT')) {
+    throw new ApiError(
+      409,
+      'REVISION_CONFLICT',
+      'The exercise changed since it was read. Search it again and retry with its current revision.',
+    );
+  }
+  if (message.includes('EXERCISE_DELETED')) {
+    throw new ApiError(409, 'EXERCISE_DELETED', 'The exercise is deleted. Restore it before editing.');
+  }
+  if (message.includes('UNKNOWN_MUSCLE')) {
+    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'A muscle id is not available. Use list_muscles.');
+  }
+  if (message.includes('NOT_FOUND')) {
+    throw new ApiError(404, 'NOT_FOUND', 'Exercise not found.');
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+const normalizeExerciseInput = <T>(normalize: () => T): T => {
+  try {
+    return normalize();
+  } catch (error) {
+    if (error instanceof ExerciseEditError) {
+      throw new ApiError(400, 'INVALID_ARGUMENT', error.message);
+    }
+    throw error;
+  }
+};
+
+/** Reads one exercise back in its catalog view, deleted or not, for a write's response. */
+const loadCatalogExercise = async (
+  client: SupabaseClient,
+  userId: string,
+  exerciseId: string,
+  bodyweightCalculationsEnabled: boolean,
+): Promise<JsonObject | null> => {
+  const { data, error } = await client
+    .schema('app_public')
+    .from('exercise_definitions')
+    .select(CATALOG_EXERCISE_COLUMNS)
+    .eq('owner_user_id', userId)
+    .eq('id', exerciseId)
+    .maybeSingle<CatalogExerciseRow>();
+  throwDatabaseError(error);
+  if (!data) return null;
+  const [exercise] = await projectCatalogExercises(client, userId, [data], bodyweightCalculationsEnabled);
+  return exercise;
+};
+
+type ExerciseWrite =
+  | { kind: 'create' }
+  | { kind: 'update'; exerciseId: string }
+  | { kind: 'delete' | 'restore'; exerciseId: string };
+
+const writeExercise = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  write: ExerciseWrite,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  let rpc: string;
+  let args: JsonObject;
+  if (write.kind === 'create') {
+    const exercise = normalizeExerciseInput(() => normalizeExerciseCreate(body));
+    rpc = 'agent_create_exercise';
+    args = { p_exercise: exercise, p_payload_sha256: await sha256Hex(JSON.stringify(exercise)) };
+  } else if (write.kind === 'update') {
+    const update = normalizeExerciseInput(() => normalizeExerciseUpdate(body));
+    rpc = 'agent_update_exercise';
+    args = {
+      p_exercise_id: write.exerciseId,
+      p_expected_revision: update.expected_revision,
+      p_changes: update.changes,
+      p_payload_sha256: await sha256Hex(JSON.stringify({ id: write.exerciseId, ...update })),
+    };
+  } else {
+    const expectedRevision = normalizeExerciseInput(() => normalizeExerciseRevision(body));
+    rpc = 'agent_set_exercise_deleted';
+    args = {
+      p_exercise_id: write.exerciseId,
+      p_expected_revision: expectedRevision,
+      p_deleted: write.kind === 'delete',
+      p_payload_sha256: await sha256Hex(JSON.stringify({ id: write.exerciseId, expected_revision: expectedRevision })),
+    };
+  }
+  const bodyweightSetting = loadBodyweightCalculationsEnabled(client, agent.userId);
+  const { data, error } = await client.schema('app_public').rpc(rpc, {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    ...args,
+  });
+  throwExerciseWriteError(error);
+  const result = data as JsonObject;
+  const bodyweightCalculationsEnabled = await bodyweightSetting;
+  return {
+    ...result,
+    exercise: await loadCatalogExercise(
+      client,
+      agent.userId,
+      String(result.exercise_id),
+      bodyweightCalculationsEnabled,
+    ),
+  };
+};
+
+const decodeExerciseId = (raw: string): string => {
+  let exerciseId: string;
+  try {
+    exerciseId = decodeURIComponent(raw);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
+  }
+  if (exerciseId.length < 1 || exerciseId.length > 200) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'exercise_id is invalid.');
+  }
+  return exerciseId;
+};
+
+/** The exercise write a POST path names, or null when it is not one. */
+const exerciseWriteFor = (path: string): ExerciseWrite | null => {
+  if (path === '/v1/agent/exercises') return { kind: 'create' };
+  const match = /^\/v1\/agent\/exercises\/([^/]+)(?:\/(delete|restore))?$/.exec(path);
+  if (!match) return null;
+  const exerciseId = decodeExerciseId(match[1]);
+  if (match[2] === 'delete') return { kind: 'delete', exerciseId };
+  if (match[2] === 'restore') return { kind: 'restore', exerciseId };
+  return { kind: 'update', exerciseId };
+};
+
 const getUpcomingSessionPlans = async (
   client: SupabaseClient,
   agent: AuthenticatedAgent,
@@ -2106,7 +2326,7 @@ const getUpcomingSessionPlans = async (
 ): Promise<JsonObject> => {
   rejectUnexpectedQuery(url, new Set(['limit', 'cursor', 'include_unscheduled']));
   const limit = parseBoundedInteger(url.searchParams.get('limit'), DEFAULT_PLAN_LIMIT, 1, MAX_PLAN_LIMIT, 'limit');
-  const includeUnscheduled = parseOptionalBoolean(url.searchParams.get('include_unscheduled'), false);
+  const includeUnscheduled = parseOptionalBoolean(url.searchParams.get('include_unscheduled'), false, 'include_unscheduled');
   const cursor = decodeCursor(url.searchParams.get('cursor'), 'session_plan');
 
   let query = client
@@ -2358,8 +2578,22 @@ const dispatchAgentRequest = async (
     return createTrainingProgramme(client, agent, request, await readJsonBody(request));
   }
 
+  if (method === 'POST') {
+    const exerciseWrite = exerciseWriteFor(path);
+    if (exerciseWrite) {
+      enforceExerciseWriteRateLimit(agent);
+      await loadPlanPermission(client, agent);
+      return writeExercise(client, agent, request, exerciseWrite);
+    }
+  }
+
   if (method !== 'GET') {
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
+  }
+
+  if (path === '/v1/agent/muscles') {
+    rejectUnexpectedQuery(url, new Set());
+    return listMuscles(client, agent.userId);
   }
 
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);

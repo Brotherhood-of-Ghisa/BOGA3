@@ -146,7 +146,7 @@ export const setAgentPlanPermission = async (
   const { data: userData, error: userError } = await client.auth.getUser();
   const ownerId = userData?.user?.id;
   if (userError || !ownerId) {
-    throw new Error('Sign in again to change plan access.');
+    throw new Error('Sign in again to change access for this coach.');
   }
 
   const { error } = await client
@@ -161,6 +161,6 @@ export const setAgentPlanPermission = async (
       { onConflict: 'owner_user_id,client_id' },
     );
   if (error) {
-    throw new Error(error.message || 'Unable to update plan access right now.');
+    throw new Error(error.message || 'Unable to update access for this coach right now.');
   }
 };

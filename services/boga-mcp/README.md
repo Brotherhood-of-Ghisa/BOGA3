@@ -1,9 +1,9 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes nine tools over stateless Streamable HTTP (seven
-read-only tools and two create-only planning tools) and delegates every data
-read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes fourteen tools over stateless Streamable HTTP
+(eight read-only tools, two create-only planning tools and four exercise editing
+tools) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -30,19 +30,34 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Seven read-only tools:
+Eight read-only tools:
 - `get_training_profile` — training preferences, equipment, gyms.
-- `search_exercises` — database-side filter by name, muscle, equipment.
+- `list_muscles` — the muscle ids exercise mappings name.
+- `search_exercises` — database-side filter by name, muscle, equipment; each
+  exercise carries `split_by_gym`, `deleted` and its `revision`.
 - `get_exercise_context` — compact recent preview, lifetime PRs and totals.
 - `get_recent_workouts` — completed workout list with working-set volume.
 - `get_exercise_history` — keyset-paginated performed set history.
 - `get_workout_detail` — exact session header, volume, and paginated sets.
 - `get_upcoming_session_plans` — upcoming and unscheduled authored plans.
 
-Two create-only planning tools (require explicit plan permission, idempotent):
+Two create-only planning tools (require write access, idempotent):
 - `create_session_plan` — create one authored session plan with pending blocks.
 - `create_training_programme` — create a multi-session programme with pending blocks.
 
+Four exercise tools (require the same write access, idempotent; edits quote the
+`revision` they read and fail `REVISION_CONFLICT` when it moved):
+- `create_exercise` — name, muscles (one primary, distinct secondaries), load
+  mode, bodyweight contribution, `split_by_gym`.
+- `update_exercise` — change any of those; `muscles` replaces the mapping.
+  Marked destructive.
+- `delete_exercise` — soft delete; history stays. Marked destructive.
+- `restore_exercise` — undo a soft delete.
+Rules and errors: the
+[agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing).
+
+`get_exercise_context` reports `gym_usage` for every exercise: sessions with a
+working set per gym and with no gym, so a coach can judge `split_by_gym`.
 `get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`
 (a gym id) for an exercise the user tracks separately per gym ([[gym.split]]).
 Unset, context reports the whole exercise, sessions with no gym included, and
@@ -112,7 +127,7 @@ starts this service, then connects the way a remote client does: 401 challenge,
 protected-resource and authorization-server discovery, dynamic registration,
 authorization code + PKCE with the challenged scopes and `resource`, the
 consent page's scope gate, token exchange and a refresh. It checks that a
-rejected token is challenged, discovers and invokes all four tools with the
+rejected token is challenged, discovers and invokes every tool with the
 refreshed token, verifies fixture IDs, and cleans up. See
 `RUNBOOK.md` for the supplied-token form.
 
@@ -131,7 +146,7 @@ refreshed token, verifies fixture IDs, and cleans up. See
    limits validated OAuth clients to 120 requests per minute.
 6. Configure logs so request bodies and `Authorization` headers are neither
    captured nor retained.
-7. Verify discovery, consent, all four tools, grant revocation, and the audit
+7. Verify discovery, consent, every tool, grant revocation, and the audit
    trail against the hosted environment. Local green results are not hosted
    deployment evidence.
 

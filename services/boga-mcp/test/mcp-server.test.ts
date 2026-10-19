@@ -92,6 +92,21 @@ const responses: Record<string, Record<string, unknown>> = {
     id: 'prog-a',
     plan_ids: ['plan-1', 'plan-2'],
   },
+  '/functions/v1/agent-api/v1/agent/muscles': {
+    muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest' }],
+  },
+  '/functions/v1/agent-api/v1/agent/exercises/exercise-a': {
+    exercise_id: 'exercise-a',
+    revision: 2,
+  },
+  '/functions/v1/agent-api/v1/agent/exercises/exercise-a/delete': {
+    deleted: true,
+    exercise_id: 'exercise-a',
+  },
+  '/functions/v1/agent-api/v1/agent/exercises/exercise-a/restore': {
+    deleted: false,
+    exercise_id: 'exercise-a',
+  },
 };
 
 const envelopeResponse = (data: Record<string, unknown>): Response =>
@@ -189,21 +204,26 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly nine tools with correct annotations', async () => {
+  it('discovers exactly fourteen tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
 
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      'create_exercise',
       'create_session_plan',
       'create_training_programme',
+      'delete_exercise',
       'get_exercise_context',
       'get_exercise_history',
       'get_recent_workouts',
       'get_training_profile',
       'get_upcoming_session_plans',
       'get_workout_detail',
+      'list_muscles',
+      'restore_exercise',
       'search_exercises',
+      'update_exercise',
     ]);
     const readOnlyNames = new Set([
       'get_exercise_context',
@@ -212,10 +232,20 @@ describe('BoGa MCP server', () => {
       'get_training_profile',
       'get_upcoming_session_plans',
       'get_workout_detail',
+      'list_muscles',
       'search_exercises',
     ]);
+    // Edits and deletes replace what the person had, so clients confirm them.
+    const destructiveNames = new Set(['delete_exercise', 'update_exercise']);
     for (const tool of result.tools) {
-      if (readOnlyNames.has(tool.name)) {
+      if (destructiveNames.has(tool.name)) {
+        expect(tool.annotations).toMatchObject({
+          destructiveHint: true,
+          idempotentHint: true,
+          openWorldHint: false,
+          readOnlyHint: false,
+        });
+      } else if (readOnlyNames.has(tool.name)) {
         expect(tool.annotations).toMatchObject({
           destructiveHint: false,
           idempotentHint: true,
@@ -342,6 +372,92 @@ describe('BoGa MCP server', () => {
     expect(called).toContain(
       'POST /functions/v1/agent-api/v1/agent/programmes',
     );
+  });
+
+  it('translates the exercise tools into the exercise routes with an idempotency key', async () => {
+    const running = await startMcp();
+    active.push(running);
+
+    const muscles = await running.client.callTool({ arguments: {}, name: 'list_muscles' });
+    await running.client.callTool({
+      arguments: { include_deleted: true, query: 'fly' },
+      name: 'search_exercises',
+    });
+    await running.client.callTool({
+      arguments: {
+        exercise: {
+          muscles: [{ muscle_id: 'chest_sternal', role: 'primary' }],
+          name: 'Cable Fly',
+          split_by_gym: true,
+        },
+        idempotency_key: 'ex-create-1',
+      },
+      name: 'create_exercise',
+    });
+    const updated = await running.client.callTool({
+      arguments: {
+        changes: { load_input_mode: 'per_side_load', split_by_gym: false },
+        exercise_id: 'exercise-a',
+        expected_revision: 1,
+        idempotency_key: 'ex-update-1',
+      },
+      name: 'update_exercise',
+    });
+    const deleted = await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', expected_revision: 2, idempotency_key: 'ex-delete-1' },
+      name: 'delete_exercise',
+    });
+    const restored = await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', expected_revision: 3, idempotency_key: 'ex-restore-1' },
+      name: 'restore_exercise',
+    });
+
+    expect(muscles.structuredContent).toEqual(responses['/functions/v1/agent-api/v1/agent/muscles']);
+    expect(updated.structuredContent).toEqual(responses['/functions/v1/agent-api/v1/agent/exercises/exercise-a']);
+    expect(deleted.structuredContent).toEqual(responses['/functions/v1/agent-api/v1/agent/exercises/exercise-a/delete']);
+    expect(restored.structuredContent).toEqual(responses['/functions/v1/agent-api/v1/agent/exercises/exercise-a/restore']);
+
+    const posts = running.requests
+      .filter((r) => r.method === 'POST')
+      .map((r) => ({
+        body: JSON.parse(r.body ?? '{}') as unknown,
+        key: r.headers.get('idempotency-key'),
+        path: r.url.pathname.replace('/functions/v1/agent-api/v1/agent/', ''),
+      }));
+    expect(posts).toEqual([
+      {
+        body: { muscles: [{ muscle_id: 'chest_sternal', role: 'primary' }], name: 'Cable Fly', split_by_gym: true },
+        key: 'ex-create-1',
+        path: 'exercises',
+      },
+      {
+        body: { expected_revision: 1, load_input_mode: 'per_side_load', split_by_gym: false },
+        key: 'ex-update-1',
+        path: 'exercises/exercise-a',
+      },
+      { body: { expected_revision: 2 }, key: 'ex-delete-1', path: 'exercises/exercise-a/delete' },
+      { body: { expected_revision: 3 }, key: 'ex-restore-1', path: 'exercises/exercise-a/restore' },
+    ]);
+    expect(running.requests.map((r) => `${r.method} ${r.url.pathname}${r.url.search}`)).toContain(
+      'GET /functions/v1/agent-api/v1/agent/exercises?include_deleted=true&query=fly',
+    );
+  });
+
+  it('rejects an unknown muscle role before calling the API', async () => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+
+    const result = await running.client.callTool({
+      arguments: {
+        exercise: { muscles: [{ muscle_id: 'chest_sternal', role: 'stabilizer' }], name: 'Plank' },
+        idempotency_key: 'ex-bad-1',
+      },
+      name: 'create_exercise',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'POST')).toHaveLength(0);
   });
 
   it('forwards the gym bucket of a split exercise to both exercise routes', async () => {

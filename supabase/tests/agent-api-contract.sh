@@ -339,7 +339,11 @@ cleanup() {
           and id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.exercise_muscle_mappings
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
-          and id like 'agent-api-${RUN_TAG}-%';
+          and (id like 'agent-api-${RUN_TAG}-%' or id like 'map_agent-api-${RUN_TAG}-%'
+            or exercise_definition_id in (select id from app_public.exercise_definitions
+              where owner_user_id = '${USER_A_UUID}'::uuid and name like 'agent-api-${RUN_TAG} %'));
+      delete from app_public.exercise_definitions
+        where owner_user_id = '${USER_A_UUID}'::uuid and name like 'agent-api-${RUN_TAG} %';
       delete from app_public.sessions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -396,6 +400,8 @@ EXERCISE_A="agent-api-${RUN_TAG}-exercise-a"
 EXERCISE_A2="agent-api-${RUN_TAG}-exercise-a2"
 EXERCISE_B="agent-api-${RUN_TAG}-exercise-b"
 MUSCLE_A="agent-api-${RUN_TAG}-muscle-a"
+MUSCLE_A2="agent-api-${RUN_TAG}-muscle-a2"
+MUSCLE_B="agent-api-${RUN_TAG}-muscle-b"
 MAPPING_A="agent-api-${RUN_TAG}-mapping-a"
 SESSION_A="agent-api-${RUN_TAG}-session-a"
 BLOCK_A="agent-api-${RUN_TAG}-block-a"
@@ -429,6 +435,10 @@ run_psql "
        created_at,updated_at,client_updated_at_ms)
     values
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A}','Pectorals','chest',0,0,
+       ${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${MUSCLE_A2}','Triceps','arms',1,0,
+       ${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_B_UUID}'::uuid,'${MUSCLE_B}','User B Muscle','arms',0,0,
        ${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_muscle_mappings
       (owner_user_id,id,exercise_definition_id,muscle_group_id,weight,role,
@@ -1069,6 +1079,17 @@ agent_post "programmes" "${PROG_BODY}" "${PROG_KEY}"
 assert_status "403" "default-denied programme create"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
   fail "default-denied programme create did not return PLAN_PERMISSION_REQUIRED"
+agent_post "exercises" "$(jq -nc --arg m "${MUSCLE_A}" --arg name "agent-api-${RUN_TAG} Denied" \
+  '{name:$name,muscles:[{muscle_id:$m,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-denied"
+assert_status "403" "default-denied exercise create"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied exercise create did not return PLAN_PERMISSION_REQUIRED"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${NOW_MS}" '{expected_revision:$rev,split_by_gym:true}')" \
+  "agent-api-${RUN_TAG}-ex-denied-update"
+assert_status "403" "default-denied exercise update"
+[[ "$(run_psql "select split_by_gym from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}';")" == "f" ]] ||
+  fail "a denied exercise update changed the exercise"
 
 echo "[agent-api-test] verifying the permission table is app-only and owner-scoped"
 GRANTED_AT="$(fetch_grant_granted_at)"
@@ -1255,11 +1276,166 @@ run_psql "update public.agent_plan_permissions
   where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
 agent_get "session-plans"
 assert_status "403" "disabled permission"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${NOW_MS}" '{expected_revision:$rev,name:"Disabled"}')" \
+  "agent-api-${RUN_TAG}-ex-disabled"
+assert_status "403" "disabled permission exercise write"
 run_psql "update public.agent_plan_permissions
   set plan_access_enabled = true
   where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
 agent_get "session-plans"
 assert_status "200" "re-enabled permission"
+
+echo "[agent-api-test] verifying the muscle list and the exercise catalog view"
+agent_get "muscles"
+assert_status "200" "muscle list"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" --arg b "${MUSCLE_B}" '
+  (.data.muscles | map(.id) | index($a)) != null
+  and (.data.muscles | map(.id) | index($a2)) != null
+  and (.data.muscles | map(.id) | index($b)) == null
+  and (.data.muscles[] | select(.id == $a) | .family) == "chest"
+' >/dev/null || fail "muscle list is not the owner taxonomy"
+agent_get "exercises?query=Agent%20A%20Bench"
+assert_status "200" "catalog view"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg ex "${EXERCISE_A}" --argjson rev "${NOW_MS}" '
+  .data.exercises[] | select(.id == $ex)
+  | .split_by_gym == false and .deleted == false and .revision == $rev
+' >/dev/null || fail "catalog view lacks split_by_gym, revision or deleted"
+# Gym usage counts sessions holding a working set: the warm-up-only exercise has none.
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status "200" "gym usage of an unsplit exercise"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg gym "${GYM_A}" '
+  .data.exercise.gym_usage.gyms | length == 1 and .[0].gym == {id:$gym,name:"Agent A Gym"} and .[0].session_count == 1
+' >/dev/null || fail "context gym usage does not count the working-set session at its gym"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.exercise.gym_usage | .no_gym_session_count == 0 and .complete == true' \
+  >/dev/null || fail "context gym usage lacks no-gym count or completeness"
+agent_get "exercises/${EXERCISE_A2}/context"
+assert_status "200" "gym usage of a warm-up-only exercise"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.exercise.gym_usage.gyms == []' >/dev/null ||
+  fail "a warm-up-only session counted toward gym usage"
+
+echo "[agent-api-test] verifying exercise create, replay and validation"
+CREATE_NAME="agent-api-${RUN_TAG} Cable Fly"
+CREATE_KEY="agent-api-${RUN_TAG}-ex-create"
+CREATE_BODY="$(jq -nc --arg name "${CREATE_NAME}" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
+  {name:$name,split_by_gym:true,
+   muscles:[{muscle_id:$a2,role:"secondary"},{muscle_id:$a,role:"primary"}]}')"
+agent_post "exercises" "${CREATE_BODY}" "${CREATE_KEY}"
+assert_status "200" "exercise create"
+CREATED_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.exercise_id')"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg name "${CREATE_NAME}" '
+  .data.idempotent_replay == false
+  and .data.exercise.name == $name and .data.exercise.split_by_gym == true
+  and .data.exercise.load_input_mode == "total_load"
+  and .data.exercise.revision == .data.revision
+  and (.data.exercise.muscles | map(.role) | sort) == ["primary","secondary"]
+' >/dev/null || fail "exercise create did not return the created exercise"
+[[ "$(run_psql "select string_agg(id || ':' || role || ':' || weight, ',' order by role)
+  from app_public.exercise_muscle_mappings
+  where owner_user_id = '${USER_A_UUID}'::uuid and exercise_definition_id = '${CREATED_ID}';")" == \
+  "map_${CREATED_ID}__${MUSCLE_A}:primary:1,map_${CREATED_ID}__${MUSCLE_A2}:secondary:0.5" ]] ||
+  fail "created muscle links are not pair-id rows weighted 1 and 0.5"
+agent_post "exercises" "${CREATE_BODY}" "${CREATE_KEY}"
+assert_status "200" "exercise create replay"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${CREATED_ID}" \
+  '.data.exercise_id == $id and .data.idempotent_replay == true' >/dev/null ||
+  fail "exercise create replay did not return the original exercise"
+agent_post "exercises" "$(jq -nc --arg name "agent-api-${RUN_TAG} Foreign" --arg b "${MUSCLE_B}" \
+  '{name:$name,muscles:[{muscle_id:$b,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-foreign"
+assert_status "400" "exercise create with another owner's muscle"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
+  fail "another owner's muscle did not return FOREIGN_RESOURCE_REFERENCE"
+agent_post "exercises" "$(jq -nc --arg name "agent-api-${RUN_TAG} Two primaries" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" \
+  '{name:$name,muscles:[{muscle_id:$a,role:"primary"},{muscle_id:$a2,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-two"
+assert_status "400" "exercise create with two primaries"
+[[ "$(run_psql "select count(*) from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and name in
+    ('agent-api-${RUN_TAG} Foreign','agent-api-${RUN_TAG} Two primaries','agent-api-${RUN_TAG} Denied');")" == "0" ]] ||
+  fail "a rejected exercise create left a row"
+
+echo "[agent-api-test] verifying revision-checked exercise update and muscle reconciliation"
+UPDATE_BODY="$(jq -nc --argjson rev "${NOW_MS}" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
+  {expected_revision:$rev,split_by_gym:true,name:"Agent A Bench Press",
+   muscles:[{muscle_id:$a2,role:"primary"},{muscle_id:$a,role:"secondary"}]}')"
+agent_post "exercises/${EXERCISE_A}" "${UPDATE_BODY}" "agent-api-${RUN_TAG}-ex-update"
+assert_status "200" "exercise update"
+REVISION_A="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.revision')"
+(( REVISION_A > NOW_MS )) || fail "exercise update did not advance the revision (${REVISION_A})"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.exercise.split_by_gym == true and .data.exercise.name == "Agent A Bench Press"' \
+  >/dev/null || fail "exercise update response does not show the change"
+[[ "$(run_psql "select string_agg(id || ':' || role || ':' || weight || ':' || (deleted_at is null), ',' order by id)
+  from app_public.exercise_muscle_mappings
+  where owner_user_id = '${USER_A_UUID}'::uuid and exercise_definition_id = '${EXERCISE_A}';")" == \
+  "${MAPPING_A}:secondary:0.5:true,map_${EXERCISE_A}__${MUSCLE_A2}:primary:1:true" ]] ||
+  fail "update did not revive the existing link in place and add a pair-id link"
+[[ "$(run_psql "select count(*) from app_public.exercise_muscle_mappings
+  where owner_user_id = '${USER_A_UUID}'::uuid and exercise_definition_id = '${EXERCISE_A}'
+    and client_updated_at_ms = ${REVISION_A};")" == "2" ]] ||
+  fail "changed links were not stamped with the update's revision"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${NOW_MS}" '{expected_revision:$rev,split_by_gym:false}')" \
+  "agent-api-${RUN_TAG}-ex-stale"
+assert_status "409" "stale exercise revision"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "REVISION_CONFLICT" ]] ||
+  fail "a stale revision did not return REVISION_CONFLICT"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${REVISION_A}" --arg a "${MUSCLE_A}" \
+  '{expected_revision:$rev,muscles:[{muscle_id:$a,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-drop"
+assert_status "200" "exercise update dropping a muscle"
+REVISION_A="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.revision')"
+[[ "$(run_psql "select string_agg(id || ':' || role || ':' || (deleted_at is null), ',' order by id)
+  from app_public.exercise_muscle_mappings
+  where owner_user_id = '${USER_A_UUID}'::uuid and exercise_definition_id = '${EXERCISE_A}';")" == \
+  "${MAPPING_A}:primary:true,map_${EXERCISE_A}__${MUSCLE_A2}:primary:false" ]] ||
+  fail "a dropped muscle was not kept as a tombstone"
+agent_post "exercises/${EXERCISE_A2}" "$(jq -nc --argjson rev "${NOW_MS}" '{expected_revision:$rev,load_input_mode:"total_load"}')" \
+  "agent-api-${RUN_TAG}-ex-mode"
+assert_status "200" "exercise load-mode update"
+[[ "$(run_psql "select load_input_mode from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A2}';")" == "total_load" ]] ||
+  fail "load-mode update did not land"
+agent_post "exercises/${EXERCISE_B}" "$(jq -nc --argjson rev "${NOW_MS}" '{expected_revision:$rev,name:"Stolen"}')" \
+  "agent-api-${RUN_TAG}-ex-cross"
+assert_status "404" "cross-owner exercise update"
+[[ "$(run_psql "select name from app_public.exercise_definitions
+  where owner_user_id = '${USER_B_UUID}'::uuid and id = '${EXERCISE_B}';")" == "User B Secret Lift" ]] ||
+  fail "a cross-owner update touched user B's exercise"
+
+echo "[agent-api-test] verifying soft delete and restore"
+CREATED_REVISION="$(run_psql "select client_updated_at_ms from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${CREATED_ID}';")"
+agent_post "exercises/${CREATED_ID}/delete" "$(jq -nc --argjson rev "${CREATED_REVISION}" '{expected_revision:$rev}')" \
+  "agent-api-${RUN_TAG}-ex-delete"
+assert_status "200" "exercise delete"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.deleted == true and .data.changed == true and .data.exercise.deleted == true' \
+  >/dev/null || fail "exercise delete did not report the deleted exercise"
+DELETED_REVISION="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.revision')"
+agent_get "exercises?query=Cable%20Fly"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${CREATED_ID}" '(.data.exercises | map(.id) | index($id)) == null' \
+  >/dev/null || fail "a deleted exercise is still in the default search"
+agent_get "exercises?query=Cable%20Fly&include_deleted=true"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${CREATED_ID}" '.data.exercises[] | select(.id == $id) | .deleted == true' \
+  >/dev/null || fail "include_deleted did not list the deleted exercise"
+agent_post "exercises/${CREATED_ID}/delete" "$(jq -nc --argjson rev "${CREATED_REVISION}" '{expected_revision:$rev}')" \
+  "agent-api-${RUN_TAG}-ex-delete-again"
+assert_status "200" "delete of a deleted exercise with an old revision"
+printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${DELETED_REVISION}" '.data.changed == false and .data.revision == $rev' \
+  >/dev/null || fail "deleting a deleted exercise was not a no-op"
+agent_post "exercises/${CREATED_ID}" "$(jq -nc --argjson rev "${DELETED_REVISION}" '{expected_revision:$rev,name:"Nope"}')" \
+  "agent-api-${RUN_TAG}-ex-edit-deleted"
+assert_status "409" "edit of a deleted exercise"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "EXERCISE_DELETED" ]] ||
+  fail "editing a deleted exercise did not return EXERCISE_DELETED"
+agent_post "exercises/${CREATED_ID}/restore" "$(jq -nc --argjson rev "${DELETED_REVISION}" '{expected_revision:$rev}')" \
+  "agent-api-${RUN_TAG}-ex-restore"
+assert_status "200" "exercise restore"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.deleted == false and .data.changed == true and .data.exercise.deleted == false' \
+  >/dev/null || fail "exercise restore did not report the live exercise"
+[[ "$(run_psql "select count(*) from app_public.session_exercises
+  where owner_user_id = '${USER_A_UUID}'::uuid and exercise_definition_id = '${EXERCISE_A}';")" == "1" ]] ||
+  fail "exercise edits changed performed history"
+[[ "$(run_psql "select string_agg(distinct tool_name, ',' order by tool_name) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name in ('list_muscles','create_exercise','update_exercise','delete_exercise','restore_exercise');")" == \
+  "create_exercise,delete_exercise,list_muscles,restore_exercise,update_exercise" ]] ||
+  fail "exercise routes are not audited under their tool names"
 
 echo "[agent-api-test] verifying plan tables stay closed to direct OAuth access"
 app_public_request GET "session_plans?select=id" "${AGENT_ACCESS_TOKEN}"

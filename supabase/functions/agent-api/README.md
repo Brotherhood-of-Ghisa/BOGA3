@@ -86,6 +86,7 @@ Query parameters:
 - `muscle` and `equipment` — optional, 1–80 trimmed characters.
 - `limit` — optional integer `1..50`, default `20`.
 - `cursor` — optional opaque cursor returned by the previous page.
+- `include_deleted` — optional `true`/`false` (default `false`).
 
 ```json
 {
@@ -93,21 +94,21 @@ Query parameters:
     "id": "exercise-id",
     "name": "Bench press",
     "load_input_mode": "total_load",
-    "muscles": [{
-      "id": "muscle-id",
-      "display_name": "Chest",
-      "family_name": "Chest",
-      "weight": 1,
-      "role": "primary"
-    }],
+    "split_by_gym": false,
+    "deleted": false,
+    "revision": 1760000000000,
+    "muscles": [{"id": "muscle-id", "name": "Chest", "family": "Chest", "weight": 1, "role": "primary"}],
     "equipment": ["Barbell"]
   }],
   "next_cursor": null
 }
 ```
 
-Only current, non-deleted owner rows are returned. Cursor ordering is stable by
-name then ID.
+Only owner rows are returned, soft-deleted ones only with `include_deleted`.
+Cursor ordering is stable by name then ID. `revision` is the definition's LWW
+stamp, quoted by every exercise edit.
+`GET /v1/agent/muscles` lists the owner's live muscles (`id`, `name`,
+`family`); exercise writes must name these ids.
 
 ## Exercise context
 
@@ -126,6 +127,12 @@ nonexistent exercise produce the same `404` envelope.
     "muscles": [],
     "equipment": [],
     "split_by_gym": true,
+    "gym_usage": {
+      "gyms": [{ "gym": { "id": "gym-id", "name": "Home" }, "session_count": 23,
+        "last_performed_at": "2026-07-25T18:00:00.000Z" }],
+      "no_gym_session_count": 2,
+      "complete": true
+    },
     "gym_buckets": [
       { "gym": { "id": "gym-id", "name": "Home" },
         "last_performed_at": "2026-07-25T18:00:00.000Z",
@@ -185,7 +192,10 @@ nonexistent exercise produce the same `404` envelope.
 
 Personal-record and volume calculations import the canonical mobile domain
 calculation module and read [working sets only](#working-sets-only)
-([[set.eligibility]]), so the warm-up above is listed but feeds no figure. BoGa has no
+([[set.eligibility]]), so the warm-up above is listed but feeds no figure.
+`gym_usage`, on every exercise, counts the sessions holding a working set per
+gym (up to 50, most recent first) and with no gym; `complete` is false when the
+history read was bounded. BoGa has no
 canonical user-authored note field or failed-set meaning, so this API reports
 those fields unavailable instead of inventing semantics.
 
@@ -448,13 +458,14 @@ read; no derived value is persisted.
 
 ## Plan permission and write routes
 
-The base OAuth grant is read-only. Reading the upcoming plan queue and creating
-plans/programmes additionally require a current-grant row in
+The base OAuth grant is read-only. Reading the upcoming plan queue, creating
+plans/programmes and editing exercises additionally require a current-grant row in
 `public.agent_plan_permissions` (`plan_access_enabled = true` and `granted_at`
 equal to the live OAuth grant timestamp). A missing, false or grant-mismatched
 row returns `403 PLAN_PERMISSION_REQUIRED` before any referenced exercise or gym
 is resolved. The person enables it per client on the app's Connected Agents
-screen; the base OAuth consent is never described as write access.
+screen (one switch covers plans and exercises); the base OAuth consent is never
+described as write access.
 
 ### `GET /v1/agent/session-plans`
 
@@ -492,14 +503,41 @@ created, and the agent cannot attach, complete, skip or edit a plan.
 }
 ```
 
+## Exercise editing
+
+Every route requires write access and an `Idempotency-Key`; replay and conflict
+behave as for plans. Bodies are strict JSON:
+
+- `POST /v1/agent/exercises` — `{name, muscles, load_input_mode?,
+  bodyweight_contribution?, split_by_gym?}`; defaults `total_load`, `0`, `false`.
+- `POST /v1/agent/exercises/{id}` — `{expected_revision, ...fields}`: only the
+  fields present change; `muscles` replaces the whole set.
+- `POST /v1/agent/exercises/{id}/delete` and `/restore` — `{expected_revision}`.
+  Soft delete only; logged history keeps its rows.
+
+`muscles` is `[{muscle_id, role}]`: exactly one `primary`, distinct
+`secondary` entries, at most 12 — the app editor's rules and role weights
+([[muscle.set-count]]; `exercise-edit.ts`). A muscle that is not the owner's live row returns `400
+FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
+`expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
+EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.
+
+The service-role-only `agent_*_exercise` RPCs stamp every row they touch with
+`greatest(now, every stamp the exercise holds + 1)`, so devices pull the change
+under LWW. A re-added muscle revives its row; a new one takes the id
+`map_<exercise>__<muscle>`; a dropped one is tombstoned. A `load_input_mode`
+change re-scores linked group exercises. The response is the RPC result
+(`exercise_id`, `revision`, `idempotent_replay`, plus `deleted`/`changed` for
+delete and restore) and `exercise`, the catalog view after the write.
+
 ## Status contract
 
 - `400` invalid/unknown argument, identity input, cursor, or foreign/nonexistent resource reference.
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
-- `403` plan permission missing, disabled or bound to a stale grant.
+- `403` write access missing, disabled or bound to a stale grant.
 - `404` unknown route or inaccessible/nonexistent exercise.
 - `405` unsupported method for the route.
-- `409` idempotency conflict (same key, different payload).
+- `409` idempotency conflict, stale exercise revision, or edit of a deleted exercise.
 - `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.

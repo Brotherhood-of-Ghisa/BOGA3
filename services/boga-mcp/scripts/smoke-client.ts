@@ -12,6 +12,9 @@ const accessToken = required('BOGA_MCP_SMOKE_ACCESS_TOKEN');
 const expectedExerciseId = required('BOGA_MCP_SMOKE_EXERCISE_ID');
 const expectedSessionId = required('BOGA_MCP_SMOKE_SESSION_ID');
 const exerciseQuery = required('BOGA_MCP_SMOKE_EXERCISE_QUERY');
+// Set only for the seeded local fixture: exercise writes never run against a
+// supplied (possibly hosted) token.
+const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -71,15 +74,20 @@ try {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
+    'create_exercise',
     'create_session_plan',
     'create_training_programme',
+    'delete_exercise',
     'get_exercise_context',
     'get_exercise_history',
     'get_recent_workouts',
     'get_training_profile',
     'get_upcoming_session_plans',
     'get_workout_detail',
+    'list_muscles',
+    'restore_exercise',
     'search_exercises',
+    'update_exercise',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error(`Unexpected MCP tools: ${names.join(', ')}`);
@@ -221,6 +229,19 @@ try {
     if (!unauthRead.isError || !JSON.stringify(unauthRead).includes('PLAN_PERMISSION_REQUIRED')) {
       throw new Error('get_upcoming_session_plans succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
     }
+
+    if (smokeMuscleId) {
+      const unauthExercise = await client.callTool({
+        arguments: {
+          exercise: { muscles: [{ muscle_id: smokeMuscleId, role: 'primary' }], name: `${exerciseQuery} Denied` },
+          idempotency_key: `smoke-ex-denied-${Date.now()}`,
+        },
+        name: 'create_exercise',
+      });
+      if (!unauthExercise.isError || !JSON.stringify(unauthExercise).includes('PLAN_PERMISSION_REQUIRED')) {
+        throw new Error('create_exercise succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
+      }
+    }
   } else {
     // Planning permission is enabled: test create_session_plan, create_training_programme, idempotency replay/conflict, and read
     const planKey = `smoke-plan-key-${Date.now()}`;
@@ -323,6 +344,91 @@ try {
     if (!plansList.some((p) => isObject(p) && p.id === planId && p.provenance === 'agent')) {
       throw new Error('get_upcoming_session_plans did not return the agent-created plan.');
     }
+
+    if (smokeMuscleId) {
+      const muscles = structured(
+        await client.callTool({ arguments: {}, name: 'list_muscles' }),
+        'list_muscles',
+      );
+      const muscleList = Array.isArray(muscles.muscles) ? muscles.muscles : [];
+      if (!muscleList.some((m) => isObject(m) && m.id === smokeMuscleId)) {
+        throw new Error('list_muscles did not return the seeded muscle.');
+      }
+
+      const created = structured(
+        await client.callTool({
+          arguments: {
+            exercise: {
+              muscles: [{ muscle_id: smokeMuscleId, role: 'primary' }],
+              name: `${exerciseQuery} Created`,
+              split_by_gym: true,
+            },
+            idempotency_key: `smoke-ex-create-${Date.now()}`,
+          },
+          name: 'create_exercise',
+        }),
+        'create_exercise',
+      );
+      const createdId = String(created.exercise_id ?? '');
+      if (!createdId || !isObject(created.exercise) || created.exercise.split_by_gym !== true) {
+        throw new Error('create_exercise did not return the created per-gym exercise.');
+      }
+
+      const updated = structured(
+        await client.callTool({
+          arguments: {
+            changes: { split_by_gym: false },
+            exercise_id: createdId,
+            expected_revision: Number(created.revision),
+            idempotency_key: `smoke-ex-update-${Date.now()}`,
+          },
+          name: 'update_exercise',
+        }),
+        'update_exercise',
+      );
+      if (!isObject(updated.exercise) || updated.exercise.split_by_gym !== false) {
+        throw new Error('update_exercise did not apply the change.');
+      }
+
+      const stale = await client.callTool({
+        arguments: {
+          changes: { name: `${exerciseQuery} Stale` },
+          exercise_id: createdId,
+          expected_revision: Number(created.revision),
+          idempotency_key: `smoke-ex-stale-${Date.now()}`,
+        },
+        name: 'update_exercise',
+      });
+      if (!stale.isError || !JSON.stringify(stale).includes('REVISION_CONFLICT')) {
+        throw new Error('A stale update_exercise revision did not fail with REVISION_CONFLICT.');
+      }
+
+      const deleted = structured(
+        await client.callTool({
+          arguments: {
+            exercise_id: createdId,
+            expected_revision: Number(updated.revision),
+            idempotency_key: `smoke-ex-delete-${Date.now()}`,
+          },
+          name: 'delete_exercise',
+        }),
+        'delete_exercise',
+      );
+      const restored = structured(
+        await client.callTool({
+          arguments: {
+            exercise_id: createdId,
+            expected_revision: Number(deleted.revision),
+            idempotency_key: `smoke-ex-restore-${Date.now()}`,
+          },
+          name: 'restore_exercise',
+        }),
+        'restore_exercise',
+      );
+      if (deleted.deleted !== true || restored.deleted !== false) {
+        throw new Error('delete_exercise / restore_exercise did not round-trip.');
+      }
+    }
   }
 
   if (process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
@@ -347,5 +453,5 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: rejected token challenged; nine tools discovered and verified');
+console.log('[boga-mcp-smoke] PASS: rejected token challenged; fourteen tools discovered and verified');
 
