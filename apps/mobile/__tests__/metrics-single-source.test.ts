@@ -111,6 +111,9 @@ describe('training-metric rules have one implementation', () => {
       'supabase/functions/agent-api/index.ts',
       'supabase/functions/agent-api/gym-buckets.ts',
       'services/boga-mcp/src/tools.ts',
+      // Agent exercise writes carry the setting, as the editor does.
+      'supabase/functions/agent-api/exercise-edit.ts',
+      'services/boga-mcp/src/api-client.ts',
     ])).toEqual([]);
   });
 

@@ -259,13 +259,15 @@ Decided with mobile training programmes.
   `programme_order_index = null`), preserving them as standalone plans. Performed
   session rows, workouts, and recorded sets are never deleted.
 
-### Connected agent plan permission
+### Connected agent write permission
 
-- **Named, dual-capability disclosure.** The Connected Agents card names the
-  client and states both capabilities of **Allow this coach to create plans**
-  next to the toggle: reading upcoming/unscheduled plans and creating plans and
-  programmes. The base OAuth consent is never labelled as write access.
-- **Default off, revert on failure.** Plan access is off until explicitly
+- **Named disclosure of every capability.** The Connected Agents card names the
+  client and states every capability of **Allow this coach to make changes**
+  next to the toggle: reading upcoming/unscheduled plans, creating plans and
+  programmes, and adding, editing, deleting or restoring exercises, whose
+  changes recalculate past figures ([[agents.write-access]]). The base OAuth consent is never labelled
+  as write access.
+- **Default off, revert on failure.** Write access is off until explicitly
   enabled, is never enabled by a loading fallback, and applies optimistically
   only with a revert to the server value plus a retryable error on failure.
 - **Revocation stays primary.** Revoking a grant remains the security-critical

@@ -6,8 +6,8 @@ only what an author or a check needs.
 
 ## Subjects
 
-Each question belongs to one subject/file. Add a new subject in its own PR,
-with a row and its load trigger in `docs/product/README.md`. A fact that
+Each question belongs to one subject/file. A new subject adds a row and its
+load trigger in `docs/product/README.md`. A fact that
 changes what its subject covers updates that trigger.
 
 ## Fact format
