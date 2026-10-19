@@ -101,6 +101,14 @@ export const ICON_GLYPHS = {
   ],
   // Lucide `timer`: the active-session rest timer.
   timer: [path('M10 2h4'), path('M12 14v-4'), circle(12, 14, 8)],
+  // Lucide `share-2`: share with an external app or person.
+  share: [
+    circle(18, 5, 3),
+    circle(6, 12, 3),
+    circle(18, 19, 3),
+    path('m8.59 13.51 6.83 3.98'),
+    path('m15.41 6.51-6.82 3.98'),
+  ],
 
   // --- Choice and status ---
   // Lucide `wifi-off`: no connection; the data shown may be stale.
