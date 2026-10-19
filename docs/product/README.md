@@ -26,6 +26,7 @@ is in `set.md`). When unsure, load it.
 | `groups.md` | group competition and certification |
 | `notifications.md` | any notification: group alerts, workout notifications |
 | `appearance.md` | the app icon or the appearance theme |
+| `agents.md` | what a connected coaching agent (MCP) may read or change |
 
 Facts govern app-wide rules; screen layout belongs in `docs/specs/ui/screen-map.md`,
 `docs/specs/ui/components-catalog.md`, component READMEs and tests.
