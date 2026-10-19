@@ -31,7 +31,7 @@ import { runBootstrapper } from '@/src/sync/bootstrapper';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
-import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { observeRemoteTimestamp, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
 import { exerciseSets } from '@/src/data/schema';
@@ -942,8 +942,10 @@ export const applyPullPage = (
 ): number => {
   const table = ENTITY_TABLES[type] as typeof schema.gyms;
   let changed = 0;
+  let newestStamp = 0;
 
   for (const envelope of entities) {
+    newestStamp = Math.max(newestStamp, envelope.client_updated_at_ms);
     const existing = tx
       .select()
       .from(table)
@@ -965,6 +967,8 @@ export const applyPullPage = (
     // Otherwise the known local row is newer-or-equal: keep it untouched.
   }
 
+  // The next local edit of any pulled row must out-stamp it under LWW.
+  observeRemoteTimestamp(tx, newestStamp);
   return changed;
 };
 

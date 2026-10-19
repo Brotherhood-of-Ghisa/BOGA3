@@ -100,6 +100,48 @@ export const nowMonotonic = (tx: Transaction): number => {
 };
 
 /**
+ * Advances `last_emitted_ms` to at least `observedMs` — a pulled row's
+ * `client_updated_at_ms` — inside the caller's transaction, and never moves it
+ * back. A row stamped by another device or by the server (agent writes) can
+ * carry a time ahead of this device's wall clock; without this, the next local
+ * edit of that row would be stamped lower and the server's LWW would silently
+ * drop it. Server stamps are bounded (push clamps to `now + 5 min`), so a
+ * pulled value cannot push the counter arbitrarily far ahead.
+ */
+export const observeRemoteTimestamp = (tx: Transaction, observedMs: number): void => {
+  let previous = cachedLastEmitted;
+  if (previous === null) {
+    const row = tx
+      .select({ lastEmittedMs: syncRuntimeState.lastEmittedMs })
+      .from(syncRuntimeState)
+      .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+      .get();
+
+    previous = row?.lastEmittedMs ?? 0;
+  }
+
+  if (observedMs <= previous) {
+    cachedLastEmitted = previous;
+    return;
+  }
+
+  tx.insert(syncRuntimeState)
+    .values({
+      id: PRIMARY_RUNTIME_STATE_ID,
+      lastEmittedMs: observedMs,
+    })
+    .onConflictDoUpdate({
+      target: syncRuntimeState.id,
+      set: {
+        lastEmittedMs: observedMs,
+      },
+    })
+    .run();
+
+  cachedLastEmitted = observedMs;
+};
+
+/**
  * Test-only helper that resets the module-scoped {@link cachedLastEmitted}
  * cache, simulating a cold start (process restart). The next call to
  * {@link nowMonotonic} will re-read the persisted value from

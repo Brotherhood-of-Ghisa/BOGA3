@@ -37,8 +37,9 @@ jest.mock('@/src/data/bootstrap', () => ({
 }));
 
 // Imported AFTER the mock so the repos pick up the mocked bootstrap.
-import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
-import { __resetClockForTests } from '@/src/data/clock';
+import { createDrizzleExerciseCatalogStore, exerciseMuscleMappingId } from '@/src/data/exercise-catalog';
+import { __resetClockForTests, type Transaction } from '@/src/data/clock';
+import { applyPullPage } from '@/src/sync/cycle';
 
 const EXERCISE_DEFINITION_ID = 'exercise-def-1';
 const seedMuscleGroups = (database: TestDatabase): void => {
@@ -156,5 +157,49 @@ describe('soft-delete: dropping a muscle link on re-save', () => {
     const tricepsRows = readMappingRows(fixture.database).filter((row) => row.muscleGroupId === 'triceps');
     expect(tricepsRows).toHaveLength(1);
     expect(tricepsRows[0].deletedAt).toBeNull();
+  });
+
+  it('gives a new link its pair-derived id, so a pulled link for the same pair updates it in place', async () => {
+    const store = createDrizzleExerciseCatalogStore();
+    await store.saveExercise({
+      id: EXERCISE_DEFINITION_ID,
+      name: 'Bench Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-30T10:00:00.000Z'),
+    });
+    const [chest] = readMappingRows(fixture.database);
+    expect(chest.id).toBe(exerciseMuscleMappingId(EXERCISE_DEFINITION_ID, 'chest'));
+
+    // Another writer (an agent write on the server) added the same pair. Its
+    // newer row arrives under the same id, so pull apply is an LWW update —
+    // not a second row colliding on the unique pair index.
+    const pulledStamp = Number(chest.localUpdatedAtMs) + 1_000;
+    const changed = fixture.database.transaction((tx) =>
+      applyPullPage(
+        tx as Transaction,
+        [
+          {
+            type: 'exercise_muscle_mappings',
+            id: exerciseMuscleMappingId(EXERCISE_DEFINITION_ID, 'chest'),
+            client_updated_at_ms: pulledStamp,
+            fields: {
+              exercise_definition_id: EXERCISE_DEFINITION_ID,
+              muscle_group_id: 'chest',
+              weight: 0.5,
+              role: 'secondary',
+              created_at: pulledStamp,
+              updated_at: pulledStamp,
+              deleted_at: null,
+            },
+          },
+        ],
+        'exercise_muscle_mappings',
+      ),
+    );
+
+    expect(changed).toBe(1);
+    const rows = readMappingRows(fixture.database);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].role).toBe('secondary');
   });
 });

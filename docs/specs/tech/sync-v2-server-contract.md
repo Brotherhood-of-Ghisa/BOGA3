@@ -377,16 +377,16 @@ there is no "mark dirty later" path.
 
 **Push-in-flight race.** At send time the cycle records each row's
 `local_updated_at_ms`. On the ack it clears `local_dirty` only for rows whose
-value is unchanged. A row edited in the meantime stays dirty for the next push.
+value is unchanged (table above).
 
 ## Clock-monotonicity guard
 
 `nowMonotonic()` (`apps/mobile/src/data/clock.ts`) returns
 `max(Date.now(), last_emitted_ms + 1)` and backs every dirtying write.
-`last_emitted_ms` persists on `sync_runtime_state` **in the same transaction as
-the row write**. If it were written fire-and-forget, a crash between the two
-could let the next launch emit a timestamp the server rejects under LWW. The
-counter is device-global and survives every wipe.
+Pull apply raises it to the newest pulled stamp, so local edits out-stamp
+rows stamped ahead of this clock. It persists on `sync_runtime_state` **in the
+same transaction as the row write**; otherwise a crash could emit a timestamp
+LWW rejects. The counter is device-global and survives every wipe.
 
 ## Client-enforced constraints
 
@@ -397,19 +397,19 @@ does not reject.
 1. Active `session_exercises` never share `(session_id, order_index)`.
 2. Active `exercise_sets` never share `(session_exercise_id, order_index)`.
 3. `exercise_muscle_mappings` has no duplicate
-   `(exercise_definition_id, muscle_group_id)`.
+   `(exercise_definition_id, muscle_group_id)`; a new link's id is
+   `map_<exercise>__<muscle>`, so writers converge on one row.
 4. Active `exercise_tag_definitions` has no duplicate
    `(exercise_definition_id, normalized_name)`.
 5. `session_exercise_tags` has no duplicate
    `(session_exercise_id, exercise_tag_definition_id)`.
-6. No orphan-child push: the topological batch builder guarantees it.
+6. No orphan-child push (the topological batch builder).
 7. `exercise_group_links` has at most one row per
-   `(group_id, exercise_definition_id)`, through its deterministic id; relink
-   reuses that id.
+   `(group_id, exercise_definition_id)`, through its deterministic id.
 
 ## Out of scope
 
-- Server-side retention or GC of tombstoned rows; they stay as ordinary rows.
+- Server-side retention or GC of tombstones; they stay ordinary rows.
 - The group domain (`docs/specs/tech/groups-contract.md`). Group tables are
   server-authoritative, reached only through group RPCs, and have no
   `owner_user_id`, so the drift checker skips them. Group triggers on Sync v2
