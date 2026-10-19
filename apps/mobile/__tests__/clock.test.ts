@@ -28,6 +28,7 @@ import {
   PRIMARY_RUNTIME_STATE_ID,
   __resetClockForTests,
   nowMonotonic,
+  observeRemoteTimestamp,
   type Transaction,
 } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
@@ -285,5 +286,56 @@ describe('nowMonotonic (monotonic clock helper)', () => {
     expect(rows[0].id).toBe(PRIMARY_RUNTIME_STATE_ID);
     expect(rows[0].id).toBe('primary');
     expect(rows[0].last_emitted_ms).toBe(1_700_002_000_000);
+  });
+});
+
+describe('observeRemoteTimestamp (pulled-stamp high-water mark)', () => {
+  let realDateNow: typeof Date.now;
+
+  beforeEach(() => {
+    __resetClockForTests();
+    realDateNow = Date.now;
+  });
+
+  afterEach(() => {
+    Date.now = realDateNow;
+    __resetClockForTests();
+    while (openClients.length > 0) {
+      openClients.pop()?.close();
+    }
+  });
+
+  it('makes the next emitted stamp exceed a pulled stamp ahead of the wall clock', () => {
+    const { database } = createTestDatabase();
+    const wall = 1_700_000_000_000;
+    Date.now = () => wall;
+
+    database.transaction((tx: Transaction) => observeRemoteTimestamp(tx, wall + 60_000));
+    const emitted = database.transaction((tx: Transaction) => nowMonotonic(tx));
+
+    expect(emitted).toBe(wall + 60_001);
+  });
+
+  it('persists the observed stamp so it survives a cold start', () => {
+    const { database } = createTestDatabase();
+    const wall = 1_700_000_000_000;
+    Date.now = () => wall;
+
+    database.transaction((tx: Transaction) => observeRemoteTimestamp(tx, wall + 5_000));
+    expect(readPersistedLastEmittedMs(database)).toBe(wall + 5_000);
+
+    __resetClockForTests();
+    expect(database.transaction((tx: Transaction) => nowMonotonic(tx))).toBe(wall + 5_001);
+  });
+
+  it('never moves the counter back for an older pulled stamp', () => {
+    const { database } = createTestDatabase();
+    seedRuntimeStateRow(database, 2_000);
+    Date.now = () => 1_000;
+
+    database.transaction((tx: Transaction) => observeRemoteTimestamp(tx, 1_500));
+
+    expect(readPersistedLastEmittedMs(database)).toBe(2_000);
+    expect(database.transaction((tx: Transaction) => nowMonotonic(tx))).toBe(2_001);
   });
 });

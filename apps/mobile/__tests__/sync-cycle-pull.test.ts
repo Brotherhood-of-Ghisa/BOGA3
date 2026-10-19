@@ -11,7 +11,12 @@
 import { eq } from 'drizzle-orm';
 
 import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
-import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import {
+  __resetClockForTests,
+  nowMonotonic,
+  PRIMARY_RUNTIME_STATE_ID,
+  type Transaction,
+} from '@/src/data/clock';
 import { gyms, sessions, syncRuntimeState } from '@/src/data/schema';
 
 import {
@@ -121,6 +126,61 @@ describe('applyPullPage last-write-wins', () => {
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.deletedAt?.getTime()).toBe(250);
+  });
+});
+
+describe('applyPullPage advances the local clock past pulled stamps', () => {
+  beforeEach(() => {
+    __resetClockForTests();
+    fixture = createInMemoryDatabase();
+    database = fixture.database;
+  });
+
+  afterEach(() => {
+    __resetClockForTests();
+  });
+
+  it('stamps the next local edit above a pulled row written ahead of this device clock', () => {
+    // A server-side (agent) write or a fast-clock device stamps a row ahead of
+    // this device's wall clock. The next local edit must out-stamp it, or the
+    // server's LWW would silently drop that edit.
+    const ahead = Date.now() + 60_000;
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [gymWire('gym-1', ahead, 'Agent')], 'gyms'),
+    );
+
+    const nextLocal = database.transaction((tx) => nowMonotonic(tx as Transaction));
+    expect(nextLocal).toBeGreaterThan(ahead);
+  });
+
+  it('also observes the stamp of a pulled row that loses LWW locally', () => {
+    const ahead = Date.now() + 60_000;
+    database
+      .insert(gyms)
+      .values({ id: 'gym-1', name: 'Local', localDirty: true, localUpdatedAtMs: ahead + 10 })
+      .run();
+    // The losing row carries the page's newest stamp; the applied one is older.
+    database.transaction((tx) =>
+      applyPullPage(
+        tx as Transaction,
+        [gymWire('gym-2', ahead - 30_000, 'Remote'), gymWire('gym-1', ahead, 'Old')],
+        'gyms',
+      ),
+    );
+
+    const nextLocal = database.transaction((tx) => nowMonotonic(tx as Transaction));
+    expect(nextLocal).toBeGreaterThan(ahead);
+  });
+
+  it('rejects a page whose stamp is not an integer instead of stamping local edits with it', () => {
+    // An existing row makes the NaN lose LWW silently; only the clock sees it.
+    database.insert(gyms).values({ id: 'gym-1', name: 'Local', localDirty: false, localUpdatedAtMs: 100 }).run();
+    const malformed = { ...gymWire('gym-1', 100, 'Bad'), client_updated_at_ms: Number.NaN };
+    expect(() =>
+      database.transaction((tx) => applyPullPage(tx as Transaction, [malformed], 'gyms')),
+    ).toThrow('Pulled client_updated_at_ms is not an integer: NaN');
+    __resetClockForTests();
+    expect(Number.isSafeInteger(database.transaction((tx) => nowMonotonic(tx as Transaction)))).toBe(true);
   });
 });
 

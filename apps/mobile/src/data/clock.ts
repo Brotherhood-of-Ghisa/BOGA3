@@ -67,36 +67,62 @@ let cachedLastEmitted: number | null = null;
  * UI timestamps, log timestamps, and other reads that do **not**
  * bump entity `local_updated_at_ms` keep using `Date.now()` directly.
  */
-export const nowMonotonic = (tx: Transaction): number => {
-  let previous = cachedLastEmitted;
-  if (previous === null) {
-    const row = tx
-      .select({ lastEmittedMs: syncRuntimeState.lastEmittedMs })
-      .from(syncRuntimeState)
-      .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
-      .get();
+const readLastEmitted = (tx: Transaction): number => {
+  if (cachedLastEmitted !== null) return cachedLastEmitted;
+  const row = tx
+    .select({ lastEmittedMs: syncRuntimeState.lastEmittedMs })
+    .from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+    .get();
+  return row?.lastEmittedMs ?? 0;
+};
 
-    previous = row?.lastEmittedMs ?? 0;
-  }
-
-  const wall = Date.now();
-  const next = Math.max(wall, previous + 1);
-
+const persistLastEmitted = (tx: Transaction, value: number): void => {
   tx.insert(syncRuntimeState)
     .values({
       id: PRIMARY_RUNTIME_STATE_ID,
-      lastEmittedMs: next,
+      lastEmittedMs: value,
     })
     .onConflictDoUpdate({
       target: syncRuntimeState.id,
       set: {
-        lastEmittedMs: next,
+        lastEmittedMs: value,
       },
     })
     .run();
 
-  cachedLastEmitted = next;
+  cachedLastEmitted = value;
+};
+
+export const nowMonotonic = (tx: Transaction): number => {
+  const next = Math.max(Date.now(), readLastEmitted(tx) + 1);
+  persistLastEmitted(tx, next);
   return next;
+};
+
+/**
+ * Advances `last_emitted_ms` to at least `observedMs` — a pulled row's
+ * `client_updated_at_ms` — inside the caller's transaction, and never moves it
+ * back. A row stamped by another device or by the server can carry a time
+ * ahead of this device's wall clock; without this, the next local edit of that
+ * row would be stamped lower and the server's LWW would silently drop it.
+ * Server stamps stay near real time: push clamps to `now + 5 min`, and a
+ * server-side writer stamps `now` or one past the row's own stamp.
+ *
+ * A stamp that is not a safe integer breaks the wire contract; it throws, so
+ * the page rolls back and the cycle reports the failure instead of stamping
+ * every later local edit with it.
+ */
+export const observeRemoteTimestamp = (tx: Transaction, observedMs: number): void => {
+  if (!Number.isSafeInteger(observedMs)) {
+    throw new Error(`Pulled client_updated_at_ms is not an integer: ${String(observedMs)}`);
+  }
+  const previous = readLastEmitted(tx);
+  if (observedMs <= previous) {
+    cachedLastEmitted = previous;
+    return;
+  }
+  persistLastEmitted(tx, observedMs);
 };
 
 /**
