@@ -26,12 +26,9 @@ Code: `GymSplitField` in `apps/mobile/components/exercise-catalog/exercise-edito
 
 ### gym.split-choice · principle · accepted
 
-Which exercises a coach tracks per gym ([[gym.split]]): an exercise on a
-machine or station, which differs from gym to gym, is split; free weights
-(dumbbells, barbells, kettlebells) and bodyweight exercises, the same
-everywhere, stay whole.
+A coach splits ([[gym.split]]) machine and station exercises; free weights
+and bodyweight exercises stay whole.
 
-- **Test:** would the same load feel different on another gym's equipment?
 - **Good:** `Leg Press` split; `Dumbbell Curl` whole.
 
 Why: machines change a lot between gyms; dumbbells are always the same.
