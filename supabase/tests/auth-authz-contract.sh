@@ -376,6 +376,12 @@ echo "[auth-test] verifying unauthenticated access is denied for protected app t
 postgrest_select "gyms" "select=id&limit=1" "${ANON_KEY}"
 assert_non_2xx "anon select gyms"
 
+echo "[auth-test] verifying the internal bootstrap markers table is closed to the API roles"
+postgrest_select "local_runtime_bootstrap_markers" "select=marker&limit=1" "${ANON_KEY}"
+assert_non_2xx "anon select local_runtime_bootstrap_markers"
+postgrest_select "local_runtime_bootstrap_markers" "select=marker&limit=1" "${USER_A_TOKEN}"
+assert_non_2xx "authenticated select local_runtime_bootstrap_markers"
+
 echo "[auth-test] verifying cross-user RLS denies reads/updates"
 postgrest_select "gyms" "id=eq.${GYM_A_ID}&select=id" "${USER_B_TOKEN}"
 assert_status "200" "user_b select user_a gym"
