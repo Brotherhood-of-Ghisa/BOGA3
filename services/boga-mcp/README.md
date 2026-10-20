@@ -84,6 +84,34 @@ The adapter adds no bodyweight write tools,
 measurement-timeline reads, group access or database credentials. See the
 [agent API contract](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
+## Tool catalogue changes and client refresh
+
+The catalogue is currently **static**. The HTTP handler creates an MCP server
+and stateless transport for each `POST /mcp` request, then closes both on
+response completion. `GET /mcp` returns 405, so no persistent GET/SSE stream
+exists for out-of-band `notifications/tools/list_changed` delivery.
+
+The v1 MCP SDK automatically advertises `tools.listChanged: true` when tools
+are registered, even in this stateless configuration. **That capability flag
+does not demonstrate working cross-request notifications.** Do not add a
+`refresh_connector` tool or assume that `sendToolListChanged()` will refresh
+ChatGPT's cached/approved actions.
+
+`test/tool-list-changed.test.ts` uses the actual BoGa tool registry, a
+persistent in-memory MCP transport and a standard SDK client. It registers a
+test-only tool after initialization, checks that the client receives a change
+notification, and verifies its automatically refreshed `tools/list`. This
+proves the protocol path **only for a persistent connection**, not the deployed
+HTTP path or ChatGPT approval/refresh behaviour.
+
+Supporting *live* tool changes in production would require designing a
+long-lived notification channel (including authentication, lifecycle and
+multi-instance delivery), then an authenticated HTTP end-to-end test that
+changes the shared catalogue and verifies notification receipt and re-listing.
+Any client-specific approval of new actions remains separate. Until that work
+is complete, use the ChatGPT connector refresh/approval flow after MCP tool
+deployments.
+
 ## Configuration
 
 Copy `.env.example` into the secret/config mechanism owned by the Node hosting
