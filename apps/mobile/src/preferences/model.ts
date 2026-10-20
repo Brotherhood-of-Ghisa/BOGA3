@@ -8,7 +8,7 @@ export type HeatmapView = 'daily' | 'weekly' | 'timeline';
 // breakdown's metric. The period is not one of them: every visit opens on
 // Settings' Progress period ([[comparison.window]]).
 export type ProgressBreakdown = 'exercise' | 'muscle';
-export type ProgressMuscleLayout = 'list' | 'heatmap';
+export type ProgressMuscleLayout = 'list' | 'heatmap' | '3d';
 export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // The Exercise breakdown offers one more: a 1RM estimate is a figure only an
 // exercise has, so the Muscle table never shows it. Each breakdown remembers
@@ -91,7 +91,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
   heatmapView: 'Choose Grid, Weekly or Timeline for history.',
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
-  progressMuscleLayout: 'Choose List or Map for Progress.',
+  progressMuscleLayout: 'Choose List, Map or 3D for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
@@ -116,7 +116,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'historyLookbackWeeks': return isPositiveSafeInteger(value) && value <= MAX_HISTORY_LOOKBACK_WEEKS;
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
-    case 'progressMuscleLayout': return value === 'list' || value === 'heatmap';
+    case 'progressMuscleLayout': return value === 'list' || value === 'heatmap' || value === '3d';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
