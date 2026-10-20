@@ -23,6 +23,9 @@ export const sessionPlanExercises = sqliteTable(
       .notNull()
       .default('pending'),
     resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+    lastModifiedBy: text('last_modified_by', { enum: ['human', 'agent'] })
+      .notNull()
+      .default('human'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
@@ -51,6 +54,10 @@ export const sessionPlanExercises = sqliteTable(
     resolvedAtGuard: check(
       'session_plan_exercises_resolved_at_valid',
       sql`${table.resolvedAt} is null or ${table.progressStatus} in ('completed', 'skipped')`
+    ),
+    lastModifiedByGuard: check(
+      'session_plan_exercises_last_modified_by_valid',
+      sql`${table.lastModifiedBy} in ('human', 'agent')`
     ),
   })
 );

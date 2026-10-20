@@ -574,6 +574,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   training_programmes: [
     SC('name', 'name'),
     SC('description', 'description'),
+    SC('last_modified_by', 'lastModifiedBy'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -585,6 +586,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('title', 'title'),
     TS('scheduled_for', 'scheduledFor'),
     SC('provenance', 'provenance'),
+    SC('last_modified_by', 'lastModifiedBy'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -596,6 +598,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('name', 'name'),
     SC('progress_status', 'progressStatus'),
     TS('resolved_at', 'resolvedAt'),
+    SC('last_modified_by', 'lastModifiedBy'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -606,6 +609,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('target_weight_value', 'targetWeightValue'),
     SC('target_reps', 'targetReps'),
     SC('target_set_type', 'targetSetType'),
+    SC('last_modified_by', 'lastModifiedBy'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -797,6 +801,17 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
   };
   for (const spec of ENTITY_FIELDS[type]) {
     values[spec.prop] = fromWireValue(envelope.fields[spec.wireKey] ?? null, spec.kind);
+  }
+  if (
+    type === 'training_programmes' ||
+    type === 'session_plans' ||
+    type === 'session_plan_exercises' ||
+    type === 'session_plan_sets'
+  ) {
+    values.lastModifiedBy = values.lastModifiedBy ?? 'human';
+  }
+  if (type === 'session_plans') {
+    values.provenance = values.provenance ?? 'human';
   }
   return values;
 };

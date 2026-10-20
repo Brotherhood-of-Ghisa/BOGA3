@@ -139,6 +139,12 @@ export const generatedMigrationBundle = {
     tag: "0021_facts_gym_bucket",
     breakpoints: true,
   },
+  {
+    idx: 22,
+    when: 1792475823374,
+    tag: "0022_plan_last_modified_by",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -845,6 +851,11 @@ BEGIN
   INSERT OR IGNORE INTO \`exercise_session_facts_stale\` (\`exercise_definition_id\`)
   VALUES (NEW.\`id\`);
 END;
+`,
+  m0022: `ALTER TABLE \`training_programmes\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));--> statement-breakpoint
+ALTER TABLE \`session_plans\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));--> statement-breakpoint
+ALTER TABLE \`session_plan_exercises\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));--> statement-breakpoint
+ALTER TABLE \`session_plan_sets\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));
 `,
   },
 } as const;

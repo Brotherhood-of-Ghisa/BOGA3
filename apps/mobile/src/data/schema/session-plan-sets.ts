@@ -17,6 +17,9 @@ export const sessionPlanSets = sqliteTable(
     targetWeightValue: text('target_weight_value'),
     targetReps: integer('target_reps').notNull(),
     targetSetType: text('target_set_type'),
+    lastModifiedBy: text('last_modified_by', { enum: ['human', 'agent'] })
+      .notNull()
+      .default('human'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
@@ -37,6 +40,10 @@ export const sessionPlanSets = sqliteTable(
     ).on(table.sessionPlanExerciseId, table.orderIndex),
     orderGuard: check('session_plan_sets_order_index_non_negative', sql`${table.orderIndex} >= 0`),
     targetRepsGuard: check('session_plan_sets_target_reps_positive', sql`${table.targetReps} > 0`),
+    lastModifiedByGuard: check(
+      'session_plan_sets_last_modified_by_valid',
+      sql`${table.lastModifiedBy} in ('human', 'agent')`
+    ),
   })
 );
 

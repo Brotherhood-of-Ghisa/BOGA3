@@ -10,6 +10,9 @@ export const trainingProgrammes = sqliteTable(
       .default(sql`(lower(hex(randomblob(16))))`),
     name: text('name').notNull(),
     description: text('description'),
+    lastModifiedBy: text('last_modified_by', { enum: ['human', 'agent'] })
+      .notNull()
+      .default('human'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
@@ -23,6 +26,10 @@ export const trainingProgrammes = sqliteTable(
   (table) => ({
     deletedAtIdx: index('training_programmes_deleted_at_idx').on(table.deletedAt),
     nameGuard: check('training_programmes_name_non_empty', sql`length(${table.name}) > 0`),
+    lastModifiedByGuard: check(
+      'training_programmes_last_modified_by_valid',
+      sql`${table.lastModifiedBy} in ('human', 'agent')`
+    ),
   })
 );
 
