@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { ProgressMetric } from '@/src/preferences/model';
+import { comparisonFigures, metricUnit } from './comparison-columns';
 import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
@@ -62,6 +63,33 @@ const resolveDatasetMuscleId = (
   const match = muscles.find(row => candidates.includes(row.muscleGroupId));
   return match ? match.muscleGroupId : canonicalId;
 };
+
+function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: Props) {
+  const unit = metricUnit(metric);
+  return (
+    <View
+      pointerEvents="box-none"
+      style={styles.srTargets}
+      testID="stats-muscle-body-targets">
+      {muscles.map(row => {
+        const figures = comparisonFigures(row, metric);
+        const selected = row.muscleGroupId === selectedId;
+        return (
+          <Pressable
+            accessibilityHint="Selects muscle on the 3D body model."
+            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now} ${unit}.`}
+            accessibilityRole="button"
+            accessibilityState={{ selected, expanded: selected }}
+            key={row.muscleGroupId}
+            onPress={() => onSelect(row.muscleGroupId)}
+            style={styles.srTarget}
+            testID={`stats-muscle-body-target-${row.muscleGroupId}`}
+          />
+        );
+      })}
+    </View>
+  );
+}
 
 /**
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
@@ -231,6 +259,12 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props)
           </Svg>
         </View>
       </GestureDetector>
+      <MuscleAccessibilityTargets
+        metric={metric}
+        muscles={muscles}
+        onSelect={onSelect}
+        selectedId={selectedId}
+      />
       <HeatmapLegend label={metric === 'workingSetCount' ? 'Sets per muscle' : 'Volume per muscle'} />
     </Card>
   );
@@ -260,5 +294,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: VIEWPORT_HEIGHT,
+  },
+  srTargets: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    overflow: 'hidden',
+  },
+  srTarget: {
+    width: 1,
+    height: 1,
   },
 });

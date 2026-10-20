@@ -58,18 +58,18 @@ Code: `apps/mobile/components/stats/muscle-map.tsx`.
 
 ### muscle.progress-layout · presentation · accepted
 
-Both Progress breakdowns use Settings → Progress → Progress view, offering
-List / Map / 3D and defaulting to List. The choice is remembered per account on
-this device, including new launches. Exercise Sets/Volume and Muscle share it;
-Exercise 1RM uses List without changing the saved choice. In 3D view, Exercise
-shades the body from the filtered exercises and tapping a muscle scopes the
-exercise list below to that muscle. Progress has no layout selector. Changing
-the choice keeps period, metric and selection. Returning from history retains
-the chosen layout and scroll. Approved 2026-10-20.
+Both Progress breakdowns use Settings → Progress → Progress view (`List` /
+`Map` / `3D`, default `List`), remembered per account on this device. Exercise
+Sets/Volume and Muscle share it; Exercise 1RM uses List without changing the
+saved choice. 3D shades each muscle on the 5-step `viz0..viz4` ramp relative to
+the period's top muscle (`0`/unavailable → `viz0`; Exercise sums filtered
+exercises by [[muscle.set-count]]), and tapping a muscle scopes the exercise
+list below. Progress has no layout selector; changing layout keeps filters,
+selection and scroll. Approved 2026-10-20.
 
-Why: keep the optional map and 3D views in Settings and the Progress controls focused on filters.
+Why: keep map/3D choice in Settings and shade the 3D body by relative distribution.
 Code: `apps/mobile/components/preferences/progress-settings.tsx`,
-`apps/mobile/src/preferences/model.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
+`apps/mobile/components/stats/muscle-body-projection.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
 
 ### muscle.comparison-primary-only · presentation · accepted
 

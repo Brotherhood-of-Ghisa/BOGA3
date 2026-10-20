@@ -1,26 +1,7 @@
 import rawMesh from './muscle-body-mesh.json';
+import type { MuscleMapId } from './muscle-map-reference';
 
-export type MuscleBodyMaterialId =
-  | 'neutral'
-  | 'chest'
-  | 'delts_front'
-  | 'delts_lateral'
-  | 'delts_rear'
-  | 'back_lats'
-  | 'back_upper'
-  | 'traps_upper'
-  | 'spinal_erectors'
-  | 'biceps'
-  | 'triceps'
-  | 'forearms_grip'
-  | 'abs_rectus'
-  | 'abs_obliques'
-  | 'quads'
-  | 'hamstrings'
-  | 'glutes_max'
-  | 'hip_abductors'
-  | 'adductors'
-  | 'calves';
+export type MuscleBodyMaterialId = 'neutral' | MuscleMapId;
 
 export type MuscleBodyVertex = readonly [x: number, y: number, z: number];
 export type MuscleBodyFace = readonly [

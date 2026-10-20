@@ -8,6 +8,7 @@ import { uiRoles } from '@/components/ui/tokens';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
+import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import {
   SHADE_STEPS,
   bodyOrientationForAngle,
@@ -107,17 +108,22 @@ describe('buildThemeShadePalette', () => {
 });
 
 describe('projectMuscleBody & hitTestProjectedMuscle', () => {
-  it('maintains left/right mirror symmetry and projects anterior vs posterior muscles by angle', () => {
-    expect(MUSCLE_BODY_MESH.materials).toHaveLength(20);
+  it('covers all 25 canonical MUSCLE_MAP_REFERENCE muscles with symmetric, hit-testable 3D regions', () => {
+    expect(MUSCLE_BODY_MESH.materials).toHaveLength(26);
     expect(MUSCLE_BODY_MESH.faces.length).toBeGreaterThan(4000);
 
+    const faceCountsByMaterial = new Map<string, number>();
+    for (const [, , , matIdx] of MUSCLE_BODY_MESH.faces) {
+      const matId = MUSCLE_BODY_MESH.materials[matIdx];
+      faceCountsByMaterial.set(matId, (faceCountsByMaterial.get(matId) ?? 0) + 1);
+    }
+    for (const ref of MUSCLE_MAP_REFERENCE) {
+      expect(MUSCLE_BODY_MESH.materials).toContain(ref.id);
+      expect(faceCountsByMaterial.get(ref.id) ?? 0).toBeGreaterThan(0);
+    }
+
     const buckets = computeMuscleBuckets(
-      [
-        makeMuscle('chest', 'Chest', 10),
-        makeMuscle('back_lats', 'Lats', 8),
-        makeMuscle('quads', 'Quads', 6),
-        makeMuscle('glutes_max', 'Glutes', 4),
-      ],
+      MUSCLE_MAP_REFERENCE.map((ref, idx) => makeMuscle(ref.id, ref.label, idx + 1)),
       'workingSetCount'
     );
 
@@ -130,6 +136,24 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     const leftTris = front.triangles.filter(t => (t.x0 + t.x1 + t.x2) / 3 < width / 2);
     const rightTris = front.triangles.filter(t => (t.x0 + t.x1 + t.x2) / 3 > width / 2);
     expect(leftTris.length).toBe(rightTris.length);
+
+    // Every canonical muscle is projected and hit-testable across canonical viewing angles.
+    const angles = [0, 45, 90, 135, 180];
+    const projections = angles.map(angleDeg =>
+      projectMuscleBody({ angleDeg, width, height, buckets })
+    );
+    for (const ref of MUSCLE_MAP_REFERENCE) {
+      const hitAtSomeAngle = projections.some(proj =>
+        proj.triangles
+          .filter(t => t.muscleGroupId === ref.id)
+          .some(tri => {
+            const cx = (tri.x0 + tri.x1 + tri.x2) / 3;
+            const cy = (tri.y0 + tri.y1 + tri.y2) / 3;
+            return hitTestProjectedMuscle(proj, cx, cy) === ref.id;
+          })
+      );
+      expect(hitAtSomeAngle).toBe(true);
+    }
 
     // Tapping a front chest triangle hits `chest`.
     const chestTri = front.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
@@ -168,7 +192,7 @@ describe('MuscleBodyCard', () => {
     makeMuscle('quads', 'Quads', 4, 1600),
   ];
 
-  it('switches orientation via Front/Back control and accessibility actions, and selects a tapped muscle', () => {
+  it('switches orientation via Front/Back control and accessibility actions, and selects muscles via both touch hit-testing and accessible buttons', () => {
     const onSelect = jest.fn();
     const view = render(
       <MuscleBodyCard
@@ -213,6 +237,12 @@ describe('MuscleBodyCard', () => {
     });
     expect(onSelect).toHaveBeenCalledWith('chest');
 
+    // Screen-reader users can select any muscle directly via its accessible button target.
+    const latsButton = screen.getByLabelText('Select Lats. Now 6 working sets.');
+    expect(latsButton.props.accessibilityState).toEqual({ selected: false, expanded: false });
+    fireEvent.press(latsButton);
+    expect(onSelect).toHaveBeenCalledWith('back_lats');
+
     view.rerender(
       <MuscleBodyCard
         metric="workingSetCount"
@@ -222,6 +252,12 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
+    expect(
+      screen.getByLabelText('Select Chest. Now 8 working sets.').props.accessibilityState
+    ).toEqual({
+      selected: true,
+      expanded: true,
+    });
   });
 
   it('renders MuscleBodyCard in 3D Muscle layout and discloses selected muscle contributions with history links', () => {
