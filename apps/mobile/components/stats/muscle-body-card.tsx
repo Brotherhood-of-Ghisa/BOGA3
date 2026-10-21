@@ -102,7 +102,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props)
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
-  const [responderStartX, setResponderStartX] = useState<number | null>(null);
 
   const angleDeg = normaliseBodyAngle(baseAngleDeg + dragOffsetDeg);
 
@@ -159,6 +158,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props)
 
   const tap = Gesture.Tap()
     .runOnJS(true)
+    .maxDistance(PAN_ACTIVATION_X)
     .onEnd(event => {
       handleTapPoint(event.x, event.y);
     });
@@ -214,31 +214,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props)
               setMeasuredWidth(nextWidth);
             }
           }}
-          onMoveShouldSetResponder={() => true}
-          onResponderGrant={event => {
-            setResponderStartX(event.nativeEvent.pageX ?? event.nativeEvent.locationX ?? 0);
-          }}
-          onResponderMove={event => {
-            if (responderStartX === null) return;
-            const currentX = event.nativeEvent.pageX ?? event.nativeEvent.locationX ?? 0;
-            const dx = currentX - responderStartX;
-            if (Math.abs(dx) >= PAN_ACTIVATION_X) {
-              setDragOffsetDeg(dx * DEGREES_PER_POINT);
-            }
-          }}
-          onResponderRelease={event => {
-            const endX = event.nativeEvent.pageX ?? event.nativeEvent.locationX ?? 0;
-            const dx = responderStartX !== null ? endX - responderStartX : 0;
-            setResponderStartX(null);
-            if (Math.abs(dx) >= PAN_ACTIVATION_X) {
-              setBaseAngleDeg(current => normaliseBodyAngle(current + dx * DEGREES_PER_POINT));
-              setDragOffsetDeg(0);
-              return;
-            }
-            setDragOffsetDeg(0);
-            handleTapPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
-          }}
-          onStartShouldSetResponder={() => true}
           style={styles.viewport}
           testID="stats-muscle-body-viewport">
           <Svg
