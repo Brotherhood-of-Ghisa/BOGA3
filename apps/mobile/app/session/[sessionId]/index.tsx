@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,7 +21,12 @@ import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
-import { findNearbyGym } from '@/src/location/gym-location-reads';
+import { findNearbyGymSuggestions } from '@/src/location/gym-location-reads';
+import {
+  beginSessionPosition,
+  getSessionPosition,
+  subscribeSessionPosition,
+} from '@/src/location/session-position';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { activeGymOptions, listGymDirectory, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import { useSessionRestTimer } from '@/src/session-recorder/rest-timer';
@@ -108,10 +113,10 @@ const confirmSubmitCleanup = async (
 type GymPickerState = {
   visible: boolean;
   options: SessionGymOption[] | null;
-  suggestion: SessionGymOption | null;
+  suggestions: SessionGymOption[];
 };
 
-const CLOSED_GYM_PICKER: GymPickerState = { visible: false, options: null, suggestion: null };
+const CLOSED_GYM_PICKER: GymPickerState = { visible: false, options: null, suggestions: [] };
 
 export type SessionViewScreenProps = {
   sessionId: string | null;
@@ -146,6 +151,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   // Bumped on every open and close, so a lookup that resolves after the sheet
   // has closed (or reopened) is dropped.
   const gymPickerGenerationRef = useRef(0);
+  const gymPickerUnsubscribeRef = useRef<(() => void) | null>(null);
   const restoreGymPickerOnFocusRef = useRef(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -177,34 +183,72 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   );
 
   const openGymPicker = useCallback(() => {
+    // A session id is what the position cache keys on; nothing to suggest for.
+    if (!sessionId) return;
     const generation = ++gymPickerGenerationRef.current;
     const isCurrent = () => gymPickerGenerationRef.current === generation;
-    setGymPicker({ visible: true, options: null, suggestion: null });
+    setGymPicker({ visible: true, options: null, suggestions: [] });
+
+    // Suggest only: a nearby gym becomes the sheet's first rows and is never
+    // selected for the lifter. The suggestion reads the session's cached fix
+    // (`beginSessionPosition`, started when the recorder opened, plus a read
+    // here for a completed session being edited) and updates live while the
+    // sheet is open.
+    let directory: Awaited<ReturnType<typeof listGymDirectory>> | null = null;
+    let position = getSessionPosition(sessionId);
+    const applySuggestions = () => {
+      if (!isCurrent() || !directory) return;
+      const suggestions = findNearbyGymSuggestions(
+        position,
+        directory.filter((gym) => !gym.archived)
+      ).map(({ id, name }) => ({ id, name }));
+      setGymPicker((current) => ({ ...current, suggestions }));
+    };
+    gymPickerUnsubscribeRef.current?.();
+    gymPickerUnsubscribeRef.current = subscribeSessionPosition((latest) => {
+      position = latest;
+      applySuggestions();
+    });
+    void beginSessionPosition(sessionId);
+
     listGymDirectory()
-      .then((directory) => {
+      .then((loaded) => {
         if (!isCurrent()) return;
-        const options = activeGymOptions(directory);
-        setGymPicker((current) => ({ ...current, options }));
-        // Suggest only: a confident match becomes the sheet's first row and is
-        // never selected for the lifter. The permission prompt, when one is
-        // due, first appears here.
-        const candidates = directory.filter((gym) => !gym.archived);
-        return findNearbyGym(candidates).then((nearby) => {
-          if (!isCurrent() || !nearby) return;
-          setGymPicker((current) => ({ ...current, suggestion: { id: nearby.id, name: nearby.name } }));
-        });
+        directory = loaded;
+        setGymPicker((current) => ({ ...current, options: activeGymOptions(loaded) }));
+        applySuggestions();
       })
       .catch(() => {
         if (!isCurrent()) return;
+        gymPickerUnsubscribeRef.current?.();
+        gymPickerUnsubscribeRef.current = null;
         setGymPicker(CLOSED_GYM_PICKER);
         setNotice("Couldn't load your gyms. Try again.");
       });
-  }, []);
+  }, [sessionId]);
 
   const closeGymPicker = () => {
     gymPickerGenerationRef.current += 1;
+    gymPickerUnsubscribeRef.current?.();
+    gymPickerUnsubscribeRef.current = null;
     setGymPicker(CLOSED_GYM_PICKER);
   };
+
+  // The recorder starts acquiring the session's fix the moment it opens, so
+  // the gym sheet suggests right away instead of racing a cold GPS read.
+  useEffect(() => {
+    if (!sessionId || !isActiveSessionReady(state)) return;
+    void beginSessionPosition(sessionId);
+  }, [sessionId, state]);
+
+  // A subscription left by a sheet that was open at unmount goes too.
+  useEffect(
+    () => () => {
+      gymPickerUnsubscribeRef.current?.();
+      gymPickerUnsubscribeRef.current = null;
+    },
+    []
+  );
 
   // Back from the Gyms screen: the gym sheet reopens with the list reloaded.
   useFocusEffect(
@@ -447,7 +491,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         onSelect={(gym) => void selectGym(gym)}
         options={gymPicker.options}
         selectedGymId={state.status === 'ready' ? state.data.gymId : null}
-        suggestion={gymPicker.suggestion}
+        suggestions={gymPicker.suggestions}
         visible={gymPicker.visible}
       />
     </Screen>

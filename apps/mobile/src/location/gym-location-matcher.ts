@@ -2,6 +2,12 @@ export const DEFAULT_MAX_POSITION_ACCURACY_M = 100;
 export const DEFAULT_MATCH_RADIUS_M = 150;
 export const DEFAULT_TIE_THRESHOLD_M = 25;
 
+// The gym sheet's suggestion policy: a fix this coarse is still trusted,
+// because gyms usually sit more than a kilometre apart, and the sheet only
+// suggests — it never selects.
+export const DEFAULT_SUGGESTION_MAX_ACCURACY_M = 500;
+export const DEFAULT_SUGGESTION_COUNT = 2;
+
 export type GymLocationCandidate = {
   id: string;
   name: string;
@@ -146,4 +152,50 @@ export const matchNearestGymForPosition = (
     status: 'matched',
     match: matches[0],
   };
+};
+
+/**
+ * The gyms worth suggesting for the current position, nearest first, at most
+ * `suggestionCount` of them. Unlike {@link matchNearestGymForPosition} this
+ * has no confident single answer to protect: the sheet's rows are suggest-only
+ * and the lifter picks, so a coarse fix is trusted (see
+ * `DEFAULT_SUGGESTION_MAX_ACCURACY_M`), ties become a second row instead of a
+ * refusal, and the radius grows with the fix's accuracy — a fix a few hundred
+ * metres out still reaches the gym the lifter stands in. An empty list covers
+ * a fix coarser than the accuracy gate, a missing fix, and no gym in range.
+ */
+export const findNearbyGymsForPosition = (
+  position: PositionReading,
+  gyms: GymLocationCandidate[],
+  options: { maxPositionAccuracyM?: number; matchRadiusM?: number; suggestionCount?: number } = {}
+): GymLocationMatch[] => {
+  const maxPositionAccuracyM = options.maxPositionAccuracyM ?? DEFAULT_SUGGESTION_MAX_ACCURACY_M;
+  const suggestionCount = options.suggestionCount ?? DEFAULT_SUGGESTION_COUNT;
+
+  if (
+    position.accuracyM === null ||
+    !Number.isFinite(position.accuracyM) ||
+    position.accuracyM < 0 ||
+    position.accuracyM > maxPositionAccuracyM
+  ) {
+    return [];
+  }
+
+  const matchRadiusM = options.matchRadiusM ?? Math.max(DEFAULT_MATCH_RADIUS_M, position.accuracyM);
+
+  return gyms
+    .filter(isEligibleGymCandidate)
+    .map((gym) => ({
+      gym,
+      distanceM: haversineDistanceM(position, {
+        latitude: gym.latitude,
+        longitude: gym.longitude,
+      }),
+    }))
+    .filter((match) => match.distanceM <= matchRadiusM)
+    .sort((left, right) => {
+      const distanceDelta = left.distanceM - right.distanceM;
+      return distanceDelta === 0 ? left.gym.id.localeCompare(right.gym.id) : distanceDelta;
+    })
+    .slice(0, suggestionCount);
 };

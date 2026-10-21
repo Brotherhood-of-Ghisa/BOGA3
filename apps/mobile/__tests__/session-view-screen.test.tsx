@@ -93,6 +93,7 @@ import * as insightsRepository from '@/src/session-insights/repository';
 import { getRestTimerEntry } from '@/src/session-recorder/rest-timer';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
 import { setAccountLocalPreferences } from '@/src/preferences/account-local';
+import { resetSessionPositions } from '@/src/location/session-position';
 import {
   bootLocalApp,
   closeLocalData,
@@ -212,6 +213,8 @@ const addExerciseThroughPicker = async (name: string) => {
 beforeEach(() => {
   jest.clearAllMocks();
   resetLocalData();
+  // The session position cache outlives a single test otherwise.
+  resetSessionPositions();
   mockFocusCallbacks.clear();
   setAddExerciseRoute(null);
   mockPush.mockImplementation((href: string) => {
@@ -560,7 +563,6 @@ describe('Session view', () => {
     ['permission denial', () => ({ status: 'permission_denied', canAskAgain: false })],
     ['services off', () => ({ status: 'unavailable', reason: 'services_disabled' })],
     ['a read failure', () => ({ status: 'read_failure', error: new Error('gps') })],
-    ['low accuracy', () => positionAt(HARBOUR, 140)],
     ['no gym in range', () => positionAt({ latitude: 48.85, longitude: 2.35 })],
   ])('shows no suggestion row on %s', async (_case, result) => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(result());
@@ -576,7 +578,34 @@ describe('Session view', () => {
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
-  it('shows no suggestion row when two gyms tie, or when no gym has a location', async () => {
+  it('shows no suggestion row when the fix never tightens past the accuracy gate', async () => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR, 600));
+    await openSession(() =>
+      upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
+    );
+
+    await openGymSheet();
+    await act(async () => {});
+
+    // The acquisition retried the coarse fix before giving up.
+    expect(location.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(3);
+    expect(screen.getByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('suggests a fix the old 1.5-second read refused', async () => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR, 140));
+    await openSession(() =>
+      upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
+    );
+
+    await openGymSheet();
+
+    expect(await screen.findByTestId('session-view-gym-suggestion')).toBeTruthy();
+    expect(screen.getByText('Nearby · Harbour Barbell')).toBeTruthy();
+  });
+
+  it('suggests both nearby gyms when two share the location, and none when no gym has a location', async () => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
     await openSession(async () => {
       await upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) });
@@ -589,8 +618,11 @@ describe('Session view', () => {
 
     await openGymSheet();
     await act(async () => {});
+    expect(screen.getByTestId('session-view-gym-suggestion')).toBeTruthy();
+    expect(screen.getByTestId('session-view-gym-suggestion-gym-iron')).toBeTruthy();
+    expect(screen.getByText('Nearby · Harbour Barbell')).toBeTruthy();
+    expect(screen.getByText('Nearby · Iron Works')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-gym-iron')).toBeTruthy();
-    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
 
     fireEvent.press(screen.getByTestId('session-view-gym-sheet-backdrop', { includeHiddenElements: true }));
     await upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: null });
@@ -601,25 +633,26 @@ describe('Session view', () => {
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
-  it('gives up on the suggestion after 1.5 s without a fix, leaving the list usable', async () => {
+  it('suggests the nearest gym the moment the fix lands while the sheet is open', async () => {
     let resolveFix: (value: unknown) => void = () => undefined;
-    location.getCurrentForegroundPositionLazy.mockReturnValue(new Promise((resolve) => (resolveFix = resolve)));
+    location.getCurrentForegroundPositionLazy.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFix = resolve;
+      })
+    );
     await openSession(() =>
       upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
     );
-    jest.useFakeTimers();
 
     await openGymSheet();
-    expect(await screen.findByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
-    await act(async () => {
-      jest.advanceTimersByTime(1500);
-    });
-    // A fix arriving after the budget is dropped.
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+
     await act(async () => {
       resolveFix(positionAt(HARBOUR));
     });
 
-    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+    expect(await screen.findByTestId('session-view-gym-suggestion')).toBeTruthy();
+    expect(screen.getByText('Nearby · Harbour Barbell')).toBeTruthy();
   });
 
   it('does not suggest the gym the session already has', async () => {
