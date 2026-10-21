@@ -1,4 +1,8 @@
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
+import {
+  SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
+  SYSTEM_MUSCLE_GROUP_SEEDS,
+} from '@/src/data/exercise-catalog-seeds';
 
 export const normalizeExerciseSearchWords = (value: string): string[] =>
   value
@@ -20,7 +24,7 @@ export type IndexedExerciseCatalogExercise = ExerciseCatalogExercise & {
 };
 
 export const buildExerciseCatalogSearchText = (
-  exercise: ExerciseCatalogExercise,
+  exercise: Pick<ExerciseCatalogExercise, 'name' | 'mappings'>,
   muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>
 ): string => {
   const muscleTerms = exercise.mappings.flatMap((mapping) => {
@@ -39,6 +43,36 @@ export const buildExerciseCatalogSearchText = (
   return [exercise.name, ...muscleTerms].join(' ').toLowerCase();
 };
 
+export const exerciseSearchTextMatches = (words: string[], searchText: string): boolean => {
+  if (words.length === 0) {
+    return true;
+  }
+  return words.every((word) => searchText.includes(word));
+};
+
+/**
+ * Muscle search terms of a bundled-catalogue exercise, by its seed id. Group
+ * exercises and catalogue seeds carry only a source id, so their searches
+ * match on the origin exercise's muscle groups.
+ */
+export const seedMuscleSearchTermsById: ReadonlyMap<string, string> = (() => {
+  const seedMuscleGroupsById = new Map(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => [seed.id, seed]));
+  const termsById = new Map<string, string[]>();
+  for (const mapping of SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS) {
+    if (mapping.role !== 'primary') {
+      continue;
+    }
+    const muscleGroup = seedMuscleGroupsById.get(mapping.muscleGroupId);
+    if (!muscleGroup) {
+      continue;
+    }
+    const terms = termsById.get(mapping.exerciseDefinitionId) ?? [];
+    terms.push(muscleGroup.displayName, muscleGroup.familyName);
+    termsById.set(mapping.exerciseDefinitionId, terms);
+  }
+  return new Map([...termsById].map(([id, terms]) => [id, terms.join(' ').toLowerCase()]));
+})();
+
 export const filterExerciseCatalogExercises = (
   exercises: ExerciseCatalogExercise[],
   muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>,
@@ -49,10 +83,9 @@ export const filterExerciseCatalogExercises = (
     return exercises;
   }
 
-  return exercises.filter((exercise) => {
-    const searchText = buildExerciseCatalogSearchText(exercise, muscleGroupsById);
-    return searchWords.every((searchWord) => searchText.includes(searchWord));
-  });
+  return exercises.filter((exercise) =>
+    exerciseSearchTextMatches(searchWords, buildExerciseCatalogSearchText(exercise, muscleGroupsById))
+  );
 };
 
 export const filterIndexedExerciseCatalogExercises = <T extends IndexedExerciseCatalogExercise>(
@@ -60,11 +93,6 @@ export const filterIndexedExerciseCatalogExercises = <T extends IndexedExerciseC
   query: string
 ): T[] => {
   const searchWords = normalizeExerciseSearchWords(query);
-  if (searchWords.length === 0) {
-    return indexed;
-  }
 
-  return indexed.filter((exercise) =>
-    searchWords.every((searchWord) => exercise.searchText.includes(searchWord))
-  );
+  return indexed.filter((exercise) => exerciseSearchTextMatches(searchWords, exercise.searchText));
 };

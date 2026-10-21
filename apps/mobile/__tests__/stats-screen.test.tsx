@@ -213,6 +213,9 @@ const buildShellProps = (
   exerciseMetric: 'workingSetCount',
   onSelectExerciseMetric: jest.fn(),
   exerciseListItems: [],
+  exerciseSearchIndex: new Map(
+    (overrides.exerciseListItems ?? []).map((item) => [item.id, item.name.toLowerCase()]),
+  ),
   searchQuery: '',
   onSearchQueryChange: jest.fn(),
   ...overrides,
@@ -1087,6 +1090,25 @@ describe('StatsScreenShell — search & filtering', () => {
 
     expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-row-ex2')).toBeNull();
+  });
+
+  it('matches exercises on their muscle groups, as the exercise picker does', () => {
+    render(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'exercise',
+          searchQuery: 'chest',
+          exerciseListItems: [
+            buildExerciseListItem('ex1', 'Bench Press'),
+            buildExerciseListItem('ex2', 'Squat'),
+          ],
+          exerciseSearchIndex: new Map([['ex2', 'squat chest']]),
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-exercise-row-ex2')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-row-ex1')).toBeNull();
   });
 
   it('shows correct empty state when no exercises match', () => {

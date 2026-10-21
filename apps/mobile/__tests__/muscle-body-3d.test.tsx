@@ -289,6 +289,7 @@ describe('MuscleBodyCard', () => {
       <StatsScreenShell
         errorMessage={null}
         exerciseListItems={[]}
+        exerciseSearchIndex={new Map()}
         exerciseMetric="workingSetCount"
         isLoading={false}
         muscleLayout="3d"
@@ -367,6 +368,11 @@ describe('MuscleBodyCard', () => {
       <StatsScreenShell
         errorMessage={null}
         exerciseDataReady
+        exerciseSearchIndex={new Map([
+          ['bench', 'barbell bench press chest triceps'],
+          ['dips', 'parallel bar dips chest triceps'],
+          ['squat', 'barbell back squat quads'],
+        ])}
         exerciseListItems={[
           {
             id: 'bench',

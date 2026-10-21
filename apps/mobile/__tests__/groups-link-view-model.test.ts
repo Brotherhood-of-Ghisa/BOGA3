@@ -41,6 +41,7 @@ const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, '
 
 const exercise = (overrides: Partial<LinkableExercise> & Pick<LinkableExercise, 'id' | 'name'>): LinkableExercise => ({
   deletedAt: null,
+  mappings: [],
   ...overrides,
 });
 
@@ -164,7 +165,20 @@ describe('pick sheet', () => {
     expect(model.choices.find((choice) => choice.exercise.id === 'ex-squat')?.unavailableReason).toBe(
       'already linked in Tuesday Crew',
     );
-    expect(filterPickSheetChoices(model.choices, 'hotel').map((choice) => choice.exercise.id)).toEqual(['ex-hotel']);
+    expect(filterPickSheetChoices(model.choices, 'hotel', {}).map((choice) => choice.exercise.id)).toEqual(['ex-hotel']);
+  });
+
+  it('matches choices on their primary muscle groups', () => {
+    const model = buildPickSheetModel({
+      groupId: 'g1',
+      groupName: 'Tuesday Crew',
+      groupExercise: GX_BENCH_IRON,
+      exercises: [exercise({ id: 'ex-press', name: 'Heavy Push Thing', mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }] })],
+      links: [],
+    });
+    const muscleGroupsById = { chest: { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0 } };
+    expect(filterPickSheetChoices(model.choices, 'chest', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
+    expect(filterPickSheetChoices(model.choices, 'Heavy Push Thing', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
   });
 });
 

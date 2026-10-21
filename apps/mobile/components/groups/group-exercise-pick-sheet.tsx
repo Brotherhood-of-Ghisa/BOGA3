@@ -21,6 +21,7 @@ import {
   type LinkRef,
   type LinkableExercise,
 } from '@/src/groups';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 
 export type GroupExercisePickTarget = {
   groupId: string;
@@ -69,6 +70,8 @@ type GroupExercisePickSheetProps = {
 export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
   const { target, exercises, links, onRequestClose, onLinkAndAdd, onAddAsNew } = props;
   const purpose = props.purpose ?? 'add-to-session';
+  // The muscle-group index the shared exercise search matches on.
+  const { muscleGroupsById } = useExerciseCatalog();
   const model = useMemo(
     () =>
       target && target.mode === 'link'
@@ -186,7 +189,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
                     value={search}
                   />
                 </View>
-                {filterPickSheetChoices(model.choices, search).map(({ exercise, unavailableReason }) => (
+                {filterPickSheetChoices(model.choices, search, muscleGroupsById).map(({ exercise, unavailableReason }) => (
                   <ListRow
                     accessibilityLabel={
                       unavailableReason ? `${exercise.name}, ${unavailableReason}` : `Choose ${exercise.name}`
