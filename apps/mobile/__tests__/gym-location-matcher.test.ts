@@ -1,7 +1,9 @@
 import {
   DEFAULT_MATCH_RADIUS_M,
   DEFAULT_MAX_POSITION_ACCURACY_M,
+  DEFAULT_SUGGESTION_MAX_ACCURACY_M,
   DEFAULT_TIE_THRESHOLD_M,
+  findNearbyGymsForPosition,
   matchNearestGymForPosition,
 } from '@/src/location/gym-location-matcher';
 
@@ -143,5 +145,49 @@ describe('matchNearestGymForPosition', () => {
     }
     expect(result.tieThresholdM).toBe(DEFAULT_TIE_THRESHOLD_M);
     expect(result.matches.map((match) => match.gym.id)).toEqual(['closest', 'near-tie']);
+  });
+});
+
+describe("findNearbyGymsForPosition (the gym sheet's suggestion list)", () => {
+  const gymAt = (id: string, latitude: number) => ({
+    id,
+    name: id,
+    latitude,
+    longitude: -0.1246,
+  });
+
+  it('returns the nearest gyms nearest first, at most two, ties included', () => {
+    const result = findNearbyGymsForPosition(basePosition, [
+      gymAt('third-nearest', 51.502),
+      gymAt('nearest', 51.5008),
+      gymAt('second-nearest', 51.5009),
+      gymAt('no-location', null as unknown as number),
+    ]);
+
+    expect(result.map((match) => match.gym.id)).toEqual(['nearest', 'second-nearest']);
+  });
+
+  it('trusts a fix the confident matcher refuses and grows the radius with its accuracy', () => {
+    const gyms = [gymAt('few-hundred-metres-out', 51.5033)];
+
+    // The same fix is below the confident matcher's accuracy gate.
+    expect(matchNearestGymForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M }, gyms).status).toBe(
+      'low_accuracy'
+    );
+
+    const result = findNearbyGymsForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M }, gyms);
+    expect(result).toHaveLength(1);
+    expect(result[0].gym.id).toBe('few-hundred-metres-out');
+    expect(result[0].distanceM).toBeGreaterThan(DEFAULT_MATCH_RADIUS_M);
+  });
+
+  it('suggests nothing without a fix, on a fix too coarse to trust, and on no gym in range', () => {
+    const gyms = [gymAt('a-gym', 51.501)];
+
+    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: null }, gyms)).toEqual([]);
+    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M + 1 }, gyms)).toEqual(
+      []
+    );
+    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: 50 }, [gymAt('far-away', 51.53)])).toEqual([]);
   });
 });

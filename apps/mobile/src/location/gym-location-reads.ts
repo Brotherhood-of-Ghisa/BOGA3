@@ -1,8 +1,8 @@
 import { getCurrentForegroundPositionLazy } from './foreground-location-lazy';
-import type { CurrentForegroundPositionResult } from './foreground-location-service';
+import type { CurrentForegroundPositionResult, ForegroundLocationPosition } from './foreground-location-service';
 import {
   DEFAULT_MAX_POSITION_ACCURACY_M,
-  matchNearestGymForPosition,
+  findNearbyGymsForPosition,
   type GymLocationCandidate,
 } from './gym-location-matcher';
 
@@ -10,65 +10,32 @@ import {
  * The two foreground location reads the gym UI makes: the gym sheet's nearby
  * suggestion and the Gyms screen's `Save current location`. Both take the
  * position reader as a parameter, so tests inject one instead of the native
- * module.
+ * module. The sheet's suggestion reads the session's cached position
+ * (`src/location/session-position.ts`), not a fresh read.
  */
 export type ReadForegroundPosition = () => Promise<CurrentForegroundPositionResult>;
 
-// How long the gym sheet waits for a fix before giving up on the suggestion;
-// the old recorder's start-time detection used the same budget.
-export const NEARBY_GYM_TIMEOUT_MS = 1500;
-
-const resolveWithTimeout = async <T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  try {
-    return await Promise.race([
-      promise.catch(() => fallback),
-      new Promise<T>((resolve) => {
-        timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
-};
-
 /**
- * The one gym that confidently matches the current position, or null. Null
- * covers every quiet case: permission denied, services off, a read failure, low
- * accuracy, no gym in range, a tie, and no fix within `timeoutMs`.
+ * The gyms to suggest for the session's cached fix, nearest first, at most two.
+ * `null` position (still acquiring, or the session gave up) and no gym in
+ * range both suggest nothing. Gyms come back as the directory's own objects,
+ * so the caller maps them straight onto rows.
  */
-export const findNearbyGym = async <T extends GymLocationCandidate>(
-  gyms: T[],
-  {
-    readPosition = getCurrentForegroundPositionLazy,
-    timeoutMs = NEARBY_GYM_TIMEOUT_MS,
-  }: { readPosition?: ReadForegroundPosition; timeoutMs?: number } = {}
-): Promise<T | null> => {
-  const lookup = async (): Promise<T | null> => {
-    const result = await readPosition();
-    if (result.status !== 'success') {
-      return null;
-    }
-
-    const match = matchNearestGymForPosition(
-      {
-        latitude: result.position.latitude,
-        longitude: result.position.longitude,
-        accuracyM: result.position.accuracyM,
-      },
-      gyms
-    );
-    if (match.status !== 'matched') {
-      return null;
-    }
-
-    return gyms.find((gym) => gym.id === match.match.gym.id) ?? null;
-  };
-
-  return resolveWithTimeout(lookup(), timeoutMs, null);
+export const findNearbyGymSuggestions = <T extends GymLocationCandidate>(
+  position: ForegroundLocationPosition | null,
+  gyms: T[]
+): T[] => {
+  if (!position) return [];
+  return findNearbyGymsForPosition(
+    {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracyM: position.accuracyM,
+    },
+    gyms
+  )
+    .map((match) => gyms.find((gym) => gym.id === match.gym.id))
+    .filter((gym): gym is T => gym !== undefined);
 };
 
 export type GymCoordinates = {

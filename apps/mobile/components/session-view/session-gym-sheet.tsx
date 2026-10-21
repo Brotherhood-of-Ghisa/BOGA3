@@ -13,37 +13,38 @@ type SessionGymSheetProps = {
   visible: boolean;
   // `null` while loading.
   options: SessionGymOption[] | null;
-  // The one gym that confidently matches the current position, once the
-  // lookup the screen started on open resolves; `null` otherwise.
-  suggestion: SessionGymOption | null;
+  // The gyms near the session's fix, nearest first, once the position the
+  // recorder acquired resolves; empty otherwise. Suggests, never selects.
+  suggestions: SessionGymOption[];
   selectedGymId: string | null;
   onSelect: (gym: SessionGymOption | null) => void;
   onManage: () => void;
   onDismiss: () => void;
 };
 
-// Picks the session's gym. A confident GPS match comes first as `Nearby ·
-// <gym>` (it suggests, never selects), then No gym and every gym with the
-// current one marked. `Manage gyms` leaves for the Gyms screen.
+// Picks the session's gym. Nearby gyms come first as `Nearby · <gym>` (they
+// suggest, never select), then No gym and every gym with the current one
+// marked. `Manage gyms` leaves for the Gyms screen.
 export function SessionGymSheet({
   visible,
   options,
-  suggestion,
+  suggestions,
   selectedGymId,
   onSelect,
   onManage,
   onDismiss,
 }: SessionGymSheetProps) {
   const { height } = useWindowDimensions();
-  // Suggesting the gym the session already has would say nothing.
-  const nearby = options !== null && suggestion && suggestion.id !== selectedGymId ? suggestion : null;
+  // Suggesting the gym the session already has would say nothing; its
+  // neighbour still says something when two gyms share a site.
+  const nearby = options === null ? [] : suggestions.filter((suggestion) => suggestion.id !== selectedGymId);
 
   const row = (gym: SessionGymOption | null, index: number) => {
     const isSelected = (gym?.id ?? null) === selectedGymId;
     return (
       <ListRow
         accessibilityLabel={gym ? `Select gym ${gym.name}` : 'Select no gym'}
-        divider={index > 0 || nearby !== null}
+        divider={index > 0 || nearby.length > 0}
         key={gym?.id ?? 'none'}
         label={gym?.name ?? 'No gym'}
         onPress={() => onSelect(gym)}
@@ -61,16 +62,17 @@ export function SessionGymSheet({
           <Text allowFontScaling={false} style={styles.message}>Loading gyms…</Text>
         ) : (
           <>
-            {nearby ? (
+            {nearby.map((gym, index) => (
               <ListRow
-                accessibilityLabel={`Select nearby gym ${nearby.name}`}
-                divider={false}
-                label={`Nearby · ${nearby.name}`}
+                accessibilityLabel={`Select nearby gym ${gym.name}`}
+                divider={index > 0}
+                key={gym.id}
+                label={`Nearby · ${gym.name}`}
                 leading={<Icon color={uiRoles.accent} name="location" />}
-                onPress={() => onSelect(nearby)}
-                testID="session-view-gym-suggestion"
+                onPress={() => onSelect(gym)}
+                testID={index === 0 ? 'session-view-gym-suggestion' : `session-view-gym-suggestion-${gym.id}`}
               />
-            ) : null}
+            ))}
             {[null, ...options].map(row)}
           </>
         )}

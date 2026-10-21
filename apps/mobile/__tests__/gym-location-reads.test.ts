@@ -1,10 +1,11 @@
-import { findNearbyGym, NEARBY_GYM_TIMEOUT_MS, readGymCoordinates } from '@/src/location/gym-location-reads';
+import { findNearbyGymSuggestions, readGymCoordinates } from '@/src/location/gym-location-reads';
 
-const fixAt = (latitude: number, longitude: number, accuracyM: number | null = 20) =>
-  jest.fn().mockResolvedValue({
-    status: 'success',
-    position: { latitude, longitude, accuracyM, capturedAt: new Date('2026-09-23T10:00:00Z') },
-  });
+const positionAt = (latitude: number, longitude: number, accuracyM: number | null = 20) => ({
+  latitude,
+  longitude,
+  accuracyM,
+  capturedAt: new Date('2026-09-23T10:00:00Z'),
+});
 
 const gym = (id: string, latitude: number | null, longitude: number | null, archived = false) => ({
   id,
@@ -14,43 +15,43 @@ const gym = (id: string, latitude: number | null, longitude: number | null, arch
   archived,
 });
 
-describe('findNearbyGym (the gym sheet suggestion)', () => {
-  afterEach(() => {
-    jest.useRealTimers();
+describe('findNearbyGymSuggestions (the gym sheet suggestion)', () => {
+  it('returns the nearest gyms as the caller passed them, nearest first', () => {
+    const harbour = { ...gym('harbour', 51.5, -0.12), extra: 'kept' };
+    const annex = gym('annex', 51.5001, -0.12);
+
+    const found = findNearbyGymSuggestions(positionAt(51.5, -0.12), [gym('far', 48.85, 2.35), annex, harbour]);
+
+    expect(found).toEqual([harbour, annex]);
+    expect(found[0]).toBe(harbour);
   });
 
-  it('returns the one gym that confidently matches, as the caller passed it', async () => {
-    const harbour = { ...gym('harbour', 51.5, -0.12), extra: 'kept' };
-    const found = await findNearbyGym([gym('far', 48.85, 2.35), harbour], { readPosition: fixAt(51.5, -0.12) });
+  it('suggests nothing without a fix and with a fix too coarse to trust', () => {
+    const gyms = [gym('a', 51.5, -0.12)];
 
-    expect(found).toBe(harbour);
+    expect(findNearbyGymSuggestions(null, gyms)).toEqual([]);
+    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12, 501), gyms)).toEqual([]);
+  });
+
+  it('trusts a fix the old 1.5-second read refused', () => {
+    const gyms = [gym('a', 51.5, -0.12)];
+
+    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12, 140), gyms)).toEqual([gyms[0]]);
   });
 
   it.each([
-    ['a tie', [gym('a', 51.5, -0.12), gym('b', 51.5001, -0.12)], fixAt(51.5, -0.12)],
-    ['no gym in range', [gym('far', 48.85, 2.35)], fixAt(51.5, -0.12)],
-    ['no gym with a location', [gym('a', null, null)], fixAt(51.5, -0.12)],
-    ['an archived gym only', [gym('a', 51.5, -0.12, true)], fixAt(51.5, -0.12)],
-    ['low accuracy', [gym('a', 51.5, -0.12)], fixAt(51.5, -0.12, 140)],
-    ['permission denial', [gym('a', 51.5, -0.12)], jest.fn().mockResolvedValue({ status: 'permission_denied', canAskAgain: true })],
-    ['a rejected read', [gym('a', 51.5, -0.12)], jest.fn().mockRejectedValue(new Error('native'))],
-  ])('returns null on %s', async (_case, gyms, readPosition) => {
-    await expect(findNearbyGym(gyms, { readPosition })).resolves.toBeNull();
-  });
-
-  it('gives up after its budget and clears its timer when the fix wins', async () => {
-    jest.useFakeTimers();
-    const pending = findNearbyGym([gym('a', 51.5, -0.12)], { readPosition: () => new Promise(() => undefined) });
-    jest.advanceTimersByTime(NEARBY_GYM_TIMEOUT_MS);
-    await expect(pending).resolves.toBeNull();
-    expect(NEARBY_GYM_TIMEOUT_MS).toBe(1500);
-
-    await findNearbyGym([gym('a', 51.5, -0.12)], { readPosition: fixAt(51.5, -0.12) });
-    expect(jest.getTimerCount()).toBe(0);
+    ['no gym in range', [gym('far', 48.85, 2.35)]],
+    ['no gym with a location', [gym('a', null, null)]],
+    ['an archived gym only', [gym('a', 51.5, -0.12, true)]],
+  ])('suggests nothing on %s', (_case, gyms) => {
+    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12), gyms)).toEqual([]);
   });
 });
 
 describe('readGymCoordinates (Save current location)', () => {
+  const fixAt = (latitude: number, longitude: number, accuracyM: number | null = 20) =>
+    jest.fn().mockResolvedValue({ status: 'success', position: positionAt(latitude, longitude, accuracyM) });
+
   it('returns an accurate fix as the coordinates to save', async () => {
     await expect(readGymCoordinates(fixAt(51.5, -0.12, 30))).resolves.toEqual({
       status: 'success',
