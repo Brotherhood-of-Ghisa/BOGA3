@@ -321,7 +321,13 @@ describe('session planning graph round-trips through the sync cycle and survives
         type: 'training_programmes',
         id: 'tp-agent',
         client_updated_at_ms: stamp,
-        fields: { name: 'Agent Wave', description: 'Coaching plan', created_at: stamp, updated_at: stamp },
+        fields: {
+          name: 'Agent Wave',
+          description: 'Coaching plan',
+          last_modified_by: 'agent',
+          created_at: stamp,
+          updated_at: stamp,
+        },
       },
       {
         type: 'session_plans',
@@ -334,6 +340,7 @@ describe('session planning graph round-trips through the sync cycle and survives
           title: 'Day 1 Bench',
           scheduled_for: 1_700_001_000_000,
           provenance: 'agent',
+          last_modified_by: 'agent',
           created_at: stamp,
           updated_at: stamp,
         },
@@ -349,6 +356,7 @@ describe('session planning graph round-trips through the sync cycle and survives
           name: 'Bench Press',
           progress_status: 'pending',
           resolved_at: null,
+          last_modified_by: 'agent',
           created_at: stamp,
           updated_at: stamp,
         },
@@ -363,6 +371,7 @@ describe('session planning graph round-trips through the sync cycle and survives
           target_weight_value: '80',
           target_reps: 6,
           target_set_type: 'rir_2',
+          last_modified_by: 'agent',
           created_at: stamp,
           updated_at: stamp,
         },
@@ -382,6 +391,7 @@ describe('session planning graph round-trips through the sync cycle and survives
       gymId: 'gym-server',
       title: 'Day 1 Bench',
       provenance: 'agent',
+      lastModifiedBy: 'agent',
       localDirty: false,
     });
 
@@ -392,6 +402,7 @@ describe('session planning graph round-trips through the sync cycle and survives
       exerciseDefinitionId: 'def-bench',
       progressStatus: 'pending',
       resolvedAt: null,
+      lastModifiedBy: 'agent',
       localDirty: false,
     });
 
@@ -402,6 +413,7 @@ describe('session planning graph round-trips through the sync cycle and survives
       targetWeightValue: '80',
       targetReps: 6,
       targetSetType: 'rir_2',
+      lastModifiedBy: 'agent',
       localDirty: false,
     });
 
@@ -410,6 +422,7 @@ describe('session planning graph round-trips through the sync cycle and survives
     expect(programme).toMatchObject({
       name: 'Agent Wave',
       description: 'Coaching plan',
+      lastModifiedBy: 'agent',
       localDirty: false,
     });
 

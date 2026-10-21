@@ -21,6 +21,9 @@ export const sessionPlans = sqliteTable(
     provenance: text('provenance', { enum: ['human', 'agent'] })
       .notNull()
       .default('human'),
+    lastModifiedBy: text('last_modified_by', { enum: ['human', 'agent'] })
+      .notNull()
+      .default('human'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
@@ -38,6 +41,10 @@ export const sessionPlans = sqliteTable(
     deletedAtIdx: index('session_plans_deleted_at_idx').on(table.deletedAt),
     titleGuard: check('session_plans_title_non_empty', sql`length(${table.title}) > 0`),
     provenanceGuard: check('session_plans_provenance_valid', sql`${table.provenance} in ('human', 'agent')`),
+    lastModifiedByGuard: check(
+      'session_plans_last_modified_by_valid',
+      sql`${table.lastModifiedBy} in ('human', 'agent')`
+    ),
     orderGuard: check(
       'session_plans_programme_order_index_non_negative',
       sql`${table.programmeOrderIndex} is null or ${table.programmeOrderIndex} >= 0`
