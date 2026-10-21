@@ -1,3 +1,6 @@
+import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { EMPTY_SESSION_WEIGHT, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
@@ -27,7 +30,7 @@ import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+
 import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 import { buildCompletedSessionDetailModel, sessionVolumeFigure } from '@/src/session-recorder/completed-session-detail-model';
 import { completedSessionTitle } from '@/src/session-recorder/session-view-model';
@@ -98,21 +101,6 @@ export type CompletedSessionDetailScreenShellProps = {
   shouldFailNextMaestroCatalog?: boolean;
   maestroInsights?: 'loading' | 'error';
 };
-
-function formatDateTimeStamp(isoTimestamp: string): string {
-  const parsed = new Date(isoTimestamp);
-  if (Number.isNaN(parsed.getTime())) {
-    return isoTimestamp;
-  }
-
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  const year = parsed.getFullYear();
-  const hours = `${parsed.getHours()}`.padStart(2, '0');
-  const minutes = `${parsed.getMinutes()}`.padStart(2, '0');
-
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
 
 function coerceRouteParam(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) {
@@ -228,6 +216,7 @@ export function CompletedSessionDetailScreenShell({
   shouldFailNextMaestroCatalog = false,
   maestroInsights,
 }: CompletedSessionDetailScreenShellProps) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
@@ -363,8 +352,8 @@ export function CompletedSessionDetailScreenShell({
   );
 
   const formattedStartedAt = useMemo(
-    () => (session ? formatDateTimeStamp(session.startedAt) : '—'),
-    [session]
+    () => (session ? formatLocalDateTime(Date.parse(session.startedAt), dateFormat) : '—'),
+    [session, dateFormat]
   );
   const performedExercises = useMemo(
     () =>
@@ -675,7 +664,7 @@ export function CompletedSessionDetailScreenShell({
         onEdit={handleEdit}
         onToggleDeleted={handleToggleDeletedState}
         summary={{
-          title: completedSessionTitle(new Date(session.startedAt)),
+          title: completedSessionTitle(new Date(session.startedAt), dateFormat),
           start: formattedStartedAt,
           duration: session.durationDisplay,
           gymName: session.gymName,

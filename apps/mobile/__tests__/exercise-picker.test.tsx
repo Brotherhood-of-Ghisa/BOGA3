@@ -553,7 +553,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     const { onSelectExercise, onAppendPlan } = await openInteractions(true, logSquatHistory);
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
-    expect(await screen.findByTestId('exercise-picker-plan-source')).toHaveTextContent('From 2026-06-10 18:42');
+    expect(await screen.findByTestId('exercise-picker-plan-source')).toHaveTextContent('From 10-06-2026 18:42');
     // The set row: type · weight × reps · 1RM · VOL, faded as planned.
     expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-picker-plan-set-row-1-values')).toHaveTextContent('0.0 × 10');

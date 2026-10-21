@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -35,6 +36,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   userId: string; groupId: string; exercise: CompetitionExerciseWire;
   initialMetric: string | null; initialScope: GroupBoardScope;
 }) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   const exerciseId = exercise.group_exercise_id;
   const requestedMetric = isCompetitionMetric(initialMetric) ? initialMetric : exercise.rules.default_metric;
@@ -88,7 +90,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
     contentContainerStyle: groupScreenStyles.cardListContent, ListHeaderComponentStyle: groupScreenStyles.cardListHeader,
     refreshControl: <RefreshControl refreshing={pulling} onRefresh={onRefresh} /> };
   if (view === 'scores') {
-    const rows = scores.items.map(row => buildCompetitionRow(row, scope, userId));
+    const rows = scores.items.map(row => buildCompetitionRow(row, scope, userId, dateFormat));
     return <FlatList {...listProps} data={rows} keyExtractor={row => row.key}
       ListEmptyComponent={scores.firstPage ? <GroupStateView title={scores.firstPage.state === 'rebuilding'
         ? 'Recalculating under the new rules' : 'Score unavailable'} testID="group-history-scores-empty" />
@@ -100,7 +102,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
     ListEmptyComponent={history.firstPage ? <GroupStateView title="No history for this view yet" testID="group-board-history-empty" />
       : <GroupMissingDataState error={error} offline={history.offline} onRetry={onRefresh} testIDPrefix="group-board-history" />}
     renderItem={({ item, index }) => <GroupBoardHistoryItem index={index} count={history.items.length}
-      testID={`group-board-history-item-${item.sequence}`} item={{ key: item.event_id, dateLabel: formatBoardDate(item.sort_at_ms), sentence: describeCompetitionEvent(item, userId) }} />}
+      testID={`group-board-history-item-${item.sequence}`} item={{ key: item.event_id, dateLabel: formatBoardDate(item.sort_at_ms, dateFormat), sentence: describeCompetitionEvent(item, userId) }} />}
     onEndReached={() => void history.loadMore()} testID="group-board-history-list" />;
 }
 

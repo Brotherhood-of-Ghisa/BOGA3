@@ -388,7 +388,7 @@ describe('ExerciseHistoryScreenShell', () => {
 
     expect(screen.getByTestId('exercise-history-best-est-1rm')).toHaveTextContent(/230/);
     expect(screen.getByTestId('exercise-history-best-top-weight')).toHaveTextContent(/185.*×.*8/);
-    expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/2026-05-18/);
+    expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/18-05-2026/);
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
   });

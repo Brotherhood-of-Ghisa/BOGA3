@@ -100,11 +100,11 @@ describe('Bodyweight heatmap coverage', () => {
       { ...day('2026-05-12', 0), totalVolume: null },
     ], 'totalVolume', { todayDateKey: TODAY });
     render(<DailyHeatmap data={coverage} formatValue={String} metricLabel="Volume" testIDPrefix={PREFIX} />);
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '2026-05-11, Volume 0');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '11-05-2026, Volume 0');
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11-value`)).toHaveTextContent('0');
     expect(style(`${PREFIX}-heatmap-cell-2026-05-12`).borderStyle).toBe('dashed');
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12-value`)).toHaveTextContent('', { exact: true });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`)).toHaveProp('accessibilityLabel', '2026-05-12, Volume unavailable');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`)).toHaveProp('accessibilityLabel', '12-05-2026, Volume unavailable');
     expect(screen.queryByText(/Rest|\?/)).toBeNull();
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain('Rest');
   });

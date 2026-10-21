@@ -8,7 +8,7 @@ import { formatMonthDayTime } from '@/src/utils/local-time';
 import { formatCompactDuration, type SessionListItem } from './types';
 
 /** The session's local start stamp respecting preferences, from a stored ISO instant. */
-export function formatDateTimeStamp(isoTimestamp: string, dateFormat?: ExerciseDateFormat): string {
+export function formatDateTimeStamp(isoTimestamp: string, dateFormat: ExerciseDateFormat): string {
   return formatMonthDayTime(Date.parse(isoTimestamp), dateFormat);
 }
 

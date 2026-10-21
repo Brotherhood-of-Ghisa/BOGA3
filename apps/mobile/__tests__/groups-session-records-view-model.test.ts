@@ -58,10 +58,10 @@ const record = ({ eventId = 'ev-1', sequence = 1, setId = 'b-2', groupExercise =
 const places = sessionSetPlaces(buildCompetitionSession(session()).cards);
 
 test('the title names the member (You for me) and the day; the eyebrow names the group', () => {
-  expect(groupSessionTitle(session(), ME, NOW)).toBe('alex · Tue 6 Oct');
-  expect(groupSessionTitle(session({ member: { user_id: ME, username: 'dino' } }), ME, NOW)).toBe('You · Tue 6 Oct');
-  expect(groupSessionTitle(session({ member: { user_id: 'x', username: null } }), ME, NOW)).toBe('Unnamed member · Tue 6 Oct');
-  expect(groupSessionTitle(session(), ME, new Date(2027, 0, 2).getTime())).toBe('alex · Tue 6 Oct 2026');
+  expect(groupSessionTitle(session(), ME, 'DD-MM-YYYY')).toBe('alex · Tue 06-10-2026');
+  expect(groupSessionTitle(session({ member: { user_id: ME, username: 'dino' } }), ME, 'DD-MM-YYYY')).toBe('You · Tue 06-10-2026');
+  expect(groupSessionTitle(session({ member: { user_id: 'x', username: null } }), ME, 'DD-MM-YYYY')).toBe('Unnamed member · Tue 06-10-2026');
+  expect(groupSessionTitle(session(), ME, 'YYYY-MM-DD')).toBe('alex · Tue 2026-10-06');
   expect(groupSessionEyebrow('Iron Crew')).toBe('Iron Crew · group view');
   expect(groupSessionEyebrow(null)).toBe('Group view');
   expect(groupSessionEyebrow('  ')).toBe('Group view');
@@ -115,12 +115,12 @@ test('the exercise card band: one line per record set, its boards joined', () =>
 
 test('certification status names the witness (you for me) and the day, else Not certified', () => {
   const certification = (certified_by: CompetitionCertificationWire['certified_by']): CompetitionCertificationWire => ({ certification_id: 'c',
-    metric: 'e1rm', certified_by, certified_at_ms: new Date(new Date().getFullYear(), 9, 7).getTime(), observed_rules_revision: 2, ended_at_ms: null, end_reason: null });
-  expect(sessionRecordCertificationStatus(null, ME)).toBe('Not certified');
-  expect(sessionRecordCertificationStatus(certification(sam), ME)).toBe('Certified by sam · 7 Oct');
-  expect(sessionRecordCertificationStatus(certification({ user_id: ME, username: 'Youssef' }), ME)).toBe('Certified by you · 7 Oct');
-  expect(sessionRecordCertificationStatus(certification({ user_id: 'y', username: 'Youssef' }), ME)).toBe('Certified by Youssef · 7 Oct');
-  expect(sessionRecordCertificationStatus(certification(null), ME)).toBe('Certified by a group member · 7 Oct');
+    metric: 'e1rm', certified_by, certified_at_ms: new Date(2026, 9, 7).getTime(), observed_rules_revision: 2, ended_at_ms: null, end_reason: null });
+  expect(sessionRecordCertificationStatus(null, ME, 'DD-MM-YYYY')).toBe('Not certified');
+  expect(sessionRecordCertificationStatus(certification(sam), ME, 'DD-MM-YYYY')).toBe('Certified by sam · 07-10-2026');
+  expect(sessionRecordCertificationStatus(certification({ user_id: ME, username: 'Youssef' }), ME, 'DD-MM-YYYY')).toBe('Certified by you · 07-10-2026');
+  expect(sessionRecordCertificationStatus(certification({ user_id: 'y', username: 'Youssef' }), ME, 'DD-MM-YYYY')).toBe('Certified by Youssef · 07-10-2026');
+  expect(sessionRecordCertificationStatus(certification(null), ME, 'DD-MM-YYYY')).toBe('Certified by a group member · 07-10-2026');
 });
 
 test('Volume sums only the ordinary volume-included sets; none reads —', () => {

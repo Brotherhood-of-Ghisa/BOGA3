@@ -1,3 +1,5 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, IconButton, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
@@ -18,11 +20,6 @@ const PROVENANCE_LABEL: Record<PlanDetailView['provenance'], string | null> = {
   agent: 'Coached plan',
 };
 
-const formatSchedule = (at: Date): string => {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
-};
-
 const progressLine = (detail: PlanDetailView): string => {
   const counts = detail.blockCounts;
   const done = counts.completed + counts.skipped;
@@ -37,6 +34,7 @@ const progressLine = (detail: PlanDetailView): string => {
  * while lifecycle permits; Edit and Duplicate sit on the header row.
  */
 export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDuplicate, onDelete }: PlanDetailSummaryProps) {
+  const dateFormat = useDateFormat();
   return (
     <Card style={styles.card} testID="plan-detail-summary">
       <View style={styles.summaryRow}>
@@ -45,7 +43,7 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
             {detail.title}
           </Text>
           <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-schedule">
-            {detail.scheduledFor !== null ? `Scheduled ${formatSchedule(detail.scheduledFor)}` : 'Unscheduled'}
+            {detail.scheduledFor !== null ? `Scheduled ${formatLocalDateTime(detail.scheduledFor.getTime(), dateFormat)}` : 'Unscheduled'}
           </Text>
           <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-progress">
             {progressLine(detail)}

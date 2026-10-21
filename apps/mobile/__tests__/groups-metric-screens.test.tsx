@@ -177,7 +177,7 @@ it('history: a deep link with an unknown metric opens the comparison default',as
   expect(screen.getByTestId('group-history-scope')).toHaveTextContent('All');
 });
 it('labels podiums with normalized units',()=>{
-  const cards=buildCompetitionPodiums({ contract_version: 4,certified: true,podiums: [{ exercise,board }] },'me');
+  const cards=buildCompetitionPodiums({ contract_version: 4,certified: true,podiums: [{ exercise,board }] },'me', 'DD-MM-YYYY');
   expect(cards[0].accessibilityLabel).toMatch(/1RM %BW.*145.7 %BW/);
   expect(cards[0].viewLabel).toBe('Certified · 1RM %BW');
 });

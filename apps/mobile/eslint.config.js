@@ -68,6 +68,24 @@ module.exports = defineConfig([
     },
   },
   {
+    // [[copy.calendar-dates]]: UI dates go through the shared local formatter.
+    files: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'src/groups/*view-model.ts', 'src/exercise-catalog/list-model.ts'],
+    rules: {
+      'no-restricted-syntax': ['error',
+        { selector: 'CallExpression[callee.property.name=/^(toLocaleDateString|toLocaleString|toDateString|toUTCString)$/]',
+          message: 'Calendar dates must use src/utils/local-time with the active dateFormat preference.' },
+        { selector: ':matches(NewExpression, CallExpression)[callee.object.name="Intl"][callee.property.name="DateTimeFormat"]',
+          message: 'Use the shared local-time formatters for date labels.' },
+        { selector: 'TemplateLiteral CallExpression[callee.property.name=/^(getDate|getUTCDate|getFullYear|getUTCFullYear)$/]',
+          message: 'Do not build date labels by hand. Use the shared local-time formatters with dateFormat.' },
+        { selector: 'CallExpression[callee.name=/^(formatShortDate|formatLocalDateTime|formatMonthDayTime|formatCalendarDate|formatCalendarWeek|formatDateRange|formatBoardDate)$/] Literal[value=/^(DD-MM-YYYY|MM-DD-YYYY|YYYY-MM-DD)$/]',
+          message: 'Pass the active dateFormat preference, never a fixed date format.' },
+      ],
+      'no-restricted-imports': ['error', { paths: [{ name: '@/src/utils/local-time', importNames: ['formatCurrentDateTime'],
+        message: 'Canonical form text is internal. Use formatLocalDateTime with useDateFormat for UI.' }] }],
+    },
+  },
+  {
     // Node CLI scripts (CommonJS).
     files: ['scripts/**/*.js'],
     languageOptions: { globals: globals.node },

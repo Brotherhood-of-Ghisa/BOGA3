@@ -74,10 +74,10 @@ export const formatMembershipSentence = (event: GroupMembershipEvent, username: 
 
 export { formatClockTime };
 
-/** The session list's local `M/D HH:MM` start stamp, on stream cards. */
+/** The session list's local start stamp in the viewer's date format. */
 export const formatStreamStartedAt = formatMonthDayTime;
 
-/** Local `YYYY-MM-DD HH:MM`, the View Session header shape (friend's session view). */
+/** The local start stamp for a friend's session view. */
 export const formatGroupDateTime = formatLocalDateTime;
 
 /** The groups contract offline marker: "Offline · last updated HH:MM" ("Offline" with nothing cached). */

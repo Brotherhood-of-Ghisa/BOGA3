@@ -249,8 +249,8 @@ describe('session view model', () => {
   });
 
   it('titles a finished session by its time of day and local start date', () => {
-    expect(completedSessionTitle(new Date(2026, 1, 19, 16, 0))).toBe('Afternoon training · 19 Feb');
-    expect(completedSessionTitle(new Date(2026, 11, 3, 6, 30))).toBe('Morning training · 3 Dec');
+    expect(completedSessionTitle(new Date(2026, 1, 19, 16, 0), 'DD-MM-YYYY')).toBe('Afternoon training · 19-02-2026');
+    expect(completedSessionTitle(new Date(2026, 11, 3, 6, 30), 'DD-MM-YYYY')).toBe('Morning training · 03-12-2026');
   });
 });
 

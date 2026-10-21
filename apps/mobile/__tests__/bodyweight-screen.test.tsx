@@ -33,7 +33,7 @@ import { __resetBodyweightCalculationPreferenceForTests } from '@/src/bodyweight
 import * as bodyweightRepository from '@/src/data/bodyweight';
 import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import * as userSettingsRepository from '@/src/data/user-settings';
-import { formatCurrentDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 
@@ -113,14 +113,14 @@ describe('body weight log', () => {
     expect(screen.getByTestId('weight-entry-value-error')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('weight-entry-value'), '80.25');
-    fireEvent.changeText(screen.getByTestId('weight-entry-date'), '2999-01-01 10:00');
+    fireEvent.changeText(screen.getByTestId('weight-entry-date'), '01-01-2999 10:00');
     fireEvent.press(screen.getByTestId('weight-entry-save'));
     expect(screen.getByText('The measurement date cannot be in the future.')).toBeTruthy();
     expect(readings()).toEqual([]);
 
     // A failed write: the editor stays open with what was typed.
     jest.spyOn(bodyweightRepository, 'saveBodyWeightReading').mockRejectedValueOnce(new Error('Storage full'));
-    const measuredAt = formatCurrentDateTime(new Date(Date.now() - 60 * 60_000));
+    const measuredAt = formatLocalDateTime(Date.now() - 60 * 60_000, 'DD-MM-YYYY');
     fireEvent.changeText(screen.getByTestId('weight-entry-date'), measuredAt);
     fireEvent.press(screen.getByTestId('weight-entry-save'));
     await screen.findByText('Storage full');
@@ -130,7 +130,7 @@ describe('body weight log', () => {
     fireEvent.press(screen.getByTestId('weight-entry-save'));
     await waitForGone(() => screen.queryByTestId('weight-entry-sheet'), AFTER_WRITE);
     expect(readings()).toEqual([expect.objectContaining({ weightKg: 80.25 })]);
-    expect(formatCurrentDateTime(readings()[0].measuredAt)).toBe(measuredAt);
+    expect(formatLocalDateTime(readings()[0].measuredAt.getTime(), 'DD-MM-YYYY')).toBe(measuredAt);
   });
 
   it('discards cancelled fields and starts each reopened editor from the stored reading', async () => {

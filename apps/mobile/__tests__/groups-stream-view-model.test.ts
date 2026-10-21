@@ -129,8 +129,8 @@ describe('group stream view model', () => {
 
     it('formats local times for cards, the friend view, and the offline marker (contract)', () => {
       expect(formatClockTime(at)).toBe('06:04');
-      expect(formatStreamStartedAt(at)).toBe('9/7 06:04');
-      expect(formatGroupDateTime(at)).toBe('2026-09-07 06:04');
+      expect(formatStreamStartedAt(at, 'DD-MM-YYYY')).toBe('07-09-2026 06:04');
+      expect(formatGroupDateTime(at, 'DD-MM-YYYY')).toBe('07-09-2026 06:04');
       expect(formatOfflineMarker(at)).toBe('Offline · last updated 06:04');
       expect(formatOfflineMarker(null)).toBe('Offline');
     });

@@ -1,8 +1,9 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useRef, useState } from 'react';
 import { Alert, Keyboard, ScrollView, Text } from 'react-native';
 import { ActionButton, FormField, Notice, Sheet } from '@/components/ui';
 import { resolveMeasurementDate, validateBodyWeight, type WeightEntry } from '@/src/bodyweight/weight-entry';
-import { formatCurrentDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime, reformatDateTime } from '@/src/utils/local-time';
 import { weightStyles as styles } from './styles';
 
 // Keep the native Modal mounted through its visible=false dismissal, matching
@@ -19,8 +20,14 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   onDelete?: () => Promise<void>;
   onDismiss: () => void;
 }) {
+  const dateFormat = useDateFormat();
   const [value, setValue] = useState(initial.weightValue);
-  const [dateText, setDateText] = useState(formatCurrentDateTime(measuredAt));
+  const [dateText, setDateText] = useState(formatLocalDateTime(measuredAt.getTime(), dateFormat));
+  const [shownDateFormat, setShownDateFormat] = useState(dateFormat);
+  if (shownDateFormat !== dateFormat) {
+    setDateText(reformatDateTime(dateText, shownDateFormat, dateFormat));
+    setShownDateFormat(dateFormat);
+  }
   const [valueError, setValueError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -34,7 +41,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     setShownFormKey(formKey);
     if (formKey !== null) {
       setValue(initial.weightValue);
-      setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
+      setDateText(formatLocalDateTime(measuredAtMs, dateFormat));
       setValueError(null); setDateError(null); setSaveError(null);
     }
   }
@@ -55,7 +62,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     catch (error) { setValueError((error as Error).message); return; }
     let date: Date;
     {
-      try { date = resolveMeasurementDate(dateText, measuredAt); }
+      try { date = resolveMeasurementDate(dateText, measuredAt, new Date(), dateFormat); }
       catch (error) { setDateError((error as Error).message); return; }
     }
     void run(() => onSave({ ...input, measuredAt: date }));
@@ -70,7 +77,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
           editable={!busy} error={valueError} testID="weight-entry-value" />
         <FormField label="Measured at" accessibilityLabel="Measurement date and time"
           value={dateText} onChangeText={setDateText} autoCapitalize="none" autoCorrect={false}
-          editable={!busy} error={dateError} hint="Local time · YYYY-MM-DD HH:mm"
+          editable={!busy} error={dateError} hint={`Local time · ${dateFormat} HH:mm`}
           testID="weight-entry-date" />
         {saveError ? <Notice live tone="danger" message={saveError} testID="weight-entry-save-error" /> : null}
         <ActionButton label={busy ? 'Saving…' : 'Save weight'} onPress={save} disabled={busy}

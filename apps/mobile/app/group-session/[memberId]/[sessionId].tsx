@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl } from 'react-native';
@@ -78,12 +79,13 @@ const fullSessionHref = (session: CompetitionSessionWire): Href =>
 
 /** The native header: which group's view, whose session and when; on my own session, the full-session action. */
 function GroupSessionHeader({ session, groupName, userId }: { session: CompetitionSessionWire | null; groupName: string | null; userId: string }) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   return (
     <Stack.Screen
       options={{
         headerTitle: session
-          ? () => <GroupSessionHeaderTitle eyebrow={groupSessionEyebrow(groupName)} title={groupSessionTitle(session, userId)} />
+          ? () => <GroupSessionHeaderTitle eyebrow={groupSessionEyebrow(groupName)} title={groupSessionTitle(session, userId, dateFormat)} />
           : 'Session',
         headerRight: session?.member.user_id === userId
           ? () => (

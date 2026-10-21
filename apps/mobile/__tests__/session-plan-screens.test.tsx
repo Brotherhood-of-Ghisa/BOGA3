@@ -362,7 +362,7 @@ describe('plan form: create', () => {
     render(<SessionPlanNewScreen editPlanId={null} fromPlanId={sourceId} />);
 
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Original');
-    expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/2026-10-06 07:00/);
+    expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/06-10-2026 07:00/);
 
     fillTitle('Duplicate of Original');
     fillSchedule('');

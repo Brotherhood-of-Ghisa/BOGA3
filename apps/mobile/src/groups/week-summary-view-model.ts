@@ -1,3 +1,4 @@
+import { localDateKey } from '@/src/utils/calendar-weeks';
 // Today's group card, from one `group_competition_week_summary` read (contract):
 // the week's top three by working sets, the caller's own line when outside
 // them, and the latest activity row. Pure; the card only draws it.
@@ -83,10 +84,10 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 export const formatWeekSessionFigures = (session: { working_sets: number; exercise_count: number }): string =>
   `${plural(session.working_sets, 'set', 'sets')} · ${formatExerciseCount(session.exercise_count)}`;
 
-const isSameLocalDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
+const isSameLocalDay = (a: number, b: number): boolean => localDateKey(new Date(a)) === localDateKey(new Date(b));
 
-/** `Started 07:40` today; `Started 10/15 23:10` when it began on an earlier day. */
-export const formatTrainingStart = (startedAtMs: number, nowMs: number, dateFormat?: ExerciseDateFormat): string =>
+/** `Started 07:40` today; a formatted local date and time on an earlier day. */
+export const formatTrainingStart = (startedAtMs: number, nowMs: number, dateFormat: ExerciseDateFormat): string =>
   `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatMonthDayTime(startedAtMs, dateFormat)}`;
 
 const joinContext = (...parts: (string | null | undefined)[]): string =>
@@ -150,7 +151,7 @@ const trainingRow = (
   session: GroupWeekTrainingSession,
   myUserId: string,
   nowMs: number,
-  dateFormat?: ExerciseDateFormat,
+  dateFormat: ExerciseDateFormat,
 ): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
   const stamp = formatTrainingStart(session.started_at_ms, nowMs, dateFormat);
@@ -192,7 +193,7 @@ const completedDuration = (session: GroupWeekLatestSession): number | null => {
 const completedRow = (
   session: GroupWeekLatestSession,
   myUserId: string,
-  dateFormat?: ExerciseDateFormat,
+  dateFormat: ExerciseDateFormat,
 ): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
   const durationSec = completedDuration(session);
@@ -230,7 +231,7 @@ export const buildLatestActivity = (
   summary: Pick<GroupWeekSummaryResult, 'training_now' | 'latest_completed'>,
   myUserId: string,
   nowMs: number,
-  dateFormat?: ExerciseDateFormat,
+  dateFormat: ExerciseDateFormat,
 ): LatestActivityViewModel | null => {
   const [first, ...rest] = summary.training_now;
   if (first && rest.length === 0) return trainingRow(first, myUserId, nowMs, dateFormat);

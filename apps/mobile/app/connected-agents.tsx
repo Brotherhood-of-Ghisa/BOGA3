@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatLocalDateTime } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
@@ -22,14 +25,11 @@ import {
   type ConnectedAgent,
 } from '@/src/auth/connected-agents';
 
-const formatTimestamp = (value: string | null): string => {
+const formatTimestamp = (value: string | null, dateFormat: ExerciseDateFormat): string => {
   if (!value) return 'Never';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'Unavailable';
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
+  return formatLocalDateTime(date.getTime(), dateFormat);
 };
 
 type ConnectedAgentCardProps = {
@@ -49,6 +49,7 @@ function ConnectedAgentCard({
   revoking,
   saving,
 }: ConnectedAgentCardProps) {
+  const dateFormat = useDateFormat();
   const isUnavailable = agent.planAccessEnabled === 'unavailable';
   const isSwitchDisabled = saving || isUnavailable;
   const switchValue = agent.planAccessEnabled === true;
@@ -66,7 +67,7 @@ function ConnectedAgentCard({
         density="list"
         meta={
           <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
-            {formatTimestamp(agent.grantedAt)}
+            {formatTimestamp(agent.grantedAt, dateFormat)}
           </Text>
         }>
         <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
@@ -75,7 +76,7 @@ function ConnectedAgentCard({
         density="list"
         meta={
           <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
-            {formatTimestamp(agent.lastAccessAt)}
+            {formatTimestamp(agent.lastAccessAt, dateFormat)}
           </Text>
         }>
         <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>

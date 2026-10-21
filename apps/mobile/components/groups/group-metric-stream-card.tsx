@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Card, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
@@ -13,8 +14,9 @@ import { GroupCertificationStatus } from './certification-status';
 export function GroupMetricStreamCard({ item,record,userId,showGroupName,onPress }: {
   item: CompetitionEventWire; record?: CompetitionStreamRecordWire; userId: string | null; showGroupName: boolean; onPress?: () => void;
 }) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
-  const model = buildCompetitionEventCard(item,userId,showGroupName,record);
+  const model = buildCompetitionEventCard(item,userId,showGroupName,record,dateFormat);
   const testID = `group-metric-stream-${item.event_id}`;
   return <Card accessibilityLabel={model.accessibilityLabel} onPress={onPress ?? (() => router.push(model.historyPath))}
     style={styles.card} testID={testID}>

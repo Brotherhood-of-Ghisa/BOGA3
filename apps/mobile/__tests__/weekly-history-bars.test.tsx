@@ -25,7 +25,7 @@ it('shows newest first, full week dates, aligned values and proportional Volume 
   render(chart(loaded));
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual([...chronological].reverse().map(key => `bars-heatmap-cell-${key}`));
   expect(loaded.weekly.map(week => week.weekStartDateKey)).toEqual(chronological);
-  expect(screen.getByText('28 Sep – 4 Oct')).toBeTruthy();
+  expect(screen.getByText('28-09-2026 – 04-10-2026')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('20%');
   expect(style('bars-heatmap-bar-2026-09-28').width).toBe('90%');
   expect(style('bars-heatmap-bar-2026-09-14').width).toBe('100%');
@@ -198,7 +198,7 @@ it('leaves rest and unavailable values blank, announces their distinction and re
   expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('', { exact: true });
   expect(screen.queryByText('Rest')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-21').props.accessibilityLabel).toContain('Rest week');
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 2026-09-28, Volume unavailable');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 28-09-2026, Volume unavailable');
   expect(screen.queryByText(/\?/)).toBeNull();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
   expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });

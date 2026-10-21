@@ -145,6 +145,14 @@ and spec 05's session invariants. The UI adds:
    `Volume`; the formats of training-metrics "Calculations", never `k`, never
    a thousands separator, `—` only for a missing value.
 
+## Calendar dates
+
+[[copy.calendar-dates]] is enforced by the presentation-source restrictions in
+`apps/mobile/eslint.config.js` and required formatter arguments in
+`apps/mobile/src/utils/local-time.ts`. Components subscribe through
+`useDateFormat`; pure view models take that preference explicitly. Lint rejects native locale APIs, direct calendar-field
+interpolation and fixed formatter preferences. Calendar keys and canonical form state remain internal values.
+
 ## Styling guardrails
 
 `apps/mobile/scripts/check-ui-guardrails.js` runs as the `ui-guardrails` lane

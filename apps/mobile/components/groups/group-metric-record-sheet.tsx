@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { Text, Alert, ScrollView } from 'react-native';
 
@@ -22,12 +23,13 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   metricOptions?: GroupMetric[]; onSelectMetric?: (metric: GroupMetric) => void; onHistory?: () => void;
   myRole: GroupRole | null; onClose: () => void; onChanged: () => Promise<void>;
 }) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   const online = useNetworkOnline();
   const { certification, pending, needsReview, notice, perform, refresh } = useMetricCertification({
     groupId,userId, row, exercise, online, readOnlyReason, initialCertification, onChanged,
   });
-  const model = buildMetricRecordSheetModel({
+  const model = buildMetricRecordSheetModel({ dateFormat,
     row, exercise, userId, myRole, certification, readOnlyReason, online, pending, needsReview, notice,
   });
   const guard = { blocked: model.blocked, active: model.active };
@@ -44,7 +46,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
-      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.performance.achieved_at_ms)}</Text>
+      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">{formatSetFigure(row.performance)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{model.statusText}</Text>
       <MutedLine text={model.readOnlyNote} />

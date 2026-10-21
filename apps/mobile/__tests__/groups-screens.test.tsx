@@ -368,7 +368,7 @@ describe('Groups tab', () => {
     const completed = within(screen.getByTestId(cardID('friend-1:s-1')));
     expect(completed.getByText('alex')).toBeTruthy();
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
-    expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
+    expect(completed.getByText('11-09-2026 09:05 · Iron Temple')).toBeTruthy();
     // The 60 × 10 warm-up adds no set, no volume and, alone on its exercise, no exercise.
     expect(completed.getByText('2 sets · 1 exercise')).toBeTruthy();
     // One group's stream does not repeat the group name on each card.
@@ -778,7 +778,7 @@ describe("Friend's session view", () => {
     // No personal record band: the friend's history is not on this device.
     expect(screen.queryByText(/New 1RM record/)).toBeNull();
     // The header: whose session, which day, seen as which group.
-    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('alex · Fri 11 Sep');
+    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('alex · Fri 11-09-2026');
     expect(screen.getByTestId('group-session-eyebrow')).toHaveTextContent('Garage Gym · group view');
     expect(screen.queryByTestId('group-session-full-view')).toBeNull();
     // Volume sums the ordinary volume-included sets: the warm-up is left out.
@@ -792,7 +792,7 @@ describe("Friend's session view", () => {
     expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 1h 5m');
     expect(screen.queryByTestId('group-session-status')).toBeNull();
     expect(screen.queryByTestId('group-session-records')).toBeNull();
-    expect(screen.getByText('2026-09-11 09:05')).toBeTruthy();
+    expect(screen.getByText('11-09-2026 09:05')).toBeTruthy();
     expect(api.getCompetitionSession).toHaveBeenCalledWith('group-a','friend-1','s-1');
 
     for (const testID of OWNER_ACTION_TEST_IDS) {
@@ -838,7 +838,7 @@ describe("Friend's session view", () => {
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
     await waitFor(() => expect(api.certifyCompetition).toHaveBeenCalledWith({ groupId: 'group-a', exerciseId: 'ge-bench',
       metric: 'e1rm', memberId: 'friend-1', setId: 'set-2', revision: 1, token: 'tok-1rm' }));
-    expect(await rm.findByText('Certified by you · 11 Sep')).toBeTruthy();
+    expect(await rm.findByText('Certified by you · 11-09-2026')).toBeTruthy();
     expect(api.getCompetitionSessionRecords).toHaveBeenCalledTimes(2);
   });
 
@@ -888,7 +888,7 @@ describe("Friend's session view", () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     render(<GroupSessionRoute />);
     const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
-    expect(await rm.findByText('Certified by you · 11 Sep')).toBeTruthy();
+    expect(await rm.findByText('Certified by you · 11-09-2026')).toBeTruthy();
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-withdraw'));
     const buttons = alert.mock.calls[0][2] ?? [];
     await act(async () => { buttons.find(button => button.text === 'Withdraw')?.onPress?.(); });
@@ -904,7 +904,7 @@ describe("Friend's session view", () => {
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords({ member: me }));
     render(<GroupSessionRoute />);
     const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
-    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('You · Fri 11 Sep');
+    expect(screen.getByTestId('group-session-title-text')).toHaveTextContent('You · Fri 11-09-2026');
     expect(rm.getByText('Not certified')).toBeTruthy();
     expect(screen.queryByTestId('group-session-record-ev-1:e1rm-certify')).toBeNull();
     fireEvent.press(screen.getByTestId('group-session-full-view'));

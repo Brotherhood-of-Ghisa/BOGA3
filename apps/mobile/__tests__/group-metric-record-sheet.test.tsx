@@ -119,7 +119,7 @@ describe('what the sheet shows', () => {
   it('shows the score, who and when, and the set on its own line, with no rules or explanatory text', () => {
     renderSheet();
     expect(text('23.3 %BW')).toBeTruthy();
-    expect(text('Dave · 10 Sep')).toBeTruthy();
+    expect(text('Dave · 10-09-2026')).toBeTruthy();
     expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent(/^5 reps$/);
     expect(screen.queryByText(/Rules \d|contribution|Bodyweight scoring|attests|Scores use|estimates|As logged/)).toBeNull();
     expect(status()).toHaveTextContent('Uncertified');
@@ -135,7 +135,7 @@ describe('what the sheet shows', () => {
   it('shows "Certified" for a certified row while its certification loads', () => {
     mockRead.mockReturnValue(new Promise(() => {}));
     renderSheet({ row: certifiedRow() });
-    expect(status()).toHaveTextContent('Certified by Kim · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by Kim · 11-09-2026');
     expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', 'e1rm');
   });
 
@@ -154,13 +154,13 @@ describe('what the sheet shows', () => {
     mockRead.mockResolvedValue({ contract_version: 4, certification: fresh });
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
     expect(mockCertify).toHaveBeenCalledWith(expect.objectContaining({ metric, token: 'pin-2' }));
-    expect(status()).toHaveTextContent('Certified by me · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by me · 11-09-2026');
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it.each<[string, CompetitionCertificationWire, string]>([
-    ['the certifier and date', certification(), 'Certified by Kim · 11 Sep'],
-    ['"a group member" for an unknown certifier', certification({ certified_by: null }), 'Certified by a group member · 11 Sep'],
+    ['the certifier and date', certification(), 'Certified by Kim · 11-09-2026'],
+    ['"a group member" for an unknown certifier', certification({ certified_by: null }), 'Certified by a group member · 11-09-2026'],
     ['how an ended certification ended', certification({ ended_at_ms: SEP_11, end_reason: 'withdrawn' }), 'Certification ended'],
   ])('shows %s', async (_label, loaded, expected) => {
     mockRead.mockResolvedValue({ contract_version: 4, certification: loaded });
@@ -230,7 +230,7 @@ describe('certifying', () => {
     expect(screen.getByTestId('group-metric-record-notice')).toHaveTextContent('Performance certified.');
     expect(onChanged).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', 'e1rm'));
-    expect(status()).toHaveTextContent('Certified by me · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by me · 11-09-2026');
     expect(screen.queryByTestId('group-metric-record-certify')).toBeNull();
   });
 
@@ -379,7 +379,7 @@ describe('reading the certification', () => {
     mockRead.mockResolvedValueOnce({ contract_version: 4, certification: certification() });
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-refresh')));
     expect(onChanged).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(status()).toHaveTextContent('Certified by Kim · 11 Sep'));
+    await waitFor(() => expect(status()).toHaveTextContent('Certified by Kim · 11-09-2026'));
     expect(mockRead).toHaveBeenCalledTimes(2);
   });
 
@@ -391,7 +391,7 @@ describe('reading the certification', () => {
     rerenderWith({ row: certifiedRow({ certification: certification({ certification_id: 'cert-2' }),write_token: 'pin-2' }) });
     await act(async () => second.resolve({ contract_version: 4, certification: certification({ certification_id: 'cert-2', certified_by: { user_id: 'sam', username: 'Sam' } }) }));
     await act(async () => first.resolve({ contract_version: 4, certification: certification() }));
-    expect(status()).toHaveTextContent('Certified by Sam · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by Sam · 11-09-2026');
   });
 
   it('ignores a failed read that finishes after another performance is shown', async () => {
@@ -413,7 +413,7 @@ describe('reading the certification', () => {
     renderSheet({ row: certifiedRow({ certification: certification({ certification_id: 'cert-0' }) }),initialCertification: certification({ certification_id: 'cert-0',ended_at_ms: SEP_10,end_reason: 'withdrawn' }) });
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
     await act(async () => read.resolve({ contract_version: 4, certification: certification({ certification_id: 'cert-0', ended_at_ms: SEP_10, end_reason: 'voided' }) }));
-    expect(status()).toHaveTextContent('Certified by me · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by me · 11-09-2026');
   });
 
   it('ignores reads that finish after the sheet closes', async () => {
@@ -438,7 +438,7 @@ describe('what a write is remembered as', () => {
     mockRead.mockResolvedValue({ contract_version: 4, certification: mine });
     const view = renderSheet();
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
-    await waitFor(() => expect(status()).toHaveTextContent('Certified by me · 11 Sep'));
+    await waitFor(() => expect(status()).toHaveTextContent('Certified by me · 11-09-2026'));
     return { view, mine };
   };
 
@@ -446,7 +446,7 @@ describe('what a write is remembered as', () => {
     const { view } = await certifyMine();
     mockOnline = false;
     view.rerenderWith({});
-    expect(status()).toHaveTextContent('Certified by me · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by me · 11-09-2026');
   });
 
   it('keeps the server end state of my certification across a connectivity change', async () => {
@@ -464,7 +464,7 @@ describe('what a write is remembered as', () => {
     const { view } = await certifyMine();
     mockRead.mockResolvedValue({ contract_version: 4, certification: certification({ certification_id: 'cert-9' }) });
     view.rerenderWith({ row: certifiedRow({ certification: certification({ certification_id: 'cert-9' }) }) });
-    await waitFor(() => expect(status()).toHaveTextContent('Certified by Kim · 11 Sep'));
+    await waitFor(() => expect(status()).toHaveTextContent('Certified by Kim · 11-09-2026'));
   });
 
   it('forgets it when the performance changes', async () => {
@@ -524,7 +524,7 @@ describe('current target and confirmed outcomes', () => {
     onChanged.mockRejectedValue(new GroupApiError('NETWORK','refresh failed'));
     renderSheet();
     await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
-    expect(status()).toHaveTextContent('Certified by Kim · 11 Sep');
+    expect(status()).toHaveTextContent('Certified by Kim · 11-09-2026');
     expect(screen.getByTestId('group-metric-record-notice')).toHaveTextContent('Certification changed. Could not refresh the view. Refresh and review.');
     expect(screen.getByTestId('group-metric-record-refresh')).toBeOnTheScreen();
   });

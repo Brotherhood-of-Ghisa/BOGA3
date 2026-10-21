@@ -1,3 +1,5 @@
+import { formatCalendarDate } from '@/src/utils/local-time';
+import { useDateFormat } from '@/src/preferences/hooks';
 // The virtualized month list owns scrolling. Calendar layout follows
 // Figure visibility follows [[copy.blank-history]].
 import React, { useMemo, useState, type ReactNode } from 'react';
@@ -37,12 +39,13 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   row: CalendarWeek; monthKey: string;
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
 } & Openers) {
+  const dateFormat = useDateFormat();
   const week = row.week;
   return <View style={styles.row} testID={`${testID}-row-${row.weekStartDateKey}`}>
-    <Text allowFontScaling={false} accessibilityLabel={`Week of ${row.weekStartDateKey}`} style={styles.rowLabel}
+    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={styles.rowLabel}
       testID={`${testID}-row-label-${row.weekStartDateKey}`}>{row.startDay}</Text>
     <View style={[styles.cells, { gap }]}>
-      {row.days.map(day => day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
+      {row.days.map(day => day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={formatCalendarDate(day.dateKey, dateFormat)}
         future={day.future}
         current={!!day.day?.isToday}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
@@ -50,7 +53,7 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
         accessibilityHint={dayHint(day.day)}
         testID={`${testID}-cell-${day.dateKey}`} />
         : <View key={day.dateKey} style={styles.blankTile} testID={`${testID}-empty-${monthKey}-${day.dateKey}`} />)}
-      {week ? <CalendarTile weekly cell={week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
+      {week ? <CalendarTile weekly cell={week} dateLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} future={row.weekStartDateKey > data.todayDateKey}
         current={!!week.isCurrentWeek}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
         onPress={onOpenWeek && week.hasTraining ? () => onOpenWeek(row.weekStartDateKey) : undefined}

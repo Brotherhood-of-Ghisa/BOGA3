@@ -29,7 +29,7 @@ it('orders months and whole week rows newest first, with eight headers and outsi
   expect(screen.queryByTestId('calendar-heatmap-cell-2026-10-06-date')).toBeNull();
   expect(october.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID)).toEqual(
     [5, 6].map(day => `calendar-heatmap-cell-2026-10-${String(day).padStart(2, '0')}`));
-  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '05-10-2026, Volume 2560');
   expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(1);
   expect(screen.UNSAFE_getByType(FlatList).props).toMatchObject({ initialNumToRender: 2, maxToRenderPerBatch: 2, windowSize: 3 });
   expect(style('calendar-heatmap-cell-2026-10-05').minHeight).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
@@ -79,7 +79,7 @@ it('opens a day with sessions and a Week tile with training, and offers no rest 
 
   const one = screen.getByTestId('calendar-heatmap-cell-2026-10-05');
   expect(one).toHaveProp('accessibilityRole', 'button');
-  expect(one).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
+  expect(one).toHaveProp('accessibilityLabel', '05-10-2026, Volume 2560');
   expect(one).toHaveProp('accessibilityHint', 'Opens the session');
   expect(screen.getByTestId('calendar-heatmap-cell-2026-09-30')).toHaveProp('accessibilityHint', "Opens the day's sessions");
   // Held, it dims like a button; released, it does not.
@@ -113,11 +113,11 @@ it('leaves rest and unavailable figures blank, retains numeric zero and clips fu
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-week-2026-09-2026-09-28-value')).toHaveTextContent('', { exact: true });
   expect(screen.queryByText(/\?/)).toBeNull();
-  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('2026-10-03, Volume unavailable');
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('03-10-2026, Volume unavailable');
   expect(screen.queryByText(/incomplete/)).toBeNull();
   expect(style('calendar-heatmap-cell-2026-10-03').borderStyle).toBe('dashed');
   expect(screen.queryByTestId('calendar-heatmap-cell-2026-10-07')).toBeNull();
-  expect(screen.queryByLabelText('2026-10-07, Future, no observed value')).toBeNull();
+  expect(screen.queryByLabelText('07-10-2026, Future, no observed value')).toBeNull();
   expect(style('calendar-heatmap-empty-2026-10-2026-10-07').backgroundColor).toBeUndefined();
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-12')).toBeNull();
 });

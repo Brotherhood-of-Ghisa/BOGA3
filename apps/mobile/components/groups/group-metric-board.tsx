@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
@@ -25,6 +26,7 @@ const SCOPE_OPTIONS = [{ value: 'certified', label: 'Certified' }, { value: 'all
 export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, initialMetric, initialScope }: {
   userId: string; groupId: string; exercise: GroupMetricExerciseWire; initialMetric: string | null; initialScope: GroupBoardScope;
 }) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   const allowed = GROUP_METRICS;
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
@@ -60,7 +62,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   };
   // A member's refreshed performance replaces the selected snapshot; disappeared rows cannot be certified.
   const liveSelected = selected ? board.items.find(row => row.member.user_id === selected.member.user_id) ?? null : null;
-  const rows = useMemo(() => board.items.map(row => buildGroupMetricRow(row, scope, userId)), [board.items, scope, userId]);
+  const rows = useMemo(() => board.items.map(row => buildGroupMetricRow(row, scope, userId, dateFormat)), [board.items, scope, userId, dateFormat]);
   const error = pickInlineError(board.error);
   const staleCursor = board.loadMoreError?.code === 'CONFLICT' || board.loadMoreError?.code === 'VALIDATION';
   if (board.lostAccess || group.lostAccess) return <GroupLostAccessState testID="group-board-lost-access" />;

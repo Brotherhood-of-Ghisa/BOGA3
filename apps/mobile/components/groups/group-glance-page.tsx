@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -81,11 +82,12 @@ export function GroupGlancePage({
   offline,
   onRetry,
 }: GroupGlancePageProps) {
+  const dateFormat = useDateFormat();
   // The chart column is held by its period, so it survives a metric change and
   // follows the same calendar period while the stepper keeps it in range.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const faded = useHoldFade(held !== null);
-  const label = groupHomePeriodLabel(period, groupHomeWindowFor(period, now, offset), offset);
+  const label = groupHomePeriodLabel(period, groupHomeWindowFor(period, now, offset), offset, dateFormat);
   const stepper = (
     <Card testID="group-glance-period-card">
       <View style={styles.card}>
@@ -141,7 +143,7 @@ export function GroupGlancePage({
               </Text>
               <GroupRankChart
                 accessibilityLabel={`Place over the last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
-                columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window))}
+                columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
                 onSelect={(index) => setSelectedKey(rankSeries.periods[index]?.key ?? null)}
                 selectedIndex={selectedIndex}
                 series={rankSeries}
@@ -150,7 +152,7 @@ export function GroupGlancePage({
                 <>
                   <View style={styles.divider} />
                   <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="group-position-selected">
-                    {`${groupHomePeriodLabel(figures.period, selected.window, 0).detail}${selected.current ? ' · so far' : ''}`}
+                    {`${groupHomePeriodLabel(figures.period, selected.window, 0, dateFormat).detail}${selected.current ? ' · so far' : ''}`}
                   </Text>
                   <GroupRankTable entries={selected.entries} />
                 </>

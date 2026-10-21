@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatLocalDateTime } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -18,11 +21,10 @@ import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/
  */
 
 /** Formats the quiet schedule line under a plan's title. */
-const scheduleLine = (plan: PlanSummaryView): string => {
+const scheduleLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): string => {
   if (plan.scheduledFor !== null) {
     const at = plan.scheduledFor;
-    const pad = (value: number) => String(value).padStart(2, '0');
-    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+    return formatLocalDateTime(at.getTime(), dateFormat);
   }
   return 'Unscheduled';
 };
@@ -45,6 +47,7 @@ export function PlanSection({
   onOpenPlan,
   onOpenProgramme,
 }: PlanSectionProps) {
+  const dateFormat = useDateFormat();
   if (plans.length === 0 && programmes.length === 0) {
     return null;
   }
@@ -74,7 +77,7 @@ export function PlanSection({
         ))}
         {plans.map((plan, index) => (
           <ListRow
-            accessibilityLabel={`${plan.title}, ${scheduleLine(plan)}`}
+            accessibilityLabel={`${plan.title}, ${scheduleLine(plan, dateFormat)}`}
             density="list"
             divider={programmes.length > 0 || index > 0}
             key={plan.id}
@@ -85,7 +88,7 @@ export function PlanSection({
                 {plan.title}
               </Text>
               <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
-                {planDetailLine(plan)}
+                {planDetailLine(plan, dateFormat)}
               </Text>
             </View>
           </ListRow>
@@ -95,10 +98,10 @@ export function PlanSection({
   );
 }
 
-const planDetailLine = (plan: PlanSummaryView): string => {
+const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): string => {
   const counts = plan.blockCounts;
   const blocks = counts.pending + counts.attached + counts.completed + counts.skipped;
-  return `${scheduleLine(plan)} · ${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
+  return `${scheduleLine(plan, dateFormat)} · ${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
 };
 
 /** The quiet Plan session action: the hub's persistent entry and the empty states' one. */

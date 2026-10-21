@@ -1,3 +1,6 @@
+import { planScheduleLabel, planFormBlockFromEmptySet, planFormBlockFromSuggestion, addPlanFormSets, formatScheduleText, type PlanFormBlock, type PlanFormSet } from '@/src/session-planner/plan-form-model';
+import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+
 import { useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -27,18 +30,10 @@ import {
   type ProgrammeChildPlanForm,
   type ProgrammeFormState,
 } from '@/src/session-planner';
-import {
-  planFormBlockFromEmptySet,
-  planFormBlockFromSuggestion,
-  addPlanFormSets,
-  formatScheduleText,
-  type PlanFormBlock,
-  type PlanFormSet,
-} from '@/src/session-planner/plan-form-model';
+
 import { parseSessionDateTime } from '@/src/utils/local-time';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 export type ProgrammeFormScreenProps = {
   initialForm: ProgrammeFormState;
@@ -198,6 +193,7 @@ function ProgrammeSessionEditSheet({
   onDismiss,
   onUpdatePlan,
 }: ProgrammeSessionEditSheetProps) {
+  const dateFormat = useDateFormat();
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
   const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
@@ -235,7 +231,7 @@ function ProgrammeSessionEditSheet({
   const selectedGymName =
     plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
   const childScheduleSummary =
-    plan.scheduleText.trim().length > 0 ? plan.scheduleText : 'Unscheduled';
+    planScheduleLabel(plan.scheduleText, dateFormat);
 
   const { updateSet, addSets, removeSet, pickExercise, removeBlock, moveBlock } =
     childPlanBlockEdits(plan, planIndex, onUpdatePlan, trainingPreferences.displayEfforts);
@@ -475,8 +471,9 @@ function ProgrammeChildPlanCard({
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
+  const dateFormat = useDateFormat();
   const blockCount = plan.blocks.length;
-  const scheduleSummary = plan.scheduleText.trim().length > 0 ? plan.scheduleText : 'Unscheduled';
+  const scheduleSummary = planScheduleLabel(plan.scheduleText, dateFormat);
   const name = plan.title || `Session ${index + 1}`;
   const testID = `programme-form-plan-${index + 1}`;
 

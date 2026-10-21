@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatShortDate } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // The sets of one history week for the Timeline's week list
 // the blocks to list, each drawn with View
 // Session's card for it (`loadCompletedSessionCards`).
@@ -41,25 +44,21 @@ export type WeekBlock = {
 /** An exercise's list follows its page's gym scope, three-state (`src/utils/gym-scope-route.ts`). */
 export type WeekSetsTarget = { exerciseDefinitionId: string; gymId?: string | null } | { muscleGroupIds: string[] };
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** A completed session's local day: `Mon 14 Sep`. */
-export const formatWeekDay = (date: Date): string =>
-  `${DAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+export const formatWeekDay = (date: Date, dateFormat: ExerciseDateFormat): string =>
+  formatShortDate(date, dateFormat);
 
 /** An exercise's blocks, titled by their day, with their gym. */
-export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[]): WeekBlock[] =>
+export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[], dateFormat: ExerciseDateFormat): WeekBlock[] =>
   entries.map((entry) => ({
     sessionId: entry.sessionId,
     sessionExerciseId: entry.sessionExerciseId,
     completedAt: entry.completedAt,
-    title: formatWeekDay(entry.completedAt),
+    title: formatWeekDay(entry.completedAt, dateFormat),
     detail: entry.gymName?.trim() ? entry.gymName : NO_GYM_LABEL,
   }));
 
 /** The blocks that worked a muscle, titled by their exercise, with their day. */
-export const muscleWeekBlocks = (contributions: MuscleSetContribution[]): WeekBlock[] => {
+export const muscleWeekBlocks = (contributions: MuscleSetContribution[], dateFormat: ExerciseDateFormat): WeekBlock[] => {
   const blocks = new Map<string, WeekBlock>();
   for (const contribution of contributions) {
     if (blocks.has(contribution.sessionExerciseId)) continue;
@@ -67,7 +66,7 @@ export const muscleWeekBlocks = (contributions: MuscleSetContribution[]): WeekBl
       sessionId: contribution.sessionId,
       sessionExerciseId: contribution.sessionExerciseId,
       completedAt: contribution.sessionCompletedAt,
-      detail: formatWeekDay(contribution.sessionCompletedAt),
+      detail: formatWeekDay(contribution.sessionCompletedAt, dateFormat),
       exerciseDefinitionId: contribution.exerciseDefinitionId,
     });
   }
@@ -95,19 +94,19 @@ export const weekSetGroups = (
       }] : [];
     });
 
-const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string): Promise<WeekBlock[]> => {
+const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string, dateFormat: ExerciseDateFormat): Promise<WeekBlock[]> => {
   const bounds = localWeekBounds(weekKey);
   if ('exerciseDefinitionId' in target) {
     const entries = await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId });
     const { gymId } = target;
-    return exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId));
+    return exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId), dateFormat);
   }
   const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds });
-  return muscleWeekBlocks(days.flatMap((day) => day.contributions));
+  return muscleWeekBlocks(days.flatMap((day) => day.contributions), dateFormat);
 };
 
-const loadWeekGroups = async (target: WeekSetsTarget, weekKey: string): Promise<WeekSetGroup[]> => {
-  const blocks = await loadWeekBlocks(target, weekKey);
+const loadWeekGroups = async (target: WeekSetsTarget, weekKey: string, dateFormat: ExerciseDateFormat): Promise<WeekSetGroup[]> => {
+  const blocks = await loadWeekBlocks(target, weekKey, dateFormat);
   const sessionIds = [...new Set(blocks.map((block) => block.sessionId))];
   const cards = await Promise.all(sessionIds.map(loadCompletedSessionCards));
   return weekSetGroups(blocks, new Map(sessionIds.map((sessionId, index) => [sessionId, cards[index]])));
@@ -117,15 +116,16 @@ export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: s
 
 /** The selected week's sets; a superseded week or an unmount cannot publish its read. */
 export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0): WeekSetsState {
+  const dateFormat = useDateFormat();
   // The last read and the request it answered; a newer request is loading until its read lands.
   const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null }>({ groups: [], error: null, for: null });
   const targetKey = target === null ? null : 'exerciseDefinitionId' in target
     ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : target.muscleGroupIds.join(',');
-  const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}`;
+  const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}|${dateFormat}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;
     let active = true;
-    loadWeekGroups(target, weekKey).then(
+    loadWeekGroups(target, weekKey, dateFormat).then(
       (groups) => { if (active) setRead({ groups, error: null, for: requestKey }); },
       (cause: unknown) => {
         if (active) setRead({ groups: [], error: cause instanceof Error ? cause.message : 'Unknown error', for: requestKey });

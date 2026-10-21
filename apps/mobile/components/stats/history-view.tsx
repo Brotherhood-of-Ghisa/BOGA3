@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -119,6 +120,7 @@ function HistoryHeatmap({
   timeline: TimelineLinks;
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
 }) {
+  const dateFormat = useDateFormat();
   // Every view spans the saved window and scrolls vertically.
   const data = useMemo(
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
@@ -142,10 +144,10 @@ function HistoryHeatmap({
     const week = view === 'timeline' ? data.weekly.find(candidate => candidate.weekStartDateKey === focusedWeekKey) : undefined;
     return week ? {
       weekStartDateKey: week.weekStartDateKey,
-      label: weekLabel(week.monday, Number(data.todayDateKey.slice(0, 4))),
+      label: weekLabel(week.monday, dateFormat),
       hasTraining: week.hasTraining ?? week.value > 0,
     } : null;
-  }, [data, focusedWeekKey, view]);
+  }, [data, focusedWeekKey, view, dateFormat]);
   // Reported by value, not by identity: the window is rebuilt on every render,
   // so an equal week must not re-render the page around the chart.
   const reported = useRef<FocusedTimelineWeek | null>(null);

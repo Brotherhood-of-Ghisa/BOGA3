@@ -314,12 +314,12 @@ describe('HistoryView', () => {
     const shared = { weeklyEffort: [buildWeeklyEffort()], dailyMetrics: DAILY_METRICS };
     const { rerender } = render(<HistoryView {...buildViewProps({ ...shared, view: 'daily' })} />);
 
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '2026-06-03, Volume 1200');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
 
     rerender(<HistoryView {...buildViewProps({ ...shared, view: 'daily', isLoading: true })} />);
     expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '2026-06-03, Volume 1200');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
 
     // An error drops the chart entirely rather than hiding it: no chart work
     // behind a state panel.
@@ -337,7 +337,7 @@ describe('HistoryView', () => {
     expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveStyle({ position: 'relative', opacity: 1 });
 
     rerender(<HistoryView {...buildViewProps({ ...shared, view: 'daily' })} />);
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '2026-06-03, Volume 1200');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
   });
 
   it('shows the active muscle metric directly in read-only daily tiles', () => {
@@ -348,7 +348,7 @@ describe('HistoryView', () => {
     const { rerender } = render(<HistoryView {...buildViewProps({ ...props, metric: 'totalVolume' })} />);
 
     // Values are visible and announced directly, without a selection action.
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '2026-06-03, Volume 1200');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03-value')).toHaveTextContent(/1200/);
     expect(screen.getByText('Volume per day')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
@@ -423,7 +423,7 @@ describe('ProgressHistoryScreen', () => {
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     // The sheet is titled with the subject; the row names the week it opens.
     expect(screen.getByTestId('progress-history-options-sheet')).toHaveTextContent(/^Side delts/);
-    expect(screen.getByTestId('progress-history-view-sessions')).toHaveTextContent(/View sessions.*1 – 7 Jun/);
+    expect(screen.getByTestId('progress-history-view-sessions')).toHaveTextContent(/View sessions.*01-06-2026 – 07-06-2026/);
     // A muscle's own page links to no other muscle.
     expect(screen.queryByTestId(/^progress-history-muscle-/)).toBeNull();
     expect(screen.queryByTestId('progress-history-rm-curve')).toBeNull();

@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
@@ -6,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-import { formatCurrentDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 
@@ -24,13 +25,14 @@ export type PickerPreselectionCardProps = {
  * set and Repeat last, the card's one `accent`.
  */
 export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, onRepeat }: PickerPreselectionCardProps) {
+  const dateFormat = useDateFormat();
   return (
     <Card testID="exercise-picker-preselection-panel">
       <Text allowFontScaling={false} style={styles.preselectionTitle}>{state.exercise.name}</Text>
       {state.suggestion ? (
         <View style={styles.plan}>
           <Text allowFontScaling={false} style={styles.planSource} testID="exercise-picker-plan-source">
-            From {formatCurrentDateTime(state.suggestion.completedAt)}
+            From {formatLocalDateTime(state.suggestion.completedAt.getTime(), dateFormat)}
           </Text>
           <ScrollView
             contentContainerStyle={styles.planRows}

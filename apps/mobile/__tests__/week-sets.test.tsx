@@ -40,29 +40,29 @@ describe('week blocks and groups', () => {
       contribution({ setIdentity: 'a' }),
       contribution({ setIdentity: 'b' }),
       contribution({ setIdentity: 'c', sessionId: 's0', sessionExerciseId: 'se0', sessionCompletedAt: local(5) }),
-    ]);
+    ], 'DD-MM-YYYY');
     expect(blocks.map(block => [block.sessionExerciseId, block.title, block.detail])).toEqual([
-      ['se1', undefined, 'Wed 7 Oct'], ['se0', undefined, 'Mon 5 Oct'],
+      ['se1', undefined, '07-10-2026'], ['se0', undefined, '05-10-2026'],
     ]);
     const band = [{ key: 'volume', label: 'New volume record · 1500', set: null, spoken: 'new volume record 1500' }];
     const groups = weekSetGroups(blocks, new Map([['s1', [card('se1', 'Bench Press', band)]], ['s0', [card('se0', 'Incline Press')]]]));
     expect(groups.map(group => [group.key, group.title, group.detail, group.record, group.exerciseDefinitionId])).toEqual([
-      ['se0', 'Incline Press', 'Mon 5 Oct', [], 'bench'],
-      ['se1', 'Bench Press', 'Wed 7 Oct', band, 'bench'],
+      ['se0', 'Incline Press', '05-10-2026', [], 'bench'],
+      ['se1', 'Bench Press', '07-10-2026', band, 'bench'],
     ]);
   });
 
   it('lists an exercise week by day with its gym, leaving out a block without a card', () => {
     const entry = (sessionExerciseId: string, completedAt: Date, gymName: string | null) =>
       ({ sessionId: `s-${sessionExerciseId}`, sessionExerciseId, completedAt, gymName }) as unknown as ExerciseHistorySessionEntry;
-    const blocks = exerciseWeekBlocks([entry('late', local(9), ' '), entry('early', local(6), 'Canal Street'), entry('empty', local(8), null)]);
+    const blocks = exerciseWeekBlocks([entry('late', local(9), ' '), entry('early', local(6), 'Canal Street'), entry('empty', local(8), null)], 'DD-MM-YYYY');
     const groups = weekSetGroups(blocks, new Map([['s-late', [card('late', 'Bench')]], ['s-early', [card('early', 'Bench')]], ['s-empty', []]]));
     // An exercise's own list links to no exercise: the page is that exercise's.
     expect(groups.map(group => [group.title, group.detail, group.workingSetCount, group.exerciseDefinitionId])).toEqual([
-      ['Tue 6 Oct', 'Canal Street', 2, null],
-      ['Fri 9 Oct', 'No gym', 2, null],
+      ['06-10-2026', 'Canal Street', 2, null],
+      ['09-10-2026', 'No gym', 2, null],
     ]);
-    expect(formatWeekDay(local(11))).toBe('Sun 11 Oct');
+    expect(formatWeekDay(local(11), 'DD-MM-YYYY')).toBe('11-10-2026');
   });
 
   it('bounds a week from its local Monday to the next, exclusive', () => {
@@ -83,7 +83,7 @@ describe('useWeekSets over local data', () => {
       { initialProps: { target: { exerciseDefinitionId: 'seed_barbell_bench_press' }, week: '2026-10-05' } });
     await waitFor(() => expect(result.current.groups).toHaveLength(3));
     expect(result.current.groups.map(group => [group.title, group.detail, group.workingSetCount, group.rows.length])).toEqual([
-      ['Mon 5 Oct', 'Canal Street Gym', 3, 3], ['Wed 7 Oct', 'Canal Street Gym', 3, 3], ['Fri 9 Oct', 'Canal Street Gym', 3, 3],
+      ['05-10-2026', 'Canal Street Gym', 3, 3], ['07-10-2026', 'Canal Street Gym', 3, 3], ['09-10-2026', 'Canal Street Gym', 3, 3],
     ]);
     // Bench steps up to 87.5 on 5 Oct: as on View Session, the record set is highlighted and the card's band
     // carries one line for it (1RM and top weight) and a separate Volume line; the repeats that week hold none.
@@ -97,7 +97,7 @@ describe('useWeekSets over local data', () => {
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.groups.map(group => [group.title, group.detail])).toEqual([
-      ['Barbell Bench Press', 'Tue 29 Sep'], ['Barbell Bench Press', 'Thu 1 Oct'], ['Barbell Bench Press', 'Sat 3 Oct'],
+      ['Barbell Bench Press', '29-09-2026'], ['Barbell Bench Press', '01-10-2026'], ['Barbell Bench Press', '03-10-2026'],
     ]);
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: null });
@@ -113,13 +113,13 @@ describe('useWeekSets over local data', () => {
     const days = (groups: { title: string }[]) => groups.map(group => group.title);
     const { result, rerender } = renderHook(({ target }: { target: WeekSetsTarget }) => useWeekSets(target, '2026-10-05'),
       { initialProps: { target: { exerciseDefinitionId: 'seed_barbell_bench_press' } as WeekSetsTarget } });
-    await waitFor(() => expect(days(result.current.groups)).toEqual(['Mon 5 Oct', 'Wed 7 Oct', 'Fri 9 Oct']));
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['05-10-2026', '07-10-2026', '09-10-2026']));
     expect(result.current.groups[1].detail).toBe('No gym');
 
     rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press', gymId: null } });
-    await waitFor(() => expect(days(result.current.groups)).toEqual(['Wed 7 Oct']));
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['07-10-2026']));
     rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press', gymId: gymId! } });
-    await waitFor(() => expect(days(result.current.groups)).toEqual(['Mon 5 Oct', 'Fri 9 Oct']));
+    await waitFor(() => expect(days(result.current.groups)).toEqual(['05-10-2026', '09-10-2026']));
   });
 
   it('still lists the cards, without records, when the records read fails', async () => {
@@ -133,7 +133,7 @@ describe('useWeekSets over local data', () => {
 });
 
 describe('WeekSetList', () => {
-  const group = { key: 'se1', sessionId: 's1', title: 'Mon 5 Oct', detail: 'Canal Street Gym', workingSetCount: 1, exerciseDefinitionId: null,
+  const group = { key: 'se1', sessionId: 's1', title: '05-10-2026', detail: 'Canal Street Gym', workingSetCount: 1, exerciseDefinitionId: null,
     record: [{ key: 'r1', label: 'New top weight', set: '80.0 × 5', spoken: 'new top weight 80.0 × 5' }],
     rows: [{ id: 'r1', typeLabel: 'RIR 2', weightReps: '80.0 × 5', oneRepMax: '93.3', volume: '400', done: true, oneRepMaxRecord: false, weightRecord: false }] };
 
@@ -142,7 +142,7 @@ describe('WeekSetList', () => {
     render(<WeekSetList groups={[group]} loading={false} error={null} onOpenSession={onOpenSession} testID="week" />);
     expect(screen.getByTestId('week-card-se1-count')).toHaveTextContent('1 set');
     expect(screen.getByText('New top weight')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Open session from Mon 5 Oct, Canal Street Gym'));
+    fireEvent.press(screen.getByLabelText('Open session from 05-10-2026, Canal Street Gym'));
     expect(onOpenSession).toHaveBeenCalledWith('s1');
     // Without an exercise link the card offers nothing else.
     expect(screen.queryByTestId('week-card-se1-exercise')).toBeNull();
@@ -150,7 +150,7 @@ describe('WeekSetList', () => {
   });
 
   describe('on a muscle\'s list', () => {
-    const muscleGroup = { ...group, title: 'Bench Press', detail: 'Mon 5 Oct', exerciseDefinitionId: 'bench' };
+    const muscleGroup = { ...group, title: 'Bench Press', detail: '05-10-2026', exerciseDefinitionId: 'bench' };
     const link = (canOpen: boolean) => ({ canOpen: jest.fn(() => canOpen), open: jest.fn() });
 
     it('opens the card\'s exercise from its progress button, and its session from the rest of the card', () => {
@@ -162,7 +162,7 @@ describe('WeekSetList', () => {
       fireEvent.press(screen.getByLabelText('Open Bench Press progress'));
       expect(exerciseLink.open).toHaveBeenCalledWith('bench');
       expect(onOpenSession).not.toHaveBeenCalled();
-      fireEvent.press(screen.getByLabelText('Open session from Bench Press, Mon 5 Oct'));
+      fireEvent.press(screen.getByLabelText('Open session from Bench Press, 05-10-2026'));
       expect(onOpenSession).toHaveBeenCalledWith('s1');
       expect(exerciseLink.open).toHaveBeenCalledTimes(1);
     });

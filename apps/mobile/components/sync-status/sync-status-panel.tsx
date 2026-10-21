@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -33,11 +36,11 @@ import {
 const STATUS_REFRESH_INTERVAL_MS = 5000;
 
 /** Formats an epoch-ms timestamp as a human-readable local time, or "Never". */
-const formatLastSuccess = (lastSuccessAtMs: number | null): string => {
+const formatLastSuccess = (lastSuccessAtMs: number | null, dateFormat: ExerciseDateFormat): string => {
   if (lastSuccessAtMs == null) {
     return 'Never';
   }
-  return new Date(lastSuccessAtMs).toLocaleString();
+  return formatLocalDateTime(lastSuccessAtMs, dateFormat);
 };
 
 /**
@@ -191,6 +194,7 @@ function SyncStatusPanelContent({
 }
 
 function SyncStatusDetails({ status }: { status: SyncStatusSnapshot | null }) {
+  const dateFormat = useDateFormat();
   const networkState: SyncNetworkState = status?.networkState ?? 'unknown';
   const offline = networkState === 'offline';
   return <>
@@ -200,7 +204,7 @@ function SyncStatusDetails({ status }: { status: SyncStatusSnapshot | null }) {
         divider={false}
         meta={
           <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-last-success">
-            {formatLastSuccess(status?.lastSuccessAtMs ?? null)}
+            {formatLastSuccess(status?.lastSuccessAtMs ?? null, dateFormat)}
           </Text>
         }
         testID="settings-sync-status-last-success-row">

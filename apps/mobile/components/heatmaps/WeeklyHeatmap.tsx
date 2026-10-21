@@ -1,3 +1,5 @@
+import { formatCalendarDate } from '@/src/utils/local-time';
+import { useDateFormat } from '@/src/preferences/hooks';
 // Newest-first weekly rows. Length follows [[comparison.weekly-reference]]; colour retains
 // the adapter's independent intensity/target meaning. Reference calculations
 // follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
@@ -100,25 +102,23 @@ function ReferenceRule({ position, testID }: { position: number; testID?: string
   </View>;
 }
 
-function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, position, references, valueWidth, currentYear, testID }: {
+function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, position, references, valueWidth, testID }: {
   week: WeekCell; onPress?: () => void; formatValue: Props['formatValue']; metricLabel: string;
-  targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; currentYear: number; testID: string;
+  targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; testID: string;
 }) {
-  const year = week.monday.getUTCFullYear();
-  const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
+  const dateFormat = useDateFormat();
   const value = weekValue(week, formatValue);
   const prCount = week.prCount ?? 0;
   const description = week.unavailable ? `${metricLabel} unavailable` : !isKnownTraining(week) ? 'Rest week' : `${metricLabel} ${value}`;
   const shared = {
-    accessibilityLabel: `Week of ${week.weekStartDateKey}, ${description}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
+    accessibilityLabel: `Week of ${formatCalendarDate(week.weekStartDateKey, dateFormat)}, ${description}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID: `${testID}-cell-${week.weekStartDateKey}`,
     style: styles.row,
   };
   const content = <>
     <View style={styles.date}>
-      <Text allowFontScaling={false} style={styles.dateText}>{weekRangeLabel(week.monday)}</Text>
+      <Text allowFontScaling={false} style={styles.dateText}>{weekRangeLabel(week.monday, dateFormat)}</Text>
       {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
-      {year !== currentYear || year !== endYear ? <Text allowFontScaling={false} style={styles.year}>{year === endYear ? year : `${year}–${endYear}`}</Text> : null}
     </View>
     <View style={styles.plot}>
       <View style={styles.track}>
@@ -175,7 +175,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
     renderItem={({ item }) => <WeeklyRow week={item}
       onPress={onOpenWeek && item.hasTraining ? () => onOpenWeek(item.weekStartDateKey) : undefined}
       formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
-      position={position} references={references} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
+      position={position} references={references} valueWidth={valueWidth} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
       <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
     </View>}
@@ -189,7 +189,6 @@ const styles = StyleSheet.create({
   date: { width: DATE_WIDTH },
   dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
   note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
-  year: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },

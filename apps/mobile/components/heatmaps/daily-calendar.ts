@@ -1,3 +1,4 @@
+import { formatMonthYear } from '@/src/utils/local-time';
 import type { DayCell, HeatmapData, WeekCell } from './heatmapData';
 
 export type CalendarDay = {
@@ -20,7 +21,6 @@ export type CalendarMonth = {
 };
 
 const DAY_MS = 86400000;
-const monthFormatter = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const date = (key: string) => new Date(`${key}T00:00:00Z`);
 const key = (value: Date) => value.toISOString().slice(0, 10);
 const addDays = (value: Date, count: number) => new Date(value.getTime() + count * DAY_MS);
@@ -39,7 +39,7 @@ export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
     const monthKey = weekStartDateKey.slice(0, 7);
     let month = months.get(monthKey);
     if (!month) {
-      month = { key: monthKey, title: monthFormatter.format(row), weeks: [] };
+      month = { key: monthKey, title: formatMonthYear(new Date(`${monthKey}-01T12:00:00`)), weeks: [] };
       months.set(monthKey, month);
     }
     const rowDays = Array.from({ length: 7 }, (_, index) => {

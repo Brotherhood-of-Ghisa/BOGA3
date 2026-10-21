@@ -1,3 +1,6 @@
+import { planScheduleLabel, createPlanFormSet, addPlanFormSets, formatScheduleText, planFormBlockFromEmptySet, planFormBlockFromSuggestion, planFormErrors, type PlanFormBlock, type PlanFormSet, type PlanFormState } from '@/src/session-planner/plan-form-model';
+import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -5,21 +8,10 @@ import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFo
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
-import {
-  createPlanFormSet,
-  addPlanFormSets,
-  formatScheduleText,
-  planFormBlockFromEmptySet,
-  planFormBlockFromSuggestion,
-  planFormErrors,
-  type PlanFormBlock,
-  type PlanFormSet,
-  type PlanFormState,
-} from '@/src/session-planner/plan-form-model';
+
 import { parseSessionDateTime } from '@/src/utils/local-time';
 import { upsertLocalGym } from '@/src/data';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 export type PlanFormScreenProps = {
   /** The editor's starting values: empty for create, a plan's values for edit/duplicate. */
@@ -92,6 +84,7 @@ export function PlanGymSheet({
  * write — this screen never touches the repository.
  */
 export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScreenProps) {
+  const dateFormat = useDateFormat();
   const [form, setForm] = useState<PlanFormState>(initialForm);
   const [submitted, setSubmitted] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -208,10 +201,10 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           value={form.title}
         />
         <ListRow
-          accessibilityLabel={`Plan schedule, ${form.scheduleText.trim().length > 0 ? form.scheduleText : 'Unscheduled'}`}
+          accessibilityLabel={`Plan schedule, ${planScheduleLabel(form.scheduleText, dateFormat)}`}
           density="list"
           divider
-          description={form.scheduleText.trim().length > 0 ? form.scheduleText : 'Unscheduled'}
+          description={planScheduleLabel(form.scheduleText, dateFormat)}
           label="Schedule (optional)"
           onPress={() => setScheduleSheetOpen(true)}
           testID="plan-form-schedule"

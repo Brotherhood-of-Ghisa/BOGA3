@@ -12,9 +12,9 @@ import { ViewSessionOptionsSheet } from './view-session-sheets';
 import { ViewSessionTopBar } from './view-session-top-bar';
 
 export type ViewSessionSummary = {
-  // `Afternoon training · 19 Feb` (`completedSessionTitle`).
+  // `Afternoon training` with its local date (`completedSessionTitle`).
   title: string;
-  // `YYYY-MM-DD HH:mm`, as the completed edit's Start field shows it.
+  // The selected date format plus `HH:mm`, as the completed edit's Start field shows it.
   start: string;
   duration: string;
   gymName: string | null;

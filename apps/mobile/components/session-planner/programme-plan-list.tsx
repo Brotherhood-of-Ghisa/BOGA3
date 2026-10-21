@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatLocalDateTime } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, IconButton, ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
@@ -9,10 +12,9 @@ export type ProgrammePlanListProps = {
   onReorderPlans?: (orderedPlanIds: string[]) => void;
 };
 
-const formatSchedule = (date: Date | null): string => {
+const formatSchedule = (date: Date | null, dateFormat: ExerciseDateFormat): string => {
   if (date === null) return 'Unscheduled';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return formatLocalDateTime(date.getTime(), dateFormat);
 };
 
 const planProgressWord = (progress: PlanDetailView['progress']): string => {
@@ -32,6 +34,7 @@ export function ProgrammePlanList({
   onOpenPlan,
   onReorderPlans,
 }: ProgrammePlanListProps) {
+  const dateFormat = useDateFormat();
   const movePlan = (index: number, step: -1 | 1) => {
     if (!onReorderPlans) return;
     const targetIndex = index + step;
@@ -58,7 +61,7 @@ export function ProgrammePlanList({
 
           return (
             <ListRow
-              accessibilityLabel={`${plan.title}, ${formatSchedule(plan.scheduledFor)}, ${planProgressWord(plan.progress)}`}
+              accessibilityLabel={`${plan.title}, ${formatSchedule(plan.scheduledFor, dateFormat)}, ${planProgressWord(plan.progress)}`}
               density="list"
               divider={index > 0}
               key={plan.id}
@@ -96,7 +99,7 @@ export function ProgrammePlanList({
                   </Text>
                 </View>
                 <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
-                  {formatSchedule(plan.scheduledFor)} · {totalBlocks} {totalBlocks === 1 ? 'block' : 'blocks'}
+                  {formatSchedule(plan.scheduledFor, dateFormat)} · {totalBlocks} {totalBlocks === 1 ? 'block' : 'blocks'}
                 </Text>
               </View>
             </ListRow>

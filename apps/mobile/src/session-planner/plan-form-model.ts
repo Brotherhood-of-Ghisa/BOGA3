@@ -1,6 +1,7 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
-import { parseSessionDateTime } from '@/src/utils/local-time';
+import { parseSessionDateTime, formatCurrentDateTime, formatLocalDateTime } from '@/src/utils/local-time';
 import { PLAN_LIMITS, validatePlanDraft } from './plan-validation';
 import type { PlanDetailView } from './plan-queries';
 import type { PlanDraft, PlanFieldError } from './types';
@@ -158,9 +159,13 @@ export const planFormFromDetail = (
   })),
 });
 
-export const formatScheduleText = (at: Date): string => {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+// The form stores canonical local text; labels format it for the user.
+export const formatScheduleText = formatCurrentDateTime;
+
+export const planScheduleLabel = (text: string, dateFormat: ExerciseDateFormat): string => {
+  if (!text.trim()) return 'Unscheduled';
+  const date = parseSessionDateTime(text);
+  return date ? formatLocalDateTime(date.getTime(), dateFormat) : 'Invalid schedule';
 };
 
 const SCHEDULE_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;

@@ -156,6 +156,6 @@ describe('timelineGeometry', () => {
 });
 
 it('names a week by its Monday and Sunday', () => {
-  expect(weekRangeLabel(new Date(Date.UTC(2026, 8, 28)))).toBe('28 Sep – 4 Oct');
-  expect(weekRangeLabel(new Date(Date.UTC(2026, 9, 5)))).toBe('5 – 11 Oct');
+  expect(weekRangeLabel(new Date(Date.UTC(2026, 8, 28)), 'DD-MM-YYYY')).toBe('28-09-2026 – 04-10-2026');
+  expect(weekRangeLabel(new Date(Date.UTC(2026, 9, 5)), 'DD-MM-YYYY')).toBe('05-10-2026 – 11-10-2026');
 });
