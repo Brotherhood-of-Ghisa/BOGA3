@@ -54,6 +54,48 @@ describe('infra-free starter catalog bootstrap', () => {
       familyName: 'Lower Legs',
       localDirty: true,
     });
+    for (const [id, displayName] of [
+      ['forearms_grip', 'Forearms'],
+      ['abs_rectus', 'Abs'],
+      ['hip_abductors', 'Hip Abductors'],
+    ]) {
+      expect(fixture.database.select().from(muscleGroups)
+        .where(eq(muscleGroups.id, id)).get()?.displayName).toBe(displayName);
+    }
+  });
+
+  it('shortens generation-6 muscle names without reseeding exercises or mappings', () => {
+    seedSystemExerciseCatalog(asLocalDatabase(fixture));
+    const renamedMuscles = [
+      { id: 'forearms_grip', oldName: 'Forearms / Grip', displayName: 'Forearms' },
+      { id: 'abs_rectus', oldName: 'Abs (Rectus Abdominis)', displayName: 'Abs' },
+      { id: 'hip_abductors', oldName: 'Hip Abductors (Glute Med/Min)', displayName: 'Hip Abductors' },
+    ];
+    for (const muscle of renamedMuscles) {
+      fixture.database.update(muscleGroups)
+        .set({ displayName: muscle.oldName, localDirty: false })
+        .where(eq(muscleGroups.id, muscle.id)).run();
+    }
+    fixture.database.update(syncRuntimeState)
+      .set({ appliedSeedMigrationAppVersion: 6 })
+      .where(eq(syncRuntimeState.id, 'primary')).run();
+    const exercises = fixture.database.select().from(exerciseDefinitions).all();
+    const mappings = fixture.database.select().from(exerciseMuscleMappings).all();
+
+    maintainInfraFreeStarterCatalog(asLocalDatabase(fixture));
+
+    for (const { id, displayName } of renamedMuscles) {
+      expect(fixture.database.select().from(muscleGroups)
+        .where(eq(muscleGroups.id, id)).get()).toMatchObject({ displayName, localDirty: true });
+    }
+    expect(fixture.database.select().from(exerciseDefinitions).all()).toEqual(exercises);
+    expect(fixture.database.select().from(exerciseMuscleMappings).all()).toEqual(mappings);
+    expect(readSeedsAppliedMarker(asLocalDatabase(fixture))).toBe(CURRENT_APP_VERSION);
+    const muscles = fixture.database.select().from(muscleGroups).all();
+
+    maintainInfraFreeStarterCatalog(asLocalDatabase(fixture));
+
+    expect(fixture.database.select().from(muscleGroups).all()).toEqual(muscles);
   });
 
   it('uses generation 2 migration for a marker-1 install without overwriting renamed or edited/extra mapping data', () => {

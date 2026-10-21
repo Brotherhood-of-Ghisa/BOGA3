@@ -2,14 +2,12 @@
 
 ### muscle.set-count · definition · accepted
 
-How many sets a muscle gets from a working set mapped to it: **primary 1,
-secondary ½**. One rule, on every screen that shows sets per muscle. Decided
-2026-10-09.
+Every screen counts working sets per muscle as **primary 1, secondary ½**.
+Decided 2026-10-09.
 
-A set mapped to one muscle twice counts at its strongest role. A muscle's
-total is the sum: a half-step figure (`1.5`), not a count of physical sets, so
-the session's own `Sets` ([[set.count-display]]) does not match it. Whether
-secondaries are shown at all is a separate question.
+A repeated mapping counts at its strongest role. Totals use half-steps (`1.5`),
+unlike the session's physical `Sets` ([[set.count-display]]). Whether to show
+secondaries is separate.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -115,3 +113,16 @@ in full. Readable Sets rows show and announce target attainment. Approved 2026-1
 Why: target colour describes the represented muscles while Volume compares the work shown.
 Code: `apps/mobile/components/stats/exercise-map-data.ts` and
 `apps/mobile/src/preferences/targets.ts`.
+
+### muscle.catalog-names · presentation · accepted
+
+Catalog labels use the following names; custom names remain. Approved 2026-10-21.
+
+| Muscle ID | Label |
+| --- | --- |
+| `forearms_grip` | Forearms |
+| `abs_rectus` | Abs |
+| `hip_abductors` | Hip Abductors |
+
+Why: keep muscle labels concise.
+Code: `apps/mobile/src/data/exercise-catalog-seeds.ts` and `apps/mobile/src/data/bundle-migrations.ts`.

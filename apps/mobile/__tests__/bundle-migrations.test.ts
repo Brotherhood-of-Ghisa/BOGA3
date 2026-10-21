@@ -98,7 +98,7 @@ describe('bundle-migration runtime loop', () => {
   });
 
   it('ships the load-mode, bodyweight and muscle migrations in order', () => {
-    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4, 5, 6]);
+    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3, 4, 5, 6, 7]);
   });
 
   describe('shipped migration behaviour', () => {
@@ -110,6 +110,18 @@ describe('bundle-migration runtime loop', () => {
       {
         id: 'chest', displayName: 'Chest', familyName: 'Chest',
         renamed: 'Pectoralis', fromVersion: 5,
+      },
+      {
+        id: 'forearms_grip', displayName: 'Forearms / Grip', familyName: 'Arms',
+        renamed: 'Forearms', fromVersion: 6,
+      },
+      {
+        id: 'abs_rectus', displayName: 'Abs (Rectus Abdominis)', familyName: 'Core',
+        renamed: 'Abs', fromVersion: 6,
+      },
+      {
+        id: 'hip_abductors', displayName: 'Hip Abductors (Glute Med/Min)', familyName: 'Legs',
+        renamed: 'Hip Abductors', fromVersion: 6,
       },
     ])('renames $id for sync and is idempotent on repeat upgrades', ({
       id, displayName, familyName, renamed, fromVersion,
@@ -164,6 +176,16 @@ describe('bundle-migration runtime loop', () => {
         deletedAt: new Date('2026-10-01T12:00:00.000Z'),
       },
       { id: 'custom_chest', displayName: 'Chest', familyName: 'Chest', deletedAt: null },
+      ...[
+        { id: 'forearms_grip', displayName: 'Forearms / Grip', renamed: 'Forearms', familyName: 'Arms' },
+        { id: 'abs_rectus', displayName: 'Abs (Rectus Abdominis)', renamed: 'Abs', familyName: 'Core' },
+        { id: 'hip_abductors', displayName: 'Hip Abductors (Glute Med/Min)', renamed: 'Hip Abductors', familyName: 'Legs' },
+      ].flatMap(({ id, displayName, renamed, familyName }) => [
+        { id, displayName: `My ${renamed}`, familyName, deletedAt: null },
+        { id, displayName: renamed, familyName, deletedAt: null },
+        { id, displayName, familyName, deletedAt: new Date('2026-10-01T12:00:00.000Z') },
+        { id: `custom_${id}`, displayName, familyName, deletedAt: null },
+      ]),
     ])('preserves $id named $displayName with deletedAt=$deletedAt', (muscle) => {
       fixture.database.insert(muscleGroups).values({
         ...muscle,
@@ -204,6 +226,15 @@ describe('bundle-migration runtime loop', () => {
       runBundleMigrations(asLocalDatabase(fixture));
 
       expect(fixture.database.select().from(exerciseDefinitions).all()).toHaveLength(0);
+    });
+
+    it('does not recreate absent muscles when shortening names', () => {
+      setMarker(fixture, 6);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      expect(fixture.database.select().from(muscleGroups).all()).toEqual([]);
+      expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
     });
 
     it('backfills a per-side starter row, dirties it, and advances the marker atomically', () => {

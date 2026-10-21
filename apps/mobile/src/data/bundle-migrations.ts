@@ -161,6 +161,14 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
       repo.reviseMuscleGroupName('chest', 'Chest', 'Pectoralis');
     },
   },
+  {
+    appVersion: 7,
+    apply(repo) {
+      repo.reviseMuscleGroupName('forearms_grip', 'Forearms / Grip', 'Forearms');
+      repo.reviseMuscleGroupName('abs_rectus', 'Abs (Rectus Abdominis)', 'Abs');
+      repo.reviseMuscleGroupName('hip_abductors', 'Hip Abductors (Glute Med/Min)', 'Hip Abductors');
+    },
+  },
 ];
 
 /**

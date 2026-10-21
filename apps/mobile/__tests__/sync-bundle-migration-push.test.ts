@@ -16,7 +16,8 @@ import { eq } from 'drizzle-orm';
 
 import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
-import { exerciseDefinitions, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, muscleGroups, syncRuntimeState } from '@/src/data/schema';
+import { CURRENT_APP_VERSION } from '@/src/data/exercise-catalog-seeds';
 import {
   __setBundleMigrationsForTests,
   __setCurrentAppVersionForTests,
@@ -112,6 +113,40 @@ afterEach(() => {
 });
 
 describe('bundle migration dirties a row that the cycle then pushes', () => {
+  it('pushes all three shortened muscle names from generation 6 once and clears their dirty bits', async () => {
+    const muscles = [
+      { id: 'forearms_grip', oldName: 'Forearms / Grip', displayName: 'Forearms', familyName: 'Arms' },
+      { id: 'abs_rectus', oldName: 'Abs (Rectus Abdominis)', displayName: 'Abs', familyName: 'Core' },
+      { id: 'hip_abductors', oldName: 'Hip Abductors (Glute Med/Min)', displayName: 'Hip Abductors', familyName: 'Legs' },
+    ];
+    database.insert(muscleGroups).values(muscles.map(({ id, oldName, familyName }) => ({
+      id, displayName: oldName, familyName, localDirty: false, localUpdatedAtMs: 100,
+    }))).run();
+    database.update(syncRuntimeState).set({ appliedSeedMigrationAppVersion: 6 })
+      .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).run();
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    expect(pushedEntities).toHaveLength(3);
+    for (const { id, displayName, familyName } of muscles) {
+      expect(database.select().from(muscleGroups).where(eq(muscleGroups.id, id)).get())
+        .toMatchObject({ displayName, familyName, localDirty: false });
+      const pushed = pushedEntities.filter(entity => entity.type === 'muscle_groups' && entity.id === id);
+      expect(pushed).toHaveLength(1);
+      expect(pushed[0].fields).toMatchObject({ display_name: displayName, family_name: familyName });
+      expect(pushed[0].client_updated_at_ms).toBeGreaterThan(100);
+    }
+    expect(database.select().from(syncRuntimeState)
+      .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.appliedSeedMigrationAppVersion)
+      .toBe(CURRENT_APP_VERSION);
+    const after = database.select().from(muscleGroups).all();
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    expect(pushedEntities).toHaveLength(3);
+    expect(database.select().from(muscleGroups).all()).toEqual(after);
+  });
+
   it('revises a seeded exercise name and pushes the migrated row to convergence', async () => {
     // A seeded, clean exercise still holding the prior bundle's name.
     database
