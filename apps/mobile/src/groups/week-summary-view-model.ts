@@ -13,6 +13,7 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
+import { SHOWN_BOARD } from './competition-session-records-view-model';
 import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
 import type { GroupMemberRef } from './types';
 
@@ -95,15 +96,23 @@ const joinContext = (...parts: (string | null | undefined)[]): string =>
 export const joinNames = (names: string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
-/** One group record: a record event and one board it took #1 on. */
+/** One group record: a record event and one shown board it took #1 on. */
 type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistoryValueWire };
 
 /**
- * The session's group records, one per board taken: the server keeps
- * only the `record` values of the boards each record took #1 on.
+ * The session's group records, one per board taken: the server keeps only the
+ * `record` values of the boards each record took #1 on, counted as the session
+ * view shows them — no Volume board, and no record it would hide — so the
+ * card's count agrees with the Group records card the row opens.
  */
 export const groupRecordBoards = (records: CompetitionEventWire[]): GroupRecordBoard[] =>
-  records.flatMap((event) => event.values.filter((value) => value.role === 'record').map((value) => ({ event, value })));
+  records
+    .filter((event) => !event.provisional && !event.voided)
+    .flatMap((event) =>
+      event.values
+        .filter((value) => value.role === 'record' && SHOWN_BOARD(value.metric))
+        .map((value) => ({ event, value })),
+    );
 
 /** `Deadlift 1RM 213.3 · group record`; several are only counted. Historical values keep their unit and revision. */
 export const buildGroupRecordLine = (records: CompetitionEventWire[]): SessionRecordLine | null =>
