@@ -613,6 +613,56 @@ expect_sql 'publication log contains only sanitized identifiers/SQLSTATE' "selec
   from public.app_logs where event='group.eval_failed' and context->>'group_exercise_id'='${GX}';" t
 pass 'metric stale-result/lease fences and publication/Sync/certification failure isolation'
 
+# Publication writes only the score rows whose values changed: republishing an
+# unchanged source keeps every row (same tuple, same write_token), and one raw
+# edit rewrites only that set's rows. Rewriting every row on every job was the
+# hosted disk-IO driver.
+# Retired revisions keep frozen rows under the same member:set:metric key, so
+# read the current revision only.
+score_rows() { run_psql "select coalesce(jsonb_object_agg(s.member_user_id::text||':'||s.set_id||':'||s.metric,
+  s.xmin::text||':'||s.write_token::text),'{}') from app_public.group_metric_set_scores s
+  join app_public.group_exercises ge on ge.id=s.group_exercise_id and ge.rules_revision=s.rules_revision
+  where s.group_exercise_id='${GX}';"; }
+published() { check "$1 published" 'any(.metric_jobs[];.group_exercise_id==$x and .outcome=="completed")' --arg x "${GX}"; }
+BEFORE_ROWS="$(score_rows)"
+[[ "${BEFORE_ROWS}" != '{}' ]] || fail 'no scores to republish'
+run_psql "select app_public.group_metric_eval_enqueue('${GID}','${GX}','set');" >/dev/null
+drain 'unchanged republication'; published 'unchanged republication'
+[[ "$(score_rows)" == "${BEFORE_ROWS}" ]] || fail 'an unchanged republication rewrote score rows'
+next_cuam; push "${ATHLETE_TOKEN}" 'one raw edit' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 '' 6 '' "${CUAM}" null rir_0)"
+drain 'one raw edit'; published 'one raw edit'
+CHANGED_ROWS="$(jq -nc --argjson a "${BEFORE_ROWS}" --argjson b "$(score_rows)" \
+  '{changed:[$b|to_entries[]|select($a[.key]!=null and $a[.key]!=.value)|.key],
+    added:(($b|keys)-($a|keys)),removed:(($a|keys)-($b|keys))}')"
+jq -e --arg p "${ATHLETE_UID}:${T}-ATHLETE-set:" \
+  '.added==[] and .removed==[] and (.changed|length)>0 and all(.changed[];startswith($p))' <<<"${CHANGED_ROWS}" >/dev/null ||
+  fail "a one-set edit rewrote other score rows: ${CHANGED_ROWS}"
+next_cuam; push "${ATHLETE_TOKEN}" 'restore the edited set' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 '' 5 '' "${CUAM}" null rir_0)"
+drain 'restored set'
+# The upsert would keep one copy of a repeated score; publication rejects it.
+expect_sql 'a repeated evaluation score is rejected' "begin;
+  do \$\$ declare q app_public.group_metric_eval_queue; graph jsonb; score jsonb;
+  begin
+    perform app_public.group_metric_eval_enqueue('${GID}','${GX}','set');
+    update app_public.group_metric_eval_queue set claim_id=gen_random_uuid(),claimed_until=now()+interval '1 minute'
+      where group_exercise_id='${GX}' returning * into strict q;
+    graph:=app_public.group_metric_eval_source_graph('${GID}','${GX}');
+    select jsonb_build_object('member_user_id',s.member_user_id,'set_id',s.set_id,'session_id',s.session_id,
+      'session_exercise_id',s.session_exercise_id,'exercise_definition_id',s.exercise_definition_id,
+      'metric',s.metric,'unit',s.unit,'working',true,'value',s.value,'fingerprint',s.fingerprint) into strict score
+      from app_public.group_metric_set_scores s
+      join app_public.group_exercises ge on ge.id=s.group_exercise_id and ge.rules_revision=s.rules_revision
+      where s.group_exercise_id='${GX}' order by s.member_user_id,s.set_id,s.metric limit 1;
+    perform app_public.group_metric_eval_publish(q.id,q.generation,q.claim_id,jsonb_build_object('contract_version',4,
+      'group_id','${GID}','group_exercise_id','${GX}','rules_revision',graph->'rules'->'rules_revision',
+      'source_token',graph->'source_token','scores',jsonb_build_array(score,score)));
+    raise exception 'a repeated score published';
+  exception when sqlstate 'P0001' then
+    if sqlerrm<>'VALIDATION: duplicate evaluation scores' then raise; end if;
+  end; \$\$;
+  select true; rollback;" t
+pass 'publication rewrites only changed score rows, keeps unchanged write tokens and rejects repeated scores'
+
 # Week summary: the latest session's records carry only the `record`
 # values of the boards they took #1 on, one group record each. On a fresh
 # ordinary comparison R's 100 × 5 takes #1 on Volume and 1RM; A's later
