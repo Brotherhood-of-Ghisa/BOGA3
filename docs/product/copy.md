@@ -22,11 +22,11 @@ Screens show data and controls, not sentences about them: no footnotes,
 formula notes, field hints, "how this works" lines, or a rule's provenance
 (`Rules N · …`).
 
-- **Test:** a sentence about a figure or control, not content, goes; if the
-  meaning needs it, fix the label or the design.
+- **Test:** explanations of figures or controls go; fix the label or design
+  instead.
 - **Exceptions:** an error line with its action; an empty state's one line,
   never a tutorial; a destructive alert naming what goes (`its N sets`); the
-  agent-consent page's grant.
+  agent-consent page's grant; the explicitly opened RM curve explainer.
 - **An incomplete figure takes no note:** one that left sets out, for an
   uncalculable load or kg a group cannot see, shows plain as `Volume`.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.

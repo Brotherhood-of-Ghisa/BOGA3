@@ -52,6 +52,35 @@ const open = (initialUrl: string) => renderRouter({
 // Native-stack renders the title in UIKit, not as a JS Text/header element.
 const nativeTitle = () => screen.UNSAFE_getAllByType(ScreenStackHeaderConfig).at(-1)!.props.title;
 
+it('explains the model on request and preserves chart choices and set selection when dismissed', async () => {
+  await open(String(rmCurveHref('curve')));
+  await screen.findByTestId('rm-curve-plot');
+  fireEvent.press(screen.getByTestId('rm-mode-two'));
+  fireEvent.press(screen.getByTestId('rm-method-joint'));
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  await screen.findByTestId('rm-curve-details');
+  expect(screen.queryByTestId('rm-curve-help')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'About the RM curve' }));
+  const help = within(screen.getByTestId('rm-curve-help'));
+  expect(help.getByText(/Heavy weights usually mean fewer reps/)).toBeTruthy();
+  for (const name of ['Reading the chart', 'Gym, time and effort', 'One curve / Two curves',
+    'Parsimonious / Rich', '1RM and fitting sessions', 'Exploratory fit']) {
+    expect(help.getByRole('header', { name })).toBeTruthy();
+  }
+  expect(help.getByText(/eight reps with two left is plotted at ten/)).toBeTruthy();
+  expect(help.getByText(/not proof that your strength changed/)).toBeTruthy();
+  fireEvent.press(screen.getByTestId('rm-curve-help-backdrop', { includeHiddenElements: true }));
+  await waitForGone(() => screen.queryByTestId('rm-curve-help'));
+  expect(screen.getByTestId('rm-mode-two')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('rm-method-joint')).toHaveProp('accessibilityState', { selected: true });
+  expect(within(screen.getByTestId('rm-curve-details')).getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
+  expect(nativeTitle()).toBe('Synthetic exercise');
+  fireEvent.press(screen.getByTestId('rm-curve-info'));
+  fireEvent(screen.getByTestId('rm-curve-help'), 'accessibilityEscape');
+  await waitForGone(() => screen.queryByTestId('rm-curve-help'));
+  expect(screen.getByTestId('rm-curve-plot')).toBeTruthy();
+});
+
 it('pushes the selected exercise chart and returns to the same History metric/week without changing a workout draft', async () => {
   await persistSessionDraftSnapshot({ sessionId: 'active', gymId: null, startedAt: new Date(Date.now() - 60000),
     exercises: [{ id: 'active-block', exerciseDefinitionId: 'curve', name: 'Synthetic exercise',
