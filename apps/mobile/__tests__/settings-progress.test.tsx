@@ -172,7 +172,7 @@ it.each([
 it('edits one shared weekly target inline and retains invalid drafts in the centralized error flow', async () => {
   await openSettings();
   const id = 'settings-weekly-working-set-target';
-  expect(screen.getByLabelText('Weekly working sets per muscle')).toHaveProp('value', '8');
+  expect(screen.getByLabelText('Target weekly working sets per muscle')).toHaveProp('value', '8');
   expect(screen.getByLabelText('Progress period (weeks)')).toHaveProp('value', '4');
   expect(screen.queryByText('Weekly muscle targets')).toBeNull();
   editNumber(id, '12');

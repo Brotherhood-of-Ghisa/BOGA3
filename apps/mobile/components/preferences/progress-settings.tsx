@@ -18,7 +18,7 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
           onChange={progressMuscleLayout => updatePreferences({ progressMuscleLayout })}
           testIDPrefix="settings-muscle-view" />
       </View>
-      <PreferenceNumberField label="Weekly working sets per muscle" testID="settings-weekly-working-set-target"
+      <PreferenceNumberField label="Target weekly working sets per muscle" testID="settings-weekly-working-set-target"
         value={pending.weeklyWorkingSetTarget ?? values.weeklyWorkingSetTarget}
         onCommit={weeklyWorkingSetTarget => updatePreferences({ weeklyWorkingSetTarget })} />
       <PreferenceNumberField label="Progress period (weeks)" testID="settings-target-window"
