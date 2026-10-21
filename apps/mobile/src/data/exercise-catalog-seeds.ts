@@ -33,7 +33,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 6;
+export const CURRENT_APP_VERSION = 7;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -168,13 +168,13 @@ export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'biceps', displayName: 'Biceps', familyName: 'Arms', sortOrder: 8, isEditable: 0 },
   { id: 'brachialis', displayName: 'Brachialis', familyName: 'Arms', sortOrder: 8, isEditable: 0 },
   { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 9, isEditable: 0 },
-  { id: 'forearms_grip', displayName: 'Forearms / Grip', familyName: 'Arms', sortOrder: 10, isEditable: 0 },
-  { id: 'abs_rectus', displayName: 'Abs (Rectus Abdominis)', familyName: 'Core', sortOrder: 11, isEditable: 0 },
+  { id: 'forearms_grip', displayName: 'Forearms', familyName: 'Arms', sortOrder: 10, isEditable: 0 },
+  { id: 'abs_rectus', displayName: 'Abs', familyName: 'Core', sortOrder: 11, isEditable: 0 },
   { id: 'abs_obliques', displayName: 'Obliques', familyName: 'Core', sortOrder: 12, isEditable: 0 },
   { id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 13, isEditable: 0 },
   { id: 'hamstrings', displayName: 'Hamstrings', familyName: 'Legs', sortOrder: 14, isEditable: 0 },
   { id: 'glutes_max', displayName: 'Glute Max', familyName: 'Legs', sortOrder: 15, isEditable: 0 },
-  { id: 'hip_abductors', displayName: 'Hip Abductors (Glute Med/Min)', familyName: 'Legs', sortOrder: 16, isEditable: 0 },
+  { id: 'hip_abductors', displayName: 'Hip Abductors', familyName: 'Legs', sortOrder: 16, isEditable: 0 },
   { id: 'adductors', displayName: 'Adductors', familyName: 'Legs', sortOrder: 17, isEditable: 0 },
   { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs', sortOrder: 17, isEditable: 0 },
   { id: 'calves', displayName: 'Calves', familyName: 'Lower Legs', sortOrder: 18, isEditable: 0 },
