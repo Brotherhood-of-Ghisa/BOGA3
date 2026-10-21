@@ -1,7 +1,8 @@
 /* eslint-disable import/first */
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { Stack, router as navigate } from 'expo-router';
 import { Text } from 'react-native';
+import { ScreenStackHeaderConfig } from 'react-native-screens';
 import { eq } from 'drizzle-orm';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -48,6 +49,9 @@ const open = (initialUrl: string) => renderRouter({
   '(tabs)/progress': () => <Text testID="returned-progress">Progress</Text>,
 }, { initialUrl });
 
+// Native-stack renders the title in UIKit, not as a JS Text/header element.
+const nativeTitle = () => screen.UNSAFE_getAllByType(ScreenStackHeaderConfig).at(-1)!.props.title;
+
 it('pushes the selected exercise chart and returns to the same History metric/week without changing a workout draft', async () => {
   await persistSessionDraftSnapshot({ sessionId: 'active', gymId: null, startedAt: new Date(Date.now() - 60000),
     exercises: [{ id: 'active-block', exerciseDefinitionId: 'curve', name: 'Synthetic exercise',
@@ -63,6 +67,8 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   fireEvent.press(screen.getByTestId('progress-history-rm-curve'));
   await screen.findByTestId('rm-curve-plot');
   expect(route.getPathname()).toBe('/rm-curve');
+  expect(nativeTitle()).toBe('Synthetic exercise');
+  expect(within(screen.getByTestId('rm-curve-content')).getByRole('header', { name: 'RM curve' })).toBeTruthy();
   expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
   expect(screen.getByText('90 sets · 30 sessions')).toBeTruthy();
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
@@ -83,10 +89,14 @@ it.each([
   ['absent', '/rm-curve'], ['blank', '/rm-curve?exerciseDefinitionId=%20'],
   ['unknown', '/rm-curve?exerciseDefinitionId=missing'], ['deleted', '/rm-curve?exerciseDefinitionId=curve'],
 ])('keeps an unavailable %s exercise in route with a safe cold-entry Back', async (kind, href) => {
-  if (kind === 'deleted') localDatabase().update(exerciseDefinitions).set({ deletedAt: new Date() }).where(eq(exerciseDefinitions.id, 'curve')).run();
+  if (kind === 'deleted') {
+    localDatabase().update(exerciseDefinitions).set({ deletedAt: new Date() }).where(eq(exerciseDefinitions.id, 'curve')).run();
+    invalidateExerciseCatalogCache(); await ensureExerciseCatalogLoaded();
+  }
   const route = await open(href);
   await screen.findByText('This exercise isn’t available');
   expect(screen.queryByTestId('rm-curve-plot')).toBeNull();
+  expect(nativeTitle()).toBe('RM curve');
   expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
   expect(screen.queryByRole('button', { name: 'Choose exercise' })).toBeNull();
   fireEvent.press(screen.getByTestId('rm-curve-back'));
@@ -113,9 +123,25 @@ it('resets the selected chart when a new exercise link reaches the mounted route
   await screen.findByText('12 sets · 4 sessions');
   await act(async () => navigate.setParams({ exerciseDefinitionId: 'other' }));
   await screen.findByText('No completed sets');
+  expect(nativeTitle()).toBe('Another exercise');
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
   expect(screen.getByLabelText('range: History look-back (52 weeks)')).toBeTruthy();
   expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
+});
+
+it('refreshes the native exercise title after a rename and clears it after deletion', async () => {
+  await open(String(rmCurveHref('curve')));
+  await screen.findByTestId('rm-curve-plot');
+  await act(async () => {
+    localDatabase().update(exerciseDefinitions).set({ name: 'Single-arm cable lateral raise' }).where(eq(exerciseDefinitions.id, 'curve')).run();
+    invalidateExerciseCatalogCache(); await ensureExerciseCatalogLoaded();
+  });
+  expect(nativeTitle()).toBe('Single-arm cable lateral raise');
+  await act(async () => {
+    localDatabase().update(exerciseDefinitions).set({ deletedAt: new Date() }).where(eq(exerciseDefinitions.id, 'curve')).run();
+    invalidateExerciseCatalogCache(); await ensureExerciseCatalogLoaded();
+  });
+  expect(nativeTitle()).toBe('RM curve');
 });
 
 it('removes a live History action when its exercise is deleted while Options is open', async () => {

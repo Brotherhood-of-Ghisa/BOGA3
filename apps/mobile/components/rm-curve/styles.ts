@@ -3,6 +3,8 @@ import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@
 
 export const curveStyles = StyleSheet.create({
   card: { padding: uiSpace.md, gap: uiSpace.sm },
+  title: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.sm },
   filter: { flexGrow: 1, flexBasis: '45%', minWidth: 0 },
   full: { width: '100%' },
