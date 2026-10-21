@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+
 import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
 
-export type TodayProgressLoader = (now: Date) => Promise<TodayProgress>;
+export type TodayProgressLoader = (now: Date, progressWeeks: number) => Promise<TodayProgress>;
 
 export type TodayProgressState =
   | { status: 'loading' }
@@ -23,7 +25,9 @@ const systemNow = () => new Date();
  * keeps the figures on screen until the new ones arrive.
  */
 export function useTodayProgress({ isFocused, load = loadTodayProgress, now = systemNow }: UseTodayProgressInput) {
-  const [state, setState] = useState<TodayProgressState>({ status: 'loading' });
+  const { values: { targetWindowWeeks }, accountRevision } = useAccountLocalPreferenceState();
+  const context = `${accountRevision}:${targetWindowWeeks}`;
+  const [result, setResult] = useState<{ context: string; state: TodayProgressState }>({ context, state: { status: 'loading' } });
   const generationRef = useRef(0);
   // Read through refs, so a caller's inline loader or clock never re-triggers the focus read.
   const loadRef = useRef(load);
@@ -37,22 +41,22 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     const isCurrent = () => generationRef.current === generation;
-    return loadRef.current(nowRef.current()).then(
+    return loadRef.current(nowRef.current(), targetWindowWeeks).then(
       (progress) => {
-        if (isCurrent()) setState({ status: 'loaded', progress });
+        if (isCurrent()) setResult({ context, state: { status: 'loaded', progress } });
       },
       (error: unknown) => {
         if (isCurrent()) {
-          setState({ status: 'error', message: error instanceof Error ? error.message : 'Unable to load progress' });
+          setResult({ context, state: { status: 'error', message: error instanceof Error ? error.message : 'Unable to load progress' } });
         }
       },
     );
-  }, []);
+  }, [targetWindowWeeks, context]);
 
   const retry = useCallback(() => {
-    setState({ status: 'loading' });
+    setResult({ context, state: { status: 'loading' } });
     return read();
-  }, [read]);
+  }, [read, context]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -62,5 +66,6 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
     };
   }, [isFocused, read]);
 
+  const state: TodayProgressState = result.context === context ? result.state : { status: 'loading' };
   return { state, retry };
 }

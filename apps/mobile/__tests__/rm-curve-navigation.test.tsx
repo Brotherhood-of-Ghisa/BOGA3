@@ -69,7 +69,7 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   expect(screen.getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
   expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
   fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
-  fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
+  fireEvent.press(screen.getByRole('radio', { name: 'Progress period (4 weeks)' }));
   await screen.findByText('12 sets · 4 sessions');
   fireEvent.press(screen.getByTestId('rm-curve-back'));
   await screen.findByTestId('progress-history-screen');
@@ -109,7 +109,7 @@ it('resets the selected chart when a new exercise link reaches the mounted route
   await screen.findByTestId('rm-curve-plot');
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
-  fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
+  fireEvent.press(screen.getByRole('radio', { name: 'Progress period (4 weeks)' }));
   await screen.findByText('12 sets · 4 sessions');
   await act(async () => navigate.setParams({ exerciseDefinitionId: 'other' }));
   await screen.findByText('No completed sets');

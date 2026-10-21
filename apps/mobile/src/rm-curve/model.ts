@@ -4,9 +4,9 @@ import type { RmCurveGraph, RmCurveRow } from '@/src/data/rm-curve';
 import { projectRmCurveSet, rmCurveKnots, rmCurveResidual, type RmCurveExclusion, type RmCurveValues } from '@/src/exercise-calculations/rm-curve';
 import type { RegimeSession } from '@/src/strength-regimes/fit';
 import { MAX_HISTORY_LOOKBACK_WEEKS } from '@/src/preferences/model';
-import { historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, historyWeekBounds } from '@/src/utils/calendar-weeks';
 
-export type RmCurveRange = 4 | 12 | 24 | 'history';
+export type RmCurveRange = 'week' | 'progress' | 'history';
 export type RmCurveEvaluation = {
   start: Date; end: Date; historyLookbackWeeks: number;
   /** Three-state (`src/utils/gym-scope-route.ts`): unset every gym, `null` no gym, an id that gym. */
@@ -21,11 +21,12 @@ function validateHistoryWeeks(weeks: number) {
 }
 
 /** [[1rm.curve-scope]]; the prior look-back is independently anchored to start. */
-export function rmCurveWindow(historyLookbackWeeks: number, now = new Date(), range: RmCurveRange = 'history') {
+export function rmCurveWindow(historyLookbackWeeks: number, now = new Date(), range: RmCurveRange = 'history', progressWeeks = 1) {
   requireDate(now, 'now'); validateHistoryWeeks(historyLookbackWeeks);
-  if (![4, 12, 24, 'history'].includes(range)) throw new Error('Invalid RM chart range');
+  validateHistoryWeeks(progressWeeks);
+  if (!['week', 'progress', 'history'].includes(range)) throw new Error('Invalid RM chart range');
   const historyStart = historyWeekBounds(historyLookbackWeeks, now).start;
-  const start = range === 'history' ? historyStart : new Date(Math.max(historyStart.getTime(), shiftCalendarWeeks(now, -range).getTime()));
+  const start = range === 'history' ? historyStart : calendarWeekBounds(range === 'week' ? 1 : progressWeeks, now).start;
   requireDate(start, 'start');
   return { start, end: new Date(now), historyLookbackWeeks };
 }

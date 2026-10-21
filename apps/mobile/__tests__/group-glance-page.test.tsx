@@ -140,16 +140,6 @@ describe('At a glance: the board', () => {
     expect(onOffsetChange).toHaveBeenLastCalledWith(-1);
   });
 
-  it('names months when the screen is set to months', () => {
-    renderPage({ period: 'month' });
-    expect(byId('group-home-period-title')).toHaveTextContent('This month');
-    expect(byId('group-home-period-detail')).toHaveTextContent('October 2026');
-
-    screen.unmount();
-    renderPage({ period: 'month', offset: -1 });
-    expect(byId('group-home-period-title')).toHaveTextContent('Last month');
-    expect(byId('group-home-period-detail')).toHaveTextContent('September 2026');
-  });
 });
 
 describe('At a glance: before the read lands', () => {
@@ -217,13 +207,6 @@ describe('At a glance: a held read while the next one lands', () => {
     expect(byId('group-position-selected')).toHaveTextContent('05-10-2026 – 11-10-2026');
   });
 
-  it('labels a held week read in weeks after a switch to months', () => {
-    renderPage({ period: 'month', series: seriesFor('week'), held: { period: 'week', offset: 0 } });
-
-    expect(byId('group-home-period-title')).toHaveTextContent('This month');
-    expect(within(byId('group-position-card')).getByText('Last 6 weeks · sets')).toBeTruthy();
-    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
-  });
 });
 
 describe('At a glance: position over time', () => {

@@ -92,7 +92,7 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn: { id: "rm-method-fixed" }
 - tapOn: { text: "range: History look-back .*" }
-- tapOn: { text: "4 weeks" }
+- tapOn: { text: "Progress period .*" }
 - scrollUntilVisible:
     element: { id: "rm-curve-plot" }
     direction: DOWN

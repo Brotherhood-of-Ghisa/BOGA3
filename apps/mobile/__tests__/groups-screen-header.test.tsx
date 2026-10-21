@@ -21,10 +21,8 @@ const renderHeader = (overrides: Partial<Parameters<typeof GroupScreenHeader>[0]
       metric="sets"
       onMetricChange={jest.fn()}
       onOpenMyGroups={jest.fn()}
-      onPeriodChange={jest.fn()}
       onSectionChange={jest.fn()}
       onSelectGroup={jest.fn()}
-      period="week"
       section="glance"
       selectedGroupId="g1"
       {...overrides}
@@ -69,10 +67,10 @@ describe('the Groups heading', () => {
     expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
   });
 
-  it('shows the metric and period pills on At a glance only', () => {
+  it('shows the metric on At a glance and offers no non-weekly period switch', () => {
     renderHeader();
     expect(screen.getByTestId('groups-filter-metric')).toBeTruthy();
-    expect(screen.getByTestId('groups-filter-period')).toBeTruthy();
+    expect(screen.queryByTestId('groups-filter-period')).toBeNull();
 
     screen.unmount();
     renderHeader({ section: 'leaderboards' });

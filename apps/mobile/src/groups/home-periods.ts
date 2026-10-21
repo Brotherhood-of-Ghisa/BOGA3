@@ -1,10 +1,10 @@
 /**
- * The group home page's periods and figures: which local weeks or months At a
+ * The group home page's periods and figures: which local weeks At a
  * glance reads, and each member's totals in them, from one
  * `group_competition_period_totals` read (groups contract, "Week summary and period totals").
  * Pure — no API, no cache, no clock of its own.
  */
-import { localMonthWindow, localWeekWindow, type LocalWindow } from '@/src/utils/local-calendar';
+import { localWeekWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import type { CompetitionPeriodWindow } from './api';
 import { YOU_LABEL } from './board-view-model';
@@ -14,7 +14,7 @@ import { formatMemberName } from './stream-view-model';
 /** The figure the board and the position chart rank by. */
 export type GroupHomeMetric = 'sets' | 'prs';
 /** The period a board covers; the stepper walks back through them. */
-export type GroupHomePeriod = 'week' | 'month';
+export type GroupHomePeriod = 'week';
 
 export const GROUP_HOME_BOARD_SIZE = 5;
 /** The position chart's columns: the period in view and the five before it. */
@@ -38,7 +38,6 @@ export type GroupHomeWindow = {
 
 const PERIOD_WINDOW: Record<GroupHomePeriod, (now: Date, offset: number) => LocalWindow> = {
   week: localWeekWindow,
-  month: localMonthWindow,
 };
 
 export const groupHomeWindowFor = (period: GroupHomePeriod, now: Date, offset: number): LocalWindow =>

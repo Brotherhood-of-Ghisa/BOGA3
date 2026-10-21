@@ -31,7 +31,7 @@ const exercises: IndexedExerciseCatalogExercise[] = [
 ];
 const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = '') => buildExerciseListModel({
   exercises, muscleGroups,
-  stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW),
+  stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) }),
   preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, ...preferences },
   query, includeDeleted: false,
 });
@@ -49,7 +49,7 @@ describe('exercise browser model', () => {
   });
 
   it('breaks equal Favourite scores by latest scoring-window use, then name', () => {
-    const stats = aggregateExerciseCatalogStats(rawHistory(), 'all', NOW);
+    const stats = aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) });
     for (const id of ['bench', 'old', 'never']) stats.recencyScoresById.set(id, {
       exerciseDefinitionId: id, score: 1, completedSetCount: 2,
       lastCompletedAt: daysBefore(id === 'old' ? 10 : 2),
@@ -77,7 +77,7 @@ describe('exercise browser model', () => {
   });
 
   it('includes deleted rows only for the management view', () => {
-    const model = buildExerciseListModel({ exercises, muscleGroups, stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW), preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: true });
+    const model = buildExerciseListModel({ exercises, muscleGroups, stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) }), preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: true });
     expect(model.items.some((item) => item.id === 'deleted')).toBe(true);
   });
 });

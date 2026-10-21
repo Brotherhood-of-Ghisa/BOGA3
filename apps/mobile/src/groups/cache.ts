@@ -28,7 +28,7 @@ export const groupCacheKeys = {
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
   weekSummary: (groupId: string) => `week:v6:${groupId}`,
   /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
-  glance: (groupId: string, period: 'week' | 'month', offset: number) => `glance:v6:${groupId}:${period}:${offset}`,
+  glance: (groupId: string, period: 'week', offset: number) => `glance:v6:${groupId}:${period}:${offset}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';

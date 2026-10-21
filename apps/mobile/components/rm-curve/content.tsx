@@ -16,7 +16,7 @@ export type CurveScope = { range: RmCurveRange; gym: RmCurveGym; rir: number | n
 export type RmCurveContentProps = {
   read: { status: 'loading' | 'ready' | 'error'; data: RmCurveModel | null; retry: () => void };
   scope: CurveScope; onScope: (scope: CurveScope) => void;
-  dateFormat: ExerciseDateFormat; historyWeeks: number;
+  dateFormat: ExerciseDateFormat; historyWeeks: number; progressWeeks: number;
 };
 type Picker = 'gym' | 'range' | 'effort';
 type Choice = { id: string; label: string; checked?: boolean; choose: () => void };
@@ -28,14 +28,15 @@ function excludedMessage(model: RmCurveModel) {
     invalid ? `${invalid} invalid observations` : ''].filter(Boolean).join('; ');
 }
 
-const rangeLabel = (range: RmCurveRange, historyWeeks: number) => range === 'history'
-  ? `History look-back (${historyWeeks} weeks)` : `${Math.min(range, historyWeeks)} weeks${range > historyWeeks ? ' (History limit)' : ''}`;
+const rangeLabel = (range: RmCurveRange, historyWeeks: number, progressWeeks: number) =>
+  range === 'history' ? `History look-back (${historyWeeks} weeks)`
+    : range === 'progress' ? `Progress period (${progressWeeks} weeks)` : 'This week';
 
 /** Page body: the host fixes the exercise; filters are controlled, selection is local.
  * Error/loading hides retained read data; only a resolved scope can prune selection.
  * Chart activation opens inline details; Previous/Next reaches overlapping sets.
  */
-export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks }: RmCurveContentProps) {
+export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks, progressWeeks }: RmCurveContentProps) {
   const [mode, setMode] = useState<CurveMode>('one');
   const [method, setMethod] = useState<UncertaintyMethod>('fixed');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -68,8 +69,8 @@ export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks 
     gym: [{ id: 'all-gyms', label: ALL_GYMS_LABEL, checked: model !== null && model.gymId === undefined, choose: () => apply({ gym: {} }) },
       ...(model?.gyms ?? []).map(g => ({ id: g.gymId ?? 'no-gym', label: gymOptionLabel(g), checked: g.gymId === model?.gymId,
         choose: () => apply({ gym: { gymId: g.gymId } }) }))],
-    range: ([4, 12, 24, 'history'] as const).map(r => ({ id: String(r),
-      label: r === 'history' ? rangeLabel(r, historyWeeks) : `${r} weeks${r > historyWeeks ? ' (limited to History)' : ''}`,
+    range: (['week', 'progress', 'history'] as const).map(r => ({ id: String(r),
+      label: rangeLabel(r, historyWeeks, progressWeeks),
       checked: r === scope.range, choose: () => apply({ range: r }) })),
     effort: [null, ...(model?.effortOptions ?? [])].map(r => ({ id: String(r), label: r === null ? 'All known RIR' : `RIR ${r}`,
       checked: r === scope.rir, choose: () => apply({ rir: r }) })),
@@ -78,7 +79,7 @@ export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks 
   const gymLabel = gymScopeLabel(scope.gym.gymId, labelModel?.gyms ?? []);
   return <>
     <ScreenScroll testID="rm-curve-content">
-      <View style={styles.filters}>{filter('gym', gymLabel)}{filter('range', rangeLabel(scope.range, historyWeeks))}
+      <View style={styles.filters}>{filter('gym', gymLabel)}{filter('range', rangeLabel(scope.range, historyWeeks, progressWeeks))}
         {filter('effort', scope.rir === null ? 'All known RIR' : `RIR ${scope.rir}`, true)}</View>
       <SegmentedControl testIDPrefix="rm-mode" accessibilityLabel="Curves" value={mode} onChange={setMode}
         options={[{ value: 'one', label: 'One curve' }, { value: 'two', label: 'Two curves' }]} />

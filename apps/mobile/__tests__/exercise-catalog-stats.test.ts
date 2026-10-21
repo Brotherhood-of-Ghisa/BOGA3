@@ -283,19 +283,21 @@ describe('aggregateExerciseCatalogStats', () => {
 });
 
 describe('Favourite and all-time browser history', () => {
-  it('uses the fixed 180-day cutoff and 60-day half-life regardless of metric period', () => {
+  it('uses the supplied History start for favourites independently of the metric window', () => {
     const ages = [0, 60, 120, 180, 180 + 1 / DAY_MS, 380];
     const raw: ExerciseCatalogStatsRawHistory = {
       sessions: ages.map((age, i) => ({ id: `s${i}`, completedAt: daysBefore(NOW, age) })),
       sessionExercises: ages.map((_, i) => ({ id: `e${i}`, sessionId: `s${i}`, exerciseDefinitionId: `def${i}` })),
       exerciseSets: ages.map((_, i) => ({ sessionExerciseId: `e${i}`, weightValue: '0', repsValue: '5', setType: 'rir_3' })),
     };
-    const all = aggregateExerciseCatalogStats(raw, 'all', NOW);
-    const short = aggregateExerciseCatalogStats(raw, 7, NOW);
+    const historyStart = daysBefore(NOW, 120);
+    const all = aggregateExerciseCatalogStats(raw, 'all', NOW, { historyStart });
+    const short = aggregateExerciseCatalogStats(raw, 7, NOW, { historyStart });
     expect(short.recencyScoresById).toEqual(all.recencyScoresById);
-    for (const [i, score] of [1, 0.5, 0.25, 0.125].entries()) {
+    for (const [i, score] of [1, 0.5, 0.25].entries()) {
       expect(all.recencyScoresById.get(`def${i}`)?.score).toBeCloseTo(score);
     }
+    expect(all.recencyScoresById.has('def3')).toBe(false);
     expect(all.recencyScoresById.has('def4')).toBe(false);
     expect(all.recencyScoresById.has('def5')).toBe(false);
     expect(all.lastCompletedAtById.get('def5')).toEqual(daysBefore(NOW, 380));
@@ -324,7 +326,7 @@ describe('Favourite and all-time browser history', () => {
         { sessionExerciseId: 'orphan', weightValue: '20', repsValue: '8', setType: null },
       ],
     };
-    const stats = aggregateExerciseCatalogStats(raw, 'all', NOW);
+    const stats = aggregateExerciseCatalogStats(raw, 'all', NOW, { historyStart: daysBefore(NOW, 120) });
     expect(stats.aggregatesById.get('valid')).toMatchObject({ sessionCount: 2, workingSetCount: 4 });
     expect(stats.recencyScoresById.get('valid')?.completedSetCount).toBe(3);
     expect([...stats.everDoneIds]).toEqual(['valid']);

@@ -32,7 +32,7 @@ it.each([
   [groupCacheKeys.session('g1','other','s1'),competitionSession],
   [groupCacheKeys.weekSummary('g1'),{ windowStartMs: 100,summary: competitionWeek }],
   [groupCacheKeys.glance('g1','week',0),periodTotals('g1')],
-  [groupCacheKeys.glance('g1','month',-3),periodTotals('g1')],
+  [groupCacheKeys.glance('g1','week',-3),periodTotals('g1')],
 ])('round-trips a closed public payload: %s', (key,payload) => {
   put(key as string,payload);
   expect(readGroupCache(fixture.database,key as string,'u1')).toEqual({ payload,fetchedAtMs: 1000 });
@@ -40,6 +40,7 @@ it.each([
 });
 it.each([
   ['another group',groupCacheKeys.glance('g1','week',0),periodTotals('g2')],
+  ['retired monthly cache',groupCacheKeys.glance('g1','week',0).replace(':week:',':month:'),periodTotals('g1')],
   ['an unknown period',groupCacheKeys.glance('g1','week',0).replace(':week:',':year:'),periodTotals('g1')],
   ['a later offset',groupCacheKeys.glance('g1','week',1),periodTotals('g1')],
   ['a padded offset',groupCacheKeys.glance('g1','week',0).replace(/:0$/,':-0'),periodTotals('g1')],
@@ -101,7 +102,7 @@ it('access loss drops group projections and every session join; local links rema
   put(groupCacheKeys.stream('g1'),competitionStream);
   put(groupCacheKeys.session('g1','other','s1'),competitionSession);
   put(groupCacheKeys.glance('g1','week',0),periodTotals('g1'));
-  put(groupCacheKeys.glance('g1','month',-2),periodTotals('g1'));
+  put(groupCacheKeys.glance('g1','week',-2),periodTotals('g1'));
   put(groupCacheKeys.glance('g10','week',0),periodTotals('g10'));
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   evictGroup(fixture.database,'g1');

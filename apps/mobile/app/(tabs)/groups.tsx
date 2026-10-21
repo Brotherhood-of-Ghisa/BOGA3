@@ -24,7 +24,7 @@ import {
 } from '@/components/groups';
 import { IconButton, ScreenScroll } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
-import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-periods';
+import type { GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { useAuth } from '@/src/auth';
@@ -77,10 +77,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
     rerender();
   }, []);
   const [segment, setSegment] = useState<GroupsSection>('glance');
-  // At a glance's two figures: which metric it ranks by and whether a step is
-  // a week or a month. They live for the visit, like the Progress filters.
+  // At a glance ranks the selected metric by calendar week for this visit.
   const [metric, setMetric] = useState<GroupHomeMetric>('sets');
-  const [period, setPeriod] = useState<GroupHomePeriod>('week');
+  const period = 'week' as const;
   // The stepper: 0 is the period in progress, -1 the one before.
   const [glanceOffset, setGlanceOffset] = useState(0);
   const [hiddenEventKinds, setHiddenEventKinds] = useState<readonly StreamEventKind[]>(DEFAULT_HIDDEN_STREAM_EVENT_KINDS);
@@ -164,10 +163,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
         metric={metric}
         onMetricChange={setMetric}
         onOpenMyGroups={() => router.push('/group/mine')}
-        onPeriodChange={setPeriod}
         onSectionChange={setSegment}
         onSelectGroup={pickGroup}
-        period={period}
         section={segment}
         selectedGroupId={selectedGroupId}
       />

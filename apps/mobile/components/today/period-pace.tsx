@@ -4,20 +4,18 @@ import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from 'react-nat
 
 import { changeToneColour } from '@/components/ui/change-tone';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { TodayProgressMonth } from '@/src/progress-summary';
+import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
   CHART_HEIGHT,
   formatPacePhrase,
   formatSignedCount,
-  monthChartAccessibilityLabel,
+  periodChartAccessibilityLabel,
   paceTone,
-  monthChartGeometry,
-  monthName,
+  periodChartGeometry,
   paceDifference,
-  shortMonthName,
   toPolyline,
-  type MonthChartGeometry,
+  type PeriodChartGeometry,
 } from './progress-format';
 import { todayText } from './text-styles';
 
@@ -32,12 +30,12 @@ const CURRENT_LABEL_MIN_Y = 10;
 
 const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
 
-function MonthChart({ month, geometry }: { month: TodayProgressMonth; geometry: MonthChartGeometry }) {
-  const { plot, current, previous, projection, today, monthEndX } = geometry;
+function PeriodChart({ period, geometry }: { period: TodayProgressPeriod; geometry: PeriodChartGeometry }) {
+  const { plot, current, previous, projection, today, periodEndX } = geometry;
   const area = [{ x: 0, y: plot.bottom }, ...current, { x: today.current.x, y: plot.bottom }];
   const previousEnd = previous[previous.length - 1];
   const showFirstDay = today.current.x >= AXIS_LABEL_CLEARANCE;
-  const showLastDay = monthEndX - today.current.x >= AXIS_LABEL_CLEARANCE;
+  const showLastDay = periodEndX - today.current.x >= AXIS_LABEL_CLEARANCE;
   const currentLabelAfter = today.current.x < 40;
   // Above today's dot, or beside it when the dot is at the top of the plot.
   const currentLabelY = Math.max(CURRENT_LABEL_MIN_Y, today.current.y - 9);
@@ -80,7 +78,7 @@ function MonthChart({ month, geometry }: { month: TodayProgressMonth; geometry: 
       <Circle cx={today.previous.x} cy={today.previous.y} fill={uiRoles.surface} r={3.5} stroke={uiRoles.inkFaint} strokeWidth={2} />
       {previousEnd ? (
         <SvgText {...axisLabel} fill={uiRoles.inkMuted} letterSpacing={1} x={previousEnd.x + 6} y={previousEnd.y + 4}>
-          {shortMonthName(month.previous.window.start).toUpperCase()}
+          PREV
         </SvgText>
       ) : null}
       <SvgText
@@ -90,7 +88,7 @@ function MonthChart({ month, geometry }: { month: TodayProgressMonth; geometry: 
         textAnchor={currentLabelAfter ? 'start' : 'end'}
         x={today.current.x + (currentLabelAfter ? 6 : -6)}
         y={currentLabelY}>
-        {shortMonthName(month.window.start).toUpperCase()}
+        NOW
       </SvgText>
       {showFirstDay ? (
         <SvgText {...axisLabel} fill={uiRoles.inkFaint} x={0} y={AXIS_LABEL_Y}>
@@ -98,21 +96,21 @@ function MonthChart({ month, geometry }: { month: TodayProgressMonth; geometry: 
         </SvgText>
       ) : null}
       <SvgText {...axisLabel} fill={uiRoles.ink} textAnchor="middle" x={today.current.x} y={AXIS_LABEL_Y}>
-        {String(month.dayOfMonth)}
+        {String(period.elapsedDays)}
       </SvgText>
       {showLastDay ? (
-        <SvgText {...axisLabel} fill={uiRoles.inkFaint} textAnchor="end" x={monthEndX} y={AXIS_LABEL_Y}>
-          {String(month.daysInMonth)}
+        <SvgText {...axisLabel} fill={uiRoles.inkFaint} textAnchor="end" x={periodEndX} y={AXIS_LABEL_Y}>
+          {String(period.totalDays)}
         </SvgText>
       ) : null}
     </>
   );
 }
 
-// `<Month> so far`: the month's working sets against the previous month at the
-// same day (a signed absolute difference, never a percentage) and the
+// The configured Progress period against its preceding block at the same
+// elapsed day (a signed absolute difference, never a percentage) and the
 // cumulative line by day.
-export function MonthPace({ month }: { month: TodayProgressMonth }) {
+export function PeriodPace({ period }: { period: TodayProgressPeriod }) {
   const [width, setWidth] = useState(FALLBACK_CHART_WIDTH);
   const onLayout = (event: LayoutChangeEvent) => {
     const measured = Math.round(event.nativeEvent.layout.width);
@@ -120,37 +118,37 @@ export function MonthPace({ month }: { month: TodayProgressMonth }) {
   };
 
   return (
-    <View style={styles.block} testID="today-progress-month">
+    <View style={styles.block} testID="today-progress-period">
       <View style={styles.heading}>
         <View style={styles.headline}>
           <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
-            {monthName(month.window.start)} so far
+            {period.weeks === 1 ? 'This week' : `${period.weeks} weeks`} so far
           </Text>
-          <Text allowFontScaling={false} style={todayText.headlineFigure} testID="today-progress-month-working-sets">
-            {month.toDate.workingSets}
+          <Text allowFontScaling={false} style={todayText.headlineFigure} testID="today-progress-period-working-sets">
+            {period.toDate.workingSets}
             <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
           </Text>
         </View>
         <View style={styles.difference}>
           {/* The pace difference takes its direction's colour, like every
               other change figure (`design-language.md` §6). */}
-          <Text allowFontScaling={false} testID="today-progress-month-difference"
-            style={[todayText.differenceFigure, { color: changeToneColour(paceTone(paceDifference(month))) }]}>
-            {formatSignedCount(paceDifference(month))}
+          <Text allowFontScaling={false} testID="today-progress-period-difference"
+            style={[todayText.differenceFigure, { color: changeToneColour(paceTone(paceDifference(period))) }]}>
+            {formatSignedCount(paceDifference(period))}
           </Text>
-          <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-progress-month-pace">
-            {formatPacePhrase(month)}
+          <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-progress-period-pace">
+            {formatPacePhrase(period)}
           </Text>
         </View>
       </View>
       <View
         accessible
-        accessibilityLabel={monthChartAccessibilityLabel(month)}
+        accessibilityLabel={periodChartAccessibilityLabel(period)}
         accessibilityRole="image"
         onLayout={onLayout}
         testID="today-progress-chart">
         <Svg height={CHART_HEIGHT} style={styles.chart} width={width}>
-          <MonthChart geometry={monthChartGeometry(month, width)} month={month} />
+          <PeriodChart geometry={periodChartGeometry(period, width)} period={period} />
         </Svg>
       </View>
     </View>
@@ -171,6 +169,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
   },
   difference: {
+    flexShrink: 1,
     alignItems: 'flex-end',
     gap: uiSpace.xs,
   },

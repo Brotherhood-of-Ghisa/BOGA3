@@ -20,8 +20,8 @@ let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
 const query = { exerciseDefinitionId: 'curve', start: new Date(wave.scenarios.plateau[0].startedAt),
   end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52, gym: { gymId: 'synthetic-gym' } };
-const scope: CurveScope = { range: 24, gym: { gymId: 'synthetic-gym' }, rir: null };
-const props = { scope, onScope: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
+const scope: CurveScope = { range: 'history', gym: { gymId: 'synthetic-gym' }, rir: null };
+const props = { scope, onScope: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52, progressWeeks: 4 };
 const read = (data: Awaited<ReturnType<typeof loadRmCurve>>) => ({ status: 'ready' as const, data, retry: jest.fn() });
 beforeEach(() => { mockFixture = createInMemoryDatabase(); seedWaveHistory(mockFixture.database); });
 afterEach(() => { mockFixture.close(); jest.restoreAllMocks(); });
@@ -150,14 +150,14 @@ it('offers all available canonical efforts and bounded range choices and retains
   const model = (await loadRmCurve(query))!;
   function Harness() {
     const [current, setScope] = useState(scope);
-    return <RmCurveContent {...props} historyWeeks={8} read={read(model)} scope={current} onScope={setScope} />;
+    return <RmCurveContent {...props} historyWeeks={8} progressWeeks={4} read={read(model)} scope={current} onScope={setScope} />;
   }
   render(<Harness />);
   fireEvent.press(screen.getByLabelText('effort: All known RIR')); fireEvent.press(screen.getByRole('radio', { name: 'RIR 4' }));
   expect(screen.getByLabelText('effort: RIR 4')).toBeTruthy();
-  fireEvent.press(screen.getByLabelText('range: 8 weeks (History limit)'));
-  fireEvent.press(screen.getByRole('radio', { name: '12 weeks (limited to History)' }));
-  expect(screen.getByLabelText('range: 8 weeks (History limit)')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('range: History look-back (8 weeks)'));
+  fireEvent.press(screen.getByRole('radio', { name: 'Progress period (4 weeks)' }));
+  expect(screen.getByLabelText('range: Progress period (4 weeks)')).toBeTruthy();
 });
 
 it('keeps every finite zero/extreme/dense observation on the plot without spread-argument overflow', () => {

@@ -108,7 +108,7 @@ Define the canonical repository structure, path ownership, and placement convent
   - remains derived-only: it owns no schema, durable achievement/share state,
     backend API, or sync envelope.
 - `apps/mobile/src/progress-summary/`
-  - owns Today's progress read (`loadTodayProgress`): the week and month
+  - owns Today's progress read (`loadTodayProgress`): the week and configured progress period
     windows of [[comparison.window]], and the latest completed session.
     Counted sessions and working sets come from the stats
     aggregation (`src/data/stats.ts`), PRs (one per record kind) from the

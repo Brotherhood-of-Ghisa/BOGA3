@@ -54,6 +54,8 @@ import {
   ExerciseHistoryScreenShell,
   type ExerciseHistoryScreenShellProps,
 } from '../app/exercise-history';
+import { localWeekWindow } from '@/src/utils/local-calendar';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { uiRoles } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
 import * as historyRepository from '@/src/data/exercise-history';
@@ -76,7 +78,7 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   exerciseName: 'Bench Press',
   exerciseDeletedAt: null,
   bodyweightContribution: 0,
-  period: 30,
+  period: { weeks: 52, kind: 'history' },
   appliedTagDefinitionId: null,
   tagOptions: [
     {
@@ -219,10 +221,50 @@ describe('ExerciseHistoryRoute over real data', () => {
     await completeSessionDraft('history_elsewhere', { completedAt, now: completedAt });
   };
 
+  it('maps legacy day links and every live choice to the configured week periods', async () => {
+    const read = jest.spyOn(historyRepository, 'loadExercisePerformanceHistory');
+    await openHistory({ exerciseDefinitionId: SQUAT, period: '30' }, async () => {
+      updatePreferences({ targetWindowWeeks: 3, historyLookbackWeeks: 9 });
+    });
+    expect(screen.getByTestId('exercise-history-period-chip-history')).toHaveTextContent('History (9w)');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ period: { weeks: 9, kind: 'history' } }));
+    expect(screen.getByRole('tab', { name: 'Progress period, 3 weeks' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'History look-back, 9 weeks' })).toBeTruthy();
+    expect(screen.queryByText('Last 30 days')).toBeNull();
+    expect(screen.queryByText('All time')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-progress'));
+    await screen.findByTestId('exercise-history-best-card');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ period: { weeks: 3, kind: 'progress' } }));
+    act(() => updatePreferences({ targetWindowWeeks: 2 }));
+    await screen.findByTestId('exercise-history-best-card');
+    expect(screen.getByTestId('exercise-history-period-chip-progress')).toHaveTextContent('Progress (2w)');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ period: { weeks: 2, kind: 'progress' } }));
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
+    await screen.findByTestId('exercise-history-best-card');
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ period: { weeks: 1, kind: 'progress' } }));
+  });
+
+  it('ignores an older pending history response after the selected period changes', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await bootLocalApp();
+    let finishOld!: (summary: ExerciseHistorySummary) => void;
+    const oldRead = new Promise<ExerciseHistorySummary>(resolve => { finishOld = resolve; });
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockReturnValueOnce(oldRead);
+    mockSearchParams = { exerciseDefinitionId: SQUAT };
+    render(<ExerciseHistoryRoute />);
+    expect(screen.getByTestId('exercise-history-loading-state')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-progress'));
+    await screen.findByTestId('exercise-history-best-card');
+    expect(sessionCards().length).toBeGreaterThan(0);
+    await act(async () => { finishOld(buildSummary()); });
+    expect(screen.queryByTestId('exercise-history-session-card-se-newest')).toBeNull();
+    expect(screen.getByTestId('exercise-history-period-chip-progress')).toHaveProp('accessibilityState', { selected: true });
+  });
+
   it('shows the all-time bests and one card per session in the period, newest first', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
-    expect(screen.getByTestId('exercise-history-period-chip-30')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('exercise-history-period-chip-history')).toHaveProp('accessibilityState', { selected: true });
     // Eight sessions in 30 days (26 days back), the 1-day-old one with two squat blocks.
     expect(sessionCards()).toEqual([
       'maestro_m24_completion_no_pr_squat',
@@ -242,12 +284,16 @@ describe('ExerciseHistoryRoute over real data', () => {
 
   it('reloads when the period changes', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
-
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-7'));
-    await waitFor(() => expect(sessionCards()).toHaveLength(5));
-
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-all'));
-    await waitFor(() => expect(sessionCards()).toHaveLength(9));
+    const history = (await historyRepository.loadExercisePerformanceHistory({
+      exerciseDefinitionId: SQUAT, period: { weeks: 52, kind: 'history' },
+    }))!;
+    // Fixtures are relative to today; the weekly selection depends on the weekday.
+    const monday = localWeekWindow(new Date()).start;
+    const expectedWeek = history.sessions.filter(entry => entry.completedAt >= monday).map(entry => entry.sessionExerciseId);
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
+    await waitFor(() => expect(sessionCards()).toEqual(expectedWeek));
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
+    await waitFor(() => expect(sessionCards()).toEqual(history.sessions.map(entry => entry.sessionExerciseId)));
   });
 
   it('keeps to the current gym only when the preference says so', async () => {
@@ -375,7 +421,7 @@ describe('ExerciseHistoryScreenShell', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
-        period={30}
+        period="history"
         appliedTagDefinitionId={null}
         isLoading={false}
         errorMessage={null}
@@ -397,7 +443,7 @@ describe('ExerciseHistoryScreenShell', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ gymOptions: [{ gymId: null, name: 'No gym', occurrenceCount: 2 }] })}
-        period={30}
+        period="history"
         appliedTagDefinitionId={null}
         appliedGymId={null}
         isLoading={false}
@@ -418,7 +464,7 @@ describe('ExerciseHistoryScreenShell', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
-        period={30}
+        period="history"
         appliedTagDefinitionId="tag-westside"
         isLoading={false}
         errorMessage={null}
@@ -446,7 +492,7 @@ describe('ExerciseHistoryScreenShell', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
-        period={7}
+        period="week"
         appliedTagDefinitionId="tag-westside"
         isLoading={false}
         errorMessage={null}
@@ -472,7 +518,7 @@ describe('ExerciseHistoryScreenShell', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
-        period={7}
+        period="week"
         appliedTagDefinitionId={null}
         appliedGymId={appliedGymId}
         isLoading={false}
@@ -506,7 +552,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={summary}
-        period={30}
+        period="history"
         appliedTagDefinitionId={null}
         isLoading={false}
         errorMessage={null}
@@ -524,7 +570,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
-        period={30}
+        period="history"
         appliedTagDefinitionId={null}
         isLoading={false}
         errorMessage={null}
@@ -546,7 +592,7 @@ describe('ExerciseHistoryScreenShell — design language', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
-        period={30}
+        period="history"
         appliedTagDefinitionId={null}
         isLoading={false}
         errorMessage={null}
@@ -596,10 +642,10 @@ describe('ExerciseHistoryScreenShell — design language', () => {
   });
 
   it('selects the period in a segmented control', () => {
-    renderShell({ period: 'all' });
+    renderShell({ period: 'history' });
 
-    expect(screen.getByTestId('exercise-history-period-chip-all')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('exercise-history-period-chip-30')).toHaveProp('accessibilityState', { selected: false });
+    expect(screen.getByTestId('exercise-history-period-chip-history')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('exercise-history-period-chip-progress')).toHaveProp('accessibilityState', { selected: false });
   });
 
   it('names a deleted tag in words on a faint chip, not in a warning hue', () => {
@@ -624,7 +670,7 @@ it('uses ordinary strength copy while bodyweight changes only the calculation', 
     sets: [{ ...summary.sessions[0].sets[0], weightValue: '20' }],
   }];
   summary.allTimeBest = { estimatedOneRepMax: null, topWeight: null };
-  render(<ExerciseHistoryScreenShell summary={summary} period={30} appliedTagDefinitionId={null}
+  render(<ExerciseHistoryScreenShell summary={summary} period="history" appliedTagDefinitionId={null}
     isLoading={false} errorMessage={null} onSelectPeriod={jest.fn()} onSelectTag={jest.fn()}
     onPressSession={jest.fn()} onSelectMainTab={jest.fn()} />);
   expect(screen.getByTestId('exercise-history-best-est-1rm').props.accessibilityLabel).toBe('1RM —');

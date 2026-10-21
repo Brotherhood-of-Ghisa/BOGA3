@@ -127,7 +127,7 @@ describe('loadTodayProgress', () => {
     await expect(loadTodayProgress(NOW)).resolves.toEqual({ status: 'empty' });
   });
 
-  it('counts sessions, working sets and PRs (one per record kind) per week and month', async () => {
+  it('counts sessions, working sets and PRs (one per record kind) per week and period', async () => {
     insertSession('sep-28', { completedAt: local(2026, 9, 28, 18) }, [bench('90', 2)]); // first bench: no PR
     insertSession('oct-6', { completedAt: local(2026, 10, 6, 18) }, [bench('95', 3)]); // 1RM, Weight and Volume: 3 PRs
     insertSession('oct-12', { completedAt: THIS_MONDAY }, [ // 1RM and Weight (Volume falls short): 2 PRs on the week boundary
@@ -138,14 +138,15 @@ describe('loadTodayProgress', () => {
     insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('80', 2)]); // no PR
     insertSession('oct-13-deleted', { completedAt: local(2026, 10, 13, 19), deletedAt: local(2026, 10, 13, 20) }, [bench('200', 5)]);
 
-    const { week, month } = ready(await loadTodayProgress(NOW));
+    const { week, period } = ready(await loadTodayProgress(NOW));
 
     expect(week.current).toEqual({ sessions: 2, workingSets: 5, prs: 2 });
     expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 3 });
-    expect(month.toDate).toEqual({ sessions: 3, workingSets: 8, prs: 5 });
-    expect(month.cumulativeWorkingSets).toEqual([0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 6, 8, 8]);
-    expect(month.previous.toSameDay).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
-    expect(month.previous.total).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
+    expect(period.toDate).toEqual({ sessions: 4, workingSets: 10, prs: 5 });
+    expect(period.cumulativeWorkingSets).toHaveLength(24);
+    expect(period.cumulativeWorkingSets.at(-1)).toBe(10);
+    expect(period.previous.toSameDay).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(period.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
   });
 
   it('counts the workout in progress where finishing it now would: its confirmed sets, and no PR', async () => {
@@ -156,11 +157,11 @@ describe('loadTodayProgress', () => {
     ]);
     insertSession('in-progress-deleted', { completedAt: NOW, status: 'active', deletedAt: NOW }, [bench('200', 5)]);
 
-    const { week, month, latest } = ready(await loadTodayProgress(NOW));
+    const { week, period, latest } = ready(await loadTodayProgress(NOW));
 
     expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
     expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 0 });
-    expect(month.toDate).toEqual({ sessions: 2, workingSets: 5, prs: 0 });
+    expect(period.toDate).toEqual({ sessions: 2, workingSets: 5, prs: 0 });
     // The latest-session card lists completed sessions only.
     expect(latest.id).toBe('oct-6');
   });
@@ -230,7 +231,7 @@ describe('loadTodayProgress', () => {
     });
   });
 
-  it('summarises a latest session older than both months, with zero figures for the windows', async () => {
+  it('summarises a latest session older than both blocks, with zero figures for the windows', async () => {
     insertSession('may-1', { completedAt: local(2026, 5, 1, 18) }, [bench('90')]);
     insertSession('may-8', { completedAt: local(2026, 5, 8, 18) }, [bench('100', 4)]);
 
@@ -239,7 +240,7 @@ describe('loadTodayProgress', () => {
     expect(progress.latest).toMatchObject({ id: 'may-8', workingSets: 4, exerciseCount: 1, gymName: null, durationSec: null });
     expect(progress.latest.records.map((record) => record.kind)).toEqual(['oneRepMax', 'weight', 'volume']);
     expect(progress.week.current).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
-    expect(progress.month.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(progress.period.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
   });
 
   it('reads the latest session alone only when it is older than the loaded range', async () => {

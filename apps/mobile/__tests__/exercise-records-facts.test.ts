@@ -238,7 +238,7 @@ describe('exercise history all-time bests from the facts', () => {
 
     const history = async (gymId?: string | null) =>
       (await loadExercisePerformanceHistory({
-        exerciseDefinitionId: BENCH, period: 7, ...(gymId === undefined ? {} : { gymId }),
+        exerciseDefinitionId: BENCH, period: { weeks: 1, kind: 'progress' }, ...(gymId === undefined ? {} : { gymId }),
       }))!;
 
     const all = await history();
@@ -350,7 +350,7 @@ describe('exercise history all-time bests of a split exercise', () => {
   });
 
   const best = async (scope: { gymId?: string | null } = {}) =>
-    (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all', ...scope }))!
+    (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: { weeks: 520, kind: 'history' }, ...scope }))!
       .allTimeBest.topWeight;
 
   it('shows the whole exercise until a gym is chosen', async () => {
@@ -446,7 +446,7 @@ describe('records from the facts equal the replay on a generated history', () =>
       insertSession(id, 1 + index, blocks, pick(['home', 'club', null]));
     }
 
-    const history = (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all' }))!.sessions;
+    const history = (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: { weeks: 520, kind: 'history' } }))!.sessions;
     const target = (sessionId: string) => db().select().from(sessions).all().find((row) => row.id === sessionId)!;
     const scopes: { gymId?: string | null }[] = [{}, { gymId: 'home' }, { gymId: null }];
     let compared = 0;
@@ -476,7 +476,7 @@ describe('records from the facts equal the replay on a generated history', () =>
       }));
       insertSession(`gen-${String(index).padStart(2, '0')}`, 1 + index, blocks, pick(['home', 'club', null]));
     }
-    const history = (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: 'all' }))!.sessions;
+    const history = (await loadExercisePerformanceHistory({ exerciseDefinitionId: BENCH, period: { weeks: 520, kind: 'history' } }))!.sessions;
     db().update(exerciseDefinitions).set({ splitByGym: true }).where(eq(exerciseDefinitions.id, BENCH)).run();
 
     let compared = 0;

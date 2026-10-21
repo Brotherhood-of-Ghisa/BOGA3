@@ -7,7 +7,7 @@ import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effo
 import vectors from '@/src/exercise-calculations/load-metrics-vectors.json';
 import { calculateSetMetrics, type SetMetricInput } from '@/src/exercise-calculations/load-metrics';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
-import { historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
 const scope = { start: new Date(wave.scenarios.plateau[0].startedAt),
   end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52 };
@@ -141,13 +141,14 @@ it('rejects nonperformed, nonworking, corrupt, overflow and noncanonical inputs 
   expect(rmCurveKnots(100, 'total_load', NaN)).toEqual([]);
 });
 
-it('clamps the approved ranges to local History bounds and anchors the prior interval independently', () => {
+it('uses configured calendar windows without inventing a clamped period and anchors prior History independently', () => {
   const now = new Date(2026, 9, 14, 12);
   const normal = rmCurveWindow(52, now);
   expect(normal.start).toEqual(historyWeekBounds(52, now).start);
-  for (const range of [4, 12, 24] as const) expect(rmCurveWindow(52, now, range).start).toEqual(shiftCalendarWeeks(now, -range));
-  const clamped = rmCurveWindow(2, now, 24);
-  expect(clamped.start).toEqual(historyWeekBounds(2, now).start);
+  for (const weeks of [3, 9, 17]) expect(rmCurveWindow(52, now, 'progress', weeks).start)
+    .toEqual(calendarWeekBounds(weeks, now).start);
+  expect(rmCurveWindow(2, now, 'progress', 9).start).toEqual(calendarWeekBounds(9, now).start);
+  expect(rmCurveWindow(52, now, 'week').start).toEqual(calendarWeekBounds(1, now).start);
   expect(rmCurveWindow(52, now, 'history').start).toEqual(historyWeekBounds(52, now).start);
   expect(rmCurvePriorStart(normal)).toEqual(historyWeekBounds(52, normal.start).start);
   expect(() => rmCurveWindow(0, now)).toThrow(); expect(() => rmCurveWindow(521, now)).toThrow();

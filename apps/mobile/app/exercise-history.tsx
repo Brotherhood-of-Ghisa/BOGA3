@@ -1,11 +1,11 @@
-import { useDateFormat } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, useDateFormat } from '@/src/preferences/hooks';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
@@ -33,7 +33,6 @@ import {
 } from '@/components/ui';
 import {
   loadExercisePerformanceHistory,
-  type ExerciseHistoryPeriod,
   type ExerciseHistorySessionEntry,
   type ExerciseHistorySummary,
   type ExerciseHistoryTagOption,
@@ -48,11 +47,7 @@ import {
   formatSetRow,
 } from '@/src/session-recorder/session-view-model';
 
-const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string; accessibilityLabel: string }[] = [
-  { value: 7, label: 'Last 7 days', accessibilityLabel: 'Show history for Last 7 days' },
-  { value: 30, label: 'Last 30 days', accessibilityLabel: 'Show history for Last 30 days' },
-  { value: 'all', label: 'All time', accessibilityLabel: 'Show history for All time' },
-];
+type ExerciseHistoryPeriod = 'week' | 'progress' | 'history';
 
 // The tag filter's "no filter" chip. Tag ids are generated, never this.
 const ALL_TAGS = 'all';
@@ -65,10 +60,8 @@ const coerceRouteParam = (value: string | string[] | undefined): string | null =
 };
 
 const parsePeriodParam = (raw: string | null): ExerciseHistoryPeriod => {
-  if (raw === 'all') return 'all';
-  if (raw === '7') return 7;
-  if (raw === '30') return 30;
-  return 30;
+  if (raw === '7' || raw === 'week') return 'week';
+  return raw === 'progress' ? 'progress' : 'history';
 };
 
 // Figures read as they do on the session view (`design-language.md` §6).
@@ -110,6 +103,12 @@ export function ExerciseHistoryScreenShell({
   activeMainTab = 'progress',
   onSelectMainTab,
 }: ExerciseHistoryScreenShellProps) {
+  const { values } = useAccountLocalPreferenceState();
+  const periodOptions = [
+    { value: 'week' as const, label: 'This week' },
+    { value: 'progress' as const, label: `Progress (${values.targetWindowWeeks}w)`, accessibilityLabel: `Progress period, ${values.targetWindowWeeks} weeks` },
+    { value: 'history' as const, label: `History (${values.historyLookbackWeeks}w)`, accessibilityLabel: `History look-back, ${values.historyLookbackWeeks} weeks` },
+  ];
   const tagOptions = useMemo(() => summary?.tagOptions ?? [], [summary]);
   const tagChips = useMemo<ChipOption<string>[]>(
     () => [
@@ -131,8 +130,10 @@ export function ExerciseHistoryScreenShell({
       <ScreenScroll testID="exercise-history-scroll">
         <SegmentedControl
           accessibilityLabel="Time range"
+          density="compact"
+          layout="fit"
           onChange={onSelectPeriod}
-          options={PERIOD_OPTIONS}
+          options={periodOptions}
           testIDPrefix="exercise-history-period-chip"
           value={period}
         />
@@ -381,6 +382,7 @@ export default function ExerciseHistoryRoute() {
     currentGymId?: string | string[];
   }>();
   const [listPreferences] = useExerciseListPreferences();
+  const { values: { targetWindowWeeks, historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
 
   const exerciseDefinitionId = coerceRouteParam(params.exerciseDefinitionId);
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
@@ -410,6 +412,7 @@ export default function ExerciseHistoryRoute() {
   const [summary, setSummary] = useState<ExerciseHistorySummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const readGeneration = useRef(0);
 
   const datedWeightRevision = useBodyWeightContextRevision();
   const loadSummary = useCallback(
@@ -418,6 +421,7 @@ export default function ExerciseHistoryRoute() {
       nextTagDefinitionId: string | null,
       nextGymId: string | null | undefined
     ) => {
+      const generation = ++readGeneration.current;
       if (!exerciseDefinitionId) {
         setSummary(null);
         setIsLoading(false);
@@ -425,14 +429,17 @@ export default function ExerciseHistoryRoute() {
         return;
       }
       setIsLoading(true);
+      setSummary(null);
       setErrorMessage(null);
       try {
         const next = await loadExercisePerformanceHistory({
           exerciseDefinitionId,
-          period: nextPeriod,
+          period: { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
+            kind: nextPeriod === 'history' ? 'history' : 'progress' },
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
         });
+        if (generation !== readGeneration.current) return;
         if (next === null) {
           setSummary(null);
           setErrorMessage('Exercise not found.');
@@ -440,44 +447,23 @@ export default function ExerciseHistoryRoute() {
           setSummary(next);
         }
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+        if (generation === readGeneration.current) setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
       } finally {
-        setIsLoading(false);
+        if (generation === readGeneration.current) setIsLoading(false);
       }
     },
-    [exerciseDefinitionId]
+    [exerciseDefinitionId, targetWindowWeeks, historyLookbackWeeks]
   );
 
   useFocusEffect(
     useCallback(() => {
       void loadSummary(period, appliedTagDefinitionId, appliedGymId);
+      return () => { readGeneration.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
-    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId, datedWeightRevision])
+    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId, datedWeightRevision, accountRevision])
   );
 
-  const handleSelectPeriod = useCallback(
-    (next: ExerciseHistoryPeriod) => {
-      setPeriod(next);
-      void loadSummary(next, appliedTagDefinitionId, appliedGymId);
-    },
-    [loadSummary, appliedTagDefinitionId, appliedGymId]
-  );
-
-  const handleSelectTag = useCallback(
-    (next: string | null) => {
-      setAppliedTagDefinitionId(next);
-      void loadSummary(period, next, appliedGymId);
-    },
-    [loadSummary, period, appliedGymId]
-  );
-
-  const handleSelectGym = useCallback(
-    (next: string | null | undefined) => {
-      setChosenGym({ gymId: next });
-      void loadSummary(period, appliedTagDefinitionId, next);
-    },
-    [loadSummary, period, appliedTagDefinitionId]
-  );
+  const handleSelectGym = useCallback((gymId: string | null | undefined) => setChosenGym({ gymId }), []);
 
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
   const gymOptions = useMemo(() => (summary?.gymOptions ?? []).map((option) => ({
@@ -524,8 +510,8 @@ export default function ExerciseHistoryRoute() {
         appliedGymId={appliedGymId}
         isLoading={isLoading}
         errorMessage={errorMessage}
-        onSelectPeriod={handleSelectPeriod}
-        onSelectTag={handleSelectTag}
+        onSelectPeriod={setPeriod}
+        onSelectTag={setAppliedTagDefinitionId}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
         onSelectMainTab={openMainTab}
       />

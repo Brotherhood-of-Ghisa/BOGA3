@@ -2,51 +2,57 @@
 
 ### comparison.change-display · presentation · accepted
 
-How a change between two periods is shown.
-
 | Figure | Shown as | Examples |
 | --- | --- | --- |
-| A set or session count (Progress, Today's month pace) | the signed difference, never a percentage | `+4`, `−3`, `±0` |
+| Set/session count (Progress, Today pace) | the signed difference, never a percentage | `+4`, `−3`, `±0` |
 | Volume (Progress tables) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `±0%`; `new` when the earlier period is 0; `—` when both are 0 |
-| A 1RM estimate (Progress's exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `±0`; `new` without an earlier estimate, `—` without a current one |
+| 1RM (Progress exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `±0`; `new` without an earlier estimate, `—` without a current one |
 
-Direction is also carried in colour, the same two everywhere; more is the
-improvement for all three. The sign stays too, so colour is never the only cue.
+More means improvement. Shared direction colours supplement the sign; colour is never the only cue.
 
 Today's week figures show none: each fills a bar in laps of last week's total.
 
-Why: a count is small and whole, so its difference reads directly; a Volume's
-size depends on the lifter, so only a ratio compares; a 1RM is a weight, so
-its difference reads in the unit trained in. Which way a figure moved is the
-first thing a comparison is read for.
-Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/month-pace.tsx`.
+Why: counts and strength differences read directly; ratios make Volume changes comparable.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`.
+
+### comparison.allowed-periods · principle · accepted
+
+Personal analytical windows come from Settings’ Progress period or History
+look-back. One calendar week is the only fixed alternative. Comparisons default to
+Progress; history, reference samples and Favourites default to History. Groups have no
+period setting and use calendar weeks only.
+
+- Bad: a 30-day default, fixed 4/12/24-week presets or a monthly group view.
+- Good: changing either setting changes every consumer of that period.
+- Kept: lifetime record baselines and catalogue metadata, individual-session
+  views, calendar-date navigation and explicit coaching query bounds.
+
+Why: consistent periods.
+Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`.
 
 ### comparison.window · definition · accepted
 
-Which periods a comparison sets side by side. Weeks start on Monday, local
-time.
+Weeks start Monday, local time.
 
 | Screen | Current period | Compared with |
 | --- | --- | --- |
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
-| Today, month pace | this month through today | the previous month through the same day (its last day when it is shorter) |
+| Today, progress pace | Settings’ Progress period through now | the preceding equal-length block through the same elapsed calendar day; its full total and daily series also appear |
 
-Why: every weekly comparison includes the unfinished current week and uses the
-whole preceding block as its baseline. Today's week bar shows progress toward
-last week's whole total.
-Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and month windows in `apps/mobile/src/progress-summary/calculations.ts`.
+Why: include the unfinished week; Today's bar targets last week's whole total.
+Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and configured progress windows in `apps/mobile/src/progress-summary/calculations.ts`.
 
 ### comparison.history-window · definition · accepted
 
-Exercise and muscle history use Settings' History look-back (weeks): N complete
+Settings' History look-back selects N complete
 Monday–Sunday weeks through today. On Monday–Saturday start on the Monday N
 weeks before this week's Monday; on Sunday, N − 1 weeks before it. The current
 partial week follows them. Displayed weeks and Weekly reference calculations
 use the whole window.
 
-Why: a history setting must select the same sample for the chart and its baseline.
+Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
 
@@ -68,5 +74,5 @@ Compute the median even below six observations. Percentiles interpolate sorted
 values; coincident positions and accessible values remain. Empty/all-zero
 windows show `0`, without fill or references. Genuine zeros stay unfilled.
 
-Why: strength remains readable around typical readings; counts and Volume retain proportional lengths.
+Why: readable strength, proportional counts and Volume.
 Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.

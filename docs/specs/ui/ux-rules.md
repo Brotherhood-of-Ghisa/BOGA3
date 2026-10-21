@@ -27,6 +27,12 @@ the names of its Jest tests are the specification of that component.
 | A reusable interaction pattern (stream card, offline marker, online-only write, row logger, link card) | `docs/specs/08-ux-delivery-standard.md` "UX patterns" |
 | Device-local preferences (browser sort, look-back, effort columns) | `docs/specs/05-data-model.md` "Device-local preferences" |
 
+## Analytical periods
+
+Every period selector and default follows [[comparison.allowed-periods]]. When
+adding an analytical read or filter, load `docs/product/comparison.md`; reuse
+the configured calendar bounds instead of introducing another duration.
+
 ## Actions and emphasis
 
 1. **One primary per screen**, the screen's one `accent` action

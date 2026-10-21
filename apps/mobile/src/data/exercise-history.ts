@@ -29,10 +29,10 @@ import {
   normalizeSessionSetType,
   type SessionSetTypeValue,
 } from './set-types';
-import { computePeriodBounds, type StatsPeriodDays } from './stats';
+import { calendarWeekBounds, historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { NO_GYM_LABEL, SELECTED_GYM_LABEL } from '@/src/utils/gym-scope-route';
 
-export type ExerciseHistoryPeriod = 'all' | StatsPeriodDays;
+export type ExerciseHistoryPeriod = { weeks: number; kind: 'progress' | 'history' };
 
 export type ExerciseHistorySetEntry = {
   setId: string;
@@ -184,7 +184,7 @@ export type ExerciseHistoryStore = {
 
 export type LoadExercisePerformanceHistoryOptions = {
   exerciseDefinitionId: string;
-  /** Period window. Defaults to 30 days when omitted. */
+  /** Screens pass the configured week window; omitted reads use one calendar week. */
   period?: ExerciseHistoryPeriod;
   tagDefinitionId?: string | null;
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
@@ -557,7 +557,7 @@ export const createExerciseHistoryRepository = (
   store: ExerciseHistoryStore = createDrizzleExerciseHistoryStore()
 ) => ({
   async load(options: LoadExercisePerformanceHistoryOptions): Promise<ExerciseHistorySummary | null> {
-    const period: ExerciseHistoryPeriod = options.period ?? 30;
+    const period: ExerciseHistoryPeriod = options.period ?? { weeks: 1, kind: 'progress' };
     const appliedTagDefinitionId = options.tagDefinitionId ?? null;
     const appliedGymId = options.gymId;
     const now = options.now ?? new Date();
@@ -568,13 +568,7 @@ export const createExerciseHistoryRepository = (
     });
     if (!exerciseDefinition) return null;
 
-    let start: Date | null = null;
-    let end: Date | null = null;
-    if (period !== 'all') {
-      const bounds = computePeriodBounds(period, now);
-      start = bounds.start;
-      end = bounds.end;
-    }
+    const { start, end } = (period.kind === 'history' ? historyWeekBounds : calendarWeekBounds)(period.weeks, now);
 
     const [sessionsInPeriod, allTimeBest, appliedGymName] = await Promise.all([
       store.loadSessionsForExercise({

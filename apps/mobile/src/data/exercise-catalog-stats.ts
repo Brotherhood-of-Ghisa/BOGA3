@@ -183,7 +183,6 @@ export const withInProgressSession = (
 type PeriodWindow = { start: Date | null; end: Date | null };
 
 const RECENCY_HALF_LIFE_DAYS = 60;
-const FAVOURITE_WINDOW_DAYS = 180;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const resolvePeriodWindow = (
@@ -253,9 +252,13 @@ const addWorkingSetToAggregate = (
  * gym, `null` the sessions with no gym, an id that gym. Every figure — counts,
  * `Last:`, favourite recency and never-done — counts only the sessions in scope.
  */
-export type ExerciseCatalogStatsGymScope = { gymId?: string | null };
+export type ExerciseCatalogStatsScope = {
+  gymId?: string | null;
+  /** Configured History start for Favourites; lifetime metadata stays unbounded. */
+  historyStart?: Date;
+};
 
-const inGymScope = (session: { gymId?: string | null }, scope: ExerciseCatalogStatsGymScope): boolean =>
+const inGymScope = (session: { gymId?: string | null }, scope: ExerciseCatalogStatsScope): boolean =>
   scope.gymId === undefined || (session.gymId ?? null) === scope.gymId;
 
 /** The gyms the history was trained at, the most recently trained first; `null` for no gym. */
@@ -282,7 +285,7 @@ export const aggregateExerciseCatalogStats = (
   raw: ExerciseCatalogStatsRawHistory,
   period: ExerciseCatalogStatsPeriod,
   now: Date = new Date(),
-  scope: ExerciseCatalogStatsGymScope = {}
+  scope: ExerciseCatalogStatsScope = {}
 ): ExerciseCatalogStats => {
   const window = resolvePeriodWindow(period, now);
 
@@ -295,7 +298,7 @@ export const aggregateExerciseCatalogStats = (
   const recencyScoresById = new Map<string, ExerciseRecencyScore>();
   const lastCompletedAtById = new Map<string, Date>();
   const sessionsSeenByDef = new Map<string, Set<string>>();
-  const favouriteStart = now.getTime() - FAVOURITE_WINDOW_DAYS * MS_PER_DAY;
+  const favouriteStart = scope.historyStart?.getTime() ?? window.start?.getTime() ?? -Infinity;
 
   for (const set of raw.exerciseSets) {
     const link = sessionExerciseById.get(set.sessionExerciseId);
