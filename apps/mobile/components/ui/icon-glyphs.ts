@@ -52,6 +52,8 @@ export const ICON_GLYPHS = {
   'caret-down': [path('M6 8h12l-6 8z', 'solid')],
 
   // --- Actions ---
+  // Lucide `info`: open an on-demand explanation.
+  info: [circle(12, 12, 10), path('M12 16v-4'), path('M12 8h.01')],
   // Lucide `trending-up`: open a thing's progress history (a week list card's exercise).
   progress: [path('M16 7h6v6'), path('m22 7-8.5 8.5-5-5L2 17')],
   // Lucide `search`: a filter or search field's leading mark.

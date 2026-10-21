@@ -129,6 +129,11 @@ Use this section as the single source of truth for reusable UX patterns.
    - Usage: the session view's exercise cards (`components/session-view/session-exercise-card.tsx`).
    - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; set rows follow [[set.row-figures]]; a record earns a band on the card, not a badge on the row.
 
+14. On-demand explainer pattern
+   - Intent: explain a specialist chart without adding inline commentary ([[copy.no-inline-explanation]]).
+   - Usage: `components/rm-curve/help.tsx`, opened by the `info` `IconButton` beside the chart title.
+   - Rules: an accessible label names the topic; the button keeps a full mobile tap target. The existing `Sheet` holds short, plain-language sections in a scrolling body and uses its standard dismissal gestures, backdrop and accessible escape. Opening or dismissing changes no chart choice or selection.
+
 ## Default appearance baseline (MVP)
 
 1. Layout

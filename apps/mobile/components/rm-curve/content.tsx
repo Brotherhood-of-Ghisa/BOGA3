@@ -11,6 +11,7 @@ import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { periodLabel, RmRegimes, selectedPeriod } from './regimes';
 import { RmCurveDetails, setDescription } from './details';
 import { curveStyles as styles } from './styles';
+import { RmCurveHelp } from './help';
 
 export type CurveScope = { range: RmCurveRange; gym: RmCurveGym; rir: number | null };
 export type RmCurveContentProps = {
@@ -127,8 +128,12 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
   return <>
     <Text allowFontScaling={false} style={styles.figure}>{points.length} {points.length === 1 ? 'set' : 'sets'} · {sessionsCount} {sessionsCount === 1 ? 'session' : 'sessions'}</Text>
     <Card style={styles.card}>
+      <View style={styles.titleRow}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>RM curve</Text>
+        <RmCurveHelp />
+      </View>
       <Text allowFontScaling={false} style={styles.micro}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>
-      <RmRegimes result={result} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
+      <RmRegimes result={result} method={method} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
       <View style={styles.dates}><Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>
         <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points[0].completedAt, dateFormat)}</Text></View>
 

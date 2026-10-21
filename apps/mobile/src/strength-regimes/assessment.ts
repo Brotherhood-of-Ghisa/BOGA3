@@ -6,9 +6,10 @@ export type CurveMode = 'one' | 'two';
 export type UncertaintyMethod = 'fixed' | 'joint';
 export type RegimeCurve = { period: 'all' | 'older' | 'newer'; totalRm: number;
   knots: ReturnType<typeof rmCurveKnots>; opacity: number };
+export type ObservationUncertainty = { correctProbability: number | null; loadSd: number };
 export type RegimeAssessment = { curves: RegimeCurve[]; boundary: number | null;
   sampledSessions: number; message: string; evidence: number | null; calibrationScope: 'unsupported';
-  boundaryBracket: [number, number] | null; diagnostics: RegimeFit | null };
+  boundaryBracket: [number, number] | null; diagnostics: RegimeFit | null; uncertainty: ObservationUncertainty | null };
 export type RegimeFit = ReturnType<typeof fitStrengthRegimes>;
 
 export function usableFit(fit: RegimeFit['bestNoBreak']) {
@@ -23,10 +24,11 @@ export function regimeCurve(model: RmCurveModel, totalRm: number, period: Regime
 /** Unknown real-history mechanisms cannot certify membership of a simulated calibration family. */
 export function assessRegimes(model: RmCurveModel, fit: RegimeFit): RegimeAssessment {
   const base = { sampledSessions: fit.sampledSessions, curves: [] as RegimeCurve[], boundary: null, evidence: fit.evidence, calibrationScope: 'unsupported' as const,
-    boundaryBracket: null, diagnostics: fit };
+    boundaryBracket: null, diagnostics: fit, uncertainty: null };
   if (fit.status === 'insufficient') return { ...base, message: 'More sessions needed' };
   if (fit.status === 'unresolved' || !fit.candidate) return { ...base, message: 'Fit unavailable' };
   return { ...base, curves: [regimeCurve(model, fit.candidate.controls[0], 'older'), regimeCurve(model, fit.candidate.controls[1], 'newer')],
+    uncertainty: { correctProbability: fit.candidate.correctProbability, loadSd: fit.candidate.loadSd },
     boundary: fit.candidate.rightTime, boundaryBracket: [fit.candidate.leftTime, fit.candidate.rightTime], message: 'Exploratory fit' };
 }
 
@@ -36,11 +38,13 @@ export function* iterateCurveAssessment(model: RmCurveModel, mode: CurveMode, me
   if (mode === 'two') return assessRegimes(model, yield* iterateStrengthRegimes(model.inferenceSessions, options));
   const points = prepareRegimePoints(model.inferenceSessions);
   const base = { sampledSessions: points.length, curves: [] as RegimeCurve[], boundary: null, evidence: null, calibrationScope: 'unsupported' as const,
-    boundaryBracket: null, diagnostics: null };
+    boundaryBracket: null, diagnostics: null, uncertainty: null };
   if (!points.length) return { ...base, message: 'More sessions needed' };
   const fit = yield* iterateStrengthTrajectory(points, 'constant', options);
-  return { ...base, message: usableFit(fit) ? 'Exploratory fit' : 'Fit unavailable',
-    curves: usableFit(fit) ? [regimeCurve(model, fit.controls[0], 'all')] : [] };
+  const usable = usableFit(fit);
+  return { ...base, message: usable ? 'Exploratory fit' : 'Fit unavailable',
+    uncertainty: usable ? { correctProbability: fit.correctProbability, loadSd: fit.loadSd } : null,
+    curves: usable ? [regimeCurve(model, fit.controls[0], 'all')] : [] };
 }
 
 export function assessSingleCurve(model: RmCurveModel, method: UncertaintyMethod): RegimeAssessment {
