@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, Share, StyleSheet, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
@@ -37,6 +37,12 @@ import {
 } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
+import {
+  buildExerciseShareLink,
+  buildExerciseShareMessage,
+  type ExerciseSharePayload,
+} from '@/src/exercise-share';
+import { listMyGroups, type GroupSummary } from '@/src/groups';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { exerciseLinkHref } from '@/src/navigation/routes';
 
@@ -80,8 +86,48 @@ export default function ExerciseCatalogScreen() {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  const [shareTarget, setShareTarget] = useState<{ exercise: ExerciseCatalogExercise; groups: GroupSummary[] } | null>(null);
   // Signed in only: linking needs my groups' exercises.
   const groupLinkingUserId = useGroupLinkingUserId();
+
+  const triggerShare = useCallback(async (group: GroupSummary, exercise: ExerciseCatalogExercise) => {
+    const payload: ExerciseSharePayload = {
+      v: 1,
+      name: exercise.name,
+      loadInputMode: exercise.loadInputMode ?? 'total_load',
+      bodyweightContribution: exercise.bodyweightContribution,
+      mappings: exercise.mappings.map((mapping) => ({
+        muscleGroupId: mapping.muscleGroupId,
+        weight: mapping.weight,
+        role: mapping.role,
+      })),
+    };
+    const link = buildExerciseShareLink(group.group_id, payload);
+    const message = buildExerciseShareMessage(group.name, exercise.name, link);
+    try {
+      await Share.share({ message });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Couldn't open share sheet.");
+    }
+  }, []);
+
+  const handleShareExercise = useCallback(async (exercise: ExerciseCatalogExercise) => {
+    setExerciseActionMenuTarget(null);
+    try {
+      const mine = await listMyGroups();
+      if (mine.groups.length === 0) {
+        Alert.alert('No groups found', 'You must be a member of a group to share an exercise with a member.');
+        return;
+      }
+      if (mine.groups.length === 1) {
+        await triggerShare(mine.groups[0], exercise);
+        return;
+      }
+      setShareTarget({ exercise, groups: mine.groups });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Couldn't load groups for sharing.");
+    }
+  }, [triggerShare]);
 
   const catalog = useExerciseCatalog();
   const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
@@ -402,6 +448,20 @@ export default function ExerciseCatalogScreen() {
             testID="exercise-action-link-group"
           />
         ) : null}
+        {groupLinkingUserId ? (
+          <ListRow
+            accessibilityLabel="Share exercise with group member from actions"
+            disabled={isActionTargetDeleted}
+            label="Share with group member…"
+            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="share" size="md" />}
+            onPress={() => {
+              if (actionTarget && !actionTarget.deletedAt) {
+                void handleShareExercise(actionTarget);
+              }
+            }}
+            testID="exercise-action-share"
+          />
+        ) : null}
         {isActionTargetDeleted ? (
           <ListRow
             accessibilityLabel="Undelete exercise from actions"
@@ -429,6 +489,31 @@ export default function ExerciseCatalogScreen() {
             tone="danger"
           />
         )}
+      </Sheet>
+
+      <Sheet
+        dismissLabel="Close group selection"
+        onDismiss={() => setShareTarget(null)}
+        testID="exercise-share-group-sheet"
+        title="Share with group"
+        visible={shareTarget !== null}>
+        <View style={styles.management}>
+          {shareTarget?.groups.map((group) => (
+            <ListRow
+              accessibilityLabel={`Share exercise with ${group.name}`}
+              key={group.group_id}
+              label={group.name}
+              onPress={() => {
+                const target = shareTarget;
+                setShareTarget(null);
+                if (target) {
+                  void triggerShare(group, target.exercise);
+                }
+              }}
+              testID={`exercise-share-group-${group.group_id}`}
+            />
+          ))}
+        </View>
       </Sheet>
     </Screen>
   );
