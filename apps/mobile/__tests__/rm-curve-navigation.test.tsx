@@ -63,11 +63,12 @@ it('explains the model on request and preserves chart choices and set selection 
   fireEvent.press(screen.getByRole('button', { name: 'About the RM curve' }));
   const help = within(screen.getByTestId('rm-curve-help'));
   expect(help.getByText(/Heavy weights usually mean fewer reps/)).toBeTruthy();
-  for (const name of ['Reading the chart', 'Gym, time and effort', 'One curve / Two curves',
+  for (const name of ['Reading the chart', 'The soft halo', 'Gym, time and effort', 'One curve / Two curves',
     'Parsimonious / Rich', '1RM and fitting sessions', 'Exploratory fit']) {
     expect(help.getByRole('header', { name })).toBeTruthy();
   }
   expect(help.getByText(/eight reps with two left is plotted at ten/)).toBeTruthy();
+  expect(help.getByText(/halo spans nine to eleven/)).toBeTruthy();
   expect(help.getByText(/not proof that your strength changed/)).toBeTruthy();
   fireEvent.press(screen.getByTestId('rm-curve-help-backdrop', { includeHiddenElements: true }));
   await waitForGone(() => screen.queryByTestId('rm-curve-help'));

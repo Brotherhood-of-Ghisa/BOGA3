@@ -9,7 +9,7 @@ export const axisLabel = (value: number) => Math.abs(value) >= 10000 ? value.toE
 
 /** Ratios before multiplication keep finite extreme inputs on the plot. */
 export function curveGeometry(model: RmCurveModel, width: number, curves?: RegimeCurve[]) {
-  const maxReps = model.observations.reduce((max, p) => Math.max(max, p.equivalentReps), 20);
+  const maxReps = model.observations.reduce((max, p) => Math.max(max, p.equivalentReps + (p.rir > 0 ? 1 : 0)), 20);
   const knots = curves === undefined ? model.curve : curves.flatMap(c => c.knots);
   const maxLoad = knots.reduce((max, p) => Math.max(max, p.loadKg),
     model.observations.reduce((max, p) => Math.max(max, p.loadKg), 1));

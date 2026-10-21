@@ -75,11 +75,11 @@ Code: `apps/mobile/src/strength-regimes/`.
 Parsimonious fixes uncertainty; Rich jointly estimates shared uncertainty across
 periods. Logged RIR0 is exact; positive n permits actual n−1/n/n+1, symmetric
 extremes, initial central probability 0.50. Fixed total-load SD: 2.50 kg (1.25 kg
-per-side entry). Shading conveys relative evidence, never break/membership
-probability. Unverified real histories remain exploratory, without calibrated
-shading or confidence claims.
+per-side entry). Curve shading conveys relative evidence, never break/membership
+probability. Point halos show assumed RIR range; RIR0 has none. Unverified real
+histories remain exploratory, without calibrated shading or confidence claims.
 
-Why: owner approved 2026-10-15.
+Why: approved 2026-10-15; halos 2026-10-21.
 Code: `apps/mobile/src/strength-regimes/assessment.ts`.
 
 ### 1rm.curve-periods · presentation · accepted

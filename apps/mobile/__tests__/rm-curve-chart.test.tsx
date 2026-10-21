@@ -100,6 +100,44 @@ it('uses viewport mouse coordinates after document scrolling instead of shifted 
   expect(pick.mock.calls[0][0]).toContain(model.observations[0].setId);
 });
 
+it('shows an assumed one-rep halo only for positive RIR, scales it with the axis and preserves point picking', async () => {
+  for (const [index, rir] of [2, 0, 12].entries()) {
+    mockFixture.database.update(exerciseSets).set({ repsValue: '8', setType: `rir_${rir}` })
+      .where(eq(exerciseSets.id, `week-24:${index + 1}`)).run();
+  }
+  const model = (await loadRmCurve({ ...query, start: new Date(wave.scenarios.plateau.at(-1)!.startedAt) }))!;
+  const pick = jest.fn();
+  render(<RmCurveChart model={model} selectedId="week-24:1" onPick={pick} />);
+  // Highest equivalent count is 20; reserve the +1 assumption at the right edge.
+  const unit = (300 - 38 - 24) / 21;
+  const halo = screen.getByTestId('rm-halo-week-24:1');
+  expect(halo.props.cx).toBeCloseTo(38 + 10 * unit);
+  expect(halo.props.rx).toBeCloseTo(unit); expect(halo.props.ry).toBe(8);
+  expect(halo.props.cx - halo.props.rx).toBeCloseTo(38 + 9 * unit);
+  expect(halo.props.cx + halo.props.rx).toBeCloseTo(38 + 11 * unit);
+  expect(screen.queryByTestId('rm-halo-week-24:2')).toBeNull();
+  expect(screen.getByTestId('rm-halo-week-24:3').props.cx + unit).toBeCloseTo(276);
+  const point = screen.getByTestId('rm-point-week-24:1');
+  expect(point.props.cx).toBe(halo.props.cx); expect(point.props.cy).toBe(halo.props.cy);
+  fireEvent.press(screen.getByTestId('rm-curve-plot'), { nativeEvent: { locationX: point.props.cx, locationY: point.props.cy } });
+  expect(pick.mock.calls[0][0]).toContain('week-24:1');
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'layout', { nativeEvent: { layout: { width: 420 } } });
+  expect(screen.getByTestId('rm-halo-week-24:1').props.rx).toBeCloseTo((420 - 38 - 24) / 21);
+  expect(screen.getByTestId('rm-selection-caret')).toBeTruthy();
+  expect(screen.getByLabelText(/assumed one-rep RIR range, not confidence/)).toBeTruthy();
+});
+
+it('keeps halos matched to the complete-session period without changing circle and diamond identity', async () => {
+  const model = (await loadRmCurve(query))!;
+  const boundary = model.observations.at(-1)!.completedAt.getTime();
+  render(<RmCurveChart model={model} selectedId={null} onPick={jest.fn()} boundary={boundary} />);
+  for (const point of model.observations.filter(point => point.rir > 0)) {
+    const newer = point.completedAt.getTime() >= boundary;
+    expect(screen.getByTestId(`rm-halo-${point.setId}`).props.fill.brushRef).toMatch(newer ? /-newer$/ : /-older$/);
+    expect(screen.getByTestId(`rm-point-${point.setId}`).props[newer ? 'd' : 'cx']).toBeDefined();
+  }
+});
+
 it('retains named gym labels on read failure and distinguishes an empty RIR filter from missing effort', async () => {
   mockFixture.database.update(exerciseSets).set({ setType: null }).where(eq(exerciseSets.id, 'week-24:1')).run();
   const model = (await loadRmCurve({ ...query, rir: 12 }))!;
