@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Path } from 'react-native-svg';
 
 import { hexToLch } from '@/components/ui/lch';
@@ -229,11 +229,26 @@ describe('MuscleBodyCard', () => {
       buckets: computeMuscleBuckets(muscles, 'workingSetCount'),
     });
     const chestTri = projected.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
-    fireEvent(viewport, 'responderRelease', {
-      nativeEvent: {
-        locationX: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        locationY: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      },
+    const tapGesture = viewport.props.gesture.gestures.find((g: any) => g.type === 'tap');
+    const panGesture = viewport.props.gesture.gestures.find((g: any) => g.type === 'pan');
+
+    // Pan rotates the model smoothly.
+    act(() => {
+      panGesture.handlers.onUpdate({ translationX: 50 });
+    });
+    expect(viewport.props.accessibilityValue.text).toContain('43 degrees');
+    act(() => {
+      panGesture.handlers.onEnd({ translationX: 50 });
+    });
+    expect(viewport.props.accessibilityValue.text).toContain('43 degrees');
+
+    // Rotate back to 0° via Front button for hit testing.
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-front'));
+
+    // Tap selects chest muscle on the 3D model.
+    tapGesture.handlers.onEnd({
+      x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
+      y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
     });
     expect(onSelect).toHaveBeenCalledWith('chest');
 
@@ -323,11 +338,12 @@ describe('MuscleBodyCard', () => {
       buckets: computeMuscleBuckets(muscles, 'workingSetCount'),
     });
     const chestTri = projected.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
-    fireEvent(viewport, 'responderRelease', {
-      nativeEvent: {
-        locationX: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        locationY: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      },
+    const tapGesture = viewport.props.gesture.gestures.find((g: any) => g.type === 'tap');
+    act(() => {
+      tapGesture.handlers.onEnd({
+        x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
+        y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
+      });
     });
 
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
@@ -337,11 +353,11 @@ describe('MuscleBodyCard', () => {
     expect(onOpenMuscleHistory).toHaveBeenCalledWith({ muscleGroupId: 'chest' }, 'daily');
 
     // Tapping the selected muscle again clears the selection.
-    fireEvent(viewport, 'responderRelease', {
-      nativeEvent: {
-        locationX: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        locationY: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      },
+    act(() => {
+      tapGesture.handlers.onEnd({
+        x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
+        y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
+      });
     });
     expect(screen.queryByTestId('stats-muscle-body-selected')).toBeNull();
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
@@ -455,11 +471,12 @@ describe('MuscleBodyCard', () => {
       buckets: computeMuscleBuckets(summary.muscles, 'workingSetCount'),
     });
     const chestTri = projected.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
-    fireEvent(viewport, 'responderRelease', {
-      nativeEvent: {
-        locationX: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        locationY: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      },
+    const tapGesture = viewport.props.gesture.gestures.find((g: any) => g.type === 'tap');
+    act(() => {
+      tapGesture.handlers.onEnd({
+        x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
+        y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
+      });
     });
 
     expect(screen.getByTestId('stats-exercise-body-detail')).toBeTruthy();
@@ -470,11 +487,11 @@ describe('MuscleBodyCard', () => {
     expect(screen.queryByTestId('stats-exercise-row-squat')).toBeNull();
 
     // Tapping Chest again restores the full unfiltered exercise list.
-    fireEvent(viewport, 'responderRelease', {
-      nativeEvent: {
-        locationX: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        locationY: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      },
+    act(() => {
+      tapGesture.handlers.onEnd({
+        x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
+        y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
+      });
     });
     expect(screen.queryByTestId('stats-exercise-body-detail')).toBeNull();
     expect(screen.getByTestId('stats-exercise-row-squat')).toBeTruthy();

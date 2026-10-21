@@ -76,15 +76,20 @@ jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
   const { Pressable, View } = require('react-native');
 
-  const chainable = () => {
-    const obj: Record<string, unknown> = {};
+  const chainable = (type = 'gesture') => {
+    const handlers: Record<string, Function> = {};
+    const obj: Record<string, unknown> = { type, handlers };
     const methods = [
       'activeOffsetX', 'activeOffsetY', 'failOffsetX', 'failOffsetY',
       'onBegin', 'onStart', 'onUpdate', 'onChange', 'onEnd', 'onFinalize',
-      'minDistance', 'maxPointers', 'minPointers', 'enabled', 'shouldCancelWhenOutside', 'runOnJS',
+      'minDistance', 'maxDistance', 'maxDuration', 'maxPointers', 'minPointers', 'numberOfTaps',
+      'enabled', 'shouldCancelWhenOutside', 'runOnJS',
     ];
     for (const m of methods) {
-      obj[m] = () => obj;
+      obj[m] = (fn: unknown) => {
+        if (typeof fn === 'function') handlers[m] = fn;
+        return obj;
+      };
     }
     return obj;
   };
@@ -95,20 +100,23 @@ jest.mock('react-native-gesture-handler', () => {
       React.createElement(Pressable, props, children),
     GestureHandlerRootView: ({ children, ...props }: { children?: unknown }) =>
       React.createElement(View, props, children),
-    GestureDetector: ({ children }: { children?: unknown }) => children ?? null,
+    GestureDetector: ({ children, gesture }: { children?: React.ReactElement; gesture?: unknown }) =>
+      React.isValidElement(children)
+        ? React.cloneElement(children, { gesture } as any)
+        : (children ?? null),
     usePanGesture: () => ({}),
     Gesture: {
-      Pan: () => chainable(),
-      Tap: () => chainable(),
-      Pinch: () => chainable(),
-      Rotation: () => chainable(),
-      Fling: () => chainable(),
-      LongPress: () => chainable(),
-      Manual: () => chainable(),
-      Native: () => chainable(),
-      Race: () => chainable(),
-      Simultaneous: () => chainable(),
-      Exclusive: () => chainable(),
+      Pan: () => chainable('pan'),
+      Tap: () => chainable('tap'),
+      Pinch: () => chainable('pinch'),
+      Rotation: () => chainable('rotation'),
+      Fling: () => chainable('fling'),
+      LongPress: () => chainable('longPress'),
+      Manual: () => chainable('manual'),
+      Native: () => chainable('native'),
+      Race: (...gestures: unknown[]) => ({ gestures, ...chainable('race') }),
+      Simultaneous: (...gestures: unknown[]) => ({ gestures, ...chainable('simultaneous') }),
+      Exclusive: (...gestures: unknown[]) => ({ gestures, ...chainable('exclusive') }),
     },
   };
 });
