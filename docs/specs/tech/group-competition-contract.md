@@ -185,8 +185,10 @@ load [notification-delivery-contract.md](notification-delivery-contract.md):
 atomic whole-board capture preserves the scorer and public boundary. Previous ordinary winners are rescored
 by the same kernel using current source modes, as comparison baselines only;
 their raw snapshots and immutable audits stay intact. Readers take shared group locks so a
-policy change cannot split authorization and disclosure. Random score tokens
-change on replacement; certify also refreshes the live source fingerprint.
+policy change cannot split authorization and disclosure. Publication writes
+only the score rows whose values changed (disk IO): a random score token changes
+when its score does and an unchanged score keeps it; certify also refreshes the
+live source fingerprint.
 
 Disclosure retains immutable historical source associations and extends them
 through stored ranked set IDs to a moved current exercise. Unlink, archive,
