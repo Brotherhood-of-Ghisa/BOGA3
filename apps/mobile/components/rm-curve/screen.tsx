@@ -20,7 +20,7 @@ export function RmCurveScreen({ exerciseDefinitionId, now }: { exerciseDefinitio
 function CurvePage({ exerciseDefinitionId, preferences, now }: {
   exerciseDefinitionId: string; preferences: ReturnType<typeof useAccountLocalPreferenceState>; now: Date;
 }) {
-  const [scope, setScope] = useState<CurveScope>({ range: 12, gym: 'latest', rir: null });
+  const [scope, setScope] = useState<CurveScope>({ range: 'history', gym: {}, rir: null });
   const { historyLookbackWeeks, dateFormat } = preferences.values;
   const instant = now.getTime();
   const window = useMemo(() => rmCurveWindow(historyLookbackWeeks, new Date(instant), scope.range), [historyLookbackWeeks, instant, scope.range]);

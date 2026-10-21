@@ -64,11 +64,11 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   await screen.findByTestId('rm-curve-plot');
   expect(route.getPathname()).toBe('/rm-curve');
   expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
-  expect(screen.getByText('36 sets · 12 sessions')).toBeTruthy();
+  expect(screen.getByText('90 sets · 30 sessions')).toBeTruthy();
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   expect(screen.getByText('2026-06-01 · block 1, set 1')).toBeTruthy();
   expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
-  fireEvent.press(screen.getByLabelText('range: 12 weeks'));
+  fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
   fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
   await screen.findByText('12 sets · 4 sessions');
   fireEvent.press(screen.getByTestId('rm-curve-back'));
@@ -108,13 +108,13 @@ it('resets the selected chart when a new exercise link reaches the mounted route
   await open(String(rmCurveHref('curve')));
   await screen.findByTestId('rm-curve-plot');
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
-  fireEvent.press(screen.getByLabelText('range: 12 weeks'));
+  fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
   fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
   await screen.findByText('12 sets · 4 sessions');
   await act(async () => navigate.setParams({ exerciseDefinitionId: 'other' }));
   await screen.findByText('No completed sets');
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
-  expect(screen.getByLabelText('range: 12 weeks')).toBeTruthy();
+  expect(screen.getByLabelText('range: History look-back (52 weeks)')).toBeTruthy();
   expect(screen.queryByLabelText(/^exercise:/)).toBeNull();
 });
 

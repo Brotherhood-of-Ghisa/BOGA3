@@ -75,10 +75,7 @@ export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks 
       checked: r === scope.rir, choose: () => apply({ rir: r }) })),
   };
   const labelModel = read.data;
-  // The default names the gym it resolved to once a read lands.
-  const gymLabel = scope.gym === 'latest'
-    ? labelModel ? gymScopeLabel(labelModel.gymId, labelModel.gyms) : 'Latest trained gym'
-    : gymScopeLabel(scope.gym.gymId, labelModel?.gyms ?? []);
+  const gymLabel = gymScopeLabel(scope.gym.gymId, labelModel?.gyms ?? []);
   return <>
     <ScreenScroll testID="rm-curve-content">
       <View style={styles.filters}>{filter('gym', gymLabel)}{filter('range', rangeLabel(scope.range, historyWeeks))}

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { RmCurveContent } from '@/components/rm-curve/content';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
-import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from '@/src/data/schema';
+import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { loadRmCurve } from '@/src/rm-curve/repository';
@@ -32,7 +32,13 @@ it('hides stale connected-screen values on storage failure and restores the sele
   seedWaveHistory(mockFixture.database);
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot');
-  const model = (await loadRmCurve({ ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve', gym: 'latest' }))!;
+  fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
+  fireEvent.press(screen.getByRole('radio', { name: '12 weeks' }));
+  await screen.findByText('36 sets · 12 sessions');
+  fireEvent.press(screen.getByLabelText('gym: All gyms'));
+  fireEvent.press(screen.getByRole('radio', { name: 'Synthetic gym' }));
+  await screen.findByLabelText('gym: Synthetic gym');
+  const model = (await loadRmCurve({ ...rmCurveWindow(52, now, 12), exerciseDefinitionId: 'curve', gym: { gymId: 'synthetic-gym' } }))!;
   const selected = model.observations[0];
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   const before = mockFixture.database.select().from(exerciseSets).all();
@@ -51,26 +57,36 @@ it('hides stale connected-screen values on storage failure and restores the sele
   expect(mockFixture.database.select().from(exerciseSets).all()).toEqual(before);
 });
 
-it('keeps No gym separate, pools every gym under All gyms, and changes both plotted and fitting populations when the gym or effort changes', async () => {
+it('defaults to all gyms including No gym and older sets, and changes plotted and fitting populations for manual gym/effort filters', async () => {
   const db = mockFixture.database; seedWaveHistory(db);
+  db.insert(gyms).values({ id: 'other-gym', name: 'Other gym' }).run();
+  db.update(sessions).set({ gymId: 'other-gym' }).where(eq(sessions.id, 'week-1')).run();
   db.insert(sessions).values({ id: 'unspecified', startedAt: new Date(now.getTime() + 10000), completedAt: new Date(now.getTime() + 30000), status: 'completed' }).run();
   db.insert(sessionExercises).values({ id: 'unspecified-block', sessionId: 'unspecified', exerciseDefinitionId: 'curve', name: 'Synthetic exercise', orderIndex: 0 }).run();
   db.insert(exerciseSets).values({ id: 'unspecified-set', sessionExerciseId: 'unspecified-block', orderIndex: 0, weightValue: '10', repsValue: '5', setType: 'rir_1' }).run();
   render(<RmCurveScreen exerciseDefinitionId="curve" now={new Date(now.getTime() + 60000)} />);
+  await screen.findByText('97 sets · 33 sessions');
+  expect(screen.getByLabelText('gym: All gyms')).toBeTruthy();
+  expect(screen.getByLabelText('range: History look-back (52 weeks)')).toBeTruthy();
+  expect(screen.getByTestId('rm-point-week-1:1')).toBeTruthy();
+  expect(screen.getByTestId('rm-point-week-24:1')).toBeTruthy();
+  expect(screen.getByTestId('rm-point-unspecified-set')).toBeTruthy();
+  await screen.findByTestId('rm-fit-all');
+  fireEvent.press(screen.getByLabelText('gym: All gyms'));
+  fireEvent.press(screen.getByRole('radio', { name: 'No gym' }));
   await screen.findByText('1 set · 1 session');
-  expect(screen.getByLabelText('gym: No gym')).toBeTruthy();
+  expect(screen.queryByTestId('rm-point-week-24:1')).toBeNull();
   await screen.findByText('Exploratory fit');
-  // All gyms is the unset scope: every gym, the no-gym session included.
   fireEvent.press(screen.getByLabelText('gym: No gym'));
   fireEvent.press(screen.getByRole('radio', { name: 'All gyms' }));
-  await screen.findByText('37 sets · 13 sessions');
-  expect(screen.getByLabelText('gym: All gyms')).toBeTruthy();
+  await screen.findByText('97 sets · 33 sessions');
   fireEvent.press(screen.getByLabelText('gym: All gyms'));
   fireEvent.press(screen.getByRole('radio', { name: 'Synthetic gym' }));
-  await screen.findByText('36 sets · 12 sessions');
+  await screen.findByText('93 sets · 31 sessions');
   await screen.findByTestId('rm-fit-all');
   expect(screen.queryByTestId('rm-reference-line')).toBeNull();
   expect(screen.queryByTestId('rm-point-unspecified-set')).toBeNull();
+  expect(screen.queryByTestId('rm-point-week-1:1')).toBeNull();
   fireEvent.press(screen.getByLabelText('effort: All known RIR'));
   fireEvent.press(screen.getByRole('radio', { name: 'RIR 4' }));
   await screen.findByText('Exploratory fit');
@@ -89,7 +105,7 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
   db.insert(bodyWeightMeasurements).values({ id: 'dated', measuredAt: new Date(2025, 0, 1), weightKg: 80 }).run();
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot');
-  const query = { ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve', gym: 'latest' as const };
+  const query = { ...rmCurveWindow(52, now), exerciseDefinitionId: 'curve', gym: { gymId: 'synthetic-gym' } };
   const initial = (await loadRmCurve(query))!.observations[0];
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   const before = db.select().from(exerciseSets).all();
@@ -109,8 +125,8 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
 
 function PrefixPreview({ name, week }: { name: keyof typeof wave.scenarios; week: number }) {
   const read = useRmCurve({ exerciseDefinitionId: 'curve', start: new Date(wave.scenarios[name][0].startedAt),
-    end: new Date(wave.scenarios[name][week * 3 - 1].completedAt + 1), historyLookbackWeeks: 52, accountRevision: 0, gym: 'latest' });
-  return <RmCurveContent read={read} scope={{ range: 24, gym: 'latest', rir: null }} onScope={() => undefined}
+    end: new Date(wave.scenarios[name][week * 3 - 1].completedAt + 1), historyLookbackWeeks: 52, accountRevision: 0, gym: { gymId: 'synthetic-gym' } });
+  return <RmCurveContent read={read} scope={{ range: 24, gym: { gymId: 'synthetic-gym' }, rir: null }} onScope={() => undefined}
     dateFormat="YYYY-MM-DD" historyWeeks={52} />;
 }
 

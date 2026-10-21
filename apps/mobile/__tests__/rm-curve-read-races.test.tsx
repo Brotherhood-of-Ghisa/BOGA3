@@ -6,7 +6,7 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 // Only impossible-to-seed read timing/failure is injected; happy-path hooks use real SQLite elsewhere.
 const query = { exerciseDefinitionId: 'curve', start: new Date(2026, 0, 5, 12),
-  end: new Date(2026, 5, 16), historyLookbackWeeks: 52, accountRevision: 0, gym: 'latest' as const };
+  end: new Date(2026, 5, 16), historyLookbackWeeks: 52, accountRevision: 0, gym: { gymId: 'synthetic-gym' } };
 const model = (name: string) => buildRmCurveModel({ ...waveGraph(), definition: {
   id: 'curve', name, loadInputMode: 'total_load',
 } }, query);

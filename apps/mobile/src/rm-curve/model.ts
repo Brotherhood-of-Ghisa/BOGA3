@@ -21,7 +21,7 @@ function validateHistoryWeeks(weeks: number) {
 }
 
 /** [[1rm.curve-scope]]; the prior look-back is independently anchored to start. */
-export function rmCurveWindow(historyLookbackWeeks: number, now = new Date(), range: RmCurveRange = 12) {
+export function rmCurveWindow(historyLookbackWeeks: number, now = new Date(), range: RmCurveRange = 'history') {
   requireDate(now, 'now'); validateHistoryWeeks(historyLookbackWeeks);
   if (![4, 12, 24, 'history'].includes(range)) throw new Error('Invalid RM chart range');
   const historyStart = historyWeekBounds(historyLookbackWeeks, now).start;
@@ -77,15 +77,6 @@ function projectRows(graph: RmCurveGraph, scope: RmCurveEvaluation): ProjectedRo
   return graph.rows.filter(row => validSessionTime(row) && row.completedAt >= lower && row.completedAt < scope.end)
     .map(row => ({ row, value: projectRmCurveSet({ ...row.loadContext, ...row,
       performanceStatus: row.performanceStatus === null ? null : 'unperformed' }) }));
-}
-
-/**
- * [[1rm.curve-scope]]'s default gym, resolved to a concrete scope before one is
- * built: the most recently trained gym in the window, `null` when that is no
- * gym or nothing was trained.
- */
-export function rmCurveLatestGym(graph: RmCurveGraph, scope: Omit<RmCurveEvaluation, 'gymId'>): string | null {
-  return gymOptions(projectRows(graph, scope))[0]?.gymId ?? null;
 }
 
 /** One graph supplies observations and reference; no evaluated/future set enters the reference. */

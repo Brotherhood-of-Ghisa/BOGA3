@@ -18,9 +18,9 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   jest.useFakeTimers();
   render(<RmCurveScreen exerciseDefinitionId={EXERCISE_PAGE_FIXTURE.benchExerciseId} now={now} />);
   await screen.findByTestId('rm-curve-plot');
-  fireEvent.press(screen.getByLabelText('gym: Gym B'));
-  fireEvent.press(screen.getByRole('radio', { name: 'All gyms' }));
   await screen.findByText('103 sets · 34 sessions');
+  expect(screen.getByLabelText('gym: All gyms')).toBeTruthy();
+  expect(screen.getByLabelText('range: History look-back (52 weeks)')).toBeTruthy();
   fireEvent.press(screen.getByTestId('rm-mode-two'));
   act(() => { jest.runAllTimers(); });
   expect(screen.getByTestId('rm-fit-newer')).toBeTruthy();
