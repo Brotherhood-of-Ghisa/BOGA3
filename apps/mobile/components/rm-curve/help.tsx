@@ -5,7 +5,7 @@ import { curveStyles as styles } from './styles';
 
 const SECTIONS = [
   ['Reading the chart', 'Each dot is a working set. Up means more load; right means more reps. RIR means reps you felt you had left: eight reps with two left is plotted at ten. Per side means one side. On bodyweight exercises, Load can include part of your bodyweight.'],
-  ['The soft halo', 'For eight reps with two left, the halo spans nine to eleven. The model allows one rep either way for positive RIR; it treats RIR 0 as exact. This halo shows that assumption, not a measured confidence level.'],
+  ['The soft halo', 'A wider halo means more uncertainty about reps left; a taller one means more everyday load variation. Parsimonious uses fixed errors. Rich uses errors estimated from your history, once the fit is ready. RIR 0 has no sideways spread. Halos show modelled variation, not a confidence level or uncertainty about the weight you logged.'],
   ['Gym, time and effort', 'These filters decide which sets count. All gyms pools their histories, even when equipment differs. All known RIR uses sets with a recorded estimate of reps left. The time filter narrows the dates.'],
   ['One curve / Two curves', 'One curve treats the selected history as one strength level. Two curves looks for an earlier and a later level, and a possible date between them.'],
   ['Parsimonious / Rich', 'Parsimonious uses fixed assumptions about everyday variation and RIR guesswork. Rich tries to learn that variation from your history too. It can need more data; it is not automatically more reliable.'],

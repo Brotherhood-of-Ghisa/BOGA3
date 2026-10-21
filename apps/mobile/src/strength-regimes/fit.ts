@@ -9,6 +9,7 @@ export type RegimeSession = { sessionId: string; time: number;
 export type RegimePoint = JointRirPoint & { sessionId: string; setId: string; time: number };
 export type RegimeOptions = { method: 'fixed' | 'joint'; minimumSegment?: number;
   correctProbability?: number; loadSd?: number; loadSdBounds?: [number, number]; maxIterations?: number; maxPointEvaluations?: number };
+export const FIXED_REGIME_UNCERTAINTY = { correctProbability: 0.5, loadSd: 2.5 } as const;
 export type FitBudget = { remaining: number };
 export class FitWorkLimitError extends Error {}
 export type TrajectoryKind = 'constant' | 'linear' | 'quadratic' | 'step';
@@ -35,7 +36,8 @@ export function prepareRegimePoints(sessions: RegimeSession[]): RegimePoint[] {
 }
 
 function validateOptions(options: RegimeOptions) {
-  const minimum = options.minimumSegment ?? 8, p = options.correctProbability ?? 0.5, sd = options.loadSd ?? 2.5;
+  const minimum = options.minimumSegment ?? 8, p = options.correctProbability ?? FIXED_REGIME_UNCERTAINTY.correctProbability,
+    sd = options.loadSd ?? FIXED_REGIME_UNCERTAINTY.loadSd;
   const bounds = options.loadSdBounds ?? [0.5, 7.5];
   if (!['fixed', 'joint'].includes(options.method) || !Number.isSafeInteger(minimum) || minimum < 2 ||
     !Number.isFinite(p) || p < 0 || p > 1 || !Number.isFinite(sd) || sd <= 0 ||

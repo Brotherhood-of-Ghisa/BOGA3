@@ -1,4 +1,5 @@
-import type { RegimeCurve } from '@/src/strength-regimes/assessment';
+import type { ObservationUncertainty, RegimeCurve } from '@/src/strength-regimes/assessment';
+import { FIXED_REGIME_UNCERTAINTY } from '@/src/strength-regimes/fit';
 import type { RmCurveModel } from '@/src/rm-curve/model';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 
@@ -8,17 +9,25 @@ const RIGHT = 24, TOP = 24, BOTTOM = 24;
 export const axisLabel = (value: number) => Math.abs(value) >= 10000 ? value.toExponential(1) : String(Number(formatOneRepMax(value)));
 
 /** Ratios before multiplication keep finite extreme inputs on the plot. */
-export function curveGeometry(model: RmCurveModel, width: number, curves?: RegimeCurve[]) {
+export function curveGeometry(model: RmCurveModel, width: number, curves?: RegimeCurve[],
+  uncertainty: ObservationUncertainty | null = FIXED_REGIME_UNCERTAINTY) {
+  // The symmetric -1/0/+1 RIR error has variance 1-p; load SD is in total-load units.
+  const rirSd = uncertainty?.correctProbability == null ? null : Math.sqrt(1 - uncertainty.correctProbability);
+  const loadSd = (uncertainty?.loadSd ?? 0) / (model.definition.loadInputMode === 'per_side_load' ? 2 : 1);
   const maxReps = model.observations.reduce((max, p) => Math.max(max, p.equivalentReps + (p.rir > 0 ? 1 : 0)), 20);
   const knots = curves === undefined ? model.curve : curves.flatMap(c => c.knots);
   const maxLoad = knots.reduce((max, p) => Math.max(max, p.loadKg),
-    model.observations.reduce((max, p) => Math.max(max, p.loadKg), 1));
+    model.observations.reduce((max, p) => Math.max(max, p.loadKg + loadSd), 1));
   const LEFT = maxLoad >= 10000 ? 56 : 38;
   const x = (reps: number) => LEFT + (reps / maxReps) * Math.max(1, width - LEFT - RIGHT);
   const y = (load: number) => TOP + (1 - load / maxLoad) * (PLOT_HEIGHT - TOP - BOTTOM);
   const duration = model.end.getTime() - model.start.getTime();
   const points = model.observations.map(p => ({
     id: p.setId, x: x(p.equivalentReps), y: y(p.loadKg),
+    halo: uncertainty && (p.rir === 0 || rirSd !== null) ? {
+      rx: (p.rir === 0 ? 0 : rirSd!) * Math.max(1, width - LEFT - RIGHT) / maxReps,
+      ry: (loadSd / maxLoad) * (PLOT_HEIGHT - TOP - BOTTOM),
+    } : null,
     recency: Math.min(3, Math.max(0, Math.floor(4 * (p.completedAt.getTime() - model.start.getTime()) / duration))),
   }));
   const lines = (curves ?? []).map(curve => ({ ...curve, line: curve.knots.map(p => `${x(p.reps)},${y(p.loadKg)}`).join(' ') }));

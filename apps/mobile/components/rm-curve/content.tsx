@@ -133,7 +133,7 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
         <RmCurveHelp />
       </View>
       <Text allowFontScaling={false} style={styles.micro}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>
-      <RmRegimes result={result} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
+      <RmRegimes result={result} method={method} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
       <View style={styles.dates}><Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>
         <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points[0].completedAt, dateFormat)}</Text></View>
 

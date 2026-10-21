@@ -68,7 +68,7 @@ it('explains the model on request and preserves chart choices and set selection 
     expect(help.getByRole('header', { name })).toBeTruthy();
   }
   expect(help.getByText(/eight reps with two left is plotted at ten/)).toBeTruthy();
-  expect(help.getByText(/halo spans nine to eleven/)).toBeTruthy();
+  expect(help.getByText(/Rich uses errors estimated from your history/)).toBeTruthy();
   expect(help.getByText(/not proof that your strength changed/)).toBeTruthy();
   fireEvent.press(screen.getByTestId('rm-curve-help-backdrop', { includeHiddenElements: true }));
   await waitForGone(() => screen.queryByTestId('rm-curve-help'));

@@ -72,12 +72,14 @@ Code: `apps/mobile/src/strength-regimes/`.
 
 ### 1rm.curve-uncertainty · calculation · accepted
 
-Parsimonious fixes uncertainty; Rich jointly estimates shared uncertainty across
-periods. Logged RIR0 is exact; positive n permits actual n−1/n/n+1, symmetric
-extremes, initial central probability 0.50. Fixed total-load SD: 2.50 kg (1.25 kg
-per-side entry). Curve shading conveys relative evidence, never break/membership
-probability. Point halos show assumed RIR range; RIR0 has none. Unverified real
-histories remain exploratory, without calibrated shading or confidence claims.
+Parsimonious fixes uncertainty; Rich estimates jointly across periods. RIR0
+is exact; positive n permits n−1/n/n+1 with symmetric extremes and initial
+central probability p=0.50. Fixed total-load SD: 2.50 kg (per-side: 1.25).
+Halos add RIR SD √(1−p) horizontally and load SD vertically beyond markers;
+RIR0 has no horizontal spread. Rich requires usable current, identified
+estimates. Halos depict model spread. Curve shading shows relative evidence,
+never break/membership probability. Unverified histories stay exploratory
+without calibrated shading/confidence claims.
 
 Why: approved 2026-10-15; halos 2026-10-21.
 Code: `apps/mobile/src/strength-regimes/assessment.ts`.
@@ -107,10 +109,9 @@ Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`
 
 ### 1rm.curve-scope · definition · accepted
 
-Each fresh chart defaults to Settings' configured History look-back through
-today, All gyms (including No gym) and All known RIR. Manual choices last for
-that mounted chart; opening another exercise resets the defaults. Offer
-This week, Settings’ Progress period and configured History look-back
+Fresh charts default to Settings' History look-back through today, All gyms
+(including No gym), All known RIR. Mounted-chart choices reset on opening another
+exercise. Offer This week, Settings’ Progress period and History look-back
 ([[comparison.allowed-periods]]).
 Effort follows [[1rm.curve-population]]; range/gym/effort changes coherently
 recompute points and [[1rm.curve-fitting]].
