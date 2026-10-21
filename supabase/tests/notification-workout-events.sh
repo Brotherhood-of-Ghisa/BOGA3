@@ -878,6 +878,13 @@ drain_eval
 assert_sql 'retry captures one coherent actual board for both workouts' "select count(*)=2 and count(distinct before_ranks)=1
   and count(distinct final_ranks)=1 and bool_and(evaluated) from app_public.notification_workout_targets
   where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}') and group_exercise_id='${X1}';"
+# A publication builds its source graph twice: once before its writes and once
+# for the final source check, which still rejects a source moved after the first.
+PUBLISH_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
+  <"${SUPABASE_DIR}/tests/group-metric-publish-benchmark.sql" | grep '^\[')" || fail 'publish benchmark fixture failed'
+jq -e 'length==4 and all(.[];.graph_calls==2) and all(.[0:3][];.completed==true and .rejected==null)
+  and .[3].rejected=="P0001 notification capture source moved"' <<<"${PUBLISH_SAMPLES}" >/dev/null ||
+  fail "publish graph reuse or late source check regressed: ${PUBLISH_SAMPLES}"
 # Restore each workout's original published contribution when testing which movement that workout caused.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Attribution bench",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
