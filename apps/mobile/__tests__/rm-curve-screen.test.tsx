@@ -29,7 +29,7 @@ it('uses the configured History bound, retains manual filters locally, and reset
   expect(screen.getByTestId('rm-mode-one')).toHaveProp('accessibilityState', { selected: true });
   expect(screen.getByTestId('rm-method-fixed')).toHaveProp('accessibilityState', { selected: true });
   fireEvent.press(screen.getByLabelText('range: History look-back (16 weeks)'));
-  fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
+  fireEvent.press(screen.getByRole('radio', { name: 'Progress period (4 weeks)' }));
   await screen.findByText('12 sets · 4 sessions');
   fireEvent.press(screen.getByLabelText('gym: All gyms'));
   fireEvent.press(screen.getByRole('radio', { name: 'Synthetic gym' }));
@@ -40,7 +40,7 @@ it('uses the configured History bound, retains manual filters locally, and reset
   fireEvent.press(screen.getByTestId('rm-mode-two'));
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   expect(screen.getByLabelText('gym: Synthetic gym')).toBeTruthy();
-  expect(screen.getByLabelText('range: 4 weeks')).toBeTruthy();
+  expect(screen.getByLabelText('range: Progress period (4 weeks)')).toBeTruthy();
   expect(screen.getByLabelText('effort: RIR 4')).toBeTruthy();
   chart.unmount();
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
@@ -69,7 +69,7 @@ it('keeps the route exercise without a picker through effort/range changes and d
   fireEvent.press(screen.getByLabelText('effort: All known RIR')); fireEvent.press(screen.getByRole('radio', { name: 'RIR 4' }));
   await waitForGone(() => screen.queryByTestId('rm-curve-details'));
   await screen.findByTestId('rm-curve-plot');
-  fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)')); fireEvent.press(screen.getByRole('radio', { name: '4 weeks' }));
+  fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)')); fireEvent.press(screen.getByRole('radio', { name: 'Progress period (4 weeks)' }));
   await screen.findByText('3 sets · 1 session');
   expect(screen.getByTestId('rm-curve-plot')).toBeTruthy();
   act(() => {

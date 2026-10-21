@@ -535,14 +535,14 @@ describe('Groups tab', () => {
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
   });
 
-  it('opens At a glance, where the filter row names the metric and the period', async () => {
+  it('opens At a glance with its metric control and weekly stepper', async () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-filters');
 
     expect(sectionLabel()).toContain('At a glance');
     expect(await screen.findByTestId('group-home-board')).toBeTruthy();
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
-    expect(screen.getByTestId('groups-filter-period')).toHaveTextContent('Week');
+    expect(screen.queryByTestId('groups-filter-period')).toBeNull();
 
     // The metric pill cycles Sets -> PRs (no Volume), and the board follows it.
     fireEvent.press(screen.getByTestId('groups-filter-metric'));

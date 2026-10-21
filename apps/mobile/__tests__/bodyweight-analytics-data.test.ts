@@ -44,7 +44,7 @@ afterEach(() => mockFixture.close());
 
 const read = async () => {
   const [history, blocks, daily, muscle, insights, graph] = await Promise.all([
-    loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: 'all' }),
+    loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: { weeks: 520, kind: 'history' } }),
     loadRecentExerciseBlocks({ exerciseDefinitionId: 'pull', now: end }),
     computeSelectedExerciseDailyEffort({ exerciseDefinitionId: 'pull', start, end, timeZone: 'UTC' }),
     computeSelectedMuscleDailyEffort({ muscleGroupIds: ['back'], start, end, timeZone: 'UTC' }),
@@ -108,7 +108,7 @@ it('keeps gym-scoped history and records on the same dated bodyweight context af
   db.insert(gyms).values([{ id: 'home', name: 'Home' }, { id: 'club', name: 'Club' }]).run();
   db.update(sessions).set({ gymId: 'home' }).where(eq(sessions.id, 'old')).run();
   db.update(sessions).set({ gymId: 'club' }).where(eq(sessions.id, 'new')).run();
-  const scopedHistory = () => loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: 'all', gymId: 'home' });
+  const scopedHistory = () => loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: { weeks: 520, kind: 'history' }, gymId: 'home' });
   const initial = await scopedHistory();
   expect(initial?.sessions).toHaveLength(1);
   expect(initial?.sessions[0]).toMatchObject({ sessionId: 'old', gymName: 'Home', bodyWeightKg: 80, totalVolume: 640 });
@@ -127,7 +127,7 @@ it('keeps gym-scoped history and records on the same dated bodyweight context af
     records: { oneRepMax: { gymName: 'Home' }, volume: { value: 720 } },
   } }));
   expect((await scopedHistory())?.sessions[0].totalVolume).toBe(720);
-  expect((await loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: 'all', gymId: 'club' }))?.sessions[0])
+  expect((await loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: { weeks: 520, kind: 'history' }, gymId: 'club' }))?.sessions[0])
     .toMatchObject({ bodyWeightKg: 80, totalVolume: 800 });
 
   hook.rerender({ scope: 'all', revision: 1 });

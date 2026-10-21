@@ -45,16 +45,13 @@ describe('groupHomeSeriesWindows', () => {
     expect(earlier.slice(1)).toEqual(current.slice(0, 5));
   });
 
-  it('asks for calendar months, across the year boundary', () => {
-    const windows = groupHomeSeriesWindows({ period: 'month', offset: -8, now: NOW });
-
-    // The month in view is February 2026; the span starts in September 2025.
-    expect(windows[5]).toEqual({ start: new Date(2026, 1, 1), end: new Date(2026, 2, 1) });
-    expect(windows[0]).toEqual({ start: new Date(2025, 8, 1), end: new Date(2025, 9, 1) });
-    expect(toCompetitionPeriodWindows(windows)[0]).toEqual({
-      start_ms: new Date(2025, 8, 1).getTime(),
-      end_ms: new Date(2025, 9, 1).getTime(),
-    });
+  it('keeps Monday weeks across the year and DST boundaries', () => {
+    for (const now of [new Date(2027, 0, 1), new Date(2026, 2, 29), new Date(2026, 9, 25)]) {
+      const windows = groupHomeSeriesWindows({ period: 'week', offset: 0, now });
+      expect(windows.every(w => w.start.getDay() === 1 && w.end.getDay() === 1)).toBe(true);
+      expect(windows.every(w => w.start.getHours() === 0 && w.end.getHours() === 0)).toBe(true);
+      expect(windows.slice(1).every((w, i) => w.start.getTime() === windows[i].end.getTime())).toBe(true);
+    }
   });
 });
 

@@ -29,7 +29,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
   if (kind === 'boards') return isCompetitionPodiumsWire(value);
   if (kind === 'week') return exact(value,['windowStartMs','summary']) &&
     Number.isSafeInteger(value.windowStartMs) && isCompetitionWeekSummaryWire(value.summary) && value.summary.group_id === groupId;
-  if (kind === 'glance') return (scope[1] === 'week' || scope[1] === 'month') && /^(0|-[1-9][0-9]*)$/.test(scope[2] ?? '') &&
+  if (kind === 'glance') return scope[1] === 'week' && /^(0|-[1-9][0-9]*)$/.test(scope[2] ?? '') &&
     scope.length === 3 && isCompetitionPeriodTotalsWire(value) && value.group_id === groupId;
   if (kind === 'session') return isCompetitionSessionDetailWire(value) && value.group_id === groupId &&
     value.session.member.user_id === scope[1] && value.session.session_id === scope.slice(2).join(':');

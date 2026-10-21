@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { GroupHomeMetric, GroupHomePeriod } from '@/src/groups/home-periods';
+import type { GroupHomeMetric } from '@/src/groups/home-periods';
 import { GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
 
 import { GroupCycleButton } from './group-cycle-button';
@@ -30,11 +30,6 @@ const METRIC_OPTIONS = [
   { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
 ];
 
-const PERIOD_OPTIONS = [
-  { value: 'week' as const, label: 'Week' },
-  { value: 'month' as const, label: 'Month' },
-];
-
 export type GroupScreenHeaderProps = {
   /** My groups; one group leaves the title with no switch. */
   groups: GroupSwitchOption[];
@@ -45,8 +40,6 @@ export type GroupScreenHeaderProps = {
   onSectionChange: (next: GroupsSection) => void;
   metric: GroupHomeMetric;
   onMetricChange: (next: GroupHomeMetric) => void;
-  period: GroupHomePeriod;
-  onPeriodChange: (next: GroupHomePeriod) => void;
   onOpenMyGroups: () => void;
   /** A control at the end of the filter row: the stream's event-type menu. */
   filterTrailing?: ReactNode;
@@ -67,7 +60,7 @@ const titleStep = (name: string) =>
 /**
  * The Groups screen's heading: the group's name as the title, which opens the
  * group switch; then the filter row — the section, pinned across all three,
- * and (at a glance) the metric and the period, each a pill that cycles
+ * and (at a glance) the metric, a pill that cycles
  * through its options. The section pill says which view this is, so the
  * title stands alone ([[copy.no-subtitles]]).
  */
@@ -80,8 +73,6 @@ export function GroupScreenHeader({
   onSectionChange,
   metric,
   onMetricChange,
-  period,
-  onPeriodChange,
   onOpenMyGroups,
   filterTrailing,
 }: GroupScreenHeaderProps) {
@@ -130,13 +121,6 @@ export function GroupScreenHeader({
               options={METRIC_OPTIONS}
               testID="groups-filter-metric"
               value={metric}
-            />
-            <GroupCycleButton
-              accessibilityLabel="Period"
-              onChange={onPeriodChange}
-              options={PERIOD_OPTIONS}
-              testID="groups-filter-period"
-              value={period}
             />
           </>
         ) : null}

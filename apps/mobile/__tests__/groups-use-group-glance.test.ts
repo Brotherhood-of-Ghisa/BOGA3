@@ -80,7 +80,6 @@ it('hides a stale read and asks again each time another stale read lands', () =>
 
 describe('holding the last series while the next read lands', () => {
   type Props = { groupId: string; period: GroupHomePeriod; offset: number };
-  const month = toCompetitionPeriodWindows(groupHomeSeriesWindows({ period: 'month', offset: 0, now: NOW }));
   const renderStepping = () =>
     renderHook((props: Props) => useGroupGlance({ userId: 'me', now: NOW, ...props }), {
       initialProps: { groupId: 'g1', period: 'week', offset: 0 },
@@ -107,19 +106,6 @@ describe('holding the last series while the next read lands', () => {
     expect(result.current.held).toBeNull();
   });
 
-  it('holds the week view across a switch to months', () => {
-    mockResource.mockReturnValue(resource(totals(current), 1));
-    const { result, rerender } = renderStepping();
-
-    mockResource.mockReturnValue(resource(null, null, { refreshing: true }));
-    rerender({ groupId: 'g1', period: 'month', offset: 0 });
-    expect(result.current.held).toEqual({ period: 'week', offset: 0 });
-
-    mockResource.mockReturnValue(resource(totals(month), 2));
-    rerender({ groupId: 'g1', period: 'month', offset: 0 });
-    expect(startOf(result.current.series)).toBe(month[5]!.start_ms);
-    expect(result.current.held).toBeNull();
-  });
 
   it('lets go once the next read fails or cannot run offline, so its own state shows', () => {
     mockResource.mockReturnValue(resource(totals(current), 1));

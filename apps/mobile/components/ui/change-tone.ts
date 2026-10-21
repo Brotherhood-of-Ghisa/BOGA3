@@ -3,7 +3,7 @@ import { uiRoles } from '@/components/ui/tokens';
 // The one rule for a change against an earlier period (`design-language.md`
 // §6): which direction it went, and the colour that says so. Every screen that
 // draws a change takes its colour from here — Progress's Change column,
-// Today's month pace, the session summary's volume against its median — so one
+// Today's progress pace, the session summary's volume against its median — so one
 // direction never reads two ways.
 //
 // `new` is an improvement: a figure that had no earlier value to fall from.

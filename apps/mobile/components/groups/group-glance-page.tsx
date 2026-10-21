@@ -41,7 +41,7 @@ export type GroupGlancePageProps = {
   onRetry: () => void;
 };
 
-const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks', month: 'months' };
+const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks' };
 
 /**
  * A held read fades only once it has been waiting this long, so a step to a

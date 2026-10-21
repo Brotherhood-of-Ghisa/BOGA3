@@ -18,12 +18,12 @@ export type GroupHomeStepperProps = {
 };
 
 /**
- * The period stepper: which week or month the cards below are reading. Which
- * metric, and whether the step is a week or a month, are the screen's filter
+ * The period stepper: which week the cards below are reading. Which
+ * metric, and the weekly step, are the screen's filter
  * bar; this only walks backwards and forwards through them.
  */
-export function GroupHomeStepper({ label, period, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
-  const noun = period === 'week' ? 'week' : 'month';
+export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
+  const noun = 'week';
   return (
     <View style={styles.stepper} testID="group-home-period-stepper">
       <IconButton

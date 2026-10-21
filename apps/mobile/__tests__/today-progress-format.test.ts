@@ -13,46 +13,35 @@ import {
   formatWeekRange,
   sessionSummaryRecordLine,
   sessionSummaryAccessibilityLabel,
-  monthChartAccessibilityLabel,
-  monthChartGeometry,
+  periodChartAccessibilityLabel,
+  periodChartGeometry,
   paceDifference,
   toPolyline,
   weekShare,
 } from '@/components/today/progress-format';
-import type { LatestSessionSummary, ProgressCounts, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
-import { localMonthWindow, localWeekWindow } from '@/src/utils/local-calendar';
+import type { LatestSessionSummary, ProgressCounts, SessionPersonalRecord, TodayProgressPeriod } from '@/src/progress-summary';
+import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { localWeekWindow } from '@/src/utils/local-calendar';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
 const counts = (workingSets: number, sessions = 0, prs = 0): ProgressCounts => ({ sessions, workingSets, prs });
 
-// A month as T02's read shapes it; only the fields a test names matter.
-const month = (overrides: {
-  now: Date;
-  cumulative: number[];
-  previousCumulative: number[];
-  projected?: number;
-  toDate?: ProgressCounts;
-  toSameDay?: ProgressCounts;
-  total?: ProgressCounts;
-}): TodayProgressMonth => {
-  const { now } = overrides;
-  const daysIn = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const previousStart = localMonthWindow(now, -1).start;
-  const last = (values: number[]) => values[values.length - 1] ?? 0;
+const period = (overrides: {
+  cumulative: number[]; previousCumulative: number[]; projected?: number;
+  toSameDay?: ProgressCounts; weeks?: number; elapsedDays?: number;
+}): TodayProgressPeriod => {
+  const weeks = overrides.weeks ?? 3;
+  const current = calendarWeekBounds(weeks, local(2026, 10, 16));
   return {
-    window: localMonthWindow(now),
-    dayOfMonth: now.getDate(),
-    daysInMonth: daysIn(now),
+    window: { start: current.start, end: local(2026, 10, 19) }, weeks,
+    elapsedDays: overrides.elapsedDays ?? 19, totalDays: weeks * 7,
     cumulativeWorkingSets: overrides.cumulative,
-    toDate: overrides.toDate ?? counts(last(overrides.cumulative)),
-    projectedWorkingSets: overrides.projected ?? 0,
+    toDate: counts(overrides.cumulative.at(-1) ?? 0), projectedWorkingSets: overrides.projected ?? 0,
     previous: {
-      window: localMonthWindow(now, -1),
-      daysInMonth: daysIn(previousStart),
+      window: { start: shiftCalendarWeeks(current.start, -weeks), end: current.start }, totalDays: weeks * 7,
       cumulativeWorkingSets: overrides.previousCumulative,
-      toSameDay: overrides.toSameDay ?? counts(0),
-      total: overrides.total ?? counts(last(overrides.previousCumulative)),
+      toSameDay: overrides.toSameDay ?? counts(0), total: counts(overrides.previousCumulative.at(-1) ?? 0),
     },
   };
 };
@@ -97,116 +86,50 @@ describe('week labels and bars', () => {
   });
 });
 
-describe('the month against the previous month', () => {
-  const now = local(2026, 10, 16, 12);
-
-  it('says the difference as a signed absolute count, never a percentage', () => {
-    expect(formatSignedCount(4)).toBe('+4');
-    expect(formatSignedCount(-3)).toBe('−3');
-    expect(formatSignedCount(0)).toBe('±0');
+describe('the configured progress block', () => {
+  it('says a signed count and compares matching elapsed days', () => {
+    expect([formatSignedCount(4), formatSignedCount(-3), formatSignedCount(0)]).toEqual(['+4', '−3', '±0']);
+    for (const [value, relation] of [[102, 'ahead of'], [90, 'behind'], [98, 'level with']] as const) {
+      const data = period({ cumulative: [value], previousCumulative: [193], toSameDay: counts(98) });
+      expect(paceDifference(data)).toBe(value - 98);
+      expect(formatPacePhrase(data)).toBe(`${relation} the previous 3 weeks`);
+    }
+    expect(formatPacePhrase(period({ weeks: 1, cumulative: [1], previousCumulative: [] }))).toBe('ahead of the previous week');
   });
 
-  it('compares to the previous month at the same day', () => {
-    const ahead = month({ now, cumulative: [102], previousCumulative: [193], toSameDay: counts(98) });
-    const behind = month({ now, cumulative: [90], previousCumulative: [193], toSameDay: counts(98) });
-    const level = month({ now, cumulative: [98], previousCumulative: [193], toSameDay: counts(98) });
-
-    expect(paceDifference(ahead)).toBe(4);
-    expect(formatPacePhrase(ahead)).toBe("ahead of Sep's pace");
-    expect(formatPacePhrase(behind)).toBe("behind Sep's pace");
-    expect(formatPacePhrase(level)).toBe("level with Sep's pace");
-  });
-
-  it('speaks the chart as one sentence, its ordinals and a shorter previous month included', () => {
-    const october = month({
-      now,
-      cumulative: [102],
-      previousCumulative: [193],
-      projected: 198,
-      toSameDay: counts(98),
-    });
-    expect(monthChartAccessibilityLabel(october)).toBe(
-      'Cumulative sets: October 102 by the 16th against September 98 by the 16th; September finished at 193. On course for 198.',
-    );
-
-    // 31 March against February: the comparison stops at February's last day.
-    const march = month({ now: local(2026, 3, 31), cumulative: [40], previousCumulative: [30], toSameDay: counts(30) });
-    expect(monthChartAccessibilityLabel(march)).toContain('March 40 by the 31st against February 30 by the 28th');
-
-    const day = (n: number) => monthChartAccessibilityLabel(month({ now: local(2026, 10, n), cumulative: [1], previousCumulative: [] }));
-    expect(day(1)).toContain('by the 1st against');
-    expect(day(2)).toContain('by the 2nd against');
-    expect(day(3)).toContain('by the 3rd against');
-    expect(day(11)).toContain('by the 11th against');
-    expect(day(12)).toContain('by the 12th against');
-    expect(day(13)).toContain('by the 13th against');
-    expect(day(22)).toContain('by the 22nd against');
+  it('speaks the configured weeks and elapsed day rather than a calendar month', () => {
+    const data = period({ cumulative: [102], previousCumulative: [193], projected: 198, toSameDay: counts(98) });
+    expect(periodChartAccessibilityLabel(data)).toBe(
+      'Cumulative sets: 3 weeks, 102 by day 19 against 98 by day 19 in the preceding block; The preceding block finished at 193. On course for 198.');
   });
 });
 
-describe('the month chart geometry', () => {
+describe('the progress chart geometry', () => {
   const width = 326;
   const plotWidth = width - CHART_RIGHT_GUTTER;
-
-  it('spans the longer month across the plot and scales to the highest line', () => {
-    // 16 Oct: October's 31 days span the plot; September's 30 stop a day short.
-    const geometry = monthChartGeometry(
-      month({
-        now: local(2026, 10, 16),
-        cumulative: Array.from({ length: 16 }, (_, index) => (index + 1) * 5),
-        previousCumulative: Array.from({ length: 30 }, (_, index) => (index + 1) * 4),
-        projected: 155,
-        toSameDay: counts(64),
-      }),
-      width,
-    );
-
+  it('uses equal week blocks and scales to the highest line', () => {
+    const geometry = periodChartGeometry(period({ cumulative: Array.from({ length: 19 }, (_, i) => (i + 1) * 5),
+      previousCumulative: Array.from({ length: 21 }, (_, i) => (i + 1) * 4), projected: 155 }), width);
     expect(geometry.plot.width).toBe(plotWidth);
-    expect(geometry.current).toHaveLength(16);
+    expect(geometry.current).toHaveLength(19);
     expect(geometry.current[0].x).toBe(0);
-    expect(geometry.monthEndX).toBeCloseTo(plotWidth);
-    expect(geometry.previous[29].x).toBeCloseTo((29 / 30) * plotWidth);
-    // The projection (155) is the highest figure: it reaches the plot's top at the month's end.
-    expect(geometry.projection.to).toEqual({ x: geometry.monthEndX, y: geometry.plot.top });
-    expect(geometry.projection.from).toEqual(geometry.today.current);
-    expect(geometry.today.current).toEqual(geometry.current[15]);
-    expect(geometry.today.previous).toEqual(geometry.previous[15]);
-    // Zero sits on the baseline.
-    expect(monthChartGeometry(month({ now: local(2026, 10, 1), cumulative: [0], previousCumulative: [0] }), width).current[0].y).toBe(
-      geometry.plot.bottom,
-    );
+    expect(geometry.periodEndX).toBeCloseTo(plotWidth);
+    expect(geometry.previous[20].x).toBeCloseTo(plotWidth);
+    // PREV plus its six-point offset must fit inside the SVG viewport.
+    expect(width - geometry.previous[20].x).toBeGreaterThanOrEqual(40);
+    expect(geometry.projection.to).toEqual({ x: geometry.periodEndX, y: geometry.plot.top });
+    expect(geometry.today.current).toEqual(geometry.current[18]);
+    expect(geometry.today.previous).toEqual(geometry.previous[18]);
   });
-
-  it('lets a longer previous month set the span, and places its same-day dot at its last day', () => {
-    // 30 March: February has 28 days, so the same-day dot is its 28th.
-    const geometry = monthChartGeometry(
-      month({
-        now: local(2026, 3, 30),
-        cumulative: Array.from({ length: 30 }, () => 10),
-        previousCumulative: Array.from({ length: 28 }, () => 20),
-        projected: 10,
-        toSameDay: counts(20),
-      }),
-      width,
-    );
-    expect(geometry.monthEndX).toBeCloseTo(plotWidth);
-    expect(geometry.today.previous).toEqual(geometry.previous[27]);
-    // The previous month's total (20) tops the scale.
-    expect(geometry.previous[0].y).toBe(geometry.plot.top);
-
-    // February against January: January's 31 days span the plot; February ends short of it.
-    const february = monthChartGeometry(
-      month({ now: local(2026, 2, 10), cumulative: [1], previousCumulative: Array.from({ length: 31 }, () => 1) }),
-      width,
-    );
-    expect(february.previous[30].x).toBeCloseTo(plotWidth);
-    expect(february.monthEndX).toBeCloseTo((27 / 30) * plotWidth);
+  it('keeps zero data and missing daily arrays on the baseline', () => {
+    const geometry = periodChartGeometry(period({ cumulative: [0], previousCumulative: [], projected: 0 }), width);
+    expect(geometry.current[0].y).toBe(geometry.plot.bottom);
+    expect(geometry.today.previous.y).toBe(geometry.plot.bottom);
   });
-
-  it('draws nothing wider than the space it is given, and writes points to one decimal', () => {
-    const narrow = monthChartGeometry(month({ now: local(2026, 10, 2), cumulative: [1, 2], previousCumulative: [] }), 10);
-    expect(narrow.plot.width).toBe(0);
-    expect(narrow.today.previous.x).toBe(0);
+  it('bounds narrow charts and formats coordinates', () => {
+    const geometry = periodChartGeometry(period({ cumulative: [1, 2], previousCumulative: [] }), 10);
+    expect(geometry.plot.width).toBe(0);
+    expect(geometry.today.previous.x).toBe(0);
     expect(toPolyline([{ x: 0, y: 80.25 }, { x: 9.731, y: 6 }])).toBe('0.0,80.3 9.7,6.0');
   });
 });
@@ -215,9 +138,6 @@ describe('the latest session row', () => {
   it('says its figures and its whole summary', () => {
     expect(formatSessionSummaryFigures(latest())).toBe('12 sets · 4 exercises');
     expect(formatSessionSummaryFigures(latest({ exerciseCount: 1 }))).toBe('12 sets · 1 exercise');
-    expect(sessionSummaryAccessibilityLabel(latest(), 'DD-MM-YYYY')).toBe(
-      'Completed session on 15-10-2026 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
-    );
     expect(sessionSummaryAccessibilityLabel(latest(), 'DD-MM-YYYY')).toBe(
       'Completed session on 15-10-2026 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );

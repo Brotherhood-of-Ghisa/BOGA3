@@ -52,7 +52,7 @@ afterEach(() => closeLocalData());
 
 const read = async () => {
   const [history, blocks, daily, muscle, catalog, facts, bests, graph, insights, input] = await Promise.all([
-    loadExercisePerformanceHistory({ exerciseDefinitionId: 'lift', period: 'all' }),
+    loadExercisePerformanceHistory({ exerciseDefinitionId: 'lift', period: { weeks: 520, kind: 'history' } }),
     loadRecentExerciseBlocks({ exerciseDefinitionId: 'lift', now: end }),
     computeSelectedExerciseDailyEffort({ exerciseDefinitionId: 'lift', start, end, timeZone: 'UTC' }),
     computeSelectedMuscleDailyEffort({ muscleGroupIds: ['back'], start, end, timeZone: 'UTC' }),

@@ -103,7 +103,7 @@ const buildInput = (
 
   return {
     exerciseDefinition,
-    period: overrides.period ?? 30,
+    period: overrides.period ?? { weeks: 52, kind: 'history' },
     appliedTagDefinitionId: overrides.appliedTagDefinitionId ?? null,
     // Three-state: left out unless an override names a gym (`null` included).
     ...('appliedGymId' in overrides ? { appliedGymId: overrides.appliedGymId } : {}),
@@ -420,26 +420,29 @@ describe('createExerciseHistoryRepository', () => {
     expect(summary).toBeNull();
   });
 
-  it('uses computePeriodBounds for 7/30 day periods and skips bounds for "all"', async () => {
+  it('uses calendar weeks for the one-week view and explicit bounds for configured history', async () => {
     const loadSessionsForExercise = jest.fn().mockResolvedValue([]);
     const repo = createExerciseHistoryRepository(buildStore({ loadSessionsForExercise }));
 
     const now = new Date('2026-05-19T15:00:00.000Z');
-    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 7, now });
+    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: { weeks: 1, kind: 'progress' }, now });
     // One session read, for the period window; the all-time bests come from the facts.
     expect(loadSessionsForExercise).toHaveBeenCalledTimes(1);
     expect(loadSessionsForExercise).toHaveBeenLastCalledWith({
       exerciseDefinitionId: 'ex-bench',
-      start: new Date('2026-05-12T15:00:00.000Z'),
+      start: new Date(2026, 4, 18),
       end: now,
     });
+  });
 
-    loadSessionsForExercise.mockClear();
-    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 'all', now });
-    expect(loadSessionsForExercise).toHaveBeenCalledTimes(1);
-    expect(loadSessionsForExercise).toHaveBeenLastCalledWith(
-      expect.objectContaining({ start: null, end: null })
-    );
+  it.each([
+    { kind: 'history' as const, weeks: 3, start: new Date(2026, 3, 27) },
+    { kind: 'progress' as const, weeks: 3, start: new Date(2026, 4, 4) },
+  ])('reads the configured $kind calendar window', async ({ kind, weeks, start }) => {
+    const store = buildStore();
+    const now = new Date(2026, 4, 19, 16);
+    await createExerciseHistoryRepository(store).load({ exerciseDefinitionId: exerciseDefinition.id, period: { kind, weeks }, now });
+    expect(store.loadSessionsForExercise).toHaveBeenCalledWith({ exerciseDefinitionId: exerciseDefinition.id, start, end: now });
   });
 
   it('reads the all-time best for the applied gym, never by period or tag', async () => {
@@ -450,7 +453,7 @@ describe('createExerciseHistoryRepository', () => {
     const loadAllTimeBest = jest.fn().mockResolvedValue(best);
     const repo = createExerciseHistoryRepository(buildStore({ loadAllTimeBest }));
 
-    const summary = await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 7, tagDefinitionId: 'tag-a' });
+    const summary = await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: { weeks: 1, kind: 'progress' }, tagDefinitionId: 'tag-a' });
     await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: 'gym-a' });
     await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: null });
 

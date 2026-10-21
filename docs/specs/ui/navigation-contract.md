@@ -102,7 +102,7 @@ access level, and `useRootRouteAccess`
 | `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
-| | `period` | `7` / `30` / `all`; absent or invalid is `30` |
+| | `period` | `week` (legacy `7`), `progress`, `history`; otherwise History look-back ([[comparison.allowed-periods]]) |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
 | `/completed-session/[sessionId]` | `intent=edit` | replaces to `/session/<sessionId>` |
 | | `presentation=completion` | the post-submit summary; `summary`, absent and invalid all open View Session with Summary active |

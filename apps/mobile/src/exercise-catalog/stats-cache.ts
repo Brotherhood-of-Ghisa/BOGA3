@@ -11,6 +11,8 @@ import {
 } from '@/src/data/exercise-catalog-stats';
 import { getBodyWeightContextRevision } from '@/src/bodyweight/invalidation';
 import { progressComparisonWindows } from '@/src/data/stats';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 import { isDevMode } from '@/src/utils/isDevMode';
@@ -197,6 +199,7 @@ export const useExerciseCatalogComparison = (
   weeks: number,
   gymId?: string | null
 ): UseExerciseCatalogComparisonResult => {
+  const { values: { historyLookbackWeeks } } = useAccountLocalPreferenceState();
   const snapshot = useSyncExternalStore(
     subscribeToExerciseCatalogStats,
     getExerciseCatalogStatsSnapshot,
@@ -217,11 +220,12 @@ export const useExerciseCatalogComparison = (
   const periods = useMemo(() => {
     const now = new Date(snapshot.loadedAt);
     const windows = progressComparisonWindows(weeks, now);
+    const historyStart = historyWeekBounds(historyLookbackWeeks, now).start;
     return {
-      current: aggregateExerciseCatalogStats(raw, windows.current, now, { gymId }),
-      previous: aggregateExerciseCatalogStats(raw, windows.previous, now, { gymId }),
+      current: aggregateExerciseCatalogStats(raw, windows.current, now, { gymId, historyStart }),
+      previous: aggregateExerciseCatalogStats(raw, windows.previous, now, { gymId, historyStart }),
     };
-  }, [raw, snapshot.loadedAt, weeks, gymId]);
+  }, [raw, snapshot.loadedAt, weeks, gymId, historyLookbackWeeks]);
   const gymOptions = useGymOptions(raw);
 
   return {
@@ -240,6 +244,7 @@ export const useExerciseCatalogStats = (
   period: ExerciseCatalogStatsPeriod,
   gymId?: string | null
 ): UseExerciseCatalogStatsResult => {
+  const { values: { historyLookbackWeeks } } = useAccountLocalPreferenceState();
   const current = useSyncExternalStore(
     subscribeToExerciseCatalogStats,
     getExerciseCatalogStatsSnapshot,
@@ -254,8 +259,8 @@ export const useExerciseCatalogStats = (
   // an empty history aggregates to nothing whatever the date.
   const stats = useMemo(
     () =>
-      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt), { gymId }),
-    [current.rawHistory, current.loadedAt, period, gymId]
+      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt), { gymId, historyStart: historyWeekBounds(historyLookbackWeeks, new Date(current.loadedAt)).start }),
+    [current.rawHistory, current.loadedAt, period, gymId, historyLookbackWeeks]
   );
   const gymOptions = useGymOptions(current.rawHistory);
 

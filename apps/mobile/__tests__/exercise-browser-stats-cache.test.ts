@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
 import { __resetExerciseCatalogStatsCacheForTests, prepareExerciseHistoryReadForMaestro, useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
@@ -13,11 +14,12 @@ const read = jest.mocked(loadExerciseCatalogStatsRawHistory);
 beforeEach(() => { __resetExerciseCatalogStatsCacheForTests(); read.mockReset(); mockDev = false; });
 afterEach(() => { jest.restoreAllMocks(); jest.useRealTimers(); });
 
-it('refreshes Favourite against time even when the reader returns the same history object', async () => {
+it('refreshes Favourite at the configured History boundary even with the same history object', async () => {
+  act(() => updatePreferences({ historyLookbackWeeks: 1 }));
   const now = new Date('2026-09-25T12:00:00Z').getTime();
   const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
   const history = {
-    sessions: [{ id: 's', completedAt: new Date(now - 179 * 86_400_000) }],
+    sessions: [{ id: 's', completedAt: new Date(now - 5 * 86_400_000) }],
     sessionExercises: [{ id: 'se', sessionId: 's', exerciseDefinitionId: 'e' }],
     exerciseSets: [{ sessionExerciseId: 'se', weightValue: '20', repsValue: '8', setType: null }],
   };
@@ -25,10 +27,12 @@ it('refreshes Favourite against time even when the reader returns the same histo
   const { result } = renderHook(() => useExerciseCatalogStats('all'));
   await waitFor(() => expect(result.current.status).toBe('ready'));
   expect(result.current.stats.recencyScoresById.has('e')).toBe(true);
-  clock.mockReturnValue(now + 2 * 86_400_000);
+  clock.mockReturnValue(now + 3 * 86_400_000);
   act(() => result.current.reload());
   await waitFor(() => expect(result.current.status).toBe('ready'));
   expect(result.current.stats.recencyScoresById.has('e')).toBe(false);
+  act(() => updatePreferences({ historyLookbackWeeks: 2 }));
+  expect(result.current.stats.recencyScoresById.has('e')).toBe(true);
   expect(result.current.stats.aggregatesById.get('e')?.sessionCount).toBe(1);
   expect(result.current.stats.lastCompletedAtById.get('e')).toEqual(history.sessions[0].completedAt);
 });

@@ -17,8 +17,7 @@ export type GroupGlanceState = {
   resource: GroupResourceState<CompetitionPeriodTotalsWire>;
   /**
    * The periods to draw, oldest first: the read for exactly the windows in
-   * view, or — while that read is still loading after a step or a week/month
-   * switch — the group's last shown series (`held`). Null when neither.
+   * view, or — while that read is still loading after a step to another week — the group's last shown series (`held`). Null when neither.
    */
   series: GroupHomeWindow[] | null;
   /** Set when `series` is that earlier read: the period and offset it is for. */

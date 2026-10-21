@@ -27,7 +27,7 @@ function fixture(B: number | null, c: number, amount: string,
     weightValue: amount, repsValue: '8', setType: 'rir_1' as const, performanceStatus: null };
   const sessionRow = { sessionId: 'session', sessionExerciseId: 'exercise', completedAt: day, gymName: null,
     bodyWeightKg: B, bodyWeightSource: B === null ? null : 'reading' as const, bodyWeightMeasurementId: B === null ? null : 'reading', bodyWeightMeasuredAt: B === null ? null : day };
-  const history = aggregateExerciseHistory({ exerciseDefinition: definition, period: 'all', appliedTagDefinitionId: null,
+  const history = aggregateExerciseHistory({ exerciseDefinition: definition, period: { weeks: 520, kind: 'history' }, appliedTagDefinitionId: null,
     sessionsInPeriod: [sessionRow], allTimeBest: { estimatedOneRepMax: null, topWeight: null }, setsBySessionExerciseId: { exercise: [set] }, tagsBySessionExerciseId: {} });
   const exercise = { id: 'exercise', exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', orderIndex: 0,
     loadContext: context, sets: [set] };

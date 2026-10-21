@@ -221,7 +221,7 @@ describe('the workout in progress', () => {
 describe('exercise history\'s gym options', () => {
   it('keep the chosen gym, by name, when the period holds none of its sessions', async () => {
     const summary = (await loadExercisePerformanceHistory({
-      exerciseDefinitionId: BENCH, period: 'all', gymId: 'annex', now: day(10),
+      exerciseDefinitionId: BENCH, period: { weeks: 520, kind: 'history' }, gymId: 'annex', now: day(10),
     }))!;
     expect(summary.sessions).toEqual([]);
     expect(summary.gymOptions).toContainEqual({ gymId: 'annex', name: 'Annex', occurrenceCount: 0 });

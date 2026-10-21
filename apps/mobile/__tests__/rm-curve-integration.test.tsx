@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { RmCurveContent } from '@/components/rm-curve/content';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { bodyWeightMeasurements, exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
@@ -30,15 +31,16 @@ afterEach(() => mockFixture.close());
 
 it('hides stale connected-screen values on storage failure and restores the selected set and filters on Retry', async () => {
   seedWaveHistory(mockFixture.database);
+  act(() => updatePreferences({ targetWindowWeeks: 9 }));
   render(<RmCurveScreen exerciseDefinitionId="curve" now={now} />);
   await screen.findByTestId('rm-curve-plot');
   fireEvent.press(screen.getByLabelText('range: History look-back (52 weeks)'));
-  fireEvent.press(screen.getByRole('radio', { name: '12 weeks' }));
-  await screen.findByText('36 sets · 12 sessions');
+  fireEvent.press(screen.getByRole('radio', { name: 'Progress period (9 weeks)' }));
+  await screen.findByText('27 sets · 9 sessions');
   fireEvent.press(screen.getByLabelText('gym: All gyms'));
   fireEvent.press(screen.getByRole('radio', { name: 'Synthetic gym' }));
   await screen.findByLabelText('gym: Synthetic gym');
-  const model = (await loadRmCurve({ ...rmCurveWindow(52, now, 12), exerciseDefinitionId: 'curve', gym: { gymId: 'synthetic-gym' } }))!;
+  const model = (await loadRmCurve({ ...rmCurveWindow(52, now, 'progress', 9), exerciseDefinitionId: 'curve', gym: { gymId: 'synthetic-gym' } }))!;
   const selected = model.observations[0];
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   const before = mockFixture.database.select().from(exerciseSets).all();
@@ -47,7 +49,7 @@ it('hides stale connected-screen values on storage failure and restores the sele
   expect(screen.queryByTestId('rm-curve-plot')).toBeNull();
   expect(screen.queryByTestId('rm-curve-details')).toBeNull();
   expect(screen.getByLabelText('gym: Synthetic gym')).toBeTruthy();
-  expect(screen.getByLabelText('range: 12 weeks')).toBeTruthy();
+  expect(screen.getByLabelText('range: Progress period (9 weeks)')).toBeTruthy();
   mockReadFailure = false;
   fireEvent.press(screen.getByText('Retry'));
   await screen.findByTestId('rm-curve-details');
@@ -126,8 +128,8 @@ it('refreshes a selected bodyweight/per-side readout after a dated reading edit 
 function PrefixPreview({ name, week }: { name: keyof typeof wave.scenarios; week: number }) {
   const read = useRmCurve({ exerciseDefinitionId: 'curve', start: new Date(wave.scenarios[name][0].startedAt),
     end: new Date(wave.scenarios[name][week * 3 - 1].completedAt + 1), historyLookbackWeeks: 52, accountRevision: 0, gym: { gymId: 'synthetic-gym' } });
-  return <RmCurveContent read={read} scope={{ range: 24, gym: { gymId: 'synthetic-gym' }, rir: null }} onScope={() => undefined}
-    dateFormat="YYYY-MM-DD" historyWeeks={52} />;
+  return <RmCurveContent read={read} scope={{ range: 'history', gym: { gymId: 'synthetic-gym' }, rir: null }} onScope={() => undefined}
+    dateFormat="YYYY-MM-DD" historyWeeks={52} progressWeeks={4} />;
 }
 
 it.each(['plateau', 'stable', 'gradual'] as const)('connects %s prefix views to real SQLite while fitting the current scope and preserving actual set details', async name => {
