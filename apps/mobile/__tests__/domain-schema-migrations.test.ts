@@ -137,9 +137,10 @@ describe('domain schema and runtime migrations', () => {
     // the local store's owning account (`account_user_id`) is m0015, and the
     // session planning schema (0016) plus pull-cursor reset (0017) append after it,
     // m0018 drops the facts' volume completeness flag, m0019 drops the plan
-    // block's machine snapshot, m0020 adds the gym-split flag, and m0021 adds
-    // the facts' reporting bucket with the triggers that keep it fresh.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(22);
+    // block's machine snapshot, m0020 adds the gym-split flag, m0021 adds
+    // the facts' reporting bucket with the triggers that keep it fresh, and
+    // m0022 adds last_modified_by across the four authored plan tables.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(23);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -191,7 +192,23 @@ describe('domain schema and runtime migrations', () => {
       'm0019',
       'm0020',
       'm0021',
+      'm0022',
     ]);
+  });
+
+  it('adds last_modified_by to the four authored plan tables in m0022', () => {
+    expect(localRuntimeMigrations.migrations.m0022).toContain(
+      'ALTER TABLE `training_programmes` ADD `last_modified_by` text DEFAULT \'human\' NOT NULL CHECK (`last_modified_by` in (\'human\', \'agent\'));',
+    );
+    expect(localRuntimeMigrations.migrations.m0022).toContain(
+      'ALTER TABLE `session_plans` ADD `last_modified_by` text DEFAULT \'human\' NOT NULL CHECK (`last_modified_by` in (\'human\', \'agent\'));',
+    );
+    expect(localRuntimeMigrations.migrations.m0022).toContain(
+      'ALTER TABLE `session_plan_exercises` ADD `last_modified_by` text DEFAULT \'human\' NOT NULL CHECK (`last_modified_by` in (\'human\', \'agent\'));',
+    );
+    expect(localRuntimeMigrations.migrations.m0022).toContain(
+      'ALTER TABLE `session_plan_sets` ADD `last_modified_by` text DEFAULT \'human\' NOT NULL CHECK (`last_modified_by` in (\'human\', \'agent\'));',
+    );
   });
 
   it('drops the facts volume completeness flag in m0018', () => {

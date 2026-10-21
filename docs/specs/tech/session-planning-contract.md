@@ -24,11 +24,13 @@ block lifecycle, or the agent plan-write API and MCP tools.
    at most one live performed session per whole-plan start, one live card per plan
    block, and one live set per plan target set — so retries, multi-device sync and
    concurrent attachments converge deterministically (§4.5).
-5. **Agent permissions are separate and opt-in.** The base Supabase OAuth grant
-   stays strictly read-only. Coaching agents read upcoming plans and create new
-   plans/programmes only under explicit per-client permission in
-   `public.agent_plan_permissions` (which also gates exercise editing); they
-   can never edit or delete plans, start workouts, or mutate performed history.
+5. **Agent permissions are separate and opt-in.** The base OAuth grant is
+   strictly read-only. Coaching agents read upcoming plans, create new
+   plans/programmes and edit exercises under explicit per-client permission in
+   `public.agent_plan_permissions` (`plan_access_enabled = true`). Mutating
+   authored plans or programmes requires separate `plan_edit_enabled = true`
+   permission (§6.1). Agents mutate pending, unattached blocks under optimistic
+   graph version tokens; they can never touch performed rows or advance workout lifecycle.
 6. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
    via stable keyset cursors to exhaustion. Silent row caps and unpaginated
    truncation are prohibited.
@@ -38,14 +40,15 @@ block lifecycle, or the agent plan-write API and MCP tools.
 ### 2.1 Synced Entity Tables (Sync v2)
 
 Four entities, all user-owned, composite-keyed `(owner_user_id, id)` with ULID
-`id`, carrying the standard Sync v2 server fields plus client
+`id`, carrying standard Sync v2 server fields plus client
 `createdAt` / `updatedAt` / `deletedAt` epoch-ms columns; foreign keys are
 `DEFERRABLE INITIALLY DEFERRED`.
 Every composite FK below is `(owner_user_id, <col>) -> <parent>(owner_user_id,
 id)`; camelCase ↔ snake_case mapping follows `apps/mobile/src/data/schema/`.
 
 **`training_programmes`** — an ordered collection of planned sessions (a 6-week
-wave, a split): `name` required 1..100 chars, `description` nullable max 500.
+wave, a split): `name` required 1..100 chars, `description` nullable max 500,
+`last_modified_by` `'human' | 'agent'`, default `'human'`.
 
 **`session_plans`** — one authored future session, standalone or in a programme.
 
@@ -55,6 +58,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
 - `title` — required, 1..100 chars
 - `scheduled_for` — nullable epoch ms; null means the unscheduled queue
 - `provenance` — `'human' | 'agent'`, default `'human'`
+- `last_modified_by` — `'human' | 'agent'`, default `'human'`
 
 **`session_plan_exercises`** — an ordered, independently consumable block.
 
@@ -67,6 +71,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
   `'pending'`, `CHECK`-constrained
 - `resolved_at` — nullable;
   `CHECK (resolved_at IS NULL OR progress_status IN ('completed','skipped'))`
+- `last_modified_by` — `'human' | 'agent'`, default `'human'`
 
 **`session_plan_sets`** — an ordered target set for a planned block.
 
@@ -78,6 +83,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
 - `target_reps` — required positive integer, `CHECK (target_reps > 0)`
 - `target_set_type` — nullable standard set type (`'warm_up'`,
   `'rir_1'`, …)
+- `last_modified_by` — `'human' | 'agent'`, default `'human'`
 
 ### 2.2 Performed-Domain Provenance Fields
 
@@ -112,17 +118,18 @@ Neither table is a synced entity.
 
 **`public.agent_plan_permissions`** — one row per connected coaching client,
 PK `(owner_user_id, client_id)`, `plan_access_enabled boolean not null default
-false`, `granted_at timestamptz not null`, created/updated timestamps.
+false`, `plan_edit_enabled boolean not null default false`, `granted_at timestamptz not null`, created/updated timestamps.
 
 - Direct table access only for authenticated users where
   `auth.uid() = owner_user_id` **and** `(auth.jwt() ->> 'client_id') IS NULL` —
   the app, never an agent. `anon` and OAuth client bearer tokens are denied by
   RLS.
 - A missing row, or `granted_at` not matching the live OAuth token's grant
-  timestamp, yields `403 PLAN_PERMISSION_REQUIRED`.
+  timestamp, yields `403 PLAN_PERMISSION_REQUIRED`. Mutating plans/programmes
+  requires `plan_edit_enabled = true` (`403 PLAN_EDIT_PERMISSION_REQUIRED`).
 
-**`public.agent_plan_write_receipts`** — makes agent plan writes idempotent
-(§6.1). PK `(owner_user_id, client_id, operation, idempotency_key)`, with
+**`public.agent_plan_write_receipts`** — makes agent writes idempotent (§6.1).
+PK `(owner_user_id, client_id, operation, idempotency_key)`, with
 `payload_sha256 text`, `result_ids jsonb`, `created_at`.
 
 - RLS enabled with no client policies: service-role only.
@@ -159,32 +166,18 @@ private root.
 
 ### 3.2 Pull Cursor Reset and Protocol-4 Gate
 
-Client pull cursors live as a JSON dictionary `pull_cursor` in
-`sync_runtime_state`, keyed by layer integer (`{"0": …, "1": …}`), so the layer
-reshuffle above invalidates every stored value. **Cursor remapping is rejected**
-— no arithmetic preserves every entity's unread range, and a shifted cursor can
-let a `session_plans` row download without its `training_programmes` parent (FK
-failure on insert), silently skip new blocks and sets, or destroy the
-independent `body_weight_measurements` cursor.
+Client cursors live in `sync_runtime_state.pull_cursor` keyed by layer integer;
+the reshuffle invalidates stored cursors. Cursor remapping is rejected: shifting
+can orphan children or skip blocks.
 
-- **Client.** The local SQLite migration to the 16-entity schema sets
-  `pull_cursor` to `{}`, so the next sync re-drains every layer from the start;
-  replayed rows upsert as idempotent LWW merges (no-ops when already current), so
-  the replay converges to the same state. Cost: one full historical replay per
-  device after upgrading — accepted over bespoke remapping and its orphaning
-  failure modes.
-- **Server.** The layer-to-table projection flip in `sync_pull` / `sync_push` is
-  a breaking protocol change, gated on `x-boga-sync-protocol: 4`, following the
-  protocol-3 cutover precedent in
-  [sync-v2-server-contract](sync-v2-server-contract.md) ("Migration-in-flight
-  contract"): compatibility client first, sync stopped with `UPDATE_REQUIRED`,
-  server switches the projection, only protocol-4 clients resume. A protocol-3
-  client never observes the new mapping, so a client filtering rows by its own
-  layer list can never advance the page cursor past rows it dropped.
+- **Client.** Local SQLite migration to the 16-entity schema resets `pull_cursor`
+  to `{}` so sync re-drains each layer from the start; replayed rows upsert as
+  idempotent LWW merges.
+- **Server.** The projection shift is gated on header `x-boga-sync-protocol: 4`.
+  Older clients halt with `UPDATE_REQUIRED`, preventing cursor corruption.
 
-**As-built.** Migrations `0016_nice_blink` (schema) and
-`0017_session_plan_cursor_reset` (reset); `require_sync_protocol()` requires
-protocol 4.
+**As-built.** Migrations `0016_nice_blink` (schema) and `0017_session_plan_cursor_reset`
+(reset); `require_sync_protocol()` enforces protocol 4.
 
 ## 4. Lifecycle and Materialization
 
@@ -277,44 +270,23 @@ path is defined so the permitted operation can never block sync.
 
 ### 4.6 As-built: mobile module map and deviations
 
-- **Boundary.** All plan-table SQL lives in
-  `apps/mobile/src/data/session-plan-store.ts` (graph save, meta-only plan
-  updates, single-block rewrite, tombstones, reorders); performed-graph
-  writes stay in `session-drafts.ts`.
-  `apps/mobile/src/session-planner/` owns the screen-facing API: types,
-  pure validation (§7.1 limits, field-addressable errors), deterministic IDs,
-  the plan/programme repository, read models, `startSessionPlan`,
-  `addPlanBlockToSession`, and `completePlanBlock` / `skipPlanBlock`. Screens
-  never write plan tables.
-  As-built UI: `/sessions`' planning sections, the two `/session-plan/…`
-  routes (create/edit/duplicate via `plan-edit-sync`), the picker's
-  **Repeat last**/**From planner** entries, and **Complete block** on sourced
-  cards.
-- **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` as §4.2; a
-  signed-out device uses the `local` owner (nothing syncs, keys only need
-  local stability).
-- **Available block.** pending, definition-bearing (cards and matching need
-  the owned reference), and unclaimed by a live performed card whose session
-  is not discarded — a discarded workout returns its blocks to pending.
-- **Add block.** The created-session id is a fresh local id, not the
-  §4.2 recipe: its `source_plan_id` stays null and a retry reuses the
-  existing active session; card/set ids still follow §4.2 so Start all and
-  Add block converge on the same rows.
-- **Arbitration.** The token message carries the failed constraint name, not
-  the winning id — the repair needs no id: pull, clear every live local
-  claimant of exactly the pulled claims, re-push (the pull leg repairs on the
-  local violation; the push leg inside its recovery pull).
-- **Mobile training programmes.** `programme-form-model.ts` validates draft
-  graphs (>=2 child plans). Authoring (`/programme/new`) edits child sessions via
-  the `ProgrammeSessionEditSheet` page-sheet editor. Detail (`/programme/[programmeId]`,
-  `useProgrammeDetail.ts`) surfaces `nextBlock` (first unresolved block across
-  plans in programme then exercise order); Add attaches via
-  `addPlanBlockToSession` and Skip advances via `skipPlanBlock`. Reordering
-  (`reorderProgrammePlans`) updates `programme_order_index`. Delete
-  (`deleteProgramme`) soft-deletes the programme and detaches child plans
-  (`programme_id = null`) as standalone plans, preserving performed history.
-  `listAvailablePlanBlocks` includes unconsumed programme blocks for picker
-  selection.
+- **Boundary.** Plan-table SQL lives in `apps/mobile/src/data/session-plan-store.ts`
+  (graph save, meta updates, block rewrite, tombstones, reorders); performed writes
+  stay in `session-drafts.ts`. `apps/mobile/src/session-planner/` owns screen-facing
+  APIs: types, validation, deterministic IDs, plan repository, read models, lifecycle
+  actions (`startSessionPlan`, `addPlanBlockToSession`, `completePlanBlock`, `skipPlanBlock`).
+- **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` per §4.2; signed-out
+  devices use owner `local`.
+- **Available block.** Pending, definition-bearing, and unclaimed by an active/completed card.
+- **Add block.** Session ID uses a fresh local ID with null `source_plan_id`; retries reuse
+  the active session.
+- **Arbitration.** Token message carries the failed constraint name. Repair clears local
+  claimants of the pulled claims and re-pushes.
+- **Mobile training programmes.** `programme-form-model.ts` validates draft graphs (>=2 plans).
+  Authoring (`/programme/new`) edits sessions via `ProgrammeSessionEditSheet`. Detail
+  (`/programme/[programmeId]`, `useProgrammeDetail.ts`) surfaces `nextBlock`, attaches blocks,
+  and skips blocks. Reordering updates `programme_order_index`. Delete soft-deletes the programme
+  and detaches child plans (`programme_id = null`) as standalone plans.
 
 ## 5. UI and UX Contracts
 
@@ -341,53 +313,54 @@ requests refuse atomically. Programme children share this form.
 
 ### 6.1 Agent API Routes (`supabase/functions/agent-api/`)
 
-All agent routes enforce strict token validation, a current-grant permission
-check against `public.agent_plan_permissions`, and service-role isolation. The
-three plan routes require `plan_access_enabled = true`; the read routes need only
-the base read-only grant.
+All agent routes enforce strict token validation, current-grant checks against
+`public.agent_plan_permissions`, and service-role isolation. Read routes need only
+the base grant; creation routes require `plan_access_enabled = true`; mutation routes
+require `plan_edit_enabled = true`.
 
 | Route | Method | Purpose |
 | :--- | :--- | :--- |
-| `/v1/agent/session-plans` | `GET` | paginated upcoming and unscheduled plans |
-| `/v1/agent/session-plans` | `POST` | atomically create one plan graph (pending blocks only) |
-| `/v1/agent/programmes` | `POST` | atomically create one programme graph (pending blocks only) |
+| `/v1/agent/session-plans` | `GET` | paginated plans with graph-wide `version` |
+| `/v1/agent/session-plans` | `POST` | create one plan graph (pending blocks only) |
+| `/v1/agent/session-plans/:planId` | `PATCH` | mutate plan graph (`base_version` check) |
+| `/v1/agent/programmes` | `POST` | create one programme graph (pending blocks only) |
+| `/v1/agent/programmes/:programmeId` | `GET` | programme detail with graph `version` |
+| `/v1/agent/programmes/:programmeId` | `PATCH` | mutate programme graph (`base_version` check) |
 | `/v1/agent/exercises/:exerciseId/history` | `GET` | exhaustive keyset-paginated performed set history |
 | `/v1/agent/workouts/:sessionId` | `GET` | exact completed workout header and paginated sets |
 
-- **Idempotency.** Both `POST` routes require an `idempotency_key` header.
+- **Idempotency.** `POST` and `PATCH` routes require an `idempotency_key` header.
   Replaying the same key and payload returns the original result IDs from
-  `public.agent_plan_write_receipts`; the same key with a different payload
-  returns `409 IDEMPOTENCY_CONFLICT`.
-- **Exhaustive history.** The history route orders rows by
-  `(session_completed_at, session_id, exercise_order, set_order)` with an opaque
-  continuation cursor, filtering database-side so no row is silently omitted.
-
-**As-built.** All five agent routes (`session-plans` GET/POST, `programmes`
-POST, `exercises/:exerciseId/history` GET, `workouts/:sessionId` GET) are live
-in `supabase/functions/agent-api/`. The plan routes require a current-grant
-`public.agent_plan_permissions` row and `Idempotency-Key` on both `POST`s.
-Writes land through the service-role-only `app_public.agent_create_session_plan` /
-`agent_create_training_programme` RPCs, which claim the key in
-`public.agent_plan_write_receipts`, insert the whole graph with `provenance =
-'agent'` and `pending` blocks in one transaction, and never touch the performed
-graph. `GET /v1/agent/session-plans` returns bounded upcoming/unscheduled plans
-with derived progress and `next_block_id`. History reads drain qualifying
-completed history to exhaustion via opaque keyset cursors. All nine MCP tools
-are exposed and verified in `services/boga-mcp/`. The Connected Agents screen
-owns the per-client toggle.
+  `public.agent_plan_write_receipts`; same key with differing payload returns
+  `409 IDEMPOTENCY_CONFLICT`.
+- **Optimistic concurrency.** Editable reads (`session-plans` GET, `programmes/:id` GET)
+  return graph `version` (maximum `server_received_at` across root plan, blocks, and sets).
+  Mutations supply `base_version`; mismatches abort with `409 PLAN_CONCURRENT_MODIFICATION`.
+- **Safety boundary.** Agents mutate pending, unattached blocks only. Attached or
+  resolved blocks reject with `400 IMMUTABLE_BLOCK_MUTATION`. Performed rows are never touched.
+- **Monotonic timestamps.** Every mutated or tombstoned row advances
+  `client_updated_at_ms = greatest(stored + 1, now_ms)` and stamps `last_modified_by = 'agent'`.
+- **Store-mirroring mutations.** Operations mirror mobile store operations (meta updates,
+  block adds/edits/reorders, set reorders, soft tombstones, programme plan detaches). Structural
+  limits (>=1 block per plan, >=2 plans per programme) reject with `400 INVALID_ARGUMENT`.
+- **Exhaustive history.** Keyset cursors drain qualifying history database-side without truncation.
 
 ### 6.2 MCP Tool Surface (`services/boga-mcp/`)
 
 The planning tools below; `services/boga-mcp/README.md` lists every tool.
-Seven read-only: `get_training_profile`, `search_exercises`
-(database filtering, no preselection cap), `get_exercise_context` (lifetime
-PRs/totals), `get_recent_workouts` (exact workout counts/volume),
-`get_exercise_history` (pageable performed sets), `get_workout_detail` (header
-and sets), `get_upcoming_session_plans` (plan queues).
+Eight read-only: `get_training_profile`, `search_exercises`, `get_exercise_context`,
+`get_recent_workouts`, `get_exercise_history`, `get_workout_detail`,
+`get_upcoming_session_plans`, `get_programme_detail` (reads include graph `version`).
 
-Two create-only (`readOnlyHint: false`, `idempotentHint: true`,
-`destructiveHint: false`, `openWorldHint: false`), requiring plan permission:
-`create_session_plan`, `create_training_programme`.
+Two create-only (`readOnlyHint: false`, `idempotentHint: true`, `destructiveHint: false`),
+requiring `plan_access_enabled`: `create_session_plan`, `create_training_programme`.
+
+Eleven edit tools requiring `plan_edit_enabled`:
+- Meta and reorder (`destructiveHint: false`): `update_plan_meta`, `update_programme_meta`,
+  `insert_plan_block`, `update_plan_block`, `reorder_plan_blocks`, `reorder_programme_plans`,
+  `reorder_block_sets`.
+- Destructive (`destructiveHint: true`): `remove_plan_block`, `detach_plan_from_programme`,
+  `remove_plan`, `remove_programme`.
 
 ## 7. Error Tokens and Validation Limits
 
@@ -395,26 +368,22 @@ Two create-only (`readOnlyHint: false`, `idempotentHint: true`,
 
 - `title` / `name`: 1..100 characters; `description`: 0..500.
 - 2..50 plans per programme; 1..30 blocks per plan; 1..30 sets per block.
-- `target_reps`: integer 1..999. `target_weight_value`: decimal text
-  0..9999.99 kg, or null.
+- `target_reps`: integer 1..999. `target_weight_value`: decimal text 0..9999.99 kg, or null.
 - `idempotency_key`: 1..128 characters.
 
 ### 7.2 Stable Error Codes
 
 Wire-stable — part of the agent API and MCP contract, never renamed.
 
-- `PLAN_PERMISSION_REQUIRED` (403) — no active plan permission in
-  `agent_plan_permissions`.
+- `PLAN_PERMISSION_REQUIRED` (403) — no active plan permission in `agent_plan_permissions`.
+- `PLAN_EDIT_PERMISSION_REQUIRED` (403) — client lacks active `plan_edit_enabled` permission.
 - `ACTIVE_SESSION_CONFLICT` (409) — Start all while another session is active.
-- `AMBIGUOUS_COMPATIBLE_CARDS` (409) — multiple compatible unsourced cards;
-  selection required.
+- `AMBIGUOUS_COMPATIBLE_CARDS` (409) — multiple compatible unsourced cards; selection required.
 - `NO_PENDING_BLOCKS` (409) — Start all with no eligible pending block (§4.2).
-- `BLOCK_ALREADY_ATTACHED` (409) — concurrent attachment of the same block;
-  server arbitrated, loser reverts (§4.5).
+- `BLOCK_ALREADY_ATTACHED` (409) — concurrent attachment of the same block; server arbitrated, loser reverts (§4.5).
+- `PLAN_CONCURRENT_MODIFICATION` (409) — graph version changed since read.
 - `IDEMPOTENCY_CONFLICT` (409) — same idempotency key, different payload.
-- `FOREIGN_RESOURCE_REFERENCE` (400) — referenced exercise, gym or plan is not
-  the user's.
-- `INVALID_BLOCK_RESOLUTION` (400) — completing a block without a confirmed
-  planned set.
-- `IMMUTABLE_BLOCK_MUTATION` (400) — modifying or deleting an already attached or
-  resolved block.
+- `FOREIGN_RESOURCE_REFERENCE` (400) — referenced exercise, gym or plan is not the user's.
+- `INVALID_ARGUMENT` (400) — structural graph violation (<1 block in plan, <2 plans in programme).
+- `INVALID_BLOCK_RESOLUTION` (400) — completing a block without a confirmed planned set.
+- `IMMUTABLE_BLOCK_MUTATION` (400) — modifying or deleting an already attached or resolved block.
