@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -6,12 +7,13 @@ import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, StatePanel, St
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
-import { formatCurrentDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 
 type Editor = { reading: BodyWeightMeasurement | null; measuredAt: Date };
 export function BodyWeightScreen() {
+  const dateFormat = useDateFormat();
   const [readings, setReadings] = useState<BodyWeightMeasurement[] | null>(null);
   const [loadedAtMs, setLoadedAtMs] = useState(0);
   const [error, setError] = useState(false);
@@ -52,7 +54,7 @@ export function BodyWeightScreen() {
               value={currentValid ? displayKg(current.weightKg) : 'Unknown'} kind={currentValid ? 'figure' : 'text'}
               testID="body-weight-current" />
             <Text allowFontScaling={false} style={styles.body}>
-              {currentValid ? `Measured ${formatCurrentDateTime(current.measuredAt)}` : current
+              {currentValid ? `Measured ${formatLocalDateTime(current.measuredAt.getTime(), dateFormat)}` : current
                 ? 'Your latest reading needs review before it can be used.' : 'No weight recorded. Add your first reading below.'}
             </Text>
           </View></Card>
@@ -64,10 +66,10 @@ export function BodyWeightScreen() {
               No readings yet. Weight is saved on this device even when you are offline.
             </Text> : <Card>{readings.map((reading, index) => <ListRow key={reading.id}
               divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
-              accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatCurrentDateTime(reading.measuredAt)}`}
+              accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}`}
               onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
               trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
-              <Stat label={formatCurrentDateTime(reading.measuredAt)} value={displayKg(reading.weightKg)}
+              <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)} value={displayKg(reading.weightKg)}
                 rank="secondary" />
               {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={styles.body}>Needs review</Text> : null}
             </ListRow>)}</Card>}

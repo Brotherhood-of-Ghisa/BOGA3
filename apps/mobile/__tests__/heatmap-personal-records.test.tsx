@@ -45,9 +45,9 @@ it('keeps rest, known zero and unavailable states while omitting absent PRs and 
     { ...days[1], totalVolume: null, personalRecordCounts: { totalVolume: 1, estimatedRM1: 0, highestWeight: 0 } },
   ], 'totalVolume', { todayDateKey: '2026-10-11', weeks: 1 });
   render(<DailyHeatmap data={data} testIDPrefix={PREFIX} metricLabel="Volume" formatValue={String} />);
-  expect(screen.getByTestId('records-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 0');
-  expect(screen.getByTestId('records-heatmap-cell-2026-10-06')).toHaveProp('accessibilityLabel', '2026-10-06, Rest');
-  expect(screen.getByTestId('records-heatmap-cell-2026-10-07')).toHaveProp('accessibilityLabel', '2026-10-07, Volume unavailable, 1 PR');
+  expect(screen.getByTestId('records-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '05-10-2026, Volume 0');
+  expect(screen.getByTestId('records-heatmap-cell-2026-10-06')).toHaveProp('accessibilityLabel', '06-10-2026, Rest');
+  expect(screen.getByTestId('records-heatmap-cell-2026-10-07')).toHaveProp('accessibilityLabel', '07-10-2026, Volume unavailable, 1 PR');
   expect(screen.getByTestId('records-heatmap-cell-2026-10-05-value')).toHaveTextContent('0');
   expect(screen.queryByTestId('records-heatmap-week-2026-10-2026-10-05-pr', { includeHiddenElements: true })).toBeNull();
   expect(screen.queryByText(/Rest/)).toBeNull();

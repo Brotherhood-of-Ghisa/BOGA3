@@ -1,3 +1,5 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { formatCalendarWeek } from '@/src/utils/local-time';
 // timeline.ts — the Timeline history view's data and geometry: one value per
 // week of the adapter's weekly series (`heatmapData.ts`), its zero-based y
 // scale, month labels and the columns. Pure, no React / react-native imports.
@@ -62,18 +64,11 @@ export interface FocusedTimelineWeek {
   hasTraining: boolean;
 }
 
-/** A Monday–Sunday week as `29 Sep – 5 Oct`, or `6 – 12 Oct` within one month. */
-export const weekRangeLabel = (monday: Date): string => {
-  const end = new Date(monday.getTime() + 6 * 86400000);
-  const first = `${monday.getUTCDate()}${monday.getUTCMonth() === end.getUTCMonth() ? '' : ` ${MONTHS[monday.getUTCMonth()]}`}`;
-  return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
-};
+/** The adapter's UTC calendar date represents a day, never an instant. */
+export const weekRangeLabel = (monday: Date, dateFormat: ExerciseDateFormat): string =>
+  formatCalendarWeek(monday.toISOString().slice(0, 10), dateFormat);
 
-/** A week's name on screen: its range, plus the year when it is not the current one. */
-export const weekLabel = (monday: Date, currentYear: number): string => {
-  const year = monday.getUTCFullYear();
-  return `${weekRangeLabel(monday)}${year === currentYear ? '' : ` ${year}`}`;
-};
+export const weekLabel = weekRangeLabel;
 
 // The first week starting in a month carries its label: its Monday is one of
 // the month's first seven days.

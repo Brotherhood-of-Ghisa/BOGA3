@@ -117,7 +117,7 @@ describe('buildWeekBoard', () => {
 
 describe('buildLatestActivity', () => {
   it('shows one member training now, opening their session', () => {
-    const activity = buildLatestActivity({ training_now: [training('maria')], latest_completed: completed() }, ME, NOW);
+    const activity = buildLatestActivity({ training_now: [training('maria')], latest_completed: completed() }, ME, NOW, 'DD-MM-YYYY');
 
     expect(activity).toEqual({
       kind: 'training',
@@ -145,7 +145,7 @@ describe('buildLatestActivity', () => {
         latest_completed: null,
       },
       ME,
-      NOW,
+      NOW, 'DD-MM-YYYY'
     );
 
     expect(activity).toEqual({
@@ -166,7 +166,7 @@ describe('buildLatestActivity', () => {
         }),
       },
       ME,
-      NOW,
+      NOW, 'DD-MM-YYYY'
     );
 
     expect(activity).toEqual({
@@ -174,13 +174,13 @@ describe('buildLatestActivity', () => {
       memberUserId: 'dave',
       sessionId: 'dave-done',
       name: 'dave',
-      stamp: '10/16 06:10',
+      stamp: '16-10-2026 06:10',
       duration: '52m',
       gym: 'Iron Works',
       figures: '18 sets · 4 exercises',
       record: { kind: 'one', lead: 'Deadlift 1RM 213.3', note: 'group record' },
       accessibilityLabel:
-        'dave, completed session on 10/16 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
+        'dave, completed session on 16-10-2026 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
     });
 
     const ddMm = buildLatestActivity(
@@ -192,7 +192,7 @@ describe('buildLatestActivity', () => {
       NOW,
       'DD-MM-YYYY',
     );
-    expect(ddMm).toMatchObject({ stamp: '16/10 06:10' });
+    expect(ddMm).toMatchObject({ stamp: '16-10-2026 06:10' });
 
     const iso = buildLatestActivity(
       {
@@ -207,27 +207,27 @@ describe('buildLatestActivity', () => {
   });
 
   it('derives a missing duration from the completion time, and shows none without either', () => {
-    const derived = buildLatestActivity({ training_now: [], latest_completed: completed({ duration_sec: null }) }, ME, NOW);
+    const derived = buildLatestActivity({ training_now: [], latest_completed: completed({ duration_sec: null }) }, ME, NOW, 'DD-MM-YYYY');
     const bare = buildLatestActivity(
       { training_now: [], latest_completed: completed({ duration_sec: null, completed_at_ms: null, gym_name: null }) },
       ME,
-      NOW,
+      NOW, 'DD-MM-YYYY'
     );
 
     expect(derived).toMatchObject({ duration: '52m' });
-    expect(bare).toMatchObject({ stamp: '10/16 06:10', duration: null, gym: null, record: null });
-    expect(bare?.accessibilityLabel).toBe('dave, completed session on 10/16 06:10, 18 sets · 4 exercises');
+    expect(bare).toMatchObject({ stamp: '16-10-2026 06:10', duration: null, gym: null, record: null });
+    expect(bare?.accessibilityLabel).toBe('dave, completed session on 16-10-2026 06:10, 18 sets · 4 exercises');
   });
 
   it('is null for a group with no live or completed session', () => {
-    expect(buildLatestActivity({ training_now: [], latest_completed: null }, ME, NOW)).toBeNull();
+    expect(buildLatestActivity({ training_now: [], latest_completed: null }, ME, NOW, 'DD-MM-YYYY')).toBeNull();
   });
 });
 
 describe('formatting', () => {
   it('names a start time today by the clock, and an earlier day by its date', () => {
-    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW)).toBe('Started 07:40');
-    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW)).toBe('Started 10/15 23:10');
+    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW, 'DD-MM-YYYY')).toBe('Started 07:40');
+    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW, 'DD-MM-YYYY')).toBe('Started 15-10-2026 23:10');
   });
 
   it('joins names the way the line reads them', () => {

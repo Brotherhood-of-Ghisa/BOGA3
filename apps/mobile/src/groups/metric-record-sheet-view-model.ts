@@ -1,3 +1,4 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // The metric record sheet, as plain data: certification status, why it is
 // read-only, and which actions it offers. The server enforces all of it again.
 import { formatBoardDate } from './board-view-model';
@@ -12,6 +13,7 @@ export type MetricCertificationTarget = Pick<GroupMetricBoardRowWire,
   'metric' | 'member' | 'former' | 'write_token' | 'certification'> & { performance: Pick<GroupMetricBoardRowWire['performance'], 'set_id'> };
 
 export type MetricRecordSheetInput = {
+  dateFormat: ExerciseDateFormat;
   row: MetricCertificationTarget;
   exercise: GroupMetricExerciseWire;
   userId: string;
@@ -54,8 +56,9 @@ const describeStatus = (
   active: GroupMetricCertificationWire | null,
   certification: GroupMetricCertificationWire | null,
   certified: boolean,
+  dateFormat: ExerciseDateFormat,
 ): string => {
-  if (active) return `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`;
+  if (active) return `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms, dateFormat)}`;
   if (certification?.end_reason) return 'Certification ended';
   return certified ? 'Certified' : 'Uncertified';
 };
@@ -94,7 +97,7 @@ export function buildMetricRecordSheetModel(input: MetricRecordSheetInput): Metr
     certified,
     readOnly: state.readOnly,
     blocked: pending || online === false || state.readOnly || needsReview,
-    statusText: describeStatus(active, certification, certified),
+    statusText: describeStatus(active, certification, certified, input.dateFormat),
     ...describeNotes(input, state),
     // A refused write, or a certification the row names that could not be read.
     showRefresh: needsReview || Boolean(row.certification?.certification_id && notice?.tone === 'error'),

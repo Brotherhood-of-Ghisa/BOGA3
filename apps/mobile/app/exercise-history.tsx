@@ -1,3 +1,5 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
@@ -69,23 +71,12 @@ const parsePeriodParam = (raw: string | null): ExerciseHistoryPeriod => {
   return 30;
 };
 
-const formatSessionDate = (value: Date): string => {
-  if (Number.isNaN(value.getTime())) return EMPTY_FIGURE;
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  const year = value.getFullYear();
-  const hours = `${value.getHours()}`.padStart(2, '0');
-  const minutes = `${value.getMinutes()}`.padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
-
 // Figures read as they do on the session view (`design-language.md` §6).
 const formatTopSet = (set: { weight: number; reps: number } | null) =>
   set ? `${formatWeight(set.weight)} × ${set.reps}` : EMPTY_FIGURE;
 
 const formatOptionalOneRepMax = (value: number | null) =>
   value === null ? EMPTY_FIGURE : formatOneRepMax(value);
-
 
 // A deleted tag still filters, and says so in words.
 const formatTagName = (tag: ExerciseHistoryTagOption) =>
@@ -249,6 +240,7 @@ function BestCard({
   gymLabel: string | null;
   onPressSession: (sessionId: string) => void;
 }) {
+  const dateFormat = useDateFormat();
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
   return (
@@ -257,7 +249,7 @@ function BestCard({
         {gymLabel ? `All-time bests · ${gymLabel}` : 'All-time bests'}
       </Text>
       <BestRow
-        date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
+        date={oneRm ? formatLocalDateTime(oneRm.completedAt.getTime(), dateFormat) : null}
         divider={false}
         label="1RM"
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
@@ -265,7 +257,7 @@ function BestCard({
         value={formatOptionalOneRepMax(oneRm?.value ?? null)}
       />
       <BestRow
-        date={topWeight ? formatSessionDate(topWeight.completedAt) : null}
+        date={topWeight ? formatLocalDateTime(topWeight.completedAt.getTime(), dateFormat) : null}
         label="Top weight"
         onPress={topWeight ? () => onPressSession(topWeight.sessionId) : undefined}
         testID="exercise-history-best-top-weight"
@@ -327,7 +319,8 @@ function SessionCard({
   tagOptions: ExerciseHistoryTagOption[];
   onPress: () => void;
 }) {
-  const date = formatSessionDate(entry.completedAt);
+  const dateFormat = useDateFormat();
+  const date = formatLocalDateTime(entry.completedAt.getTime(), dateFormat);
   const tags = entry.tagIds
     .map((id) => tagOptions.find((tag) => tag.tagDefinitionId === id))
     .filter((tag): tag is ExerciseHistoryTagOption => tag !== undefined);

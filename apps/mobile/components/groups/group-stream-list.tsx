@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useMemo, useState, type ReactElement } from 'react';
 import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
 import { StatePanel } from '@/components/ui';
@@ -24,10 +25,11 @@ type Props = {
 export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChanged,showGroupNames,
   onPressSession,onPressMembership,pulling,onRefresh,header,emptyState,contentContainerStyle,testID,
   hiddenEventKinds = DEFAULT_HIDDEN_STREAM_EVENT_KINDS }: Props) {
+  const dateFormat = useDateFormat();
   const [selectedKey,setSelectedKey] = useState<string | null>(null);
   // No snapshot fallback: access, mode or account changes immediately remove an open detail.
   const live = stream.items.find(item => item.key === selectedKey);
-  const models = useMemo(() => buildCompetitionStreamModels(stream.items,hiddenEventKinds),[stream.items,hiddenEventKinds]);
+  const models = useMemo(() => buildCompetitionStreamModels(stream.items,hiddenEventKinds,dateFormat),[stream.items,hiddenEventKinds,dateFormat]);
   const refresh = async () => { await stream.refresh(); onCertificationChanged(); };
   const renderItem = ({ item }: { item: CompetitionStreamModel }) => {
     if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession}

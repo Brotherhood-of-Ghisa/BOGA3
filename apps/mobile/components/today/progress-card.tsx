@@ -36,7 +36,7 @@ function LatestSessionRow({
   onPress,
 }: {
   latest: LatestSessionSummary;
-  dateFormat?: ExerciseDateFormat;
+  dateFormat: ExerciseDateFormat;
   onPress: () => void;
 }) {
   return (

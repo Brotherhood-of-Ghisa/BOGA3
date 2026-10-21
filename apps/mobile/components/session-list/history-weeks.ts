@@ -1,8 +1,9 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // The completed history in calendar weeks (pure), over [[comparison.window]]'s
 // week, Monday 00:00 local. A session sits in the week it completed; a run of
 // empty weeks collapses to one line.
 
-import { formatWeekRange, weekDayLabel } from '@/components/today/progress-format';
+import { formatWeekRange } from '@/components/today/progress-format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
@@ -65,39 +66,25 @@ export const groupSessionsByWeek = (sessions: SessionListItem[], now: Date): His
   return sections;
 };
 
-/**
- * `Mon 15 – Sun 21 Sep`; a week across two months names both
- * (`Mon 29 Sep – Sun 5 Oct`). A week of another year adds it, to both ends
- * when the week spans two (`Mon 29 Dec 2025 – Sun 4 Jan 2026`).
- */
-export const formatHistoryWeekRange = (window: LocalWindow, now: Date): string => {
-  const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
-  const startYear = window.start.getFullYear();
-  const endYear = sunday.getFullYear();
-  const acrossMonths = sunday.getMonth() !== window.start.getMonth();
-  const start = weekDayLabel(window.start, acrossMonths);
-  const end = weekDayLabel(sunday, true);
-  if (startYear !== endYear) return `${start} ${startYear} – ${end} ${endYear}`;
-  return endYear === now.getFullYear() ? `${start} – ${end}` : `${start} – ${end} ${endYear}`;
-};
+export const formatHistoryWeekRange = formatWeekRange;
 
 const formatSessionCount = (count: number): string => `${count} ${count === 1 ? 'session' : 'sessions'}`;
 
 export type HistoryWeekHeading = { title: string; detail: string };
 
 /**
- * `This week` / `Last week` with Today's range (`Mon 6 – Sun 12 · 2 sessions`);
+ * `This week` / `Last week` with Today's formatted range and session count;
  * an older week is its range, then its count (`1 session`).
  */
-export const historyWeekHeading = (section: HistoryWeekSection, now: Date): HistoryWeekHeading => {
+export const historyWeekHeading = (section: HistoryWeekSection, dateFormat: ExerciseDateFormat): HistoryWeekHeading => {
   const count = formatSessionCount(section.sessionCount);
   if (section.weeksAgo === 0 || section.weeksAgo === 1) {
     return {
       title: section.weeksAgo === 0 ? 'This week' : 'Last week',
-      detail: `${formatWeekRange(section.window)} · ${count}`,
+      detail: `${formatWeekRange(section.window, dateFormat)} · ${count}`,
     };
   }
-  return { title: formatHistoryWeekRange(section.window, now), detail: count };
+  return { title: formatHistoryWeekRange(section.window, dateFormat), detail: count };
 };
 
 /** `No sessions · 1 week`, `No sessions · 3 weeks`. */

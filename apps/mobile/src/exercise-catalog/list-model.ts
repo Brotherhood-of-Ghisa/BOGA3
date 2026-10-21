@@ -1,3 +1,4 @@
+import { formatShortDate } from '@/src/utils/local-time';
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import type {
   ExerciseAggregate,
@@ -47,7 +48,6 @@ export type BuildExerciseListModelInput = {
   preferences: ExerciseListPreferences;
   query: string;
   includeDeleted: boolean;
-  now?: Date;
 };
 
 export type ExerciseListModel = {
@@ -106,20 +106,17 @@ export const formatExerciseMuscleSummary = (
 
 export { formatShortDate } from '@/src/utils/local-time';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export const formatExerciseListStatsSummary = (
   aggregate: ExerciseAggregate | undefined,
   hasAllTimeHistory: boolean,
-  lastDoneDate?: Date | null,
-  now: Date = new Date()
+  lastDoneDate: Date | null | undefined,
+  dateFormat: ExerciseDateFormat
 ): string => {
   if (!hasAllTimeHistory) return 'Never done';
   const count = aggregate?.sessionCount ?? 0;
   const sessions = `${count} ${count === 1 ? 'session' : 'sessions'}`;
   if (!lastDoneDate) return sessions;
-  const year = lastDoneDate.getFullYear() === now.getFullYear() ? '' : ` ${lastDoneDate.getFullYear()}`;
-  return `Last: ${lastDoneDate.getDate()} ${MONTHS[lastDoneDate.getMonth()]}${year} · ${sessions}`;
+  return `Last: ${formatShortDate(lastDoneDate, dateFormat)} · ${sessions}`;
 };
 
 const compareExerciseNames = (left: ExerciseCatalogExercise, right: ExerciseCatalogExercise): number =>
@@ -161,7 +158,6 @@ export const buildExerciseListModel = ({
   preferences,
   query,
   includeDeleted,
-  now = new Date(),
 }: BuildExerciseListModelInput): ExerciseListModel => {
   const muscleGroupById = new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup]));
   const isSearching = query.trim().length > 0;
@@ -185,7 +181,7 @@ export const buildExerciseListModel = ({
       lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
       muscleSummary: formatExerciseMuscleSummary(exercise, muscleGroupById),
-      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, now),
+      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
     };
   });
 

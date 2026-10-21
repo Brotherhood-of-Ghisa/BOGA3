@@ -106,7 +106,7 @@ describe('At a glance: the board', () => {
     renderPage();
 
     expect(byId('group-home-period-title')).toHaveTextContent('This week');
-    expect(byId('group-home-period-detail')).toHaveTextContent('Mon 12 – Sun 18');
+    expect(byId('group-home-period-detail')).toHaveTextContent('12-10-2026 – 18-10-2026');
     expect(within(byId('group-home-board')).getByText('Sets')).toBeTruthy();
     expect(within(byId('group-home-board')).getByText(`Top ${GROUP_HOME_BOARD_SIZE}`)).toBeTruthy();
     expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
@@ -134,7 +134,7 @@ describe('At a glance: the board', () => {
     screen.unmount();
     renderPage({ offset: -2, onOffsetChange });
     // A week the title already dates says its month underneath, not the dates twice.
-    expect(byId('group-home-period-title')).toHaveTextContent('Mon 28 Sep – Sun 4 Oct');
+    expect(byId('group-home-period-title')).toHaveTextContent('28-09-2026 – 04-10-2026');
     expect(byId('group-home-period-detail')).toHaveTextContent('September 2026');
     fireEvent.press(byId('group-home-period-later'));
     expect(onOffsetChange).toHaveBeenLastCalledWith(-1);
@@ -189,7 +189,7 @@ describe('At a glance: a held read while the next one lands', () => {
     expect(screen.queryByTestId('group-glance-loading')).toBeNull();
     expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
     // Drawn as the week it was read for: still "so far".
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 12 – Sun 18 · so far');
+    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
     expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
     expect(opacity()).toBeUndefined();
 
@@ -214,7 +214,7 @@ describe('At a glance: a held read while the next one lands', () => {
     );
     expect(opacity()).toBeUndefined();
     expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: false });
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 5 – Sun 11');
+    expect(byId('group-position-selected')).toHaveTextContent('05-10-2026 – 11-10-2026');
   });
 
   it('labels a held week read in weeks after a switch to months', () => {
@@ -222,7 +222,7 @@ describe('At a glance: a held read while the next one lands', () => {
 
     expect(byId('group-home-period-title')).toHaveTextContent('This month');
     expect(within(byId('group-position-card')).getByText('Last 6 weeks · sets')).toBeTruthy();
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 12 – Sun 18 · so far');
+    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
   });
 });
 
@@ -232,7 +232,7 @@ describe('At a glance: position over time', () => {
 
     expect(byId('group-rank-chart')).toBeTruthy();
     expect(screen.getAllByTestId(/^group-rank-chart-label-\d+$/)).toHaveLength(GROUP_RANK_PERIODS);
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 12 – Sun 18 · so far');
+    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
   });
 
   it('reads the selected period into the table: place, sets and PRs for every member', () => {
@@ -248,7 +248,7 @@ describe('At a glance: position over time', () => {
     // The oldest column: six weeks back, never "so far", and I led it.
     fireEvent.press(byId('group-rank-chart-label-0'));
     expect(byId('group-rank-chart-label-0').props.accessibilityState).toEqual({ selected: true });
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 7 – Sun 13');
+    expect(byId('group-position-selected')).toHaveTextContent('07-09-2026 – 13-09-2026');
     expect(String(byId('group-position-selected').props.children)).not.toContain('so far');
     expect(byId(`group-rank-table-row-${ME}-sets`)).toHaveTextContent('99');
     expect(byId(`group-rank-table-row-${ME}`).props.accessibilityLabel).toMatch(/^1, You,/);
@@ -256,7 +256,7 @@ describe('At a glance: position over time', () => {
 
   it('marks no column "so far" once the stepper has left the current period', () => {
     renderPage({ offset: -1 });
-    expect(byId('group-position-selected')).toHaveTextContent('Mon 5 – Sun 11');
+    expect(byId('group-position-selected')).toHaveTextContent('05-10-2026 – 11-10-2026');
     expect(String(byId('group-position-selected').props.children)).not.toContain('so far');
   });
 });

@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { buildCompetitionPodiums as buildGroupMetricPodiums } from '@/src/groups/competition-view-model';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useRouter } from 'expo-router';
@@ -30,8 +31,9 @@ type GroupLeaderboardsPageProps = {
  * search box that narrows them by exercise name. A card opens its full board.
  */
 export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error, onRetry }: GroupLeaderboardsPageProps) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
-  const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId) : null), [boards.data, userId]);
+  const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId, dateFormat) : null), [boards.data, userId, dateFormat]);
   const [query, setQuery] = useState('');
 
   if (!cards) {

@@ -1,3 +1,4 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // Presentation preserves server values, ordering, units and public disclosure.
 import { formatWeight } from '@/src/exercise-calculations/format';
 import { formatBoardDate, formatBoardMemberLabel, formatOrdinal,
@@ -44,11 +45,11 @@ export const formatContributionPercent = (contribution: number): string =>
   String(Number((contribution * 100).toPrecision(15)));
 
 export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoardScope,userId: string | null,
-  nowMs: number = Date.now()): BoardRowViewModel {
+  dateFormat: ExerciseDateFormat): BoardRowViewModel {
   const memberLabel=formatBoardMemberLabel(row.member,row.former,userId);
   const valueLabel=formatCompetitionValue(row);
   const detailLabel=formatCompetitionPerformance(row.performance);
-  const dateLabel=formatBoardDate(row.performance.achieved_at_ms,nowMs);
+  const dateLabel=formatBoardDate(row.performance.achieved_at_ms,dateFormat);
   const certification=scope === 'all' ? row.certification ? 'certified' : 'uncertified' : null;
   return { key: row.member.user_id,rank: row.rank,rankLabel: String(row.rank),memberLabel,
     isMe: row.member.user_id === userId,former: row.former,valueLabel,detailLabel,dateLabel,certification,
@@ -56,11 +57,11 @@ export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoa
       detailLabel,dateLabel,certification].filter(Boolean).join(', ') };
 }
 export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: string | null,
-  nowMs: number = Date.now()): PodiumCardViewModel[] {
+  dateFormat: ExerciseDateFormat): PodiumCardViewModel[] {
   return payload.podiums.map(({ exercise,board }) => {
     const rows=board.state === 'rebuilding' ? [] : board.entries.slice(0,3).map(row => ({ key: row.member.user_id,
       rank: row.rank,memberLabel: formatBoardMemberLabel(row.member,row.former,userId),isMe: row.member.user_id === userId,
-      valueLabel: formatCompetitionValue(row),dateLabel: formatBoardDate(row.performance.achieved_at_ms,nowMs) }));
+      valueLabel: formatCompetitionValue(row),dateLabel: formatBoardDate(row.performance.achieved_at_ms,dateFormat) }));
     const viewLabel=`${board.certified ? 'Certified' : 'All'} · ${competitionViewLabel(board.metric,board.rules)}`;
     const emptyLabel=board.state === 'rebuilding' ? 'Recalculating under the new rules…'
       : rows.length === 0 ? board.certified ? 'No certified sets yet' : 'Score unavailable' : null;

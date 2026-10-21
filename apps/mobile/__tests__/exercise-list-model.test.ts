@@ -33,7 +33,7 @@ const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = 
   exercises, muscleGroups,
   stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW),
   preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, ...preferences },
-  query, includeDeleted: false, now: NOW,
+  query, includeDeleted: false,
 });
 
 describe('exercise browser model', () => {
@@ -54,16 +54,16 @@ describe('exercise browser model', () => {
       exerciseDefinitionId: id, score: 1, completedSetCount: 2,
       lastCompletedAt: daysBefore(id === 'old' ? 10 : 2),
     });
-    const model = buildExerciseListModel({ exercises, muscleGroups, stats, preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: false, now: NOW });
+    const model = buildExerciseListModel({ exercises, muscleGroups, stats, preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: false });
     expect(model.sections[0].exercises.map((item) => item.id)).toEqual(['bench', 'never', 'old']);
   });
 
   it('keeps old history visible with never-done off and shows all-time deduplicated sessions', () => {
     const model = buildModel({ showNeverDone: false });
     expect(model.items.map((item) => item.id)).toEqual(['bench', 'old']);
-    expect(model.items[0].statsSummary).toBe('Last: 23 Sep · 1 session');
+    expect(model.items[0].statsSummary).toBe('Last: 23-09-2026 · 1 session');
     expect(model.items[1].recency).toBeUndefined();
-    expect(model.items[1].statsSummary).toBe('Last: 10 Sep 2025 · 1 session');
+    expect(model.items[1].statsSummary).toBe('Last: 10-09-2025 · 1 session');
     expect(buildModel().items.find((item) => item.id === 'never')?.statsSummary).toBe('Never done');
   });
 
@@ -86,15 +86,15 @@ describe('browser last-performed date', () => {
   const aggregate = { exerciseDefinitionId: 'e', sessionCount: 18, setCount: 40, workingSetCount: 0,
     totalVolume: 300, volumeSetCount: 4, estimatedOneRepMax: 50 };
   afterEach(() => jest.useRealTimers());
-  it('uses local dates and refreshes the year at display time across local New Year', () => {
+  it('keeps local dates unambiguous across local New Year', () => {
     jest.useFakeTimers();
     const last = new Date(2026, 11, 31, 23, 30);
     jest.setSystemTime(new Date(2026, 11, 31, 23, 59));
-    expect(formatExerciseListStatsSummary(aggregate, true, last)).toBe('Last: 31 Dec · 18 sessions');
+    expect(formatExerciseListStatsSummary(aggregate, true, last, 'DD-MM-YYYY')).toBe('Last: 31-12-2026 · 18 sessions');
     jest.setSystemTime(new Date(2027, 0, 1, 0, 1));
-    expect(formatExerciseListStatsSummary(aggregate, true, last)).toBe('Last: 31 Dec 2026 · 18 sessions');
+    expect(formatExerciseListStatsSummary(aggregate, true, last, 'DD-MM-YYYY')).toBe('Last: 31-12-2026 · 18 sessions');
   });
   it('never invents a date for an unused exercise', () => {
-    expect(formatExerciseListStatsSummary(undefined, false, null, NOW)).toBe('Never done');
+    expect(formatExerciseListStatsSummary(undefined, false, null, 'DD-MM-YYYY')).toBe('Never done');
   });
 });

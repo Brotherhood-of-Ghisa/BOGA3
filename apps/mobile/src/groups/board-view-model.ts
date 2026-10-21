@@ -1,3 +1,5 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { formatShortDate } from '@/src/utils/local-time';
 // Pure presentation rules for group leaderboards (P6–P9, E1.1–E1.3;
 // `docs/specs/tech/groups-contract.md`): the podium card, full-board row and
 // history item shapes, the board's route params, and the ordinal / date /
@@ -51,14 +53,9 @@ export const formatOrdinal = (value: number): string => {
   }
 };
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** Local "12 Sep"; "12 Sep 2025" when not in the current year. */
-export const formatBoardDate = (epochMs: number, nowMs: number = Date.now()): string => {
-  const date = new Date(epochMs);
-  const label = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
-  return date.getFullYear() === new Date(nowMs).getFullYear() ? label : `${label} ${date.getFullYear()}`;
-};
+/** A performance's local date in the viewer's selected format. */
+export const formatBoardDate = (epochMs: number, dateFormat: ExerciseDateFormat): string =>
+  formatShortDate(new Date(epochMs), dateFormat);
 
 export const YOU_LABEL = 'You';
 

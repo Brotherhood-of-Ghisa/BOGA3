@@ -115,7 +115,7 @@ export function HistoryList({
           session={item}
         />
       )}
-      renderSectionHeader={({ section }) => <WeekHeading now={now} section={section} />}
+      renderSectionHeader={({ section }) => <WeekHeading dateFormat={resolvedDateFormat} section={section} />}
       sections={sections}
       stickySectionHeadersEnabled={false}
       style={styles.list}
@@ -177,8 +177,8 @@ function useJumpOnce(
   }, [scrollToTarget]);
 }
 
-function WeekHeading({ section, now }: { section: HistoryWeekSection; now: Date }) {
-  const heading = historyWeekHeading(section, now);
+function WeekHeading({ section, dateFormat }: { section: HistoryWeekSection; dateFormat: ExerciseDateFormat }) {
+  const heading = historyWeekHeading(section, dateFormat);
   return (
     <View style={styles.weekHeading} testID={`completed-history-week-${section.key}`}>
       {section.emptyWeeksBefore > 0 ? (
@@ -212,7 +212,7 @@ function HistoryRow({
   session: SessionListItem;
   first: boolean;
   last: boolean;
-  dateFormat?: ExerciseDateFormat;
+  dateFormat: ExerciseDateFormat;
   onOpen: (sessionId: string) => void;
 }) {
   const deleted = session.deletedAt !== null;

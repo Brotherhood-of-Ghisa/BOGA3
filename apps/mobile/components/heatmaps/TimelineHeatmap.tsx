@@ -1,3 +1,5 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // Timeline: the selected metric week by week across the history window, oldest
 // on the left, as zero-based columns. A month
 // is labelled at the first week that starts in it. The window fits the width
@@ -74,26 +76,27 @@ const weekFigure = (week: TimelineWeek, metric: CalendarHeatmapMetric, formatVal
 };
 
 // `Volume 100`, `Sets 6`, `1RM 112.5`: a unit that repeats the metric is not spoken twice.
-const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string) => {
+const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string, dateFormat: ExerciseDateFormat) => {
   const unit = figure.unit && !metricLabel.toLowerCase().startsWith(figure.unit.toLowerCase()) ? ` ${figure.unit}` : '';
   // Spoken weeks always carry their year, whichever one it is.
-  const range = `${weekRangeLabel(week.monday)} ${week.monday.getUTCFullYear()}`;
+  const range = weekRangeLabel(week.monday, dateFormat);
   return `Week of ${range}, ${metricLabel} ${figure.value}${unit}${week.isCurrentWeek ? ', Current week' : ''}`;
 };
 
 // The focused week, its figure, and the two steps away from it. The label is
 // read by neither arrow nor plot: the plot's adjustable value speaks for it.
-function Readout({ week, figure, currentYear, onStep, hasPrevious, hasNext, testID }: {
-  week: TimelineWeek; figure: Figure; currentYear: number;
+function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
+  week: TimelineWeek; figure: Figure;
   onStep: (delta: number) => void; hasPrevious: boolean; hasNext: boolean; testID: string;
 }) {
+  const dateFormat = useDateFormat();
   return <View style={styles.readout}>
     <View style={styles.weekNav}>
       <IconButton accessibilityLabel="Previous week" disabled={!hasPrevious} name="chevron-left"
         onPress={() => onStep(-1)} testID={`${testID}-previous-week`} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.readoutWeek}
-          testID={`${testID}-readout-week`}>{weekLabel(week.monday, currentYear)}</Text>
+        <Text allowFontScaling={false} style={styles.readoutWeek}
+          testID={`${testID}-readout-week`}>{weekLabel(week.monday, dateFormat)}</Text>
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
@@ -107,6 +110,7 @@ function Readout({ week, figure, currentYear, onStep, hasPrevious, hasNext, test
 
 export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
   metricLabel, unitLabel, header, children }: Props) {
+  const dateFormat = useDateFormat();
   const testID = `${testIDPrefix}-timeline`;
   const series = useMemo(() => buildTimelineSeries(data.weekly, metric), [data.weekly, metric]);
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
@@ -156,7 +160,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
     {header}
     {focused && figure ? <Readout week={focused} figure={figure} onStep={onStep}
       hasPrevious={focusedIndex > 0} hasNext={focusedIndex < weeks.length - 1}
-      currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} /> : null}
+      testID={testID} /> : null}
     <View style={styles.chartRow}>
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[styles.axis, { width: axisWidth }]}>
         {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
@@ -169,7 +173,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
           testID={`${testID}-scroll`}>
           <Pressable accessible accessibilityRole="adjustable"
             accessibilityLabel={`${metricLabel} by week, ${weeks.length} weeks`}
-            accessibilityValue={focused && figure ? { text: weekDescription(focused, figure, metricLabel) } : undefined}
+            accessibilityValue={focused && figure ? { text: weekDescription(focused, figure, metricLabel, dateFormat) } : undefined}
             accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
             onAccessibilityAction={onAccessibilityAction}
             onPress={onPress} testID={`${testID}-plot`} style={{ width: geometry.width }}>

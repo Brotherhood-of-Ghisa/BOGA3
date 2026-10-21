@@ -31,7 +31,7 @@ test.each([0,-1,NaN,Infinity])('invalid score %s uses generic unavailable copy',
   expect(formatCompetitionValue({ metric: 'e1rm',unit: 'percent_bw',value })).toBe('Score unavailable');
 });
 test('normalized rows and accessibility contain reps and percentages without an absolute counterpart', () => {
-  const row=buildCompetitionRow(competitionRow,'all','me',3_000);
+  const row=buildCompetitionRow(competitionRow,'all','me','DD-MM-YYYY');
   expect(row.valueLabel).toBe('145.7 %BW');expect(row.detailLabel).toBe('5 reps');
   expect(row.accessibilityLabel).toContain('145.7 %BW, 5 reps');expect(row.accessibilityLabel).not.toMatch(/kg|reading|bodyweight.*\d/i);
   const poisoned={ ...competitionRow.performance };
@@ -47,11 +47,11 @@ test('Off and c=0 use ordinary units independently of a saved positive contribut
 });
 test('podiums preserve server order, unit and default metric; rebuilding has no stale figures', () => {
   const payload={ contract_version: 4 as const,certified: false,podiums: [{ exercise: competitionExercise,board: competitionBoard }] };
-  expect(buildCompetitionPodiums(payload,'me')[0].viewLabel).toContain('All · 1RM %BW');
-  expect(buildCompetitionPodiums(payload,'me')[0].rows[0].valueLabel).toBe('145.7 %BW');
+  expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].viewLabel).toContain('All · 1RM %BW');
+  expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].rows[0].valueLabel).toBe('145.7 %BW');
   const rebuilding={ ...payload,podiums: [{ exercise: { ...competitionExercise,rebuilding: true,published_revision: null },
     board: { ...competitionBoard,state: 'rebuilding' as const,entries: [],entry_count: 0,me: null } }] };
-  expect(buildCompetitionPodiums(rebuilding,'me')[0]).toMatchObject({ rows: [],youLabel: null,emptyLabel: 'Recalculating under the new rules…' });
+  expect(buildCompetitionPodiums(rebuilding,'me', 'DD-MM-YYYY')[0]).toMatchObject({ rows: [],youLabel: null,emptyLabel: 'Recalculating under the new rules…' });
 });
 test('normalized full sessions keep permitted reps and effort without derived load columns or totals', () => {
   const model=buildCompetitionSession(competitionSession.session);
@@ -104,7 +104,7 @@ describe('buildStreamRecordSheet', () => {
   it('names me, shows the set from the record stream and orders 1RM before Volume', () => {
     const event = { ...competitionEvent, member: { user_id: 'me', username: 'Me' }, sort_at_ms: Date.UTC(2026, 9, 6, 12),
       values: [{ ...competitionEvent.values[0], metric: 'volume' as const, unit: 'percent_bw_reps', value: 650 }, competitionEvent.values[0]] };
-    const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [] }, 'me', NOW);
+    const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [] }, 'me', 'DD-MM-YYYY');
     expect(model.who).toMatch(/^You · /);
     expect(model.set).toBe('120.0 × 5');
     expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '145.7 %BW'], ['Volume', '650.0 %BW·reps']]);
@@ -114,33 +114,33 @@ describe('buildStreamRecordSheet', () => {
     const context = competitionEvent.record_context!;
     const volume = { ...context.metrics[0], metric: 'volume' as const, write_token: 'volume-token' };
     const both = { ...competitionEvent, record_context: { ...context, metrics: [volume, context.metrics[0]] } };
-    expect(buildStreamRecordSheet(both, undefined, 'me', NOW).certification?.target).toEqual(expect.objectContaining({ metric: 'e1rm', write_token: 'server-random-token' }));
+    expect(buildStreamRecordSheet(both, undefined, 'me', 'DD-MM-YYYY').certification?.target).toEqual(expect.objectContaining({ metric: 'e1rm', write_token: 'server-random-token' }));
     const certified = { ...both, record_context: { ...both.record_context, metrics: [{ ...volume, certification: { ...competitionCertification, metric: 'volume' as const } },
       context.metrics[0]] } };
-    expect(buildStreamRecordSheet(certified, undefined, 'me', NOW).certification?.target.metric).toBe('volume');
+    expect(buildStreamRecordSheet(certified, undefined, 'me', 'DD-MM-YYYY').certification?.target.metric).toBe('volume');
     const ineligible = { ...both, record_context: { ...both.record_context, metrics: [volume, { ...context.metrics[0], eligible: false }] } };
-    expect(buildStreamRecordSheet(ineligible, undefined, 'me', NOW).certification?.target.metric).toBe('volume');
-    expect(buildStreamRecordSheet({ ...competitionEvent, record_context: null }, undefined, 'me', NOW).certification).toBeNull();
+    expect(buildStreamRecordSheet(ineligible, undefined, 'me', 'DD-MM-YYYY').certification?.target.metric).toBe('volume');
+    expect(buildStreamRecordSheet({ ...competitionEvent, record_context: null }, undefined, 'me', 'DD-MM-YYYY').certification).toBeNull();
   });
   it('lists the previous #1 per board with holder and set, or value only', () => {
     const record = { performance: null, previous: [
       { value: { role: 'previous' as const, metric: 'volume' as const, unit: 'kg_reps', value: 500, unavailable: false, member: { user_id: 'me', username: 'Me' } }, performance: null },
       { value: { role: 'previous' as const, metric: 'e1rm' as const, unit: 'kg', value: 110, unavailable: false, member: { user_id: 'sam', username: 'Sam' } },
         performance: { ...ordinary, weight_value: '100', reps: 3, source_load_input_mode: 'per_side_load' as const } }] };
-    const model = buildStreamRecordSheet(competitionEvent, record, 'me', NOW);
+    const model = buildStreamRecordSheet(competitionEvent, record, 'me', 'DD-MM-YYYY');
     expect(model.set).toBe('5 reps');
     expect(model.previous).toEqual([
       { metric: 'e1rm', label: '1RM', value: '110.0', holder: 'Sam', set: '100.0 × 3 per side' },
       { metric: 'volume', label: 'Volume', value: '500.0', holder: 'You', set: null }]);
   });
   it('shows a voided record as unavailable with nothing to certify, no previous, and no set without reps', () => {
-    const model = buildStreamRecordSheet({ ...competitionEvent, voided: true, reps: null }, undefined, 'me', NOW);
+    const model = buildStreamRecordSheet({ ...competitionEvent, voided: true, reps: null }, undefined, 'me', 'DD-MM-YYYY');
     expect(model.set).toBeNull();
     expect(model.certification).toBeNull();
     expect(model.metrics).toEqual([expect.objectContaining({ value: 'Score unavailable' })]);
   });
   it('omits the historical ordinary weight unit', () => {
-    const model = buildStreamRecordSheet({ ...competitionEvent, values: [{ ...competitionEvent.values[0], metric: 'weight', unit: 'kg', value: 100 }] }, undefined, 'me', NOW);
+    const model = buildStreamRecordSheet({ ...competitionEvent, values: [{ ...competitionEvent.values[0], metric: 'weight', unit: 'kg', value: 100 }] }, undefined, 'me', 'DD-MM-YYYY');
     expect(model.metrics).toEqual([{ metric: 'weight', label: 'Weight', value: '100.0' }]);
   });
 });

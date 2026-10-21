@@ -313,12 +313,12 @@ describe('Sessions over real data', () => {
       await completeSessionDraft(lateId, { completedAt, now: completedAt });
     });
 
-    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24/7 23:45');
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24-07-2026 23:45');
 
     await act(async () => {
       setExerciseListPreferences({ dateFormat: 'MM-DD-YYYY' });
     });
-    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('7/24 23:45');
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('07-24-2026 23:45');
 
     await act(async () => {
       setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' });
@@ -328,7 +328,7 @@ describe('Sessions over real data', () => {
     await act(async () => {
       setExerciseListPreferences({ dateFormat: 'DD-MM-YYYY' });
     });
-    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24/7 23:45');
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24-07-2026 23:45');
   });
 });
 
@@ -704,8 +704,8 @@ describe('Sessions planning sections', () => {
 
     // Soonest scheduled first; rows say when in words.
     expect(planRowLabels('sessions-plan-section-upcoming')).toEqual([
-      'Tomorrow, 2026-10-06 07:00',
-      'Later Week, 2026-10-12 07:00',
+      'Tomorrow, 06-10-2026 07:00',
+      'Later Week, 12-10-2026 07:00',
     ]);
     // Most recently updated first.
     expect(planRowLabels('sessions-plan-section-unscheduled')).toEqual([

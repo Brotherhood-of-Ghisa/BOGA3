@@ -50,7 +50,7 @@ describe('the stream as drawn', () => {
       eventItem('r-1', { session_id: 's-1', group_exercise: { group_exercise_id: 'ge1', name: 'Deadlift' } }),
       eventItem('r-2', { session_id: 's-1', group_exercise: { group_exercise_id: 'ge2', name: 'Pull-up' } }),
       sessionItem('s-1'),
-    ]);
+    ], undefined, 'DD-MM-YYYY');
 
     expect(models).toHaveLength(1);
     const [card] = sessions(models);
@@ -61,7 +61,7 @@ describe('the stream as drawn', () => {
   });
 
   it('keeps a record whose session is not in the page on its own card', () => {
-    const models = buildCompetitionStreamModels([eventItem('r-1', { session_id: 's-missing' }), sessionItem('s-1')]);
+    const models = buildCompetitionStreamModels([eventItem('r-1', { session_id: 's-missing' }), sessionItem('s-1')], undefined, 'DD-MM-YYYY');
 
     expect(models.map((model) => model.kind)).toEqual(['competition', 'session']);
     expect(sessions(models)[0]?.records).toEqual([]);
@@ -70,15 +70,15 @@ describe('the stream as drawn', () => {
   it('leaves linking out by default and draws it once the drawer asks', () => {
     const items = [eventItem('l-1', { kind: 'link', session_id: null }), eventItem('u-1', { kind: 'unlink', session_id: null })];
 
-    expect(buildCompetitionStreamModels(items)).toEqual([]);
+    expect(buildCompetitionStreamModels(items, undefined, 'DD-MM-YYYY')).toEqual([]);
     expect(DEFAULT_HIDDEN_STREAM_EVENT_KINDS).toEqual(['link', 'unlink']);
-    expect(buildCompetitionStreamModels(items, []).map((model) => model.key)).toEqual(['l-1', 'u-1']);
+    expect(buildCompetitionStreamModels(items, [], 'DD-MM-YYYY').map((model) => model.key)).toEqual(['l-1', 'u-1']);
   });
 
   it('hides any kind the drawer switches off, nested records included', () => {
     const models = buildCompetitionStreamModels(
       [eventItem('r-1', { session_id: 's-1' }), sessionItem('s-1')],
-      ['record'],
+      ['record'], 'DD-MM-YYYY'
     );
 
     expect(sessions(models)[0]?.records).toEqual([]);
@@ -97,7 +97,7 @@ describe('the stream as drawn', () => {
     });
     const voided = eventItem('r-2', { session_id: 's-1', voided: true });
 
-    const models = buildCompetitionStreamModels([certified, voided, sessionItem('s-1')]);
+    const models = buildCompetitionStreamModels([certified, voided, sessionItem('s-1')], undefined, 'DD-MM-YYYY');
 
     expect(sessions(models)[0]?.records.map((line) => line.certified)).toEqual([true]);
     expect(models.map((model) => model.kind)).toEqual(['competition', 'session']);

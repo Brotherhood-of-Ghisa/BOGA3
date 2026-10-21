@@ -74,8 +74,8 @@ const latest = (overrides: Partial<LatestSessionSummary> = {}): LatestSessionSum
 
 describe('week labels and bars', () => {
   it('names a week by its Monday and Sunday, and both months when it spans two', () => {
-    expect(formatWeekRange(localWeekWindow(local(2026, 10, 16)))).toBe('Mon 12 – Sun 18');
-    expect(formatWeekRange(localWeekWindow(local(2026, 10, 1)))).toBe('Mon 28 Sep – Sun 4 Oct');
+    expect(formatWeekRange(localWeekWindow(local(2026, 10, 16)), 'DD-MM-YYYY')).toBe('12-10-2026 – 18-10-2026');
+    expect(formatWeekRange(localWeekWindow(local(2026, 10, 1)), 'DD-MM-YYYY')).toBe('28-09-2026 – 04-10-2026');
   });
 
   it('fills a bar by this week over last week in laps of last week, empty at zero', () => {
@@ -215,11 +215,11 @@ describe('the latest session row', () => {
   it('says its figures and its whole summary', () => {
     expect(formatSessionSummaryFigures(latest())).toBe('12 sets · 4 exercises');
     expect(formatSessionSummaryFigures(latest({ exerciseCount: 1 }))).toBe('12 sets · 1 exercise');
-    expect(sessionSummaryAccessibilityLabel(latest())).toBe(
-      'Completed session on 10/15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
+    expect(sessionSummaryAccessibilityLabel(latest(), 'DD-MM-YYYY')).toBe(
+      'Completed session on 15-10-2026 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );
     expect(sessionSummaryAccessibilityLabel(latest(), 'DD-MM-YYYY')).toBe(
-      'Completed session on 15/10 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
+      'Completed session on 15-10-2026 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );
     expect(sessionSummaryAccessibilityLabel(latest(), 'YYYY-MM-DD')).toBe(
       'Completed session on 2026-10-15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
@@ -227,10 +227,10 @@ describe('the latest session row', () => {
   });
 
   it('leaves out a missing gym and a session without PRs', () => {
-    expect(sessionSummaryAccessibilityLabel(latest({ gymName: '  ', records: [], workingSets: 1, exerciseCount: 1 }))).toBe(
-      'Completed session on 10/15 07:12, 1h 5m, 1 set, 1 exercise',
+    expect(sessionSummaryAccessibilityLabel(latest({ gymName: '  ', records: [], workingSets: 1, exerciseCount: 1 }), 'DD-MM-YYYY')).toBe(
+      'Completed session on 15-10-2026 07:12, 1h 5m, 1 set, 1 exercise',
     );
-    expect(sessionSummaryAccessibilityLabel(latest({ gymName: null, records: [BENCH_1RM] })))
+    expect(sessionSummaryAccessibilityLabel(latest({ gymName: null, records: [BENCH_1RM] }), 'DD-MM-YYYY'))
       .toContain('4 exercises, Bench Press 1RM 102.5 · PR');
   });
 });

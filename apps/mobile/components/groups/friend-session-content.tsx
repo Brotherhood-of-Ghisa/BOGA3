@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -45,6 +46,7 @@ export type FriendSessionRecordsProps = {
 
 export function FriendSessionContent({ session, records, groupId, userId, myRole, online, onRecordsChanged }:
   { session: CompetitionSessionWire } & FriendSessionRecordsProps) {
+  const dateFormat = useDateFormat();
   const model = useMemo(() => buildCompetitionSession(session),[session]);
   const { rows, bands } = useMemo(() => {
     const shown = shownSessionRecords(session, records);
@@ -70,7 +72,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
         ]}
         testID="group-session-summary"
         times={{
-          start: formatGroupDateTime(session.started_at_ms),
+          start: formatGroupDateTime(session.started_at_ms, dateFormat),
           duration: formatGroupSessionDuration(session),
           testID: 'group-session-times',
         }}

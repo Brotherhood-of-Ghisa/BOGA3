@@ -1,3 +1,4 @@
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 /* eslint-disable import/first */
 
 /**
@@ -192,6 +193,17 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     goToSection('Leaderboards');
   };
 
+  it('updates mounted podium dates when Date format changes, including cached rows', async () => {
+    await openLeaderboards();
+    const rowId = `group-podium-card-${EXERCISE_ID}-row-1`;
+    await waitFor(() => expect(screen.getByTestId(rowId)).toHaveTextContent(/10-09-2026/));
+    for (const [dateFormat, expected] of [['MM-DD-YYYY', '09-10-2026'], ['YYYY-MM-DD', '2026-09-10'], ['DD-MM-YYYY', '10-09-2026']] as const) {
+      await act(async () => setExerciseListPreferences({ dateFormat }));
+      await waitFor(() => expect(screen.getByTestId(rowId)).toHaveTextContent(new RegExp(expected)));
+    }
+    expect(api.getCompetitionPodiums).toHaveBeenCalledTimes(1);
+  });
+
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
@@ -203,7 +215,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID);
 
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^Certified · 1RM$/);
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10 Sep/);
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10-09-2026/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-you`)).toHaveTextContent('You: 5th');
     expect(screen.getByTestId('group-podium-card-ge-old-archived')).toHaveTextContent('Archived');
     expect(screen.getByTestId('group-podium-card-ge-old-empty')).toHaveTextContent('No certified sets yet');
@@ -429,7 +441,7 @@ describe('Competition history',()=>{
       .mockResolvedValueOnce(historyPage({ events: [{ ...event,event_id: 'lc1',sequence: 7,
         values: [{ ...event.values[0],value: 138,member: { user_id: 'u2',username: 'Sam' } }] }] }));
     openHistory();expect(await screen.findByTestId('group-board-history-item-12-sentence')).toHaveTextContent('Dave · #1 1RM · 142.5.');
-    expect(screen.getByTestId('group-board-history-item-12-date')).toHaveTextContent('10 Sep');
+    expect(screen.getByTestId('group-board-history-item-12-date')).toHaveTextContent('10-09-2026');
     await act(async()=>fireEvent(screen.getByTestId('group-board-history-list'),'onEndReached'));
     expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ before: 'older-events' }));
     expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent('Sam · #1 1RM · 138.0.');

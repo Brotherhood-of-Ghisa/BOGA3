@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter, type Href } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -20,9 +21,10 @@ type Props = {
  * then links to the session and the leaderboard. No explanatory text.
  */
 export function GroupMetricStreamRecordSheet({ record, detail, userId, myRole, onClose, onChanged }: Props) {
+  const dateFormat = useDateFormat();
   const router = useRouter();
   const online = useNetworkOnline();
-  const model = buildStreamRecordSheet(record, detail, userId);
+  const model = buildStreamRecordSheet(record, detail, userId, dateFormat);
   const go = (href: string) => { onClose(); router.push(href as Href); };
   const boardMetric = model.metrics.map(entry => entry.metric).find(isCompetitionMetric);
   return <Sheet visible title={record.group_exercise.name} dismissLabel="Close record details" onDismiss={onClose} testID="group-metric-record-sheet">

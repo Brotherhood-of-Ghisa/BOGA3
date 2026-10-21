@@ -537,8 +537,8 @@ describe('CompletedSessionDetailScreenShell', () => {
     await screen.findByTestId('completed-session-detail-screen');
 
     // 16:00 UTC is 16:00 in London in February: an afternoon.
-    expect(screen.getByTestId('completed-session-detail-title')).toHaveTextContent('Afternoon training · 20 Feb');
-    expect(screen.getByLabelText('Start 2026-02-20 16:00')).toBeTruthy();
+    expect(screen.getByTestId('completed-session-detail-title')).toHaveTextContent('Afternoon training · 20-02-2026');
+    expect(screen.getByLabelText('Start 20-02-2026 16:00')).toBeTruthy();
     expect(screen.getByLabelText('Duration 58m')).toBeTruthy();
     expect(screen.queryByTestId('completed-session-detail-times-end')).toBeNull();
     expect(screen.getByTestId('completed-session-detail-gym')).toHaveProp('accessibilityLabel', 'Gym Westside Barbell Club');

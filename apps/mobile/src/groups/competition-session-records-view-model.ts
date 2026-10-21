@@ -1,3 +1,4 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 // The group session view's records, as plain data: the Group records card's
 // rows (one per #1 board), each exercise card's record band (one line per
 // record set), and the screen's title. No React, no I/O.
@@ -45,9 +46,9 @@ const nameOf = (member: GroupMemberRef, userId: string | null): string =>
   isMe(member, userId) ? YOU_LABEL : formatMemberName(member.username);
 
 /** `sam · Mon 6 Oct`; `You · Mon 6 Oct` on my own session. */
-export function groupSessionTitle(session: Pick<CompetitionSessionWire, 'member' | 'started_at_ms'>, userId: string | null, nowMs = Date.now()): string {
+export function groupSessionTitle(session: Pick<CompetitionSessionWire, 'member' | 'started_at_ms'>, userId: string | null, dateFormat: ExerciseDateFormat): string {
   const day = WEEKDAYS[new Date(session.started_at_ms).getDay()];
-  return `${nameOf(session.member, userId)} · ${day} ${formatBoardDate(session.started_at_ms, nowMs)}`;
+  return `${nameOf(session.member, userId)} · ${day} ${formatBoardDate(session.started_at_ms, dateFormat)}`;
 }
 
 /** `Iron Crew · group view`; just the words until the group's name is known. */
@@ -56,7 +57,7 @@ export const groupSessionEyebrow = (groupName: string | null): string =>
 
 /** View Session's Duration: the session's own once completed, else the time since it started. */
 export function formatGroupSessionDuration(session: Pick<CompetitionSessionWire, 'status' | 'started_at_ms' | 'completed_at_ms' | 'duration_sec'>,
-  nowMs = Date.now()): string {
+  nowMs: number = Date.now()): string {
   if (session.status !== 'completed') return formatCompactDuration(Math.floor(Math.max(0, nowMs - session.started_at_ms) / 1000));
   if (session.duration_sec !== null) return formatCompactDuration(session.duration_sec);
   return session.completed_at_ms === null ? '—' : formatCompactDuration(Math.floor(Math.max(0, session.completed_at_ms - session.started_at_ms) / 1000));
@@ -165,9 +166,9 @@ export function buildSessionRecordBands(records: readonly CompetitionSessionReco
 }
 
 /** `Certified by alex · 7 Oct` (`you` for mine) while a certification stands, else `Not certified`. */
-export function sessionRecordCertificationStatus(active: CompetitionCertificationWire | null, userId: string | null): string {
+export function sessionRecordCertificationStatus(active: CompetitionCertificationWire | null, userId: string | null, dateFormat: ExerciseDateFormat): string {
   if (!active) return 'Not certified';
   const by = active.certified_by;
   const witness = !by ? 'a group member' : isMe(by, userId) ? 'you' : formatMemberName(by.username);
-  return `Certified by ${witness} · ${formatBoardDate(active.certified_at_ms)}`;
+  return `Certified by ${witness} · ${formatBoardDate(active.certified_at_ms, dateFormat)}`;
 }

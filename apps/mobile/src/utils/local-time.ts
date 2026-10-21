@@ -10,11 +10,13 @@ const pad2 = (value: number): string => `${value}`.padStart(2, '0');
 /** Local `HH:MM`. */
 export const formatClockTime = (epochMs: number): string => {
   const date = new Date(epochMs);
+  if (!Number.isFinite(date.getTime())) return '—';
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 };
 
 /** Local `YYYY-MM-DD` / `MM-DD-YYYY` / `DD-MM-YYYY`. */
 export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
+  if (!Number.isFinite(date.getTime())) return '—';
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
   const year = date.getFullYear();
@@ -27,45 +29,54 @@ export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): str
   return `${day}-${month}-${year}`;
 };
 
-/** Local start stamp respecting dateFormat: `M/D HH:mm`, `D/M HH:mm`, or `YYYY-MM-DD HH:mm`. */
-export const formatMonthDayTime = (epochMs: number, dateFormat?: ExerciseDateFormat): string => {
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const formatMonthYear = (date: Date): string => `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+
+/** A local calendar date and 24-hour clock in the user's selected format. */
+export const formatLocalDateTime = (epochMs: number, dateFormat: ExerciseDateFormat): string => {
   const date = new Date(epochMs);
-  const time = formatClockTime(epochMs);
-  if (dateFormat === 'DD-MM-YYYY') {
-    return `${date.getDate()}/${date.getMonth() + 1} ${time}`;
-  }
-  if (dateFormat === 'YYYY-MM-DD') {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${time}`;
-  }
-  return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+  return Number.isFinite(date.getTime()) ? `${formatShortDate(date, dateFormat)} ${formatClockTime(epochMs)}` : '—';
 };
 
-/** Local `YYYY-MM-DD HH:MM`. */
-export const formatLocalDateTime = (epochMs: number): string => {
-  const date = new Date(epochMs);
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${formatClockTime(epochMs)}`;
+export const formatMonthDayTime = formatLocalDateTime;
+
+/** Canonical local form state, never a display label. */
+export const formatCurrentDateTime = (date: Date): string => formatLocalDateTime(date.getTime(), 'YYYY-MM-DD');
+
+/** A calendar key is a day, not a UTC instant: preserve it in every time zone. */
+export const formatCalendarDate = (key: string, dateFormat: ExerciseDateFormat): string =>
+  formatShortDate(new Date(`${key}T12:00:00`), dateFormat);
+
+/** A Monday key from the calendar adapter, formatted without changing its day. */
+export const formatCalendarWeek = (key: string, dateFormat: ExerciseDateFormat): string => {
+  const start = new Date(`${key}T12:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return formatDateRange(start, end, dateFormat);
 };
 
-/** Local `YYYY-MM-DD HH:MM` of a Date: the editable session and weigh-in stamp. */
-export function formatCurrentDateTime(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const hours = `${date.getHours()}`.padStart(2, '0');
-  const minutes = `${date.getMinutes()}`.padStart(2, '0');
+/** Inclusive range of calendar days; callers supply the actual last day. */
+export const formatDateRange = (start: Date, end: Date, dateFormat: ExerciseDateFormat): string =>
+  `${formatShortDate(start, dateFormat)} – ${formatShortDate(end, dateFormat)}`;
 
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
+/** Preserve an unfinished/invalid edit while switching the selected format. */
+export const reformatDateTime = (text: string, from: ExerciseDateFormat, to: ExerciseDateFormat): string => {
+  const date = parseSessionDateTime(text, from);
+  return date ? formatLocalDateTime(date.getTime(), to) : text;
+};
 
-/** Reads a local `YYYY-MM-DD HH:MM` stamp back; null unless it names a real wall-clock minute. */
-export function parseSessionDateTime(dateTime: string): Date | null {
+/** Parses a selected-format local wall-clock minute; internal form state defaults to ISO order. */
+export function parseSessionDateTime(dateTime: string, dateFormat: ExerciseDateFormat = 'YYYY-MM-DD'): Date | null {
   const trimmed = dateTime.trim();
-  const matched = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(trimmed);
+  const pattern = dateFormat === 'YYYY-MM-DD' ? /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/ : /^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2})$/;
+  const matched = pattern.exec(trimmed);
   if (!matched) {
     return null;
   }
 
-  const [, yearText, monthText, dayText, hourText, minuteText] = matched;
+  const [, first, second, third, hourText, minuteText] = matched;
+  const [yearText, monthText, dayText] = dateFormat === 'YYYY-MM-DD' ? [first, second, third]
+    : dateFormat === 'MM-DD-YYYY' ? [third, first, second] : [third, second, first];
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);

@@ -26,6 +26,8 @@ export const reportPreferenceValidationError = (message: string) => {
   setAccountLocalPreferenceValidationError(message);
 };
 
+export const useDateFormat = () => useAccountLocalPreferenceState().values.dateFormat;
+
 export function useAccountLocalPreferenceState() {
   const state = useSyncExternalStore(
     subscribeToAccountLocalPreferences, getAccountLocalPreferenceState, getAccountLocalPreferenceState,

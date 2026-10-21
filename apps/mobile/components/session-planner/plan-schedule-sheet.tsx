@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
@@ -28,6 +29,7 @@ function PlanScheduleSheetBody({
   onDismiss: () => void;
   onConfirm: (date: Date | null) => void;
 }) {
+  const dateFormat = useDateFormat();
   const [selectedDate, setSelectedDate] = useState<Date>(() => currentSchedule ?? defaultScheduleDate());
 
   const openAndroidPicker = (mode: 'date' | 'time') => {
@@ -56,6 +58,7 @@ function PlanScheduleSheetBody({
         <View style={styles.iosPickerContainer}>
           <DateTimePicker
             display="spinner"
+            locale={dateFormat === 'MM-DD-YYYY' ? 'en-US' : dateFormat === 'YYYY-MM-DD' ? 'sv-SE' : 'en-GB'}
             mode="datetime"
             onChange={(_event, date) => {
               if (date) setSelectedDate(date);
@@ -68,10 +71,10 @@ function PlanScheduleSheetBody({
       ) : (
         <Card>
           <ListRow
-            accessibilityLabel={`Select date, currently ${formatShortDate(selectedDate, 'YYYY-MM-DD')}`}
+            accessibilityLabel={`Select date, currently ${formatShortDate(selectedDate, dateFormat)}`}
             density="list"
             divider
-            description={formatShortDate(selectedDate, 'YYYY-MM-DD')}
+            description={formatShortDate(selectedDate, dateFormat)}
             label="Date"
             onPress={() => openAndroidPicker('date')}
             testID="plan-schedule-android-date"

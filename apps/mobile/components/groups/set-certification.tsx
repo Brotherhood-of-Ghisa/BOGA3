@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
@@ -20,9 +21,10 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
   /** `between`: status left, action right (a row's own line). `end`: both at the end (beside the set). */
   align?: 'between' | 'end'; testID: string;
 }) {
+  const dateFormat = useDateFormat();
   const state = useMetricCertification({ groupId, userId, row: certification.target, exercise: certification.exercise,
     online, readOnlyReason, onChanged });
-  const model = buildMetricRecordSheetModel({ ...state, row: certification.target, exercise: certification.exercise,
+  const model = buildMetricRecordSheetModel({ dateFormat, ...state, row: certification.target, exercise: certification.exercise,
     userId, myRole, online, readOnlyReason });
   const guard = { blocked: model.blocked, active: model.active };
   const withdraw = () => {
@@ -33,7 +35,7 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
   const action = model.showRefresh ? { label: 'Refresh', onPress: state.refresh, disabled: state.pending || online === false }
     : model.canCertify ? { label: 'Certify', onPress: () => void state.perform('certify', guard), disabled: model.blocked }
     : model.canWithdraw ? { label: 'Withdraw', onPress: withdraw, disabled: model.blocked } : null;
-  const status = sessionRecordCertificationStatus(model.active, userId);
+  const status = sessionRecordCertificationStatus(model.active, userId, dateFormat);
   return (
     <View style={styles.block}>
       <View style={[styles.statusLine, align === 'end' ? styles.end : null]}>

@@ -1,3 +1,6 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { reformatDateTime } from '@/src/utils/local-time';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -49,6 +52,7 @@ const describeSaveError = (error: unknown) =>
 // controller — created once, on first render — always writes the latest.
 type SessionTimesLive = {
   text: SessionTimesText;
+  dateFormat: ExerciseDateFormat;
   // The instants first loaded: a field left showing them keeps them exactly.
   initial: SessionTimes | null;
   saveFailed: boolean;
@@ -60,18 +64,20 @@ const createSessionTimesPersistence = ({
   save,
   setPaused,
   setSaveError,
+  dateFormat,
 }: {
   sessionId: string | null;
+  dateFormat: ExerciseDateFormat;
   save: (sessionId: string, times: SessionTimes) => Promise<void>;
   setPaused: (paused: boolean) => void;
   setSaveError: (message: string | null) => void;
 }) => {
-  const live: SessionTimesLive = { text: EMPTY_TEXT, initial: null, saveFailed: false, mounted: true };
+  const live: SessionTimesLive = { text: EMPTY_TEXT, dateFormat, initial: null, saveFailed: false, mounted: true };
   const autosave = createDraftAutosaveController({
     persistDraft: async () => {
       const initial = live.initial;
       if (!sessionId || !initial) return;
-      const times = resolveSessionTimes(live.text, initial);
+      const times = resolveSessionTimes(live.text, initial, live.dateFormat);
       if (!times) {
         if (live.mounted) setPaused(true);
         return;
@@ -108,6 +114,7 @@ export const useCompletedSessionTimes = ({
   persisted: SessionTimes | null;
   save?: (sessionId: string, times: SessionTimes) => Promise<void>;
 }): UseCompletedSessionTimes => {
+  const dateFormat = useDateFormat();
   const [text, setText] = useState<SessionTimesText>(EMPTY_TEXT);
   const [touched, setTouched] = useState({ start: false, end: false });
   const [paused, setPaused] = useState(false);
@@ -116,17 +123,22 @@ export const useCompletedSessionTimes = ({
   const [initial, setInitial] = useState<SessionTimes | null>(null);
   const navigation = useNavigation();
   const [{ live, setLive, autosave, lifecycle }] = useState(() =>
-    createSessionTimesPersistence({ sessionId, save, setPaused, setSaveError })
+    createSessionTimesPersistence({ sessionId, save, setPaused, setSaveError, dateFormat })
   );
 
   // Filled once: later reloads of the session must not overwrite the fields.
   if (!initial && persisted) {
     setInitial(persisted);
-    setText(formatSessionTimes(persisted));
+    const next = formatSessionTimes(persisted, dateFormat);
+    setText(next);
+    setLive({ initial: persisted, text: next, dateFormat });
   }
-  useEffect(() => {
-    if (initial) setLive({ initial, text: formatSessionTimes(initial) });
-  }, [initial, setLive]);
+  if (live.dateFormat !== dateFormat) {
+    const next = { start: reformatDateTime(live.text.start, live.dateFormat, dateFormat),
+      end: reformatDateTime(live.text.end, live.dateFormat, dateFormat) };
+    setLive({ text: next, dateFormat });
+    setText(next);
+  }
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -178,7 +190,7 @@ export const useCompletedSessionTimes = ({
     void autosave.flushInputCommit();
   };
 
-  const validation = validateSessionTimes(text);
+  const validation = validateSessionTimes(text, dateFormat);
   const invalid = Boolean(validation.start || validation.end);
 
   return {
@@ -194,7 +206,7 @@ export const useCompletedSessionTimes = ({
     commitStart: () => commit('start'),
     commitEnd: () => commit('end'),
     submit: () => {
-      const times = initial ? resolveSessionTimes(live.text, initial) : null;
+      const times = initial ? resolveSessionTimes(live.text, initial, live.dateFormat) : null;
       if (!times) setTouched({ start: true, end: true });
       return times;
     },

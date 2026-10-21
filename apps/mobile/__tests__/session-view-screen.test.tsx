@@ -1,3 +1,4 @@
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 /* eslint-disable import/first */
 
 /**
@@ -853,8 +854,8 @@ describe('Session view: editing a completed session', () => {
     expect(screen.queryByTestId('session-view-finish-button')).toBeNull();
     expect(screen.queryByTestId('session-view-options-button')).toBeNull();
     expect(screen.queryByTestId('session-view-summary-time')).toBeNull();
-    expect(screen.getByTestId('session-view-start-time')).toHaveProp('value', '2026-02-25 10:00');
-    expect(screen.getByTestId('session-view-end-time')).toHaveProp('value', '2026-02-25 10:45');
+    expect(screen.getByTestId('session-view-start-time')).toHaveProp('value', '25-02-2026 10:00');
+    expect(screen.getByTestId('session-view-end-time')).toHaveProp('value', '25-02-2026 10:45');
     expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Iron Works');
     expect(screen.getByLabelText(/^Barbell Bench Press, 1 of 2 sets done/)).toBeTruthy();
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
@@ -863,22 +864,37 @@ describe('Session view: editing a completed session', () => {
     expect(screen.getByTestId('session-view-add-exercise')).toBeTruthy();
   });
 
+  it('reformats mounted Start/End fields without writing or rounding their stored instants', async () => {
+    await renderCompleted();
+    const before = sessionRow(DONE);
+    for (const [dateFormat, expected] of [['MM-DD-YYYY', '02-25-2026 10:00'], ['YYYY-MM-DD', '2026-02-25 10:00'], ['DD-MM-YYYY', '25-02-2026 10:00']] as const) {
+      await act(async () => setExerciseListPreferences({ dateFormat }));
+      await waitFor(() => expect(screen.getByTestId('session-view-start-time')).toHaveProp('value', expected));
+      expect(screen.getByTestId('session-view-start-time')).toHaveProp('placeholder', `${dateFormat} HH:mm`);
+      expect(sessionRow(DONE)?.startedAt).toEqual(before?.startedAt);
+      expect(sessionRow(DONE)?.completedAt).toEqual(before?.completedAt);
+    }
+    await pressDone();
+    expect(sessionRow(DONE)?.startedAt).toEqual(STARTED_AT);
+    expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
+  });
+
   it('validates Start/End, and Done writes nothing until they are valid', async () => {
     await renderCompleted();
     const start = screen.getByTestId('session-view-start-time');
     const end = screen.getByTestId('session-view-end-time');
 
-    fireEvent.changeText(start, '2026-02-30 10:00');
-    fireEvent.changeText(end, '2026-02-30 10:50');
+    fireEvent.changeText(start, '30-02-2026 10:00');
+    fireEvent.changeText(end, '30-02-2026 10:50');
     await act(async () => {
       fireEvent(start, 'blur');
       fireEvent(end, 'blur');
     });
     expect(screen.getByTestId('session-view-start-time-error')).toHaveTextContent(
-      'Enter a valid Start time in YYYY-MM-DD HH:mm format.'
+      'Enter a valid Start time.'
     );
     expect(screen.getByTestId('session-view-end-time-error')).toHaveTextContent(
-      'Enter a valid End time in YYYY-MM-DD HH:mm format.'
+      'Enter a valid End time.'
     );
     expect(screen.getByTestId('session-view-times-notice')).toHaveTextContent(
       'Autosave paused until Start/End times are valid.'
@@ -886,8 +902,8 @@ describe('Session view: editing a completed session', () => {
     await pressDone();
     expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
 
-    fireEvent.changeText(start, '2026-02-25 10:00');
-    fireEvent.changeText(end, '2026-02-25 09:55');
+    fireEvent.changeText(start, '25-02-2026 10:00');
+    fireEvent.changeText(end, '25-02-2026 09:55');
     expect(screen.queryByTestId('session-view-start-time-error')).toBeNull();
     expect(screen.getByTestId('session-view-end-time-error')).toHaveTextContent(
       'End time must be later than or equal to Start time.'
@@ -895,7 +911,7 @@ describe('Session view: editing a completed session', () => {
     await pressDone();
     expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
 
-    fireEvent.changeText(end, '2026-02-25 10:50');
+    fireEvent.changeText(end, '25-02-2026 10:50');
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
     answerAlerts((title) => (title.startsWith('Discard unconfirmed') ? 'Discard unconfirmed sets and save changes' : 'x'));
     await pressDone();
@@ -915,14 +931,14 @@ describe('Session view: editing a completed session', () => {
     await renderCompleted();
     jest.useFakeTimers();
 
-    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 09:50');
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '25-02-2026 09:50');
     await act(async () => {
       jest.advanceTimersByTime(3_000);
     });
     expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
     expect(screen.getByTestId('session-view-times-notice')).toBeTruthy();
 
-    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 10:50');
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '25-02-2026 10:50');
     await act(async () => {
       jest.advanceTimersByTime(3_000);
     });
@@ -1095,7 +1111,7 @@ describe('Session view: editing a completed session', () => {
     const listener = mockNavigation.addListener.mock.calls.find(([event]) => event === 'beforeRemove')?.[1];
     expect(listener).toBeTruthy();
 
-    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 10:50');
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '25-02-2026 10:50');
     const preventDefault = jest.fn();
     const action = { type: 'GO_BACK' };
     await act(async () => {
@@ -1186,7 +1202,7 @@ describe('Session view: editing a completed session', () => {
 
     // Now after the 170 × 8 (1RM 215.3) session, its 204.3 is no longer a record.
     const end = screen.getByTestId('session-view-end-time');
-    fireEvent.changeText(end, '2026-03-10 10:45');
+    fireEvent.changeText(end, '10-03-2026 10:45');
     await act(async () => {
       fireEvent(end, 'blur');
     });

@@ -9,13 +9,12 @@ that describes it.
   was a subtitle: remove it. If they lose a value (a date, a duration, a
   count, `3 sets · 1RM 102.5`), it is data and stays.
 - **Bad:** a line like "Your training at a glance" under `Today`.
-- **Good:** `Mon 6 Oct · 52 min` under a session title.
+- **Good:** `06-10-2026 · 52 min` under a session title.
 - **Kept:** `<group> · group view` above a group session's title: it says
   whose view of the session this is, which the screen cannot show otherwise
   (decided 2026-10-08).
 
-Why: the screen's content already says what the screen is; a describing line
-costs space and is read once.
+Why: descriptive subtitles repeat the screen.
 
 ### copy.no-inline-explanation · principle · accepted
 
@@ -33,8 +32,7 @@ formula notes, field hints, "how this works" lines, or a rule's provenance
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
 - **Good:** the label carries it — the ramp reads `Weekly target` `0%`…`100%`.
 
-Why: an explanation on screen means the label or the layout failed; fixing
-those helps every user, every time.
+Why: labels carry meaning.
 
 ### copy.blank-history · presentation · accepted
 
@@ -43,7 +41,7 @@ is left visibly blank: no `Rest`, `?`, substitute dash or zero. Known zero
 training stays numeric. Accessibility preserves the difference between rest,
 unavailable and known zero.
 
-Why: an absent training figure should not look like a measurement or an error marker.
+Why: missing data must not resemble a measurement.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
 
 ### copy.set-entry · presentation · accepted
@@ -63,3 +61,13 @@ kg and kilograms, including compound volume units. Keep `per side`, `%BW` and
 
 Why: the sole weight unit adds no information. Approved 2026-10-17.
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
+
+### copy.calendar-dates · presentation · accepted
+
+Every complete calendar date displayed, spoken or edited uses Date format,
+including ranges and shared images. Formatting preserves the device-local day
+and stored instant. Month/day calendar headings, relative and time-only labels
+keep their roles.
+
+Why: one setting; issue #777.
+Code: `apps/mobile/src/utils/local-time.ts`.

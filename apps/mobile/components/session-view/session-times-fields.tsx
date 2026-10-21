@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FormField } from '@/components/ui/form-field';
@@ -15,8 +16,6 @@ export type SessionTimesFieldsProps = {
   onCommitEnd: () => void;
 };
 
-const PLACEHOLDER = 'YYYY-MM-DD HH:mm';
-
 type TimeFieldProps = {
   label: string;
   value: string;
@@ -29,9 +28,10 @@ type TimeFieldProps = {
 // A labelled time field: a `FormField` (the logger's field style) whose
 // figure `base` fits the 16 characters of a time in half the card's width.
 function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFieldProps) {
+  const dateFormat = useDateFormat();
   return (
     <FormField
-      accessibilityHint={PLACEHOLDER}
+      accessibilityHint={`${dateFormat} HH:mm`}
       accessibilityLabel={`Session ${label.toLowerCase()} time`}
       autoCapitalize="none"
       autoCorrect={false}
@@ -42,7 +42,7 @@ function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFiel
       onBlur={onCommit}
       onChangeText={onChange}
       onSubmitEditing={onCommit}
-      placeholder={PLACEHOLDER}
+      placeholder={`${dateFormat} HH:mm`}
       returnKeyType="done"
       // Typing replaces the whole time, as the logger's fields do.
       selectTextOnFocus

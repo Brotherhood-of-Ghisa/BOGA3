@@ -1,3 +1,4 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
@@ -33,7 +34,7 @@ export const STREAM_EVENT_KIND_LABELS: Record<StreamEventKind,string> = {
 export const DEFAULT_HIDDEN_STREAM_EVENT_KINDS: readonly StreamEventKind[] = ['link','unlink'];
 
 /** Counts come only from permitted set context; absolute totals are never reconstructed. */
-export function buildCompetitionStreamItem(item: CompetitionStreamItemWire): CompetitionStreamModel {
+export function buildCompetitionStreamItem(item: CompetitionStreamItemWire, dateFormat: ExerciseDateFormat): CompetitionStreamModel {
   if (item.kind === 'competition') return { kind: item.kind,key: item.key,event: item.event,record: item.record };
   if (item.kind === 'membership') return { kind: item.kind,key: item.key,groupId: item.group.group_id,
     groupName: item.group.name,sentence: formatMembershipSentence(item.event,item.member.username) };
@@ -43,7 +44,7 @@ export function buildCompetitionStreamItem(item: CompetitionStreamItemWire): Com
     memberUserId: session.member.user_id,sessionId: session.session_id,
     memberName: formatMemberName(session.member.username),isTrainingNow: session.status === 'active',
     statusLabel: session.status === 'draft' ? 'Draft' : formatSessionStatusLabel({ ...session,status: session.status }),
-    startedAtLabel: formatStreamStartedAt(session.started_at_ms),gymName: session.gym_name,
+    startedAtLabel: formatStreamStartedAt(session.started_at_ms, dateFormat),gymName: session.gym_name,
     groupNames: item.groups.map(group => group.name),setsLabel: formatSetCount(counts.setCount),
     exercisesLabel: formatExerciseCount(counts.exerciseCount) };
 }
@@ -51,11 +52,11 @@ export function buildCompetitionStreamItem(item: CompetitionStreamItemWire): Com
 /** A record card's certification line: the set's, one per set. */
 export type StreamCertificationLine = { status: RecordCertificationStatus; label: string };
 
-function certificationLine(event: CompetitionEventWire,userId: string | null): StreamCertificationLine | null {
+function certificationLine(event: CompetitionEventWire,userId: string | null, dateFormat: ExerciseDateFormat): StreamCertificationLine | null {
   const metrics = event.record_context?.metrics;
   if (!metrics?.length) return null;
   const active = metrics.map(entry => entry.certification).find(c => c !== null && c.ended_at_ms === null) ?? null;
-  if (active) return { status: 'certified',label: sessionRecordCertificationStatus(active,userId) };
+  if (active) return { status: 'certified',label: sessionRecordCertificationStatus(active,userId,dateFormat) };
   return metrics.some(entry => entry.certification !== null) ? { status: 'voided',label: 'Certification ended' }
     : { status: 'uncertified',label: 'Not certified' };
 }
@@ -67,7 +68,7 @@ export function streamRecordSet(event: CompetitionEventWire,record: CompetitionS
 }
 
 export function buildCompetitionEventCard(event: CompetitionEventWire,userId: string | null,showGroup: boolean,
-  record?: CompetitionStreamRecordWire) {
+  record: CompetitionStreamRecordWire | undefined, dateFormat: ExerciseDateFormat) {
   const name = event.member?.user_id === userId ? 'You' : formatMemberName(event.member?.username);
   const ended = event.voided || event.kind === 'record_voided';
   const label = ended ? 'Certification ended' : event.kind === 'record' ? `${name} · record`
@@ -78,9 +79,9 @@ export function buildCompetitionEventCard(event: CompetitionEventWire,userId: st
     : event.kind === 'rules_change' ? [] : [describeCompetitionEvent(event)];
   const isRecord = !ended && event.kind === 'record';
   const set = isRecord ? streamRecordSet(event,record) : null;
-  const certification = isRecord ? certificationLine(event,userId) : null;
+  const certification = isRecord ? certificationLine(event,userId,dateFormat) : null;
   const context = event.group_exercise.name;
-  const date = isRecord && event.provisional ? `${formatBoardDate(event.sort_at_ms)} · Session in progress` : formatBoardDate(event.sort_at_ms);
+  const date = isRecord && event.provisional ? `${formatBoardDate(event.sort_at_ms,dateFormat)} · Session in progress` : formatBoardDate(event.sort_at_ms,dateFormat);
   const groupName = showGroup ? event.group.name : null;
   return { label,context,set,certification,details,groupName,date,
     accessibilityLabel: [groupName,label,context,set,certification?.label,...details,date].filter(Boolean).join(', '),
@@ -100,7 +101,7 @@ const e1rmFirst = (a: { metric: string },b: { metric: string }) => (a.metric ===
  * took. A voided record has no certification.
  */
 export function buildStreamRecordSheet(event: CompetitionEventWire,record: CompetitionStreamRecordWire | undefined,
-  userId: string | null,nowMs: number = Date.now()) {
+  userId: string | null,dateFormat: ExerciseDateFormat) {
   const nameOf = (member: { user_id: string; username: string | null } | null | undefined) =>
     member?.user_id === userId ? 'You' : formatMemberName(member?.username);
   const metrics: StreamRecordMetric[] = event.values.filter(value => value.role === 'record').sort(e1rmFirst)
@@ -109,7 +110,7 @@ export function buildStreamRecordSheet(event: CompetitionEventWire,record: Compe
   const previous: StreamPreviousRecord[] = event.voided ? [] : (record?.previous ?? []).map(entry => ({
     metric: entry.value.metric,label: HISTORICAL_METRIC_LABELS[entry.value.metric],value: figure(entry.value),
     holder: nameOf(entry.value.member),set: entry.performance ? formatSetFigure(entry.performance) : null })).sort(e1rmFirst);
-  return { who: `${nameOf(event.member)} · ${formatBoardDate(event.sort_at_ms,nowMs)}`,set: streamRecordSet(event,record),
+  return { who: `${nameOf(event.member)} · ${formatBoardDate(event.sort_at_ms,dateFormat)}`,set: streamRecordSet(event,record),
     certification: event.voided ? null : setCertification(event),metrics,previous };
 }
 
@@ -129,8 +130,8 @@ function sessionRecordLine(key: string,event: CompetitionEventWire): Competition
  * tied to a session in the same page nests; anything else keeps its own card.
  */
 export function buildCompetitionStreamModels(items: CompetitionStreamItemWire[],
-  hiddenKinds: readonly StreamEventKind[] = DEFAULT_HIDDEN_STREAM_EVENT_KINDS): CompetitionStreamModel[] {
-  const models = items.map(buildCompetitionStreamItem);
+  hiddenKinds: readonly StreamEventKind[] = DEFAULT_HIDDEN_STREAM_EVENT_KINDS, dateFormat: ExerciseDateFormat): CompetitionStreamModel[] {
+  const models = items.map(item => buildCompetitionStreamItem(item, dateFormat));
   const sessions = new Map<string,CompetitionSessionCard>();
   for (const model of models) if (model.kind === 'session') sessions.set(model.sessionId,model);
   const drawn: CompetitionStreamModel[] = [];

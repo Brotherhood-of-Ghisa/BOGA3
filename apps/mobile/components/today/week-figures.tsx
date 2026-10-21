@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -67,6 +68,7 @@ function WeekFigure({ label, current, previous, record = false, testID }: Figure
 // over last week's whole total. No signed deltas: a part week against a whole
 // one says little.
 export function WeekFigures({ week }: { week: TodayProgressWeek }) {
+  const dateFormat = useDateFormat();
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>
@@ -77,7 +79,7 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
           allowFontScaling={false}
           style={[todayText.microLabel, todayText.microLabelFaint]}
           testID="today-progress-week-range">
-          {formatWeekRange(week.window)}
+          {formatWeekRange(week.window, dateFormat)}
         </Text>
       </View>
       <View style={styles.figures}>

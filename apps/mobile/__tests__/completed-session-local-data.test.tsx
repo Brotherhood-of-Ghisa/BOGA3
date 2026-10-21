@@ -518,9 +518,9 @@ describe('a session written through the app', () => {
     });
     // The bar names the session by when it started.
     expect(screen.getByTestId('completed-session-detail-title'))
-      .toHaveTextContent(/^(Morning|Afternoon|Evening|Night) training · \d{1,2} [A-Z][a-z]{2}$/);
+      .toHaveTextContent(/^(Morning|Afternoon|Evening|Night) training · \d{2}-\d{2}-\d{4}$/);
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
-    expect(label('completed-session-detail-times-start')).toMatch(/^Start \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(label('completed-session-detail-times-start')).toMatch(/^Start \d{2}-\d{2}-\d{4} \d{2}:\d{2}$/);
     expect(label('completed-session-detail-times-duration')).toBe('Duration 58m');
     expect(screen.queryByTestId('completed-session-detail-times-end')).toBeNull();
     expect(label('completed-session-detail-gym')).toBe('Gym Westside Barbell Club');

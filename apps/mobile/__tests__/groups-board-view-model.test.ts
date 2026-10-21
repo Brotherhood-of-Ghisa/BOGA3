@@ -36,9 +36,9 @@ describe('formatting', () => {
     expect(formatOrdinal(value)).toBe(expected);
   });
 
-  it('dates read "12 Sep", with the year only outside the current year', () => {
-    expect(formatBoardDate(SEP_12, NOW)).toBe('12 Sep');
-    expect(formatBoardDate(new Date(2025, 6, 2, 9).getTime(), NOW)).toBe('2 Jul 2025');
+  it('dates use the selected format with their year', () => {
+    expect(formatBoardDate(SEP_12, 'DD-MM-YYYY')).toBe('12-09-2026');
+    expect(formatBoardDate(new Date(2025, 6, 2, 9).getTime(), 'DD-MM-YYYY')).toBe('02-07-2025');
   });
 
   it('an invalid scope param falls back to Certified; the board path carries its view', () => {

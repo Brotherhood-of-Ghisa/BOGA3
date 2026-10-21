@@ -66,7 +66,7 @@ it('fills the selected column in ink, so a full column still shows it', () => {
 
 it('marks the week it reads out, selected or not, so the two never disagree', () => {
   const { rerender } = render(chart());
-  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('5 – 11 Oct');
+  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('05-10-2026 – 11-10-2026');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 volume');
   // The readout names the week alone: the current week takes no note.
   expect(screen.queryByText('Current week', { includeHiddenElements: true })).toBeNull();
@@ -74,7 +74,7 @@ it('marks the week it reads out, selected or not, so the two never disagree', ()
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 240);
 
   rerender(chart({ selectedWeekKey: '2026-09-14' }));
-  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14 – 20 Sep');
+  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14-09-2026 – 20-09-2026');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('400 volume');
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 60);
 });
@@ -107,16 +107,16 @@ it('steps to the previous and next week with the readout\'s arrows, stopping at 
 it('reads a rest week as zero for a sum and as no sets for a best', () => {
   const { rerender } = render(chart({ selectedWeekKey: '2026-09-21' }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('0 volume');
-  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21 – 27 Sep 2026, Volume 0' });
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21-09-2026 – 27-09-2026, Volume 0' });
 
   rerender(chart({ metric: 'estimatedRM1', selectedWeekKey: '2026-09-21' }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('No sets');
-  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21 – 27 Sep 2026, 1RM No sets' });
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21-09-2026 – 27-09-2026, 1RM No sets' });
 });
 
 it('speaks a unit that differs from the metric', () => {
   render(chart({ metric: 'estimatedRM1' }));
-  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 5 – 11 Oct 2026, 1RM 80.0 kg, Current week' });
+  expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 05-10-2026 – 11-10-2026, 1RM 80.0 kg, Current week' });
 });
 
 it('reads an unavailable week as unavailable', () => {
@@ -169,7 +169,7 @@ it('steps through weeks as an adjustable element', () => {
   const { rerender } = render(chart({ onSelectWeek }));
   const plot = screen.getByTestId(`${ID}-plot`);
   expect(plot).toHaveProp('accessibilityRole', 'adjustable');
-  expect(plot).toHaveProp('accessibilityValue', { text: 'Week of 5 – 11 Oct 2026, Volume 100, Current week' });
+  expect(plot).toHaveProp('accessibilityValue', { text: 'Week of 05-10-2026 – 11-10-2026, Volume 100, Current week' });
   fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
   expect(onSelectWeek).not.toHaveBeenCalled(); // already the newest week
   fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });

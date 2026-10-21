@@ -22,7 +22,7 @@ export type GroupRankChartProps = {
   series: GroupRankSeries;
   selectedIndex: number;
   onSelect: (index: number) => void;
-  /** `Mon 5`, `Oct`: one short label per column. */
+  /** A formatted week date or month name for each column. */
   columnLabels: string[];
   accessibilityLabel: string;
 };
@@ -128,7 +128,6 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
             testID={`group-rank-chart-label-${index}`}>
             <Text
               allowFontScaling={false}
-              numberOfLines={1}
               style={[
                 todayText.microLabel,
                 index === selectedIndex ? todayText.microLabelStrong : todayText.microLabelFaint,

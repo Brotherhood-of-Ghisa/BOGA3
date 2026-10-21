@@ -14,9 +14,8 @@ import {
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
-import { formatMonthDayTime } from '@/src/utils/local-time';
+import { formatMonthDayTime, formatDateRange } from '@/src/utils/local-time';
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTHS = [
   'January',
   'February',
@@ -35,15 +34,10 @@ const MONTHS = [
 export const monthName = (date: Date): string => MONTHS[date.getMonth()];
 export const shortMonthName = (date: Date): string => monthName(date).slice(0, 3);
 
-/** `Mon 13`, or `Mon 13 Oct` with its month. */
-export const weekDayLabel = (date: Date, withMonth: boolean): string =>
-  `${WEEKDAYS[date.getDay()]} ${date.getDate()}${withMonth ? ` ${shortMonthName(date)}` : ''}`;
-
-/** `Mon 13 – Sun 19`; a week across two months names both (`Mon 29 Sep – Sun 5 Oct`). */
-export const formatWeekRange = (window: LocalWindow): string => {
+/** The local Monday–Sunday range in the selected date format. */
+export const formatWeekRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
   const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
-  const acrossMonths = sunday.getMonth() !== window.start.getMonth();
-  return `${weekDayLabel(window.start, acrossMonths)} – ${weekDayLabel(sunday, acrossMonths)}`;
+  return formatDateRange(window.start, sunday, dateFormat);
 };
 
 /** A count's signed absolute difference: `+4`, `−3`, `±0`. */
@@ -134,7 +128,7 @@ export const formatSessionSummaryDuration = (session: SessionSummaryFigures): st
 
 export const sessionSummaryAccessibilityLabel = (
   session: SessionSummaryFigures,
-  dateFormat?: ExerciseDateFormat
+  dateFormat: ExerciseDateFormat
 ): string => {
   const gym = session.gymName?.trim();
   return [

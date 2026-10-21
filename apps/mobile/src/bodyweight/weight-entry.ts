@@ -1,5 +1,6 @@
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { parseSetWeight } from '@/src/exercise-calculations';
-import { formatCurrentDateTime, parseSessionDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime, parseSessionDateTime } from '@/src/utils/local-time';
 
 export { isValidSessionWeight } from './as-of';
 
@@ -22,9 +23,9 @@ export const requireDate = (date: Date, label: string): void => {
 
 // Date fields show minutes; keeping unchanged text must not alter a reading's
 // exact timestamp or its ordering against other readings in that same minute.
-export function resolveMeasurementDate(text: string, original: Date, now = new Date()): Date {
-  const date = text.trim() === formatCurrentDateTime(original) ? original : parseSessionDateTime(text);
-  if (!date) throw new Error('Use a valid date and time: YYYY-MM-DD HH:mm.');
+export function resolveMeasurementDate(text: string, original: Date, now = new Date(), dateFormat: ExerciseDateFormat = 'YYYY-MM-DD'): Date {
+  const date = text.trim() === formatLocalDateTime(original.getTime(), dateFormat) ? original : parseSessionDateTime(text, dateFormat);
+  if (!date) throw new Error(`Use a valid date and time: ${dateFormat} HH:mm.`);
   requireDate(date, 'measurement date');
   if (date.getTime() > now.getTime()) throw new Error('The measurement date cannot be in the future.');
   return date;

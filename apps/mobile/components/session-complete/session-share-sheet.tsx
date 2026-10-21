@@ -1,3 +1,5 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatShortDate } from '@/src/utils/local-time';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
@@ -46,16 +48,6 @@ type SessionShareSheetProps = {
 const formatCount = (count: number, singular: string): string =>
   `${count} ${count === 1 ? singular : `${singular}s`}`;
 
-const formatSessionDate = (isoTimestamp: string): string => {
-  const parsed = new Date(isoTimestamp);
-  if (Number.isNaN(parsed.getTime())) return isoTimestamp;
-  return new Intl.DateTimeFormat('en', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(parsed);
-};
-
 type ShareRecord = { record: ExercisePersonalRecord; set: ExerciseRecordSet };
 
 // The image lists one set per exercise: its 1RM record's set, else its Weight
@@ -97,6 +89,7 @@ function ShareRecordRow({ record, set }: ShareRecord) {
  * can compare, in the design language. It never shows the gym or any location.
  */
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
+  const dateFormat = useDateFormat();
   const shareRecords = shareRecordsOf(snapshot.personalRecords);
   // The image carries comparisons, not shortfalls: an exercise the session
   // cannot compare yet is left out rather than pooled.
@@ -115,7 +108,7 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
         )}`}
       </Text>
       <Text allowFontScaling={false} style={styles.meta}>
-        {formatSessionDate(snapshot.completedAt)}
+        {formatShortDate(new Date(snapshot.completedAt), dateFormat)}
       </Text>
 
       {shareRecords.length > 0 ? (

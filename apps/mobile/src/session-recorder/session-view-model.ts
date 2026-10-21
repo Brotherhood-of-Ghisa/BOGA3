@@ -1,3 +1,5 @@
+import { formatShortDate } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { sumVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { calculateAnalyticsSetMetrics, ordinaryLoadContext, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
@@ -225,11 +227,6 @@ export const sessionTitleForStart = (startedAt: Date): string => {
   return 'Night training';
 };
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-
-/**
- * A finished session's title: the active title with its local start date
- * where the elapsed time was (`Afternoon training · 19 Feb`).
- */
-export const completedSessionTitle = (startedAt: Date): string =>
-  `${sessionTitleForStart(startedAt)} · ${startedAt.getDate()} ${MONTHS[startedAt.getMonth()]}`;
+/** The finished session's local date uses the active date preference. */
+export const completedSessionTitle = (startedAt: Date, dateFormat: ExerciseDateFormat): string =>
+  `${sessionTitleForStart(startedAt)} · ${formatShortDate(startedAt, dateFormat)}`;
