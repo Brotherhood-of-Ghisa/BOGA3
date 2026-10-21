@@ -28,18 +28,27 @@ appId: com.dinoderek.mobile
     visible: { id: "rm-mode-one" }
     timeout: 15000
 - assertVisible: { id: "rm-method-fixed" }
+- assertVisible: { text: "gym: All gyms" }
+- assertVisible: { text: "range: History look-back .*" }
+- assertVisible: { text: "effort: All known RIR" }
 - extendedWaitUntil:
     visible: { text: "Exploratory fit" }
     timeout: 15000
+- takeScreenshot: "03-default-controls"
 - scrollUntilVisible:
     element: { id: "rm-curve-plot" }
     direction: DOWN
     centerElement: true
 - takeScreenshot: "03-one-curve"
 - scrollUntilVisible:
-    element: { text: "gym: Gym B" }
+    element: { text: "gym: All gyms" }
     direction: UP
     centerElement: true
+- tapOn: { text: "gym: All gyms" }
+- tapOn: { text: "Gym B" }
+- extendedWaitUntil:
+    visible: { text: "48 sets · 16 sessions" }
+    timeout: 15000
 - tapOn: { text: "gym: Gym B" }
 - tapOn: { text: "All gyms" }
 - extendedWaitUntil:
@@ -82,7 +91,7 @@ appId: com.dinoderek.mobile
     direction: UP
     centerElement: true
 - tapOn: { id: "rm-method-fixed" }
-- tapOn: { text: "range: 12 weeks" }
+- tapOn: { text: "range: History look-back .*" }
 - tapOn: { text: "4 weeks" }
 - scrollUntilVisible:
     element: { id: "rm-curve-plot" }

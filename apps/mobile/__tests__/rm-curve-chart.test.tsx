@@ -19,8 +19,8 @@ import oracle from './fixtures/rm-curve-weekly-wave-oracle.json';
 let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
 const query = { exerciseDefinitionId: 'curve', start: new Date(wave.scenarios.plateau[0].startedAt),
-  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52, gym: 'latest' as const };
-const scope: CurveScope = { range: 24, gym: 'latest', rir: null };
+  end: new Date(wave.scenarios.plateau.at(-1)!.completedAt + 1), historyLookbackWeeks: 52, gym: { gymId: 'synthetic-gym' } };
+const scope: CurveScope = { range: 24, gym: { gymId: 'synthetic-gym' }, rir: null };
 const props = { scope, onScope: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
 const read = (data: Awaited<ReturnType<typeof loadRmCurve>>) => ({ status: 'ready' as const, data, retry: jest.fn() });
 beforeEach(() => { mockFixture = createInMemoryDatabase(); seedWaveHistory(mockFixture.database); });

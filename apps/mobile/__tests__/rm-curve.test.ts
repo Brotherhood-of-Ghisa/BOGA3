@@ -1,7 +1,7 @@
 import wave from './fixtures/rm-curve-weekly-wave.json';
 import oracle from './fixtures/rm-curve-weekly-wave-oracle.json';
 import { waveGraph } from './helpers/rm-curve-history';
-import { buildRmCurveModel, rmCurveLatestGym, rmCurvePriorStart, rmCurveWindow } from '@/src/rm-curve/model';
+import { buildRmCurveModel, rmCurvePriorStart, rmCurveWindow } from '@/src/rm-curve/model';
 import { predictRmCurveLoad, projectRmCurveSet, rmCurveKnots, rmCurveResidual } from '@/src/exercise-calculations/rm-curve';
 import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
 import vectors from '@/src/exercise-calculations/load-metrics-vectors.json';
@@ -91,7 +91,7 @@ it('scopes gym and RIR identically for observations and priors and retains missi
   expect(buildRmCurveModel(graph, { ...scope, gymId: 'synthetic-gym', rir: 9 }).observations).toEqual([]);
 });
 
-it('reads an unset gym as every gym and resolves the latest-trained default to a concrete scope', () => {
+it('reads an unset gym as every gym including No gym', () => {
   // The three-state convention (spec 09): unset every gym, null no gym, an id that gym.
   const graph = waveGraph(); const newest = graph.rows.reduce((a, b) => (b.completedAt > a.completedAt ? b : a));
   const window = { ...scope, end: new Date(scope.end.getTime() + 10) };
@@ -101,11 +101,7 @@ it('reads an unset gym as every gym and resolves the latest-trained default to a
   expect(every.gymId).toBeUndefined();
   expect(every.observations.map(p => p.setId)).toEqual(expect.arrayContaining(['no-gym-newest', newest.setId]));
   expect(every.observations).toHaveLength(buildRmCurveModel(graph, { ...window, gymId: 'synthetic-gym' }).observations.length + 1);
-  // The newest set had no gym, so the default is the no-gym scope, not every gym.
-  expect(rmCurveLatestGym(graph, window)).toBeNull();
-  graph.rows.pop();
-  expect(rmCurveLatestGym(graph, window)).toBe('synthetic-gym');
-  expect(rmCurveLatestGym({ ...graph, rows: [] }, window)).toBeNull();
+  expect(buildRmCurveModel(graph, { ...window, gymId: null }).observations.map(p => p.setId)).toEqual(['no-gym-newest']);
 });
 
 it('preserves singles, zero load and per-side/bodyweight coordinates and residuals', () => {
@@ -148,7 +144,8 @@ it('rejects nonperformed, nonworking, corrupt, overflow and noncanonical inputs 
 it('clamps the approved ranges to local History bounds and anchors the prior interval independently', () => {
   const now = new Date(2026, 9, 14, 12);
   const normal = rmCurveWindow(52, now);
-  expect(normal.start).toEqual(shiftCalendarWeeks(now, -12));
+  expect(normal.start).toEqual(historyWeekBounds(52, now).start);
+  for (const range of [4, 12, 24] as const) expect(rmCurveWindow(52, now, range).start).toEqual(shiftCalendarWeeks(now, -range));
   const clamped = rmCurveWindow(2, now, 24);
   expect(clamped.start).toEqual(historyWeekBounds(2, now).start);
   expect(rmCurveWindow(52, now, 'history').start).toEqual(historyWeekBounds(52, now).start);

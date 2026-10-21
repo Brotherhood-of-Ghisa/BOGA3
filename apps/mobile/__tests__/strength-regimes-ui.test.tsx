@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { RmCurveContent } from '@/components/rm-curve/content';
 import { periodLabel, selectedPeriod } from '@/components/rm-curve/regimes';
 import { curveGeometry } from '@/components/rm-curve/geometry';
-import { buildRmCurveModel, rmCurveLatestGym } from '@/src/rm-curve/model';
+import { buildRmCurveModel } from '@/src/rm-curve/model';
 import type { RmCurveRow } from '@/src/data/rm-curve';
 import { assessRegimes, assessSingleCurve } from '@/src/strength-regimes/assessment';
 import { fitStrengthRegimes, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
@@ -12,8 +12,7 @@ import { waveGraph } from './helpers/rm-curve-history';
 
 const graph = waveGraph();
 const query = { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1), historyLookbackWeeks: 52 };
-// The screen's default: the most recently trained gym, resolved before the scope is built.
-const model = () => buildRmCurveModel(graph, { ...query, gymId: rmCurveLatestGym(graph, query) });
+const model = () => buildRmCurveModel(graph, query);
 
 afterEach(() => jest.useRealTimers());
 
@@ -150,7 +149,7 @@ it('defaults to One curve and Parsimonious, keeps controls on failure, and offer
   jest.useFakeTimers();
   const onScope = jest.fn();
   const props = { read: { status: 'ready' as const, data: model(), retry: jest.fn() },
-    scope: { range: 24 as const, gym: 'latest' as const, rir: null }, onScope,
+    scope: { range: 24 as const, gym: { gymId: 'synthetic-gym' }, rir: null }, onScope,
     dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52 };
   const component = render(<RmCurveContent {...props} />);
   expect(screen.getByTestId('rm-mode-one').props.accessibilityState.selected).toBe(true);
@@ -216,7 +215,7 @@ it('bounds a thousand-session UI request, retains every plotted point, and recov
   const large = { ...m, inferenceSessions: Array.from({ length: 1000 }, (_, i) => ({ sessionId: `long-${i}`, time: i,
     selectedSet: { setId: `long-set-${i}`, reps: 5, rir: i % 4, load: 80 + i % 3 } })) };
   const props = { read: { status: 'ready' as const, data: large, retry: jest.fn() },
-    scope: { range: 'history' as const, gym: 'latest' as const, rir: null }, onScope: jest.fn(),
+    scope: { range: 'history' as const, gym: { gymId: 'synthetic-gym' }, rir: null }, onScope: jest.fn(),
     dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 520 };
   const view = render(<RmCurveContent {...props} />);
   fireEvent.press(screen.getByTestId('rm-mode-two'));

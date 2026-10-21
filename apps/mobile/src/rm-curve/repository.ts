@@ -1,12 +1,11 @@
 import { loadRmCurveGraph, type RmCurveRead } from '@/src/data/rm-curve';
-import { buildRmCurveModel, rmCurveLatestGym, rmCurvePriorStart, type RmCurveEvaluation } from './model';
+import { buildRmCurveModel, rmCurvePriorStart, type RmCurveEvaluation } from './model';
 
 /**
- * The curve's gym: [[1rm.curve-scope]]'s default (`'latest'`, the most recently
- * trained gym, resolved once the graph is read), or a chosen three-state scope
- * (`src/utils/gym-scope-route.ts`) — `{}` is every gym.
+ * Three-state gym scope (`src/utils/gym-scope-route.ts`): `{}` is every gym,
+ * `null` is No gym, an ID selects that gym. Default: [[1rm.curve-scope]].
  */
-export type RmCurveGym = 'latest' | { gymId?: string | null };
+export type RmCurveGym = { gymId?: string | null };
 
 export type RmCurveQuery = Omit<RmCurveEvaluation, 'gymId'> & { exerciseDefinitionId: string; gym: RmCurveGym };
 
@@ -16,7 +15,7 @@ export function createRmCurveRepository(read: typeof loadRmCurveGraph = loadRmCu
     const input: RmCurveRead = { exerciseDefinitionId: query.exerciseDefinitionId, start: rmCurvePriorStart(window), end: window.end };
     const graph = await read(input);
     if (graph === null) return null;
-    const gymId = gym === 'latest' ? rmCurveLatestGym(graph, window) : gym.gymId;
+    const gymId = gym.gymId;
     return buildRmCurveModel(graph, gymId === undefined ? window : { ...window, gymId });
   };
 }

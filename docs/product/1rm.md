@@ -107,13 +107,14 @@ Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`
 
 ### 1rm.curve-scope · definition · accepted
 
-Default: latest 12 weeks through today, bounded by Settings' History look-back;
-selected exercise's latest trained gym, including No gym, stable gym ID
-tiebreak. Offer 4/12/24 weeks and configured History look-back, clamped to bounds.
-Effort follows [[1rm.curve-population]]. Exercise changes select its latest gym;
-range/gym/effort changes coherently recompute points and [[1rm.curve-fitting]].
+Each fresh chart defaults to Settings' configured History look-back through
+today, All gyms (including No gym) and All known RIR. Manual choices last for
+that mounted chart; opening another exercise resets the defaults. Offer
+4/12/24 weeks and configured History look-back, clamped to bounds.
+Effort follows [[1rm.curve-population]]; range/gym/effort changes coherently
+recompute points and [[1rm.curve-fitting]].
 All gyms preserves provenance; pooling establishes neither equipment equivalence
 nor reliable strength changes.
 
-Why: owner approved scope/design defaults 2026-10-14.
-Code: `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
+Why: owner approved scope/design defaults 2026-10-14; broader initial scope approved 2026-10-21.
+Code: `apps/mobile/components/rm-curve/screen.tsx`; `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.
