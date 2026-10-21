@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import {
-  GroupLoadingState,
+  GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
   groupScreenStyles,
@@ -69,7 +69,14 @@ export default function ExerciseShareRoute() {
     );
   }
 
-  return <ExerciseShareContent groupId={groupId} rawPayload={rawPayload} userId={user.id} />;
+  return (
+    <ExerciseShareContent
+      groupId={groupId}
+      key={`${user.id}:${groupId}:${rawPayload}`}
+      rawPayload={rawPayload}
+      userId={user.id}
+    />
+  );
 }
 
 function ExerciseShareContent({
@@ -150,7 +157,12 @@ function ExerciseShareContent({
     return (
       <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
         <Stack.Screen options={{ title: 'Shared exercise' }} />
-        <GroupLoadingState testID="exercise-share-loading" />
+        <GroupMissingDataState
+          error={group.error}
+          offline={group.offline}
+          onRetry={group.refresh}
+          testIDPrefix="exercise-share"
+        />
       </View>
     );
   }
@@ -184,6 +196,8 @@ function ExerciseShareContent({
     setSaveFeedback(`"${exercise.name}" was added to your exercises.`);
   };
 
+  const addLabel = existingInCatalog ? 'Add another exercise' : 'Add to my exercises';
+
   return (
     <>
       <Stack.Screen options={{ title: 'Shared exercise' }} />
@@ -193,7 +207,7 @@ function ExerciseShareContent({
         {existingInCatalog && !savedExercise ? (
           <Notice
             live
-            message={`You already have an active exercise named "${payload.name}". Adding this will create another definition.`}
+            message={`You already have an active exercise named "${payload.name}".`}
             testID="exercise-share-exists-notice"
             tone="neutral"
           />
@@ -218,9 +232,9 @@ function ExerciseShareContent({
           ) : (
             <>
               <ActionButton
-                accessibilityLabel="Add to my exercises"
+                accessibilityLabel={addLabel}
                 disabled={savePending}
-                label={savePending ? 'Adding…' : 'Add to my exercises'}
+                label={savePending ? 'Adding…' : addLabel}
                 onPress={() => void handleDirectSave()}
                 testID="exercise-share-save-btn"
                 variant="primary"

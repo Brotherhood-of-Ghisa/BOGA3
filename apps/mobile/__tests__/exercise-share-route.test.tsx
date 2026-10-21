@@ -135,7 +135,7 @@ describe('ExerciseShareRoute', () => {
     expect(screen.getByTestId('exercise-share-customize-btn')).toBeTruthy();
   });
 
-  it('saves the exercise directly when "Add to my exercises" is pressed', async () => {
+  it('saves the exercise directly when save button is pressed', async () => {
     const saveSpy = jest.spyOn(exerciseCatalogData, 'saveExerciseCatalogExercise');
     render(<ExerciseShareRoute />);
 
@@ -160,6 +160,111 @@ describe('ExerciseShareRoute', () => {
 
     fireEvent.press(screen.getByTestId('exercise-share-view-catalog-btn'));
     expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)/exercise-catalog');
+  });
+
+  it('resets import state when link parameters change', async () => {
+    const { rerender } = render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
+    expect(screen.getByTestId('exercise-share-title')).toHaveTextContent('Bulgarian Split Squat');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-share-save-btn'));
+    });
+
+    expect(await screen.findByTestId('exercise-share-feedback')).toBeTruthy();
+    expect(screen.getByTestId('exercise-share-view-catalog-btn')).toBeTruthy();
+
+    const secondPayload: ExerciseSharePayload = {
+      v: 1,
+      name: 'Romanian Deadlift',
+      loadInputMode: 'total_load',
+      bodyweightContribution: 0,
+      mappings: [{ muscleGroupId: 'hamstrings', weight: 1.0, role: 'primary' }],
+    };
+
+    mockParams = {
+      groupId: 'group-1',
+      payload: encodeExerciseSharePayload(secondPayload),
+    };
+
+    rerender(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-title')).toHaveTextContent('Romanian Deadlift');
+    expect(screen.queryByTestId('exercise-share-feedback')).toBeNull();
+    expect(screen.queryByTestId('exercise-share-view-catalog-btn')).toBeNull();
+    expect(screen.getByTestId('exercise-share-save-btn')).toBeTruthy();
+  });
+
+  it('renders offline state when offline without cached group data', async () => {
+    mockConnected = false;
+    (groupsApi.getGroup as jest.Mock).mockRejectedValue(
+      new groupsApi.GroupApiError('NETWORK', 'Network request failed.')
+    );
+    render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-offline-empty-state')).toBeTruthy();
+    expect(screen.getByText("You're offline")).toBeTruthy();
+    expect(screen.getByText("This loads when you're back online.")).toBeTruthy();
+  });
+
+  it('renders error state and allows retry on network/internal failure', async () => {
+    (groupsApi.getGroup as jest.Mock).mockRejectedValueOnce(
+      new groupsApi.GroupApiError('INTERNAL', 'Server error')
+    );
+    render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-error-state')).toBeTruthy();
+    expect(screen.getByText("Couldn't load this")).toBeTruthy();
+    expect(screen.getByTestId('exercise-share-error-state-retry')).toBeTruthy();
+
+    (groupsApi.getGroup as jest.Mock).mockResolvedValue(VALID_GROUP_DETAIL);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-share-error-state-retry'));
+    });
+
+    expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
+  });
+
+  it('renders update required state when client is incompatible', async () => {
+    (groupsApi.getGroup as jest.Mock).mockRejectedValue(
+      new groupsApi.GroupApiError('UPDATE_REQUIRED', 'Upgrade app')
+    );
+    render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-error-state')).toBeTruthy();
+    expect(screen.getByText('Group comparisons unavailable')).toBeTruthy();
+  });
+
+  it('displays duplicate notice without explanatory text and uses "Add another exercise" label', async () => {
+    render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-exists-notice')).toHaveTextContent(
+      'You already have an active exercise named "Bulgarian Split Squat".'
+    );
+    expect(screen.queryByText(/Adding this will create another definition/)).toBeNull();
+    expect(screen.getByTestId('exercise-share-save-btn')).toHaveTextContent('Add another exercise');
+  });
+
+  it('uses "Add to my exercises" label and omits duplicate notice when exercise is novel', async () => {
+    const novelPayload: ExerciseSharePayload = {
+      v: 1,
+      name: 'Completely Novel Exercise 999',
+      loadInputMode: 'total_load',
+      bodyweightContribution: 0,
+      mappings: [{ muscleGroupId: 'quads', weight: 1.0, role: 'primary' }],
+    };
+    mockParams = {
+      groupId: 'group-1',
+      payload: encodeExerciseSharePayload(novelPayload),
+    };
+
+    render(<ExerciseShareRoute />);
+
+    expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-share-exists-notice')).toBeNull();
+    expect(screen.getByTestId('exercise-share-save-btn')).toHaveTextContent('Add to my exercises');
   });
 
   it('opens customize modal when "Customize and add…" is pressed', async () => {
