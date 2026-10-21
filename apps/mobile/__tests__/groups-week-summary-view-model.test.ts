@@ -250,10 +250,22 @@ describe('formatting', () => {
     // One set #1 on Weight and on 1RM is two group records.
     expect(buildGroupRecordLine([record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }])]))
       .toEqual({ kind: 'many', count: '2 group records' });
+  });
+
+  it('counts the boards the session view shows: no Volume, no provisional or voided record', () => {
+    // A record that took 1RM and Volume is one group record here and one row
+    // on the session's Group records card, which never shows Volume.
+    expect(buildGroupRecordLine([record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }, { metric: 'volume', value: 2400, unit: 'kg' }])]))
+      .toEqual({ kind: 'one', lead: 'Squat 1RM 150.0', note: 'group record' });
+    // A Volume-only record shows nowhere on the session, so it does not count.
+    expect(buildGroupRecordLine([record('Bench', [{ metric: 'volume', value: 2400, unit: 'kg' }])])).toBeNull();
+    // A provisional or voided record can still move or is gone: the session
+    // view hides both, so neither counts.
     expect(buildGroupRecordLine([
-      record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }]),
-      record('Bench', [{ metric: 'volume', value: 2400, unit: 'kg' }]),
-    ])).toEqual({ kind: 'many', count: '2 group records' });
+      record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }]),
+      { ...record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }]), provisional: true },
+      { ...record('Deadlift', [{ metric: 'e1rm', value: 200, unit: 'kg' }]), voided: true },
+    ])).toEqual({ kind: 'one', lead: 'Bench 1RM 120.0', note: 'group record' });
   });
 
   it('counts only record values, not the leader or previous holders an event may carry', () => {

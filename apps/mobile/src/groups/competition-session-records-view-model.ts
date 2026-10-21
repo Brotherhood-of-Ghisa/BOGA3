@@ -63,7 +63,7 @@ export function formatGroupSessionDuration(session: Pick<CompetitionSessionWire,
 }
 
 /** Group competition no longer ranks Volume; only the boards it keeps show. */
-const SHOWN_BOARD = (metric: string): boolean => metric !== 'volume';
+export const SHOWN_BOARD = (metric: string): boolean => metric !== 'volume';
 
 /** Records only once the session is completed: an in-progress record can still move or vanish. */
 export const shownSessionRecords = (session: Pick<CompetitionSessionWire, 'status'>,
