@@ -233,6 +233,16 @@ export FAIL_STAGE=history
 if worker history; then fail 'migration history mismatch accepted'; fi
 assert_absent 'db push|functions deploy|eas-cli build' "$FIXTURE/calls" 'deployment continued after history mismatch'
 unset FAIL_STAGE
+touch "$FIXTURE/repo/supabase/migrations/20261017000000_duplicate.sql"
+git -C "$FIXTURE/repo" add supabase/migrations/20261017000000_duplicate.sql
+git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm 'duplicate migration version'
+saved_sha="$sha"
+sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
+if worker duplicate-migration; then fail 'duplicate migration version accepted'; fi
+[[ "$(cat "$FIXTURE/duplicate-migration/log")" == *'duplicate migration version 20261017000000'* ]] || fail 'duplicate version not identified'
+assert_absent 'db query|db push|functions deploy|eas-cli build|eas-cli submit' "$FIXTURE/calls" 'deployment continued with duplicate migration versions'
+git -C "$FIXTURE/repo" reset -q --hard "$saved_sha"
+sha="$saved_sha"
 echo dirty >> "$FIXTURE/repo/apps/mobile/eas.json"
 if worker dirty origin/main; then fail 'dirty release source accepted'; fi
 [[ ! -s "$FIXTURE/calls" ]] || fail 'dirty release started external commands'
