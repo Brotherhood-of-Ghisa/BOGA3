@@ -7,6 +7,12 @@
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
+import {
+  exerciseSearchTextMatches,
+  normalizeExerciseSearchWords,
+  seedMuscleSearchTermsById,
+} from '@/src/exercise-catalog/search';
+
 import type { GroupApiError } from './api';
 import type { GroupExercise, GroupRole } from './types';
 import { canManageGroup, describeGroupWriteError } from './write-view-model';
@@ -172,18 +178,26 @@ const STANDARD_EXERCISES: StandardExerciseOption[] = SYSTEM_EXERCISE_DEFINITION_
   loadInputMode: seed.loadInputMode,
 })).sort((left, right) => left.name.localeCompare(right.name));
 
+/** Search haystacks by seed id: name plus the origin's muscle-group terms. */
+const STANDARD_EXERCISE_SEARCH_TEXTS: ReadonlyMap<string, string> = new Map(
+  STANDARD_EXERCISES.map((option) => {
+    const muscleTerms = seedMuscleSearchTermsById.get(option.sourceExerciseId) ?? '';
+    return [option.sourceExerciseId, `${option.name} ${muscleTerms}`.toLowerCase()];
+  }),
+);
+
 /**
- * The bundled standard exercises whose name contains every typed word
- * (case-insensitive), by name, capped at `limit`. `total` counts every match.
+ * The bundled standard exercises whose name or primary muscle groups contain
+ * every typed word (case-insensitive), by name, capped at `limit`. `total`
+ * counts every match.
  */
 export const searchStandardExercises = (
   query: string,
   limit: number = STANDARD_EXERCISE_RESULT_LIMIT,
 ): { options: StandardExerciseOption[]; total: number } => {
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = STANDARD_EXERCISES.filter((option) => {
-    const name = option.name.toLowerCase();
-    return words.every((word) => name.includes(word));
-  });
+  const words = normalizeExerciseSearchWords(query);
+  const matches = STANDARD_EXERCISES.filter((option) =>
+    exerciseSearchTextMatches(words, STANDARD_EXERCISE_SEARCH_TEXTS.get(option.sourceExerciseId) ?? option.name),
+  );
   return { options: matches.slice(0, limit), total: matches.length };
 };

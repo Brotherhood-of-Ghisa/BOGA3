@@ -6,8 +6,14 @@
 // and right after a local write; names come from the cache, with placeholders
 // when an entry is missing.
 
-import { normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
+import {
+  buildExerciseCatalogSearchText,
+  exerciseSearchTextMatches,
+  normalizeExerciseSearchWords,
+  seedMuscleSearchTermsById,
+} from '@/src/exercise-catalog/search';
 
+import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import type { GroupExercise } from './types';
 
 /** A personal exercise as the linking UI needs it (a subset of the catalogue row). */
@@ -15,6 +21,8 @@ export type LinkableExercise = {
   id: string;
   name: string;
   deletedAt: Date | null;
+  /** Primary muscle mappings, for muscle-name search ([[search.buildExerciseCatalogSearchText]]). */
+  mappings: ExerciseCatalogExercise['mappings'];
 };
 
 /** A live link row (`listLinks()`). */
@@ -54,13 +62,14 @@ const isLive = (exercise: LinkableExercise): boolean => exercise.deletedAt === n
 const byName = (left: { name: string }, right: { name: string }): number =>
   left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
 
-const matchesQuery = (words: string[], ...texts: string[]): boolean => {
-  if (words.length === 0) {
-    return true;
-  }
-  const haystack = texts.join(' ').toLowerCase();
-  return words.every((word) => haystack.includes(word));
-};
+/**
+ * What a group-exercise search matches: its (possibly renamed) name, its origin
+ * exercise's muscle groups, and the group's name.
+ */
+const groupExerciseSearchText = (groupExercise: GroupExercise, groupName: string): string =>
+  [groupExercise.name, seedMuscleSearchTermsById.get(groupExercise.source_exercise_id ?? '') ?? '', groupName]
+    .join(' ')
+    .toLowerCase();
 
 // ---- Notes ------------------------------------------------------------------
 
@@ -221,7 +230,7 @@ export const buildPickerGroupSections = ({
     }
     const rows = catalog.exercises
       .filter((groupExercise) => groupExercise.archived_at_ms === null)
-      .filter((groupExercise) => matchesQuery(words, groupExercise.name, catalog.groupName))
+      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName)))
       .map((groupExercise): PickerGroupRow => {
         const linkedExercises = links
           .filter(
@@ -303,11 +312,18 @@ export const buildPickSheetModel = ({
   return { suggestion, choices, defaultOption: suggestion ? 'suggested' : 'add-new' };
 };
 
-/** Pick-sheet "Choose another" search over my live exercises. */
-export const filterPickSheetChoices = (choices: readonly PickSheetChoice[], query: string): PickSheetChoice[] => {
-  const words = normalizeExerciseSearchWords(query);
-  return choices.filter((choice) => matchesQuery(words, choice.exercise.name));
-};
+/** Pick-sheet "Choose another" search over my live exercises (name + muscle groups). */
+export const filterPickSheetChoices = (
+  choices: readonly PickSheetChoice[],
+  query: string,
+  muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>,
+): PickSheetChoice[] =>
+  choices.filter((choice) =>
+    exerciseSearchTextMatches(
+      normalizeExerciseSearchWords(query),
+      buildExerciseCatalogSearchText(choice.exercise, muscleGroupsById),
+    )
+  );
 
 // ---- Link screen (E0.3) -----------------------------------------------------
 
@@ -407,7 +423,7 @@ export const buildLinkScreenModel = ({
     const rows = (catalog.exercises ?? [])
       .filter((groupExercise) => groupExercise.archived_at_ms === null)
       .filter((groupExercise) => !linkedTargets.has(`${catalog.groupId}:${groupExercise.group_exercise_id}`))
-      .filter((groupExercise) => matchesQuery(words, groupExercise.name, catalog.groupName))
+      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName)))
       .map(
         (groupExercise): LinkScreenAvailableRow => ({
           key: `${catalog.groupId}:${groupExercise.group_exercise_id}`,

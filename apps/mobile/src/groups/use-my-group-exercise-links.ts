@@ -57,7 +57,13 @@ export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksSt
             groupExerciseId: link.groupExerciseId,
             exerciseName: names.get(link.exerciseDefinitionId) ?? null,
           })),
-        exercises: exercises.map(({ id, name, loadInputMode, deletedAt }) => ({ id, name, loadInputMode, deletedAt })),
+        exercises: exercises.map(({ id, name, loadInputMode, deletedAt, mappings }) => ({
+          id,
+          name,
+          loadInputMode,
+          deletedAt,
+          mappings,
+        })),
         allLinks: links.map(({ exerciseDefinitionId, groupId: linkGroupId, groupExerciseId }) => ({
           exerciseDefinitionId,
           groupId: linkGroupId,

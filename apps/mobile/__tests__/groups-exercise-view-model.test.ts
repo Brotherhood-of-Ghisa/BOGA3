@@ -164,6 +164,14 @@ describe('searchStandardExercises', () => {
     expect(all.options).toHaveLength(Math.min(STANDARD_EXERCISE_RESULT_LIMIT, all.total));
   });
 
+  it('matches primary muscle groups, as every exercise search does', () => {
+    const bench = searchStandardExercises('chest').options.find((option) => option.name.toLowerCase().includes('bench'));
+    expect(bench).toBeTruthy();
+    const { options, total } = searchStandardExercises('pectoralis');
+    expect(options.length).toBeGreaterThan(0);
+    expect(total).toBeGreaterThanOrEqual(options.length);
+  });
+
   it('returns nothing for an unmatched query', () => {
     expect(searchStandardExercises('zzz-no-such-lift')).toEqual({ options: [], total: 0 });
   });

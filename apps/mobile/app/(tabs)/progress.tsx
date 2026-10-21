@@ -64,6 +64,12 @@ import { progressHistoryHref } from '@/src/navigation/routes';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import {
+  buildExerciseCatalogSearchText,
+  exerciseSearchTextMatches,
+  indexExerciseCatalogMuscleGroupsById,
+  normalizeExerciseSearchWords,
+} from '@/src/exercise-catalog/search';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 import { GymPicker } from '@/components/gyms/gym-picker';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
@@ -237,6 +243,8 @@ export type StatsScreenShellProps = {
   exerciseMetric: ProgressExerciseMetric;
   onSelectExerciseMetric: (metric: ProgressExerciseMetric) => void;
   exerciseListItems: ExerciseListItem[];
+  /** Catalogue search haystacks by exercise id (name + muscle groups). */
+  exerciseSearchIndex: ReadonlyMap<string, string>;
   exerciseMappings?: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
   exerciseDataReady?: boolean;
   exerciseDataError?: string | null;
@@ -270,6 +278,7 @@ export function StatsScreenShell({
   exerciseMetric,
   onSelectExerciseMetric,
   exerciseListItems,
+  exerciseSearchIndex,
   exerciseMappings = [],
   exerciseDataReady = true,
   exerciseDataError = null,
@@ -327,11 +336,11 @@ export function StatsScreenShell({
   // A row with nothing for the metric in either period is not drawn, as in the
   // Muscle table's contributions.
   const filteredExerciseListItems = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
+    const searchWords = normalizeExerciseSearchWords(searchQuery);
     const matching = exerciseListItems.filter(item => hasComparisonMetric(item, exerciseMetric)
-      && (query === '' || item.name.toLowerCase().includes(query)));
+      && exerciseSearchTextMatches(searchWords, exerciseSearchIndex.get(item.id) ?? item.name));
     return sortExerciseListItems(matching, exerciseSortMode, exerciseMetric);
-  }, [exerciseListItems, exerciseMetric, exerciseSortMode, searchQuery]);
+  }, [exerciseListItems, exerciseSearchIndex, exerciseMetric, exerciseSortMode, searchQuery]);
 
   const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
@@ -372,7 +381,7 @@ export function StatsScreenShell({
           <View style={styles.searchRow}>
             <View style={styles.search}>
               <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
-                onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+                onChangeText={onSearchQueryChange} placeholder="Search exercises or muscles" testID="stats-search-input" value={searchQuery} />
             </View>
             {onSelectGym ? <GymPicker onChange={onSelectGym} options={gymOptions} testID="stats-gym" value={gymId} /> : null}
           </View>
@@ -690,8 +699,14 @@ function StatsContent() {
       previous: periodFigures(lastPeriod.aggregatesById.get(item.id)),
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
+  // Name plus muscle-group names, the haystack the shared catalogue search
+  // matches word by word, built from the same catalogue rows as the list.
+  const exerciseSearchIndex = useMemo(() => {
+    const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(catalog.muscleGroups);
+    return new Map(catalog.exercises.map(item => [item.id, buildExerciseCatalogSearchText(item, muscleGroupsById)]));
+  }, [catalog.exercises, catalog.muscleGroups]);
   return <StatsScreenShell {...summary} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
-    exerciseMappings={catalog.exercises} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
+    exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
