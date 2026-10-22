@@ -214,6 +214,8 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
     perform vault.create_secret('http://127.0.0.1:9/functions/v1/notification-worker','notification_worker_url');
     perform vault.create_secret('fixture-only','notification_worker_key');
   end \$\$;
+  update app_public.notification_deliveries set state='ticket',ticket_at=now(),receipt_attempts=0,
+    receipt_available_at=now(),receipt_lease_until=null where id=${CD};
   select app_public.notification_sweep() is not null;
   rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
 run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null

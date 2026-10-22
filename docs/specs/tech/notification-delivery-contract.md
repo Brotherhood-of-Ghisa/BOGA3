@@ -20,13 +20,15 @@ Pre-cutover completed history never replays; a pre-cutover active workout can
 complete freshly without replaying its start. Its rank baseline starts at the
 cutover's current coherent board, or the first trustworthy later publication
 if rebuilding; unavailable earlier ranks are never invented.
-Isolated session triggers append immutable activity moments; start admission
-survives completion before recovery. Descendant writes
-kick the worker. Raw intake retains no source/workout/allocator locks. Exact
-current digests reject changed graphs even if intake failed. Recovery admits a
-fair bounded batch, locks all repair groups then all sources before enqueue,
-and reads source rows/shares with the same identity and
-deadline, rather than replaying stream history. Missing first moments fail closed;
+An isolated session trigger appends immutable activity moments; each new moment
+queues its source once and kicks the worker, so start admission survives
+completion before admission. Descendant writes queue and kick nothing. Raw intake
+retains no source/workout/allocator locks. Exact current digests reject changed
+graphs even if intake failed. Admission claims a bounded batch of queued sources,
+locks their share groups then all sources before enqueue, tracks and starts each
+once, then forgets it; it never rescans recent sessions or replays stream
+history. Nothing repairs a failed trigger later: a missed share or a failed
+admission loses that alert and is logged. Missing first moments fail closed;
 known failed admissions become immutable forfeiture markers, never newer source
 timestamps. A first capture failure can forfeit that alert. If both the isolated
 write and its diagnostic fail, erased earlier timing cannot be reconstructed.
@@ -221,16 +223,20 @@ allowlisted outcomes only, never tokens, ciphertext, names, secrets or raw error
 
 The deterministic sink is enabled only by the local configuration and handles
 synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
-Provider sending defaults off. The five-minute backstop uses Vault entries
-`notification_worker_url` and `notification_worker_key`; absent entries do
-nothing. The key matches the runtime's default secret API key, with legacy
+Provider sending defaults off. The five-minute backstop calls the worker only
+while `notification_worker_due()` finds queued admissions, unready confirmed
+completions, due sends, receipts, expiries or pruning; an idle sweep writes
+nothing. It uses Vault entries `notification_worker_url` and
+`notification_worker_key`; absent entries do nothing. The key matches the runtime's default secret API key, with legacy
 service-role fallback for projects without one. The worker accepts both runtime
 credentials. Releases authenticate a read-only worker probe before building. Configure
 credentials only under explicit hosted rollout authority. Tests use real sync intake, confirmation,
 publication and service boundaries, with synthetic local registrations.
 Use `./boga test fast` plus the operator-agreed backend lane set; registration,
 claims and the sink contract live in `supabase/tests/notification-delivery.sh`;
-workout proof/publication fixtures in `supabase/tests/notification-workout-events.sh`.
+workout proof/publication fixtures in `supabase/tests/notification-workout-events.sh`,
+which also asserts `supabase/tests/notification-idle-benchmark.sql`: idle work
+must not grow with recent workouts or history.
 
 ## Rollout boundary
 

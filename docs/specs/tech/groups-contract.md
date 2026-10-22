@@ -184,8 +184,8 @@ intake and atomic whole-board snapshots.
 **Enqueue.** Isolated triggers on sessions, session exercises, sets,
 `load_input_mode` changes and links, plus catch-up on unarchive and a new
 membership period. Set and session-exercise writes queue their definitions;
-session inserts, status/start/deletion changes, recreated shares, rules drains
-and notification recovery queue the whole session. A session job re-applies
+session inserts, status/start/deletion changes, recreated shares and rules
+drains queue the whole session. A session job re-applies
 only targets they reach: a live link, board state linked to one, or an active
 certification or record on their sets. No `DELETE` triggers: the next
 evaluation drops hard-delete leftovers. Non-uuid, unknown or foreign links
