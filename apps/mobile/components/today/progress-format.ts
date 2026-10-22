@@ -1,7 +1,7 @@
 // The Progress card's words and chart geometry (pure). The figures come from
 // `src/progress-summary`; this file only says them.
 
-import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressPeriod } from '@/src/progress-summary';
+import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
 import type { LocalWindow } from '@/src/utils/local-calendar';
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
@@ -51,14 +51,14 @@ export const formatSignedCount = (difference: number): string => {
 export const paceTone = (difference: number): ChangeTone =>
   difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
-export const paceDifference = (period: TodayProgressPeriod): number =>
-  period.toDate.workingSets - period.previous.toSameDay.workingSets;
+export const paceDifference = (month: TodayProgressMonth): number =>
+  month.toDate.workingSets - month.previous.toSameDay.workingSets;
 
-/** Names the configured preceding block alongside the signed count. */
-export const formatPacePhrase = (period: TodayProgressPeriod): string => {
-  const difference = paceDifference(period);
+/** `ahead of Sep's pace` / `behind Sep's pace` / `level with Sep's pace`. */
+export const formatPacePhrase = (month: TodayProgressMonth): string => {
+  const difference = paceDifference(month);
   const relation = difference > 0 ? 'ahead of' : difference < 0 ? 'behind' : 'level with';
-  return `${relation} the previous ${period.weeks === 1 ? 'week' : `${period.weeks} weeks`}`;
+  return `${relation} ${shortMonthName(month.previous.window.start)}'s pace`;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -80,14 +80,20 @@ export const weekShare = (counts: { current: number; previous: number }): { lap:
   return { lap, fraction: Math.min(ratio - lap, 1) };
 };
 
-/** The period chart's spoken summary; the chart itself is one image. */
-export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): string => {
-  const sameDay = Math.min(period.elapsedDays, period.previous.totalDays);
+const ordinal = (day: number): string => {
+  const teen = day % 100 >= 11 && day % 100 <= 13;
+  const suffix = teen ? 'th' : (['th', 'st', 'nd', 'rd'][day % 10] ?? 'th');
+  return `${day}${suffix}`;
+};
+
+/** The month chart's spoken summary; the chart itself is one image. */
+export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string => {
+  const sameDay = Math.min(month.dayOfMonth, month.previous.daysInMonth);
   return [
-    `Cumulative sets: ${period.weeks} ${period.weeks === 1 ? 'week' : 'weeks'}, ${period.toDate.workingSets} by day ${period.elapsedDays}`,
-    `against ${period.previous.toSameDay.workingSets} by day ${sameDay} in the preceding block;`,
-    `The preceding block finished at ${period.previous.total.workingSets}.`,
-    `On course for ${period.projectedWorkingSets}.`,
+    `Cumulative sets: ${monthName(month.window.start)} ${month.toDate.workingSets} by the ${ordinal(month.dayOfMonth)}`,
+    `against ${monthName(month.previous.window.start)} ${month.previous.toSameDay.workingSets} by the ${ordinal(sameDay)};`,
+    `${monthName(month.previous.window.start)} finished at ${month.previous.total.workingSets}.`,
+    `On course for ${month.projectedWorkingSets}.`,
   ].join(' ');
 };
 
@@ -140,51 +146,52 @@ export const sessionSummaryAccessibilityLabel = (
 export const weekFigureAccessibilityLabel = (label: string, counts: { current: number; previous: number }): string =>
   `${label} ${counts.current}, vs ${counts.previous} last week`;
 
-// --- The period chart's geometry -------------------------------------------
+// --- The month chart's geometry -------------------------------------------
 
 export type ChartPoint = { x: number; y: number };
 
-export type PeriodChartGeometry = {
+export type MonthChartGeometry = {
   plot: { width: number; top: number; bottom: number };
   current: ChartPoint[];
   previous: ChartPoint[];
   projection: { from: ChartPoint; to: ChartPoint };
   today: { current: ChartPoint; previous: ChartPoint };
-  periodEndX: number;
+  monthEndX: number;
 };
 
-// Room on the right for the preceding block's label at the end of its line.
-export const CHART_RIGHT_GUTTER = 40;
+// Room on the right for the previous month's name at the end of its line.
+export const CHART_RIGHT_GUTTER = 34;
 export const CHART_HEIGHT = 104;
 const PLOT_TOP = 6;
 const PLOT_BOTTOM = 86;
 
 /**
- * Day of the configured block on x (its first Monday at 0) and cumulative working sets on y, scaled to the highest of the
- * projection, the previous period's total and today's figure.
+ * Day of month on x (the 1st at 0; the longer of the two months spans the
+ * plot) and cumulative working sets on y, scaled to the highest of the
+ * projection, the previous month's total and today's figure.
  */
-export const periodChartGeometry = (period: TodayProgressPeriod, width: number): PeriodChartGeometry => {
+export const monthChartGeometry = (month: TodayProgressMonth, width: number): MonthChartGeometry => {
   const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
-  const days = Math.max(period.totalDays, period.previous.totalDays);
-  const yMax = Math.max(1, period.projectedWorkingSets, period.previous.total.workingSets, period.toDate.workingSets);
+  const days = Math.max(month.daysInMonth, month.previous.daysInMonth);
+  const yMax = Math.max(1, month.projectedWorkingSets, month.previous.total.workingSets, month.toDate.workingSets);
   const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
   const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (PLOT_BOTTOM - PLOT_TOP);
   const toPoints = (values: number[]) => values.map((value, index) => ({ x: x(index), y: y(value) }));
 
-  const current = toPoints(period.cumulativeWorkingSets);
-  const previous = toPoints(period.previous.cumulativeWorkingSets);
-  const todayIndex = period.elapsedDays - 1;
-  const todayCurrent = current[todayIndex] ?? { x: x(todayIndex), y: y(period.toDate.workingSets) };
-  const sameDayIndex = Math.min(period.elapsedDays, period.previous.totalDays) - 1;
-  const todayPrevious = previous[sameDayIndex] ?? { x: x(sameDayIndex), y: y(period.previous.toSameDay.workingSets) };
+  const current = toPoints(month.cumulativeWorkingSets);
+  const previous = toPoints(month.previous.cumulativeWorkingSets);
+  const todayIndex = month.dayOfMonth - 1;
+  const todayCurrent = current[todayIndex] ?? { x: x(todayIndex), y: y(month.toDate.workingSets) };
+  const sameDayIndex = Math.min(month.dayOfMonth, month.previous.daysInMonth) - 1;
+  const todayPrevious = previous[sameDayIndex] ?? { x: x(sameDayIndex), y: y(month.previous.toSameDay.workingSets) };
 
   return {
     plot: { width: plotWidth, top: PLOT_TOP, bottom: PLOT_BOTTOM },
     current,
     previous,
-    projection: { from: todayCurrent, to: { x: x(period.totalDays - 1), y: y(period.projectedWorkingSets) } },
+    projection: { from: todayCurrent, to: { x: x(month.daysInMonth - 1), y: y(month.projectedWorkingSets) } },
     today: { current: todayCurrent, previous: todayPrevious },
-    periodEndX: x(period.totalDays - 1),
+    monthEndX: x(month.daysInMonth - 1),
   };
 };
 

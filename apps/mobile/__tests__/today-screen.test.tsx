@@ -25,7 +25,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-import { updatePreferences } from '@/src/preferences/hooks';
 import { ShareBar } from '@/components/today';
 import { uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -33,6 +32,7 @@ import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/se
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
@@ -127,6 +127,7 @@ describe('Today: the Progress card over real data', () => {
 
     expect(text('today-progress-empty')).toBeTruthy();
     expect(screen.getByText('Your week starts here')).toBeTruthy();
+    expect(screen.getByText('Log a workout and your sessions, working sets and PRs show up here, against last month.')).toBeTruthy();
     expect(screen.queryByTestId('today-progress-card')).toBeNull();
 
     fireEvent.press(text('today-empty-open-train'));
@@ -162,38 +163,40 @@ describe('Today: the Progress card over real data', () => {
     expect(prs.fill).toHaveStyle({ width: '100%' });
   });
 
-  it('uses a non-default Progress period and reloads when that setting changes', async () => {
+  it('keeps the calendar month when the configured Progress period changes', async () => {
     await bootLocalApp();
     await logHistory();
     act(() => updatePreferences({ targetWindowWeeks: 3 }));
-    await renderToday();
-    expect(screen.getByText('3 weeks so far')).toBeTruthy();
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
+    const loadProgress = jest.fn(loadTodayProgress);
+    await renderToday({ loadProgress });
+    expect(screen.getByText('October so far')).toBeTruthy();
+    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     act(() => updatePreferences({ targetWindowWeeks: 1 }));
-    await screen.findByText('This week so far');
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('6 sets');
-    expect(text('today-progress-chart').props.accessibilityLabel).toContain('1 week, 6 by day 5');
+    expect(screen.getByText('October so far')).toBeTruthy();
+    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
+    expect(loadProgress).toHaveBeenCalledTimes(1);
+    expect(text('today-progress-chart').props.accessibilityLabel).toContain('October 18 by the 16th');
   });
 
-  it('compares the configured progress block with its preceding block at the same elapsed day', async () => {
+  it('compares the month so far with the previous month at the same day', async () => {
     await bootLocalApp();
     await logHistory();
     await renderToday();
 
     // October: 3 sessions, 18 working sets, 6 PRs. September to the 16th: 1, 6, 0; all of it: 2, 12, 3.
-    expect(screen.getByText('4 weeks so far')).toBeTruthy();
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
-    expect(text('today-progress-period-difference')).toHaveTextContent('+12');
+    expect(screen.getByText('October so far')).toBeTruthy();
+    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
+    expect(text('today-progress-month-difference')).toHaveTextContent('+12');
     // Ahead of the pace is an improvement, in the one colour every change
     // figure uses for one (`design-language.md` §6).
-    expect(text('today-progress-period-difference')).toHaveStyle({ color: uiRoles.gain });
-    expect(text('today-progress-period-pace')).toHaveTextContent("ahead of the previous 4 weeks");
+    expect(text('today-progress-month-difference')).toHaveStyle({ color: uiRoles.gain });
+    expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
     // No summary line under the chart; its spoken label still carries the
-    // projection the chart draws (18 over 26 elapsed days, across 28: 19).
-    expect(screen.queryByTestId('today-progress-period-summary')).toBeNull();
+    // projection the chart draws (18 over 16 days, across 31: 34.9 → 35).
+    expect(screen.queryByTestId('today-progress-month-summary')).toBeNull();
     expect(text('today-progress-chart')).toHaveProp(
       'accessibilityLabel',
-      'Cumulative sets: 4 weeks, 18 by day 26 against 6 by day 26 in the preceding block; The preceding block finished at 12. On course for 19.',
+      'Cumulative sets: October 18 by the 16th against September 6 by the 16th; September finished at 12. On course for 35.',
     );
     expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'image');
   });
@@ -266,12 +269,12 @@ describe('Today: the Progress card over real data', () => {
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15-10-2026 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
-    expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4);
+    expect(loadProgress).toHaveBeenLastCalledWith(NOW);
   });
 });
 
 describe('Today: the today-progress harness fixture', () => {
-  it('draws every part of the card, ahead of the preceding Progress block', async () => {
+  it('draws every part of the card, ahead of the previous month', async () => {
     await bootLocalApp();
     // Sep: every third day from the 2nd (10). Oct: every other day from the 1st to the 15th (8), and this morning.
     await expect(seedTodayProgressFixture({ now: NOW })).resolves.toMatchObject({ sessionCount: 19 });
@@ -281,7 +284,7 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-progress-week-sessions-previous')).toHaveTextContent('vs 4 last wk');
     // One bench climb this week: its 1RM, Weight and Volume.
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
-    expect(text('today-progress-period-difference')).toHaveTextContent('+54');
+    expect(text('today-progress-month-difference')).toHaveTextContent('+36');
     expect(text('today-latest-session-start')).toHaveTextContent('16-10-2026 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');
   });
