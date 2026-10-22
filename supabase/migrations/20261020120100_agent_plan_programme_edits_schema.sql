@@ -1,4 +1,4 @@
--- Migration: 20261020120000_agent_plan_programme_edits_schema.sql
+-- Migration: 20261020120100_agent_plan_programme_edits_schema.sql
 -- Agent programme and plan edit permissions, receipt operations, and attribution schema.
 
 -- -----------------------------------------------------------------------------

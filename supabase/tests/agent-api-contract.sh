@@ -1285,6 +1285,313 @@ run_psql "update public.agent_plan_permissions
 agent_get "session-plans"
 assert_status "200" "re-enabled permission"
 
+echo "[agent-api-test] verifying service-role atomic plan and programme mutation RPCs"
+
+rpc_expect_error() {
+  local expected_err="$1"
+  local sql="$2"
+  local context="$3"
+  local out
+  out="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "${sql}" 2>&1 || true)"
+  if [[ "${out}" != *"${expected_err}"* ]]; then
+    fail "${context}: expected error containing '${expected_err}', got: ${out}"
+  fi
+}
+
+MUT_KEY_BASE="agent-api-${RUN_TAG}-mut"
+MUT_HASH_1="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+MUT_HASH_2="ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+
+for fn in agent_update_plan_meta agent_update_programme_meta agent_insert_plan_block agent_update_plan_block agent_reorder_plan_blocks agent_reorder_programme_plans agent_reorder_block_sets agent_tombstone_plan_block agent_detach_programme_plan agent_tombstone_plan agent_tombstone_programme; do
+  [[ "$(run_psql "select has_function_privilege('anon', to_regproc('app_public.${fn}'), 'execute');")" == "f" ]] ||
+    fail "anon has execute privilege on ${fn}"
+  [[ "$(run_psql "select has_function_privilege('authenticated', to_regproc('app_public.${fn}'), 'execute');")" == "f" ]] ||
+    fail "authenticated has execute privilege on ${fn}"
+  [[ "$(run_psql "select has_function_privilege('service_role', to_regproc('app_public.${fn}'), 'execute');")" == "t" ]] ||
+    fail "service_role lacks execute privilege on ${fn}"
+done
+
+V_PLAN_INITIAL="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "PLAN_CONCURRENT_MODIFICATION" "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid,
+    '${AGENT_CLIENT_ID}',
+    '${MUT_KEY_BASE}-stale-1',
+    '${MUT_HASH_1}',
+    '${PLAN_ID}',
+    '2020-01-01T00:00:00.000000Z',
+    '{\"title\": \"Should Not Land\"}'::jsonb
+  );
+" "stale base_version plan update"
+[[ "$(run_psql "select title from app_public.session_plans where id = '${PLAN_ID}';")" != "Should Not Land" ]] ||
+  fail "stale plan update wrote title"
+
+BLOCK1_ID="$(run_psql "select id from app_public.session_plan_exercises where session_plan_id = '${PLAN_ID}' and deleted_at is null order by order_index limit 1;")"
+ATTACH_SESS_ID="agent-api-${RUN_TAG}-mut-attach-sess"
+ATTACH_CARD_ID="agent-api-${RUN_TAG}-mut-attach-card"
+run_psql "
+  insert into app_public.sessions (owner_user_id, id, status, started_at, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${ATTACH_SESS_ID}', 'active', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_exercises (owner_user_id, id, session_id, source_plan_exercise_id, order_index, name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${ATTACH_CARD_ID}', '${ATTACH_SESS_ID}', '${BLOCK1_ID}', 0, 'Attached Block', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-att-upd', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK1_ID}', '${V_PLAN_INITIAL}',
+    '{\"name\": \"Mutated Attached\"}'::jsonb
+  );
+" "attached block update"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_tombstone_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-att-del', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK1_ID}', '${V_PLAN_INITIAL}'
+  );
+" "attached block tombstone"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_tombstone_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-att-pldel', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_INITIAL}'
+  );
+" "attached plan tombstone"
+run_psql "
+  delete from app_public.session_exercises where id = '${ATTACH_CARD_ID}';
+  delete from app_public.sessions where id = '${ATTACH_SESS_ID}';
+" >/dev/null
+
+update_training_fixture "update app_public.session_plan_exercises set progress_status = 'completed' where id = '${BLOCK1_ID}';"
+V_RESOLVED="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-res-upd', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK1_ID}', '${V_RESOLVED}',
+    '{\"name\": \"Mutated Resolved\"}'::jsonb
+  );
+" "resolved block update"
+update_training_fixture "update app_public.session_plan_exercises set progress_status = 'pending' where id = '${BLOCK1_ID}';"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "INVALID_ARGUMENT" "
+  select app_public.agent_tombstone_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-tomb-one', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK1_ID}', '${V_PLAN_CUR}'
+  );
+" "tombstone sole block"
+
+PROG_CHILD_1="$(run_psql "select id from app_public.session_plans where programme_id = '${PROGRAMME_ID}' and deleted_at is null order by programme_order_index limit 1;")"
+V_PROG_CUR="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROGRAMME_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "INVALID_ARGUMENT" "
+  select app_public.agent_detach_programme_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-detach-under', '${MUT_HASH_1}',
+    '${PROGRAMME_ID}', '${PROG_CHILD_1}', '${V_PROG_CUR}'
+  );
+" "detach leaving < 2 plans"
+
+RES_META="$(run_psql "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-meta-1', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    '{\"title\": \"Renamed Plan Agent\", \"gym_id\": \"${GYM_A}\"}'::jsonb
+  );
+")"
+[[ "$(printf '%s' "${RES_META}" | jq -r '.plan_id')" == "${PLAN_ID}" ]] || fail "update_plan_meta result missing plan_id"
+[[ "$(printf '%s' "${RES_META}" | jq -r '.idempotent_replay')" == "false" ]] || fail "initial update_plan_meta was replay"
+[[ "$(run_psql "select title || '|' || last_modified_by from app_public.session_plans where id = '${PLAN_ID}';")" == "Renamed Plan Agent|agent" ]] ||
+  fail "update_plan_meta did not stamp title and last_modified_by = 'agent'"
+
+RES_REPLAY="$(run_psql "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-meta-1', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    '{\"title\": \"Renamed Plan Agent\", \"gym_id\": \"${GYM_A}\"}'::jsonb
+  );
+")"
+[[ "$(printf '%s' "${RES_REPLAY}" | jq -r '.idempotent_replay')" == "true" ]] || fail "replay was not flagged"
+[[ "$(printf '%s' "${RES_REPLAY}" | jq -r '.version')" == "$(printf '%s' "${RES_META}" | jq -r '.version')" ]] ||
+  fail "replay returned different version"
+
+rpc_expect_error "IDEMPOTENCY_CONFLICT" "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-meta-1', '${MUT_HASH_2}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    '{\"title\": \"Differing Payload\"}'::jsonb
+  );
+" "idempotency conflict on update_plan_meta"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "FOREIGN_RESOURCE_REFERENCE" "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-meta-foreign', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    '{\"gym_id\": \"agent-api-nonexistent-gym\"}'::jsonb
+  );
+" "foreign gym in update_plan_meta"
+rpc_expect_error "INVALID_ARGUMENT" "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-meta-empty', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    '{\"title\": \"\"}'::jsonb
+  );
+" "empty title in update_plan_meta"
+
+RES_INS_BLOCK="$(run_psql "
+  select app_public.agent_insert_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-ins-blk', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    jsonb_build_object(
+      'exercise_definition_id', '${EXERCISE_A2}',
+      'name', 'Block Two Bench',
+      'sets', jsonb_build_array(
+        jsonb_build_object('target_reps', 10, 'target_weight_value', '60'),
+        jsonb_build_object('target_reps', 8, 'target_weight_value', '70')
+      )
+    )
+  );
+")"
+BLOCK2_ID="$(printf '%s' "${RES_INS_BLOCK}" | jq -er '.exercise_id')"
+[[ "$(printf '%s' "${RES_INS_BLOCK}" | jq '.set_ids | length')" == "2" ]] || fail "insert_plan_block did not return 2 set IDs"
+[[ "$(run_psql "select order_index || '|' || last_modified_by from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "1|agent" ]] ||
+  fail "new block did not get dense order_index 1 and last_modified_by = 'agent'"
+[[ "$(run_psql "select count(*) from app_public.session_plan_sets where session_plan_exercise_id = '${BLOCK2_ID}' and last_modified_by = 'agent';")" == "2" ]] ||
+  fail "inserted sets lack last_modified_by = 'agent'"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+SET2_ID_1="$(printf '%s' "${RES_INS_BLOCK}" | jq -r '.set_ids[0]')"
+SET2_ID_2="$(printf '%s' "${RES_INS_BLOCK}" | jq -r '.set_ids[1]')"
+RES_UPD_BLOCK="$(run_psql "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-upd-blk', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK2_ID}', '${V_PLAN_CUR}',
+    jsonb_build_object(
+      'name', 'Block Two Bench Edited',
+      'sets', jsonb_build_array(
+        jsonb_build_object('id', '${SET2_ID_1}', 'target_reps', 12, 'target_weight_value', '65'),
+        jsonb_build_object('target_reps', 6, 'target_weight_value', '75')
+      )
+    )
+  );
+")"
+[[ "$(run_psql "select name || '|' || last_modified_by from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "Block Two Bench Edited|agent" ]] ||
+  fail "block update did not stamp name and agent attribution"
+[[ "$(run_psql "select target_reps || '|' || (deleted_at is null) from app_public.session_plan_sets where id = '${SET2_ID_1}';")" == "12|true" ]] ||
+  fail "kept set was not updated"
+[[ "$(run_psql "select deleted_at is not null from app_public.session_plan_sets where id = '${SET2_ID_2}';")" == "t" ]] ||
+  fail "omitted set was not tombstoned"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+LIVE_SET_IDS="$(run_psql "select json_agg(id order by order_index desc) from app_public.session_plan_sets where session_plan_exercise_id = '${BLOCK2_ID}' and deleted_at is null;")"
+run_psql "
+  select app_public.agent_reorder_block_sets(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-reord-sets', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK2_ID}', '${V_PLAN_CUR}',
+    '${LIVE_SET_IDS}'::jsonb
+  );
+" >/dev/null
+FIRST_SET_ID="$(printf '%s' "${LIVE_SET_IDS}" | jq -r '.[0]')"
+[[ "$(run_psql "select order_index from app_public.session_plan_sets where id = '${FIRST_SET_ID}';")" == "0" ]] ||
+  fail "sets reorder did not update order_index to 0"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_reorder_plan_blocks(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-reord-blks', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_CUR}',
+    jsonb_build_array('${BLOCK2_ID}', '${BLOCK1_ID}')
+  );
+" >/dev/null
+[[ "$(run_psql "select order_index from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "0" ]] ||
+  fail "block reorder did not set block 2 to order 0"
+[[ "$(run_psql "select order_index from app_public.session_plan_exercises where id = '${BLOCK1_ID}';")" == "1" ]] ||
+  fail "block reorder did not set block 1 to order 1"
+
+V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_tombstone_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-tomb-blk2', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK2_ID}', '${V_PLAN_CUR}'
+  );
+" >/dev/null
+[[ "$(run_psql "select deleted_at is not null from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "t" ]] ||
+  fail "tombstoned block is not deleted"
+[[ "$(run_psql "select order_index from app_public.session_plan_exercises where id = '${BLOCK1_ID}';")" == "0" ]] ||
+  fail "remaining sibling block was not redensified to order_index 0"
+
+V_PROG_CUR="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROGRAMME_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_update_programme_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-prog-meta', '${MUT_HASH_1}',
+    '${PROGRAMME_ID}', '${V_PROG_CUR}',
+    '{\"name\": \"Renamed Coaching Wave\", \"description\": \"Updated description\"}'::jsonb
+  );
+" >/dev/null
+[[ "$(run_psql "select name || '|' || last_modified_by from app_public.training_programmes where id = '${PROGRAMME_ID}';")" == "Renamed Coaching Wave|agent" ]] ||
+  fail "update_programme_meta did not update name and agent attribution"
+
+PROG_CHILD_3="agent-api-${RUN_TAG}-child-3"
+run_psql "
+  select app_public.agent_insert_plan_graph(
+    '${USER_A_UUID}'::uuid,
+    '${PROG_CHILD_3}',
+    '${PROGRAMME_ID}',
+    2,
+    jsonb_build_object(
+      'title', 'Child Plan 3',
+      'exercises', jsonb_build_array(
+        jsonb_build_object('exercise_definition_id', '${EXERCISE_A}', 'name', 'Exercise 1', 'sets', jsonb_build_array(jsonb_build_object('target_reps', 5)))
+      )
+    ),
+    ${NOW_MS}
+  );
+" >/dev/null
+PROG_CHILD_2="$(run_psql "select id from app_public.session_plans where programme_id = '${PROGRAMME_ID}' and id not in ('${PROG_CHILD_1}', '${PROG_CHILD_3}') and deleted_at is null;")"
+V_PROG_CUR="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROGRAMME_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_reorder_programme_plans(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-reord-progs', '${MUT_HASH_1}',
+    '${PROGRAMME_ID}', '${V_PROG_CUR}',
+    jsonb_build_array('${PROG_CHILD_3}', '${PROG_CHILD_1}', '${PROG_CHILD_2}')
+  );
+" >/dev/null
+[[ "$(run_psql "select programme_order_index from app_public.session_plans where id = '${PROG_CHILD_3}';")" == "0" ]] ||
+  fail "reorder_programme_plans did not set plan 3 to order 0"
+
+V_PROG_CUR="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROGRAMME_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_detach_programme_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-detach-3', '${MUT_HASH_1}',
+    '${PROGRAMME_ID}', '${PROG_CHILD_3}', '${V_PROG_CUR}'
+  );
+" >/dev/null
+[[ "$(run_psql "select (programme_id is null) || '|' || (deleted_at is null) || '|' || last_modified_by from app_public.session_plans where id = '${PROG_CHILD_3}';")" == "true|true|agent" ]] ||
+  fail "detached plan is not standalone live with agent attribution"
+[[ "$(run_psql "select count(*) from app_public.session_plans where programme_id = '${PROGRAMME_ID}' and deleted_at is null;")" == "2" ]] ||
+  fail "programme does not have exactly 2 plans left"
+[[ "$(run_psql "select programme_order_index from app_public.session_plans where id = '${PROG_CHILD_1}';")" == "0" ]] ||
+  fail "remaining plan 1 not redensified to order 0"
+
+V_CHILD3="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PROG_CHILD_3}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_tombstone_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-tomb-pl3', '${MUT_HASH_1}',
+    '${PROG_CHILD_3}', '${V_CHILD3}'
+  );
+" >/dev/null
+[[ "$(run_psql "select deleted_at is not null from app_public.session_plans where id = '${PROG_CHILD_3}';")" == "t" ]] ||
+  fail "tombstoned standalone plan is not deleted"
+
+V_PROG_CUR="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROGRAMME_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_tombstone_programme(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-tomb-prog', '${MUT_HASH_1}',
+    '${PROGRAMME_ID}', '${V_PROG_CUR}'
+  );
+" >/dev/null
+[[ "$(run_psql "select deleted_at is not null from app_public.training_programmes where id = '${PROGRAMME_ID}';")" == "t" ]] ||
+  fail "tombstoned programme is not deleted"
+[[ "$(run_psql "select count(*) from app_public.session_plans where id in ('${PROG_CHILD_1}', '${PROG_CHILD_2}') and programme_id is null and deleted_at is null;")" == "2" ]] ||
+  fail "tombstone_programme did not detach live child plans as standalone live"
+
+
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"
 agent_get "muscles"
 assert_status "200" "muscle list"
