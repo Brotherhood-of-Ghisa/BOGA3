@@ -44,6 +44,29 @@ describe('worker after an admitted start has already completed', () => {
     } finally { error.mockRestore(); }
   });
 
+  test('a later due admission sends after an earlier future-only invocation was idle', async () => {
+    let due = false;
+    let preparations = 0;
+    const claims = [[job(1)], []];
+    const rpc: Rpc = async <T>(name: string): Promise<T> => {
+      if (name === 'notification_work_pending') return due as T;
+      if (name === 'notification_workout_prepare') { preparations++; return { jobs: [] } as T; }
+      if (name === 'notification_receipt_claim') return { jobs: [] } as T;
+      if (name === 'notification_claim') return { jobs: claims.shift() ?? [], disabled: false } as T;
+      if (name === 'notification_begin_send') return prepared(1, 'start') as T;
+      return true as T;
+    };
+    const idle = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+    expect(await idle.json()).toMatchObject({ idle: true, claimed: 0 });
+    expect(preparations).toBe(0);
+    expect(sendPush).not.toHaveBeenCalled();
+    due = true;
+    const active = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+    expect(await active.json()).toMatchObject({ outcomes: { ticket: 1 } });
+    expect(preparations).toBe(1);
+    expect(jest.mocked(sendPush).mock.calls[0][1].expiration).toBe((startedAt + 86400000) / 1000);
+  });
+
   test('a completion-first claim defers, then both events retain their own original provider deadline', async () => {
     const claims = [[job(2), job(1)], [], [job(2)], []];
     let completionAttempts = 0;
