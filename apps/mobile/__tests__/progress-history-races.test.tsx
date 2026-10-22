@@ -9,13 +9,13 @@ const weekly = (count: number): SelectedMuscleWeeklyEffort[] => [{
   weekStartDateKey: '2026-09-28', monthKey: '2026-09', weekOfMonth: 4,
   totalVolume: count, workingSetCount: count, estimatedRM1: null, highestWeight: null,
 }];
-const history = (count: number) => ({ weekly: weekly(count), daily: [] });
+const history = (count: number) => ({ weekly: weekly(count), daily: [], gyms: [] });
 const muscle = (id: string): HistorySubject => ({ kind: 'muscle', id });
 const deferred = () => {
   let resolve!: (rows: SelectedMuscleWeeklyEffort[]) => void;
   let reject!: (error: Error) => void;
   const rows = new Promise<SelectedMuscleWeeklyEffort[]>((done, fail) => { resolve = done; reject = fail; });
-  return { promise: rows.then(weeks => ({ weekly: weeks, daily: [] })), resolve, reject };
+  return { promise: rows.then(weeks => ({ weekly: weeks, daily: [], gyms: [] })), resolve, reject };
 };
 // The page's own props: its subject, the saved window and the policy revision.
 const renderHistory = (subject: HistorySubject | null, weeks = 52, revision = 0) =>
@@ -120,4 +120,19 @@ it('publishes its loading state before starting the read, cancelling the read a 
   await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
   expect(read).toHaveBeenCalledTimes(1);
   expect(read).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['chest'] }));
+});
+
+it.each(['success', 'failure'])('ignores a superseded muscle gym’s late %s', async outcome => {
+  const old = deferred();
+  const read = jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort').mockReturnValueOnce(old.promise).mockResolvedValue(history(8));
+  const { result, rerender } = renderHistory({ kind: 'muscle', id: 'quads', gymId: 'gym-a' });
+  await started(1);
+  rerender({ subject: { kind: 'muscle', id: 'quads', gymId: null }, weeks: 52, revision: 0 });
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(8)));
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], gymId: null }));
+  await act(async () => {
+    if (outcome === 'success') old.resolve(weekly(100)); else old.reject(Error('old gym'));
+  });
+  expect(result.current.weekly).toEqual(weekly(8));
+  expect(result.current.error).toBeNull();
 });

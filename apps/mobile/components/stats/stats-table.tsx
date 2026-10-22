@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, Icon, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
 // Progress's one table style, which both breakdowns are drawn with: a `Card`
 // holding a micro-label header row over right-aligned figure columns, and
@@ -54,6 +54,32 @@ export function StatsTableHeaderLabel({ label, active = false }: { label: string
     style={[styles.headerLabel, active && styles.headerLabelActive]}>{label}</Text>;
 }
 
+/** Shared sortable header; the caller names its ordering and next action. */
+export function StatsTableSortHeader({ label, active, descending, description, currentSort, nextSort, onPress,
+  testID, style, numeric = false, recent = false }: {
+  label: string; active: boolean; descending: boolean; description: string; currentSort: string; nextSort: string;
+  onPress: () => void; testID: string; style?: StyleProp<ViewStyle>; numeric?: boolean; recent?: boolean;
+}) {
+  const direction = active && !descending ? 'up' : 'down';
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
+    accessibilityLabel={`${description}.${active ? ` Current sort: ${currentSort}.` : ''} Activate to sort ${nextSort}.`}
+    onPress={onPress} testID={testID}
+    style={({ pressed }) => [statsTableStyles.headerCell, style,
+      numeric && statsTableStyles.headerCellNumeric, pressed && styles.pressed]}>
+    <StatsTableHeaderLabel active={active} label={label} />
+    <View accessible={false} testID={`${testID}-indicator`}
+      style={[styles.indicator, recent && styles.recency, !active && styles.hidden]}>
+      {recent ? <StatsTableHeaderLabel label="Recent" /> : null}
+      <Icon color={uiRoles.ink} name={direction === 'up' ? 'arrow-up' : 'arrow-down'} size="xs"
+        testID={`${testID}-indicator-${direction}`} />
+    </View>
+  </Pressable>;
+}
+
+export function StatsTableFamily({ name, testID }: { name: string; testID?: string }) {
+  return <Text allowFontScaling={false} accessibilityRole="header" style={styles.family} testID={testID}>{name}</Text>;
+}
+
 export const statsTableStyles = StyleSheet.create({
   // The name takes whatever the figure columns leave, and wraps.
   nameCell: { flex: 1, minWidth: 0 },
@@ -66,6 +92,14 @@ export const statsTableStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  family: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase', color: uiRoles.inkMuted, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
+    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
+  pressed: { backgroundColor: uiRoles.paper },
+  indicator: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
+  recency: { width: 64 },
+  hidden: { opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.md, paddingHorizontal: uiSpace.md },
   figures: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   headerLabel: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,

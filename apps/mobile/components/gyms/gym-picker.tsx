@@ -1,11 +1,11 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import {
   ALL_GYMS_LABEL,
   SELECTED_GYM_LABEL,
@@ -87,13 +87,14 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
   const offered = offeredOptions(value, options);
   if (!showsGymPicker(value, offered)) return null;
   const label = gymScopeLabel(value, offered);
-  if (size === 'compact') return <CompactButton label={label} on={value !== undefined} onPress={onPress} testID={testID} />;
   return (
     <FilterChip
       accessibilityHint={HINT}
       accessibilityLabel={`Gym: ${label}`}
       accessibilityRole="button"
       label={label}
+      size={size}
+      trailing={size === 'compact' ? <Icon color={value !== undefined ? uiRoles.surface : uiRoles.inkMuted} name="chevron-down" size="xs" /> : undefined}
       on={value !== undefined}
       onPress={onPress}
       testID={testID}
@@ -148,59 +149,7 @@ export function GymPickerSheet({
 
 const HINT = 'Chooses the gym this view counts';
 
-// The compact button: a segment's height and label face, filled while a gym is
-// chosen so the state never rides the label alone.
-function CompactButton({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID: string }) {
-  return (
-    <Pressable
-      accessibilityHint={HINT}
-      accessibilityLabel={`Gym: ${label}`}
-      accessibilityRole="button"
-      hitSlop={uiSpace.sm}
-      onPress={onPress}
-      style={({ pressed }) => [styles.compact, on ? styles.compactOn : null, pressed && !on ? styles.compactPressed : null]}
-      testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.compactLabel, on ? styles.compactLabelOn : null]}>
-        {label}
-      </Text>
-      <Icon color={on ? uiRoles.surface : uiRoles.inkMuted} name="chevron-down" size="xs" />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  compact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    maxWidth: 140,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.pill,
-  },
-  compactOn: {
-    backgroundColor: uiRoles.ink,
-    borderColor: uiRoles.ink,
-  },
-  compactPressed: {
-    backgroundColor: uiRoles.paper,
-  },
-  compactLabel: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  compactLabelOn: {
-    color: uiRoles.surface,
-  },
   label: {
     fontFamily: uiFonts.body.family,
     fontSize: uiTypography.size.base,

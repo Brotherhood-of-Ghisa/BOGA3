@@ -120,6 +120,12 @@ describe('useWeekSets over local data', () => {
     await waitFor(() => expect(days(result.current.groups)).toEqual(['07-10-2026']));
     rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press', gymId: gymId! } });
     await waitFor(() => expect(days(result.current.groups)).toEqual(['05-10-2026', '09-10-2026']));
+    rerender({ target: { muscleGroupIds: ['chest'], gymId: null } });
+    await waitFor(() => expect(result.current.groups.map(group => group.detail)).toEqual(['07-10-2026']));
+    rerender({ target: { muscleGroupIds: ['chest'], gymId: gymId! } });
+    await waitFor(() => expect(result.current.groups.map(group => group.detail)).toEqual(['05-10-2026', '09-10-2026']));
+    rerender({ target: { muscleGroupIds: ['chest'] } });
+    await waitFor(() => expect(result.current.groups).toHaveLength(3));
   });
 
   it('still lists the cards, without records, when the records read fails', async () => {

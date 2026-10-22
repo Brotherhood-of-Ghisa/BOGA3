@@ -54,6 +54,8 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
 
 type FilterChipProps = {
   label: string;
+  size?: 'pill' | 'compact';
+  trailing?: ReactNode;
   on: boolean;
   onPress: () => void;
   testID: string;
@@ -63,19 +65,21 @@ type FilterChipProps = {
   accessibilityHint?: string;
 };
 
-// A pill one tap target tall; solid `ink` while on, so the state never rides
-// colour alone (the role and checked state carry it too). The picker's Groups
-// toggle draws the same pill.
-export function FilterChip({ label, on, onPress, testID, ...a11y }: FilterChipProps) {
+// Full-height filters or compact row controls share their pill and selected
+// state. Compact controls keep a 44pt tap target through hit slop.
+export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
+  const compact = size === 'compact';
   return (
     <Pressable
       {...a11y}
+      hitSlop={compact ? uiSpace.sm : undefined}
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
+      style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipLabel, on ? styles.chipLabelOn : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipLabel, compact && styles.compactLabel, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>
+      {trailing}
     </Pressable>
   );
 }
@@ -282,6 +286,26 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.pill,
+  },
+  compact: {
+    minHeight: uiGeometry.compactControlHeight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+    // Leave the search query and its clear control room on narrow phones.
+    maxWidth: 112,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
+  },
+  compactLabel: {
+    flexShrink: 1,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
   chipOn: {
     backgroundColor: uiRoles.ink,

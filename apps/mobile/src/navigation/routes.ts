@@ -35,18 +35,18 @@ export const PROGRESS_HISTORY_METRIC_PARAMS: Record<ProgressMetric, string> = {
 };
 
 /**
- * An exercise's page may open on a gym: `gymId` is three-state
+ * Either subject may open on a gym: `gymId` is three-state
  * (`src/utils/gym-scope-route.ts`), and unset — every gym — sends no param.
  */
 export const progressHistoryHref = (
-  subject: { muscleGroupId: string } | { exerciseDefinitionId: string; gymId?: string | null },
+  subject: ({ muscleGroupId: string } | { exerciseDefinitionId: string }) & { gymId?: string | null },
   metric?: ProgressMetric,
   view?: HeatmapView
 ): Href => {
   const id = 'muscleGroupId' in subject
     ? `muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
     : `exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`;
-  const gym = 'exerciseDefinitionId' in subject ? encodeGymRouteParam(subject.gymId) : undefined;
+  const gym = encodeGymRouteParam(subject.gymId);
   const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
   return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${view ? `&view=${view}` : ''}` as Href;
 };

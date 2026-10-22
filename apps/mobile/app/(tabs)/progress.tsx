@@ -1,11 +1,10 @@
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { type ComponentRef, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, type ComponentRef, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   findNodeHandle,
   Keyboard,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -23,7 +22,6 @@ import {
   SearchField,
   StatePanel,
   ToggleChip,
-  uiRoles,
   uiSpace,
 } from '@/components/ui';
 import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
@@ -40,6 +38,9 @@ import type { MuscleMapFamily } from '@/components/stats/muscle-map-reference';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
+import { compareProgressFamilies, nextMuscleSortMode, type MuscleSortMode } from '@/components/stats/progress-tables';
+import { getExercisePrimaryFamilyName } from '@/src/exercise-catalog/list-model';
+import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import {
   COLUMN_KEYS,
@@ -48,6 +49,7 @@ import {
   ComparisonValues,
   comparisonFigures,
   comparisonSortValues,
+  compareOptionalNumbers,
   hasComparisonMetric,
   metricUnit,
   resolveComparisonLayout,
@@ -56,7 +58,8 @@ import {
 } from '@/components/stats/comparison-columns';
 import {
   StatsTable,
-  StatsTableHeaderLabel,
+  StatsTableFamily,
+  StatsTableSortHeader,
   statsTableStyles,
 } from '@/components/stats/stats-table';
 import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
@@ -177,21 +180,6 @@ const compareExerciseIdentity = (left: ExerciseListItem, right: ExerciseListItem
   return nameComparison === 0 ? left.id.localeCompare(right.id) : nameComparison;
 };
 
-const compareOptionalNumbers = (
-  left: number | null,
-  right: number | null,
-  descending: boolean
-): number => {
-  const validLeft = left !== null && Number.isFinite(left) ? left : null;
-  const validRight = right !== null && Number.isFinite(right) ? right : null;
-  if (validLeft === null && validRight === null) return 0;
-  if (validLeft === null) return 1;
-  if (validRight === null) return -1;
-  if (validLeft === validRight) return 0;
-  if (descending) return validLeft > validRight ? -1 : 1;
-  return validLeft < validRight ? -1 : 1;
-};
-
 const completedTimestamp = (item: ExerciseListItem): number | null => {
   const timestamp = item.lastCompletedAt?.getTime() ?? null;
   return timestamp !== null && Number.isFinite(timestamp) ? timestamp : null;
@@ -245,6 +233,7 @@ export type StatsScreenShellProps = {
   exerciseListItems: ExerciseListItem[];
   /** Catalogue search haystacks by exercise id (name + muscle groups). */
   exerciseSearchIndex: ReadonlyMap<string, string>;
+  exerciseFamilies?: ReadonlyMap<string, string>;
   exerciseMappings?: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
   exerciseDataReady?: boolean;
   exerciseDataError?: string | null;
@@ -252,11 +241,32 @@ export type StatsScreenShellProps = {
   isFocused?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  /** The Exercise table's gym filter, three-state (`src/utils/gym-scope-route.ts`). */
+  /** The tables' gym filter, three-state (`src/utils/gym-scope-route.ts`). */
   gymId?: string | null;
   gymOptions?: readonly GymScopeOption[];
   onSelectGym?: (gymId: string | null | undefined) => void;
 };
+
+// The pinned search row keeps its controls reachable above either table.
+function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup, query, onChangeQuery,
+  gymId, gymOptions, onSelectGym }: Pick<StatsScreenShellProps, 'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym'> & {
+  tableVisible: boolean; grouped: boolean; onToggleGroup: () => void; query: string; onChangeQuery: (query: string) => void;
+}) {
+  const exercise = viewMode === 'exercise';
+  if (!exercise && !tableVisible) return null;
+  return <View style={styles.searchRow}>
+    <View style={styles.search}>
+      <SearchField accessibilityLabel={exercise ? 'Exercise filter input' : 'Muscle filter input'}
+        autoCapitalize="none" clearLabel="Clear search input" onChangeText={onChangeQuery}
+        placeholder={exercise ? 'Search exercises or muscles' : 'Search muscles'}
+        testID={exercise ? 'stats-search-input' : 'stats-muscle-search-input'} value={query} />
+    </View>
+    {tableVisible ? <FilterChip label="Group" size="compact" on={grouped} accessibilityLabel="Group by muscle family"
+      accessibilityRole="switch" accessibilityState={{ checked: grouped }} testID="stats-group-toggle" onPress={onToggleGroup} /> : null}
+    {onSelectGym ? <GymPicker size="compact" onChange={onSelectGym}
+      options={gymOptions ?? []} testID="stats-gym" value={gymId} /> : null}
+  </View>;
+}
 
 export function StatsScreenShell({
   summary,
@@ -279,6 +289,7 @@ export function StatsScreenShell({
   onSelectExerciseMetric,
   exerciseListItems,
   exerciseSearchIndex,
+  exerciseFamilies,
   exerciseMappings = [],
   exerciseDataReady = true,
   exerciseDataError = null,
@@ -292,6 +303,10 @@ export function StatsScreenShell({
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
+  const [muscleSortMode, setMuscleSortMode] = useState<MuscleSortMode>('now-desc');
+  const [grouped, setGrouped] = useState({ exercise: true, muscle: true });
+  const [muscleSearch, setMuscleSearch] = useState('');
+  const tableVisible = muscleLayout === 'list' || (viewMode === 'exercise' && muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const [exerciseFamily, setExerciseFamily] = useState<MuscleMapFamily | null>(null);
   const exerciseSpatial = muscleLayout !== 'list' && !(muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const [contributionId, setContributionId] = useState<string | null>(null);
@@ -353,6 +368,7 @@ export function StatsScreenShell({
   const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
   const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
     targetAttainmentById={targetAttainmentById} secondary={secondary} labels={labels}
+    grouped={tableVisible && grouped.exercise} families={exerciseFamilies}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
     sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />;
@@ -373,18 +389,11 @@ export function StatsScreenShell({
               value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
           )}
         </View>
-        {/* The gym pill sits beside the search: the three chips fill the row
-            above. Exercise view only — muscle totals are the whole exercise
-            ([[gym.split]]). */}
-        {viewMode === 'exercise' ? (
-          <View style={styles.searchRow}>
-            <View style={styles.search}>
-              <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
-                onChangeText={onSearchQueryChange} placeholder="Search exercises or muscles" testID="stats-search-input" value={searchQuery} />
-            </View>
-            {onSelectGym ? <GymPicker onChange={onSelectGym} options={gymOptions} testID="stats-gym" value={gymId} /> : null}
-          </View>
-        ) : null}
+        <ProgressSearchControls viewMode={viewMode} tableVisible={tableVisible} grouped={grouped[viewMode]}
+          onToggleGroup={() => setGrouped(current => ({ ...current, [viewMode]: !current[viewMode] }))}
+          query={viewMode === 'exercise' ? searchQuery : muscleSearch}
+          onChangeQuery={viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch}
+          gymId={gymId} gymOptions={gymOptions} onSelectGym={onSelectGym} />
       </View>
       <ScreenScroll key={viewMode === 'exercise' ? `exercise-${exerciseSpatial}` : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {activeError ? <StatePanel fill={false} kind="error" title="Could not load progress"
@@ -396,7 +405,8 @@ export function StatsScreenShell({
           items={filteredExerciseListItems} allItems={exerciseListItems}
           selectedFamily={exerciseFamily} onSelectFamily={setExerciseFamily}
           selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
-          workingSetTarget={workingSetTarget}
+          workingSetTarget={workingSetTarget} grouped={grouped.muscle} searchQuery={muscleSearch}
+          sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
           onMuscleHistory={(row, target, view) => openHistory(muscle => onOpenMuscleHistory(muscle, view), { muscleGroupId: row.muscleGroupId }, target)}
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
@@ -487,8 +497,12 @@ function ExerciseListView({
   targetAttainmentById,
   secondary,
   labels,
+  grouped,
+  families,
 }: {
   items: ExerciseListItem[];
+  grouped: boolean;
+  families?: ReadonlyMap<string, string>;
   targetAttainmentById?: ReadonlyMap<string, number>;
   secondary?: ExerciseMapSecondary;
   labels?: ReadonlyMap<string, number>;
@@ -511,6 +525,8 @@ function ExerciseListView({
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
   const layout = resolveComparisonLayout(width, secondary && metric !== 'estimatedOneRepMax' ? [...items, secondary] : items, metric, false, true);
+  const familyName = (item: ExerciseListItem) => families?.get(item.id) ?? 'Other';
+  const rows = grouped ? [...items].sort((left, right) => compareProgressFamilies(familyName(left), familyName(right))) : items;
   return (
     <StatsTable testID="stats-exercise-list">
       <ComparisonHeaders
@@ -541,7 +557,7 @@ function ExerciseListView({
         testID="stats-exercise-table-header"
       />
       {secondary && metric !== 'estimatedOneRepMax' ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
-      {items.map((item) => {
+      {rows.map((item, index) => {
         const attainment = metric === 'workingSetCount' ? secondary?.targetAttainment ?? targetAttainmentById?.get(item.id) : undefined;
         const target = attainment === undefined ? null : Math.round(attainment * 100);
         const values = (
@@ -554,8 +570,10 @@ function ExerciseListView({
           />
         );
         return (
+          <Fragment key={item.id}>
+          {grouped && (index === 0 || familyName(rows[index - 1]) !== familyName(item)) ?
+            <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
-            key={item.id}
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
             accessibilityLabel={`${secondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}${target === null ? '' : ` ${secondary ? 'Secondary' : 'Primary'} muscle target ${target}%.`}`}
             density="list"
@@ -569,6 +587,7 @@ function ExerciseListView({
               testID={`stats-exercise-target-${item.id}`}>{target}% target</Text> : null}
             {layout.stacked ? values : null}
           </ListRow>
+          </Fragment>
         );
       })}
     </StatsTable>
@@ -598,78 +617,18 @@ const exerciseRowLabel = (item: ExerciseListItem, metric: ProgressExerciseMetric
   return `Open ${item.name} heatmap. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.`;
 };
 
-const exerciseSortDirection = (mode: ExerciseSortMode): 'up' | 'down' =>
-  mode.endsWith('-asc') ? 'up' : 'down';
-
-// A figure column is named as the columns name themselves (`Previous`, not the
-// header's abbreviated `Prev`).
 const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string =>
   header === 'exercise' ? 'Exercise' : COLUMN_NAMES[COLUMN_KEYS.indexOf(header)];
 
-function ExerciseSortHeaderCell({
-  header,
-  label,
-  metric,
-  sortMode,
-  onPress,
-  style,
-  numeric = false,
-}: {
-  header: ExerciseSortHeader;
-  label: string;
-  metric: ProgressExerciseMetric;
-  sortMode: ExerciseSortMode;
-  onPress: (header: ExerciseSortHeader) => void;
-  style: StyleProp<ViewStyle>;
-  numeric?: boolean;
+function ExerciseSortHeaderCell({ header, label, metric, sortMode, onPress, style, numeric = false }: {
+  header: ExerciseSortHeader; label: string; metric: ProgressExerciseMetric; sortMode: ExerciseSortMode;
+  onPress: (header: ExerciseSortHeader) => void; style: StyleProp<ViewStyle>; numeric?: boolean;
 }) {
-  const isActive = EXERCISE_SORT_HEADER_BY_MODE[sortMode] === header;
-  const nextMode = nextExerciseSortMode(sortMode, header);
-  // An inactive header still lays out a (transparent) indicator, so the
-  // column does not shift when it becomes the active sort.
-  const direction = isActive ? exerciseSortDirection(sortMode) : 'down';
-  // A figure column names its unit, like the Muscle table's spoken headers.
-  const named = numeric
-    ? `${exerciseSortHeaderLabel(header)}, ${metricUnit(metric)}`
-    : exerciseSortHeaderLabel(header);
-  const accessibilityLabel = isActive
-    ? `${named}. Current sort: ${describeExerciseSortMode(sortMode)}. Activate to sort ${describeExerciseSortMode(nextMode)}.`
-    : `${named}. Activate to sort ${describeExerciseSortMode(nextMode)}.`;
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isActive }}
-      onPress={() => onPress(header)}
-      style={({ pressed }) => [
-        statsTableStyles.headerCell,
-        style,
-        numeric && statsTableStyles.headerCellNumeric,
-        pressed && styles.headerCellPressed,
-      ]}
-      testID={`stats-exercise-sort-${header}`}>
-      <StatsTableHeaderLabel active={isActive} label={label} />
-      <View
-        accessible={false}
-        style={[
-          styles.headerIndicator,
-          header === 'exercise' && styles.headerIndicatorRecency,
-          !isActive && styles.headerIndicatorHidden,
-        ]}
-        testID={`stats-exercise-sort-${header}-indicator`}>
-        {header === 'exercise' ? (
-          <StatsTableHeaderLabel label="Recent" />
-        ) : null}
-        <Icon
-          color={uiRoles.ink}
-          name={direction === 'up' ? 'arrow-up' : 'arrow-down'}
-          size="xs"
-          testID={`stats-exercise-sort-${header}-indicator-${direction}`}
-        />
-      </View>
-    </Pressable>
-  );
+  return <StatsTableSortHeader label={label} active={EXERCISE_SORT_HEADER_BY_MODE[sortMode] === header}
+    descending={!sortMode.endsWith('-asc')}
+    description={`${exerciseSortHeaderLabel(header)}${numeric ? `, ${metricUnit(metric)}` : ''}`}
+    currentSort={describeExerciseSortMode(sortMode)} nextSort={describeExerciseSortMode(nextExerciseSortMode(sortMode, header))}
+    onPress={() => onPress(header)} testID={`stats-exercise-sort-${header}`} style={style} numeric={numeric} recent={header === 'exercise'} />;
 }
 
 export default function StatsRoute() {
@@ -685,11 +644,12 @@ function StatsContent() {
   const filters = useProgressFilters(params);
   const weeks = filters.period === 'this-week' ? 1 : values.targetWindowWeeks;
   const catalog = useExerciseCatalog();
-  // The Exercise table's gym ([[gym.view-filter]]); this visit's choice only.
+  // The tables' gym ([[gym.view-filter]]); this visit's choice only.
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
   const { current: thisPeriod, previous: lastPeriod, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
-  const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload);
+  const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
+  const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload, summaryGymId);
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
@@ -702,21 +662,23 @@ function StatsContent() {
       previous: periodFigures(lastPeriod.aggregatesById.get(item.id)),
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
-  // Name plus muscle-group names, the haystack the shared catalogue search
-  // matches word by word, built from the same catalogue rows as the list.
+  const exerciseFamilies = useMemo(() => {
+    const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
+    return new Map(catalog.exercises.map(exercise => [exercise.id, getExercisePrimaryFamilyName(exercise, byId)]));
+  }, [catalog.exercises, catalog.muscleGroups]);
+  // Search and family placement read the same current catalogue metadata.
   const exerciseSearchIndex = useMemo(() => {
     const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(catalog.muscleGroups);
     return new Map(catalog.exercises.map(item => [item.id, buildExerciseCatalogSearchText(item, muscleGroupsById)]));
   }, [catalog.exercises, catalog.muscleGroups]);
   return <StatsScreenShell {...summary} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
-    exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
+    exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
-    onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref(muscle, filters.metric, view))}
-    // Exercise browsing carries its gym; muscle contributors open all-gyms Timeline.
+    onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId }, filters.metric, view))}
     onOpenExerciseHistory={exercise => router.push(progressHistoryHref(
-      { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : undefined },
+      { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : summaryGymId },
       filters.breakdown === 'exercise' && filters.exerciseMetric !== 'estimatedOneRepMax' ? filters.exerciseMetric : filters.metric,
       filters.breakdown === 'muscle' ? 'timeline' : undefined))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
@@ -742,35 +704,17 @@ const periodFigures = (aggregate: ExerciseAggregate | undefined): ComparisonPeri
 // switch does not push the table down and back up.
 const LOADING_PANEL_DELAY_MS = 100;
 
-// The width the Exercise header reserves for its `Recent` + arrow indicator,
-// visible or not, so the label never moves when the sort changes.
-const RECENCY_INDICATOR_WIDTH = 64;
-
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
-  search: { flex: 1 },
+  search: { flex: 1, minWidth: 0 },
   target: { textAlign: 'left' },
   // The page's last row clears the display's rounded corner above the tab bar,
   // which otherwise clips it: one more step of the spacing scale than the
   // gutter `ScreenScroll` already applies.
   scrollContent: { paddingBottom: uiSpace.xxl },
-  headerCellPressed: {
-    backgroundColor: uiRoles.paper,
-  },
-  headerIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  headerIndicatorRecency: {
-    width: RECENCY_INDICATOR_WIDTH,
-  },
-  headerIndicatorHidden: {
-    opacity: 0,
-  },
   // The name takes whatever the three figure columns leave, and lets `Recent`
   // wrap below the label when both cannot fit beside `Now`.
   nameColumn: {

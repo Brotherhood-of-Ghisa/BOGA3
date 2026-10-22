@@ -325,8 +325,8 @@ const loadExerciseRawSessions = async (
 const inGymScope = (rawSessions: ExerciseRawSession[], gymId: string | null | undefined): ExerciseRawSession[] =>
   gymId === undefined ? rawSessions : rawSessions.filter((session) => (session.gymId ?? null) === gymId);
 
-/** The gyms the exercise was trained at in the window, most recently first, with their session counts. */
-export const exerciseHistoryGymOptions = (rawSessions: ExerciseRawSession[]): GymScopeOption[] => {
+/** The gyms trained at in the window, most recently first, with their session counts. */
+export const exerciseHistoryGymOptions = (rawSessions: Pick<ExerciseRawSession, 'id' | 'completedAt' | 'gymId' | 'gymName'>[]): GymScopeOption[] => {
   const byGym = new Map<string | null, { option: GymScopeOption; sessionIds: Set<string>; latest: Date }>();
   for (const session of rawSessions) {
     const gymId = session.gymId ?? null;
