@@ -91,3 +91,5 @@ archives are the 2-minute windows of an hour holding a WAL-writing tick (one
 Each run writes `apps/mobile/artifacts/perf/groups/<run>/report.json` and
 `summary.md`, and prints the summary. Compare counters, not durations; record
 which `main` commit a baseline ran on, since a migration moves every number.
+Rows and WAL repeat closely run to run; pages can move by a tenth as the
+planner's statistics shift, so read a slope, not a single page count.

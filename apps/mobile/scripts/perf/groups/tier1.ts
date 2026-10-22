@@ -9,7 +9,7 @@ import { Client } from 'pg';
 import { handleNotificationRequest } from '../../../../../supabase/functions/notification-worker/handler.ts';
 import { sumCounters, type Counters } from './counters.ts';
 import { definitionId, fixtureStatements, FIXTURE_COUNTS_SQL, type FixtureSpec } from './fixture.ts';
-import { runGroupEval, type DrainSummary, type Rpc } from './group-eval-mirror.ts';
+import { runGroupEval, type DrainSummary, type Rpc, type RpcFailure } from './group-eval-mirror.ts';
 import { Tier1Session, type CallRecord, type Caller } from './session.ts';
 
 export const GROUP_EVAL_KICK_URL = 'http://kong:8000/functions/v1/group-eval';
@@ -146,7 +146,21 @@ export const pushEntities = {
 const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1Scenario['steadyState']> => {
   const failures: string[] = [];
   let groupEvalRuns = 0;
-  const service = run.rpc({ role: 'service_role' }, false);
+  // After one publication outruns the statement timeout the scenario is
+  // unreachable; later comparisons fail at once instead of each waiting it out.
+  const inner = run.rpc({ role: 'service_role' }, false);
+  let timedOut = false;
+  const service: Rpc = async <T>(name: string, args: Record<string, unknown>) => {
+    if (timedOut && (name === 'group_metric_eval_prepare' || name === 'group_metric_eval_publish')) {
+      throw Object.assign(new Error('skipped: an earlier call exceeded the statement timeout'), { sqlstate: '57014' });
+    }
+    try {
+      return await inner<T>(name, args);
+    } catch (error) {
+      if ((error as RpcFailure).sqlstate === '57014') timedOut = true;
+      throw error;
+    }
+  };
   for (; groupEvalRuns < MAX_STEADY_STATE_RUNS; groupEvalRuns += 1) {
     const summary = await runGroupEval(service);
     failures.push(...summary.failures);
