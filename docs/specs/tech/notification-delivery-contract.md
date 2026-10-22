@@ -26,7 +26,11 @@ kick the worker. Raw intake retains no source/workout/allocator locks. Exact
 current digests reject changed graphs even if intake failed. Recovery admits a
 fair bounded batch, locks all repair groups then all sources before enqueue,
 and reads source rows/shares with the same identity and
-deadline, rather than replaying stream history. Missing first moments fail closed;
+deadline, rather than replaying stream history. Recovery selects missing admissions,
+shares or start intents and confirmed unfinished completions before batching;
+unchanged settled workouts do not rebuild proofs or rewrite their tuples.
+Selected unfinished work still advances its recovery position so an unprovable
+early graph cannot starve later candidates. Missing first moments fail closed;
 known failed admissions become immutable forfeiture markers, never newer source
 timestamps. A first capture failure can forfeit that alert. If both the isolated
 write and its diagnostic fail, erased earlier timing cannot be reconstructed.
@@ -57,7 +61,8 @@ caller's live completed sessions using immutable captured completion time,
 retaining epoch, eligibility, forfeiture and original deadline guards. It pages
 ten IDs in stable ID order. A keyset
 cursor prevents an unprovable early graph from starving later candidates;
-confirmed graphs remain candidates because their context can change. The
+confirmed graphs with unfinished completion deliveries remain candidates because
+their context can change; settled summaries leave this polling backlog. The
 mobile quiet-round hook reads one page under the existing local-data lock,
 captures the five domain types including tombstones through `entityToWire`,
 and omits dirty/quarantined graphs. It excludes clocks/bookkeeping, pins the
@@ -221,7 +226,15 @@ allowlisted outcomes only, never tokens, ciphertext, names, secrets or raw error
 
 The deterministic sink is enabled only by the local configuration and handles
 synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
-Provider sending defaults off. The five-minute backstop uses Vault entries
+Provider sending defaults off. A service-only due-work check gates both the
+five-minute backstop's HTTP invocation and duplicate worker requests. It keeps
+due sends, expired leases and deliveries, receipts (including exhausted or
+expired receipt windows), recovery and pruning independent from new-send
+enablement. Identical valid confirmations retain their generation without a
+tuple rewrite; they can still wake unfinished work after a missed kick.
+Private-only source edits do not kick the worker. A transaction consumes its
+kick only after a request is queued, so an idle early row cannot suppress later
+work in the same transaction. The backstop uses Vault entries
 `notification_worker_url` and `notification_worker_key`; absent entries do
 nothing. The key matches the runtime's default secret API key, with legacy
 service-role fallback for projects without one. The worker accepts both runtime

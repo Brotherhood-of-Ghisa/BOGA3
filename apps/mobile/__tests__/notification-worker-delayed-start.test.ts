@@ -23,6 +23,27 @@ describe('worker after an admitted start has already completed', () => {
   beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(completedAt + 3600000); jest.clearAllMocks(); });
   afterEach(() => { jest.useRealTimers(); });
 
+  test('an idle duplicate invocation performs only the due-work check', async () => {
+    const calls: string[] = [];
+    const rpc: Rpc = async <T>(name: string): Promise<T> => { calls.push(name); return false as T; };
+    const response = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ claimed: 0, receipts: 0, outcomes: {}, idle: true });
+    expect(calls).toEqual(['notification_work_pending']);
+    expect(sendPush).not.toHaveBeenCalled();
+  });
+
+  test('a due-work check failure remains retryable without attempting a provider handoff', async () => {
+    const rpc: Rpc = jest.fn(async () => { throw new Error('database unavailable'); });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const response = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: 'INTERNAL' });
+      expect(sendPush).not.toHaveBeenCalled();
+    } finally { error.mockRestore(); }
+  });
+
   test('a completion-first claim defers, then both events retain their own original provider deadline', async () => {
     const claims = [[job(2), job(1)], [], [job(2)], []];
     let completionAttempts = 0;
