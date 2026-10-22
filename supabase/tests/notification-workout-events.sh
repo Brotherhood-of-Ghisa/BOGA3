@@ -149,6 +149,70 @@ rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${INSTALL_ID}" --arg c
   '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[ok]",p_environment:"local",
     p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
 expect_ok 'register local recipient'
+# Rollback isolates scheduling from other fixtures and prevents real pg_net dispatch.
+CUTOVER_SEED_SQL="$(sed -n '/^insert into app_public.notification_moment_queue/,/;/p' "${SUPABASE_DIR}/migrations/20261022180000_notification_moment_admission.sql")"
+run_psql "begin;
+  truncate app_public.notification_moment_queue,app_public.notification_workout_moments,
+    app_public.notification_workouts,app_public.notification_intents cascade;
+  update app_public.notification_workout_epoch set started_at=now()-interval '26 hours';
+  set local request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}';
+  insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+    values('${B_UID}','cutover-scheduling-${RUN_TAG}','active',floor(extract(epoch from now()-interval '23 hours 50 minutes')*1000),1,1,1);
+  select app_public.notification_track_workout('${B_UID}','cutover-scheduling-${RUN_TAG}');
+  update app_public.sessions set status='completed',completed_at=floor(extract(epoch from now()+interval '30 minutes')*1000)
+    where owner_user_id='${B_UID}' and id='cutover-scheduling-${RUN_TAG}';
+  delete from app_public.notification_moment_queue;
+  ${CUTOVER_SEED_SQL}
+  do \$\$ begin
+    if not exists(select 1 from app_public.notification_moment_queue where session_id='cutover-scheduling-${RUN_TAG}'
+      and available_at<=now()) then raise exception 'cutover postponed an expiring start behind a future completion'; end if;
+    perform app_public.notification_admit_moments(20);
+    if not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}'
+      and session_id='cutover-scheduling-${RUN_TAG}' and kind='start'
+      and expires_at>now() and expires_at<now()+interval '11 minutes') then
+      raise exception 'cutover lost the captured start or renewed its deadline'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+pass 'cutover admits an expiring start before its future completion'
+run_psql "begin;
+  truncate app_public.notification_moment_queue,app_public.notification_workout_moments,
+    app_public.notification_workouts,app_public.notification_intents cascade;
+  delete from vault.secrets where name in ('notification_worker_url','notification_worker_key');
+  select vault.create_secret('http://127.0.0.1:9/functions/v1/notification-worker','notification_worker_url');
+  select vault.create_secret('fixture-only','notification_worker_key');
+  set local request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}';
+  set local boga.notification_kicked='false';
+  insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+    values('${B_UID}','future-kick-${RUN_TAG}','active',floor(extract(epoch from now()+interval '30 minutes')*1000),1,1,1);
+  do \$\$ declare requests bigint; begin
+    if app_public.notification_worker_due() or current_setting('boga.notification_kicked')='true' then
+      raise exception 'future-only intake consumed the transaction kick'; end if;
+    select count(*) into requests from net.http_request_queue;
+    insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+      values('${B_UID}','due-kick-${RUN_TAG}','active',floor(extract(epoch from now())*1000),1,1,1);
+    if current_setting('boga.notification_kicked')<>'true' or (select count(*) from net.http_request_queue)<>requests+1 then
+      raise exception 'due second row did not dispatch'; end if;
+    perform app_public.notification_kick_once();
+    if (select count(*) from net.http_request_queue)<>requests+1 then raise exception 'transaction dispatched twice'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+pass 'future then due intake dispatches exactly once in one transaction'
+HISTORY_ENTITIES=()
+for number in {1..200}; do
+  next_cuam
+  HISTORY_ENTITIES+=("$(e_session "old-admission-${number}-${RUN_TAG}" "$((NOW_MS-180000000))" completed "$((NOW_MS-172800000))" 7200 null "${CUAM}")")
+done
+push "${B_TOKEN}" '200 expired historical sessions' "${HISTORY_ENTITIES[@]}"
+assert_sql 'expired history preserves moments without filling the admission queue' "select count(*)=200
+  and not exists(select 1 from app_public.notification_moment_queue where session_id like 'old-admission-%-${RUN_TAG}')
+  from app_public.notification_workout_moments where member_user_id='${B_UID}' and session_id like 'old-admission-%-${RUN_TAG}';"
+next_cuam
+push "${B_TOKEN}" 'live start behind historical batch' "$(e_session "history-live-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")"
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'one admission pass reaches the live start after historical intake' "select exists(select 1 from app_public.notification_intents
+  where lifter_user_id='${B_UID}' and recipient_user_id='${A_UID}' and session_id='history-live-${RUN_TAG}' and kind='start')
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}');"
+run_psql "delete from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}';" >/dev/null
 DELAYED_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 DELAYED_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
 DELAYED_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
@@ -291,14 +355,14 @@ next_cuam
 push "${B_TOKEN}" 'new raw start cannot renew expired captured timing' \
   "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null null "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
 rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'expired-timing admission expected HTTP 204 with no body'
-assert_sql 'newer raw timestamp admits without renewing its expired original event' "select w.eligible and w.can_start
-  and s.started_at=${NOW_MS} and w.start_at=to_timestamp(${EXPIRED_START_MS}/1000.0) and m.event_at=w.start_at
-  and w.start_at>=(select started_at from app_public.notification_workout_epoch) and w.start_at+interval '24 hours'<=now()
-  and not app_public.notification_start_ready(w.member_user_id,w.session_id,w.start_at)
-  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
-  from app_public.notification_workouts w join app_public.sessions s on s.owner_user_id=w.member_user_id and s.id=w.session_id
-    join app_public.notification_workout_moments m on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
-  where w.member_user_id='${B_UID}' and w.session_id='${EXPIRED_AUTOSAVE}';"
+assert_sql 'newer raw timestamp never queues or renews its expired original event' "select s.started_at=${NOW_MS}
+  and m.event_at=to_timestamp(${EXPIRED_START_MS}/1000.0)
+  and not exists(select 1 from app_public.notification_workouts where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id=m.member_user_id and session_id=m.session_id)
+  from app_public.sessions s join app_public.notification_workout_moments m
+    on m.member_user_id=s.owner_user_id and m.session_id=s.id and m.kind='start'
+  where s.owner_user_id='${B_UID}' and s.id='${EXPIRED_AUTOSAVE}';"
 next_cuam
 push "${B_TOKEN}" 'delete expired autosave control' \
   "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
@@ -677,11 +741,11 @@ push "${B_TOKEN}" 'forfeit missed start on later autosave' "$(e_session "recover
 assert_sql 'missed start stays an immutable forfeited moment' "select event_at is null from app_public.notification_workout_moments
   where member_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}' and kind='start';"
 rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'forfeited-source admission expected HTTP 204 with no body'
-assert_sql 'recent raw fallback cannot admit a null forfeited start as an alert' "select not w.can_start and m.event_at is null
-  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
-  from app_public.notification_workouts w join app_public.notification_workout_moments m
-    on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
-  where w.member_user_id='${B_UID}' and w.session_id='recovery-${RUN_TAG}';"
+assert_sql 'recent raw fallback never queues a null forfeited start' "select m.event_at is null
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id=m.member_user_id and session_id=m.session_id)
+  from app_public.notification_workout_moments m
+  where m.member_user_id='${B_UID}' and m.session_id='recovery-${RUN_TAG}' and m.kind='start';"
 next_cuam
 push "${B_TOKEN}" 'reopen workout whose first completion capture failed' \
   "$(e_session "${LOST_COMPLETION}" "$((NOW_MS-90001000))" active null null null "${CUAM}")"

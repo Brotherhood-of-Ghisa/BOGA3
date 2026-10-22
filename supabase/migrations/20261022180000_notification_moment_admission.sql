@@ -50,8 +50,9 @@ begin
   if not found then return false; end if;
   insert into notification_moment_queue(member_user_id,session_id,available_at)
     select p_member,p_session,greatest(now(),event_at-interval '5 minutes') from notification_workout_moments
-    where member_user_id=p_member and session_id=p_session and kind=p_kind;
-  return true;
+    where member_user_id=p_member and session_id=p_session and kind=p_kind
+      and event_at+interval '24 hours'>now();
+  return found;
 end $$;
 
 -- Only session rows carry moments; a write kicks the worker only when it queued one.
@@ -211,10 +212,20 @@ exception when others then
   raise warning 'notification_worker_sweep_failed'; return null;
 end $$;
 
+create or replace function app_public.notification_kick_once() returns void
+language plpgsql security definer set search_path=app_public,pg_temp as $$
+begin
+  if current_setting('boga.notification_kicked',true)='true' then return; end if;
+  -- A future-only queue must leave a later due row free to dispatch.
+  if notification_sweep() is not null then
+    perform set_config('boga.notification_kicked','true',true);
+  end if;
+end $$;
+
 -- Sources whose moments are still inside their alert window are admitted once
 -- by the new worker; admission is idempotent for any already sent.
 insert into app_public.notification_moment_queue(member_user_id,session_id,available_at)
-  select member_user_id,session_id,greatest(now(),max(event_at)-interval '5 minutes') from app_public.notification_workout_moments
+  select member_user_id,session_id,min(greatest(now(),event_at-interval '5 minutes')) from app_public.notification_workout_moments
   where event_at+interval '24 hours'>now() group by member_user_id,session_id;
 
 do $$ declare f record; begin
