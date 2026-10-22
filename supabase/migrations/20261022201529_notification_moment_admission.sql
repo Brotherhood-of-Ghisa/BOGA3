@@ -78,7 +78,10 @@ begin
       moment_kind:='completion';
       queued:=notification_append_moment(new.owner_user_id,new.id,moment_kind,new.completed_at) or queued;
     end if;
-    if queued then perform notification_kick_once(); end if;
+    if queued and exists(select 1 from group_session_shares sh join groups g on g.id=sh.group_id
+      where sh.member_user_id=new.owner_user_id and sh.session_id=new.id and g.deleted_at is null) then
+      perform notification_kick_once();
+    end if;
   exception when others then
     get stacked diagnostics code=returned_sqlstate;
     perform group_eval_log_failure('notification.intake_failed',new.owner_user_id,
@@ -180,19 +183,21 @@ $$;
 
 -- True while a worker run has something to do: admissions, ready completions,
 -- sends, receipts, expiries or pruning. Mirrors the worker's claim predicates.
-create function app_public.notification_worker_due() returns boolean
+create or replace function app_public.notification_work_pending() returns boolean
 language sql stable security definer set search_path=app_public,pg_temp as $$
   select exists(select 1 from notification_moment_queue where available_at<=now())
     or exists(select 1 from notification_workouts w where w.eligible and w.confirmed_at is not null
       and w.enqueued_generation<w.generation and w.completion_at>now()-interval '24 hours')
-    or exists(select 1 from notification_deliveries d where (d.state in ('pending','retry') and d.available_at<=now())
-      or (d.state in ('leased','sending') and d.lease_until<=now())
-      or (d.state='disabled' and d.available_at<=now() and exists(select 1 from notification_config
-        where singleton and sending_enabled and provider<>'disabled')))
-    or exists(select 1 from notification_deliveries d join notification_intents n on n.id=d.intent_id
-      where n.expires_at<=now() and d.state in ('pending','retry','disabled','leased'))
-    or exists(select 1 from notification_deliveries where state='ticket' and ((receipt_available_at<=now()
-      and (receipt_lease_until is null or receipt_lease_until<=now())) or ticket_at+interval '24 hours'<=now() or receipt_attempts>=20))
+    or exists(select 1 from notification_deliveries d join notification_intents n on n.id=d.intent_id where
+      (d.state='sending' and d.lease_until<=now()) or
+      (d.state in ('pending','retry','disabled','leased') and n.expires_at<=now()) or
+      (d.state in ('pending','retry','disabled') and d.available_at<=now() and exists(
+        select 1 from notification_config where singleton and sending_enabled and provider<>'disabled')) or
+      (d.state='leased' and d.lease_until<=now()) or
+      (d.state in ('pending','retry') and not exists(
+        select 1 from notification_config where singleton and sending_enabled and provider<>'disabled')) or
+      (d.state='ticket' and (d.receipt_lease_until is null or d.receipt_lease_until<=now()) and
+        (d.receipt_available_at<=now() or d.ticket_at+interval '24 hours'<=now() or d.receipt_attempts>=20)))
     or notification_prune_due();
 $$;
 
@@ -201,7 +206,7 @@ language plpgsql security definer set search_path=app_public,pg_temp as $$
 declare endpoint text; key text;
 begin
   -- An idle sweep reads and returns: no worker run, no pg_net rows.
-  if not notification_worker_due() then return null; end if;
+  if not notification_work_pending() then return null; end if;
   -- Disabling new sends must not stop accepted-ticket receipts or secret pruning.
   select decrypted_secret into endpoint from vault.decrypted_secrets where name='notification_worker_url' order by created_at desc limit 1;
   select decrypted_secret into key from vault.decrypted_secrets where name='notification_worker_key' order by created_at desc limit 1;
@@ -212,15 +217,7 @@ exception when others then
   raise warning 'notification_worker_sweep_failed'; return null;
 end $$;
 
-create or replace function app_public.notification_kick_once() returns void
-language plpgsql security definer set search_path=app_public,pg_temp as $$
-begin
-  if current_setting('boga.notification_kicked',true)='true' then return; end if;
-  -- A future-only queue must leave a later due row free to dispatch.
-  if notification_sweep() is not null then
-    perform set_config('boga.notification_kicked','true',true);
-  end if;
-end $$;
+drop function app_public.notification_recovery_candidates();
 
 -- Sources whose moments are still inside their alert window are admitted once
 -- by the new worker; admission is idempotent for any already sent.
@@ -231,7 +228,7 @@ insert into app_public.notification_moment_queue(member_user_id,session_id,avail
 do $$ declare f record; begin
   for f in select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='app_public' and p.proname in ('notification_append_moment','notification_admit_moments',
-      'notification_prune_due','notification_worker_due') loop
+      'notification_prune_due','notification_work_pending') loop
     execute format('revoke all on function %s from public,anon,authenticated',f.oid::regprocedure);
     execute format('grant execute on function %s to service_role',f.oid::regprocedure);
   end loop;

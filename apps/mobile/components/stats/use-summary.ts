@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { computeProgressComparisons, type ProgressComparisons } from '@/src/data';
+import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 type PeriodReads = {
   summaries: ReadonlyMap<string, ProgressComparisons>;
@@ -10,7 +11,7 @@ type PeriodReads = {
 
 const NO_READS: PeriodReads = { summaries: new Map(), failures: new Map(), pending: new Set() };
 
-const contextKey = (weeks: number, revision: number) => `${weeks}:${revision}`;
+const contextKey = (weeks: number, revision: number, gymId?: string | null) => `${weeks}:${revision}:${encodeGymRouteParam(gymId) ?? ''}`;
 
 const withEntry = <V,>(map: ReadonlyMap<string, V>, key: string, value: V) => new Map(map).set(key, value);
 const withoutKey = <V,>(map: ReadonlyMap<string, V>, key: string) => {
@@ -30,23 +31,24 @@ const withoutPending = (pending: ReadonlySet<string>, key: string) => {
  * period's last snapshot until its new read lands; another window size or
  * policy revision hides it.
  */
-export function useStatsSummary(weeks: number, targetWindowWeeks: number, revision: number, reloadExercises: () => void) {
+export function useStatsSummary(weeks: number, targetWindowWeeks: number, revision: number, reloadExercises: () => void, gymId?: string | null) {
   const [reads, setReads] = useState<PeriodReads>(NO_READS);
   const [retryRevision, setRetryRevision] = useState(0);
   useFocusEffect(useCallback(() => {
     let active = true;
     const periods = targetWindowWeeks === 1 ? [1] : [targetWindowWeeks, 1];
-    const keys = periods.map(period => contextKey(period, revision));
+    const keys = periods.map(period => contextKey(period, revision, gymId));
+    const retainedKeys = [...keys, ...periods.map(period => contextKey(period, revision))];
     setReads(current => ({
       // Only this revision's periods survive, so an older policy never shows.
-      summaries: new Map([...current.summaries].filter(([key]) => keys.includes(key))),
+      summaries: new Map([...current.summaries].filter(([key]) => retainedKeys.includes(key))),
       failures: new Map(),
       pending: new Set(keys),
     }));
     reloadExercises();
     periods.forEach((period, index) => {
       const key = keys[index];
-      void computeProgressComparisons({ periodWeeks: period }).then(summary => {
+      void computeProgressComparisons({ periodWeeks: period, ...(gymId === undefined ? {} : { gymId }) }).then(summary => {
         if (active) setReads(current => ({ ...current, summaries: withEntry(current.summaries, key, summary),
           failures: withoutKey(current.failures, key), pending: withoutPending(current.pending, key) }));
       }).catch((cause: unknown) => {
@@ -57,8 +59,8 @@ export function useStatsSummary(weeks: number, targetWindowWeeks: number, revisi
     });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same reads.
-  }, [targetWindowWeeks, revision, reloadExercises, retryRevision]));
-  const key = contextKey(weeks, revision);
+  }, [targetWindowWeeks, revision, reloadExercises, retryRevision, gymId]));
+  const key = contextKey(weeks, revision, gymId);
   const summary = reads.summaries.get(key) ?? null;
   const errorMessage = reads.failures.get(key) ?? null;
   return { summary, isLoading: reads.pending.has(key) || (!summary && errorMessage === null),

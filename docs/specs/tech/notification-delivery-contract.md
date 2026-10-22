@@ -59,7 +59,8 @@ caller's live completed sessions using immutable captured completion time,
 retaining epoch, eligibility, forfeiture and original deadline guards. It pages
 ten IDs in stable ID order. A keyset
 cursor prevents an unprovable early graph from starving later candidates;
-confirmed graphs remain candidates because their context can change. The
+confirmed graphs with unfinished completion deliveries remain candidates because
+their context can change; settled summaries leave this polling backlog. The
 mobile quiet-round hook reads one page under the existing local-data lock,
 captures the five domain types including tombstones through `entityToWire`,
 and omits dirty/quarantined graphs. It excludes clocks/bookkeeping, pins the
@@ -223,11 +224,17 @@ allowlisted outcomes only, never tokens, ciphertext, names, secrets or raw error
 
 The deterministic sink is enabled only by the local configuration and handles
 synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
-Provider sending defaults off. The five-minute backstop calls the worker only
-while `notification_worker_due()` finds queued admissions, unready confirmed
-completions, due sends, receipts, expiries or pruning; an idle sweep writes
-nothing. It uses Vault entries `notification_worker_url` and
-`notification_worker_key`; absent entries do nothing. The key matches the runtime's default secret API key, with legacy
+Provider sending defaults off. A service-only due-work check gates both the
+five-minute backstop's HTTP invocation and duplicate worker requests. It keeps
+due sends, expired leases and deliveries, receipts (including exhausted or
+expired receipt windows), queued admissions and pruning independent from new-send
+enablement. Identical valid confirmations retain their generation without a
+tuple rewrite; they can still wake unfinished work after a missed kick.
+Private-only source edits do not kick the worker. A transaction consumes its
+kick only after a request is queued, so an idle early row cannot suppress later
+work in the same transaction. The backstop uses Vault entries
+`notification_worker_url` and `notification_worker_key`; absent entries do
+nothing. The key matches the runtime's default secret API key, with legacy
 service-role fallback for projects without one. The worker accepts both runtime
 credentials. Releases authenticate a read-only worker probe before building. Configure
 credentials only under explicit hosted rollout authority. Tests use real sync intake, confirmation,

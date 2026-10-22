@@ -7,13 +7,11 @@ import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
 /**
- * What one history page is about: one exercise definition — at one gym scope,
- * three-state (`src/utils/gym-scope-route.ts`), unset every gym — or one
- * muscle group, whose totals are the whole exercise's ([[gym.split]]).
+ * One exercise or muscle at a three-state gym scope; unset means every gym.
  */
 export type HistorySubject =
   | { kind: 'exercise'; id: string; gymId?: string | null }
-  | { kind: 'muscle'; id: string };
+  | { kind: 'muscle'; id: string; gymId?: string | null };
 
 const historySubjectId = (subject: HistorySubject | null): string | null => {
   const id = subject?.id.trim();
@@ -27,7 +25,7 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
   const now = new Date();
   const bounds = { ...historyWeekBounds(weeks, now), now };
   if (subject.kind === 'muscle') {
-    return { ...await computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id] }), gyms: NO_GYMS };
+    return computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id], ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }) });
   }
   return computeSelectedExerciseHistoryEffort({
     ...bounds, exerciseDefinitionId: id, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
@@ -43,7 +41,7 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
 export function useHistory(subject: HistorySubject | null, weeks: number, revision: number, accountRevision: number) {
   const kind = subject?.kind ?? null;
   const id = historySubjectId(subject);
-  const gymId = subject?.kind === 'exercise' ? subject.gymId : undefined;
+  const gymId = subject?.gymId;
   const gymKey = encodeGymRouteParam(gymId) ?? '';
   const subjectKey = `${kind ?? ''}:${id ?? ''}:${accountRevision}`;
   const context = `${subjectKey}:${gymKey}:${weeks}:${revision}`;

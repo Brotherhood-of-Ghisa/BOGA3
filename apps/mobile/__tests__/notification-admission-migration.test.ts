@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const migration = readFileSync(join(__dirname,
-  '../../../supabase/migrations/20261022180000_notification_moment_admission.sql'), 'utf8');
+  '../../../supabase/migrations/20261022201529_notification_moment_admission.sql'), 'utf8');
 
 // Fast contract guards; notification-workout-events.sh executes the real SQL regressions.
 describe('notification admission migration', () => {
@@ -19,7 +19,9 @@ describe('notification admission migration', () => {
   });
 
   test('transaction kick is consumed only by an actual dispatch', () => {
-    const kick = migration.split('create or replace function app_public.notification_kick_once')[1].split('end $$;')[0];
+    const idleMigration = readFileSync(join(__dirname,
+      '../../../supabase/migrations/20261022184807_notification_idle_work.sql'), 'utf8');
+    const kick = idleMigration.split('create or replace function app_public.notification_kick_once')[1].split('end $$;')[0];
     expect(kick).toContain("if current_setting('boga.notification_kicked',true)='true' then return; end if;");
     expect(kick).toMatch(/if notification_sweep\(\) is not null then\s*perform set_config\('boga.notification_kicked','true',true\);\s*end if;/);
   });

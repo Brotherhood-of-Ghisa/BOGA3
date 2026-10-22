@@ -150,7 +150,7 @@ rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${INSTALL_ID}" --arg c
     p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
 expect_ok 'register local recipient'
 # Rollback isolates scheduling from other fixtures and prevents real pg_net dispatch.
-CUTOVER_SEED_SQL="$(sed -n '/^insert into app_public.notification_moment_queue/,/;/p' "${SUPABASE_DIR}/migrations/20261022180000_notification_moment_admission.sql")"
+CUTOVER_SEED_SQL="$(sed -n '/^insert into app_public.notification_moment_queue/,/;/p' "${SUPABASE_DIR}/migrations/20261022201529_notification_moment_admission.sql")"
 run_psql "begin;
   truncate app_public.notification_moment_queue,app_public.notification_workout_moments,
     app_public.notification_workouts,app_public.notification_intents cascade;
@@ -185,7 +185,7 @@ run_psql "begin;
   insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
     values('${B_UID}','future-kick-${RUN_TAG}','active',floor(extract(epoch from now()+interval '30 minutes')*1000),1,1,1);
   do \$\$ declare requests bigint; begin
-    if app_public.notification_worker_due() or current_setting('boga.notification_kicked')='true' then
+    if app_public.notification_work_pending() or current_setting('boga.notification_kicked')='true' then
       raise exception 'future-only intake consumed the transaction kick'; end if;
     select count(*) into requests from net.http_request_queue;
     insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
@@ -483,6 +483,61 @@ drain_worker
 assert_sql 'one accepted completion across overlapping groups' "select count(*)=1 from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id
   where n.recipient_user_id='${A_UID}' and n.session_id='${SESSION}' and n.kind='completion' and d.state='ticket';"
 INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${SESSION}' and kind='completion';")"
+# Repeated settled recovery must be a physical no-op, including its heavy proof helpers.
+run_psql "begin;
+  set local track_functions='all';
+  set local client_min_messages=notice;
+  create temp table notification_idle_before as select
+    (select coalesce(sum(n_tup_upd),0) from pg_stat_xact_user_tables where relname in ('notification_workouts','notification_intents')) as writes,
+    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure) as proofs,
+    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure) as graphs,
+    (select jsonb_agg(jsonb_build_array(member_user_id,session_id,xmin::text) order by member_user_id,session_id) from app_public.notification_workouts) as versions;
+  do \$\$ begin for n in 1..10 loop
+    perform app_public.notification_admit_moments(20);
+    perform app_public.notification_workout_prepare(20);
+  end loop; end \$\$;
+  do \$\$ declare b record; writes bigint; proofs bigint; graphs bigint; versions jsonb; begin
+    select * into b from notification_idle_before;
+    select coalesce(sum(n_tup_upd),0)-b.writes into writes from pg_stat_xact_user_tables where relname in ('notification_workouts','notification_intents');
+    select coalesce(sum(calls),0)-b.proofs into proofs from pg_stat_xact_user_functions where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure;
+    select coalesce(sum(calls),0)-b.graphs into graphs from pg_stat_xact_user_functions where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure;
+    select jsonb_agg(jsonb_build_array(member_user_id,session_id,xmin::text) order by member_user_id,session_id) into versions from app_public.notification_workouts;
+    if writes<>0 or proofs<>0 or graphs<>0 or versions is distinct from b.versions then
+      raise exception 'idle recovery repeated work: writes=%, proofs=%, graphs=%',writes,proofs,graphs;
+    end if;
+    raise notice 'notification idle passes=10, writes=%, proofs=%, graphs=%',writes,proofs,graphs;
+  end \$\$;
+  rollback;" >/dev/null
+IDLE_VERSION="$(run_psql "select xmin::text from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';")"
+confirm "${B_TOKEN}" "${SESSION}" "$(manifest "${B_UID}" "${SESSION}")"; check 'unchanged settled confirmation retains success' '.confirmed==true'
+assert_sql 'unchanged confirmation does not rewrite its workout tuple' "select xmin::text='${IDLE_VERSION}' from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';"
+# The no-op shortcut must still adopt a captured start and reject a forfeited completion.
+run_psql "begin;
+  set local track_functions='all';
+  set local client_min_messages=notice;
+  select set_config('request.jwt.claims',jsonb_build_object('sub','${B_UID}','role','authenticated',
+    'session_id',(select id from auth.sessions where user_id='${B_UID}' limit 1))::text,true);
+  update app_public.notification_workouts set can_start=false where member_user_id='${B_UID}' and session_id='${SESSION}';
+  do \$\$ declare proof jsonb; answer jsonb; calls_before bigint; tuple_before tid; begin
+    proof:=app_public.notification_source_manifest('${B_UID}','${SESSION}');
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if not (answer->>'confirmed')::boolean or not exists(select 1 from app_public.notification_workouts
+      where member_user_id='${B_UID}' and session_id='${SESSION}' and can_start) then raise exception 'captured start was not repaired'; end if;
+    select coalesce(sum(calls),0) into calls_before from pg_stat_xact_user_functions where funcid='app_public.notification_track_workout(uuid,text)'::regprocedure;
+    select ctid into tuple_before from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if not (answer->>'confirmed')::boolean or (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
+        where funcid='app_public.notification_track_workout(uuid,text)'::regprocedure)<>calls_before or not exists(
+        select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}' and ctid=tuple_before) then
+      raise exception 'unchanged confirmation repeated its tracker or row write'; end if;
+    update app_public.notification_workout_moments set event_at=null where member_user_id='${B_UID}' and session_id='${SESSION}' and kind='completion';
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if (answer->>'confirmed')::boolean or exists(select 1 from app_public.notification_workouts
+      where member_user_id='${B_UID}' and session_id='${SESSION}' and eligible) then raise exception 'forfeited completion was not rejected'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+rpc "${B_TOKEN}" notification_pending_completions '{}'; expect_ok 'settled completion polling'
+check 'settled summaries leave the proof polling backlog' '(.session_ids|index($s))==null' --arg s "${SESSION}"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'narrow authorized projection'
 check 'below-first own bests and both-metric full-rank movement' '.bestCount==4 and .rankCount==8 and (.identity|contains("2 groups"))'
 check 'no privileged source fields or extra section route' 'has("weight_value")|not'

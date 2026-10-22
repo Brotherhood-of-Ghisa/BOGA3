@@ -98,6 +98,9 @@ for table in notification_config notification_installations notification_prefere
   done
 done
 rpc "${A_TOKEN}" notification_claim '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail 'app can invoke worker RPC'
+for worker_rpc in notification_work_pending notification_admit_moments; do
+  rpc "${A_TOKEN}" "${worker_rpc}" '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail "app can invoke ${worker_rpc}"
+done
 
 EVENT_AT="$(run_psql "select now()::text;")"
 CONTRIBUTIONS="[{\"group_id\":\"${GROUP_ID}\",\"best_count\":2,\"rank_count\":3}]"
@@ -214,9 +217,56 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
     perform vault.create_secret('http://127.0.0.1:9/functions/v1/notification-worker','notification_worker_url');
     perform vault.create_secret('fixture-only','notification_worker_key');
   end \$\$;
-  update app_public.notification_deliveries set state='ticket',ticket_at=now(),receipt_attempts=0,
-    receipt_available_at=now(),receipt_lease_until=null where id=${CD};
+  -- Isolate operational due states without deleting any private history; all changes roll back.
+  insert into app_public.notification_workouts(member_user_id,session_id,eligible)
+    select owner_user_id,id,false from app_public.sessions on conflict do nothing;
+  delete from app_public.notification_moment_queue;
+  delete from app_public.notification_workout_targets;
+  delete from app_public.notification_workout_moments;
+  update app_public.notification_workouts set eligible=false,completion_at=null,manifest_digest=null,context_digest=null,confirmed_at=null,contributions='[]';
+  update app_public.notification_intents set contributions='[]',event_at=now(),expires_at=now()+interval '24 hours';
+  update app_public.notification_installations set updated_at=now();
+  update app_public.notification_deliveries set state='receipt_ok',ticket_id=null,error_code=null;
+  do \$\$ begin
+    for n in 1..10 loop
+      if app_public.notification_work_pending() or app_public.notification_sweep() is not null then raise exception 'idle sweep invoked worker'; end if;
+    end loop;
+    perform set_config('boga.notification_kicked','false',true);
+    perform app_public.notification_kick_once();
+    if current_setting('boga.notification_kicked',true)='true' then raise exception 'idle early row consumed transaction kick'; end if;
+  end \$\$;
+  update app_public.notification_deliveries set state='ticket',receipt_attempts=20,receipt_available_at=now()+interval '1 hour',receipt_lease_until=null where id=${CD};
+  do \$\$ begin
+    if not app_public.notification_work_pending() then raise exception 'exhausted future receipt skipped'; end if;
+    perform app_public.notification_kick_once();
+    if current_setting('boga.notification_kicked',true) is distinct from 'true' then raise exception 'later due row lost transaction kick'; end if;
+  end \$\$;
   select app_public.notification_sweep() is not null;
+  update app_public.notification_config set sending_enabled=true,provider='local';
+  update app_public.notification_deliveries set state='pending',available_at=now() where id=${CD};
+  do \$\$ begin perform set_config('boga.notification_kicked','false',true); end \$\$;
+  create temp table private_kick_before as select max(id) as id from net.http_request_queue;
+  insert into app_public.sessions(owner_user_id,id,status,started_at,completed_at,created_at,updated_at,client_updated_at_ms)
+    values('${C_UID}','idle-private-${RUN_TAG}','completed',floor(extract(epoch from now())*1000),floor(extract(epoch from now())*1000),1,1,1);
+  do \$\$ begin
+    if (select max(id) from net.http_request_queue) is distinct from (select id from private_kick_before) then
+      raise exception 'private workout woke unrelated pending notification work'; end if;
+  end \$\$;
+  delete from app_public.notification_moment_queue;
+  update app_public.notification_config set sending_enabled=false,provider='disabled';
+  update app_public.notification_deliveries set state='ticket',receipt_attempts=0,ticket_at=now()-interval '25 hours' where id=${CD};
+  do \$\$ begin if not app_public.notification_work_pending() then raise exception 'expired future receipt skipped'; end if; end \$\$;
+  update app_public.notification_deliveries set receipt_lease_until=now()+interval '1 hour' where id=${CD};
+  do \$\$ begin if app_public.notification_work_pending() then raise exception 'live receipt lease reclaimed'; end if; end \$\$;
+  update app_public.notification_deliveries set state='sending',lease_until=now()-interval '1 second' where id=${CD};
+  do \$\$ begin if not app_public.notification_work_pending() then raise exception 'uncertain handoff cleanup skipped'; end if; end \$\$;
+  update app_public.notification_deliveries set state='disabled' where id=${CD};
+  do \$\$ begin if app_public.notification_work_pending() then raise exception 'disabled send repeatedly woke worker'; end if; end \$\$;
+  update app_public.notification_intents set event_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where id=${COMPLETION};
+  do \$\$ begin if not app_public.notification_work_pending() then raise exception 'disabled expiry cleanup skipped'; end if; end \$\$;
+  update app_public.notification_deliveries set state='receipt_ok',ticket_id='old-secret' where id=${CD};
+  update app_public.notification_intents set event_at=now()-interval '32 days',expires_at=now()-interval '31 days' where id=${COMPLETION};
+  do \$\$ begin if not app_public.notification_work_pending() then raise exception 'old secret pruning skipped'; end if; end \$\$;
   rollback;")" == t ]] || fail 'disabled sending stopped receipt/prune sweep'
 run_psql "update app_public.notification_config set sending_enabled=true,provider='local';" >/dev/null
 # Enqueue and handoff take the workout lock before the installation FK/row lock.

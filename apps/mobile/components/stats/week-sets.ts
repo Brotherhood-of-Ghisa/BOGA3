@@ -41,8 +41,8 @@ export type WeekBlock = {
   exerciseDefinitionId?: string;
 };
 
-/** An exercise's list follows its page's gym scope, three-state (`src/utils/gym-scope-route.ts`). */
-export type WeekSetsTarget = { exerciseDefinitionId: string; gymId?: string | null } | { muscleGroupIds: string[] };
+/** Each list follows its page's three-state gym scope. */
+export type WeekSetsTarget = ({ exerciseDefinitionId: string } | { muscleGroupIds: string[] }) & { gymId?: string | null };
 
 export const formatWeekDay = (date: Date, dateFormat: ExerciseDateFormat): string =>
   formatShortDate(date, dateFormat);
@@ -101,7 +101,7 @@ const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string, dateForma
     const { gymId } = target;
     return exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId), dateFormat);
   }
-  const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds });
+  const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds, gymId: target.gymId });
   return muscleWeekBlocks(days.flatMap((day) => day.contributions), dateFormat);
 };
 
@@ -120,7 +120,7 @@ export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | nul
   // The last read and the request it answered; a newer request is loading until its read lands.
   const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null }>({ groups: [], error: null, for: null });
   const targetKey = target === null ? null : 'exerciseDefinitionId' in target
-    ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : target.muscleGroupIds.join(',');
+    ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${target.muscleGroupIds.join(',')}:${encodeGymRouteParam(target.gymId) ?? ''}`;
   const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}|${dateFormat}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;
