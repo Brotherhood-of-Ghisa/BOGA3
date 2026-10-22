@@ -321,7 +321,6 @@ describe('MuscleBodyCard', () => {
         summary={summary}
         tableMetric="workingSetCount"
         viewMode="muscle"
-        weeklyWorkingSetTarget={10}
       />
     );
 
@@ -450,7 +449,6 @@ describe('MuscleBodyCard', () => {
         summary={summary}
         tableMetric="workingSetCount"
         viewMode="exercise"
-        weeklyWorkingSetTarget={8}
       />
     );
 
@@ -483,7 +481,8 @@ describe('MuscleBodyCard', () => {
     expect(screen.getByTestId('stats-exercise-row-bench-now')).toHaveTextContent('6');
     expect(screen.queryByTestId('stats-exercise-target-bench')).toBeNull();
     expect(screen.getByTestId('stats-exercise-row-bench').props.accessibilityLabel).not.toMatch(/target/i);
-    expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent('2');
+    expect(screen.queryByText('Total')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-secondary-summary')).toBeNull();
     expect(screen.getByTestId('stats-exercise-row-dips-now')).toHaveTextContent('2');
     expect(screen.queryByTestId('stats-exercise-row-squat')).toBeNull();
 

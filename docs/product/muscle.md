@@ -24,48 +24,29 @@ Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
 the session summary, Progress, the muscle heatmaps and Stats.
 Signature: `primary + ½ secondary`
 
-### muscle.map-area · presentation · accepted
+### muscle.map-area · presentation · superseded-by: muscle.progress-layout
 
-Progress muscle-map area represents fixed reference anatomy, independent of
-training, period and metric. Each family's outer area is proportional to its
-sum of reference muscle volumes; readability adjustments stay inside that
-family. Zero-activity muscles remain represented. Approved 2026-10-17.
+The Progress Map view was removed; List and 3D remain.
 
-The reference uses published MRI means, estimated deltoid/trapezius
-subdivisions and an external-oblique-only proxy for Obliques. It represents
-the mapped anatomy, not personal measurements or percentages of all body muscle.
+### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
 
-Why: a muscle must remain findable when no work was recorded for it.
-Code: `apps/mobile/components/stats/muscle-map-reference.ts` and
-`apps/mobile/components/stats/muscle-map-layout.ts`.
-
-### muscle.map-colour · presentation · accepted
-
-Progress muscle-map Sets fills grade each muscle's current working-set count
-against Settings' weekly working-set target multiplied by the number of
-calendar weeks selected; an unfinished week still has its full weekly target.
-Active Sets tiles use the existing target ramp, capped at target attainment.
-Volume fills follow the reference-period comparison. Tiles with no contributing
-sets for the selected metric use the loss fill regardless of the reference
-period. Volume uses volume-included-set count, so a recorded zero-load set
-still counts as activity. Change values retain [[comparison.change-display]].
-Approved 2026-10-18.
-
-Why: Sets shows progress toward the configured target; unused muscles remain visible.
-Code: `apps/mobile/components/stats/muscle-map.tsx`.
+The Progress Map view was removed; List and 3D remain.
 
 ### muscle.progress-layout · presentation · accepted
 
 Both Progress breakdowns use Settings → Progress → Progress view (`List` /
-`Map` / `3D`, default `List`), remembered per account on this device. Exercise
-and Muscle share it; Exercise 1RM keeps Map, but uses List for 3D.
+`3D`, default `List`), remembered per account on this device. Exercise
+and Muscle share it; Exercise 1RM uses List for 3D.
 3D shades each muscle on the 5-step `viz0..viz4` ramp relative to
 the period's top muscle (`0`/unavailable → `viz0`; Exercise sums filtered
 exercises by [[muscle.set-count]]), and tapping a muscle scopes the exercise
 list below. Progress has no layout selector; changing layout keeps filters,
 selection and scroll. Approved 2026-10-20.
 
-Why: keep map/3D choice in Settings and shade the 3D body by relative distribution.
+A saved retired Map choice falls back to List. 3D contribution tables show
+individual exercises without subtotals.
+
+Why: keep List/3D choice in Settings and shade the 3D body by relative distribution.
 Code: `apps/mobile/components/preferences/progress-settings.tsx`,
 `apps/mobile/components/stats/muscle-body-projection.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
 
@@ -83,36 +64,13 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 `apps/mobile/src/session-insights/calculations.ts`.
 
 
-### muscle.exercise-map-area · presentation · accepted
+### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
 
-Exercise Map keeps fixed family frames ([[muscle.map-area]]).
-Primary tiles always use full current-period exercise Volume, once per primary
-family. One Secondary aggregate uses half the full Volume of secondary-only
-exercises, once per exercise regardless of mapped muscle count.
-Switching metric preserves geometry and membership; figures follow the selected
-metric's eligibility ([[set.eligibility]]). 1RM hides Secondary tiles and their
-contribution section, reserving their space without expanding primary tiles.
-Individual 1RM estimates remain unweighted. Zero/unavailable Volume has no area;
-detail rows retain those exercises. Approved 2026-10-22 (#807 discussion).
+The Progress Map view was removed; List and 3D remain.
 
-Why: exercise size shows its work while secondary work remains visible without duplicating primary work within a family.
-Code: `apps/mobile/components/stats/exercise-map-data.ts`.
+### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
 
-### muscle.exercise-map-colour · presentation · accepted
-
-Exercise-map Volume colours compare each primary exercise's own periods and
-Secondary's combined weighted periods. Unavailable operands or overflow keep
-an aggregate unavailable. Sets colours average capped muscle target attainment:
-primary tiles use their primary muscles in that family; Secondary uses muscles
-reached by secondary-only exercises with working sets in either period,
-selected before search/gym filtering. Muscle counts follow [[muscle.set-count]]
-over all gyms. Neither search nor gym changes target colour. Settings' weekly
-target multiplies by selected calendar weeks, including the unfinished week
-in full. Contribution tables omit target percentages. Approved 2026-10-18, updated 2026-10-22.
-
-Why: target colour describes the represented muscles while Volume compares the work shown.
-Code: `apps/mobile/components/stats/exercise-map-data.ts` and
-`apps/mobile/src/preferences/targets.ts`.
+The Progress Map view was removed; List and 3D remain.
 
 ### muscle.catalog-names · presentation · accepted
 
