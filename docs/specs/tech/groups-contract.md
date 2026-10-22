@@ -290,7 +290,7 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
   advisory, queue and projection locks. A stale result writes nothing; readers
   see `rebuilding`, never mixed revisions.
 - Witness corrections follow [[groups.certification]] and the competition
-  contract's generation/reading checks.
+  contract's generation checks.
 - `competition-wire-guards.ts` rejects private fields, mixed revisions and
   wrong units before the cache.
 
