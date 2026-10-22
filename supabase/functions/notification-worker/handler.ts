@@ -65,6 +65,9 @@ export const handleNotificationRequest = async (request: Request, dependencies: 
   const outcomes: Record<string, number> = {};
   const record = (outcome: string) => { outcomes[outcome] = (outcomes[outcome] ?? 0) + 1; };
   try {
+    if (!await dependencies.rpc<boolean>('notification_work_pending')) {
+      return json(200, { claimed: 0, receipts: 0, outcomes, idle: true });
+    }
     try {
       const workouts = await dependencies.rpc<{ jobs: WorkoutJob[] }>('notification_workout_prepare', { p_limit: 20 });
       for (const workout of workouts.jobs) {
