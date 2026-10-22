@@ -932,7 +932,7 @@ pass "a failed enqueue logs once per certification and commits; the next job rep
 echo "[${LANE_LABEL}] one witness per set: any row's end ends it; merging per-metric witnesses"
 # =============================================================================
 
-# An evaluator void (a reading correction) can end one projection; the set's
+# An evaluator void (e.g. a source-mode correction) can end one projection; the set's
 # whole witness ends with it.
 run_psql "update app_public.group_metric_certifications set ended_at = now(), end_reason = 'voided'
             where coalesce(witness_certification_id, id) = '${A4B_volume}' and metric = 'e1rm' and ended_at is null;" >/dev/null

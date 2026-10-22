@@ -291,6 +291,10 @@ run_psql_sql "
       (owner_user_id, id, weight_kg, measured_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, '${A_BW}', 80, ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    -- A group's bound reading context: not a Sync row, so not in the count.
+    insert into app_public.group_set_body_weight_bindings (member_user_id, set_id, source_key, context)
+    values ('${USER_A_UUID}'::uuid, '${A_SET}', 'dw-key', jsonb_build_object('body_weight_kg', 80));
+
     insert into app_public.user_settings
       (owner_user_id, id, bodyweight_calculations_enabled, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'settings', true, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
@@ -347,6 +351,12 @@ if [[ "${remaining_a}" != "0" ]]; then
   fail "scenario 3 expected all of user A's rows gone, ${remaining_a} remain"
 fi
 pass "scenario 3: every one of the caller's rows was deleted"
+
+bindings_a="$(run_psql "select count(*) from app_public.group_set_body_weight_bindings where member_user_id = '${USER_A_UUID}'::uuid;")"
+if [[ "${bindings_a}" != "0" ]]; then
+  fail "scenario 3 expected the caller's bound group reading contexts gone, ${bindings_a} remain"
+fi
+pass "scenario 3: the caller's bound group reading contexts were deleted"
 
 remaining_b="$(run_psql "select count(*) from app_public.gyms where owner_user_id = '${USER_B_UUID}'::uuid and id = '${B_GYM}';")"
 if [[ "${remaining_b}" != "1" ]]; then
