@@ -128,10 +128,7 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
   return <>
     <Text allowFontScaling={false} style={styles.figure}>{points.length} {points.length === 1 ? 'set' : 'sets'} · {sessionsCount} {sessionsCount === 1 ? 'session' : 'sessions'}</Text>
     <Card style={styles.card}>
-      <View style={styles.titleRow}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>RM curve</Text>
-        <RmCurveHelp />
-      </View>
+      <RmCurveHelp />
       <Text allowFontScaling={false} style={styles.micro}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>
       <RmRegimes result={result} method={method} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
       <View style={styles.dates}><Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>

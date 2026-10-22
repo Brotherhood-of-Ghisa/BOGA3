@@ -15,6 +15,7 @@ export {
 export { FormField, type FormFieldFace, type FormFieldProps } from '@/components/ui/form-field';
 export { Icon, type IconName, type IconProps } from '@/components/ui/icon';
 export { IconButton, type IconButtonProps, type IconButtonTone } from '@/components/ui/icon-button';
+export { Information, type InformationProps } from '@/components/ui/information';
 export {
   ListRow,
   type ListRowDensity,
