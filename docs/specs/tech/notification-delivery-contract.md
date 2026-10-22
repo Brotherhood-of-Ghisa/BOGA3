@@ -20,17 +20,15 @@ Pre-cutover completed history never replays; a pre-cutover active workout can
 complete freshly without replaying its start. Its rank baseline starts at the
 cutover's current coherent board, or the first trustworthy later publication
 if rebuilding; unavailable earlier ranks are never invented.
-Isolated session triggers append immutable activity moments; start admission
-survives completion before recovery. Descendant writes
-kick the worker. Raw intake retains no source/workout/allocator locks. Exact
-current digests reject changed graphs even if intake failed. Recovery admits a
-fair bounded batch, locks all repair groups then all sources before enqueue,
-and reads source rows/shares with the same identity and
-deadline, rather than replaying stream history. Recovery selects missing admissions,
-shares or start intents and confirmed unfinished completions before batching;
-unchanged settled workouts do not rebuild proofs or rewrite their tuples.
-Selected unfinished work still advances its recovery position so an unprovable
-early graph cannot starve later candidates. Missing first moments fail closed;
+An isolated session trigger appends immutable activity moments and queues each
+fresh, non-forfeited moment once; shared sources kick the worker. Start admission
+survives completion before admission. Descendant writes queue and kick nothing. Raw intake
+retains no source/workout/allocator locks. Exact current digests reject changed
+graphs even if intake failed. Admission claims a bounded batch of queued sources,
+locks their share groups then all sources before enqueue, tracks and starts each
+once, then forgets it; it never rescans recent sessions or replays stream
+history. Nothing repairs a failed trigger later: a missed share or a failed
+admission loses that alert and is logged. Missing first moments fail closed;
 known failed admissions become immutable forfeiture markers, never newer source
 timestamps. A first capture failure can forfeit that alert. If both the isolated
 write and its diagnostic fail, erased earlier timing cannot be reconstructed.
@@ -229,7 +227,7 @@ synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
 Provider sending defaults off. A service-only due-work check gates both the
 five-minute backstop's HTTP invocation and duplicate worker requests. It keeps
 due sends, expired leases and deliveries, receipts (including exhausted or
-expired receipt windows), recovery and pruning independent from new-send
+expired receipt windows), queued admissions and pruning independent from new-send
 enablement. Identical valid confirmations retain their generation without a
 tuple rewrite; they can still wake unfinished work after a missed kick.
 Private-only source edits do not kick the worker. A transaction consumes its
@@ -243,7 +241,9 @@ credentials only under explicit hosted rollout authority. Tests use real sync in
 publication and service boundaries, with synthetic local registrations.
 Use `./boga test fast` plus the operator-agreed backend lane set; registration,
 claims and the sink contract live in `supabase/tests/notification-delivery.sh`;
-workout proof/publication fixtures in `supabase/tests/notification-workout-events.sh`.
+workout proof/publication fixtures in `supabase/tests/notification-workout-events.sh`,
+which also asserts `supabase/tests/notification-idle-benchmark.sql`: idle work
+must not grow with recent workouts or history.
 
 ## Rollout boundary
 

@@ -98,7 +98,7 @@ for table in notification_config notification_installations notification_prefere
   done
 done
 rpc "${A_TOKEN}" notification_claim '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail 'app can invoke worker RPC'
-for worker_rpc in notification_work_pending notification_recovery_candidates; do
+for worker_rpc in notification_work_pending notification_admit_moments; do
   rpc "${A_TOKEN}" "${worker_rpc}" '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail "app can invoke ${worker_rpc}"
 done
 
@@ -220,6 +220,7 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
   -- Isolate operational due states without deleting any private history; all changes roll back.
   insert into app_public.notification_workouts(member_user_id,session_id,eligible)
     select owner_user_id,id,false from app_public.sessions on conflict do nothing;
+  delete from app_public.notification_moment_queue;
   delete from app_public.notification_workout_targets;
   delete from app_public.notification_workout_moments;
   update app_public.notification_workouts set eligible=false,completion_at=null,manifest_digest=null,context_digest=null,confirmed_at=null,contributions='[]';
@@ -248,10 +249,10 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
   insert into app_public.sessions(owner_user_id,id,status,started_at,completed_at,created_at,updated_at,client_updated_at_ms)
     values('${C_UID}','idle-private-${RUN_TAG}','completed',floor(extract(epoch from now())*1000),floor(extract(epoch from now())*1000),1,1,1);
   do \$\$ begin
-    if exists(select 1 from app_public.notification_recovery_candidates() where member='${C_UID}' and session='idle-private-${RUN_TAG}') or
-      (select max(id) from net.http_request_queue) is distinct from (select id from private_kick_before) then
+    if (select max(id) from net.http_request_queue) is distinct from (select id from private_kick_before) then
       raise exception 'private workout woke unrelated pending notification work'; end if;
   end \$\$;
+  delete from app_public.notification_moment_queue;
   update app_public.notification_config set sending_enabled=false,provider='disabled';
   update app_public.notification_deliveries set state='ticket',receipt_attempts=0,ticket_at=now()-interval '25 hours' where id=${CD};
   do \$\$ begin if not app_public.notification_work_pending() then raise exception 'expired future receipt skipped'; end if; end \$\$;
