@@ -481,7 +481,8 @@ describe('MuscleBodyCard', () => {
 
     expect(screen.getByTestId('stats-exercise-body-detail')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-row-bench-now')).toHaveTextContent('6');
-    expect(screen.getByTestId('stats-exercise-target-bench')).toHaveTextContent('100% target');
+    expect(screen.queryByTestId('stats-exercise-target-bench')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-row-bench').props.accessibilityLabel).not.toMatch(/target/i);
     expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent('2');
     expect(screen.getByTestId('stats-exercise-row-dips-now')).toHaveTextContent('2');
     expect(screen.queryByTestId('stats-exercise-row-squat')).toBeNull();

@@ -13,15 +13,17 @@ export type ExerciseMapItem = ComparisonRow & {
   name: string;
   lastCompletedAt: Date | null;
 };
-export type ExerciseMapEntry = { item: ExerciseMapItem; targetAttainment: number };
-export type ExerciseMapSecondary = ComparisonRow & { exercises: ExerciseMapEntry[]; targetAttainment: number };
+export type ExerciseContributionEntry = { item: ExerciseMapItem };
+export type ExerciseContributions = ComparisonRow & { exercises: ExerciseContributionEntry[] };
+export type ExerciseMapEntry = ExerciseContributionEntry & { targetAttainment: number };
+export type ExerciseMapSecondary = ExerciseContributions & { exercises: ExerciseMapEntry[]; targetAttainment: number };
 export type ExerciseMapTile = ExerciseMapEntry | ExerciseMapSecondary;
 export type ExerciseMapFamily = { name: MuscleMapFamily; exercises: ExerciseMapEntry[]; secondary: ExerciseMapSecondary | null };
 export type ExerciseBodyMuscleDetail = {
   muscleGroupId: string;
   displayName: string;
-  exercises: ExerciseMapEntry[];
-  secondary: ExerciseMapSecondary | null;
+  exercises: ExerciseContributionEntry[];
+  secondary: ExerciseContributions | null;
 };
 
 type Input = {
@@ -94,27 +96,25 @@ export function buildExerciseBodyMuscles({ items, exercises, muscles }: Omit<Inp
 
 /** Scopes the Exercise list to a selected muscle on the 3D body, preserving primary and half-weight secondary work. */
 export function buildExerciseBodyMuscle({
-  muscleGroupId, items, exercises, muscles, workingSetTarget,
-}: Input & { muscleGroupId: string | null }): ExerciseBodyMuscleDetail | null {
+  muscleGroupId, items, exercises, muscles,
+}: Omit<Input, 'workingSetTarget'> & { muscleGroupId: string | null }): ExerciseBodyMuscleDetail | null {
   if (!muscleGroupId) return null;
   const muscle = muscles.find(row => row.muscleGroupId === muscleGroupId);
   if (!muscle) return null;
   const definitions = new Map(exercises.map(exercise => [exercise.id, exercise]));
-  const counts = Object.fromEntries(muscles.map(row => [row.muscleGroupId, row.current.workingSetCount]));
-  const attainment = groupedTargetAttainment([muscle.muscleGroupId], counts, workingSetTarget);
-  const primary: ExerciseMapEntry[] = [];
-  const secondaryItems: ExerciseMapEntry[] = [];
+  const primary: ExerciseContributionEntry[] = [];
+  const secondaryItems: ExerciseContributionEntry[] = [];
   for (const item of items) {
     const exercise = definitions.get(item.id);
     if (!exercise) continue;
     const mapping = exerciseCountedMuscles(exercise).find(entry => entry.muscleGroupId === muscle.muscleGroupId);
-    if (mapping?.role === 'primary') primary.push({ item, targetAttainment: attainment });
+    if (mapping?.role === 'primary') primary.push({ item });
     else if (mapping?.role === 'secondary') secondaryItems.push({
-      item: { ...item, current: halfPeriod(item.current), previous: halfPeriod(item.previous) }, targetAttainment: 0,
+      item: { ...item, current: halfPeriod(item.current), previous: halfPeriod(item.previous) },
     });
   }
-  const secondary: ExerciseMapSecondary | null = secondaryItems.length > 0 ? {
-    exercises: secondaryItems, targetAttainment: attainment,
+  const secondary: ExerciseContributions | null = secondaryItems.length > 0 ? {
+    exercises: secondaryItems,
     current: sumPeriods(secondaryItems.map(entry => entry.item.current)),
     previous: sumPeriods(secondaryItems.map(entry => entry.item.previous)),
   } : null;

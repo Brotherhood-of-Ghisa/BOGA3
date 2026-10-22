@@ -32,7 +32,7 @@ import {
   buildExerciseBodyMuscle,
   buildExerciseBodyMuscles,
   buildExerciseMapFamilies,
-  type ExerciseMapSecondary,
+  type ExerciseContributions,
 } from '@/components/stats/exercise-map-data';
 import type { MuscleMapFamily } from '@/components/stats/muscle-map-reference';
 import { useAuth } from '@/src/auth';
@@ -366,10 +366,8 @@ export function StatsScreenShell({
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
   const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
-  // Scoped Map/3D details supply a target map, including when it has no primary rows.
-  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
-    targetAttainmentById={targetAttainmentById} secondary={secondary} labels={labels}
-    splitByEffort={targetAttainmentById !== undefined}
+  const exerciseList = (items: ExerciseListItem[], splitByEffort = false, secondary?: ExerciseContributions, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
+    secondary={secondary} labels={labels} splitByEffort={splitByEffort}
     grouped={tableVisible && grouped.exercise} families={exerciseFamilies}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
@@ -441,7 +439,7 @@ function ExerciseBreakdown({
   items: ExerciseListItem[]; allItems: ExerciseListItem[];
   selectedFamily: MuscleMapFamily | null; onSelectFamily: (family: MuscleMapFamily) => void;
   selectedMuscleId: string | null; onSelectMuscle: (id: string) => void;
-  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => ReactNode;
+  renderList: (items: ExerciseListItem[], splitByEffort?: boolean, secondary?: ExerciseContributions, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => ReactNode;
 }) {
   const families = useMemo(
     () => buildExerciseMapFamilies({ items, exercises, muscles, workingSetTarget }),
@@ -452,8 +450,8 @@ function ExerciseBreakdown({
     [items, exercises, muscles]
   );
   const selectedMuscle = useMemo(
-    () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, workingSetTarget }),
-    [selectedMuscleId, items, exercises, muscles, workingSetTarget]
+    () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles }),
+    [selectedMuscleId, items, exercises, muscles]
   );
   if (muscleLayout === 'list') return renderList(items);
   if (muscleLayout === '3d') {
@@ -463,13 +461,13 @@ function ExerciseBreakdown({
       selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
       renderAll={() => renderList(items)}
       renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
-        new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
+        true, secondary,
         entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
   }
   if (!ready) return null;
   return <ExerciseMap families={families} metric={metric} selectedFamily={selectedFamily} onSelectFamily={onSelectFamily}
     renderDetail={(entries, secondary, labels) => renderList(entries.map(entry => entry.item),
-      new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
+      true, secondary,
       entries.length === 0 ? 'No exercises for this family.' : undefined, labels)}
     emptyBody={items.length > 0 ? 'No exercises with muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
 }
@@ -496,7 +494,6 @@ function ExerciseListView({
   emptyBody,
   sortMode,
   onPressSortHeader,
-  targetAttainmentById,
   secondary,
   labels,
   grouped,
@@ -507,8 +504,7 @@ function ExerciseListView({
   grouped: boolean;
   splitByEffort: boolean;
   families?: ReadonlyMap<string, string>;
-  targetAttainmentById?: ReadonlyMap<string, number>;
-  secondary?: ExerciseMapSecondary;
+  secondary?: ExerciseContributions;
   labels?: ReadonlyMap<string, number>;
   metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
@@ -566,9 +562,6 @@ function ExerciseListView({
       />
       {rows.map(({ item, isSecondary }, index) => {
         const sectionStart = index === 0 || rows[index - 1].isSecondary !== isSecondary;
-        const attainment = metric === 'workingSetCount'
-          ? isSecondary ? secondary?.targetAttainment : targetAttainmentById?.get(item.id) : undefined;
-        const target = attainment === undefined ? null : Math.round(attainment * 100);
         const values = (
           <ComparisonValues
             layout={layout}
@@ -588,7 +581,7 @@ function ExerciseListView({
             <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
-            accessibilityLabel={`${isSecondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}${target === null ? '' : ` ${isSecondary ? 'Secondary' : 'Primary'} muscle target ${target}%.`}`}
+            accessibilityLabel={`${isSecondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}`}
             density="list"
             meta={layout.stacked ? undefined : values}
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
@@ -596,8 +589,6 @@ function ExerciseListView({
             <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
               {labels?.has(item.id) ? `[${labels.get(item.id)}] ` : ''}{item.name}
             </Text>
-            {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
-              testID={`stats-exercise-target-${item.id}`}>{target}% target</Text> : null}
             {layout.stacked ? values : null}
           </ListRow>
           </Fragment>
@@ -609,16 +600,13 @@ function ExerciseListView({
 
 // This aggregate is read-only; only its real contributors below open full exercise history.
 function SecondarySummary({ secondary, metric, layout }: {
-  secondary: ExerciseMapSecondary; metric: ProgressMetric; layout: ReturnType<typeof resolveComparisonLayout>;
+  secondary: ExerciseContributions; metric: ProgressMetric; layout: ReturnType<typeof resolveComparisonLayout>;
 }) {
   const figures = comparisonFigures(secondary, metric);
-  const target = metric === 'workingSetCount' ? Math.round(secondary.targetAttainment * 100) : null;
   const values = <ComparisonValues row={secondary} metric={metric} layout={layout} prefix="stats-exercise-secondary-summary" speak={false} />;
-  return <ListRow accessible accessibilityLabel={`Secondary contribution total. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.${target === null ? '' : ` Secondary muscle target ${target}%.`}`}
+  return <ListRow accessible accessibilityLabel={`Secondary contribution total. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.`}
     meta={layout.stacked ? undefined : values} testID="stats-exercise-secondary-summary">
     <Text allowFontScaling={false} style={statsTableStyles.name}>Total</Text>
-    {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
-      testID="stats-exercise-secondary-target">{target}% target</Text> : null}
     {layout.stacked ? values : null}
   </ListRow>;
 }
@@ -723,7 +711,6 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.sm },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   search: { flex: 1, minWidth: 0 },
-  target: { textAlign: 'left' },
   // The page's last row clears the display's rounded corner above the tab bar,
   // which otherwise clips it: one more step of the spacing scale than the
   // gutter `ScreenScroll` already applies.

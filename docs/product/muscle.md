@@ -108,7 +108,7 @@ reached by secondary-only exercises with working sets in either period,
 selected before search/gym filtering. Muscle counts follow [[muscle.set-count]]
 over all gyms. Neither search nor gym changes target colour. Settings' weekly
 target multiplies by selected calendar weeks, including the unfinished week
-in full. Readable Sets rows show and announce target attainment. Approved 2026-10-18.
+in full. Contribution tables omit target percentages. Approved 2026-10-18, updated 2026-10-22.
 
 Why: target colour describes the represented muscles while Volume compares the work shown.
 Code: `apps/mobile/components/stats/exercise-map-data.ts` and

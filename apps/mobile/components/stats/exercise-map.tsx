@@ -13,6 +13,8 @@ import {
   exerciseMapTileKey,
   exerciseMapTileRow,
   type ExerciseBodyMuscleDetail,
+  type ExerciseContributionEntry,
+  type ExerciseContributions,
   type ExerciseMapEntry,
   type ExerciseMapFamily,
   type ExerciseMapSecondary,
@@ -97,7 +99,7 @@ export function ExerciseBodyView({
   selectedMuscle: ExerciseBodyMuscleDetail | null;
   onSelectMuscle: (muscleGroupId: string) => void;
   renderAll: () => ReactNode;
-  renderDetail: (entries: ExerciseMapEntry[], secondary?: ExerciseMapSecondary, labels?: ReadonlyMap<string, number>) => ReactNode;
+  renderDetail: (entries: ExerciseContributionEntry[], secondary?: ExerciseContributions, labels?: ReadonlyMap<string, number>) => ReactNode;
 }) {
   return <View style={styles.body}>
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} />

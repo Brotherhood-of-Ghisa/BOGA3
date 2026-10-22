@@ -279,8 +279,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
     const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
-    expect(screen.getByTestId(`stats-exercise-target-${SQUAT}`)).toHaveTextContent('88% target');
-    expect(screen.getByTestId(SQUAT_ROW)).toHaveProp('accessibilityLabel', expect.stringContaining('Primary muscle target 88%.'));
+    expect(screen.queryByTestId(`stats-exercise-target-${SQUAT}`)).toBeNull();
+    expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).not.toMatch(/target/i);
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
     expect(tile()).toHaveStyle({ backgroundColor: fill });
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
@@ -353,6 +353,11 @@ describe('Stats over real data', () => {
     expect(table.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^3.5$/);
     expect(table.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^3.5$/);
     expect(table.getByTestId('stats-exercise-secondary-summary').props.onPress).toBeUndefined();
+    expect(table.queryAllByText(/% target/)).toHaveLength(0);
+    expect(table.queryAllByTestId(/^stats-exercise-(target-|secondary-target)/)).toHaveLength(0);
+    for (const id of [`stats-exercise-row-${BENCH}`, SQUAT_ROW, 'stats-exercise-secondary-summary']) {
+      expect(table.getByTestId(id).props.accessibilityLabel).not.toMatch(/target/i);
+    }
     const width = (prefix: string) => StyleSheet.flatten(table.getByTestId(`${prefix}-now`).parent!.props.style).width;
     expect(width(`stats-exercise-row-${BENCH}`)).toBe(width(`stats-exercise-row-${SQUAT}`));
     expect(width(`stats-exercise-row-${BENCH}`)).toBe(width('stats-exercise-secondary-summary'));
@@ -385,6 +390,7 @@ describe('Stats over real data', () => {
     expect(muscle.getAllByTestId('stats-contributions-header')).toHaveLength(1);
     expect(muscle.getByText('Primary effort')).toHaveProp('accessibilityRole', 'header');
     expect(muscle.getByText('Secondary effort')).toHaveProp('accessibilityRole', 'header');
+    expect(muscle.queryAllByText(/% target/)).toHaveLength(0);
     expect(muscle.getAllByTestId(new RegExp(`^stats-contribution-(${BENCH}|${SQUAT})$`)).map(row => row.props.testID))
       .toEqual([`stats-contribution-${BENCH}`, `stats-contribution-${SQUAT}`]);
     await act(async () => { updatePreferences({ progressMuscleLayout: 'list' }); });
@@ -392,7 +398,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByText('Secondary effort')).toBeNull();
   });
 
-  it('weights Secondary exercise rows, keeps its unfiltered target under search/gym, and opens full history with the selected metric', async () => {
+  it('weights Secondary exercise rows, keeps map target colour under search/gym, and opens full history with the selected metric', async () => {
     await loadMaestroFixture('exercise-block-history');
     const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
@@ -409,8 +415,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^4$/);
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^3.5$/);
     expect(screen.getByTestId(`stats-exercise-row-${BENCH}-now`)).toHaveTextContent(/^0.5$/);
-    expect(screen.getByTestId('stats-exercise-secondary-target')).toHaveTextContent('25% target');
-    expect(screen.getByTestId(`stats-exercise-row-${BENCH}`)).toHaveProp('accessibilityLabel', expect.stringContaining('Secondary muscle target 25%.'));
+    expect(screen.queryByTestId('stats-exercise-secondary-target')).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-row-${BENCH}`).props.accessibilityLabel).not.toMatch(/target/i);
     expect(screen.getByTestId(`stats-exercise-row-${BENCH}`)).toHaveProp('accessibilityLabel', expect.stringContaining('Secondary contribution.'));
     expect(screen.getByTestId('stats-exercise-secondary-summary').props.onPress).toBeUndefined();
     expect(screen.queryByTestId('stats-exercise-row-Secondary')).toBeNull();
@@ -426,7 +432,7 @@ describe('Stats over real data', () => {
     expect(tile()).toHaveStyle({ backgroundColor: fill });
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Bench');
     expect(screen.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^0$/);
-    expect(screen.getByTestId('stats-exercise-secondary-target')).toHaveTextContent('25% target');
+    expect(screen.queryByTestId('stats-exercise-secondary-target')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-secondary-Arms', { includeHiddenElements: true })).toBeNull();
     expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^0.5$/);
     fireEvent.press(screen.getByTestId(`stats-exercise-row-${BENCH}`));
