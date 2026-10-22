@@ -293,7 +293,7 @@ export function StatsScreenShell({
     DEFAULT_EXERCISE_SORT_MODE
   );
   const [exerciseFamily, setExerciseFamily] = useState<MuscleMapFamily | null>(null);
-  const exerciseSpatial = muscleLayout !== 'list' && exerciseMetric !== 'estimatedOneRepMax';
+  const exerciseSpatial = muscleLayout !== 'list' && !(muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const [contributionId, setContributionId] = useState<string | null>(null);
   // The row whose history was opened, held only until the return it is for:
   // any other way back to Progress (a tab, the Sessions link) leaves the
@@ -333,14 +333,13 @@ export function StatsScreenShell({
     []
   );
 
-  // A row with nothing for the metric in either period is not drawn, as in the
-  // Muscle table's contributions.
+  // Maps retain the same exercise population when only the displayed metric changes.
   const filteredExerciseListItems = useMemo(() => {
     const searchWords = normalizeExerciseSearchWords(searchQuery);
-    const matching = exerciseListItems.filter(item => hasComparisonMetric(item, exerciseMetric)
+    const matching = exerciseListItems.filter(item => (muscleLayout === 'heatmap' || hasComparisonMetric(item, exerciseMetric))
       && exerciseSearchTextMatches(searchWords, exerciseSearchIndex.get(item.id) ?? item.name));
     return sortExerciseListItems(matching, exerciseSortMode, exerciseMetric);
-  }, [exerciseListItems, exerciseSearchIndex, exerciseMetric, exerciseSortMode, searchQuery]);
+  }, [exerciseListItems, exerciseSearchIndex, exerciseMetric, exerciseSortMode, muscleLayout, searchQuery]);
 
   const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
@@ -352,8 +351,8 @@ export function StatsScreenShell({
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
   const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
-  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string) => <ExerciseListView items={items} metric={exerciseMetric}
-    targetAttainmentById={targetAttainmentById} secondary={secondary}
+  const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
+    targetAttainmentById={targetAttainmentById} secondary={secondary} labels={labels}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
     sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />;
@@ -430,7 +429,7 @@ function ExerciseBreakdown({
   items: ExerciseListItem[]; allItems: ExerciseListItem[];
   selectedFamily: MuscleMapFamily | null; onSelectFamily: (family: MuscleMapFamily) => void;
   selectedMuscleId: string | null; onSelectMuscle: (id: string) => void;
-  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string) => ReactNode;
+  renderList: (items: ExerciseListItem[], targets?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => ReactNode;
 }) {
   const families = useMemo(
     () => buildExerciseMapFamilies({ items, exercises, muscles, workingSetTarget }),
@@ -444,9 +443,10 @@ function ExerciseBreakdown({
     () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, workingSetTarget }),
     [selectedMuscleId, items, exercises, muscles, workingSetTarget]
   );
-  if (muscleLayout === 'list' || metric === 'estimatedOneRepMax') return renderList(items);
-  if (!ready) return null;
+  if (muscleLayout === 'list') return renderList(items);
   if (muscleLayout === '3d') {
+    if (metric === 'estimatedOneRepMax') return renderList(items);
+    if (!ready) return null;
     return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
       selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
       renderAll={() => renderList(items)}
@@ -454,10 +454,11 @@ function ExerciseBreakdown({
         new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
         entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
   }
+  if (!ready) return null;
   return <ExerciseMap families={families} metric={metric} selectedFamily={selectedFamily} onSelectFamily={onSelectFamily}
-    renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
+    renderDetail={(entries, secondary, labels) => renderList(entries.map(entry => entry.item),
       new Map(entries.map(entry => [entry.item.id, entry.targetAttainment])), secondary,
-      entries.length === 0 ? 'No exercises for this family.' : undefined)}
+      entries.length === 0 ? 'No exercises for this family.' : undefined, labels)}
     emptyBody={items.length > 0 ? 'No exercises with muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
 }
 
@@ -485,10 +486,12 @@ function ExerciseListView({
   onPressSortHeader,
   targetAttainmentById,
   secondary,
+  labels,
 }: {
   items: ExerciseListItem[];
   targetAttainmentById?: ReadonlyMap<string, number>;
   secondary?: ExerciseMapSecondary;
+  labels?: ReadonlyMap<string, number>;
   metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
   emptyBody: string;
@@ -507,7 +510,7 @@ function ExerciseListView({
 
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
-  const layout = resolveComparisonLayout(width, secondary ? [...items, secondary] : items, metric, false, true);
+  const layout = resolveComparisonLayout(width, secondary && metric !== 'estimatedOneRepMax' ? [...items, secondary] : items, metric, false, true);
   return (
     <StatsTable testID="stats-exercise-list">
       <ComparisonHeaders
@@ -537,7 +540,7 @@ function ExerciseListView({
         }
         testID="stats-exercise-table-header"
       />
-      {secondary ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
+      {secondary && metric !== 'estimatedOneRepMax' ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
       {items.map((item) => {
         const attainment = metric === 'workingSetCount' ? secondary?.targetAttainment ?? targetAttainmentById?.get(item.id) : undefined;
         const target = attainment === undefined ? null : Math.round(attainment * 100);
@@ -560,7 +563,7 @@ function ExerciseListView({
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
             testID={`stats-exercise-row-${item.id}`}>
             <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
-              {item.name}
+              {labels?.has(item.id) ? `[${labels.get(item.id)}] ` : ''}{item.name}
             </Text>
             {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
               testID={`stats-exercise-target-${item.id}`}>{target}% target</Text> : null}
@@ -574,14 +577,14 @@ function ExerciseListView({
 
 // This aggregate is read-only; only its real contributors below open full exercise history.
 function SecondarySummary({ secondary, metric, layout }: {
-  secondary: ExerciseMapSecondary; metric: ProgressExerciseMetric; layout: ReturnType<typeof resolveComparisonLayout>;
+  secondary: ExerciseMapSecondary; metric: ProgressMetric; layout: ReturnType<typeof resolveComparisonLayout>;
 }) {
   const figures = comparisonFigures(secondary, metric);
   const target = metric === 'workingSetCount' ? Math.round(secondary.targetAttainment * 100) : null;
   const values = <ComparisonValues row={secondary} metric={metric} layout={layout} prefix="stats-exercise-secondary-summary" speak={false} />;
   return <ListRow accessible accessibilityLabel={`Secondary contribution. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.${target === null ? '' : ` Secondary muscle target ${target}%.`}`}
     meta={layout.stacked ? undefined : values} testID="stats-exercise-secondary-summary">
-    <Text allowFontScaling={false} accessibilityRole="header" style={statsTableStyles.name}>Secondary</Text>
+    <Text allowFontScaling={false} accessibilityRole="header" style={statsTableStyles.name}>Secondary effort</Text>
     {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
       testID="stats-exercise-secondary-target">{target}% target</Text> : null}
     {layout.stacked ? values : null}

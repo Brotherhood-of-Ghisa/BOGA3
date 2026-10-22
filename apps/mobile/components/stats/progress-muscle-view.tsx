@@ -30,7 +30,7 @@ export function ProgressMuscleView(props: Props) {
             accessibilityLabel: `Open ${selected.displayName} ${option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'}` }))}
           testIDPrefix="stats-contributions-view" onNavigate={(view, target) => onMuscleHistory(selected, target, view)} />
       </View>
-      <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
+      <ProgressContributionRows splitByEffort muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
     </StatsTable> : null}
   </View>;
 }

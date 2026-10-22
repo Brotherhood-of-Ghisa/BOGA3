@@ -55,16 +55,22 @@ export function ProgressTables(props: ProgressTablesProps) {
 }
 
 // Both presentations keep one contribution-row and empty-state implementation.
-export function ProgressContributionRows({ muscle, metric, layout, onHistory }: {
+export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false }: {
   muscle: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout;
-  onHistory: ProgressTablesProps['onExerciseHistory'];
+  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean;
 }) {
   const exercises = muscle.exercises.filter(row => hasComparisonMetric(row, metric));
   return <>
     <Headers name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
     {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
-      body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : exercises.map(row =>
-        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} />)}
+      body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : (splitByEffort ? (['primary', 'secondary'] as const).map(role => {
+        const rows = exercises.filter(row => row.role === role);
+        return rows.length > 0 ? <Fragment key={role}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.family}>{role === 'primary' ? 'Primary effort' : 'Secondary effort'}</Text>
+          {rows.map(row => <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} hideRole />)}
+        </Fragment> : null;
+      }) : exercises.map(row =>
+        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} />))}
   </>;
 }
 
@@ -97,8 +103,8 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
   </ListRow>;
 }
 
-function ExerciseRow({ row, metric, layout, onHistory }: {
-  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory'];
+function ExerciseRow({ row, metric, layout, onHistory, hideRole }: {
+  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory']; hideRole?: boolean;
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-contribution-${row.exerciseDefinitionId}`;
@@ -109,7 +115,7 @@ function ExerciseRow({ row, metric, layout, onHistory }: {
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
       <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
-      <Text allowFontScaling={false} style={styles.role}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>
+      {hideRole ? null : <Text allowFontScaling={false} style={styles.role}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>}
     </Pressable>
     {layout.stacked ? values : null}
   </ListRow>;
