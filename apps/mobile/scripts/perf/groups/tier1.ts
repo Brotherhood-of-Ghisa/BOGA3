@@ -52,6 +52,8 @@ const mergeSummary = (into: Omit<DrainSummary, 'failures'>, from: DrainSummary):
   into.completed += from.completed;
   into.requeued += from.requeued;
   into.failed += from.failed;
+  into.metricRequeued += from.metricRequeued;
+  into.metricFailed += from.metricFailed;
   into.graphBytes += from.graphBytes;
   into.setsScored += from.setsScored;
 };
@@ -82,7 +84,8 @@ class Tier1Run {
     this.session.take();
     const result: StepResult = {
       label, total: sumCounters([]), calls: [], edgeRuns: { groupEval: 0, notificationWorker: 0 },
-      groupEval: { claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, graphBytes: 0, setsScored: 0 },
+      groupEval: { claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, metricRequeued: 0, metricFailed: 0,
+        graphBytes: 0, setsScored: 0 },
       evaluations: 0, rejectedPublishes: 0, notificationOutcomes: {}, failures: [], cascadeCapped: false,
     };
     await start();
@@ -118,7 +121,7 @@ class Tier1Run {
     result.calls = records;
     result.total = sumCounters(records.map((record) => record.counters));
     result.evaluations = records.filter((record) => record.fn === 'group_metric_eval_publish').length;
-    result.rejectedPublishes = result.groupEval.requeued + result.groupEval.failed;
+    result.rejectedPublishes = result.groupEval.metricRequeued + result.groupEval.metricFailed;
     return result;
   }
 }
@@ -146,13 +149,13 @@ export const pushEntities = {
 const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1Scenario['steadyState']> => {
   const failures: string[] = [];
   let groupEvalRuns = 0;
-  // After one publication outruns the statement timeout the scenario is
+  // After one publication outruns the call budget the scenario is
   // unreachable; later comparisons fail at once instead of each waiting it out.
   const inner = run.rpc({ role: 'service_role' }, false);
   let timedOut = false;
   const service: Rpc = async <T>(name: string, args: Record<string, unknown>) => {
     if (timedOut && (name === 'group_metric_eval_prepare' || name === 'group_metric_eval_publish')) {
-      throw Object.assign(new Error('skipped: an earlier call exceeded the statement timeout'), { sqlstate: '57014' });
+      throw Object.assign(new Error('skipped: an earlier call exceeded the call budget'), { sqlstate: '57014' });
     }
     try {
       return await inner<T>(name, args);
@@ -177,8 +180,8 @@ const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1S
 export type Tier1Options = {
   dbUrl: string;
   adminDbUrl: string;
-  /** Every statement's ceiling; hosted ran a 2-minute statement timeout. */
-  statementTimeoutMs: number;
+  /** Every RPC's wall-clock ceiling: a harness budget that keeps a run finite, not a hosted limit. */
+  callBudgetMs: number;
   log: (line: string) => void;
 };
 
@@ -197,13 +200,15 @@ const vacuum = async (adminDbUrl: string): Promise<void> => {
 
 /** Why a scenario has no numbers, or null: a failed steady state, or a measured call that failed. */
 export const scenarioIncomplete = (steady: Tier1Scenario['steadyState'], steps: Record<string, StepResult>): string | null => {
-  const timeout = (failures: string[]) => failures.some((failure) => failure.includes('statement timeout'));
+  const timeout = (failures: string[]) => failures.some((failure) => /statement timeout|call budget/.test(failure));
   if (steady.failures.length > 0 || steady.leftoverJobs > 0) {
-    return timeout(steady.failures) ? 'steady state unreachable: a publication exceeded the statement timeout'
+    return timeout(steady.failures) ? 'steady state unreachable: a publication exceeded the call budget'
       : `steady state unreachable: ${steady.failures.length} failed jobs, ${steady.leftoverJobs} left`;
   }
   const failed = Object.values(steps).flatMap((step) => step.calls.filter((call) => call.error).map((call) => `${step.label}:${call.fn}:${call.error}`));
   if (failed.length > 0) return `failed calls: ${failed.join(', ')}`;
+  const stepFailures = Object.values(steps).flatMap((step) => step.failures.map((failure) => `${step.label}: ${failure}`));
+  if (stepFailures.length > 0) return `step failures: ${stepFailures.join('; ')}`;
   const capped = Object.values(steps).filter((step) => step.cascadeCapped).map((step) => step.label);
   return capped.length > 0 ? `kick cascade did not settle: ${capped.join(', ')}` : null;
 };
@@ -215,7 +220,7 @@ export const runTier1Scenario = async (
   await vacuum(options.adminDbUrl);
   const client = new Client({ connectionString: options.dbUrl });
   await client.connect();
-  const session = new Tier1Session(client, options.statementTimeoutMs);
+  const session = new Tier1Session(client, options.callBudgetMs);
   try {
     await session.begin();
     // Hosted configuration, inside the rolled-back transaction: both kick

@@ -49,8 +49,8 @@ reached by the real worker sequence before anything is measured.
 Deterministic SQL counters, each scenario in one transaction that is rolled
 back, after a `vacuum (analyze)` and an in-transaction `analyze`. Every RPC
 runs as PostgREST would run it (role, claims, headers) inside a savepoint
-standing for its own transaction, under the hosted 2-minute statement
-timeout, wrapped in `EXPLAIN (ANALYZE, BUFFERS, WAL)` with
+standing for its own transaction, under a per-call budget that keeps the
+run finite, wrapped in `EXPLAIN (ANALYZE, BUFFERS, WAL)` with
 `pg_stat_xact_user_tables` diffed around it. pg_net never sends inside the
 transaction, so each queued kick is replayed as one Edge run: group-eval
 through `group-eval-mirror.ts`, which `__tests__/groups-perf-mirror.test.ts`
@@ -59,8 +59,10 @@ holds to `supabase/functions/group-eval/index.ts`.
 It sweeps H with M fixed and M with H fixed. The default matrix is a doubling
 series that today's code finishes in one gate run; `GROUPS_PERF_MATRIX=full`
 runs the production-scale matrix. A scenario whose steady state or measured
-call exceeds the statement timeout is reported incomplete, and the larger
-points of its sweep are skipped.
+call exceeds the budget is reported incomplete, and the larger points of its
+sweep are skipped. The budget is wall-clock, so it is no hosted limit; calls
+slower than PostgREST's 8 s statement timeout on the machine that ran them are
+listed for information, never asserted.
 
 Fidelity limits, by design:
 

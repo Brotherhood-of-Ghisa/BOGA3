@@ -31,6 +31,9 @@ export type DrainSummary = {
   completed: number;
   requeued: number;
   failed: number;
+  /** Comparison publications that wrote nothing: requeued (stale claim or graph) or failed. */
+  metricRequeued: number;
+  metricFailed: number;
   /** Bytes of every source graph `group_metric_eval_prepare` returned. */
   graphBytes: number;
   /** Sets in those graphs: every set each evaluation scored. */
@@ -39,7 +42,8 @@ export type DrainSummary = {
 };
 
 const emptySummary = (): DrainSummary => ({
-  claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, graphBytes: 0, setsScored: 0, failures: [],
+  claimed: 0, metricClaimed: 0, completed: 0, requeued: 0, failed: 0, metricRequeued: 0, metricFailed: 0,
+  graphBytes: 0, setsScored: 0, failures: [],
 });
 
 /** The DB error class of a failed RPC, for `group_eval_fail`; the Edge function records the same. */
@@ -67,7 +71,12 @@ const processJob = async (rpc: Rpc, job: Job, summary: DrainSummary): Promise<vo
   } catch (error) {
     summary.failed += 1;
     summary.failures.push(`group_eval job ${job.job_id}: ${(error as Error).message}`);
-    await rpc('group_eval_fail', { p_job_id: job.job_id, p_sqlstate: sqlstateOf(error) });
+    try {
+      await rpc('group_eval_fail', { p_job_id: job.job_id, p_sqlstate: sqlstateOf(error) });
+    } catch (failError) {
+      // As the Edge drain does: the lease expires and a later drain retries.
+      summary.failures.push(`group_eval_fail job ${job.job_id}: ${(failError as Error).message}`);
+    }
   }
 };
 
@@ -78,6 +87,7 @@ const processMetricJob = async (rpc: Rpc, job: MetricJob, summary: DrainSummary)
       'group_metric_eval_prepare', claim);
     if (!prepared.prepared) {
       summary.requeued += 1;
+      summary.metricRequeued += 1;
       return;
     }
     if (!prepared.frozen && !prepared.graph) throw new Error('Missing comparison source graph');
@@ -87,12 +97,21 @@ const processMetricJob = async (rpc: Rpc, job: MetricJob, summary: DrainSummary)
     }
     const evaluation = prepared.frozen ? null : evaluateCompetitionGraph(prepared.graph!);
     const done = await rpc<{ completed: boolean }>('group_metric_eval_publish', { ...claim, p_evaluation: evaluation });
-    if (done.completed) summary.completed += 1;
-    else summary.requeued += 1;
+    if (done.completed) {
+      summary.completed += 1;
+    } else {
+      summary.requeued += 1;
+      summary.metricRequeued += 1;
+    }
   } catch (error) {
     summary.failed += 1;
+    summary.metricFailed += 1;
     summary.failures.push(`metric job ${job.job_id}: ${(error as Error).message}`);
-    await rpc('group_metric_eval_fail', { ...claim, p_sqlstate: sqlstateOf(error) });
+    try {
+      await rpc('group_metric_eval_fail', { ...claim, p_sqlstate: sqlstateOf(error) });
+    } catch (failError) {
+      summary.failures.push(`group_metric_eval_fail job ${job.job_id}: ${(failError as Error).message}`);
+    }
   }
 };
 

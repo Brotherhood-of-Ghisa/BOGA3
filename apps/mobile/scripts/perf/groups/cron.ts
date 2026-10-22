@@ -40,7 +40,9 @@ export const runsPerHour = (schedule: string): number => {
   if (dayOfMonth !== '*' || month !== '*') throw new Error(`unsupported cron schedule: ${schedule}`);
   const minutes = fieldCount(minute, 60, 0);
   const hours = fieldCount(hour, 24, 0);
-  const days = dayOfWeek === '*' ? 7 : fieldCount(dayOfWeek.replace(/\b7\b/g, '0'), 7, 0);
+  // Sunday is 0 or 7, so 1-7 and 0-6 both cover the week.
+  const days = dayOfWeek === '*' ? 7
+    : [0, 1, 2, 3, 4, 5, 6].filter((day) => matchesField(dayOfWeek, day) || (day === 0 && matchesField(dayOfWeek, 7))).length;
   return (minutes * hours * days) / (24 * 7);
 };
 

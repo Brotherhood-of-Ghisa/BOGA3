@@ -23,7 +23,7 @@ export type Caller =
   | { role: 'postgres' }
   | { role: 'authenticated'; userId: string };
 
-/** One measured RPC; `error` is its SQLSTATE when it failed (57014: the statement timeout). */
+/** One measured RPC; `error` is its SQLSTATE when it failed (57014: the call budget). */
 export type CallRecord = { fn: string; counters: Counters; error: string | null };
 
 const NULL_RESULT = '<<perf:null>>';
@@ -74,12 +74,16 @@ export class Tier1Session {
   readonly records: CallRecord[] = [];
   private savepoints = 0;
 
-  /** `statementTimeoutMs` bounds every statement; hosted runs a 2-minute statement timeout. */
-  constructor(private readonly client: Client, private readonly statementTimeoutMs: number) {}
+  /**
+   * `callBudgetMs` bounds every RPC: a harness budget that keeps a run finite,
+   * not a hosted limit (wall-clock is machine-specific). Setup statements are
+   * unbounded.
+   */
+  constructor(private readonly client: Client, private readonly callBudgetMs: number) {}
 
   async begin(): Promise<void> {
     await this.client.query('begin');
-    await this.client.query(`set local statement_timeout = '${this.statementTimeoutMs}ms'`);
+    await this.client.query('set local statement_timeout = 0');
     const deferred = await this.client.query(DEFERRED_CONSTRAINTS_SQL);
     await this.client.query(flushFunctionSql(deferred.rows[0].list as string | null));
   }
@@ -105,6 +109,7 @@ export class Tier1Session {
     await this.client.query(`savepoint ${savepoint}`);
     try {
       await this.enter(caller);
+      await this.client.query(`set local statement_timeout = '${this.callBudgetMs}ms'`);
       let counters = emptyCounters();
       let before: TableSnapshot = {};
       if (measured) {
@@ -118,20 +123,20 @@ export class Tier1Session {
       } else {
         await this.client.query(`select set_config('perf.result', coalesce((${sql})::text, '${NULL_RESULT}'), true)`, params);
       }
-      if (measured) {
-        counters.tables = diffTables(before, await this.tables());
-        this.records.push({ fn, counters, error: null });
-      }
+      if (measured) counters.tables = diffTables(before, await this.tables());
       await this.client.query('reset role');
       // Deferred constraint checks (a few index probes per pushed row) run
       // here, unmeasured: their cost does not depend on history or group size.
       await this.client.query('select pg_temp.perf_flush()');
+      await this.client.query('set local statement_timeout = 0');
+      if (measured) this.records.push({ fn, counters, error: null });
       const result = await this.client.query("select current_setting('perf.result') as r");
       await this.client.query(`release savepoint ${savepoint}`);
       return parseResult(result.rows[0].r as string) as T;
     } catch (error) {
       await this.client.query(`rollback to savepoint ${savepoint}`);
       await this.client.query('reset role');
+      await this.client.query('set local statement_timeout = 0');
       const sqlstate = (error as { code?: string }).code ?? null;
       if (measured) this.records.push({ fn, counters: emptyCounters(), error: sqlstate ?? 'ERROR' });
       const failure = new Error(`${fn}: ${(error as Error).message}`) as RpcFailure;

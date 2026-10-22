@@ -69,7 +69,7 @@ test('one drain runs session jobs, then comparison jobs, and counts what each ev
   expect(calls[3].args).toEqual({ p_job_id: 1, p_generation: 3, p_facts: [] });
   expect(calls[0].args).toEqual({ p_rules_version: GROUP_EVAL_RULES_VERSION, p_limit: RULES_REQUEUE_LIMIT });
   expect(calls[7].args).toEqual({ p_job_id: 9, p_generation: 2, p_claim_id: 'c', p_evaluation: null });
-  expect(summary).toMatchObject({ claimed: 2, metricClaimed: 1, completed: 1, requeued: 1, failed: 0, setsScored: 3 });
+  expect(summary).toMatchObject({ claimed: 2, metricClaimed: 1, completed: 1, requeued: 1, failed: 0, metricRequeued: 1, setsScored: 3 });
   expect(summary.graphBytes).toBe(Buffer.byteLength(JSON.stringify(graph)));
 });
 
@@ -88,7 +88,7 @@ test('a failed job is recorded with its SQLSTATE, or EVALX when it has none', as
   expect(calls.find((call) => call.name === 'group_eval_fail')?.args).toEqual({ p_job_id: 1, p_sqlstate: 'EVALX' });
   expect(calls.find((call) => call.name === 'group_metric_eval_fail')?.args)
     .toEqual({ p_job_id: 9, p_generation: 2, p_claim_id: 'c', p_sqlstate: '57014' });
-  expect(summary.failed).toBe(2);
+  expect(summary).toMatchObject({ failed: 2, metricFailed: 1, metricRequeued: 0 });
   expect(summary.failures).toEqual([
     'group_eval job 1: no sqlstate',
     'metric job 9: canceling statement due to statement timeout',
@@ -122,4 +122,23 @@ test('a drain stops after its claim-round limit', async () => {
 
   expect(calls.filter((call) => call.name === 'group_eval_claim')).toHaveLength(MAX_CLAIM_ROUNDS);
   expect(summary.claimed).toBe(MAX_CLAIM_ROUNDS);
+});
+
+test('a failure that cannot be recorded is reported and the drain goes on, as the Edge drain logs it', async () => {
+  const calls: Call[] = [];
+  const rpc = fakeRpc({
+    group_eval_claim: [{ jobs: [{ job_id: 1, kind: 'target', member_user_id: 'u1', session_id: null, generation: 1 }] }],
+    group_eval_complete: [new Error('boom')],
+    group_eval_fail: [new Error('fenced')],
+    group_metric_eval_claim: [{ jobs: [{ job_id: 9, generation: 2, claim_id: 'c' }] }],
+    group_metric_eval_prepare: [new Error('late')],
+    group_metric_eval_fail: [new Error('gone')],
+  }, calls);
+
+  const summary = await runGroupEval(rpc);
+
+  expect(summary.failures).toEqual([
+    'group_eval job 1: boom', 'group_eval_fail job 1: fenced', 'metric job 9: late', 'group_metric_eval_fail job 9: gone',
+  ]);
+  expect(calls.filter((call) => call.name === 'group_metric_eval_claim')).toHaveLength(2);
 });

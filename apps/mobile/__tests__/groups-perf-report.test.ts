@@ -93,9 +93,9 @@ const step = (pages: number, extra: Partial<MeasuredStep> = {}): MeasuredStep =>
 });
 
 test('stepMetrics flattens one step; combineSteps adds steps; scaleMetrics multiplies every metric', () => {
-  const metrics = stepMetrics(step(1000, { calls: [{ error: '57014' }] }));
+  const metrics = stepMetrics(step(1000, { calls: [{ error: '57014' }, { error: null, counters: { elapsedMs: 8001 } }, { counters: { elapsedMs: 8000 } }] }));
   expect(metrics).toMatchObject({ pages: 1000, walBytes: 100, rowsWritten: 3, appRowsWritten: 2, seqScans: 1, idxScans: 3,
-    edgeRuns: 3, claimedJobs: 2, evaluations: 1, graphBytes: 500, setsScored: 40, failedCalls: 1 });
+    edgeRuns: 3, claimedJobs: 2, evaluations: 1, graphBytes: 500, setsScored: 40, failedCalls: 1, callsOver8s: 1 });
   expect(stepMetrics(combineSteps([step(1), step(2)]))).toMatchObject({ pages: 3, edgeRuns: 6, evaluations: 2, graphBytes: 1000 });
   expect(scaleMetrics(metrics, 12)).toMatchObject({ pages: 12000, appRowsWritten: 24, edgeRuns: 36 });
 });

@@ -140,13 +140,18 @@ const zero = (): StatementTotals => ({ calls: 0, pages: 0, tempBytes: 0, walByte
 
 const windowCounters = async (admin: Client, before: Snapshot, after: Snapshot): Promise<WindowCounters> => {
   let statements = zero();
+  let harnessWal = 0;
   const byFunction: Record<string, StatementTotals> = {};
   for (const [key, end] of after.statements) {
-    if (end.query.includes(TAG)) continue;
     const start = before.statements.get(key) ?? { ...zero(), query: end.query };
     const delta = { calls: end.calls - start.calls, pages: end.pages - start.pages, tempBytes: end.tempBytes - start.tempBytes,
       walBytes: end.walBytes - start.walBytes, execMs: end.execMs - start.execMs };
     if (delta.calls <= 0) continue;
+    // The harness's own statements (snapshots, cron.alter_job) are not the stack's work.
+    if (end.query.includes(TAG)) {
+      harnessWal += delta.walBytes;
+      continue;
+    }
     statements = addTotals(statements, delta);
     const fn = statementFunction(end.query);
     byFunction[fn] = addTotals(byFunction[fn] ?? zero(), delta);
@@ -156,6 +161,7 @@ const windowCounters = async (admin: Client, before: Snapshot, after: Snapshot):
   const appTables: Record<string, number> = {};
   for (const [table, end] of after.tables) {
     const delta = end - (before.tables.get(table) ?? 0);
+    if (table === 'cron.job') continue; // only the harness's schedule changes write it
     if (!/^(app_public|public)\./.test(table)) {
       platformRowsWritten += delta;
     } else if (delta !== 0) {
@@ -188,7 +194,7 @@ const windowCounters = async (admin: Client, before: Snapshot, after: Snapshot):
   const cron = (await admin.query(`${TAG} select j.jobname, count(*)::int as n from cron.job_run_details d join cron.job j using (jobid)
     where d.runid > $1 and d.runid <= $2 group by 1`, [before.cronRunId, after.cronRunId])).rows;
   return {
-    durationMs: after.at - before.at, statements, byFunction, appRowsWritten, appTables, platformRowsWritten, walBytes: wal.bytes,
+    durationMs: after.at - before.at, statements, byFunction, appRowsWritten, appTables, platformRowsWritten, walBytes: Math.max(0, wal.bytes - harnessWal),
     deadlocks: after.deadlocks - before.deadlocks,
     edgeResponses: { groupEval, notificationWorker, timedOut, failed },
     cronRuns: Object.fromEntries(cron.map((row) => [row.jobname as string, row.n as number])),
@@ -312,16 +318,19 @@ export class Tier2Run {
   private async loadFixture(): Promise<Fixture> {
     const tag = `load${crypto.randomBytes(3).toString('hex')}`;
     await this.app.query('begin');
+    let fx: { group_id: string };
+    let members: Fixture['members'];
     try {
       for (const statement of fixtureStatements({ ...this.options.fixture, tag })) await this.app.query(statement);
+      [fx] = (await this.app.query('select group_id::text from perf_fx')).rows;
+      members = (await this.app.query('select idx, uid::text from perf_members order by idx')).rows as Fixture['members'];
+      // Registered before the commit, so no interruption can leave committed rows behind.
+      this.restore.push(() => this.deleteFixture(fx.group_id, members.map((m) => m.uid)));
       await this.app.query('commit');
     } catch (error) {
       await this.app.query('rollback');
       throw error;
     }
-    const [fx] = (await this.app.query('select group_id::text from perf_fx')).rows;
-    const members = (await this.app.query('select idx, uid::text from perf_members order by idx')).rows as Fixture['members'];
-    this.restore.push(() => this.deleteFixture(fx.group_id, members.map((m) => m.uid)));
     const exercises = (await this.app.query('select ex, id::text from perf_group_exercises')).rows;
     const [counts] = (await this.app.query(`select count(*)::int as n from app_public.exercise_sets es join perf_members m on m.uid = es.owner_user_id`)).rows;
     return { groupId: fx.group_id, members, groupExercises: new Map(exercises.map((row) => [row.ex as number, row.id as string])), sets: counts.n };
@@ -344,13 +353,15 @@ export class Tier2Run {
   /** Steady state through the real Edge function, as the groups-leaderboards lane drains it. */
   private async drain(): Promise<void> {
     const [secret] = (await this.admin.query(`${TAG} select app_public.group_eval_config('group_eval_secret') as s`)).rows;
-    for (let round = 0; round < 500; round += 1) {
+    let drained = false;
+    for (let round = 0; round < 500 && !drained; round += 1) {
       const response = await this.edge('group-eval', { 'x-group-eval-secret': secret.s });
       if (!response.ok) throw new Error(`group-eval drain failed: HTTP ${response.status}`);
       const body = (await response.json()) as { claimed: number; failed: number };
       if (body.failed > 0) throw new Error(`group-eval drain: ${body.failed} jobs failed`);
-      if (body.claimed === 0 && (await this.pendingJobs()) === 0) break;
+      drained = body.claimed === 0 && (await this.pendingJobs()) === 0;
     }
+    if (!drained) throw new Error('group-eval drain did not reach an empty queue in 500 runs');
     const worker = await this.edge('notification-worker', { apikey: this.options.serviceRoleKey });
     if (!worker.ok) throw new Error(`notification-worker failed: HTTP ${worker.status}`);
     await this.quiesce();
@@ -362,19 +373,23 @@ export class Tier2Run {
     return row.n;
   }
 
-  /** Until no queued job, no unsent kick and no running app statement is left, or the settle time runs out. */
-  private async quiesce(): Promise<boolean> {
+  /**
+   * Until no queued job, no unsent kick and no running app statement is left.
+   * A stack that does not settle fails the run: measuring on it would charge
+   * one window's work to the next.
+   */
+  private async quiesce(): Promise<void> {
     const deadline = Date.now() + this.options.settleMs;
     while (Date.now() < deadline) {
       const [active] = (await this.admin.query(`${TAG} select count(*)::int as n from pg_stat_activity
         where datname = current_database() and state = 'active' and query ilike '%app_public%' and query not like '%groups-perf%'`)).rows;
       if ((await this.pendingJobs()) === 0 && active.n === 0) {
         await sleep(1500);
-        return true;
+        return;
       }
       await sleep(500);
     }
-    return false;
+    throw new Error(`stack did not settle within ${this.options.settleMs / 1000} s: ${await this.pendingJobs()} jobs or kicks pending`);
   }
 
   private async push(token: string, entities: unknown[]): Promise<boolean> {

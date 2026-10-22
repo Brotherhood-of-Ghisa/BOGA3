@@ -4,6 +4,9 @@
 
 import { isAppTable, rowsWritten, scans, sumCounters, type Counters } from './counters.ts';
 
+/** The authenticator role's statement_timeout, which every PostgREST RPC runs under. */
+export const POSTGREST_STATEMENT_TIMEOUT_MS = 8000;
+
 export type StepMetrics = {
   pages: number;
   pagesRead: number;
@@ -21,14 +24,20 @@ export type StepMetrics = {
   rejectedPublishes: number;
   graphBytes: number;
   setsScored: number;
-  /** Measured calls that failed; 57014 is the statement timeout. */
+  /** Measured calls that failed; 57014 is the call budget. */
   failedCalls: number;
+  /**
+   * Calls that took longer than PostgREST's 8 s statement timeout (the
+   * authenticator role's) on the machine that ran them: wall-clock, so
+   * informative only, never asserted.
+   */
+  callsOver8s: number;
   elapsedMs: number;
 };
 
 export type MeasuredStep = {
   total: Counters;
-  calls: { error?: string | null }[];
+  calls: { error?: string | null; counters?: { elapsedMs: number } }[];
   edgeRuns: { groupEval: number; notificationWorker: number };
   groupEval: { claimed: number; graphBytes: number; setsScored: number };
   evaluations: number;
@@ -55,6 +64,7 @@ export const stepMetrics = (step: MeasuredStep): StepMetrics => {
     graphBytes: step.groupEval.graphBytes,
     setsScored: step.groupEval.setsScored,
     failedCalls: step.calls.filter((call) => call.error).length,
+    callsOver8s: step.calls.filter((call) => (call.counters?.elapsedMs ?? 0) > POSTGREST_STATEMENT_TIMEOUT_MS).length,
     elapsedMs: step.total.elapsedMs,
   };
 };
@@ -189,7 +199,7 @@ export const tier1Assertions = (scenarios: readonly ScenarioSummary[], slopes: r
       observed: idleRows === null ? 'no data' : `max ${Math.round(idleRows)} rows/h`, pass: idleRows === null ? null : idleRows <= THRESHOLDS.idleAppRowsPerHour },
     { id: 'idle-pages', description: `an idle hour touches < ${THRESHOLDS.idlePagesPerHour} pages`,
       observed: idlePages === null ? 'no data' : `max ${Math.round(idlePages)} pages/h`, pass: idlePages === null ? null : idlePages < THRESHOLDS.idlePagesPerHour },
-    { id: 'scenarios-complete', description: 'every scenario completes within the hosted statement timeout and its budget',
+    { id: 'scenarios-complete', description: 'every scenario reaches steady state and completes within the call budget',
       observed: incomplete.length === 0 ? 'all complete' : incomplete.map((s) => `${s.name}: ${s.incomplete}`).join('; '),
       pass: incomplete.length === 0 },
   ];
@@ -212,9 +222,9 @@ export const tier1Markdown = (scenarios: readonly ScenarioSummary[], slopes: rea
   const lines = [
     '### Tier 1 — work per logged set and per idle hour',
     '',
-    '| Scenario | M | H (days) | Sets | Pages/set | WAL/set | Rows/set | Temp/set | Seq scans/set | Evals/set | Edge runs/set | Graph bytes/set | Unlinked set pages | Idle pages/h | Idle app rows/h | Idle WAL/h | Idle Edge runs/h |',
-    '| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |',
-    ...scenarios.map((s) => `| ${s.name}${s.incomplete ? ` (${s.incomplete})` : ''} | ${s.members} | ${s.historyDays} | ${fmt(s.sets)} | ${fmt(s.perSet?.pages)} | ${fmt(s.perSet?.walBytes)} | ${fmt(s.perSet?.rowsWritten)} | ${fmt(s.perSet?.tempBytes)} | ${fmt(s.perSet?.seqScans)} | ${fmt(s.perSet?.evaluations)} | ${fmt(s.perSet?.edgeRuns)} | ${fmt(s.perSet?.graphBytes)} | ${fmt(s.perSetUnlinked?.pages)} | ${fmt(s.idleHour?.pages)} | ${fmt(s.idleHour?.appRowsWritten)} | ${fmt(s.idleHour?.walBytes)} | ${fmt(s.idleHour?.edgeRuns)} |`),
+    '| Scenario | M | H (days) | Sets | Pages/set | WAL/set | Rows/set | Temp/set | Seq scans/set | Evals/set | Edge runs/set | Graph bytes/set | Calls > 8 s/set (this machine) | Unlinked set pages | Idle pages/h | Idle app rows/h | Idle WAL/h | Idle Edge runs/h |',
+    '| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |',
+    ...scenarios.map((s) => `| ${s.name}${s.incomplete ? ` (${s.incomplete})` : ''} | ${s.members} | ${s.historyDays} | ${fmt(s.sets)} | ${fmt(s.perSet?.pages)} | ${fmt(s.perSet?.walBytes)} | ${fmt(s.perSet?.rowsWritten)} | ${fmt(s.perSet?.tempBytes)} | ${fmt(s.perSet?.seqScans)} | ${fmt(s.perSet?.evaluations)} | ${fmt(s.perSet?.edgeRuns)} | ${fmt(s.perSet?.graphBytes)} | ${fmt(s.perSet?.callsOver8s)} | ${fmt(s.perSetUnlinked?.pages)} | ${fmt(s.idleHour?.pages)} | ${fmt(s.idleHour?.appRowsWritten)} | ${fmt(s.idleHour?.walBytes)} | ${fmt(s.idleHour?.edgeRuns)} |`),
     '',
     'Slope = ratio per doubling, (v2/v1)^(1/log2(x2/x1)): 1.00× flat, 2.00× linear.',
     '',

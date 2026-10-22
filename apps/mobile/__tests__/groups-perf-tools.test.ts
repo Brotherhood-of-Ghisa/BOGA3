@@ -20,6 +20,8 @@ describe('cron rates', () => {
     ['0 3 * * *', 1 / 24],
     ['0 3 * * 1', 1 / 168],
     ['0 3 * * 0,7', 1 / 168],
+    ['0 * * * 1-7', 1],
+    ['0 * * * 5-7', 3 / 7],
     ['30 seconds', 120],
     ['10 seconds', 360],
   ])('%s runs %d times an hour', (schedule, expected) => {
@@ -104,16 +106,20 @@ test('push entities have the wire shape sync_push takes', () => {
 describe('scenarioIncomplete', () => {
   const ok = { groupEvalRuns: 2, leftoverJobs: 0, failures: [] };
   const step = (label: string, extra: Partial<StepResult> = {}) => ({
-    label, calls: [{ fn: 'sync_push', error: null }], cascadeCapped: false, ...extra,
+    label, calls: [{ fn: 'sync_push', error: null }], failures: [], cascadeCapped: false, ...extra,
   }) as unknown as StepResult;
 
   test('a clean steady state and clean steps are complete', () => {
     expect(scenarioIncomplete(ok, { a: step('a') })).toBeNull();
   });
 
-  test('a statement timeout, failed or leftover jobs, a failed call or a runaway cascade each make it incomplete', () => {
+  test('a budget overrun, failed or leftover jobs, a failed call, a step failure or a runaway cascade each make it incomplete', () => {
     expect(scenarioIncomplete({ ...ok, failures: ['metric job 1: canceling statement due to statement timeout'] }, {}))
-      .toBe('steady state unreachable: a publication exceeded the statement timeout');
+      .toBe('steady state unreachable: a publication exceeded the call budget');
+    expect(scenarioIncomplete({ ...ok, failures: ['metric job 2: skipped: an earlier call exceeded the call budget'] }, {}))
+      .toBe('steady state unreachable: a publication exceeded the call budget');
+    expect(scenarioIncomplete(ok, { a: step('logged_set', { failures: ['unexpected kick url http://x'] }) }))
+      .toBe('step failures: logged_set: unexpected kick url http://x');
     expect(scenarioIncomplete({ ...ok, leftoverJobs: 3 }, {})).toBe('steady state unreachable: 0 failed jobs, 3 left');
     expect(scenarioIncomplete(ok, { a: step('logged_set', { calls: [{ fn: 'group_metric_eval_publish', error: '57014' }] } as never) }))
       .toBe('failed calls: logged_set:group_metric_eval_publish:57014');

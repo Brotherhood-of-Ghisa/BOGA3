@@ -43,7 +43,8 @@ export const FULL_PLAN: SweepPlan = {
   history: { members: 10, days: [91, 365, 730, 1460] },
   members: { days: 730, members: [2, 5, 10, 20] },
 };
-const HOSTED_STATEMENT_TIMEOUT_MS = 120000;
+/** A harness budget per RPC that keeps a run finite; wall-clock is machine-specific, so it is no hosted limit. */
+const CALL_BUDGET_MS = 120000;
 
 const STACK_ENV = {
   DB_URL: process.env.DB_URL,
@@ -123,7 +124,7 @@ const tier1 = async (args: string[], log: (line: string) => void) => {
   if (matrix !== 'default' && matrix !== 'full') throw new Error(`unknown matrix ${matrix}`);
   const plan = matrix === 'full' ? FULL_PLAN : DEFAULT_PLAN;
   const dbUrl = env('DB_URL');
-  const options = { dbUrl, adminDbUrl: adminUrl(dbUrl), statementTimeoutMs: HOSTED_STATEMENT_TIMEOUT_MS, log };
+  const options = { dbUrl, adminDbUrl: adminUrl(dbUrl), callBudgetMs: CALL_BUDGET_MS, log };
   const raw = await runPlan(plan, (members, days) =>
     runTier1Scenario(scenarioName(members, days), { members, historyDays: days, tag: `t${members}x${days}` }, options));
   const client = new Client({ connectionString: dbUrl });
@@ -146,7 +147,7 @@ const tier1 = async (args: string[], log: (line: string) => void) => {
   }
   const summary = `## Groups performance — Tier 1 (${matrix} matrix, ${gitRef()})\n\n${tier1Markdown(summaries, slopes, assertions)}`;
   const dir = writeReport(`tier1-${matrix}`, { tier: 1, matrix, gitRef: gitRef(), generatedAt: new Date().toISOString(),
-    plan, cronJobs: jobs, statementTimeoutMs: HOSTED_STATEMENT_TIMEOUT_MS, summaries, slopes, assertions, scenarios: raw }, summary);
+    plan, cronJobs: jobs, callBudgetMs: CALL_BUDGET_MS, summaries, slopes, assertions, scenarios: raw }, summary);
   return { summary, dir, assertions };
 };
 
