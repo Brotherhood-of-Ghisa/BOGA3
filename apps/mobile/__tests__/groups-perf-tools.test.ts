@@ -163,3 +163,33 @@ describe('load run helpers', () => {
     expect(hour.edgeResponses.groupEval.claimed).toBe(4);
   });
 });
+
+describe('runPlan', () => {
+  const { runPlan } = jest.requireActual('../scripts/perf/groups/cli') as typeof import('../scripts/perf/groups/cli');
+  const plan = { history: { members: 4, days: [14, 28, 56] }, members: { days: 28, members: [2, 4, 8, 16] } };
+
+  test('runs every point once, the shared one included', async () => {
+    const ran: string[] = [];
+    const results = await runPlan(plan, async (members, days) => {
+      ran.push(`${members}x${days}`);
+      return { name: `m${members}-h${days}d`, incomplete: null } as never;
+    });
+    expect(ran).toEqual(['4x14', '4x28', '4x56', '2x28', '8x28', '16x28']);
+    expect(results).toHaveLength(6);
+  });
+
+  test('after a point fails, the larger points of its sweep are skipped, naming the point that failed', async () => {
+    const ran: string[] = [];
+    const results = await runPlan(plan, async (members, days) => {
+      ran.push(`${members}x${days}`);
+      return { name: `m${members}-h${days}d`, incomplete: members === 2 || days === 28 ? 'unreachable' : null } as never;
+    });
+    expect(ran).toEqual(['4x14', '4x28', '2x28']);
+    const reasons = Object.fromEntries(results.map((r) => [r.name, r.incomplete]));
+    expect(reasons).toMatchObject({
+      'm4-h56d': 'skipped: m4-h28d did not complete',
+      'm8-h28d': 'skipped: m2-h28d did not complete',
+      'm16-h28d': 'skipped: m2-h28d did not complete',
+    });
+  });
+});

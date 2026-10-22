@@ -49,8 +49,8 @@ export const validateFixtureSpec = (spec: FixtureSpec): FixtureSpec => {
  * The statements that build one fixture, in order. They leave session temp
  * tables `perf_fx` (group, tag, clock), `perf_members` (idx, uid) and
  * `perf_group_exercises` (ex, id) for the runner. Sessions start every other
- * day per member (staggered by member), the newest 2-6 hours ago, so some fall
- * in the notification recovery's 24-hour window.
+ * day per member (staggered by member), the newest 2-6 hours ago, so some are
+ * still recent enough to notify ([[notifications.freshness]]).
  */
 export const fixtureStatements = (input: FixtureSpec): string[] => {
   const { members, historyDays: days, tag } = validateFixtureSpec(input);

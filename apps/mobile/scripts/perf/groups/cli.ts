@@ -88,7 +88,7 @@ const writeReport = (tier: string, report: object, summary: string): string => {
 const scenarioName = (members: number, days: number) => `m${members}-h${days}d`;
 
 /** Every point of both sweeps, the shared one once; after a point fails, the rest of its sweep is skipped. */
-const runPlan = async (plan: SweepPlan, run: (members: number, days: number) => Promise<Tier1Scenario>) => {
+export const runPlan = async (plan: SweepPlan, run: (members: number, days: number) => Promise<Tier1Scenario>) => {
   const results = new Map<string, Tier1Scenario | ScenarioSummary>();
   const sweeps: [number, number][][] = [
     plan.history.days.map((days) => [plan.history.members, days]),
@@ -100,7 +100,7 @@ const runPlan = async (plan: SweepPlan, run: (members: number, days: number) => 
       const name = scenarioName(members, days);
       const known = results.get(name);
       if (known) {
-        if (known.incomplete) blocked = name;
+        if (known.incomplete && !blocked) blocked = name;
         continue;
       }
       if (blocked) {
@@ -135,7 +135,7 @@ const tier1 = async (args: string[], log: (line: string) => void) => {
     if (!isScenario(item)) return item;
     const { summary, unmeasuredJobs } = summarizeTier1(
       { ...item, steps: item.incomplete ? {} : item.steps }, jobs, runsPerHour);
-    unmeasuredJobs.forEach((job) => unmeasured.add(job));
+    if (!item.incomplete) unmeasuredJobs.forEach((job) => unmeasured.add(job));
     return summary;
   });
   const slopes = computeSlopes(summaries, plan);
