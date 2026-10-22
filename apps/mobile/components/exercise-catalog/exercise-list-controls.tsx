@@ -200,7 +200,7 @@ type ExerciseListRowProps = {
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
-// Name, muscles and the stats line. A deleted exercise steps back: a faint
+// Name, wrapping Primary/Secondary muscles and stats. Deleted rows use a faint
 // `Deleted` tag and faint text, never a warning hue.
 const ExerciseListRow = memo(function ExerciseListRow({
   exercise,
@@ -226,10 +226,6 @@ const ExerciseListRow = memo(function ExerciseListRow({
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
       <Text allowFontScaling={false}
-        adjustsFontSizeToFit
-        ellipsizeMode="clip"
-        minimumFontScale={0.82}
-        numberOfLines={1}
         style={[styles.muscles, deleted ? styles.faded : null]}>
         {exercise.muscleSummary}
       </Text>

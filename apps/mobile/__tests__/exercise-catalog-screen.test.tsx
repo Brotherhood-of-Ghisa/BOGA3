@@ -203,7 +203,7 @@ describe('ExerciseCatalogScreen', () => {
       { muscleGroupId: 'delts_front', role: 'secondary', weight: 0.5 },
     ]);
     expect(await screen.findByLabelText('Edit exercise definition Bench Press')).toHaveTextContent(
-      /Pectoralis · Front Delts \(s\)/
+      /Primary: Pectoralis\s+Secondary: Front Delts/
     );
 
     fireEvent.press(screen.getByLabelText('Edit exercise definition Bench Press'));

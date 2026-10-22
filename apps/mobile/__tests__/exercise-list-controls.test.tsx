@@ -26,7 +26,7 @@ const item = (id: string, name: string, overrides: Partial<ExerciseListItem> = {
     id,
     name,
     deletedAt: null,
-    muscleSummary: 'Chest · Triceps (s)',
+    muscleSummary: 'Primary: Chest\nSecondary: Front Delts · Triceps',
     statsSummary: 'Never done',
     ...overrides,
   }) as ExerciseListItem;
@@ -59,6 +59,14 @@ const colorOf = (node: { props: { style?: unknown } }) =>
   (StyleSheet.flatten(node.props.style as any) ?? {}).color;
 
 describe('ExerciseListContent rows', () => {
+  it('lets all muscle names wrap at their normal size', () => {
+    renderList();
+    const muscles = within(screen.getByLabelText('Select exercise Bench Press')).getByText(bench.muscleSummary);
+    expect(muscles.props.numberOfLines).toBeUndefined();
+    expect(muscles.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(muscles.props.ellipsizeMode).toBeUndefined();
+  });
+
   it('makes each row one target labelled for the pick, with the stats line in Plex Mono', () => {
     const { onPressExercise } = renderList();
 
