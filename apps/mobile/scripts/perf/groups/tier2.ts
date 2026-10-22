@@ -257,6 +257,7 @@ export class Tier2Run {
   private readonly sampler: Client;
   private restore: (() => Promise<void>)[] = [];
   private fixture: Fixture | null = null;
+  private closed = false;
 
   constructor(private readonly options: Tier2Options) {
     this.admin = new Client({ connectionString: options.adminDbUrl });
@@ -268,12 +269,16 @@ export class Tier2Run {
     const startedAt = Date.now();
     await Promise.all([this.admin.connect(), this.app.connect(), this.sampler.connect()]);
     try {
+      const phase = (name: string, since: number) => this.options.log(`[load] ${name} after ${Math.round((Date.now() - since) / 1000)} s`);
       await this.configure();
       this.fixture = await this.loadFixture();
+      phase(`fixture of ${this.fixture.sets} sets loaded`, startedAt);
+      const drainStarted = Date.now();
       await this.drain();
+      phase('Edge drain to steady state', drainStarted);
       await this.admin.query(`${TAG} vacuum (analyze)`);
       const setupMs = Date.now() - startedAt;
-      this.options.log(`[load] steady state after ${Math.round(setupMs / 1000)} s: ${this.fixture.sets} sets`);
+      phase('setup', startedAt);
       const levels: LevelResult[] = [];
       for (const loggers of this.options.levels) levels.push(await this.level(loggers));
       const idle = this.options.idleTicks > 0 ? await this.idle() : null;
@@ -467,16 +472,22 @@ export class Tier2Run {
     };
   }
 
-  private async cleanup(): Promise<void> {
+  /** Undo every change, newest first; idempotent, so a signal handler may call it while the run unwinds. */
+  async cleanup(): Promise<void> {
+    const undos = this.restore.splice(0).reverse();
+    if (undos.length === 0 && this.closed) return;
     const errors: string[] = [];
-    for (const undo of this.restore.reverse()) {
+    for (const undo of undos) {
       try {
         await undo();
       } catch (error) {
         errors.push((error as Error).message);
       }
     }
-    await Promise.all([this.admin.end(), this.app.end(), this.sampler.end()]);
+    if (!this.closed) {
+      this.closed = true;
+      await Promise.all([this.admin.end(), this.app.end(), this.sampler.end()]);
+    }
     if (errors.length > 0) throw new Error(`load run cleanup failed: ${errors.join('; ')}`);
   }
 }

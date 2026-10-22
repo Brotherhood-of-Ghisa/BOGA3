@@ -153,16 +153,24 @@ const tier1 = async (args: string[], log: (line: string) => void) => {
 const load = async (log: (line: string) => void) => {
   const dbUrl = env('DB_URL');
   const fixture = { members: 10, historyDays: 28 };
-  const result = await new Tier2Run({
+  const run = new Tier2Run({
     dbUrl, adminDbUrl: adminUrl(dbUrl), apiUrl: env('API_URL'), anonKey: env('ANON_KEY'), jwtSecret: env('JWT_SECRET'),
     serviceRoleKey: env('SERVICE_ROLE_KEY'), fixture,
     levels: numberList(process.env.GROUPS_PERF_LEVELS, [1, 5, 10]),
     cadenceMs: Number(process.env.GROUPS_PERF_CADENCE_S ?? 90) * 1000,
-    windowMs: Number(process.env.GROUPS_PERF_WINDOW_S ?? 120) * 1000,
-    settleMs: 120000,
-    idleTicks: Number(process.env.GROUPS_PERF_IDLE_TICKS ?? 6),
+    windowMs: Number(process.env.GROUPS_PERF_WINDOW_S ?? 100) * 1000,
+    settleMs: 60000,
+    idleTicks: Number(process.env.GROUPS_PERF_IDLE_TICKS ?? 4),
     log,
-  }).run();
+  });
+  // An interrupted run still restores the stack before it exits.
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      run.cleanup().catch((error: unknown) => console.error(`[groups-perf] ${(error as Error).message}`))
+        .finally(() => process.exit(130));
+    });
+  }
+  const result = await run.run();
   const levels = result.levels.map(summarizeLevel);
   const assertions = tier2Assertions(levels, result.idle);
   const summary = `## Groups performance — Tier 2 load run (${gitRef()})\n\n${tier2Markdown(result.fixture, levels, result.idle, assertions)}`;
