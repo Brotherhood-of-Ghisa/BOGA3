@@ -20,7 +20,7 @@ export type MuscleAnalyticsInput = {
     loadInputMode: 'total_load' | 'per_side_load';
     bodyweightContribution: number;
   }[];
-  sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
+  sessions: ({ id: string; completedAt: Date; gymId?: string | null; gymName?: string | null } & SessionWeightContext)[];
   sessionExercises: {
     id: string;
     sessionId: string;

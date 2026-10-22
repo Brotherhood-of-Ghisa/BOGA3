@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { computeProgressComparisons, computeStatsSummary } from '@/src/data/stats';
+import { computeProgressComparisons, computeStatsSummary, computeSelectedMuscleHistoryEffort, computeSelectedMuscleDailyEffort } from '@/src/data/stats';
 import { exerciseDefinitions, exerciseMuscleMappings, exerciseSets, muscleGroups, sessionExercises,
-  sessions, bodyWeightMeasurements, userSettings } from '@/src/data/schema';
+  sessions, gyms, bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount, setAccountLocalPreferences,
   __resetAccountLocalPreferencesForTests } from '@/src/preferences/account-local';
 import { DEFAULT_PERSONAL_EFFORT_POLICY, type EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
@@ -231,4 +231,33 @@ it.each([
   // Back is secondary on `lift`: half a set per physical set ([[muscle.set-count]]).
   expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: currentCount * 0.5, totalVolume: currentCount * 100 },
     previous: { workingSetCount: 1, totalVolume: 200 } });
+});
+
+it('scopes both Muscle periods, contributors and history to gym sessions, including in-progress and no gym', async () => {
+  const db = mockFixture.database;
+  db.insert(gyms).values([{ id: 'gym-a', name: 'A' }, { id: 'gym-b', name: 'B' }]).run();
+  db.update(sessions).set({ gymId: 'gym-a' }).where(eq(sessions.id, 'now')).run();
+  db.update(sessions).set({ gymId: 'gym-b' }).where(eq(sessions.id, 'prev')).run();
+  db.insert(sessions).values({ id: 'active', status: 'active', startedAt: new Date(now.getTime() - 60_000), gymId: 'gym-a' }).run();
+  db.insert(sessionExercises).values({ id: 'active-block', sessionId: 'active', exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
+  db.insert(exerciseSets).values({ id: 'active-set', sessionExerciseId: 'active-block', orderIndex: 0,
+    setType: 'rir_2', weightValue: '40', repsValue: '5' }).run();
+  const a = await computeProgressComparisons({ ...options, gymId: 'gym-a' });
+  const b = await computeProgressComparisons({ ...options, gymId: 'gym-b' });
+  expect(a.muscles[0]).toMatchObject({ current: { workingSetCount: 1.5 }, previous: { workingSetCount: 0 } });
+  expect(a.muscles[0].exercises.map(row => row.exerciseDefinitionId)).toEqual(['lift']);
+  expect(b.muscles[0]).toMatchObject({ current: { workingSetCount: 0 }, previous: { workingSetCount: 1.5 } });
+  expect(a.current.totals.sessionCount).toBe(2);
+  expect(b.previous.totals.sessionCount).toBe(1);
+  const bounds = { start: b.previous.period.start, end: now, now, muscleGroupIds: ['back'] };
+  const history = await computeSelectedMuscleHistoryEffort({ ...bounds, gymId: 'gym-a' });
+  expect(history.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBe(1.5);
+  expect(history.weekly.reduce((sum, week) => sum + week.workingSetCount, 0)).toBe(1.5);
+  expect(history.gyms).toEqual([{ gymId: 'gym-a', name: 'A', sessionCount: 2 }, { gymId: 'gym-b', name: 'B', sessionCount: 1 }]);
+  expect((await computeSelectedMuscleDailyEffort({ ...bounds, gymId: null }))).toEqual([]);
+  db.update(sessions).set({ gymId: null }).where(eq(sessions.id, 'active')).run();
+  const noGym = await computeProgressComparisons({ ...options, gymId: null });
+  expect(noGym.muscles[0]).toMatchObject({ current: { workingSetCount: 0.5 }, previous: { workingSetCount: 0 } });
+  const all = await computeProgressComparisons(options);
+  expect(all.muscles[0]).toMatchObject({ current: { workingSetCount: 1.5 }, previous: { workingSetCount: 1.5 } });
 });
