@@ -7,7 +7,8 @@
 -- work does not grow with recent workouts or history. Each sample reports
 -- buffer pages (EXPLAIN BUFFERS, nested calls included), rows written, WAL and
 -- worker posts. It touches no admission internals, so it also measures schemas
--- that predate them. It empties the notification tables first, inside its
+-- that predate them. A final positive control starts a workout, so that sweep
+-- must call the worker. It empties the notification tables first, inside its
 -- rolled-back transaction, so other fixtures' work cannot make the sweep due.
 \set ON_ERROR_STOP on
 begin;
@@ -20,6 +21,10 @@ select vault.create_secret('idle-benchmark','notification_worker_key') \gset
 delete from app_public.notification_deliveries; delete from app_public.notification_intents;
 delete from app_public.notification_workouts; delete from app_public.notification_workout_moments;
 delete from app_public.notification_installations;
+do $$ begin
+  if to_regclass('app_public.notification_moment_queue') is not null then
+    execute 'delete from app_public.notification_moment_queue'; end if;
+end $$;
 -- Recent workouts must postdate the cutover, as they do on hosted.
 update app_public.notification_workout_epoch set started_at=now()-interval '30 days';
 create temporary table idle_fixture as
@@ -130,5 +135,9 @@ select pg_temp.add_sessions('history-b',120,(select stamp from idle_fixture)-864
 select pg_temp.settle();
 select pg_temp.measure('sweep','select app_public.notification_sweep()');
 select pg_temp.measure('prepare','select app_public.notification_workout_prepare(20)');
+-- Positive control: a workout starting now makes the next sweep call the worker.
+insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+select m.member,'starting-now','active',f.stamp,f.stamp,f.stamp,f.stamp from idle_fixture f join idle_members m on m.n=2;
+select pg_temp.measure('due_sweep','select app_public.notification_sweep()');
 select jsonb_agg(to_jsonb(s) order by s.ctid) as idle_benchmark from idle_samples s;
 rollback;

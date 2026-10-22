@@ -15,7 +15,9 @@ create table app_public.notification_moment_queue (
   id bigint generated always as identity primary key,
   member_user_id uuid not null references auth.users(id) on delete cascade,
   session_id text not null,
-  queued_at timestamptz not null default now()
+  queued_at timestamptz not null default now(),
+  -- A start more than 5 minutes ahead of server time is admitted once it is not.
+  available_at timestamptz not null default now()
 );
 alter table app_public.notification_moment_queue enable row level security;
 revoke all on app_public.notification_moment_queue from public,anon,authenticated;
@@ -46,7 +48,9 @@ begin
       and event='notification.intake_failed' and context->>'table'='sessions' and context->>'row_id'=p_session
       and context->>'moment_kind'=p_kind) then null else to_timestamp(p_event_ms/1000.0) end) on conflict do nothing;
   if not found then return false; end if;
-  insert into notification_moment_queue(member_user_id,session_id) values(p_member,p_session);
+  insert into notification_moment_queue(member_user_id,session_id,available_at)
+    select p_member,p_session,greatest(now(),event_at-interval '5 minutes') from notification_workout_moments
+    where member_user_id=p_member and session_id=p_session and kind=p_kind;
   return true;
 end $$;
 
@@ -92,7 +96,7 @@ declare source record; code text; claimed bigint[]; candidates jsonb;
 begin
   if p_limit not between 1 and 20 or p_limit is null then raise exception 'VALIDATION: invalid admission limit'; end if;
   select coalesce(array_agg(id),array[]::bigint[]) into claimed from (
-    select id from notification_moment_queue order by id for update skip locked limit p_limit) picked;
+    select id from notification_moment_queue where available_at<=now() order by id for update skip locked limit p_limit) picked;
   if cardinality(claimed)=0 then return; end if;
   select coalesce(jsonb_agg(distinct jsonb_build_object('member',member_user_id,'session',session_id)),'[]'::jsonb)
     into candidates from notification_moment_queue where id=any(claimed);
@@ -146,9 +150,10 @@ language sql stable security definer set search_path=app_public,pg_temp as $$
       w.manifest_digest is not null or w.context_digest is not null or w.confirmed_at is not null or w.contributions<>'[]'::jsonb))
     or exists(select 1 from notification_workout_targets t join notification_workouts w using(member_user_id,session_id)
       where not w.eligible or w.completion_at<=now()-interval '24 hours')
-    -- A workout's moments never postdate its completion, so only moments older than the window can be pruned.
+    -- A workout's moments never postdate its completion, so only moments older than the window, or
+    -- forfeited ones, can be pruned.
     or exists(select 1 from notification_workout_moments m join notification_workouts w using(member_user_id,session_id)
-      where m.event_at<=now()-interval '24 hours' and w.completion_at<=now()-interval '24 hours')
+      where (m.event_at<=now()-interval '24 hours' or m.event_at is null) and w.completion_at<=now()-interval '24 hours')
     or exists(select 1 from notification_intents where expires_at<now()-interval '30 days' and contributions<>'[]')
     or exists(select 1 from notification_installations where not active and updated_at<now()-interval '30 days'
       and (encryption_key<>'' or token<>'retired:'||id::text))
@@ -160,7 +165,7 @@ $$;
 -- sends, receipts, expiries or pruning. Mirrors the worker's claim predicates.
 create function app_public.notification_worker_due() returns boolean
 language sql stable security definer set search_path=app_public,pg_temp as $$
-  select exists(select 1 from notification_moment_queue)
+  select exists(select 1 from notification_moment_queue where available_at<=now())
     or exists(select 1 from notification_workouts w where w.eligible and w.confirmed_at is not null
       and w.enqueued_generation<w.generation and w.completion_at>now()-interval '24 hours')
     or exists(select 1 from notification_deliveries d where (d.state in ('pending','retry') and d.available_at<=now())
@@ -192,9 +197,9 @@ end $$;
 
 -- Sources whose moments are still inside their alert window are admitted once
 -- by the new worker; admission is idempotent for any already sent.
-insert into app_public.notification_moment_queue(member_user_id,session_id)
-  select distinct member_user_id,session_id from app_public.notification_workout_moments
-  where event_at+interval '24 hours'>now();
+insert into app_public.notification_moment_queue(member_user_id,session_id,available_at)
+  select member_user_id,session_id,greatest(now(),max(event_at)-interval '5 minutes') from app_public.notification_workout_moments
+  where event_at+interval '24 hours'>now() group by member_user_id,session_id;
 
 do $$ declare f record; begin
   for f in select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace

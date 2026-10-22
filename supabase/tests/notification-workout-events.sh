@@ -325,6 +325,8 @@ drain_worker; check 'actual local sink accepts admitted backdated source' '.outc
 next_cuam
 push "${B_TOKEN}" 'repeat backdated autosave after accepted admitted start' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null null "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
+# An autosave appends no moment; queue the source again, as the cutover seed or a duplicate append would.
+run_psql "insert into app_public.notification_moment_queue(member_user_id,session_id) values('${B_UID}','${BACKDATED}');" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'repeat admission expected HTTP 204 with no body'
 drain_worker; check 'backdated autosave and admission never replay the accepted start' '.claimed==0'
 assert_sql 'backdated source retains one real local ticket and its immutable original clock' "select count(*)=1 and bool_and(n.kind='start'
@@ -337,10 +339,12 @@ BACKDATED_RECOVERY_AT="$(run_psql "select updated_at from app_public.notificatio
 next_cuam
 push "${B_TOKEN}" 'delete backdated source whose captured moment remains fresh' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
+run_psql "insert into app_public.notification_moment_queue(member_user_id,session_id) values('${B_UID}','${BACKDATED}');" >/dev/null
 rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'deleted-source admission expected HTTP 204 with no body'
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${BACKDATED_INTENT}}"; expect_ok 'deleted captured-start projection'
 [[ "${BODY}" == null ]] || fail 'deleted backdated source projected its captured start'
 assert_sql 'deleted source is excluded from admission and retains one immutable identity' "select updated_at='${BACKDATED_RECOVERY_AT}'
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='${BACKDATED}')
   and (select count(*)=1 from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}')
   from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${BACKDATED}';"
 run_psql 'update app_public.notification_config set sending_enabled=false;' >/dev/null
@@ -717,6 +721,15 @@ drain_worker
 assert_sql 'one worker run admits the queued start and forgets it' "select exists(select 1 from app_public.notification_intents
     where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${WORKER_START}' and kind='start')
   and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='${WORKER_START}');"
+# A device clock more than 5 minutes fast: the start waits in the queue until it is admissible.
+AHEAD_START="ahead-start-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'start from a fast device clock' "$(e_session "${AHEAD_START}" "$((NOW_MS+1800000))" active null null null "${CUAM}")"
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'a future start stays queued until five minutes before it, unsent' "select count(*)=1
+    and bool_and(q.available_at=to_timestamp(${NOW_MS}/1000.0)+interval '25 minutes')
+    and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${AHEAD_START}')
+  from app_public.notification_moment_queue q where q.member_user_id='${B_UID}' and q.session_id='${AHEAD_START}';"
 confirm "${B_TOKEN}" "dual-retry-${RUN_TAG}" "$(manifest "${B_UID}" "dual-retry-${RUN_TAG}")"; check 'missed intake graph reconfirmed' '.confirmed==true'
 drain_eval
 assert_sql 'source proof recovers after failed intake' "select app_public.notification_workout_ready('${B_UID}','dual-retry-${RUN_TAG}');"
@@ -909,9 +922,9 @@ jq -e 'length==4 and all(.[];.graph_calls==2) and all(.[0:3][];.completed==true 
 # preparation reads the same few pages however many workouts and sessions exist.
 IDLE_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
   <"${SUPABASE_DIR}/tests/notification-idle-benchmark.sql" | grep '^\[')" || fail 'idle benchmark fixture failed'
-jq -e 'length==6 and all(.[];.rows_written==0 and .wal_kb==0 and .worker_posts==0 and .temp_pages==0)
+jq -e 'length==7 and all(.[0:6][];.rows_written==0 and .wal_kb==0 and .worker_posts==0 and .temp_pages==0)
   and all(.[]|select(.step=="prepare");.pages<=20) and all(.[]|select(.step=="sweep");.pages<=1000)
-  and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25' <<<"${IDLE_SAMPLES}" >/dev/null ||
+  and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25 and .[6].worker_posts==1' <<<"${IDLE_SAMPLES}" >/dev/null ||
   fail "idle notification background regressed: ${IDLE_SAMPLES}"
 # Restore each workout's original published contribution when testing which movement that workout caused.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
