@@ -82,7 +82,6 @@ it('shortens names, falls back on native overflow and passes matching numbers to
     { nativeEvent: { lines: [{ height: 20 }, { height: 20 }, { height: 20 }] } });
   expect(screen.getByText('[1]', { includeHiddenElements: true })).toBeTruthy();
   expect(screen.getByText('1 Dumbbell Overhead Press')).toBeTruthy();
-  expect(screen.getByText('Primary effort')).toBeTruthy();
   expect(screen.getByTestId('stats-exercise-selection-Chest')).toHaveStyle({ borderColor: uiRoles.ink });
   fireEvent.press(screen.getByTestId('stats-exercise-family-Chest'));
   expect(onSelect).toHaveBeenCalledWith('Chest');
@@ -108,6 +107,7 @@ it('keeps Volume geometry across metrics and reserves hidden Secondary space in 
   expect(original.width * original.height / (secondaryBounds.width * secondaryBounds.height)).toBeCloseTo(3);
   expect(screen.getByText('6 / +2', { includeHiddenElements: true })).toBeTruthy();
   expect(screen.getByText('Secondary details')).toBeTruthy();
+  expect(detail).toHaveBeenLastCalledWith([exercise], secondary, expect.any(Map));
   view.rerender(<ExerciseMap {...props} metric="totalVolume" />);
   expect(bounds()).toEqual(original);
   expect(screen.getByTestId('stats-exercise-tile-Chest-bench-now', { includeHiddenElements: true })).toHaveTextContent('600');

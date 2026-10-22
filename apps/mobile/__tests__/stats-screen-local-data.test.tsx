@@ -331,6 +331,67 @@ describe('Stats over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=volume&gymId=no-gym`);
   });
 
+  it.each(['heatmap', '3d'] as const)('splits both %s contribution tables by effort under one aligned header, without changing List', async layout => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
+    await act(async () => invalidateExerciseCatalogCache());
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    expect(screen.queryByText('Primary effort')).toBeNull();
+    expect(screen.queryByText('Secondary effort')).toBeNull();
+    await act(async () => { updatePreferences({ progressMuscleLayout: layout }); });
+    const select = (muscle: string, family: string) => fireEvent.press(screen.getByTestId(layout === 'heatmap'
+      ? `stats-exercise-family-${family}` : `stats-muscle-body-target-${muscle}`));
+    select('biceps', 'Arms');
+    const table = within(screen.getByTestId('stats-exercise-list'));
+    expect(table.getAllByTestId('stats-exercise-table-header')).toHaveLength(1);
+    expect(table.getAllByTestId(/^stats-exercise-effort-/).map(row => row.props.children))
+      .toEqual(['Primary effort', 'Secondary effort']);
+    expect(table.getAllByTestId(new RegExp(`^stats-exercise-row-(${BENCH}|${SQUAT})$`)).map(row => row.props.testID))
+      .toEqual([`stats-exercise-row-${BENCH}`, SQUAT_ROW]);
+    expect(table.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^3.5$/);
+    expect(table.getByTestId('stats-exercise-secondary-summary-now')).toHaveTextContent(/^3.5$/);
+    expect(table.getByTestId('stats-exercise-secondary-summary').props.onPress).toBeUndefined();
+    const width = (prefix: string) => StyleSheet.flatten(table.getByTestId(`${prefix}-now`).parent!.props.style).width;
+    expect(width(`stats-exercise-row-${BENCH}`)).toBe(width(`stats-exercise-row-${SQUAT}`));
+    expect(width(`stats-exercise-row-${BENCH}`)).toBe(width('stats-exercise-secondary-summary'));
+    fireEvent.press(table.getByTestId(SQUAT_ROW));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets`);
+
+    // Filtering can leave either section alone, or no contributor at all.
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+    expect(screen.queryByTestId('stats-exercise-effort-primary')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-effort-secondary')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Bench');
+    expect(screen.getByTestId('stats-exercise-effort-primary')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-effort-secondary')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'nothing matches');
+    expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-effort-primary')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-effort-secondary')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), '');
+    chooseFilter('metric', 'Volume');
+    chooseFilter('metric', '1RM');
+    expect(screen.queryByTestId('stats-exercise-effort-secondary')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-secondary-summary')).toBeNull();
+    if (layout === '3d') expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+
+    chooseFilter('view-mode', 'Muscle');
+    if (!screen.queryByTestId('stats-contributions')) {
+      fireEvent.press(await screen.findByTestId(layout === 'heatmap' ? 'stats-muscle-tile-biceps' : 'stats-muscle-body-target-biceps'));
+    }
+    const muscle = within(screen.getByTestId('stats-contributions'));
+    expect(muscle.getAllByTestId('stats-contributions-header')).toHaveLength(1);
+    expect(muscle.getByText('Primary effort')).toHaveProp('accessibilityRole', 'header');
+    expect(muscle.getByText('Secondary effort')).toHaveProp('accessibilityRole', 'header');
+    expect(muscle.getAllByTestId(new RegExp(`^stats-contribution-(${BENCH}|${SQUAT})$`)).map(row => row.props.testID))
+      .toEqual([`stats-contribution-${BENCH}`, `stats-contribution-${SQUAT}`]);
+    await act(async () => { updatePreferences({ progressMuscleLayout: 'list' }); });
+    expect(screen.queryByText('Primary effort')).toBeNull();
+    expect(screen.queryByText('Secondary effort')).toBeNull();
+  });
+
   it('weights Secondary exercise rows, keeps its unfiltered target under search/gym, and opens full history with the selected metric', async () => {
     await loadMaestroFixture('exercise-block-history');
     const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;

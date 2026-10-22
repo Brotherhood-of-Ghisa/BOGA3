@@ -366,8 +366,10 @@ export function StatsScreenShell({
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
   const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
+  // Scoped Map/3D details supply a target map, including when it has no primary rows.
   const exerciseList = (items: ExerciseListItem[], targetAttainmentById?: ReadonlyMap<string, number>, secondary?: ExerciseMapSecondary, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
     targetAttainmentById={targetAttainmentById} secondary={secondary} labels={labels}
+    splitByEffort={targetAttainmentById !== undefined}
     grouped={tableVisible && grouped.exercise} families={exerciseFamilies}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
@@ -499,9 +501,11 @@ function ExerciseListView({
   labels,
   grouped,
   families,
+  splitByEffort,
 }: {
   items: ExerciseListItem[];
   grouped: boolean;
+  splitByEffort: boolean;
   families?: ReadonlyMap<string, string>;
   targetAttainmentById?: ReadonlyMap<string, number>;
   secondary?: ExerciseMapSecondary;
@@ -514,7 +518,8 @@ function ExerciseListView({
 }) {
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
   const { width } = useWindowDimensions();
-  if (items.length === 0) {
+  const secondaryRows = metric === 'estimatedOneRepMax' ? [] : secondary?.exercises.map(entry => entry.item) ?? [];
+  if (items.length === 0 && secondaryRows.length === 0) {
     return (
       <Card>
         <StatePanel body={emptyBody} fill={false} testID="stats-exercise-list-empty" />
@@ -524,9 +529,12 @@ function ExerciseListView({
 
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
-  const layout = resolveComparisonLayout(width, secondary && metric !== 'estimatedOneRepMax' ? [...items, secondary] : items, metric, false, true);
+  const layout = resolveComparisonLayout(width, secondaryRows.length > 0 && secondary
+    ? [...items, ...secondaryRows, secondary] : items, metric, false, true);
   const familyName = (item: ExerciseListItem) => families?.get(item.id) ?? 'Other';
-  const rows = grouped ? [...items].sort((left, right) => compareProgressFamilies(familyName(left), familyName(right))) : items;
+  const primaryRows = grouped ? [...items].sort((left, right) => compareProgressFamilies(familyName(left), familyName(right))) : items;
+  const rows = [...primaryRows.map(item => ({ item, isSecondary: false })),
+    ...secondaryRows.map(item => ({ item, isSecondary: true }))];
   return (
     <StatsTable testID="stats-exercise-list">
       <ComparisonHeaders
@@ -556,9 +564,10 @@ function ExerciseListView({
         }
         testID="stats-exercise-table-header"
       />
-      {secondary && metric !== 'estimatedOneRepMax' ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
-      {rows.map((item, index) => {
-        const attainment = metric === 'workingSetCount' ? secondary?.targetAttainment ?? targetAttainmentById?.get(item.id) : undefined;
+      {rows.map(({ item, isSecondary }, index) => {
+        const sectionStart = index === 0 || rows[index - 1].isSecondary !== isSecondary;
+        const attainment = metric === 'workingSetCount'
+          ? isSecondary ? secondary?.targetAttainment : targetAttainmentById?.get(item.id) : undefined;
         const target = attainment === undefined ? null : Math.round(attainment * 100);
         const values = (
           <ComparisonValues
@@ -571,11 +580,15 @@ function ExerciseListView({
         );
         return (
           <Fragment key={item.id}>
-          {grouped && (index === 0 || familyName(rows[index - 1]) !== familyName(item)) ?
+          {splitByEffort && sectionStart ? <StatsTableFamily name={isSecondary ? 'Secondary effort' : 'Primary effort'}
+            testID={`stats-exercise-effort-${isSecondary ? 'secondary' : 'primary'}`} /> : null}
+          {isSecondary && sectionStart && secondary && metric !== 'estimatedOneRepMax'
+            ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
+          {grouped && (index === 0 || familyName(rows[index - 1].item) !== familyName(item)) ?
             <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
-            accessibilityLabel={`${secondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}${target === null ? '' : ` ${secondary ? 'Secondary' : 'Primary'} muscle target ${target}%.`}`}
+            accessibilityLabel={`${isSecondary ? 'Secondary contribution. ' : ''}${exerciseRowLabel(item, metric)}${target === null ? '' : ` ${isSecondary ? 'Secondary' : 'Primary'} muscle target ${target}%.`}`}
             density="list"
             meta={layout.stacked ? undefined : values}
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
@@ -601,9 +614,9 @@ function SecondarySummary({ secondary, metric, layout }: {
   const figures = comparisonFigures(secondary, metric);
   const target = metric === 'workingSetCount' ? Math.round(secondary.targetAttainment * 100) : null;
   const values = <ComparisonValues row={secondary} metric={metric} layout={layout} prefix="stats-exercise-secondary-summary" speak={false} />;
-  return <ListRow accessible accessibilityLabel={`Secondary contribution. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.${target === null ? '' : ` Secondary muscle target ${target}%.`}`}
+  return <ListRow accessible accessibilityLabel={`Secondary contribution total. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.${target === null ? '' : ` Secondary muscle target ${target}%.`}`}
     meta={layout.stacked ? undefined : values} testID="stats-exercise-secondary-summary">
-    <Text allowFontScaling={false} accessibilityRole="header" style={statsTableStyles.name}>Secondary effort</Text>
+    <Text allowFontScaling={false} style={statsTableStyles.name}>Total</Text>
     {target !== null ? <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.target]}
       testID="stats-exercise-secondary-target">{target}% target</Text> : null}
     {layout.stacked ? values : null}

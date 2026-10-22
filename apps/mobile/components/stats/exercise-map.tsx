@@ -75,11 +75,8 @@ export function ExerciseMap({ families, metric, selectedFamily, onSelectFamily, 
     </View>
     {selected ? <View testID="stats-exercise-map-detail" style={styles.detail}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selected.name}</Text>
-      {selected.exercises.length > 0 || !showSecondary || !selected.secondary ? <>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>Primary effort</Text>
-        {renderDetail(selected.exercises, undefined, new Map(selected.exercises.filter(entry => overflow.has(`${selected.name}:${entry.item.id}`)).map(entry => [entry.item.id, numbers.get(entry.item.id)!])))}
-      </> : null}
-      {showSecondary && selected.secondary ? renderDetail(selected.secondary.exercises, selected.secondary) : null}
+      {renderDetail(selected.exercises, showSecondary ? selected.secondary ?? undefined : undefined,
+        new Map(selected.exercises.filter(entry => overflow.has(`${selected.name}:${entry.item.id}`)).map(entry => [entry.item.id, numbers.get(entry.item.id)!])))}
     </View> : null}
   </View>;
 }
@@ -106,8 +103,7 @@ export function ExerciseBodyView({
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} />
     {selectedMuscle ? <View testID="stats-exercise-body-detail" style={styles.detail}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selectedMuscle.displayName}</Text>
-      {selectedMuscle.exercises.length > 0 || !selectedMuscle.secondary ? <><Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>Primary effort</Text>{renderDetail(selectedMuscle.exercises)}</> : null}
-      {selectedMuscle.secondary ? renderDetail(selectedMuscle.secondary.exercises, selectedMuscle.secondary) : null}
+      {renderDetail(selectedMuscle.exercises, selectedMuscle.secondary ?? undefined)}
     </View> : renderAll()}
   </View>;
 }
