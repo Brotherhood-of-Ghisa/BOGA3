@@ -4,8 +4,6 @@
 
 import { and, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
-import { getAccountLocalPreferenceState } from '@/src/preferences/account-local';
-
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 import { loadFlaggedExerciseSessionFacts, type ExerciseSessionFactRow } from '@/src/data/exercise-session-facts';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
@@ -124,13 +122,13 @@ const instantWindow = (instant: Date): LocalWindow => ({
 export const createTodayProgressRepository = (
   store: ProgressSummaryStore = createDrizzleProgressSummaryStore(),
 ) => ({
-  async loadTodayProgress(now: Date = new Date(), progressWeeks = getAccountLocalPreferenceState().values.targetWindowWeeks): Promise<TodayProgress> {
+  async loadTodayProgress(now: Date = new Date()): Promise<TodayProgress> {
     const latest = await store.loadLatestCompletedSession();
-    if (latest === null) return deriveTodayProgress({ now, progressWeeks, sessions: [], prAchievedAt: [], latest: null });
+    if (latest === null) return deriveTodayProgress({ now, sessions: [], prAchievedAt: [], latest: null });
 
-    const range = todayProgressLoadWindow(now, progressWeeks);
+    const range = todayProgressLoadWindow(now);
     const [aggregation, recordFacts] = await Promise.all([
-      // The workout in progress counts in this week and progress period (§2).
+      // The workout in progress counts in this week and month (§2).
       store.loadAggregationInput({ ...range, now }),
       store.loadRecordFacts(range),
     ]);
@@ -144,7 +142,6 @@ export const createTodayProgressRepository = (
         ]);
     return deriveTodayProgress({
       now,
-      progressWeeks,
       sessions: sessionsInRange,
       prAchievedAt: recordFacts.map((fact) => fact.achievedAt),
       latest: {

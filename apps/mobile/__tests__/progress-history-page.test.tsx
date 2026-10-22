@@ -169,6 +169,11 @@ describe('resolveHistorySubject', () => {
     }
   });
 
+  it.each(['gym a/b', null, undefined])('round-trips muscle gym scope %s', gymId => {
+    const params = Object.fromEntries(new URLSearchParams(String(progressHistoryHref({ muscleGroupId: 'quads', gymId })).split('?')[1]));
+    expect(resolveHistorySubject(params)).toEqual({ kind: 'muscle', id: 'quads', ...(gymId === undefined ? {} : { gymId }) });
+  });
+
   it('takes one id per kind, and nothing from a malformed link', () => {
     expect(resolveHistorySubject({ exerciseDefinitionId: 'ex1' })).toEqual({ kind: 'exercise', id: 'ex1' });
     expect(resolveHistorySubject({ muscleGroupId: 'front_delts' })).toEqual({ kind: 'muscle', id: 'front_delts' });
@@ -370,7 +375,7 @@ describe('ProgressHistoryScreen', () => {
     setAccountLocalPreferenceAccount('A', true);
     await act(async () => { updatePreferences({ heatmapView: 'daily', historyLookbackWeeks: 52, weeklyWorkingSetTarget: 8 }); });
     jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort')
-      .mockResolvedValue({ weekly: [buildWeeklyEffort()], daily: DAILY_METRICS });
+      .mockResolvedValue({ weekly: [buildWeeklyEffort()], daily: DAILY_METRICS, gyms: [] });
   });
   afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
@@ -469,7 +474,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('links an exercise to each muscle it counts towards, primary first, from the ⋮ in any view', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2' }} initialMetric="workingSetCount"
+    render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2', gymId: 'gym-a' }} initialMetric="workingSetCount"
       todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
 
@@ -484,7 +489,7 @@ describe('ProgressHistoryScreen', () => {
 
     fireEvent.press(rows[1]);
     // The muscle opens on the metric the exercise was showing.
-    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ muscleGroupId: 'triceps' }, 'workingSetCount'));
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ muscleGroupId: 'triceps', gymId: 'gym-a' }, 'workingSetCount'));
     expect(screen.queryByTestId(/^progress-history-muscle-/)).toBeNull();
   });
 

@@ -7,6 +7,7 @@ import type {
 } from '@/src/data/exercise-catalog-stats';
 
 import { filterIndexedExerciseCatalogExercises, type IndexedExerciseCatalogExercise } from './search';
+import { exerciseCountedMuscles } from './exercise-muscles';
 
 import type { ExerciseDateFormat, ExerciseListPreferences } from '@/src/preferences/model';
 export { DEFAULT_EXERCISE_LIST_PREFERENCES } from '@/src/preferences/model';
@@ -79,29 +80,14 @@ export const formatExerciseMuscleSummary = (
   exercise: ExerciseCatalogExercise,
   muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
 ) => {
-  if (exercise.mappings.length === 0) {
-    return 'No muscle links';
-  }
-
-  const primaryMapping = pickPrimaryExerciseMapping(exercise);
-
-  if (!primaryMapping) {
-    return 'No muscle links';
-  }
-
-  const secondaryMappings = exercise.mappings.filter((mapping) => mapping.id !== primaryMapping.id);
-  const primaryLabel = getMuscleDisplayName(primaryMapping.muscleGroupId, muscleGroupById);
-
-  if (secondaryMappings.length === 0) {
-    return primaryLabel;
-  }
-
-  if (secondaryMappings.length === 1) {
-    const secondaryLabel = getMuscleDisplayName(secondaryMappings[0].muscleGroupId, muscleGroupById);
-    return `${primaryLabel} · ${secondaryLabel} (s)`;
-  }
-
-  return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
+  const muscles = exerciseCountedMuscles(exercise);
+  const lines = (['primary', 'secondary'] as const).map((role) => {
+    const names = muscles
+      .filter((muscle) => muscle.role === role)
+      .map((muscle) => getMuscleDisplayName(muscle.muscleGroupId, muscleGroupById));
+    return names.length ? `${role === 'primary' ? 'Primary' : 'Secondary'}: ${names.join(' · ')}` : '';
+  });
+  return lines.filter(Boolean).join('\n') || 'No muscle links';
 };
 
 export { formatShortDate } from '@/src/utils/local-time';

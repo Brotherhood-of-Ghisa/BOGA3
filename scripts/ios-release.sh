@@ -75,6 +75,7 @@ check_migrations() {
   for file in supabase/migrations/*.sql; do
     version="${file##*/}"; version="${version%%_*}"
     [[ "$version" =~ ^[0-9]{14}$ ]] || fail "invalid migration filename: $file"
+    [[ "$versions" != *"('$version')"* ]] || fail "duplicate migration version $version: $file"
     versions+="${versions:+,}('$version')"
   done
   # Refuse remote-only history before writing; require exact history afterwards.

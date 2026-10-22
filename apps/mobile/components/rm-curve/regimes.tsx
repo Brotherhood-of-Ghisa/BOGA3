@@ -2,21 +2,23 @@ import { Text, View } from 'react-native';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { RmCurveModel } from '@/src/rm-curve/model';
-import type { RegimeAssessment } from '@/src/strength-regimes/assessment';
+import type { RegimeAssessment, UncertaintyMethod } from '@/src/strength-regimes/assessment';
+import { FIXED_REGIME_UNCERTAINTY } from '@/src/strength-regimes/fit';
 import type { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { formatShortDate } from '@/src/utils/local-time';
 import { RmCurveChart, periodColour } from './chart';
 import { curveStyles as styles } from './styles';
 
-/** Fitted amplitudes only. Unsupported histories keep a plain exploratory state and no calibrated shading. */
-export function RmRegimes({ model, result, selectedId, dateFormat, onPick }: {
+/** Fitted amplitudes and observation-error scales; unsupported histories stay exploratory. */
+export function RmRegimes({ model, result, method, selectedId, dateFormat, onPick }: {
   model: RmCurveModel; result: ReturnType<typeof useRegimeAssessment>; selectedId: string | null;
-  dateFormat: ExerciseDateFormat; onPick: (ids: string[]) => void;
+  method: UncertaintyMethod; dateFormat: ExerciseDateFormat; onPick: (ids: string[]) => void;
 }) {
   const assessment = result?.data;
   const factor = model.definition.loadInputMode === 'per_side_load' ? 2 : 1;
   return <>
     <RmCurveChart model={model} selectedId={selectedId} onPick={onPick}
+      uncertainty={method === 'fixed' ? FIXED_REGIME_UNCERTAINTY : assessment?.uncertainty ?? null}
       curves={assessment?.curves ?? []} boundary={assessment?.boundary ?? null} />
     <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={styles.body}>
       {result === null ? 'Fitting curves' : result.limited ? 'Choose a shorter range' : result.error ? 'Fit unavailable' : assessment?.message}

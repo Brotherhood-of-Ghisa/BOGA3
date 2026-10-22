@@ -84,10 +84,11 @@ regardless of the private calculation preference. Readings are private,
 sync offline through the normal owner-scoped domain, and never live on a session.
 There is no session prompt, card, entry link, override, correction or automatic
 dialog. Adding, editing, deleting, restoring, importing or pulling a reading
-refreshes every affected personal projection and every enabled positive-
-contribution group projection without rewriting sessions or sets. Off/zero
-group projections do not read or invalidate on private readings. Editing a
-session start resolves context again where the active policy requires it.
+refreshes every affected personal projection without rewriting sessions or
+sets. A group projection binds a set's reading context when it is first scored
+and never refreshes on a reading change ([competition contract](group-competition-contract.md)
+§3). Editing a session start resolves context again where the active policy
+requires it.
 
 Personal screens do not expose a missing-reading warning: the personal policy's
 zero fallback keeps Weight, 1RM and Volume available. Group readers may omit a
@@ -198,8 +199,9 @@ selected private reading or an explicit `missing` sentinel; off/zero digests do
 not query or include reading facts. The digest never crosses the group boundary.
 Scoring fingerprints fence stale results, separately from immutable observed-set
 and private-reading pins. Rule-only changes preserve an unchanged performance
-witness. Source-mode and applicable reading corrections follow
-[[groups.certification]] and the competition contract's lifecycle.
+witness. Source-mode corrections follow [[groups.certification]] and the
+competition contract's lifecycle; a reading change ends no witness, because
+the set's bound context does not change.
 Certification RPCs identify the
 record/revision and re-read dependencies server-side; the client never supplies
 or receives private reading facts.
@@ -229,8 +231,8 @@ source mode before converting it to target mode, and keep legacy aggregate Volum
 target-unconverted. Protocol-4 vectors keep ordinary Volume in total kg·reps, convert only ordinary
 1RM to target units, and normalize physical total load;
 both mode changes rebuild coherently. Privacy vectors prove off/zero group
-evaluation performs no reading lookup or reading-change invalidation, while a
-positive missing dependency is rebuilt when its first reading arrives.
+evaluation performs no reading lookup; backend vectors prove no reading change
+moves a bound group score or witness, and a set edit binds again.
 Migration tests use populated old schemas and prove retained identities, clocks,
 history, readings and contributions plus removed columns. Sync/backend tests cover
 preference/contribution convergence, reinstall restore, protocol cutoff, coherent

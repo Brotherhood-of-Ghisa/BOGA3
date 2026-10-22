@@ -218,16 +218,16 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('opens an exercise on the gym its link names, and the gym picker changes the days counted', async () => {
+  it.each(['exercise', 'muscle'] as const)('opens %s history on the linked gym, and the picker changes the days counted', async kind => {
     await loadMaestroFixture('exercise-block-history');
     const noGymSession = 'maestro_exercise_block_history_squat_2';
     localDataClient().prepare('UPDATE sessions SET gym_id = NULL WHERE id = ?').run(noGymSession);
     // The fixture places that session four days before it was loaded.
     const noGymDay = localDateKey(new Date(Date.now() - 4 * DAY_MS));
     act(() => updatePreferences({ heatmapView: 'daily' }));
-    await openHistory({ exerciseDefinitionId: SQUAT, gymId: 'no-gym' });
-    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
-    const trainingDays = () => renderedDailySample().filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
+    await openHistory({ ...(kind === 'exercise' ? { exerciseDefinitionId: SQUAT } : { muscleGroupId: 'quads' }), gymId: 'no-gym' });
+    await waitForGone(() => screen.queryByTestId(`stats-${kind}-history-loading`));
+    const trainingDays = () => renderedDailySample(kind).filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
     expect(trainingDays()).toEqual([noGymDay]);
     expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('No gym');
 
@@ -368,9 +368,9 @@ describe('The history page over real data', () => {
   it('opens a muscle card\'s exercise history on the metric shown, and its session from the card', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));
-    await openHistory({ muscleGroupId: 'quads' });
+    await openHistory({ muscleGroupId: 'quads', gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId });
 
-    const squat = { exerciseDefinitionId: SQUAT };
+    const squat = { exerciseDefinitionId: SQUAT, gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId };
     const buttons = await screen.findAllByLabelText(/^Open .*Squat.* progress$/);
     fireEvent.press(buttons[0]);
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'totalVolume'));

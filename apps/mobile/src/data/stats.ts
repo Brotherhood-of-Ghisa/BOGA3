@@ -5,6 +5,7 @@ import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { selectDatedInProgressSession } from './in-progress-session';
+import { exerciseHistoryGymOptions } from './exercise-analytics';
 import {
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
@@ -25,6 +26,7 @@ import {
   exerciseDefinitions,
   exerciseMuscleMappings,
   exerciseSets,
+  gyms,
   muscleGroups,
   sessionExercises,
   sessions,
@@ -90,6 +92,7 @@ export type StatsStore = {
 export type ComputeStatsSummaryOptions = ({ periodDays: StatsPeriodDays; periodWeeks?: never }
   | { periodWeeks: number; periodDays?: never }) & {
   now?: Date;
+  gymId?: string | null;
 };
 
 export type ComputeSelectedMuscleDailyEffortOptions =
@@ -98,6 +101,7 @@ export type ComputeSelectedMuscleDailyEffortOptions =
     end: Date;
     /** The read's clock: given, the workout in progress counts (§2). */
     now?: Date;
+    gymId?: string | null;
   };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -153,6 +157,9 @@ const comparisonPeriods = (options: ComputeStatsSummaryOptions) => {
 const inputInPeriod = (input: StatsAggregationInput, period: StatsPeriodBounds): StatsAggregationInput => ({
   ...input, sessions: input.sessions.filter(session => session.completedAt >= period.start && session.completedAt < period.end),
 });
+
+const inputInGym = (input: StatsAggregationInput, gymId: string | null | undefined): StatsAggregationInput =>
+  gymId === undefined ? input : { ...input, sessions: input.sessions.filter(session => (session.gymId ?? null) === gymId) };
 
 type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null };
 
@@ -253,8 +260,11 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           id: sessions.id,
           completedAt: sessions.completedAt,
           startedAt: sessions.startedAt,
+          gymId: sessions.gymId,
+          gymName: gyms.name,
         })
         .from(sessions)
+        .leftJoin(gyms, eq(gyms.id, sessions.gymId))
         .where(
           and(
             eq(sessions.status, 'completed'),
@@ -410,17 +420,17 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     ]);
 
     return {
-      current: { period: currentPeriod, totals: aggregateStats(currentInput) },
-      previous: { period: previousPeriod, totals: aggregateStats(previousInput) },
+      current: { period: currentPeriod, totals: aggregateStats(inputInGym(currentInput, options.gymId)) },
+      previous: { period: previousPeriod, totals: aggregateStats(inputInGym(previousInput, options.gymId)) },
     };
   },
   async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
     const periods = comparisonPeriods(options);
     // One awaited read, then synchronous derivation: edits, mappings, dated
     // weight context and the active durable effort policy cannot split periods.
-    const input = await store.loadAggregationInput({
+    const input = inputInGym(await store.loadAggregationInput({
       start: periods.previous.start, end: periods.current.end, now: periods.now,
-    });
+    }), options.gymId);
     return {
       current: { period: periods.current, totals: aggregateStats(inputInPeriod(input, periods.current)) },
       previous: { period: periods.previous, totals: aggregateStats(inputInPeriod(input, periods.previous)) },
@@ -438,7 +448,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       end: options.end,
       now: options.now,
     });
-    return aggregateSelectedMuscleDailyEffort(input, options);
+    return aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);
   },
   async computeSelectedMuscleWeeklyEffort(
     options: ComputeSelectedMuscleDailyEffortOptions
@@ -451,17 +461,20 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       end: options.end,
       now: options.now,
     });
-    const daily = aggregateSelectedMuscleDailyEffort(input, options);
+    const daily = aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);
     return aggregateSelectedMuscleWeeklyEffort(daily);
   },
   async computeSelectedMuscleHistoryEffort(options: ComputeSelectedMuscleDailyEffortOptions) {
     ensureDate(options.start, 'start');
     ensureDate(options.end, 'end');
     const input = await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now });
-    const effort = aggregateSelectedMuscleDailyEffort(input, options);
+    const allEffort = aggregateSelectedMuscleDailyEffort(input, options);
+    const contributingSessions = new Set(allEffort.flatMap(day => day.contributions.map(row => row.sessionId)));
+    const effort = options.gymId === undefined ? allEffort : aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);
     return {
       daily: aggregateSelectedMuscleDailyEffortMetrics(effort),
       weekly: aggregateSelectedMuscleWeeklyEffort(effort),
+      gyms: exerciseHistoryGymOptions(input.sessions.filter(session => contributingSessions.has(session.id))),
     };
   },
   async computeSelectedMuscleDailyEffortMetrics(
@@ -475,7 +488,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       end: options.end,
       now: options.now,
     });
-    const daily = aggregateSelectedMuscleDailyEffort(input, options);
+    const daily = aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);
     return aggregateSelectedMuscleDailyEffortMetrics(daily);
   },
 });

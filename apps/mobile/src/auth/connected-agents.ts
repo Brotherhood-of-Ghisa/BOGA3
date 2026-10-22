@@ -8,6 +8,7 @@ export type ConnectedAgent = {
   lastAccessAt: string | null;
   name: string;
   planAccessEnabled: boolean | 'unavailable';
+  planEditEnabled: boolean | 'unavailable';
   scopes: string[];
 };
 
@@ -19,7 +20,8 @@ type AgentAuditRow = {
 type PlanPermissionRow = {
   client_id: string;
   granted_at: string;
-  plan_access_enabled: boolean;
+  plan_access_enabled?: boolean;
+  plan_edit_enabled?: boolean;
 };
 
 /**
@@ -30,8 +32,9 @@ type PlanPermissionRow = {
 const grantMatchesPermission = (
   permission: PlanPermissionRow | undefined,
   grantedAt: string,
+  flag: 'plan_access_enabled' | 'plan_edit_enabled' = 'plan_access_enabled',
 ): boolean => {
-  if (!permission || permission.plan_access_enabled !== true) return false;
+  if (!permission || permission[flag] !== true) return false;
   const stored = Date.parse(permission.granted_at);
   const live = Date.parse(grantedAt);
   return Number.isFinite(stored) && Number.isFinite(live) && stored === live;
@@ -46,7 +49,8 @@ const normalizeGrant = (
   grantedAt: grant.granted_at,
   lastAccessAt: lastAccessByClient.get(grant.client.id) ?? null,
   name: grant.client.name?.trim() || 'Connected agent',
-  planAccessEnabled: grantMatchesPermission(permissionByClient.get(grant.client.id), grant.granted_at),
+  planAccessEnabled: grantMatchesPermission(permissionByClient.get(grant.client.id), grant.granted_at, 'plan_access_enabled'),
+  planEditEnabled: grantMatchesPermission(permissionByClient.get(grant.client.id), grant.granted_at, 'plan_edit_enabled'),
   scopes: grant.scopes.filter((scope) => typeof scope === 'string'),
 });
 
@@ -69,7 +73,7 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
       .returns<AgentAuditRow[]>(),
     client
       .from('agent_plan_permissions')
-      .select('client_id,granted_at,plan_access_enabled')
+      .select('client_id,granted_at,plan_access_enabled,plan_edit_enabled')
       .in('client_id', clientIds)
       .returns<PlanPermissionRow[]>(),
   ]);
@@ -101,7 +105,11 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
     .map((grant) => {
       const normalized = normalizeGrant(grant, lastAccessByClient, permissionByClient);
       if (permissionsUnavailable) {
-        return { ...normalized, planAccessEnabled: 'unavailable' as const };
+        return {
+          ...normalized,
+          planAccessEnabled: 'unavailable' as const,
+          planEditEnabled: 'unavailable' as const,
+        };
       }
       return normalized;
     })
@@ -164,3 +172,56 @@ export const setAgentPlanPermission = async (
     throw new Error(error.message || 'Unable to update access for this coach right now.');
   }
 };
+
+/**
+ * Enables or disables plan editing for one connected client. The row is bound
+ * to the client's current grant, so re-authorizing the same client yields a new
+ * grant timestamp and starts disabled again.
+ */
+export async function setAgentPlanEditEnabled(
+  clientId: string,
+  enabled: boolean,
+  grantedAt: string,
+): Promise<void>;
+export async function setAgentPlanEditEnabled(
+  clientId: string,
+  grantedAt: string,
+  enabled: boolean,
+): Promise<void>;
+export async function setAgentPlanEditEnabled(
+  clientId: string,
+  arg2: boolean | string,
+  arg3: boolean | string,
+): Promise<void> {
+  const enabled = typeof arg2 === 'boolean' ? arg2 : Boolean(arg3);
+  const grantedAt = typeof arg2 === 'string' ? arg2 : String(arg3);
+  const normalizedClientId = clientId.trim();
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(normalizedClientId)) {
+    throw new Error('Connected agent identifier is invalid.');
+  }
+  if (!Number.isFinite(Date.parse(grantedAt))) {
+    throw new Error('This connection has changed. Reload the list and try again.');
+  }
+
+  const client = getRequiredSupabaseMobileClient();
+  const { data: userData, error: userError } = await client.auth.getUser();
+  const ownerId = userData?.user?.id;
+  if (userError || !ownerId) {
+    throw new Error('Sign in again to change access for this coach.');
+  }
+
+  const { error } = await client
+    .from('agent_plan_permissions')
+    .upsert(
+      {
+        owner_user_id: ownerId,
+        client_id: normalizedClientId,
+        plan_edit_enabled: enabled,
+        granted_at: grantedAt,
+      },
+      { onConflict: 'owner_user_id,client_id' },
+    );
+  if (error) {
+    throw new Error(error.message || 'Unable to update access for this coach right now.');
+  }
+}

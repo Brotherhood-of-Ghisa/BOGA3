@@ -23,6 +23,41 @@ describe('worker after an admitted start has already completed', () => {
   beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(completedAt + 3600000); jest.clearAllMocks(); });
   afterEach(() => { jest.useRealTimers(); });
 
+  test('an idle invocation only checks due work and resumes sending when work becomes due', async () => {
+    const calls: string[] = [];
+    let due = false;
+    const claims = [[job(1)], []];
+    const rpc: Rpc = async <T>(name: string): Promise<T> => {
+      calls.push(name);
+      if (name === 'notification_work_pending') return due as T;
+      if (name === 'notification_workout_prepare' || name === 'notification_receipt_claim') return { jobs: [] } as T;
+      if (name === 'notification_claim') return { jobs: claims.shift() ?? [], disabled: false } as T;
+      if (name === 'notification_begin_send') return prepared(1, 'start') as T;
+      return true as T;
+    };
+    const response = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ claimed: 0, receipts: 0, outcomes: {}, idle: true });
+    expect(calls).toEqual(['notification_work_pending']);
+    expect(sendPush).not.toHaveBeenCalled();
+    due = true;
+    const active = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+    expect(await active.json()).toMatchObject({ claimed: 1, outcomes: { ticket: 1 } });
+    expect(calls.filter(name => name === 'notification_workout_prepare')).toHaveLength(1);
+    expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  test('a due-work check failure remains retryable without attempting a provider handoff', async () => {
+    const rpc: Rpc = jest.fn(async () => { throw new Error('database unavailable'); });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const response = await handleNotificationRequest(request(), { serviceKeys: ['service-key'], rpc });
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: 'INTERNAL' });
+      expect(sendPush).not.toHaveBeenCalled();
+    } finally { error.mockRestore(); }
+  });
+
   test('a completion-first claim defers, then both events retain their own original provider deadline', async () => {
     const claims = [[job(2), job(1)], [], [job(2)], []];
     let completionAttempts = 0;

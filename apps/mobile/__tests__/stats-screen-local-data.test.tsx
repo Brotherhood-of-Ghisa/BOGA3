@@ -21,7 +21,7 @@ import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as mockReact from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { uiSpace, uiRoles } from '@/components/ui';
+import { uiGeometry, uiSpace, uiRoles } from '@/components/ui';
 import { withAlpha } from '@/components/ui/lch';
 import { HEAT_RAMP } from '@/components/heatmaps/heatmap-metric';
 
@@ -206,7 +206,67 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('uses the shared layout for exercise families, keeps history detail, and restores it after 1RM List', async () => {
+  it('matches Group by and Gym compact geometry and label typography while retaining the switch state', async () => {
+    await renderSeededStats();
+    const group = screen.getByTestId('stats-group-toggle');
+    const gym = screen.getByTestId('stats-gym');
+    const geometry = ['minHeight', 'borderRadius', 'paddingHorizontal', 'paddingVertical'] as const;
+    const groupStyle = StyleSheet.flatten(group.props.style);
+    const gymStyle = StyleSheet.flatten(gym.props.style);
+    for (const field of geometry) expect(groupStyle[field]).toBe(gymStyle[field]);
+    expect(groupStyle.minHeight).toBe(uiGeometry.compactControlHeight);
+    expect(group.props.hitSlop).toBe(gym.props.hitSlop);
+    const groupLabel = StyleSheet.flatten(within(group).getByText('Group by').props.style);
+    const gymLabel = StyleSheet.flatten(within(gym).getByText('All gyms').props.style);
+    for (const field of ['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform'] as const) {
+      expect(groupLabel[field]).toBe(gymLabel[field]);
+    }
+    expect(group).toHaveProp('accessibilityState', { checked: true });
+    fireEvent.press(group);
+    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.queryAllByTestId(/^stats-exercise-family-header-/)).toHaveLength(0);
+  });
+
+  it('groups exercises by catalogue primary family, sorts within it and retains each breakdown’s controls', async () => {
+    await renderSeededStats();
+    const familyHeaders = () => screen.queryAllByTestId(/^stats-exercise-family-header-/).map(row => row.props.children);
+    expect(familyHeaders()).toEqual(['Chest', 'Legs', 'Other']);
+    expect(exerciseOrder().indexOf(BENCH)).toBeLessThan(exerciseOrder().indexOf(SQUAT));
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-previous'));
+    expect(familyHeaders()).toEqual(['Chest', 'Legs', 'Other']);
+    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    expect(familyHeaders()).toEqual([]);
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+    expect(exerciseOrder()).toEqual([SQUAT]);
+
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.getByTestId('stats-muscle-search-input')).toHaveProp('value', '');
+    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent.changeText(screen.getByTestId('stats-muscle-search-input'), ' LEGS ');
+    expect(screen.getAllByTestId(/^stats-family-header-/)).toHaveLength(2);
+    expect(screen.getByTestId('stats-family-header-legs')).toHaveTextContent('Legs');
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
+    const order = () => screen.queryAllByTestId(/^stats-muscle-block-/).map(row => row.props.testID);
+    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    expect(screen.queryAllByTestId(/^stats-family-header-/)).toHaveLength(0);
+    const values = screen.getAllByTestId(/^stats-muscle-row-.*-now$/).map(row => Number(row.props.children));
+    expect(values).toEqual([...values].sort((left, right) => left - right));
+    fireEvent.changeText(screen.getByTestId('stats-muscle-search-input'), 'nothing matches');
+    expect(screen.getByTestId('stats-muscle-list-empty')).toBeTruthy();
+    expect(order()).toEqual([]);
+    fireEvent.press(screen.getByTestId('stats-muscle-search-input-clear'));
+    expect(order().length).toBeGreaterThan(0);
+
+    chooseFilter('view-mode', 'Exercise');
+    expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
+    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.getByTestId('stats-exercise-sort-previous')).toHaveProp('accessibilityState', { selected: true });
+    chooseFilter('view-mode', 'Muscle');
+    expect(screen.getByTestId('stats-muscle-sort-now').props.accessibilityLabel).toContain('low to high');
+    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+  });
+
+  it('uses the shared layout for exercise families, keeps history detail, and keeps it in 1RM Map', async () => {
     await renderSeededStats();
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     await showHeatmap();
@@ -215,6 +275,7 @@ describe('Stats over real data', () => {
     const family = screen.getByTestId('stats-exercise-family-Legs');
     fireEvent.press(family);
     expect(family).toHaveProp('accessibilityState', { selected: true, expanded: true });
+    expect(screen.getByTestId('stats-exercise-selection-Legs')).toHaveStyle({ borderColor: uiRoles.ink });
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
     const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
@@ -232,9 +293,10 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     chooseFilter('metric', 'Volume');
     chooseFilter('metric', '1RM');
-    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/\d+\.\d/);
     chooseFilter('metric', 'Sets');
     await screen.findByTestId('stats-exercise-map-detail');
     expect(screen.getByTestId('stats-exercise-family-Legs')).toHaveProp('accessibilityState', { selected: true, expanded: true });
@@ -312,6 +374,10 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^1450$/);
     fireEvent.press(screen.getByTestId(`stats-exercise-row-${BENCH}`));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${BENCH}&metric=volume&gymId=${gym}`);
+    chooseFilter('metric', '1RM');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    expect(screen.queryByTestId(`stats-exercise-row-${BENCH}`)).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-secondary-summary')).toBeNull();
   });
 
   it('uses independent working/Volume eligibility for Secondary and keeps a zero Volume contribution readable', async () => {
@@ -385,7 +451,10 @@ describe('Stats over real data', () => {
     await screen.findByTestId('stats-loading-state');
     await act(async () => pending.resolve(await real()));
     await screen.findByTestId('stats-exercise-map');
-    expect(screen.getByTestId('stats-exercise-map-empty')).toHaveTextContent('No exercises with working sets in either period.');
+    expect(screen.queryByTestId('stats-exercise-map-empty')).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}-now`, { includeHiddenElements: true })).toHaveTextContent(/^0$/);
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^0$/);
   });
 
   it('does not fabricate an empty map on an exercise-history read failure and retries the source', async () => {
@@ -522,12 +591,26 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId('stats-gym'));
     fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
-    // Both muscle layouts keep the whole exercise despite the Exercise gym filter.
+    // The Muscle table shares the gym; maps retain all-gym target figures.
     chooseFilter('view-mode', 'Muscle');
-    expect(screen.queryByTestId('stats-gym')).toBeNull();
-    expect(await screen.findByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/);
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
+    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=sets&gymId=${gym}`);
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/));
+    fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=sets&gymId=no-gym');
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
     await showHeatmap();
-    expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/);
+    expect(screen.queryByTestId('stats-gym')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
     fireEvent.press(screen.getByTestId('stats-muscle-tile-quads'));
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
@@ -537,6 +620,28 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
     expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+  });
+
+  it('hides the previous gym’s Muscle snapshot and ignores its late read', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare("UPDATE sessions SET gym_id = NULL WHERE id = 'maestro_exercise_block_history_squat_2'").run();
+    await renderStats();
+    chooseFilter('view-mode', 'Muscle');
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
+    const real = statsRepository.computeProgressComparisons;
+    const old = await real({ periodWeeks: 1 });
+    const pending = deferred<typeof old>();
+    const read = jest.spyOn(statsRepository, 'computeProgressComparisons').mockImplementation(options =>
+      options.gymId === EXERCISE_BLOCK_HISTORY_FIXTURE.gymId ? pending.promise : real(options));
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId(`stats-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    await waitFor(() => expect(read).toHaveBeenCalledWith(expect.objectContaining({ gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId })));
+    expect(screen.queryByTestId('stats-muscle-row-quads-now')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-gym'));
+    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/));
+    await act(async () => pending.resolve(old));
+    expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/);
   });
 
   it('shows the empty state on an empty database', async () => {
@@ -588,6 +693,7 @@ describe('Stats over real data', () => {
     chooseFilter('period', '4 weeks');
     await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`);
 
+    fireEvent.press(screen.getByTestId('stats-group-toggle'));
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
 
     // Carry (0.2 days ago), Squat (0.25), Bench (2), Pulldown (20).

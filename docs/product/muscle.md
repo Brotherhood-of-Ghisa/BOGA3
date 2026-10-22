@@ -58,8 +58,8 @@ Code: `apps/mobile/components/stats/muscle-map.tsx`.
 
 Both Progress breakdowns use Settings → Progress → Progress view (`List` /
 `Map` / `3D`, default `List`), remembered per account on this device. Exercise
-Sets/Volume and Muscle share it; Exercise 1RM uses List without changing the
-saved choice. 3D shades each muscle on the 5-step `viz0..viz4` ramp relative to
+and Muscle share it; Exercise 1RM keeps Map, but uses List for 3D.
+3D shades each muscle on the 5-step `viz0..viz4` ramp relative to
 the period's top muscle (`0`/unavailable → `viz0`; Exercise sums filtered
 exercises by [[muscle.set-count]]), and tapping a muscle scopes the exercise
 list below. Progress has no layout selector; changing layout keeps filters,
@@ -85,15 +85,15 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 
 ### muscle.exercise-map-area · presentation · accepted
 
-Progress Exercise's heatmap keeps the fixed family frames ([[muscle.map-area]]).
-Within each family, named primary exercises get full current-period Volume or
-working-set area, once per exercise. Each primary family repeats that value.
-One Secondary aggregate sums half the full exercise values for exercises with
-secondary mappings and no primary anywhere in that family, once per exercise
-regardless of mapped muscle count. Both use the same exercise units and
-independent metric eligibility ([[set.eligibility]]). Zero/unavailable values
-have no area; detail rows retain them. Secondary contributor rows show weighted
-figures but open full exercise history. Approved 2026-10-18.
+Exercise Map keeps fixed family frames ([[muscle.map-area]]).
+Primary tiles always use full current-period exercise Volume, once per primary
+family. One Secondary aggregate uses half the full Volume of secondary-only
+exercises, once per exercise regardless of mapped muscle count.
+Switching metric preserves geometry and membership; figures follow the selected
+metric's eligibility ([[set.eligibility]]). 1RM hides Secondary tiles and their
+contribution section, reserving their space without expanding primary tiles.
+Individual 1RM estimates remain unweighted. Zero/unavailable Volume has no area;
+detail rows retain those exercises. Approved 2026-10-22 (#807 discussion).
 
 Why: exercise size shows its work while secondary work remains visible without duplicating primary work within a family.
 Code: `apps/mobile/components/stats/exercise-map-data.ts`.

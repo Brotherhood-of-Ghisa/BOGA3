@@ -119,26 +119,21 @@ Score publication binds the trusted graph generation; certify locks the source
 row and rejects a score from an older generation. These markers never enter
 public payloads or alter arithmetic, record fingerprints or original audits.
 
-The executing agent retained the existing reading-correction boundary under
-standing delegated authority. Compare the selected valid reading's ID, exact
-instant and kg, not a rounded score or bookkeeping clock. An authoritative
-change ends each already-bound dependent projection (`voided`), recomputes All
-when eligible and removes Certified eligibility. Keep original audit and append
-terminal metadata. Restore never reopens an ended projection; a new witness is
-needed. A witness is the set's ([[groups.certification]]): ending any of its
-projections ends it.
+A set's reading context is bound when an enabled positive comparison first
+scores it: the valid reading selected as of its session start, or none. The
+binding stands while the set's raw values and session start are unchanged:
+adding, editing, deleting or restoring a reading queues no evaluation and never
+rescores a published set, moves a record or ends a witness. An edit of the set
+or its session start binds again at its next score; a set bound with no
+applicable reading has no normalized score until then. Off/zero comparisons
+never resolve or bind a reading. A witness is the set's
+([[groups.certification]]): ending any of its projections ends it.
 
-Value/date edits, delete/invalid input with fallback or missing context, winning
-backdated/restore/equal-time ID selection changes all follow this rule. Losing,
-later or malformed candidates and no-ops with the same selected tuple preserve
-exact audits. Coalesced updates leaving the authoritative tuple unchanged are
-harmless; an already observed correction remains terminal after later restoration.
-Off/zero does not query/enqueue readings; retained private pins are checked on
-next dependent activation. A never-bound ordinary certificate made ineligible
-solely by rules stays active; first valid context binds it and restores its entry.
-Public state/copy is generic “Certification ended”/“Score unavailable”, never a
-private correction reason/value/date. Raw set corrections/deletions and manual
-withdrawal/cancellation keep their existing terminal lifecycle.
+A certificate made ineligible solely by rules (no reading bound to its set)
+stays active and counts again if the rules return. Public state/copy
+is generic “Certification ended”/“Score unavailable”, never a private reason.
+Raw set corrections/deletions and manual withdrawal/cancellation keep their
+existing terminal lifecycle.
 
 Protocol-3 witnesses stay history. An active 1RM witness kept its public ID as
 a 1RM projection with its original kg audit. A raw Weight witness supplies a

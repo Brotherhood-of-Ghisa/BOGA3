@@ -52,6 +52,10 @@ Real-history error mechanisms and independence cannot be certified from their
 observed coordinates. Runtime assessments therefore use the approved exploratory
 path: no calibrated interval, evidence emphasis or adequacy claim. Raw likelihood
 evidence is retained internally; curves stay readable at a uniform emphasis.
+Observation halos use the current fit's nuisance values under
+[[1rm.curve-uncertainty]]; their faded shape is a scale glyph, not a probability
+contour. The marker footprint is padding. Hide Rich halos until a usable fit
+is available; an unidentified RIR probability cannot size positive-RIR halos.
 The simulated null references and uncertainty radii are conditional on their
 validated designs; sample size or joint fitting alone cannot transfer them.
 A future matching-context assessment must explicitly establish that scope before

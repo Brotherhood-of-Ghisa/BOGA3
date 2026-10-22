@@ -5,7 +5,7 @@ import { curveGeometry } from '@/components/rm-curve/geometry';
 import { buildRmCurveModel } from '@/src/rm-curve/model';
 import type { RmCurveRow } from '@/src/data/rm-curve';
 import { assessRegimes, assessSingleCurve } from '@/src/strength-regimes/assessment';
-import { fitStrengthRegimes, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
+import { fitStrengthRegimes, fitStrengthTrajectory, iterateStrengthRegimes, iterateStrengthTrajectory, prepareRegimePoints, FitWorkLimitError } from '@/src/strength-regimes/fit';
 import { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { generateRegimeHistory } from './helpers/regime-reliability-research';
 import { waveGraph } from './helpers/rm-curve-history';
@@ -98,6 +98,7 @@ it.each(['fixed', 'joint'] as const)('preserves the reviewed %s fitter results a
     expect(assessment.boundary).toBe(expected.candidate!.rightTime);
     expect(assessment.curves.map(c => c.totalRm)).toEqual(expected.candidate!.controls);
     expect(assessment.message).toBe('Exploratory fit');
+    expect(assessment.uncertainty).toEqual({ correctProbability: expected.candidate!.correctProbability, loadSd: expected.candidate!.loadSd });
   }
 });
 
@@ -105,6 +106,8 @@ it('does not draw unsupported results, historical fallbacks or probability claim
   const m = model();
   const fit = fitStrengthRegimes(generateRegimeHistory('step10', 37201).sessions, { method: 'fixed' });
   expect(assessRegimes(m, { ...fit, status: 'unresolved' }).curves).toEqual([]);
+  expect(assessRegimes(m, { ...fit, status: 'unresolved' }).uncertainty).toBeNull();
+  expect(assessRegimes(m, { ...fit, status: 'insufficient' }).uncertainty).toBeNull();
   expect(assessRegimes(m, { ...fit, status: 'insufficient' }).message).toBe('More sessions needed');
   expect(assessSingleCurve({ ...m, inferenceSessions: [] }, 'fixed').curves).toEqual([]);
   const single = assessSingleCurve(m, 'fixed');
@@ -112,6 +115,15 @@ it('does not draw unsupported results, historical fallbacks or probability claim
   const plot = curveGeometry(m, 320, single.curves);
   expect(plot.lines).toHaveLength(1);
   expect(plot.lines[0].totalRm).not.toBe(m.reference.totalRm);
+});
+
+it.each(['fixed', 'joint'] as const)('exposes the same %s observation errors as the single-curve fit', method => {
+  const m = model();
+  const expected = fitStrengthTrajectory(prepareRegimePoints(m.inferenceSessions), 'constant', { method });
+  const assessment = assessSingleCurve(m, method);
+  expect(assessment.curves).toHaveLength(1);
+  expect(assessment.uncertainty).toEqual({ correctProbability: expected.correctProbability, loadSd: expected.loadSd });
+  expect(assessSingleCurve({ ...m, inferenceSessions: [] }, method).uncertainty).toBeNull();
 });
 
 it('cancels queued fits and never exposes another snapshot or method result', () => {

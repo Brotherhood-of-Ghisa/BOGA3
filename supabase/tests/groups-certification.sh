@@ -860,6 +860,53 @@ drain "rules"
 expect_centry R volume "97@r3" "a rules requeue keeps the Certified entry"
 pass "unlink/relink (reason link) and a rules requeue keep the certification"
 
+# Once unlinked, only the active certification ties r4's exercise to GX: a
+# correction must still reach GX and end it. r4's session is then deleted, so
+# the sections below see r3 as before.
+next_session_at
+R4_AT="${SESSION_AT}"
+sess "${RIVAL_TOKEN}" "${T}-r4s" completed "${DR}" "r4:99:1"
+drain "r4"
+certify_set "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r4 R4
+drain "certify r4"
+link "${RIVAL_TOKEN}" "${DR}" deleted
+drain "unlink before the correction"
+set_edit "${RIVAL_TOKEN}" "${T}-r4s" r4 0 98 1
+drain "r4 corrected while unlinked"
+check_args "the correction's session job reaches GX through the certification" --arg s "${T}-r4s" --arg x "${GX}" \
+  '[.jobs[] | select(.session_id == $s) | [.targets[].group_exercise_id]] == [[$x]]'
+[[ "$(certs_col R4 end_reason)" == "voided,voided" ]] || fail "a correction to a certified, unlinked set voids it"
+link "${RIVAL_TOKEN}" "${DR}"
+drain "relink after the correction"
+session_row "${RIVAL_TOKEN}" "${T}-r4s" "${R4_AT}" completed "$(now_ms)"
+drain "r4s tombstone"
+expect_centry R volume "97@r3" "r3 is R's certified entry again"
+pass "a correction reaches an unlinked comparison through its active certification"
+
+# A completed session's record card survives an unlink too; a correction must
+# still reach GX and void it.
+next_session_at
+R5_AT="${SESSION_AT}"
+sess "${RIVAL_TOKEN}" "${T}-r5s" completed "${DR}" "r5:101:1"
+drain "r5"
+expect_sql "r5 holds a record card" \
+  "select count(*) > 0 from app_public.group_events where group_exercise_id = '${GX}' and kind = 'record' and set_id = '${T}-r5';" t
+link "${RIVAL_TOKEN}" "${DR}" deleted
+drain "unlink before the r5 correction"
+set_edit "${RIVAL_TOKEN}" "${T}-r5s" r5 0 100 1
+drain "r5 corrected while unlinked"
+check_args "the correction's session job reaches GX through the record card" --arg s "${T}-r5s" --arg x "${GX}" \
+  '[.jobs[] | select(.session_id == $s) | [.targets[].group_exercise_id]] == [[$x]]'
+expect_sql "every r5 record card is voided" \
+  "select bool_and(exists (select 1 from app_public.group_events v where v.related_event_id = r.id and v.kind = 'record_voided'))
+     from app_public.group_events r where r.group_exercise_id = '${GX}' and r.kind = 'record' and r.set_id = '${T}-r5';" t
+link "${RIVAL_TOKEN}" "${DR}"
+drain "relink after the r5 correction"
+session_row "${RIVAL_TOKEN}" "${T}-r5s" "${R5_AT}" completed "$(now_ms)"
+drain "r5s tombstone"
+expect_centry R volume "97@r3" "r3 is R's certified entry after r5"
+pass "a correction reaches an unlinked comparison through its record card"
+
 # =============================================================================
 echo "[${LANE_LABEL}] frozen board: a former lifter"
 # =============================================================================
@@ -932,7 +979,7 @@ pass "a failed enqueue logs once per certification and commits; the next job rep
 echo "[${LANE_LABEL}] one witness per set: any row's end ends it; merging per-metric witnesses"
 # =============================================================================
 
-# An evaluator void (a reading correction) can end one projection; the set's
+# An evaluator void (e.g. a source-mode correction) can end one projection; the set's
 # whole witness ends with it.
 run_psql "update app_public.group_metric_certifications set ended_at = now(), end_reason = 'voided'
             where coalesce(witness_certification_id, id) = '${A4B_volume}' and metric = 'e1rm' and ended_at is null;" >/dev/null

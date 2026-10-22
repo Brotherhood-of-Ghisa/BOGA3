@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { Platform, View, type ViewInstance } from 'react-native';
 import { RmCurveChart } from '@/components/rm-curve/chart';
@@ -24,7 +24,7 @@ const scope: CurveScope = { range: 'history', gym: { gymId: 'synthetic-gym' }, r
 const props = { scope, onScope: jest.fn(), dateFormat: 'YYYY-MM-DD' as const, historyWeeks: 52, progressWeeks: 4 };
 const read = (data: Awaited<ReturnType<typeof loadRmCurve>>) => ({ status: 'ready' as const, data, retry: jest.fn() });
 beforeEach(() => { mockFixture = createInMemoryDatabase(); seedWaveHistory(mockFixture.database); });
-afterEach(() => { mockFixture.close(); jest.restoreAllMocks(); });
+afterEach(() => { mockFixture.close(); jest.restoreAllMocks(); jest.useRealTimers(); });
 
 it.each(['plateau', 'stable', 'gradual'] as const)('renders %s prefix coordinates and recency without gain styling or future points', name => {
   const graph = waveGraph(name);
@@ -100,6 +100,87 @@ it('uses viewport mouse coordinates after document scrolling instead of shifted 
   expect(pick.mock.calls[0][0]).toContain(model.observations[0].setId);
 });
 
+it('scales halo spread beyond the marker by fixed errors, keeps RIR0 horizontal spread zero and preserves picking', async () => {
+  for (const [index, rir] of [2, 0, 12].entries()) {
+    mockFixture.database.update(exerciseSets).set({ repsValue: '8', setType: `rir_${rir}` })
+      .where(eq(exerciseSets.id, `week-24:${index + 1}`)).run();
+  }
+  const model = (await loadRmCurve({ ...query, start: new Date(wave.scenarios.plateau.at(-1)!.startedAt) }))!;
+  const pick = jest.fn();
+  render(<RmCurveChart model={model} selectedId="week-24:1" onPick={pick} />);
+  // Highest equivalent count is 20; reserve the +1 assumption at the right edge.
+  const unit = (300 - 38 - 24) / 21;
+  const halo = screen.getByTestId('rm-halo-week-24:1');
+  expect(halo.props.cx).toBeCloseTo(38 + 10 * unit);
+  expect(halo.props.rx - 4).toBeCloseTo(Math.SQRT1_2 * unit);
+  const plot = curveGeometry(model, 300, []);
+  expect(halo.props.ry - 4).toBeCloseTo(2.5 * 204 / plot.maxLoad);
+  expect(screen.getByTestId('rm-halo-week-24:2').props.rx).toBe(4);
+  expect(screen.getByTestId('rm-halo-week-24:3').props.cx + unit).toBeCloseTo(276);
+  const point = screen.getByTestId('rm-point-week-24:1');
+  expect(point.props.cx).toBe(halo.props.cx); expect(point.props.cy).toBe(halo.props.cy);
+  fireEvent.press(screen.getByTestId('rm-curve-plot'), { nativeEvent: { locationX: point.props.cx, locationY: point.props.cy } });
+  expect(pick.mock.calls[0][0]).toContain('week-24:1');
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'layout', { nativeEvent: { layout: { width: 420 } } });
+  expect(screen.getByTestId('rm-halo-week-24:1').props.rx - 4).toBeCloseTo(Math.SQRT1_2 * (420 - 38 - 24) / 21);
+  expect(screen.getByTestId('rm-selection-caret')).toBeTruthy();
+  expect(screen.getByLabelText(/Halos show modelled spread, not confidence/)).toBeTruthy();
+});
+
+it.each(['total_load', 'per_side_load'] as const)('maps probability endpoints and load error to axis units for %s', loadInputMode => {
+  const model = buildRmCurveModel(waveGraph(), query);
+  model.definition.loadInputMode = loadInputMode;
+  const factor = loadInputMode === 'per_side_load' ? 2 : 1;
+  for (const [correctProbability, loadSd] of [[0, 1.5], [0.75, 3], [1, 2.5]]) {
+    const plot = curveGeometry(model, 300, [], { correctProbability, loadSd });
+    for (const [i, point] of plot.points.entries()) {
+      expect(point.halo!.rx / ((300 - 38 - 24) / plot.maxReps))
+        .toBeCloseTo(model.observations[i].rir === 0 ? 0 : Math.sqrt(1 - correctProbability));
+      expect(point.halo!.ry * plot.maxLoad / 204).toBeCloseTo(loadSd / factor);
+    }
+  }
+  const unidentified = curveGeometry(model, 300, [], { correctProbability: null, loadSd: 2 });
+  for (const [i, point] of unidentified.points.entries()) {
+    expect(point.halo !== null).toBe(model.observations[i].rir === 0);
+  }
+  expect(curveGeometry(model, 300, [], null).points.every(point => point.halo === null)).toBe(true);
+});
+
+it('switches from given errors to current Rich estimates without retaining a pending halo or losing the selected set', async () => {
+  const model = (await loadRmCurve(query))!;
+  jest.useFakeTimers();
+  render(<RmCurveContent {...props} read={read(model)} />);
+  act(() => { jest.runAllTimers(); });
+  fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
+  expect(screen.getAllByTestId(/^rm-halo-/)).toHaveLength(model.observations.length);
+  fireEvent.press(screen.getByTestId('rm-method-joint'));
+  expect(screen.queryAllByTestId(/^rm-halo-/)).toHaveLength(0);
+  expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
+  act(() => { jest.runAllTimers(); });
+  const rich = assessSingleCurve(model, 'joint');
+  expect(rich.uncertainty).not.toBeNull();
+  const plot = curveGeometry(model, 300, rich.curves, rich.uncertainty);
+  for (const point of plot.points) {
+    if (point.halo) expect(screen.getByTestId(`rm-halo-${point.id}`).props)
+      .toMatchObject({ rx: 4 + point.halo.rx, ry: 4 + point.halo.ry });
+    else expect(screen.queryByTestId(`rm-halo-${point.id}`)).toBeNull();
+  }
+  expect(screen.getByTestId('rm-curve-details')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('rm-method-fixed'));
+  expect(screen.getAllByTestId(/^rm-halo-/)).toHaveLength(model.observations.length);
+});
+
+it('keeps halos matched to the complete-session period without changing circle and diamond identity', async () => {
+  const model = (await loadRmCurve(query))!;
+  const boundary = model.observations.at(-1)!.completedAt.getTime();
+  render(<RmCurveChart model={model} selectedId={null} onPick={jest.fn()} boundary={boundary} />);
+  for (const point of model.observations.filter(point => point.rir > 0)) {
+    const newer = point.completedAt.getTime() >= boundary;
+    expect(screen.getByTestId(`rm-halo-${point.setId}`).props.fill.brushRef).toMatch(newer ? /-newer$/ : /-older$/);
+    expect(screen.getByTestId(`rm-point-${point.setId}`).props[newer ? 'd' : 'cx']).toBeDefined();
+  }
+});
+
 it('retains named gym labels on read failure and distinguishes an empty RIR filter from missing effort', async () => {
   mockFixture.database.update(exerciseSets).set({ setType: null }).where(eq(exerciseSets.id, 'week-24:1')).run();
   const model = (await loadRmCurve({ ...query, rir: 12 }))!;
@@ -166,6 +247,7 @@ it('keeps every finite zero/extreme/dense observation on the plot without spread
   const dense = { ...model, observations: Array.from({ length: 100000 }, (_, i) => ({ ...base, setId: String(i), loadKg: i ? Number.MAX_VALUE : 0, equivalentReps: Number.MAX_SAFE_INTEGER })) };
   const plot = curveGeometry(dense, 300);
   expect(plot.points).toHaveLength(100000); expect(plot.points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
+  expect(plot.points.every(p => p.halo === null || Number.isFinite(p.halo.rx) && Number.isFinite(p.halo.ry))).toBe(true);
   expect(Math.min(...plot.points.slice(0, 2).map(p => p.y)) - 12).toBeGreaterThan(1);
   expect(pointsAt(plot, -100, -100, 44)).toEqual([]);
   expect(axisLabel(Number.MAX_VALUE)).toBe('1.8e+308'); expect(axisLabel(Number.MAX_SAFE_INTEGER)).toBe('9.0e+15');

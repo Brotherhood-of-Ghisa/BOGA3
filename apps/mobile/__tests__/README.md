@@ -160,8 +160,8 @@ contribution, strict 1RM/Volume, kg total/per-side input, missing or
 invalid reading omission, performed eligibility and zero ranking exclusion.
 Ordinary single-set Volume is total load; only 1RM converts to the target (the load-factor vectors in
 `groups-link-compatibility.test.ts`) and normalized percentages use physical
-total load; mode changes rebuild. Off/zero vectors must prove no private-reading lookup or invalidation;
-positive+missing must rebuild when a first applicable reading arrives. Personal
+total load; mode changes rebuild. Off/zero vectors must prove no private-reading lookup; a
+reading change never moves a bound group score (backend). Personal
 preference/contribution must never affect group results.
 
 `groups-competition-contract.test.ts` must fail closed if any reading
@@ -192,7 +192,7 @@ anonymous/OAuth/outsider/unsupported-protocol denial.
 short-circuiting. `groups-competition-readers.test.ts` covers every exact nested
 reader shape, scope coherence, request-local capability headers, normalized kg
 rejection and server-normalized write responses.
-The backend competition fixture tests both-metric selected-reading corrections,
+The backend competition fixture tests both-metric bound reading contexts,
 exact witness audit, SQL-seeded protocol-3 history, paired-reader privacy and
 publication failure/fence behavior. Current safe UI tests cover explicit units,
 normalized details/full sessions,
