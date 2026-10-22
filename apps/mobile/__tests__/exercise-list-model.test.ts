@@ -3,6 +3,7 @@ import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   buildExerciseListModel,
   formatExerciseListStatsSummary,
+  formatExerciseMuscleSummary,
   type ExerciseListPreferences,
 } from '@/src/exercise-catalog/list-model';
 import type { IndexedExerciseCatalogExercise } from '@/src/exercise-catalog/search';
@@ -37,6 +38,31 @@ const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = 
 });
 
 describe('exercise browser model', () => {
+  it('shows every muscle by role, primaries first and duplicates at their strongest role', () => {
+    const groups = new Map([
+      ...muscleGroups.map((group) => [group.id, group] as const),
+      ['triceps', { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 20 }],
+      ['delts', { id: 'delts', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 30 }],
+    ]);
+    const exercise: IndexedExerciseCatalogExercise = { ...exercises[0], mappings: [
+      { id: 's1', muscleGroupId: 'delts', role: 'secondary', weight: 0.5 },
+      { id: 'p1', muscleGroupId: 'chest', role: 'primary', weight: 1 },
+      { id: 's2', muscleGroupId: 'triceps', role: 'secondary', weight: 0.5 },
+      { id: 's3', muscleGroupId: 'chest', role: 'secondary', weight: 0.5 },
+    ] };
+    expect(formatExerciseMuscleSummary(exercise, groups)).toBe('Primary: Chest\nSecondary: Front Delts · Triceps');
+    exercise.mappings.push({ id: 'p2', muscleGroupId: 'triceps', role: 'primary', weight: 1 });
+    expect(formatExerciseMuscleSummary(exercise, groups)).toBe('Primary: Chest · Triceps\nSecondary: Front Delts');
+  });
+
+  it('omits absent role lines and keeps unmapped or unknown muscles readable', () => {
+    const groups = new Map(muscleGroups.map((group) => [group.id, group]));
+    expect(formatExerciseMuscleSummary(exercises[0], groups)).toBe('Primary: Chest');
+    expect(formatExerciseMuscleSummary(exercises[1], groups)).toBe('Secondary: Chest');
+    expect(formatExerciseMuscleSummary(exercises[3], groups)).toBe('No muscle links');
+    expect(formatExerciseMuscleSummary(exercises[0], new Map())).toBe('Primary: chest');
+  });
+
   it('always keeps taxonomy order and the existing fallback mapping, with Other last', () => {
     const model = buildModel();
     expect(model.sections.map((section) => `${section.familyName}:${section.count}`)).toEqual([

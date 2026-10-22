@@ -98,7 +98,7 @@ access level, and `useRootRouteAccess`
 | `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one catalogue id; both, neither, blank or missing from the catalogue renders unavailable. Names come from the catalogue |
 | | `metric=volume\|sets` | Progress's choice, carried over; absent or invalid opens on Volume |
 | | `view=timeline\|daily\|weekly` | entry override only; absent/invalid uses the saved view. Selector changes still save |
-| | `gymId` | exercise scope via `src/utils/gym-scope-route.ts` ([[gym.view-filter]]); ignored for muscles |
+| | `gymId` | either subject’s scope via `src/utils/gym-scope-route.ts` ([[gym.view-filter]]) |
 | `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
@@ -153,12 +153,12 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>` | `/progress-history?exerciseDefinitionId=<id>` | the records panel's `Progress` (`progressHistoryHref`, `push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise list or map-detail row → saved view with its exercise metric and gym; all carry `metric` (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise list or map-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle's card progress button opens its catalogued exercise, metric carried |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle card opens exercise history, carrying metric/gym |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
 | `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |
-| `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | the header ⋮'s muscle rows, carrying the metric if a muscle has it (`progressHistoryHref`, `push`) |
+| `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | header ⋮ muscle rows carry gym and supported metric (`progressHistoryHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
@@ -194,7 +194,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 Progress filters stay in-route; Sessions last. [[muscle.progress-layout]]
 governs both layouts. Exercise families disclose contributions
 ([[muscle.exercise-map-area]]); their links open full history at the selected
-metric/gym. 1RM uses List; layout switches reset scroll.
+metric/gym. Exercise 1RM follows [[muscle.progress-layout]]; layout switches reset scroll.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

@@ -17,8 +17,8 @@ import {
 // The three columns both Progress breakdowns are drawn with — the period in
 // force, the one before it ([[comparison.window]]), and the change between
 // them ([[comparison.change-display]]) — and the layout that decides whether
-// they still fit beside the row's name. The Muscle table puts plain header
-// labels over them, the Exercise table its sort controls; neither owns the
+// they still fit beside the row's name. Both tables put spoken header
+// labels or shared sort controls over them; neither owns the
 // columns, and a figure means the same thing in both.
 
 /** The figure the columns show. 1RM is a metric only an exercise has. */
@@ -112,6 +112,21 @@ export const comparisonSortValues = (
   previous: metricValue(row.previous, metric),
   change: changeSortValue(row, metric),
 });
+
+export const compareOptionalNumbers = (
+  left: number | null,
+  right: number | null,
+  descending: boolean
+): number => {
+  const validLeft = left !== null && Number.isFinite(left) ? left : null;
+  const validRight = right !== null && Number.isFinite(right) ? right : null;
+  if (validLeft === null && validRight === null) return 0;
+  if (validLeft === null) return 1;
+  if (validRight === null) return -1;
+  if (validLeft === validRight) return 0;
+  if (descending) return validLeft > validRight ? -1 : 1;
+  return validLeft < validRight ? -1 : 1;
+};
 
 export type ComparisonLayout = { columns: number[]; stacked: boolean };
 

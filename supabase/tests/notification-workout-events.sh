@@ -149,34 +149,104 @@ rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${INSTALL_ID}" --arg c
   '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[ok]",p_environment:"local",
     p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
 expect_ok 'register local recipient'
+# Rollback isolates scheduling from other fixtures and prevents real pg_net dispatch.
+CUTOVER_SEED_SQL="$(sed -n '/^insert into app_public.notification_moment_queue/,/;/p' "${SUPABASE_DIR}/migrations/20261022201529_notification_moment_admission.sql")"
+run_psql "begin;
+  truncate app_public.notification_moment_queue,app_public.notification_workout_moments,
+    app_public.notification_workouts,app_public.notification_intents cascade;
+  update app_public.notification_workout_epoch set started_at=now()-interval '26 hours';
+  set local request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}';
+  insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+    values('${B_UID}','cutover-scheduling-${RUN_TAG}','active',floor(extract(epoch from now()-interval '23 hours 50 minutes')*1000),1,1,1);
+  select app_public.notification_track_workout('${B_UID}','cutover-scheduling-${RUN_TAG}');
+  update app_public.sessions set status='completed',completed_at=floor(extract(epoch from now()+interval '30 minutes')*1000)
+    where owner_user_id='${B_UID}' and id='cutover-scheduling-${RUN_TAG}';
+  delete from app_public.notification_moment_queue;
+  ${CUTOVER_SEED_SQL}
+  do \$\$ begin
+    if not exists(select 1 from app_public.notification_moment_queue where session_id='cutover-scheduling-${RUN_TAG}'
+      and available_at<=now()) then raise exception 'cutover postponed an expiring start behind a future completion'; end if;
+    perform app_public.notification_admit_moments(20);
+    if not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}'
+      and session_id='cutover-scheduling-${RUN_TAG}' and kind='start'
+      and expires_at>now() and expires_at<now()+interval '11 minutes') then
+      raise exception 'cutover lost the captured start or renewed its deadline'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+pass 'cutover admits an expiring start before its future completion'
+run_psql "begin;
+  truncate app_public.notification_moment_queue,app_public.notification_workout_moments,
+    app_public.notification_workouts,app_public.notification_intents cascade;
+  delete from vault.secrets where name in ('notification_worker_url','notification_worker_key');
+  select vault.create_secret('http://127.0.0.1:9/functions/v1/notification-worker','notification_worker_url');
+  select vault.create_secret('fixture-only','notification_worker_key');
+  set local request.jwt.claims='{\"sub\":\"${B_UID}\",\"role\":\"authenticated\"}';
+  set local boga.notification_kicked='false';
+  insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+    values('${B_UID}','future-kick-${RUN_TAG}','active',floor(extract(epoch from now()+interval '30 minutes')*1000),1,1,1);
+  do \$\$ declare requests bigint; begin
+    if app_public.notification_work_pending() or current_setting('boga.notification_kicked')='true' then
+      raise exception 'future-only intake consumed the transaction kick'; end if;
+    select count(*) into requests from net.http_request_queue;
+    insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+      values('${B_UID}','due-kick-${RUN_TAG}','active',floor(extract(epoch from now())*1000),1,1,1);
+    if current_setting('boga.notification_kicked')<>'true' or (select count(*) from net.http_request_queue)<>requests+1 then
+      raise exception 'due second row did not dispatch'; end if;
+    perform app_public.notification_kick_once();
+    if (select count(*) from net.http_request_queue)<>requests+1 then raise exception 'transaction dispatched twice'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+pass 'future then due intake dispatches exactly once in one transaction'
+HISTORY_ENTITIES=()
+for number in {1..200}; do
+  next_cuam
+  HISTORY_ENTITIES+=("$(e_session "old-admission-${number}-${RUN_TAG}" "$((NOW_MS-180000000))" completed "$((NOW_MS-172800000))" 7200 null "${CUAM}")")
+done
+push "${B_TOKEN}" '200 expired historical sessions' "${HISTORY_ENTITIES[@]}"
+assert_sql 'expired history preserves moments without filling the admission queue' "select count(*)=200
+  and not exists(select 1 from app_public.notification_moment_queue where session_id like 'old-admission-%-${RUN_TAG}')
+  from app_public.notification_workout_moments where member_user_id='${B_UID}' and session_id like 'old-admission-%-${RUN_TAG}';"
+next_cuam
+push "${B_TOKEN}" 'live start behind historical batch' "$(e_session "history-live-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")"
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'one admission pass reaches the live start after historical intake' "select exists(select 1 from app_public.notification_intents
+  where lifter_user_id='${B_UID}' and recipient_user_id='${A_UID}' and session_id='history-live-${RUN_TAG}' and kind='start')
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}');"
+pass '200 expired sessions preserve moments without delaying a live start'
+# The upload also queues group evaluation; keep that bulk fixture out of later readiness probes.
+run_psql "delete from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}';
+  delete from app_public.group_eval_queue where member_user_id='${B_UID}'
+    and (session_id like 'old-admission-%-${RUN_TAG}' or session_id='history-live-${RUN_TAG}');
+  delete from app_public.sessions where owner_user_id='${B_UID}'
+    and (id like 'old-admission-%-${RUN_TAG}' or id='history-live-${RUN_TAG}');" >/dev/null
 DELAYED_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 DELAYED_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
 DELAYED_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
 rpc "${A_TOKEN}" notification_register "$(jq -nc --arg i "${DELAYED_INSTALL}" --arg c "${DELAYED_CAPABILITY}" --arg k "${DELAYED_KEY}" \
   '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[delayed-second]",p_environment:"local",
     p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
-expect_ok 'register temporary delayed-recovery installation'; DELAYED_BINDING="$(jq -er '.binding_id' <<<"${BODY}")"
-# Both uploads commit before any recovery; the immutable active moment must still produce its start.
+expect_ok 'register temporary delayed-admission installation'; DELAYED_BINDING="$(jq -er '.binding_id' <<<"${BODY}")"
+# Both uploads commit before any admission; the immutable active moment must still produce its start.
 DELAYED="delayed-recovery-${RUN_TAG}"
 next_cuam
-push "${B_TOKEN}" 'capture active upload without recovering its producer' "$(e_session "${DELAYED}" "${NOW_MS}" active null null null "${CUAM}")"
+push "${B_TOKEN}" 'capture active upload without admitting its producer' "$(e_session "${DELAYED}" "${NOW_MS}" active null null null "${CUAM}")"
 assert_sql 'active upload captures its start before any workout ledger exists' "select exists(select 1 from app_public.notification_workout_moments
   where member_user_id='${B_UID}' and session_id='${DELAYED}' and kind='start' and event_at=to_timestamp(${NOW_MS}/1000.0))
   and not exists(select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${DELAYED}')
   and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${DELAYED}');"
 next_cuam
-push "${B_TOKEN}" 'complete before first recovery or evaluation' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
+push "${B_TOKEN}" 'complete before first admission or evaluation' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "${CUAM}")"
 assert_sql 'completed upload still has no producer ledger and retains both original moments' "select
   not exists(select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${DELAYED}')
   and (select count(*)=2 from app_public.notification_workout_moments where member_user_id='${B_UID}' and session_id='${DELAYED}');"
 confirm "${B_TOKEN}" "${DELAYED}" "$(manifest "${B_UID}" "${DELAYED}")"; check 'delayed completed graph confirmed' '.confirmed==true'
 drain_eval
-# An already-applied producer could have persisted can_start=false before recovery; the original moment repairs it.
+# An already-applied producer could have persisted can_start=false before admission; the original moment repairs it.
 run_psql "update app_public.notification_workouts set can_start=false where member_user_id='${B_UID}' and session_id='${DELAYED}';" >/dev/null
 prepare_outcome "${B_UID}" "${DELAYED}"; enqueue_outcome "${B_UID}" "${DELAYED}"
-assert_sql 'recovery repairs old admission from the immutable original active moment' "select can_start from app_public.notification_workouts
+assert_sql 'admission repairs old can_start from the immutable original active moment' "select can_start from app_public.notification_workouts
   where member_user_id='${B_UID}' and session_id='${DELAYED}';"
-assert_sql 'first recovery produces two overlap-deduplicated logical alerts with original expiry' "select count(*)=2
+assert_sql 'first admission produces two overlap-deduplicated logical alerts with original expiry' "select count(*)=2
   and count(distinct kind)=2 and bool_and(expires_at=event_at+interval '24 hours')
   and bool_and(event_at=case kind when 'start' then to_timestamp(${NOW_MS}/1000.0) else to_timestamp($((NOW_MS+1000))/1000.0) end)
   from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${DELAYED}';"
@@ -244,11 +314,11 @@ assert_sql 'both delayed alerts reach each installation once and keep original d
   where n.recipient_user_id='${A_UID}' and n.lifter_user_id='${B_UID}' and n.session_id='${DELAYED}';"
 drain_worker; check 'accepted delayed alerts never replay' '.claimed==0'
 rpc "${A_TOKEN}" notification_unregister "$(jq -nc --arg i "${DELAYED_INSTALL}" --arg b "${DELAYED_BINDING}" '{p_installation_id:$i,p_binding_id:$b}')"
-expect_ok 'unregister temporary delayed-recovery installation'
+expect_ok 'unregister temporary delayed-admission installation'
 assert_sql 'downstream fixture retains only its original active installation' "select count(*)=1 from app_public.notification_installations
   where user_id='${A_UID}' and active and permission and opted_in;"
 next_cuam
-push "${B_TOKEN}" 'delete recovered completed source' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 "${NOW_MS}" "${CUAM}")"
+push "${B_TOKEN}" 'delete admitted completed source' "$(e_session "${DELAYED}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 "${NOW_MS}" "${CUAM}")"
 for intent_id in "${DELAYED_START}" "${DELAYED_COMPLETION}"; do
   rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${intent_id}}"; expect_ok 'deleted source projection'
   [[ "${BODY}" == null ]] || fail 'deleted source projected a captured activity alert'
@@ -290,20 +360,20 @@ push "${B_TOKEN}" 'expired original moment before a newer raw autosave' "$(e_ses
 next_cuam
 push "${B_TOKEN}" 'new raw start cannot renew expired captured timing' \
   "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null null "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'expired-timing recovery expected HTTP 204 with no body'
-assert_sql 'newer raw timestamp admits recovery without renewing its expired original event' "select w.eligible and w.can_start
-  and s.started_at=${NOW_MS} and w.start_at=to_timestamp(${EXPIRED_START_MS}/1000.0) and m.event_at=w.start_at
-  and w.start_at>=(select started_at from app_public.notification_workout_epoch) and w.start_at+interval '24 hours'<=now()
-  and not app_public.notification_start_ready(w.member_user_id,w.session_id,w.start_at)
-  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
-  from app_public.notification_workouts w join app_public.sessions s on s.owner_user_id=w.member_user_id and s.id=w.session_id
-    join app_public.notification_workout_moments m on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
-  where w.member_user_id='${B_UID}' and w.session_id='${EXPIRED_AUTOSAVE}';"
+rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'expired-timing admission expected HTTP 204 with no body'
+assert_sql 'newer raw timestamp never queues or renews its expired original event' "select s.started_at=${NOW_MS}
+  and m.event_at=to_timestamp(${EXPIRED_START_MS}/1000.0)
+  and not exists(select 1 from app_public.notification_workouts where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id=m.member_user_id and session_id=m.session_id)
+  from app_public.sessions s join app_public.notification_workout_moments m
+    on m.member_user_id=s.owner_user_id and m.session_id=s.id and m.kind='start'
+  where s.owner_user_id='${B_UID}' and s.id='${EXPIRED_AUTOSAVE}';"
 next_cuam
 push "${B_TOKEN}" 'delete expired autosave control' \
   "$(e_session "${EXPIRED_AUTOSAVE}" "${NOW_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${EXPIRED_AUTOSAVE_CREATED}" '.fields.created_at=$c')"
 run_psql "update app_public.notification_workout_epoch set started_at='${EXPIRY_EPOCH}';" >/dev/null
-# Recovery admission follows a fresh captured moment even after a higher-LWW raw timestamp moves outside the window.
+# Admission follows a fresh captured moment even after a higher-LWW raw timestamp moves outside the window.
 BACKDATED="backdated-recovery-${RUN_TAG}"
 next_cuam; BACKDATED_CREATED="${CUAM}"
 push "${B_TOKEN}" 'capture fresh active start before raw backdating' "$(e_session "${BACKDATED}" "${NOW_MS}" active null null null "${CUAM}")"
@@ -317,16 +387,18 @@ assert_sql 'backdated active source still has its recent original moment and no 
   from app_public.sessions s join app_public.notification_workout_moments m
     on m.member_user_id=s.owner_user_id and m.session_id=s.id and m.kind='start'
   where s.owner_user_id='${B_UID}' and s.id='${BACKDATED}';"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'captured-time recovery expected HTTP 204 with no body'
+rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'captured-time admission expected HTTP 204 with no body'
 assert_sql 'captured timing creates one start with its original deadline across overlapping groups' "select count(*)=1 and bool_and(kind='start'
   and event_at=to_timestamp(${NOW_MS}/1000.0) and expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours')
   from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}';"
-drain_worker; check 'actual local sink accepts recovered backdated source' '.outcomes.ticket==1'
+drain_worker; check 'actual local sink accepts admitted backdated source' '.outcomes.ticket==1'
 next_cuam
-push "${B_TOKEN}" 'repeat backdated autosave after accepted recovered start' \
+push "${B_TOKEN}" 'repeat backdated autosave after accepted admitted start' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null null "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'repeat recovery expected HTTP 204 with no body'
-drain_worker; check 'backdated autosave and recovery never replay the accepted start' '.claimed==0'
+# An autosave appends no moment; queue the source again, as the cutover seed or a duplicate append would.
+run_psql "insert into app_public.notification_moment_queue(member_user_id,session_id) values('${B_UID}','${BACKDATED}');" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'repeat admission expected HTTP 204 with no body'
+drain_worker; check 'backdated autosave and admission never replay the accepted start' '.claimed==0'
 assert_sql 'backdated source retains one real local ticket and its immutable original clock' "select count(*)=1 and bool_and(n.kind='start'
   and n.event_at=to_timestamp(${NOW_MS}/1000.0) and n.expires_at=to_timestamp(${NOW_MS}/1000.0)+interval '24 hours'
   and d.state='ticket' and d.provider='local' and d.ticket_id like 'local:ok:%' and d.attempts=1)
@@ -337,17 +409,19 @@ BACKDATED_RECOVERY_AT="$(run_psql "select updated_at from app_public.notificatio
 next_cuam
 push "${B_TOKEN}" 'delete backdated source whose captured moment remains fresh' \
   "$(e_session "${BACKDATED}" "${EXPIRED_START_MS}" active null null "${NOW_MS}" "${CUAM}" | jq --argjson c "${BACKDATED_CREATED}" '.fields.created_at=$c')"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'deleted-source recovery expected HTTP 204 with no body'
+run_psql "insert into app_public.notification_moment_queue(member_user_id,session_id) values('${B_UID}','${BACKDATED}');" >/dev/null
+rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'deleted-source admission expected HTTP 204 with no body'
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${BACKDATED_INTENT}}"; expect_ok 'deleted captured-start projection'
 [[ "${BODY}" == null ]] || fail 'deleted backdated source projected its captured start'
-assert_sql 'deleted source is excluded from recovery and retains one immutable identity' "select updated_at='${BACKDATED_RECOVERY_AT}'
+assert_sql 'deleted source is excluded from admission and retains one immutable identity' "select updated_at='${BACKDATED_RECOVERY_AT}'
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='${BACKDATED}')
   and (select count(*)=1 from app_public.notification_intents where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${BACKDATED}')
   from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${BACKDATED}';"
 run_psql 'update app_public.notification_config set sending_enabled=false;' >/dev/null
 SESSION="fresh-${RUN_TAG}"; BLOCK="fresh-block-${RUN_TAG}"; SET="fresh-set-${RUN_TAG}"
 next_cuam
 push "${B_TOKEN}" 'active session' "$(e_session "${SESSION}" "${NOW_MS}" active null null null "${CUAM}")"
-run_psql 'select app_public.notification_recover_workouts(20);' >/dev/null
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
 assert_sql 'overlap creates one recipient start and excludes lifter' "select count(*)=1 from app_public.notification_intents
   where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${SESSION}' and kind='start';"
 run_psql 'update app_public.notification_config set sending_enabled=true;' >/dev/null
@@ -415,6 +489,36 @@ drain_worker
 assert_sql 'one accepted completion across overlapping groups' "select count(*)=1 from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id
   where n.recipient_user_id='${A_UID}' and n.session_id='${SESSION}' and n.kind='completion' and d.state='ticket';"
 INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${SESSION}' and kind='completion';")"
+IDLE_VERSION="$(run_psql "select xmin::text from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';")"
+confirm "${B_TOKEN}" "${SESSION}" "$(manifest "${B_UID}" "${SESSION}")"; check 'unchanged settled confirmation retains success' '.confirmed==true'
+assert_sql 'unchanged confirmation does not rewrite its workout tuple' "select xmin::text='${IDLE_VERSION}' from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';"
+# The no-op shortcut must still adopt a captured start and reject a forfeited completion.
+run_psql "begin;
+  set local track_functions='all';
+  set local client_min_messages=notice;
+  select set_config('request.jwt.claims',jsonb_build_object('sub','${B_UID}','role','authenticated',
+    'session_id',(select id from auth.sessions where user_id='${B_UID}' limit 1))::text,true);
+  update app_public.notification_workouts set can_start=false where member_user_id='${B_UID}' and session_id='${SESSION}';
+  do \$\$ declare proof jsonb; answer jsonb; calls_before bigint; tuple_before tid; begin
+    proof:=app_public.notification_source_manifest('${B_UID}','${SESSION}');
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if not (answer->>'confirmed')::boolean or not exists(select 1 from app_public.notification_workouts
+      where member_user_id='${B_UID}' and session_id='${SESSION}' and can_start) then raise exception 'captured start was not repaired'; end if;
+    select coalesce(sum(calls),0) into calls_before from pg_stat_xact_user_functions where funcid='app_public.notification_track_workout(uuid,text)'::regprocedure;
+    select ctid into tuple_before from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if not (answer->>'confirmed')::boolean or (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
+        where funcid='app_public.notification_track_workout(uuid,text)'::regprocedure)<>calls_before or not exists(
+        select 1 from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}' and ctid=tuple_before) then
+      raise exception 'unchanged confirmation repeated its tracker or row write'; end if;
+    update app_public.notification_workout_moments set event_at=null where member_user_id='${B_UID}' and session_id='${SESSION}' and kind='completion';
+    answer:=app_public.notification_confirm_completion('${SESSION}',proof);
+    if (answer->>'confirmed')::boolean or exists(select 1 from app_public.notification_workouts
+      where member_user_id='${B_UID}' and session_id='${SESSION}' and eligible) then raise exception 'forfeited completion was not rejected'; end if;
+  end \$\$;
+  rollback;" >/dev/null
+rpc "${B_TOKEN}" notification_pending_completions '{}'; expect_ok 'settled completion polling'
+check 'settled summaries leave the proof polling backlog' '(.session_ids|index($s))==null' --arg s "${SESSION}"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'narrow authorized projection'
 check 'below-first own bests and both-metric full-rank movement' '.bestCount==4 and .rankCount==8 and (.identity|contains("2 groups"))'
 check 'no privileged source fields or extra section route' 'has("weight_value")|not'
@@ -451,7 +555,7 @@ assert_sql 'completed first upload has exactly one completion and no start' "sel
 OFFLINE_DEADLINE="$(run_psql "select expires_at from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${OFFLINE}';")"
 next_cuam
 push "${B_TOKEN}" 'reopen same workout' "$(e_session "${OFFLINE}" "$((NOW_MS+70000))" active null null null "${CUAM}")"
-run_psql 'select app_public.notification_recover_workouts(20);' >/dev/null
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
 next_cuam
 push "${B_TOKEN}" 'complete reopened workout' "$(e_session "${OFFLINE}" "$((NOW_MS+70000))" completed "$((NOW_MS+110000))" 40 null "${CUAM}")"
 confirm "${B_TOKEN}" "${OFFLINE}" "$(manifest "${B_UID}" "${OFFLINE}")"; check 'reopened graph confirmed' '.confirmed==true'
@@ -515,7 +619,7 @@ push "${B_TOKEN}" 'cold fresh own best' \
   "$(e_session "${COLD_SESSION}" "$((NOW_MS+120000))" active null null null "${CUAM}")" \
   "$(e_se "${COLD_BLOCK}" "${COLD_SESSION}" "cold-def-B-${RUN_TAG}" 0 Bench "${CUAM}")" \
   "$(e_set "${COLD_SET}" "${COLD_BLOCK}" 0 150 1 '' "${CUAM}")"
-run_psql 'select app_public.notification_recover_workouts(20);' >/dev/null
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
 next_cuam
 push "${B_TOKEN}" 'complete before rebuilt revision publishes' \
   "$(e_session "${COLD_SESSION}" "$((NOW_MS+120000))" completed "$((NOW_MS+130000))" 10 null "${CUAM}")"
@@ -648,7 +752,7 @@ for outcome in ticket retry; do
   fi
 done
 run_psql 'update app_public.notification_config set sending_enabled=false;' >/dev/null
-# Missing original moments fail closed; a missed share with a valid moment remains repairable.
+# Missing original moments fail closed; a missed share loses its alert, never repaired.
 SEALED_GEN="$(run_psql "select generation from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='dual-retry-${RUN_TAG}';")"
 run_psql 'alter table app_public.notification_workout_moments add constraint notification_test_intake check(false) not valid;
   alter table app_public.group_session_shares add constraint notification_test_share check(false) not valid;' >/dev/null
@@ -664,20 +768,20 @@ push "${B_TOKEN}" 'failed capture of old first completion' \
   "$(e_session "${LOST_COMPLETION}" "$((NOW_MS-90001000))" completed "$((NOW_MS-90000000))" 1 null "${CUAM}")"
 run_psql 'alter table app_public.notification_workout_moments drop constraint notification_test_intake;
   alter table app_public.group_session_shares drop constraint notification_test_share;
-  select app_public.notification_recover_workouts(20);' >/dev/null
-assert_sql 'missing start timing does not manufacture a recovered alert' "select exists(select 1 from app_public.sessions
+  select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'missing start timing does not manufacture an admitted alert' "select exists(select 1 from app_public.sessions
   where owner_user_id='${B_UID}' and id='recovery-${RUN_TAG}' and status='active') and not exists(select 1 from app_public.notification_intents
   where lifter_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}');"
 next_cuam
 push "${B_TOKEN}" 'forfeit missed start on later autosave' "$(e_session "recovery-${RUN_TAG}" "${NOW_MS}" active null null null "${CUAM}")"
 assert_sql 'missed start stays an immutable forfeited moment' "select event_at is null from app_public.notification_workout_moments
   where member_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}' and kind='start';"
-rpc "${SERVICE_ROLE_KEY}" notification_recover_workouts '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'forfeited-source recovery expected HTTP 204 with no body'
-assert_sql 'recent raw fallback cannot admit a null forfeited start as an alert' "select not w.can_start and m.event_at is null
-  and not exists(select 1 from app_public.notification_intents n where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id)
-  from app_public.notification_workouts w join app_public.notification_workout_moments m
-    on m.member_user_id=w.member_user_id and m.session_id=w.session_id and m.kind='start'
-  where w.member_user_id='${B_UID}' and w.session_id='recovery-${RUN_TAG}';"
+rpc "${SERVICE_ROLE_KEY}" notification_admit_moments '{"p_limit":20}'; [[ "${STATUS}" == 204 && -z "${BODY}" ]] || fail 'forfeited-source admission expected HTTP 204 with no body'
+assert_sql 'recent raw fallback never queues a null forfeited start' "select m.event_at is null
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id=m.member_user_id and session_id=m.session_id)
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id=m.member_user_id and session_id=m.session_id)
+  from app_public.notification_workout_moments m
+  where m.member_user_id='${B_UID}' and m.session_id='recovery-${RUN_TAG}' and m.kind='start';"
 next_cuam
 push "${B_TOKEN}" 'reopen workout whose first completion capture failed' \
   "$(e_session "${LOST_COMPLETION}" "$((NOW_MS-90001000))" active null null null "${CUAM}")"
@@ -685,18 +789,47 @@ next_cuam
 push "${B_TOKEN}" 'later completion cannot replace missing original timing' \
   "$(e_session "${LOST_COMPLETION}" "$((NOW_MS-90001000))" completed "$((NOW_MS+1000))" 90002 null "${CUAM}")"
 confirm "${B_TOKEN}" "${LOST_COMPLETION}" "$(manifest "${B_UID}" "${LOST_COMPLETION}")"; check 'missing first completion proof rejected' '.confirmed==false'
-run_psql 'select app_public.notification_recover_workouts(20);' >/dev/null
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
 assert_sql 'lost first completion never produces a current replay' "select event_at is null
   and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${LOST_COMPLETION}')
   from app_public.notification_workout_moments where member_user_id='${B_UID}' and session_id='${LOST_COMPLETION}' and kind='completion';"
-SHARE_RECOVERY="share-recovery-${RUN_TAG}"
+MISSED_SHARE="missed-share-${RUN_TAG}"
 run_psql 'alter table app_public.group_session_shares add constraint notification_test_share check(false) not valid;' >/dev/null
 next_cuam
-push "${B_TOKEN}" 'missed share retains valid start moment' "$(e_session "${SHARE_RECOVERY}" "${NOW_MS}" active null null null "${CUAM}")"
+push "${B_TOKEN}" 'missed share keeps private sync' "$(e_session "${MISSED_SHARE}" "${NOW_MS}" active null null null "${CUAM}")"
 run_psql 'alter table app_public.group_session_shares drop constraint notification_test_share;
-  select app_public.notification_recover_workouts(20);' >/dev/null
-assert_sql 'missed share alone recovers the captured start identity' "select count(*)=1 from app_public.notification_intents
-  where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${SHARE_RECOVERY}' and kind='start';"
+  select app_public.notification_admit_moments(20);' >/dev/null
+# Nothing repairs a failed trigger later: that start alert is lost, and admission keeps nothing to retry.
+assert_sql 'missed share loses only its start alert' "select exists(select 1 from app_public.notification_workout_moments
+    where member_user_id='${B_UID}' and session_id='${MISSED_SHARE}' and kind='start' and event_at is not null)
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${MISSED_SHARE}')
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='${MISSED_SHARE}');"
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'a later admission pass never repairs the missed share' "select not exists(select 1 from app_public.group_session_shares
+    where member_user_id='${B_UID}' and session_id='${MISSED_SHARE}')
+  and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${MISSED_SHARE}');"
+# The start moment queues its source once; descendant writes queue nothing; a plain worker run admits it.
+WORKER_START="worker-start-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'start queued for the worker' "$(e_session "${WORKER_START}" "${NOW_MS}" active null null null "${CUAM}")"
+next_cuam
+push "${B_TOKEN}" 'set during the queued workout' "$(e_se "${WORKER_START}-block" "${WORKER_START}" "def-B-${RUN_TAG}" 0 Bench "${CUAM}")" \
+  "$(e_set "${WORKER_START}-set" "${WORKER_START}-block" 0 100 1 '' "${CUAM}")"
+assert_sql 'a start moment queues its source once, sets queue nothing' "select count(*)=1 from app_public.notification_moment_queue
+  where member_user_id='${B_UID}' and session_id='${WORKER_START}';"
+drain_worker
+assert_sql 'one worker run admits the queued start and forgets it' "select exists(select 1 from app_public.notification_intents
+    where recipient_user_id='${A_UID}' and lifter_user_id='${B_UID}' and session_id='${WORKER_START}' and kind='start')
+  and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='${WORKER_START}');"
+# A device clock more than 5 minutes fast: the start waits in the queue until it is admissible.
+AHEAD_START="ahead-start-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" 'start from a fast device clock' "$(e_session "${AHEAD_START}" "$((NOW_MS+1800000))" active null null null "${CUAM}")"
+run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
+assert_sql 'a future start stays queued until five minutes before it, unsent' "select count(*)=1
+    and bool_and(q.available_at=to_timestamp(${NOW_MS}/1000.0)+interval '25 minutes')
+    and not exists(select 1 from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='${AHEAD_START}')
+  from app_public.notification_moment_queue q where q.member_user_id='${B_UID}' and q.session_id='${AHEAD_START}';"
 confirm "${B_TOKEN}" "dual-retry-${RUN_TAG}" "$(manifest "${B_UID}" "dual-retry-${RUN_TAG}")"; check 'missed intake graph reconfirmed' '.confirmed==true'
 drain_eval
 assert_sql 'source proof recovers after failed intake' "select app_public.notification_workout_ready('${B_UID}','dual-retry-${RUN_TAG}');"
@@ -808,7 +941,7 @@ for source in "${COMMON_A}" "${COMMON_B}"; do
     "$(e_se "${source}-block" "${source}" "def-B-${RUN_TAG}" 0 Bench "${CUAM}")" \
     "$(e_set "${source}-set" "${source}-block" 0 80 1 '' "${CUAM}")"
 done
-run_psql "select app_public.notification_recover_workouts(20);
+run_psql "select app_public.notification_admit_moments(20);
   update app_public.group_eval_queue set available_at=now()+interval '1 hour'
     where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}');
   select app_public.group_metric_eval_enqueue('${G1}','${X1}','set');
@@ -885,6 +1018,15 @@ PUBLISH_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postg
 jq -e 'length==4 and all(.[];.graph_calls==2) and all(.[0:3][];.completed==true and .rejected==null)
   and .[3].rejected=="P0001 notification capture source moved"' <<<"${PUBLISH_SAMPLES}" >/dev/null ||
   fail "publish graph reuse or late source check regressed: ${PUBLISH_SAMPLES}"
+# With nobody training, a sweep writes nothing and calls no worker, and worker
+# preparation reads the same few pages however many workouts and sessions exist.
+IDLE_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
+  <"${SUPABASE_DIR}/tests/notification-idle-benchmark.sql" | grep '^\[')" || fail 'idle benchmark fixture failed'
+jq -e 'length==7 and all(.[0:6][];.rows_written==0 and .proof_calls==0 and .graph_calls==0 and .worker_posts==0 and .temp_pages==0)
+  and all(.[]|select(.step=="prepare");.pages<=20) and all(.[]|select(.step=="sweep");.pages<=1000)
+  and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25 and .[6].worker_posts==1' <<<"${IDLE_SAMPLES}" >/dev/null ||
+  fail "idle notification background regressed: ${IDLE_SAMPLES}"
+printf '[notification-workout-events] idle benchmark (server-wide WAL is diagnostic): %s\n' "${IDLE_SAMPLES}"
 # Restore each workout's original published contribution when testing which movement that workout caused.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Attribution bench",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"
@@ -1829,7 +1971,7 @@ assert_sql 'the unchanged old shared source gains placement without a performed 
   where member_user_id='${B_UID}' and session_id='${REJOIN_SESSION}' and group_exercise_id='${REJOIN_EXERCISE}';"
 rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${INTENT}}"; expect_ok 'public preview after private baseline capture'
 check 'public preview omits private source baselines and controls' '[..|objects|(has("baseline_scores") or has("baselineScores") or has("admission_scores") or has("admissionScores") or has("source_controls") or has("sourceControls"))]|any|not'
-assert_sql 'forfeited start remains absent after later recovery and worker preparation' "select not exists(select 1 from app_public.notification_intents
+assert_sql 'forfeited start remains absent after later admission and worker preparation' "select not exists(select 1 from app_public.notification_intents
   where lifter_user_id='${B_UID}' and session_id='recovery-${RUN_TAG}');"
 assert_sql 'diagnostic is sanitized' "select exists(select 1 from public.app_logs where event='notification.intake_failed'
   and user_id='${B_UID}' and context? 'sqlstate' and not context? 'error');"
@@ -1888,4 +2030,4 @@ check 'expired captured moments and older workout deadlines do not renew' \
 rpc "${E_TOKEN}" notification_pending_completions '{"p_after_session_id":""}'
 expect_error VALIDATION 'invalid completion cursor'
 COMPLETED=1
-pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and recovery contracts'
+pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and admission contracts'

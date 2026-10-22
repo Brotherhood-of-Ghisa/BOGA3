@@ -45,19 +45,19 @@ it('keeps target colour independent of filtered exercise rows, and uses the full
   expect(buildExerciseMapFamilies({ ...input, exercises: [] }).every(family => family.exercises.length === 0)).toBe(true);
 });
 
-it.each(['workingSetCount', 'totalVolume'] as const)('preserves exact %s areas without inflating tiny or zero tiles', metric => {
-  const entries: ExerciseMapEntry[] = [item('large', 100, 100), item('medium', 30, 30), item('tiny', .0001, .0001),
+it('preserves exact Volume areas without inflating tiny or zero tiles', () => {
+  const entries: ExerciseMapEntry[] = [item('large', 1, 100), item('medium', 1000, 30), item('tiny', 100, .0001),
     item('zero', 0, 0), item('unavailable', 0, null)].map(row => ({ item: row, targetAttainment: .5 }));
   for (const width of [288, 343, 398]) {
     const outer = exerciseMapLayout(width).families.Legs;
     const bounds = { x: MUSCLE_MAP_INSET, y: MUSCLE_MAP_HEADER, width: outer.width - MUSCLE_MAP_INSET * 2,
       height: outer.height - MUSCLE_MAP_HEADER - MUSCLE_MAP_INSET };
-    const tiles = exerciseMapTileRects(entries, bounds, metric);
+    const tiles = exerciseMapTileRects(entries, bounds);
     const area = bounds.width * bounds.height;
     expect(tiles.map(tile => tile.entry.item.id)).toEqual(['large', 'medium', 'tiny']);
     expect(tiles.reduce((sum, tile) => sum + tile.bounds.width * tile.bounds.height, 0)).toBeCloseTo(area, 7);
     for (const tile of tiles) {
-      const value = metric === 'workingSetCount' ? tile.entry.item.current.workingSetCount : tile.entry.item.current.totalVolume!;
+      const value = tile.entry.item.current.totalVolume!;
       expect(tile.bounds.width * tile.bounds.height / area).toBeCloseTo(value / 130.0001, 12);
       expect(tile.bounds.x).toBeGreaterThanOrEqual(bounds.x);
       expect(tile.bounds.y).toBeGreaterThanOrEqual(bounds.y);
@@ -65,14 +65,14 @@ it.each(['workingSetCount', 'totalVolume'] as const)('preserves exact %s areas w
       expect(tile.bounds.y + tile.bounds.height).toBeLessThanOrEqual(bounds.y + bounds.height + 1e-8);
     }
     expect(Math.min(tiles[2].bounds.width, tiles[2].bounds.height)).toBeLessThan(1);
-    expect(exerciseMapTileRects([], bounds, metric)).toEqual([]);
+    expect(exerciseMapTileRects([], bounds)).toEqual([]);
   }
 });
 
 it('normalizes large finite weights without overflowing a family sum', () => {
   const entries = [item('a', 1, Number.MAX_VALUE), item('b', 1, Number.MAX_VALUE), item('invalid', 1, Infinity)]
     .map(row => ({ item: row, targetAttainment: 0 }));
-  const tiles = exerciseMapTileRects(entries, { x: 0, y: 0, width: 100, height: 100 }, 'totalVolume');
+  const tiles = exerciseMapTileRects(entries, { x: 0, y: 0, width: 100, height: 100 });
   expect(tiles).toHaveLength(2);
   expect(tiles.map(tile => tile.bounds.width * tile.bounds.height)).toEqual([5000, 5000]);
 });
@@ -110,8 +110,8 @@ it('deduplicates secondary muscles within a family, keeps primary dominance and 
   expect(chest.exercises.map(entry => entry.item.id)).toEqual(['bench', 'mixed']);
   expect(chest.secondary).toBeNull();
   expect(arms.secondary).not.toHaveProperty('id');
-  const tiles = exerciseMapTileRects([...arms.exercises, arms.secondary!], { x: 0, y: 0, width: 100, height: 100 }, 'workingSetCount');
-  expect(tiles.find(tile => tile.entry === arms.secondary)!.bounds.width * tiles.find(tile => tile.entry === arms.secondary)!.bounds.height).toBeCloseTo(10000 * 2 / 7);
+  const tiles = exerciseMapTileRects([...arms.exercises, arms.secondary!], { x: 0, y: 0, width: 100, height: 100 });
+  expect(tiles.find(tile => tile.entry === arms.secondary)!.bounds.width * tiles.find(tile => tile.entry === arms.secondary)!.bounds.height).toBeCloseTo(10000 * 800 / 1500);
 });
 
 it('uses unfiltered current/previous working contributors for the Secondary target, capped before averaging', () => {
@@ -140,14 +140,44 @@ it('weights each full exercise Volume before summing, propagating unavailable va
     expect(aggregate.current.totalVolume).toBeNull();
     expect(aggregate.exercises[0].item.current.totalVolume).toBeNull();
     expect(aggregate.previous.totalVolume).toBe(50);
-    expect(exerciseMapValue(aggregate, 'totalVolume')).toBe(0);
+    expect(exerciseMapValue(aggregate)).toBe(0);
   }
   const overflowingSets = secondary(['a', 'b', 'c'].map(id => item(id, Number.MAX_VALUE, 1)));
   expect(Number.isFinite(overflowingSets.current.workingSetCount)).toBe(false);
-  expect(exerciseMapValue(overflowingSets, 'workingSetCount')).toBe(0);
+  expect(exerciseMapValue(overflowingSets)).toBe(1.5);
   const zero = secondary([{ ...item('a'), current: period(0, 0) }]);
   expect(zero.current.totalVolume).toBe(0);
   expect(zero.previous.totalVolume).toBe(25);
   expect(zero.exercises).toHaveLength(1);
-  expect(exerciseMapTileRects([zero], { x: 0, y: 0, width: 100, height: 100 }, 'totalVolume')).toEqual([]);
+  expect(exerciseMapTileRects([zero], { x: 0, y: 0, width: 100, height: 100 })).toEqual([]);
+});
+
+
+it('sizes by Volume independently of working sets and individual strength estimates', () => {
+  const bench = { ...item('bench', 6, 100), current: { ...period(6, 100), estimatedOneRepMax: 110 },
+    previous: { ...period(2, 50), estimatedOneRepMax: 100 } };
+  const row = { ...item('row', 2, 900), current: { ...period(2, 900), estimatedOneRepMax: 80 } };
+  const families = buildExerciseMapFamilies({ items: [bench, row],
+    exercises: [definition('bench', ['chest'], ['triceps']), definition('row', ['chest'], ['triceps'])],
+    muscles: [muscle('chest', 'Chest', 8), muscle('triceps', 'Arms', 4)], workingSetTarget: 8 });
+  const chest = families.find(family => family.name === 'Chest')!;
+  const secondary = families.find(family => family.name === 'Arms')!.secondary!;
+  const tiles = exerciseMapTileRects([...chest.exercises, secondary], { x: 0, y: 0, width: 120, height: 100 });
+  for (const tile of tiles) {
+    const volume = 'item' in tile.entry ? tile.entry.item.current.totalVolume! : tile.entry.current.totalVolume!;
+    expect(tile.bounds.width * tile.bounds.height).toBeCloseTo(12000 * volume / 1500);
+  }
+  expect(secondary.current).not.toHaveProperty('estimatedOneRepMax');
+  expect(chest.exercises[0].item.current.estimatedOneRepMax).toBe(110);
+  expect(chest.exercises[0].item.previous.estimatedOneRepMax).toBe(100);
+});
+
+
+it('keeps Secondary Volume stable when metric sorting reorders contributors', () => {
+  const items = [item('a', 1, 1e16), item('b', 2, 1), item('c', 3, 1)];
+  const input = { exercises: items.map(row => definition(row.id, [], ['triceps'])),
+    muscles: [muscle('triceps', 'Arms', 3)], workingSetTarget: 8 };
+  const secondary = (rows: ExerciseMapItem[]) => buildExerciseMapFamilies({ ...input, items: rows })
+    .find(family => family.name === 'Arms')!.secondary!;
+  expect(secondary(items).current.totalVolume).toBe(secondary([...items].reverse()).current.totalVolume);
 });

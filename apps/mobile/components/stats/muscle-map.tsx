@@ -69,10 +69,12 @@ function MuscleTile({ row, label, metric, bounds, selected, workingSetTarget, on
       <Text allowFontScaling={false} testID={`${prefix}-now`} style={[styles.now, compact && styles.compact, large && styles.large]}>{figures.now}</Text>
       <Text allowFontScaling={false} testID={`${prefix}-change`} style={[styles.change, { color: targetGraded ? uiRoles.ink : changeToneColour(figures.change.tone) }]}>{figures.change.text}</Text>
     </View>
+    {selected ? <View testID={`stats-muscle-selection-${row.muscleGroupId}`} pointerEvents="none" style={[StyleSheet.absoluteFill, styles.selection]} /> : null}
   </Pressable>;
 }
 
 const styles = StyleSheet.create({
+  selection: { borderWidth: uiBorder.width * 3, borderColor: uiRoles.ink },
   family: { position: 'absolute', borderWidth: uiBorder.width, borderColor: uiRoles.rule, backgroundColor: uiRoles.surface },
   familyName: { paddingHorizontal: uiSpace.xs, paddingTop: uiSpace.xs, fontFamily: uiFonts.display.family,
     fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted, textTransform: 'uppercase' },

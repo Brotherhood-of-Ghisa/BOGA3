@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # groups-competitions.sh — group competitions (protocol 4) on an active stack:
 # actual Sync/Edge publication, reader and write authorization, the contract
-# header, payload privacy with bodyweight calculations enabled, the both-metric
-# correction matrix, write tokens, publication fences and fault isolation, the
+# header, payload privacy with bodyweight calculations enabled, both-metric
+# bound reading contexts, write tokens, publication fences and fault isolation, the
 # week summary's record values, and stored protocol-3-era history read through
 # the protocol-4 readers (an SQL-seeded fixture).
 #
@@ -363,7 +363,7 @@ check 'unknown exercise retains reps and omits kg' 'any(.session.exercises[]; .e
   .visibility=="normalized" and .sets[0].reps_value=="7" and (.sets[0]|has("weight_value")|not))'
 pass 'queued identity and unbound exercise privacy with permitted reps retained'
 
-# Run every selected-reading transition against BOTH dependent metrics. Public
+# Rules, distribution and reading changes against BOTH dependent metrics. Public
 # IDs and immutable observed audit are checked separately from private bindings.
 update_rules() {
   local rev; rev="$(run_psql "select rules_revision from app_public.group_exercises where id='${GX}';")"
@@ -442,45 +442,96 @@ reading noop "${MAIN_READING}" "${START}" 90; drain noop; retained noop
 reading coalesced-first "${MAIN_READING}" "${START}" 91
 reading coalesced-restored "${MAIN_READING}" "${START}" 90
 drain coalesced; retained 'coalesced unchanged tuple'
-reading value "${MAIN_READING}" "${START}" 91; drain value; ended value
-reading restored "${MAIN_READING}" "${START}" 90; drain restored; ended 'restoration never reopens'
-pair
-reading date "${MAIN_READING}" "$((START-1))" 90; drain date; ended 'date changed with same kg'
-pair
-reading future-date "${MAIN_READING}" "$((START+100))" 90; drain 'date moved beyond session'; ended 'date leaves session interval'
-reading restore-date "${MAIN_READING}" "$((START-1))" 90; drain 'restore date'; ended 'date restoration remains terminal'
-pair
-reading fallback "${T}-fallback" "$((START-100))" 85; drain 'losing fallback'; retained 'losing fallback'
-reading invalid-selected "${MAIN_READING}" "$((START-1))" 0; drain 'invalid selected reading'; ended 'invalid selected input falls back'
-reading valid-restored "${MAIN_READING}" "$((START-1))" 90; drain 'valid input restored'; ended 'valid restoration stays terminal'
-pair
-reading deletion "${MAIN_READING}" "$((START-1))" 90 "${CUAM}"; drain deletion; ended 'deletion selects fallback'
-pair
-reading restored-winner "${MAIN_READING}" "$((START-1))" 90; drain 'restored winner'; ended 'restoration changes selected tuple'
-pair
-reading winning-backdate "${T}-backdated" "${START}" 90; drain 'winning backdate'; ended 'same-score new dependency'
-pair
-reading equal-time-winner "a-${T}" "${START}" 90; drain 'equal-time winner'; ended 'binary tie winner with equal score'
-pair
-reading equal-time-loser "z-${T}" "${START}" 90; drain 'equal-time loser'; retained 'losing equal-time ID'
-# Drop every valid applicable candidate in one Sync transaction: missing input
-# omits All and ends bound Certified, rather than substituting kg or zero.
+# A set's reading context is bound when it is first scored: no later reading
+# change moves its published score or ends its witness, and none queues work.
+athlete_value() { board "$1"; jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.value' <<<"${BODY}"; }
+# bound <context>: an unrelated republication still scores the set with its
+# bound reading (a reading change itself queues nothing to republish).
+bound() {
+  expect_sql "$1: republish" "select app_public.group_metric_eval_enqueue('${GID}','${GX}','set');" t
+  drain "$1: republish"
+  retained "$1"
+  [[ "$(athlete_value volume)" == "${BOUND_VOLUME}" && "$(athlete_value e1rm)" == "${BOUND_E1RM}" ]] ||
+    fail "$1: the bound score moved"
+}
+BOUND_VOLUME="$(athlete_value volume)"; BOUND_E1RM="$(athlete_value e1rm)"
+before="$(run_psql "select count(*) from app_public.group_metric_eval_queue where group_id='${GID}';")"
+reading value "${MAIN_READING}" "${START}" 91
+expect_sql 'a reading edit queues nothing' "select count(*) from app_public.group_metric_eval_queue where group_id='${GID}';" "${before}"
+drain value; bound value
+reading restored "${MAIN_READING}" "${START}" 90; drain restored; bound 'value restored'
+reading date "${MAIN_READING}" "$((START-1))" 90; drain date; bound 'date changed with same kg'
+reading future-date "${MAIN_READING}" "$((START+100))" 90; drain 'date moved beyond session'; bound 'date leaves session interval'
+reading restore-date "${MAIN_READING}" "$((START-1))" 90; drain 'restore date'; bound 'date restored'
+reading fallback "${T}-fallback" "$((START-100))" 85; drain 'losing fallback'; bound 'losing fallback'
+reading invalid-selected "${MAIN_READING}" "$((START-1))" 0; drain 'invalid selected reading'; bound 'invalid selected input'
+reading valid-restored "${MAIN_READING}" "$((START-1))" 90; drain 'valid input restored'; bound 'valid input restored'
+reading deletion "${MAIN_READING}" "$((START-1))" 90 "${CUAM}"; drain deletion; bound 'selected reading deleted'
+reading restored-winner "${MAIN_READING}" "$((START-1))" 90; drain 'restored winner'; bound 'deleted reading restored'
+reading winning-backdate "${T}-backdated" "${START}" 95; drain 'winning backdate'; bound 'winning backdate'
+reading equal-time-winner "a-${T}" "${START}" 95; drain 'equal-time winner'; bound 'equal-time winner'
+# Drop every applicable candidate in one Sync transaction: the bound score stays.
 next_cuam
 push "${ATHLETE_TOKEN}" 'delete all applicable context' \
   "$(e_reading "${MAIN_READING}" "$((START-1))" 90 "${CUAM}")" \
-  "$(e_reading "${T}-backdated" "${START}" 90 "${CUAM}")" \
-  "$(e_reading "a-${T}" "${START}" 90 "${CUAM}")" \
+  "$(e_reading "${T}-backdated" "${START}" 95 "${CUAM}")" \
+  "$(e_reading "a-${T}" "${START}" 95 "${CUAM}")" \
   "$(e_reading "z-${T}" "${START}" 90 "${CUAM}")" \
   "$(e_reading "${T}-fallback" "$((START-100))" 85 "${CUAM}")" \
   "$(e_reading "${T}-losing" "$((START-1000))" 75 "${CUAM}")"
-drain missing; ended 'delete without fallback'
-for metric in volume e1rm; do board "${metric}"; check 'missing context omits All' 'all(.entries[];.member.user_id!=$u)' --arg u "${ATHLETE_UID}"; done
-reading restore-after-missing "${MAIN_READING}" "${START}" 90; drain restore; ended 'restore after missing stays terminal'
+drain missing; bound 'every reading deleted'
+# An edit of the set binds again: with no applicable reading it has no
+# normalized score, and a reading added later does not give it one until the
+# set is next edited.
+next_cuam; push "${ATHLETE_TOKEN}" 'edit binds again' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 20 6 '' "${CUAM}" null rir_0)"
+drain 'edit with no reading'; ended 'a raw edit'
+for metric in volume e1rm; do board "${metric}"; check 'a set bound with no reading omits All' 'all(.entries[];.member.user_id!=$u)' --arg u "${ATHLETE_UID}"; done
+reading restore-after-missing "${MAIN_READING}" "${START}" 90
+expect_sql 'republish after the reading' "select app_public.group_metric_eval_enqueue('${GID}','${GX}','set');" t
+drain 'reading after the binding'
+for metric in volume e1rm; do board "${metric}"; check 'a later reading does not rebind' 'all(.entries[];.member.user_id!=$u)' --arg u "${ATHLETE_UID}"; done
+next_cuam; push "${ATHLETE_TOKEN}" 'edit back binds the reading' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 20 5 '' "${CUAM}" null rir_0)"
+drain 'edit with a reading'
+[[ "$(athlete_value volume)" == "${BOUND_VOLUME}" && "$(athlete_value e1rm)" == "${BOUND_E1RM}" ]] ||
+  fail 'an edit binds the current as-of reading'
 pair
+# Moving the session start binds again: a reading between the old and the new
+# start then applies; moving it back binds the original reading.
+reading later "${T}-later" "$((START+1))" 95
+next_cuam; push "${ATHLETE_TOKEN}" 'session start moved' \
+  "$(e_session "${T}-ATHLETE" "$((START+2))" completed "$((START+30000))" 30 null "${CUAM}")"
+drain 'session start moved'
+[[ "$(athlete_value volume)" != "${BOUND_VOLUME}" ]] || fail 'a session start change binds the reading again'
+next_cuam; push "${ATHLETE_TOKEN}" 'session start restored' \
+  "$(e_session "${T}-ATHLETE" "${START}" completed "$((START+30000))" 30 null "${CUAM}")" \
+  "$(e_reading "${T}-later" "$((START+1))" 95 "${CUAM}")"
+drain 'session start restored'
+[[ "$(athlete_value volume)" == "${BOUND_VOLUME}" ]] || fail 'restoring the session start binds the original reading'
+pair
+# The migration binds every set an enabled positive comparison published, with
+# exactly the context a live lookup gives.
+BACKFILL_SQL="$(sed -n '/^-- Bind what the enabled positive comparisons last published/,/^on conflict (member_user_id, set_id) do nothing;/p' \
+  "${SUPABASE_DIR}"/migrations/*_group_bodyweight_bound_at_scoring.sql)"
+[[ -n "${BACKFILL_SQL}" ]] || fail 'backfill statement not found in the migration'
+expect_sql 'the migration backfill binds the published context' "begin;
+  delete from app_public.group_set_body_weight_bindings where member_user_id='${ATHLETE_UID}';
+  ${BACKFILL_SQL}
+  select b.context = app_public.session_weight_as_of('${ATHLETE_UID}', s.started_at)
+    from app_public.group_set_body_weight_bindings b
+    join app_public.exercise_sets es on es.owner_user_id=b.member_user_id and es.id=b.set_id
+    join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
+    join app_public.sessions s on s.owner_user_id=se.owner_user_id and s.id=se.session_id
+   where b.member_user_id='${ATHLETE_UID}' and b.set_id='${T}-ATHLETE-set';
+  rollback;" t
 for inactive in off zero; do
   if [[ "${inactive}" == off ]]; then policy false; else update_rules 0; fi
   drain "${inactive}"; retained "${inactive}"
+  expect_sql "${inactive} source graph ignores existing bindings" \
+    "select (select count(*) > 0 from app_public.group_set_body_weight_bindings where member_user_id='${ATHLETE_UID}')
+        and bool_and(r->>'body_weight_kg' is null and r->>'reading_pin' is null)
+      from jsonb_array_elements(app_public.group_metric_eval_source_graph('${GID}','${GX}')->'sets') r;" t
   expect_sql "${inactive} source graph never invokes private resolver" "begin;
+    delete from app_public.group_set_body_weight_bindings where member_user_id in ('${ATHLETE_UID}','${RIVAL_UID}');
     create or replace function app_public.session_weight_as_of(p_owner uuid,p_started_at bigint)
     returns jsonb language plpgsql stable security invoker set search_path='' as \$\$ begin raise exception 'private resolver called'; end; \$\$;
     select bool_and(r->>'body_weight_kg' is null and r->>'reading_pin' is null)
@@ -491,22 +542,26 @@ for inactive in off zero; do
   expect_sql "${inactive} reading edit does not enqueue" "select count(*) from app_public.group_metric_eval_queue where group_id='${GID}';" "${before}"
   retained "${inactive} retained pin"
   if [[ "${inactive}" == off ]]; then policy true; else update_rules 1; fi
-  drain reactivation; ended "${inactive} intervening correction detected"
-  reading baseline "${MAIN_READING}" "${START}" 90; drain baseline; pair
+  drain reactivation; retained "${inactive}: reactivation keeps the bound reading"
+  reading baseline "${MAIN_READING}" "${START}" 90; drain baseline
 done
-pass 'both-metric correction matrix, exact witness audit, rules/distribution retention and inactive lookup isolation'
+pass 'bound reading context: no reading change moves a score or ends a witness; an edit binds again; inactive lookup isolation'
 
 # Random write tokens must reject both a published rescore and a queued source
 # edit, even when the revision stays unchanged. No private hash is sent back.
 board e1rm
 OLD_TOKEN="$(jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.write_token' <<<"${BODY}")"
 REV="$(jq -er .rules.rules_revision <<<"${BODY}")"
-reading token-correction "${MAIN_READING}" "${START}" 91; drain token-correction
+next_cuam; push "${ATHLETE_TOKEN}" 'published source rescore' \
+  "$(e_def "${T}-ATHLETE-def" 'Pull-up' "${CUAM}" per_side_load | jq '.fields.bodyweight_contribution=0.25')"
+drain 'published source rescore'
 rpc "${OWNER_TOKEN}" group_competition_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \
   --arg s "${T}-ATHLETE-set" --arg t "${OLD_TOKEN}" --argjson r "${REV}" \
   '{p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_write_token:$t}')"
 expect_error CONFLICT 'old random token after rescore'
-reading reset-token-baseline "${MAIN_READING}" "${START}" 90; drain reset-token-baseline; pair
+next_cuam; push "${ATHLETE_TOKEN}" 'source restored' \
+  "$(e_def "${T}-ATHLETE-def" 'Pull-up' "${CUAM}" total_load | jq '.fields.bodyweight_contribution=0.25')"
+drain 'source restored'; pair
 board e1rm; OLD_TOKEN="$(jq -er --arg u "${ATHLETE_UID}" '.entries[]|select(.member.user_id==$u)|.write_token' <<<"${BODY}")"
 next_cuam; push "${ATHLETE_TOKEN}" 'pending raw correction' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 21 5 '' "${CUAM}" null rir_0)"
 rpc "${OWNER_TOKEN}" group_competition_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \

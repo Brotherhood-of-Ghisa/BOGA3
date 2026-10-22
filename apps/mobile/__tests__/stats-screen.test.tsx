@@ -26,6 +26,7 @@ import {
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
 import { comparisonFigures } from '@/components/stats/comparison-columns';
+import { compareProgressFamilies, nextMuscleSortMode, sortProgressMuscles } from '@/components/stats/progress-tables';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
 import ProgressRoute from '../app/(tabs)/progress';
@@ -485,7 +486,7 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('uses the same supplied layout for Exercise and Muscle, keeping 1RM in List without changing that choice', () => {
+  it('uses the same supplied layout for Exercise and Muscle, keeping 1RM in Map and retaining the 3D List fallback', () => {
     const props = buildShellProps({ viewMode: 'exercise', muscleLayout: 'heatmap' });
     const view = render(<StatsScreenShell {...props} />);
     expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
@@ -493,12 +494,32 @@ describe('StatsScreenShell', () => {
     view.rerender(<StatsScreenShell {...props} viewMode="muscle" />);
     expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
     view.rerender(<StatsScreenShell {...props} exerciseMetric="estimatedOneRepMax" />);
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    view.rerender(<StatsScreenShell {...props} muscleLayout="3d" exerciseMetric="estimatedOneRepMax" />);
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     view.rerender(<StatsScreenShell {...props} exerciseMetric="totalVolume" />);
     expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
     view.rerender(<StatsScreenShell {...props} muscleLayout="list" />);
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  });
+
+  it('retains Volume-only exercises across Map metrics, with unavailable 1RM figures', () => {
+    const exercise: ExerciseListItem = { id: 'missing-strength', name: 'Unavailable strength', lastCompletedAt: null,
+      current: { workingSetCount: 0, totalVolume: 400, volumeSetCount: 4, estimatedOneRepMax: null },
+      previous: { workingSetCount: 0, totalVolume: 200, volumeSetCount: 2, estimatedOneRepMax: null } };
+    const props = buildShellProps({ viewMode: 'exercise', muscleLayout: 'heatmap',
+      exerciseListItems: [exercise], exerciseMappings: [{ id: exercise.id,
+        mappings: [{ id: 'mapping', muscleGroupId: 'chest', role: 'primary', weight: 1 }] }] });
+    const view = render(<StatsScreenShell {...props} />);
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Chest'));
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent(/^0$/);
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="totalVolume" />);
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent(/^400$/);
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="estimatedOneRepMax" />);
+    expect(screen.getByTestId('stats-exercise-tile-Chest-missing-strength', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent('—');
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-change')).toHaveTextContent('—');
   });
 
   it('uses the Settings layout without offering a presentation filter in Progress', () => {
@@ -1395,4 +1416,40 @@ it('draws the three filter chips as one equal-width outline row', () => {
     expect(chip).toHaveTextContent(label);
     expect(StyleSheet.flatten(within(chip).getByText(label).props.style).color).toBe(uiRoles.ink);
   }
+});
+
+
+describe('Progress table ordering', () => {
+  it('keeps the family order fixed, custom families alphabetical and Other last', () => {
+    expect(['Other', 'Custom B', 'Legs', 'Custom A', 'Chest'].sort(compareProgressFamilies))
+      .toEqual(['Chest', 'Legs', 'Custom A', 'Custom B', 'Other']);
+  });
+
+  it('sorts muscle figures within families or globally, with unavailable values last', () => {
+    const muscles = buildSummary().muscles;
+    const rows = [
+      { ...muscles[0], muscleGroupId: 'zero', displayName: 'Zero', familyName: 'Chest', current: { ...muscles[0].current, totalVolume: 0 } },
+      { ...muscles[0], muscleGroupId: 'null', displayName: 'Absent', familyName: 'Chest', current: { ...muscles[0].current, totalVolume: null } },
+      { ...muscles[0], muscleGroupId: 'large', displayName: 'Large', familyName: 'Legs', current: { ...muscles[0].current, totalVolume: 100 } },
+    ];
+    const ids = (grouped: boolean, mode: 'now-asc' | 'now-desc' | 'name-asc' | 'name-desc') =>
+      sortProgressMuscles(rows, mode, 'totalVolume', grouped).map(row => row.muscleGroupId);
+    expect(ids(true, 'now-desc')).toEqual(['zero', 'null', 'large']);
+    expect(ids(false, 'now-desc')).toEqual(['large', 'zero', 'null']);
+    expect(ids(false, 'now-asc')).toEqual(['zero', 'large', 'null']);
+    expect(ids(false, 'name-asc')).toEqual(['null', 'large', 'zero']);
+    expect(ids(false, 'name-desc')).toEqual(['zero', 'large', 'null']);
+    expect(rows.map(row => row.muscleGroupId)).toEqual(['zero', 'null', 'large']);
+    const ties = [rows[0], { ...rows[0], muscleGroupId: 'aaa' }];
+    expect(sortProgressMuscles(ties, 'previous-desc', 'workingSetCount', false)[0].muscleGroupId).toBe('aaa');
+  });
+
+  it('cycles muscle headers in both directions and starts a new numeric column high to low', () => {
+    expect(nextMuscleSortMode('now-desc', 'muscle')).toBe('name-asc');
+    expect(nextMuscleSortMode('name-asc', 'muscle')).toBe('name-desc');
+    expect(nextMuscleSortMode('name-desc', 'muscle')).toBe('name-asc');
+    expect(nextMuscleSortMode('name-asc', 'previous')).toBe('previous-desc');
+    expect(nextMuscleSortMode('previous-desc', 'previous')).toBe('previous-asc');
+    expect(nextMuscleSortMode('previous-asc', 'change')).toBe('change-desc');
+  });
 });

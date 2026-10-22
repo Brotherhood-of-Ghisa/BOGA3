@@ -55,12 +55,10 @@ export const resolveHistorySubject = (params: {
   const exerciseDefinitionId = firstRouteParam(params.exerciseDefinitionId);
   const muscleGroupId = firstRouteParam(params.muscleGroupId);
   if (exerciseDefinitionId && muscleGroupId) return null;
-  if (exerciseDefinitionId) {
-    // An exercise opens on the gym its link names (`src/utils/gym-scope-route.ts`).
-    const gymId = decodeGymRouteParam(firstRouteParam(params.gymId));
-    return gymId === undefined ? { kind: 'exercise', id: exerciseDefinitionId } : { kind: 'exercise', id: exerciseDefinitionId, gymId };
-  }
-  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId };
+  const gymId = decodeGymRouteParam(firstRouteParam(params.gymId));
+  const scope = gymId === undefined ? {} : { gymId };
+  if (exerciseDefinitionId) return { kind: 'exercise', id: exerciseDefinitionId, ...scope };
+  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope };
   return null;
 };
 
@@ -84,12 +82,12 @@ type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondar
 
 const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary' } as const;
 
-/** An exercise page's gym ([[gym.view-filter]]), chosen from the header. */
+/** The history page's gym ([[gym.view-filter]]), chosen from the header. */
 type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChange' | 'allSessionCount'>;
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-// An exercise's gym button sits beside it, so no row is added for it.
+// The gym button sits beside it, so no row is added for it.
 function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, gym }: {
   title: string;
   week: FocusedTimelineWeek | null;
@@ -208,13 +206,13 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
   // The Timeline's focused week, reported by the chart: the ⋮ opens its sessions.
   const [focusedWeek, setFocusedWeek] = useState<FocusedTimelineWeek | null>(null);
-  // An exercise's gym: the one it was opened on, until the picker changes it.
+  // The gym: the one it was opened on, until the picker changes it.
   const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
   const subject = useMemo<HistorySubject | null>(
-    () => routeSubject?.kind === 'exercise' && chosenGym !== null ? { ...routeSubject, gymId: chosenGym.gymId } : routeSubject,
+    () => routeSubject && chosenGym !== null ? { ...routeSubject, gymId: chosenGym.gymId } : routeSubject,
     [routeSubject, chosenGym]
   );
-  const gymId = subject?.kind === 'exercise' ? subject.gymId : undefined;
+  const gymId = subject?.gymId;
 
   // The catalogue is the one name source for both kinds, and it is already
   // loaded by boot. Until it is, the page keeps its declared title; once it is
@@ -257,13 +255,13 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     const catalogued = new Set(catalog.exercises.map(exercise => exercise.id));
     return {
       canOpen: id => catalogued.has(id),
-      open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id }, muscleMetric)),
+      open: id => router.push(progressHistoryHref({ exerciseDefinitionId: id, gymId }, muscleMetric)),
     };
-  }, [catalog, muscleMetric, router, subject]);
+  }, [catalog, muscleMetric, router, subject, gymId]);
   // A muscle's page opens on the exercise's metric when a muscle has it too
   // (Volume or Sets); 1RM and top weight are exercise-only, so it opens on Volume.
   const openMuscle = (muscleGroupId: string) => router.push(progressHistoryHref(
-    { muscleGroupId },
+    { muscleGroupId, gymId },
     isProgressMetric(exerciseMetric) ? exerciseMetric : undefined
   ));
 
@@ -303,7 +301,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     view: entryView ?? pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
     timeline: {
-      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id, gymId },
+      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id], gymId } : { exerciseDefinitionId: subject.id, gymId },
       onOpenSession: openSession,
       exerciseLink,
     },
@@ -319,12 +317,12 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}
         week={focusedWeek}
-        gym={subject.kind === 'exercise' ? {
+        gym={{
           value: gymId,
           options: history.gyms,
           onChange: next => setChosenGym({ gymId: next }),
           allSessionCount: history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0),
-        } : undefined}
+        }}
       />
       {/* The view selector writes a preference; this is the only screen that
           now offers it, so a failed save says so here, with its Retry. */}
@@ -377,7 +375,7 @@ export default function ProgressHistoryRoute() {
   // Progress pushes a fresh page each time, but a link can reach this route
   // while it is mounted: new params are a new page, opening on their own
   // metric and week rather than keeping the last link's.
-  const gym = subject?.kind === 'exercise' ? encodeGymRouteParam(subject.gymId) ?? '' : '';
+  const gym = encodeGymRouteParam(subject?.gymId) ?? '';
   return <ProgressHistoryScreen initialMetric={metric} initialView={view} key={`${subject?.kind}:${subject?.id}:${metric}:${view}:${gym}`} subject={subject} />;
 }
 

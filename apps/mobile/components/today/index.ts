@@ -1,4 +1,4 @@
-export { PeriodPace } from './period-pace';
+export { MonthPace } from './month-pace';
 export { TodayProgressCard, type TodayProgressCardProps } from './progress-card';
 export { ShareBar, WeekFigures } from './week-figures';
 export {

@@ -8,7 +8,7 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { LatestSessionSummary, TodayProgress } from '@/src/progress-summary';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
-import { PeriodPace } from './period-pace';
+import { MonthPace } from './month-pace';
 import {
   formatSessionSummaryDuration,
   formatSessionSummaryFigures,
@@ -54,8 +54,8 @@ function LatestSessionRow({
   );
 }
 
-// Today's Progress card: this week against last week, the period against the
-// previous period's pace, the latest session.
+// Today's Progress card: this week against last week, the month against the
+// previous month's pace, the latest session.
 export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat }: TodayProgressCardProps) {
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
@@ -63,7 +63,7 @@ export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dat
     <Card style={styles.card} testID="today-progress-card">
       <WeekFigures week={progress.week} />
       <View style={styles.divider} />
-      <PeriodPace period={progress.period} />
+      <MonthPace month={progress.month} />
       <View style={styles.divider} />
       <View style={styles.latestHeading}>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>

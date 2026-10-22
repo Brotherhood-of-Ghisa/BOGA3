@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react-n
 import { Dimensions, Modal, Platform, Pressable, ScrollView, Text } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
+import { Information } from '@/components/ui/information';
 import { Sheet } from '@/components/ui/sheet';
 import { shouldDismissSheet, type SheetDrag } from '@/components/ui/sheet-gesture';
 
@@ -195,4 +196,17 @@ it.each(['backdrop', 'escape', 'back'])('still closes through %s without a slide
   if (path === 'back') fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
   expect(dismiss).toHaveBeenCalledTimes(1);
   expect(mockAnimations).toHaveLength(0);
+});
+
+it('keeps information open after a short drag and dismisses after a deliberate downward drag', () => {
+  render(<Information title="About Example" body="Lorem ipsum." testIDPrefix="example" />);
+  fireEvent.press(screen.getByTestId('example-info'));
+  release(40);
+  expect(screen.getByTestId('example-help')).toBeTruthy();
+  release(130);
+  expect(screen.queryByTestId('example-help')).toBeNull();
+  nextFrame();
+  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  fireEvent.press(screen.getByTestId('example-info'));
+  expect(screen.getByTestId('example-help')).toHaveStyle({ transform: [{ translateY: 0 }] });
 });
