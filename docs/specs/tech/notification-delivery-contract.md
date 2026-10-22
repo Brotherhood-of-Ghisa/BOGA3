@@ -20,9 +20,9 @@ Pre-cutover completed history never replays; a pre-cutover active workout can
 complete freshly without replaying its start. Its rank baseline starts at the
 cutover's current coherent board, or the first trustworthy later publication
 if rebuilding; unavailable earlier ranks are never invented.
-An isolated session trigger appends immutable activity moments; each new moment
-queues its source once and kicks the worker, so start admission survives
-completion before admission. Descendant writes queue and kick nothing. Raw intake
+An isolated session trigger appends immutable activity moments and queues each
+fresh, non-forfeited moment once; shared sources kick the worker. Start admission
+survives completion before admission. Descendant writes queue and kick nothing. Raw intake
 retains no source/workout/allocator locks. Exact current digests reject changed
 graphs even if intake failed. Admission claims a bounded batch of queued sources,
 locks their share groups then all sources before enqueue, tracks and starts each

@@ -212,7 +212,13 @@ run_psql 'select app_public.notification_admit_moments(20);' >/dev/null
 assert_sql 'one admission pass reaches the live start after historical intake' "select exists(select 1 from app_public.notification_intents
   where lifter_user_id='${B_UID}' and recipient_user_id='${A_UID}' and session_id='history-live-${RUN_TAG}' and kind='start')
   and not exists(select 1 from app_public.notification_moment_queue where member_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}');"
-run_psql "delete from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}';" >/dev/null
+pass '200 expired sessions preserve moments without delaying a live start'
+# The upload also queues group evaluation; keep that bulk fixture out of later readiness probes.
+run_psql "delete from app_public.notification_intents where lifter_user_id='${B_UID}' and session_id='history-live-${RUN_TAG}';
+  delete from app_public.group_eval_queue where member_user_id='${B_UID}'
+    and (session_id like 'old-admission-%-${RUN_TAG}' or session_id='history-live-${RUN_TAG}');
+  delete from app_public.sessions where owner_user_id='${B_UID}'
+    and (id like 'old-admission-%-${RUN_TAG}' or id='history-live-${RUN_TAG}');" >/dev/null
 DELAYED_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 DELAYED_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
 DELAYED_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"

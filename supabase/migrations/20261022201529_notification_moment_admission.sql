@@ -1,13 +1,8 @@
 -- Workout notifications are admitted from the moments that produced them, not
 -- from a periodic rescan of every session of the last 24 hours.
 --
--- Before: every worker run (each kick and each 5-minute sweep) re-verified up
--- to 20 recent sessions (tracking, share repair, start, readiness digests and
--- a stuck-evaluation re-enqueue) and rewrote each one's updated_at, even with
--- nobody training; every set write kicked the worker; the sweep called the
--- worker unconditionally.
--- After: appending a moment queues its source once and kicks; the worker admits
--- only queued sources, then forgets them. A failed trigger loses that alert and
+-- A fresh moment queues its source once; the worker admits only queued sources,
+-- then forgets them. A failed trigger loses that alert and
 -- is logged; nothing repairs it later. The sweep calls the worker only when
 -- something is due, so an idle hour writes no application rows.
 
