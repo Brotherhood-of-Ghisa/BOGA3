@@ -17,6 +17,7 @@ import { fixtureStatements, type FixtureSpec } from './fixture.ts';
 import { NOTIFICATION_WORKER_URL, pushEntities } from './tier1.ts';
 
 const TAG = '/* groups-perf */';
+const DRAIN_TIMEOUT_MS = 300000;
 const LINKED_EXERCISES = [
   { ex: 0, name: 'Bench press', weight: (k: number) => (k === 0 ? '50' : '82.5'), reps: '5' },
   { ex: 1, name: 'Back squat', weight: (k: number) => (k === 0 ? '60' : '110'), reps: '5' },
@@ -353,15 +354,20 @@ export class Tier2Run {
   /** Steady state through the real Edge function, as the groups-leaderboards lane drains it. */
   private async drain(): Promise<void> {
     const [secret] = (await this.admin.query(`${TAG} select app_public.group_eval_config('group_eval_secret') as s`)).rows;
-    let drained = false;
-    for (let round = 0; round < 500 && !drained; round += 1) {
+    // The fixture's own commit kicks group-eval too: while that run holds the
+    // jobs, a drain claims nothing, so wait for it rather than spin.
+    const deadline = Date.now() + DRAIN_TIMEOUT_MS;
+    for (;;) {
       const response = await this.edge('group-eval', { 'x-group-eval-secret': secret.s });
       if (!response.ok) throw new Error(`group-eval drain failed: HTTP ${response.status}`);
       const body = (await response.json()) as { claimed: number; failed: number };
       if (body.failed > 0) throw new Error(`group-eval drain: ${body.failed} jobs failed`);
-      drained = body.claimed === 0 && (await this.pendingJobs()) === 0;
+      if (body.claimed > 0) continue;
+      const pending = await this.pendingJobs();
+      if (pending === 0) break;
+      if (Date.now() > deadline) throw new Error(`group-eval drain left ${pending} jobs or kicks after ${DRAIN_TIMEOUT_MS / 1000} s`);
+      await sleep(1000);
     }
-    if (!drained) throw new Error('group-eval drain did not reach an empty queue in 500 runs');
     const worker = await this.edge('notification-worker', { apikey: this.options.serviceRoleKey });
     if (!worker.ok) throw new Error(`notification-worker failed: HTTP ${worker.status}`);
     await this.quiesce();
