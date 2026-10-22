@@ -19,8 +19,8 @@
 | what a backend lane asserts | its body under `supabase/tests/` |
 | whether this machine can run a lane | `./boga doctor` |
 
-Durations are owned by the measured per-run records every `./boga test` lane run
-writes to `~/.config/boga/timings/records/`. Cite the reader or re-measure —
+Durations come from the per-run records every lane run writes
+(`~/.config/boga/timings/records/`). Cite the reader or re-measure —
 never estimate. A run above ~2-3× the recorded median is a signal something is
 wrong, not a normal slow run.
 
@@ -51,9 +51,8 @@ owns the risk.** Two standing cases:
 
 ## Lane design rules
 
-The cheapest-layer rule in *Test layers* above is the first of these, and the
-one this suite drifts from fastest. These five keep a lane's cost proportional
-to what only that lane can prove.
+These five keep a lane's cost proportional to what only that lane can prove;
+the cheapest-layer rule above is the one this suite drifts from fastest.
 
 1. **Name a lane for what it proves**, not for the feature it touches. A name
    that tracks a screen or a domain stops describing the lane's contents the
@@ -209,6 +208,7 @@ the name does not give away.
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
 | `mcp-smoke` | Protocol-to-data proof for the MCP service: OAuth/PKCE consent, tool discovery and calls, returned fixture ids, account-data exclusion, artifact cleanup. |
 | `dev-wipe-my-data` | The developer-only RPC's guards: auth, non-production environment, owner-scoped deletion only. |
+| `groups-perf`, `groups-perf-load` | Report-only: how group evaluation and sweep cost grows with history, group size and concurrent loggers. If you are changing those costs, load `docs/specs/tech/groups-performance-measurement.md`. |
 
 Required coverage by surface: policy, SQL-function and constraint changes need
 DB-level tests; Edge Functions need runtime-native unit tests *and* local
@@ -260,8 +260,7 @@ runs `docs-check` alone; every later step is skipped in the same job, and push
 to `main` always runs everything. `scripts/ci-docs-only.sh` owns that rule and
 `scripts/tests/ci-docs-only.test.sh` pins it — a doc that a test or script
 reads at runtime must live outside `docs/`. The one exception is
-`docs/product/`, whose fact tables Jest runs: a change there runs everything. Two consequences are policy, not
-trivia:
+`docs/product/`, whose fact tables Jest runs: a change there runs everything. Two consequences:
 
 - **"Not in CI" means you run it here.** This machine boots the iOS simulator and
   local Supabase; `./boga doctor` proves it. Never record a slow lane as
@@ -287,5 +286,3 @@ it when editing tests there (rule in `AGENTS.md`):
   UI↔server e2e requirement).
 - `apps/mobile/__tests__/README.md` — GPS gym-location, exercise-tag, auth
   bootstrap and profile-management coverage.
-
-This doc keeps only the cross-cutting policies above.

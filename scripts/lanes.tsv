@@ -51,3 +51,5 @@ jest-sync	extra	none	no	apps/mobile	npm run test:sync
 jest-coverage	extra	none	no	apps/mobile	npm run test:coverage
 complexity	extra	none	no	apps/mobile	npm run lint:complexity
 dependencies	extra	none	no	apps/mobile	npm run lint:deps
+groups-perf	extra	supabase	no	.	./supabase/scripts/run-suite.sh groups-perf.sh
+groups-perf-load	extra	supabase	no	.	./supabase/scripts/run-suite.sh groups-perf-load.sh
