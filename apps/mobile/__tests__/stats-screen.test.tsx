@@ -485,7 +485,7 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('uses the same supplied layout for Exercise and Muscle, keeping 1RM in List without changing that choice', () => {
+  it('uses the same supplied layout for Exercise and Muscle, keeping 1RM in Map and retaining the 3D List fallback', () => {
     const props = buildShellProps({ viewMode: 'exercise', muscleLayout: 'heatmap' });
     const view = render(<StatsScreenShell {...props} />);
     expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
@@ -493,12 +493,32 @@ describe('StatsScreenShell', () => {
     view.rerender(<StatsScreenShell {...props} viewMode="muscle" />);
     expect(screen.getByTestId('stats-muscle-map')).toBeTruthy();
     view.rerender(<StatsScreenShell {...props} exerciseMetric="estimatedOneRepMax" />);
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    view.rerender(<StatsScreenShell {...props} muscleLayout="3d" exerciseMetric="estimatedOneRepMax" />);
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     view.rerender(<StatsScreenShell {...props} exerciseMetric="totalVolume" />);
     expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
     view.rerender(<StatsScreenShell {...props} muscleLayout="list" />);
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  });
+
+  it('retains Volume-only exercises across Map metrics, with unavailable 1RM figures', () => {
+    const exercise: ExerciseListItem = { id: 'missing-strength', name: 'Unavailable strength', lastCompletedAt: null,
+      current: { workingSetCount: 0, totalVolume: 400, volumeSetCount: 4, estimatedOneRepMax: null },
+      previous: { workingSetCount: 0, totalVolume: 200, volumeSetCount: 2, estimatedOneRepMax: null } };
+    const props = buildShellProps({ viewMode: 'exercise', muscleLayout: 'heatmap',
+      exerciseListItems: [exercise], exerciseMappings: [{ id: exercise.id,
+        mappings: [{ id: 'mapping', muscleGroupId: 'chest', role: 'primary', weight: 1 }] }] });
+    const view = render(<StatsScreenShell {...props} />);
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Chest'));
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent(/^0$/);
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="totalVolume" />);
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent(/^400$/);
+    view.rerender(<StatsScreenShell {...props} exerciseMetric="estimatedOneRepMax" />);
+    expect(screen.getByTestId('stats-exercise-tile-Chest-missing-strength', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-now')).toHaveTextContent('—');
+    expect(screen.getByTestId('stats-exercise-row-missing-strength-change')).toHaveTextContent('—');
   });
 
   it('uses the Settings layout without offering a presentation filter in Progress', () => {

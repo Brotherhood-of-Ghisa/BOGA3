@@ -206,7 +206,7 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('uses the shared layout for exercise families, keeps history detail, and restores it after 1RM List', async () => {
+  it('uses the shared layout for exercise families, keeps history detail, and keeps it in 1RM Map', async () => {
     await renderSeededStats();
     expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
     await showHeatmap();
@@ -215,6 +215,7 @@ describe('Stats over real data', () => {
     const family = screen.getByTestId('stats-exercise-family-Legs');
     fireEvent.press(family);
     expect(family).toHaveProp('accessibilityState', { selected: true, expanded: true });
+    expect(screen.getByTestId('stats-exercise-selection-Legs')).toHaveStyle({ borderColor: uiRoles.ink });
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     const tile = () => screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}`, { includeHiddenElements: true });
     const fill = StyleSheet.flatten(tile().props.style).backgroundColor;
@@ -232,9 +233,10 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     chooseFilter('metric', 'Volume');
     chooseFilter('metric', '1RM');
-    expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/\d+\.\d/);
     chooseFilter('metric', 'Sets');
     await screen.findByTestId('stats-exercise-map-detail');
     expect(screen.getByTestId('stats-exercise-family-Legs')).toHaveProp('accessibilityState', { selected: true, expanded: true });
@@ -312,6 +314,10 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-row-${BENCH}-previous`)).toHaveTextContent(/^1450$/);
     fireEvent.press(screen.getByTestId(`stats-exercise-row-${BENCH}`));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${BENCH}&metric=volume&gymId=${gym}`);
+    chooseFilter('metric', '1RM');
+    expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
+    expect(screen.queryByTestId(`stats-exercise-row-${BENCH}`)).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-secondary-summary')).toBeNull();
   });
 
   it('uses independent working/Volume eligibility for Secondary and keeps a zero Volume contribution readable', async () => {
@@ -385,7 +391,10 @@ describe('Stats over real data', () => {
     await screen.findByTestId('stats-loading-state');
     await act(async () => pending.resolve(await real()));
     await screen.findByTestId('stats-exercise-map');
-    expect(screen.getByTestId('stats-exercise-map-empty')).toHaveTextContent('No exercises with working sets in either period.');
+    expect(screen.queryByTestId('stats-exercise-map-empty')).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-tile-Legs-${SQUAT}-now`, { includeHiddenElements: true })).toHaveTextContent(/^0$/);
+    fireEvent.press(screen.getByTestId('stats-exercise-family-Legs'));
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^0$/);
   });
 
   it('does not fabricate an empty map on an exercise-history read failure and retries the source', async () => {

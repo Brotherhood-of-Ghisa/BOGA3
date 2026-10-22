@@ -194,7 +194,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 Progress filters stay in-route; Sessions last. [[muscle.progress-layout]]
 governs both layouts. Exercise families disclose contributions
 ([[muscle.exercise-map-area]]); their links open full history at the selected
-metric/gym. 1RM uses List; layout switches reset scroll.
+metric/gym. Exercise 1RM follows [[muscle.progress-layout]]; layout switches reset scroll.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

@@ -43,7 +43,7 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('shares Progress view with Exercise, keeps 1RM in List, and restores Map and 3D on a fresh visit', async () => {
+it('shares Progress view with Exercise, keeps 1RM in Map, and restores Map and 3D on a fresh visit', async () => {
   const page = await openSettingsAndProgress();
   expect(screen.getByText('Progress view')).toBeTruthy();
   const layout = screen.getByTestId('settings-muscle-view-row');
@@ -70,8 +70,7 @@ it('shares Progress view with Exercise, keeps 1RM in List, and restores Map and 
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
-  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
-  expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+  expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('heatmap');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();

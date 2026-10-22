@@ -4,7 +4,6 @@ import type { ProgressMuscleComparison } from '@/src/data/progress-comparisons';
 import { exerciseCountedMuscles } from '@/src/exercise-catalog/exercise-muscles';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
-import type { ProgressMetric } from '@/src/preferences/model';
 import { hasComparisonMetric, type ComparisonPeriodFigures, type ComparisonRow } from './comparison-columns';
 import { MUSCLE_MAP_FAMILIES, MUSCLE_MAP_HEADER, MUSCLE_MAP_INSET, muscleMapFamilyRects, type MapRect } from './muscle-map-layout';
 import type { MuscleMapFamily } from './muscle-map-reference';
@@ -57,6 +56,8 @@ export function buildExerciseMapFamilies({ items, exercises, muscles, workingSet
         current: halfPeriod(item.current), previous: halfPeriod(item.previous) }, targetAttainment: 0 });
     }
     if (secondaryItems.length > 0) {
+      // Keep floating-point sums independent of the table's metric sort.
+      const orderedSecondary = [...secondaryItems].sort((a, b) => a.item.id.localeCompare(b.item.id));
       // Target membership comes from either period before search/gym filtering, never displayed rows.
       const represented = muscles.filter(muscle => muscle.familyName === name && muscle.exercises.some(contributor => {
         const exercise = definitions.get(contributor.exerciseDefinitionId);
@@ -66,8 +67,8 @@ export function buildExerciseMapFamilies({ items, exercises, muscles, workingSet
       })).map(muscle => muscle.muscleGroupId);
       family.secondary = { exercises: secondaryItems,
         targetAttainment: groupedTargetAttainment(represented, counts, workingSetTarget),
-        current: sumPeriods(secondaryItems.map(entry => entry.item.current)),
-        previous: sumPeriods(secondaryItems.map(entry => entry.item.previous)) };
+        current: sumPeriods(orderedSecondary.map(entry => entry.item.current)),
+        previous: sumPeriods(orderedSecondary.map(entry => entry.item.previous)) };
     }
     return family;
   });
@@ -133,8 +134,8 @@ const sumPeriods = (periods: ComparisonPeriodFigures[]): ComparisonPeriodFigures
 
 export const exerciseMapTileRow = (entry: ExerciseMapTile): ComparisonRow => 'item' in entry ? entry.item : entry;
 export const exerciseMapTileKey = (entry: ExerciseMapTile): string => 'item' in entry ? `exercise:${entry.item.id}` : 'secondary';
-export const exerciseMapValue = (item: ComparisonRow, metric: ProgressMetric): number => {
-  const value = metric === 'workingSetCount' ? item.current.workingSetCount : item.current.totalVolume;
+export const exerciseMapValue = (item: ComparisonRow): number => {
+  const value = item.current.totalVolume;
   return value !== null && Number.isFinite(value) && value > 0 ? value : 0;
 };
 
@@ -146,9 +147,9 @@ export function exerciseMapLayout(width: number) {
   return { height, families: muscleMapFamilyRects(width, height) };
 }
 
-/** Binary partition preserves area, including tiny values; readable rows supply the touch targets. */
-export function exerciseMapTileRects<T extends ExerciseMapTile>(entries: readonly T[], bounds: MapRect, metric: ProgressMetric) {
-  const value = (entry: T) => exerciseMapValue(exerciseMapTileRow(entry), metric);
+/** Volume fixes every metric's geometry, including reserved Secondary area; detail rows supply touch targets. */
+export function exerciseMapTileRects<T extends ExerciseMapTile>(entries: readonly T[], bounds: MapRect) {
+  const value = (entry: T) => exerciseMapValue(exerciseMapTileRow(entry));
   const positive = entries.filter(entry => value(entry) > 0);
   const max = Math.max(0, ...positive.map(value));
   const weighted = positive.map(entry => ({ entry, weight: value(entry) / max }))
