@@ -489,31 +489,6 @@ drain_worker
 assert_sql 'one accepted completion across overlapping groups' "select count(*)=1 from app_public.notification_deliveries d join app_public.notification_intents n on n.id=d.intent_id
   where n.recipient_user_id='${A_UID}' and n.session_id='${SESSION}' and n.kind='completion' and d.state='ticket';"
 INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${A_UID}' and session_id='${SESSION}' and kind='completion';")"
-# Repeated settled recovery must be a physical no-op, including its heavy proof helpers.
-run_psql "begin;
-  set local track_functions='all';
-  set local client_min_messages=notice;
-  create temp table notification_idle_before as select
-    (select coalesce(sum(n_tup_upd),0) from pg_stat_xact_user_tables where relname in ('notification_workouts','notification_intents')) as writes,
-    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure) as proofs,
-    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure) as graphs,
-    (select jsonb_agg(jsonb_build_array(member_user_id,session_id,xmin::text) order by member_user_id,session_id) from app_public.notification_workouts) as versions;
-  do \$\$ begin for n in 1..10 loop
-    perform app_public.notification_admit_moments(20);
-    perform app_public.notification_workout_prepare(20);
-  end loop; end \$\$;
-  do \$\$ declare b record; writes bigint; proofs bigint; graphs bigint; versions jsonb; begin
-    select * into b from notification_idle_before;
-    select coalesce(sum(n_tup_upd),0)-b.writes into writes from pg_stat_xact_user_tables where relname in ('notification_workouts','notification_intents');
-    select coalesce(sum(calls),0)-b.proofs into proofs from pg_stat_xact_user_functions where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure;
-    select coalesce(sum(calls),0)-b.graphs into graphs from pg_stat_xact_user_functions where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure;
-    select jsonb_agg(jsonb_build_array(member_user_id,session_id,xmin::text) order by member_user_id,session_id) into versions from app_public.notification_workouts;
-    if writes<>0 or proofs<>0 or graphs<>0 or versions is distinct from b.versions then
-      raise exception 'idle recovery repeated work: writes=%, proofs=%, graphs=%',writes,proofs,graphs;
-    end if;
-    raise notice 'notification idle passes=10, writes=%, proofs=%, graphs=%',writes,proofs,graphs;
-  end \$\$;
-  rollback;" >/dev/null
 IDLE_VERSION="$(run_psql "select xmin::text from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';")"
 confirm "${B_TOKEN}" "${SESSION}" "$(manifest "${B_UID}" "${SESSION}")"; check 'unchanged settled confirmation retains success' '.confirmed==true'
 assert_sql 'unchanged confirmation does not rewrite its workout tuple' "select xmin::text='${IDLE_VERSION}' from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';"
@@ -1047,10 +1022,11 @@ jq -e 'length==4 and all(.[];.graph_calls==2) and all(.[0:3][];.completed==true 
 # preparation reads the same few pages however many workouts and sessions exist.
 IDLE_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
   <"${SUPABASE_DIR}/tests/notification-idle-benchmark.sql" | grep '^\[')" || fail 'idle benchmark fixture failed'
-jq -e 'length==7 and all(.[0:6][];.rows_written==0 and .wal_kb==0 and .worker_posts==0 and .temp_pages==0)
+jq -e 'length==7 and all(.[0:6][];.rows_written==0 and .proof_calls==0 and .graph_calls==0 and .worker_posts==0 and .temp_pages==0)
   and all(.[]|select(.step=="prepare");.pages<=20) and all(.[]|select(.step=="sweep");.pages<=1000)
   and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25 and .[6].worker_posts==1' <<<"${IDLE_SAMPLES}" >/dev/null ||
   fail "idle notification background regressed: ${IDLE_SAMPLES}"
+printf '[notification-workout-events] idle benchmark (server-wide WAL is diagnostic): %s\n' "${IDLE_SAMPLES}"
 # Restore each workout's original published contribution when testing which movement that workout caused.
 rpc "${A_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${G2}" \
   '{p_group_id:$g,p_name:"Attribution bench",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"e1rm"}')"

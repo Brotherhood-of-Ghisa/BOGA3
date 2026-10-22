@@ -5,15 +5,16 @@
 -- members with linked history. notification-workout-events.sh asserts its
 -- output: an idle sweep writes nothing and calls no worker, and preparation
 -- work does not grow with recent workouts or history. Each sample reports
--- buffer pages (EXPLAIN BUFFERS, nested calls included), rows written, WAL and
--- worker posts. It touches no admission internals, so it also measures schemas
--- that predate them. A final positive control starts a workout, so that sweep
+-- buffer pages (EXPLAIN BUFFERS, nested calls included), rows written, proof/graph
+-- calls and worker posts. Server-wide WAL growth is diagnostic only. It touches
+-- no admission internals, so it also measures schemas that predate them. A final positive control starts a workout, so that sweep
 -- must call the worker. It empties the notification tables first, inside its
 -- rolled-back transaction, so other fixtures' work cannot make the sweep due.
 \set ON_ERROR_STOP on
 begin;
 set local client_min_messages=warning;
 set local statement_timeout='120s';
+set local track_functions='all';
 select app_public.group_eval_set_url('') \gset
 select vault.create_secret('http://127.0.0.1:9/idle-benchmark','notification_worker_url') \gset
 select vault.create_secret('idle-benchmark','notification_worker_key') \gset
@@ -98,12 +99,16 @@ begin
 end $$;
 
 create temporary table idle_samples(step text,sessions int,recent int,pages bigint,temp_pages bigint,
-  rows_written bigint,wal_kb numeric,worker_posts bigint);
+  rows_written bigint,wal_kb numeric,worker_posts bigint,proof_calls bigint,graph_calls bigint);
 create function pg_temp.measure(p_step text,p_sql text) returns void language plpgsql as $$
-declare plan json; lsn pg_lsn; written_before bigint; posts_before bigint;
+declare plan json; lsn pg_lsn; written_before bigint; posts_before bigint; proofs_before bigint; graphs_before bigint;
 begin
   select coalesce(sum(n_tup_ins+n_tup_upd+n_tup_del),0) into written_before from pg_stat_xact_user_tables;
   select count(*) into posts_before from net.http_request_queue;
+  select coalesce(sum(calls),0) into proofs_before from pg_stat_xact_user_functions
+    where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure;
+  select coalesce(sum(calls),0) into graphs_before from pg_stat_xact_user_functions
+    where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure;
   lsn:=pg_current_wal_insert_lsn();
   -- Fixture tables are a few pages, where the planner prefers sequential scans;
   -- disabling them measures the plans hosted-sized tables get.
@@ -118,7 +123,11 @@ begin
     (plan->0->'Plan'->>'Temp Written Blocks')::bigint,
     (select coalesce(sum(n_tup_ins+n_tup_upd+n_tup_del),0) from pg_stat_xact_user_tables)-written_before,
     round(pg_wal_lsn_diff(pg_current_wal_insert_lsn(),lsn)/1024.0,1),
-    (select count(*) from net.http_request_queue)-posts_before;
+    (select count(*) from net.http_request_queue)-posts_before,
+    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
+      where funcid='app_public.notification_workout_ready(uuid,text)'::regprocedure)-proofs_before,
+    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
+      where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure)-graphs_before;
 end $$;
 
 -- Linked history outside the alert window, about the hosted size (~1.2k sets).
