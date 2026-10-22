@@ -206,7 +206,7 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('matches Group and Gym compact geometry and label typography while retaining the switch state', async () => {
+  it('matches Group by and Gym compact geometry and label typography while retaining the switch state', async () => {
     await renderSeededStats();
     const group = screen.getByTestId('stats-group-toggle');
     const gym = screen.getByTestId('stats-gym');
@@ -216,7 +216,7 @@ describe('Stats over real data', () => {
     for (const field of geometry) expect(groupStyle[field]).toBe(gymStyle[field]);
     expect(groupStyle.minHeight).toBe(uiGeometry.compactControlHeight);
     expect(group.props.hitSlop).toBe(gym.props.hitSlop);
-    const groupLabel = StyleSheet.flatten(within(group).getByText('Group').props.style);
+    const groupLabel = StyleSheet.flatten(within(group).getByText('Group by').props.style);
     const gymLabel = StyleSheet.flatten(within(gym).getByText('All gyms').props.style);
     for (const field of ['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform'] as const) {
       expect(groupLabel[field]).toBe(gymLabel[field]);

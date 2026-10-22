@@ -261,7 +261,7 @@ function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup
         placeholder={exercise ? 'Search exercises or muscles' : 'Search muscles'}
         testID={exercise ? 'stats-search-input' : 'stats-muscle-search-input'} value={query} />
     </View>
-    {tableVisible ? <FilterChip label="Group" size="compact" on={grouped} accessibilityLabel="Group by muscle family"
+    {tableVisible ? <FilterChip label="Group by" size="compact" on={grouped} accessibilityLabel="Group by muscle family"
       accessibilityRole="switch" accessibilityState={{ checked: grouped }} testID="stats-group-toggle" onPress={onToggleGroup} /> : null}
     {onSelectGym ? <GymPicker size="compact" onChange={onSelectGym}
       options={gymOptions ?? []} testID="stats-gym" value={gymId} /> : null}
