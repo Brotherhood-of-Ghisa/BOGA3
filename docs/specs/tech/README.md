@@ -25,6 +25,9 @@ Current docs:
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.
 
+When measuring or changing the server cost of group evaluation or the pg_cron
+sweeps, load `groups-performance-measurement.md`.
+
 When changing notifications, load `notification-delivery-contract.md` for
 installation/account binding, encrypted provider handoff and receipt recovery.
 
