@@ -36,6 +36,7 @@ Two standing rules:
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
+| An on-demand explanation, optionally beside a heading | `Information` (`information.tsx`) — owns the info trigger, prose and standard `Sheet` |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
 | A filter, breakdown, view or compact history links | `SegmentedControl` (`segmented-control.tsx`) — `fill` / `fit` / `inline`, `density="compact"` and icon segments for two controls sharing a row; navigation mode reuses the frame as links |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |

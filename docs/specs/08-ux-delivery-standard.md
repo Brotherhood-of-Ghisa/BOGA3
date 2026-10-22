@@ -131,7 +131,7 @@ Use this section as the single source of truth for reusable UX patterns.
 
 14. On-demand explainer pattern
    - Intent: explain a specialist chart without adding inline commentary ([[copy.no-inline-explanation]]).
-   - Usage: `components/rm-curve/help.tsx`, opened by the `info` `IconButton` beside the chart title.
+   - Usage: `Information` (`components/ui/information.tsx`), used by `components/rm-curve/help.tsx` beside the chart title.
    - Rules: an accessible label names the topic; the button keeps a full mobile tap target. The existing `Sheet` holds short, plain-language sections in a scrolling body and uses its standard dismissal gestures, backdrop and accessible escape. Opening or dismissing changes no chart choice or selection.
 
 ## Default appearance baseline (MVP)

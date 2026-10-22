@@ -1,7 +1,4 @@
-import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
-import { IconButton, Sheet } from '@/components/ui';
-import { curveStyles as styles } from './styles';
+import { Information } from '@/components/ui';
 
 const SECTIONS = [
   ['Reading the chart', 'Each dot is a working set. Up means more load; right means more reps. RIR means reps you felt you had left: eight reps with two left is plotted at ten. Per side means one side. On bodyweight exercises, Load can include part of your bodyweight.'],
@@ -15,21 +12,7 @@ const SECTIONS = [
 
 /** Help is requested explicitly; opening or dismissing it never changes chart scope. */
 export function RmCurveHelp() {
-  const [visible, setVisible] = useState(false);
-  return <>
-    <IconButton name="info" tone="muted" size="sm" accessibilityLabel="About the RM curve"
-      testID="rm-curve-info" onPress={() => setVisible(true)} />
-    <Sheet visible={visible} title="About the RM curve" dismissLabel="Dismiss RM curve explanation"
-      testID="rm-curve-help" onDismiss={() => setVisible(false)}>
-      <ScrollView style={styles.helpScroll} contentContainerStyle={styles.helpContent}>
-        <Text allowFontScaling={false} style={styles.body}>
-          Heavy weights usually mean fewer reps. The curve uses your past sets to estimate that trade-off for this exercise. It can also look for a possible change in strength over time.
-        </Text>
-        {SECTIONS.map(([title, body]) => <View key={title} style={styles.helpSection}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.filterLabel}>{title}</Text>
-          <Text allowFontScaling={false} style={styles.body}>{body}</Text>
-        </View>)}
-      </ScrollView>
-    </Sheet>
-  </>;
+  return <Information label="RM curve" title="About the RM curve" testIDPrefix="rm-curve"
+    body="Heavy weights usually mean fewer reps. The curve uses your past sets to estimate that trade-off for this exercise. It can also look for a possible change in strength over time."
+    sections={SECTIONS} />;
 }
