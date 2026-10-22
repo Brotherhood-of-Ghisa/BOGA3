@@ -1070,6 +1070,9 @@ sess "${AWAY_TOKEN}" "${T}-sj" completed "${DMJ}" "j1:100:5"
 drain "rejoin setup"
 rpc "${AWAY_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
 expect_ok "M leaves"
+[[ "$(run_psql "select exists(select 1 from app_public.group_metric_eval_queue
+    where group_exercise_id = '${GXJ}' and 'membership' = any(causes));")" == t ]] ||
+  fail "a member leaving re-evaluates the group's comparisons"
 mark
 link "${AWAY_TOKEN}" "${DMJ}" "${GID}" "${GXJ}" deleted
 drain "unlink while away"

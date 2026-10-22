@@ -143,6 +143,22 @@ end $$;
 
 drop function app_public.notification_recover_workouts(integer);
 
+-- A member who leaves drops out of every comparison of the group, so those
+-- comparisons are evaluated again rather than waiting for the next set.
+create function app_public.group_metric_on_membership_end() returns trigger
+language plpgsql security definer set search_path=app_public,pg_temp as $$
+declare exercise uuid;
+begin
+  for exercise in select id from group_exercises where group_id=new.group_id and archived_at is null order by id loop
+    perform group_metric_enqueue_isolated(new.group_id,exercise,'membership',new.user_id);
+  end loop;
+  return null;
+end $$;
+create trigger group_memberships_metric_on_end after update of ended_at on app_public.group_memberships
+  for each row when (old.ended_at is null and new.ended_at is not null)
+  execute function app_public.group_metric_on_membership_end();
+revoke all on function app_public.group_metric_on_membership_end() from public,anon,authenticated;
+
 -- Mirrors notification_prune's predicates: true while a prune pass would change something.
 create function app_public.notification_prune_due() returns boolean
 language sql stable security definer set search_path=app_public,pg_temp as $$

@@ -1,7 +1,7 @@
 -- Local-only, rollback-only fixture. Run through the leased Postgres container:
 --   docker exec -i supabase_db_<project_id> psql -U postgres -d postgres -f - < this file
 -- Measures the notification background with nobody training: one sweep and one
--- worker preparation, with 8 and then 60 recent, already-notified workouts of
+-- worker preparation, with 8 and then 32 recent, already-notified workouts of
 -- members with linked history. notification-workout-events.sh asserts its
 -- output: an idle sweep writes nothing and calls no worker, and preparation
 -- work does not grow with recent workouts or history. Each sample reports
@@ -90,7 +90,8 @@ begin
     manifest_digest=app_public.notification_manifest_digest(w.member_user_id,w.session_id),
     context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id),
     enqueued_generation=w.generation
-  where w.member_user_id in(select member from idle_members) and w.completion_at+interval '24 hours'>now();
+  where w.member_user_id in(select member from idle_members) and w.confirmed_at is null
+    and w.completion_at+interval '24 hours'>now();
   -- Hosted autovacuum keeps statistics current; a fixture built in one transaction must do it itself.
   analyze app_public.notification_workouts,app_public.notification_workout_moments,app_public.notification_workout_targets,
     app_public.notification_intents,app_public.notification_deliveries,app_public.notification_installations;
@@ -126,7 +127,7 @@ select pg_temp.add_sessions('recent-a',2,(select stamp from idle_fixture)-864000
 select pg_temp.settle();
 select pg_temp.measure('sweep','select app_public.notification_sweep()');
 select pg_temp.measure('prepare','select app_public.notification_workout_prepare(20)');
-select pg_temp.add_sessions('recent-b',13,(select stamp from idle_fixture)-86400000::bigint*19/24,3600000,5);
+select pg_temp.add_sessions('recent-b',6,(select stamp from idle_fixture)-86400000::bigint*19/24,3600000,5);
 select pg_temp.settle();
 select pg_temp.measure('sweep','select app_public.notification_sweep()');
 select pg_temp.measure('prepare','select app_public.notification_workout_prepare(20)');
