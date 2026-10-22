@@ -170,47 +170,50 @@ contribution or reading.
 
 ## Evaluator
 
-**Queues.** `group_eval_queue` holds session jobs (re-normalize, then re-apply
-targets) and target jobs (enqueue one comparison evaluation);
-`group_metric_eval_queue` holds comparisons. Jobs coalesce on their natural
-key: a re-enqueue merges `causes`, bumps `generation`, and is available now.
-Completion writes only if `generation` is unchanged since the claim. Failures
-back off (2 s … 5 min) and park at `group_eval_max_attempts()`; nothing is
-dropped or retried forever.
+**Queues.** `group_eval_queue` holds session jobs (re-normalize, re-apply
+targets) and target jobs (enqueue one comparison); `group_metric_eval_queue`
+holds comparisons. A re-enqueue coalesces on the natural key, merges `causes`,
+bumps `generation` and is available now; completion writes only if
+`generation` is unchanged. Failures back off (2 s … 5 min) and
+park at `group_eval_max_attempts()`.
 
 **Notification capture.** If changing workout notifications, load
 [notification-delivery-contract.md](notification-delivery-contract.md): isolated
 intake and atomic whole-board snapshots.
 
 **Enqueue.** Isolated triggers on sessions, session exercises, sets,
-`load_input_mode` changes and links, plus catch-up on unarchive and on a new
-membership period. No `DELETE` triggers: the next evaluation drops hard-delete
-leftovers. A link to a non-uuid, unknown or foreign target enqueues nothing.
-The evaluator never writes links: a bad server-written link stalls the
-member's pull.
+`load_input_mode` changes and links, plus catch-up on unarchive and a new
+membership period. Set and session-exercise writes queue their definitions;
+session inserts, status/start/deletion changes, recreated shares, rules drains
+and notification recovery queue the whole session. A session job re-applies
+only targets they reach: a live link, board state linked to one, or an active
+certification or record on their sets. No `DELETE` triggers: the next
+evaluation drops hard-delete leftovers. Non-uuid, unknown or foreign links
+enqueue nothing. The evaluator never writes links: a bad server-written link
+stalls the member's pull.
 
 **Invocation.** A `pg_net` kick (one per transaction, after commit) starts work
 in seconds. A `pg_cron` sweep every 5 minutes is the backstop, slow on purpose:
-every run writes `cron.job_run_details`, which forces a hosted WAL archive. URL
-and secret live in Vault; with no URL the queue waits. The function's caller is
-Postgres (shared secret, no JWT); it has no client API.
+each run's `cron.job_run_details` row forces a hosted WAL archive. URL
+and secret live in Vault; with no URL the queue waits. Its caller is
+Postgres (shared secret, no JWT), never a client.
 
 **Facts.** `group_set_facts` has one row per set of every shared session,
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`
-is the one implementation of the group set rules; device session cards parse
-with the same kernel.
+is the one implementation of the group set rules; device session cards use
+the same kernel.
 `fingerprint` hashes raw synced values and interprets nothing. `working` is
 the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
-policy); every reader reads it as `working is not false`, so a non-working
-set is excluded like a warm-up. A set-rule or kernel change bumps
+policy); readers read it as `working is not false`, so a non-working
+set is excluded. A set-rule or kernel change bumps
 `GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
 `rules` recompute, a bounded batch per run. Each run records its version
-(`group_eval_rules_state`); the sweep also kicks while a shared session with
-older facts has no queued job, so once the new function has run once, a bump
-finishes without member activity. Comparisons are not stamped with it: the
-same change ships a migration enqueuing a `rules` evaluation of every live
-comparison, applied after the new worker is live. Kernel rescores advance only
-private record baselines; immutable historical values and revisions stay intact.
+(`group_eval_rules_state`); the sweep kicks while older facts lack a queued
+job, so once the new function has run, bumps finish without member activity.
+Comparisons are not stamped: the same change ships a migration, applied once
+the new worker is live, queuing `rules` evaluations of live comparisons. Kernel
+rescores advance only private record baselines; historical values and
+revisions stay immutable.
 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.

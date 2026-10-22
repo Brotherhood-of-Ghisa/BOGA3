@@ -25,9 +25,11 @@
 #     group_eval_retry_parked revives it;
 #   - the sweep drains a missed kick; the pg_net smoke (one kick per push).
 #
-# Every comparison is a protocol-4 one, and a session job's targets include
-# every exercise the member already has board state on
-# (group_eval_session_targets).
+# Every comparison is a protocol-4 one. A set or session-exercise write queues
+# a session job for its own exercise definitions; a session insert, a
+# status/start/deletion change or a recreated share queues the whole session.
+# A completed job applies only targets its definitions reach (live link, board
+# state linked at the last apply, active certification or record card).
 #
 # Direct-drain mode: the lane unsets the kick URL for the run and POSTs to
 # group-eval itself, so every assertion is deterministic; only the sweep and
@@ -434,6 +436,10 @@ push_b1() { # push_b1 <weight> [deleted_ms] — reps keep b1's raw "5 " so only 
   next_cuam
   push "${ATHLETE_TOKEN}" "b1 ${1}" "$(e_set "${T}-b1" "${SE_B}" 0 "$1" "5 " "" "${CUAM}" "${2:-null}")"
 }
+push_d1() { # push_d1 <weight>: the DB press set
+  next_cuam
+  push "${ATHLETE_TOKEN}" "d1 ${1}" "$(e_set "${T}-d1" "${SE_D}" 0 "$1" 10 "" "${CUAM}")"
+}
 FP_1025="$(fingerprint_of "${T}-b1")"
 push_b1 " 102.5 "
 drain_ok "b1 re-push, same values"
@@ -554,11 +560,16 @@ expect_ok "unarchive GXA"
 push_b1 108
 drain_ok "after unarchive"
 # A protocol-4 unarchive catches up through a comparison job (cause
-# membership, from the unarchive trigger), not a target job per link.
-expect_mine "after unarchive the link counts" \
-  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GXA}\"]}]"
+# membership, from the unarchive trigger), not a target job per link. A bench
+# set re-applies only the bench's comparison, never GXA's DB press.
+expect_mine "a set re-applies only its own exercise's target" \
+  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\"]}]"
 check "the unarchive catch-up comparison job completes" \
   "[.metric_jobs[] | select(.group_exercise_id == \"${GXA}\") | .outcome] == [\"completed\"]"
+push_d1 31
+drain_ok "DB press set after unarchive"
+expect_mine "after unarchive the link counts" \
+  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GXA}\"]}]"
 pass "archived targets are frozen (links written after archive included); unarchive restores them"
 
 next_cuam
@@ -583,11 +594,45 @@ drain_ok "unlink"
 expect_mine "unlink re-applies the target it left" "[{key: \"${GX3}\", kind: \"target\", outcome: \"completed\", causes: [\"link\"], targets: [\"${GX3}\"]}]"
 push_b1 109
 drain_ok "after unlink"
-# A session job also resolves every comparison the member holds board state on
-# in a group the session is shared to (group_eval_session_targets): unlinking
-# the bench leaves GX and GX3 resolving, so corrections still reach them.
-expect_mine "an unlinked exercise keeps resolving through the member's board state" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"
+# Once the unlink's re-apply has run, no link, board state or certification
+# ties the bench to GX or GX3, so a bench correction reaches neither (an active
+# certification keeps resolving: groups-certification.sh).
+expect_mine "an unlinked exercise no longer resolves" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []}]"
 pass "load-mode change, retarget, and unlink resolve the right targets"
+
+# session_defs: the S1 job's exercise definitions (`*` = the whole session).
+session_defs() {
+  run_psql "select coalesce(array_to_string(exercise_definition_ids, ','), '*') from app_public.group_eval_queue
+             where member_user_id = '${ATHLETE_UID}' and session_id = '${S1}';"
+}
+push_d1 32
+[[ "$(session_defs)" == "${DEF_DB}" ]] || fail "a set write queues its own definition: got '$(session_defs)'"
+push_b1 116
+[[ "$(session_defs)" == "$(printf '%s\n' "${DEF_BENCH}" "${DEF_DB}" | LC_ALL=C sort | paste -sd, -)" ]] ||
+  fail "coalesced set writes queue both definitions: got '$(session_defs)'"
+drain_ok "per-definition job"
+expect_mine "a per-definition job applies only the targets its definitions reach" \
+  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GXA}\"]}]"
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 row rewrite" "$(e_session "${S1}" "${START}" active null null null "${CUAM}")"
+[[ -z "$(queue_of)" ]] || fail "a session row rewrite (every set push sends one) must not queue: got '$(queue_of)'"
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 completed" "$(e_session "${S1}" "${START}" completed $(( START + HOUR )) 3600 null "${CUAM}")"
+[[ "$(session_defs)" == "*" ]] || fail "a status change queues the whole session: got '$(session_defs)'"
+drain_ok "S1 completed"
+expect_mine "a whole-session job applies every exercise's targets" \
+  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GXA}\"]}]"
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 active again" "$(e_session "${S1}" "${START}" active null null null "${CUAM}")"
+drain_ok "S1 active again"
+# A missed share is recreated on the session's next write, which then
+# evaluates the whole session.
+run_psql "delete from app_public.group_session_shares where member_user_id = '${ATHLETE_UID}' and session_id = '${S1}';" >/dev/null
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 rewrite recreates its share" "$(e_session "${S1}" "${START}" active null null null "${CUAM}")"
+[[ "$(session_defs)" == "*" ]] || fail "a write that recreates a missed share queues the whole session: got '$(session_defs)'"
+drain_ok "recreated share"
+pass "a set queues its definition; a row rewrite queues nothing; a status change or a recreated share queues the whole session"
 
 # =============================================================================
 echo "[${LANE_LABEL}] generation guard, lease expiry, rules requeue"
@@ -621,7 +666,7 @@ expect_sql "a leased job is not claimed twice" \
   "select app_public.group_eval_claim(200) -> 'jobs' @> jsonb_build_array(jsonb_build_object('job_id', ${JOB_ID}));" "f"
 run_psql "update app_public.group_eval_queue set claimed_until = now() - interval '1 second' where id = ${JOB_ID};" >/dev/null
 drain_ok "expired lease"
-expect_mine "an expired lease is reclaimed" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"
+expect_mine "an expired lease is reclaimed" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []}]"
 pass "lease expiry"
 
 # Two statements: one statement's snapshot cannot see what its own volatile
@@ -631,7 +676,9 @@ run_psql "update app_public.group_set_facts set rules_version=6
 expect_sql "current rules requeue older evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
 [[ "$(queue_of)" == "session:${S1}:rules" ]] || fail "a rules bump must requeue S1 with cause rules: got '$(queue_of)'"
 drain_ok "rules"
-expect_mine "a rules requeue re-normalizes the session" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"
+# A rules requeue re-applies the whole session: every exercise in it still
+# reaches a target through its links (only the DB press, linked to GXA).
+expect_mine "a rules requeue re-normalizes the session" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GXA}\"]}]"
 pass "rules requeue"
 expect_sql "a drain records the rules version it runs with" \
   "select rules_version from app_public.group_eval_rules_state;" "7"
@@ -701,7 +748,7 @@ push_b1 115
 run_psql "alter table app_public.group_set_facts add constraint ${FORCE_EVAL_CONSTRAINT} check (set_id <> '${T}-p1') not valid;" >/dev/null
 drain_ok "evaluator fault"
 expect_mine "one failing job; the other completes" \
-  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]},
+  "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []},
     {key: \"${S2}\", kind: \"session\", outcome: \"failed\", causes: [\"set\"], targets: []}]"
 expect_fact b1 "true:true:115:5:$(e1rm 115 5)"
 expect_sql "the failed job is kept with attempts, backoff, and its sqlstate" \
@@ -739,7 +786,8 @@ expect_sql "group_eval_retry_parked revives the parked job with a fresh budget" 
    select attempts || '|' || (available_at <= now()) from app_public.group_eval_queue where id = ${S2_JOB};" "t
 0|true"
 drain_ok "retry after the fault"
-expect_mine "the retried job completes" "[{key: \"${S2}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GX3}\", \"${GXA}\"]}]"
+# S2 logs only the Row, linked to no comparison: it reaches no target.
+expect_mine "the retried job completes" "[{key: \"${S2}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []}]"
 expect_fact p1 "true:true:70:8:$(e1rm 70 8)"
 pass "a failing evaluator job is kept, logged once, parked at the cap, revived, retried; the rest of the drain completes"
 
