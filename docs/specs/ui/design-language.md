@@ -113,7 +113,8 @@ nearest one that is. **Web gets system fonts** — config-plugin embedding is
 iOS/Android only. That is accepted, not a bug: web is a dev convenience with no
 gate, and this spec promises no web parity.
 
-**The type scale is eight rungs** (`uiTypography.size`), and the raw-literal
+**The type scale is eight ordinary rungs plus `timer` (104/124pt)** for a
+fullscreen countdown (`uiTypography.size` / `lineHeight`), and the raw-literal
 budgets in `apps/mobile/scripts/ui-guardrails.config.js` stay at 0. A size a
 screen cannot express is a case for revising the scale, here and in `tokens.ts`,
 never for an exception (`ux-rules.md` "Styling guardrails"); a design drawn off

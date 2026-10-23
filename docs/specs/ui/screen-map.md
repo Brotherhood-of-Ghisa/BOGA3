@@ -192,3 +192,8 @@ addressable, each resolving to a canonical owner for tab selection.
   boards and podiums follow [[copy.no-weight-unit]]; record detail and history
   retain public witness state and original wire units. Normalized rows follow
   [[groups.normalized-set-display]]. See `docs/specs/tech/group-competition-contract.md`.
+
+The session and exercise timer strips expand their repeating readout fullscreen
+(`components/session-recorder/repeating-timer-focus.tsx`). Close, Back and
+accessibility escape collapse without changing the timer; the strip’s dismiss
+control remains separate. This is in-route state, not a new route.
