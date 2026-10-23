@@ -43,74 +43,60 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('shares Progress view with Exercise, keeps 1RM in Map, and restores Map and 3D on a fresh visit', async () => {
+it('offers only List and 3D for both breakdowns, persists 3D and falls back to List for 1RM', async () => {
   const page = await openSettingsAndProgress();
-  expect(screen.getByText('Progress view')).toBeTruthy();
-  const layout = screen.getByTestId('settings-muscle-view-row');
-  expect(layout).toHaveProp('accessibilityRole', 'tablist');
-  expect(layout).toHaveProp('accessibilityLabel', 'Progress view');
-  expect(within(layout).getByRole('tab', { name: 'List' })).toHaveProp('accessibilityState', { selected: true });
-  expect(within(layout).getByRole('tab', { name: '3D' })).toHaveProp('accessibilityState', { selected: false });
-  expect(screen.queryByTestId('stats-muscle-view-chip')).toBeNull();
-  expect(screen.queryByTestId('stats-exercise-view-chip')).toBeNull();
+  const selector = within(screen.getByTestId('settings-muscle-view-row'));
+  expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['List', '3D']);
+  expect(screen.queryByTestId('settings-muscle-view-heatmap')).toBeNull();
   fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
-  expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
-  expect(values().progressMuscleLayout).toBe('3d');
-  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
-  expect(await screen.findByTestId('stats-muscle-map')).toBeTruthy();
-  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveTextContent('Map');
-  expect(values().progressMuscleLayout).toBe('heatmap');
+  await screen.findByTestId('stats-muscle-body-card');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
-  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
-  fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
-  expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
-  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
-  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
-  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
+  await screen.findByTestId('stats-exercise-list');
+  expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
-  expect(screen.getByTestId('stats-exercise-map')).toBeTruthy();
-  expect(values().progressMuscleLayout).toBe('heatmap');
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+  expect(values().progressMuscleLayout).toBe('3d');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
-  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
-
+  await screen.findByTestId('stats-muscle-body-card');
   page.unmount();
   __resetAccountLocalPreferencesForTests();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
   render(<><SettingsRoute /><ProgressRoute /></>);
-  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
-  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveProp('accessibilityState', { selected: true });
+  await screen.findByTestId('stats-muscle-body-card');
+  expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
   fireEvent.press(screen.getByTestId('settings-muscle-view-list'));
-  expect(await screen.findByTestId('stats-exercise-list')).toBeTruthy();
-  expect(values().progressMuscleLayout).toBe('list');
+  await screen.findByTestId('stats-exercise-list');
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
 });
 
-it('keeps an unsaved Map choice as a Settings draft and applies it to Exercise after Refresh', async () => {
+it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise after Refresh', async () => {
   await openSettingsAndProgress();
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
   const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
-  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
+  fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
   expect(values().progressMuscleLayout).toBe('list');
-  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
   expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
-  expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
-  expect(await screen.findByTestId('stats-exercise-map')).toBeTruthy();
-  expect(values().progressMuscleLayout).toBe('heatmap');
+  expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(values().progressMuscleLayout).toBe('3d');
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('restores the shared Exercise layout per account without carrying another account’s Map choice', async () => {
+it('restores the shared Exercise layout per account without carrying another account’s 3D choice', async () => {
   const page = await openSettingsAndProgress();
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
-  fireEvent.press(screen.getByTestId('settings-muscle-view-heatmap'));
-  await screen.findByTestId('stats-exercise-map');
+  fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
+  await screen.findByTestId('stats-muscle-body-card');
 
   await act(async () => {
     mockUserId = 'B';
@@ -121,7 +107,7 @@ it('restores the shared Exercise layout per account without carrying another acc
   await screen.findByTestId('stats-muscle-table');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
-  expect(screen.queryByTestId('stats-exercise-map')).toBeNull();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
   expect(screen.getByTestId('settings-muscle-view-list')).toHaveProp('accessibilityState', { selected: true });
 
   await act(async () => {
@@ -130,8 +116,8 @@ it('restores the shared Exercise layout per account without carrying another acc
     await ensureAccountLocalPreferencesLoaded();
   });
   page.rerender(<><SettingsRoute /><ProgressRoute /></>);
-  await screen.findByTestId('stats-exercise-map');
-  expect(screen.getByTestId('settings-muscle-view-heatmap')).toHaveProp('accessibilityState', { selected: true });
+  await screen.findByTestId('stats-muscle-body-card');
+  expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
 });
 
 it('saves both window settings, and retains invalid numeric drafts in the centralized error flow', async () => {

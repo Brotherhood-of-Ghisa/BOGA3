@@ -153,7 +153,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>` | `/progress-history?exerciseDefinitionId=<id>` | the records panel's `Progress` (`progressHistoryHref`, `push`) |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; map header → chosen view; contributor → Timeline; Exercise list or map-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list or 3D-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle card opens exercise history, carrying metric/gym |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
@@ -192,9 +192,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
 Progress filters stay in-route; Sessions last. [[muscle.progress-layout]]
-governs both layouts. Exercise families disclose contributions
-([[muscle.exercise-map-area]]); their links open full history at the selected
-metric/gym. Exercise 1RM follows [[muscle.progress-layout]]; layout switches reset scroll.
+governs both layouts. Tapping a muscle in Exercise 3D discloses contributions;
+their links open full history at the selected metric/gym. Exercise 1RM follows [[muscle.progress-layout]]; layout switches reset scroll.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

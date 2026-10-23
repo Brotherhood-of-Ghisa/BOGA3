@@ -12,7 +12,7 @@ current gym; a session with no gym counts only in the whole exercise.
 | Repeat last and plan prefill | newest session at the same gym, else the whole exercise's newest |
 | Progress tables, history, catalog stats, exercise heatmaps | the whole exercise until a gym is chosen |
 | 1RM curve | [[1rm.curve-scope]] |
-| Session/period totals; muscle maps; groups | the whole exercise |
+| Session/period totals; muscle 3D; groups | the whole exercise |
 | Share image name | plain, never a gym |
 | Coaching | the whole exercise by default, or one named gym |
 
@@ -40,7 +40,7 @@ Code: `EXERCISE_WRITE_RULES` in `services/boga-mcp/src/tools.ts`.
 Both Progress tables, exercise and muscle history, catalog stats and the exercise
 heatmap offer a gym picker, split or not, opening on all gyms. A chosen gym counts
 only its sessions; no gym is a separate choice. History links carry that scope.
-Muscle maps remain all gyms.
+Muscle 3D remains all gyms.
 
 Why: gym scope answers where the effort happened; splitting only changes which
 PRs show ([[gym.split-progress-prs]]). Approved 2026-10-18;

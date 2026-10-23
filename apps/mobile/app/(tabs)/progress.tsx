@@ -27,14 +27,12 @@ import {
 import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { ExerciseBodyView, ExerciseMap } from '@/components/stats/exercise-map';
+import { ExerciseBodyView } from '@/components/stats/exercise-body-view';
 import {
   buildExerciseBodyMuscle,
   buildExerciseBodyMuscles,
-  buildExerciseMapFamilies,
-  type ExerciseContributions,
-} from '@/components/stats/exercise-map-data';
-import type { MuscleMapFamily } from '@/components/stats/muscle-map-reference';
+  type ExerciseContributionEntry,
+} from '@/components/stats/exercise-body-data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
@@ -213,7 +211,6 @@ export type StatsScreenShellProps = {
   onRetry?: () => void;
   period: ProgressPeriod;
   targetWindowWeeks?: number;
-  weeklyWorkingSetTarget: number;
   onSelectPeriod: (period: ProgressPeriod) => void;
   onPressSessionsCard: () => void;
   // A muscle or exercise name opens its history page; Progress keeps its own
@@ -273,7 +270,6 @@ export function StatsScreenShell({
   onRetry,
   period,
   targetWindowWeeks = 4,
-  weeklyWorkingSetTarget,
   onSelectPeriod,
   onPressSessionsCard,
   onOpenMuscleHistory,
@@ -307,7 +303,6 @@ export function StatsScreenShell({
   const [grouped, setGrouped] = useState({ exercise: true, muscle: true });
   const [muscleSearch, setMuscleSearch] = useState('');
   const tableVisible = muscleLayout === 'list' || (viewMode === 'exercise' && muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
-  const [exerciseFamily, setExerciseFamily] = useState<MuscleMapFamily | null>(null);
   const exerciseSpatial = muscleLayout !== 'list' && !(muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const [contributionId, setContributionId] = useState<string | null>(null);
   // The row whose history was opened, held only until the return it is for:
@@ -334,7 +329,7 @@ export function StatsScreenShell({
     if (row) focus(row);
   }, [focus, isFocused]);
   const showContributions = (id: string) => {
-    setContributionId(current => muscleLayout !== 'heatmap' && current === id ? null : id);
+    setContributionId(current => current === id ? null : id);
   };
   // The press that opens history: the keyboard goes, the row is remembered for
   // the return, and any pending focus request for an earlier row is dropped.
@@ -348,26 +343,24 @@ export function StatsScreenShell({
     []
   );
 
-  // Maps retain the same exercise population when only the displayed metric changes.
   const filteredExerciseListItems = useMemo(() => {
     const searchWords = normalizeExerciseSearchWords(searchQuery);
-    const matching = exerciseListItems.filter(item => (muscleLayout === 'heatmap' || hasComparisonMetric(item, exerciseMetric))
+    const matching = exerciseListItems.filter(item => hasComparisonMetric(item, exerciseMetric)
       && exerciseSearchTextMatches(searchWords, exerciseSearchIndex.get(item.id) ?? item.name));
     return sortExerciseListItems(matching, exerciseSortMode, exerciseMetric);
-  }, [exerciseListItems, exerciseSearchIndex, exerciseMetric, exerciseSortMode, muscleLayout, searchQuery]);
+  }, [exerciseListItems, exerciseSearchIndex, exerciseMetric, exerciseSortMode, searchQuery]);
 
   const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
   }, []);
 
   const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
-  const mapActive = viewMode === 'exercise' && exerciseSpatial;
-  const { activeError, mapReady, pending } = progressPresentationState({ mapActive, summary, isLoading,
+  const bodyActive = viewMode === 'exercise' && exerciseSpatial;
+  const { activeError, bodyReady, pending } = progressPresentationState({ bodyActive, summary, isLoading,
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
-  const workingSetTarget = weeklyWorkingSetTarget * (period === 'this-week' ? 1 : targetWindowWeeks);
-  const exerciseList = (items: ExerciseListItem[], splitByEffort = false, secondary?: ExerciseContributions, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => <ExerciseListView items={items} metric={exerciseMetric}
-    secondary={secondary} labels={labels} splitByEffort={splitByEffort}
+  const exerciseList = (items: ExerciseListItem[], splitByEffort = false, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => <ExerciseListView items={items} metric={exerciseMetric}
+    secondary={secondary} splitByEffort={splitByEffort}
     grouped={tableVisible && grouped.exercise} families={exerciseFamilies}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
@@ -400,12 +393,11 @@ export function StatsScreenShell({
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {showLoading ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
-        {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={mapReady}
-          exercises={exerciseMappings} muscles={summary?.muscles ?? []} workingSetTarget={workingSetTarget}
-          items={filteredExerciseListItems} allItems={exerciseListItems}
-          selectedFamily={exerciseFamily} onSelectFamily={setExerciseFamily}
+        {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={bodyReady}
+          exercises={exerciseMappings} muscles={summary?.muscles ?? []}
+          items={filteredExerciseListItems}
           selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
-          workingSetTarget={workingSetTarget} grouped={grouped.muscle} searchQuery={muscleSearch}
+          grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
           onMuscleHistory={(row, target, view) => openHistory(muscle => onOpenMuscleHistory(muscle, view), { muscleGroupId: row.muscleGroupId }, target)}
@@ -419,32 +411,27 @@ export function StatsScreenShell({
   );
 }
 
-function progressPresentationState({ mapActive, summary, isLoading, errorMessage, exerciseDataReady, exerciseDataError }: {
-  mapActive: boolean; summary: ProgressComparisons | null; isLoading: boolean; errorMessage: string | null;
+function progressPresentationState({ bodyActive, summary, isLoading, errorMessage, exerciseDataReady, exerciseDataError }: {
+  bodyActive: boolean; summary: ProgressComparisons | null; isLoading: boolean; errorMessage: string | null;
   exerciseDataReady: boolean; exerciseDataError: string | null;
 }) {
-  const activeError = mapActive ? errorMessage ?? exerciseDataError : errorMessage;
-  const mapReady = summary !== null && exerciseDataReady && !activeError;
-  const pending = mapActive ? !mapReady && !activeError : isLoading && !summary && !activeError;
-  return { activeError, mapReady, pending };
+  const activeError = bodyActive ? errorMessage ?? exerciseDataError : errorMessage;
+  const bodyReady = summary !== null && exerciseDataReady && !activeError;
+  const pending = bodyActive ? !bodyReady && !activeError : isLoading && !summary && !activeError;
+  return { activeError, bodyReady, pending };
 }
 
 function ExerciseBreakdown({
-  metric, muscleLayout, ready, exercises, muscles, workingSetTarget, items, allItems,
-  selectedFamily, onSelectFamily, selectedMuscleId, onSelectMuscle, renderList,
+  metric, muscleLayout, ready, exercises, muscles, items,
+  selectedMuscleId, onSelectMuscle, renderList,
 }: {
   metric: ProgressExerciseMetric; muscleLayout: ProgressMuscleLayout; ready: boolean;
   exercises: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
-  muscles: readonly ProgressMuscleComparison[]; workingSetTarget: number;
-  items: ExerciseListItem[]; allItems: ExerciseListItem[];
-  selectedFamily: MuscleMapFamily | null; onSelectFamily: (family: MuscleMapFamily) => void;
+  muscles: readonly ProgressMuscleComparison[];
+  items: ExerciseListItem[];
   selectedMuscleId: string | null; onSelectMuscle: (id: string) => void;
-  renderList: (items: ExerciseListItem[], splitByEffort?: boolean, secondary?: ExerciseContributions, emptyOverride?: string, labels?: ReadonlyMap<string, number>) => ReactNode;
+  renderList: (items: ExerciseListItem[], splitByEffort?: boolean, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => ReactNode;
 }) {
-  const families = useMemo(
-    () => buildExerciseMapFamilies({ items, exercises, muscles, workingSetTarget }),
-    [items, exercises, muscles, workingSetTarget]
-  );
   const bodyMuscles = useMemo(
     () => buildExerciseBodyMuscles({ items, exercises, muscles }),
     [items, exercises, muscles]
@@ -454,22 +441,13 @@ function ExerciseBreakdown({
     [selectedMuscleId, items, exercises, muscles]
   );
   if (muscleLayout === 'list') return renderList(items);
-  if (muscleLayout === '3d') {
-    if (metric === 'estimatedOneRepMax') return renderList(items);
-    if (!ready) return null;
-    return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
-      selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
-      renderAll={() => renderList(items)}
-      renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
-        true, secondary,
-        entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
-  }
+  if (metric === 'estimatedOneRepMax') return renderList(items);
   if (!ready) return null;
-  return <ExerciseMap families={families} metric={metric} selectedFamily={selectedFamily} onSelectFamily={onSelectFamily}
-    renderDetail={(entries, secondary, labels) => renderList(entries.map(entry => entry.item),
-      true, secondary,
-      entries.length === 0 ? 'No exercises for this family.' : undefined, labels)}
-    emptyBody={items.length > 0 ? 'No exercises with muscle mappings in either period.' : exerciseEmptyBody(allItems, metric)} />;
+  return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
+    selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
+    renderAll={() => renderList(items)}
+    renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
+      true, secondary, entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
 }
 
 // An empty table says which of the three it is: no history at all, nothing
@@ -495,7 +473,6 @@ function ExerciseListView({
   sortMode,
   onPressSortHeader,
   secondary,
-  labels,
   grouped,
   families,
   splitByEffort,
@@ -504,8 +481,7 @@ function ExerciseListView({
   grouped: boolean;
   splitByEffort: boolean;
   families?: ReadonlyMap<string, string>;
-  secondary?: ExerciseContributions;
-  labels?: ReadonlyMap<string, number>;
+  secondary?: readonly ExerciseContributionEntry[];
   metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
   emptyBody: string;
@@ -514,7 +490,7 @@ function ExerciseListView({
 }) {
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
   const { width } = useWindowDimensions();
-  const secondaryRows = metric === 'estimatedOneRepMax' ? [] : secondary?.exercises.map(entry => entry.item) ?? [];
+  const secondaryRows = metric === 'estimatedOneRepMax' ? [] : secondary?.map(entry => entry.item) ?? [];
   if (items.length === 0 && secondaryRows.length === 0) {
     return (
       <Card>
@@ -525,8 +501,7 @@ function ExerciseListView({
 
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
-  const layout = resolveComparisonLayout(width, secondaryRows.length > 0 && secondary
-    ? [...items, ...secondaryRows, secondary] : items, metric, false, true);
+  const layout = resolveComparisonLayout(width, [...items, ...secondaryRows], metric, false, true);
   const familyName = (item: ExerciseListItem) => families?.get(item.id) ?? 'Other';
   const primaryRows = grouped ? [...items].sort((left, right) => compareProgressFamilies(familyName(left), familyName(right))) : items;
   const rows = [...primaryRows.map(item => ({ item, isSecondary: false })),
@@ -575,8 +550,6 @@ function ExerciseListView({
           <Fragment key={item.id}>
           {splitByEffort && sectionStart ? <StatsTableFamily name={isSecondary ? 'Secondary effort' : 'Primary effort'}
             testID={`stats-exercise-effort-${isSecondary ? 'secondary' : 'primary'}`} /> : null}
-          {isSecondary && sectionStart && secondary && metric !== 'estimatedOneRepMax'
-            ? <SecondarySummary secondary={secondary} metric={metric} layout={layout} /> : null}
           {grouped && (index === 0 || familyName(rows[index - 1].item) !== familyName(item)) ?
             <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
@@ -587,7 +560,7 @@ function ExerciseListView({
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
             testID={`stats-exercise-row-${item.id}`}>
             <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
-              {labels?.has(item.id) ? `[${labels.get(item.id)}] ` : ''}{item.name}
+              {item.name}
             </Text>
             {layout.stacked ? values : null}
           </ListRow>
@@ -596,19 +569,6 @@ function ExerciseListView({
       })}
     </StatsTable>
   );
-}
-
-// This aggregate is read-only; only its real contributors below open full exercise history.
-function SecondarySummary({ secondary, metric, layout }: {
-  secondary: ExerciseContributions; metric: ProgressMetric; layout: ReturnType<typeof resolveComparisonLayout>;
-}) {
-  const figures = comparisonFigures(secondary, metric);
-  const values = <ComparisonValues row={secondary} metric={metric} layout={layout} prefix="stats-exercise-secondary-summary" speak={false} />;
-  return <ListRow accessible accessibilityLabel={`Secondary contribution total. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.`}
-    meta={layout.stacked ? undefined : values} testID="stats-exercise-secondary-summary">
-    <Text allowFontScaling={false} style={statsTableStyles.name}>Total</Text>
-    {layout.stacked ? values : null}
-  </ListRow>;
 }
 
 // The whole row is one target, so it speaks its own figures; the cells inside
@@ -675,7 +635,6 @@ function StatsContent() {
   return <StatsScreenShell {...summary} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
     exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
-    weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
     onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId }, filters.metric, view))}
     onOpenExerciseHistory={exercise => router.push(progressHistoryHref(

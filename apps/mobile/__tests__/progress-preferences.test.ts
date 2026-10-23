@@ -44,7 +44,7 @@ it.each([null, 'monthly', '"weekly"', 'null', ''])('uses Daily for missing or in
   expect(Storage.getItemSync(key)).toBe(raw);
 });
 
-it.each(['list', 'heatmap', '3d'] as const)('remembers the %s Progress layout per account without changing history view', async layout => {
+it.each(['list', '3d'] as const)('remembers the %s Progress layout per account without changing history view', async layout => {
   await account();
   expect(values().progressMuscleLayout).toBe('list');
   setAccountLocalPreferences({ progressMuscleLayout: layout, heatmapView: 'weekly' });
@@ -57,6 +57,17 @@ it.each(['list', 'heatmap', '3d'] as const)('remembers the %s Progress layout pe
   expect(values().progressMuscleLayout).toBe('list');
   await account('A');
   expect(values().progressMuscleLayout).toBe(layout);
+});
+
+it.each(['heatmap', 'invalid', '"3d"'])('falls back to List for retired or invalid Progress layout %s', async raw => {
+  const key = preferenceKey('account:A', 'progressMuscleLayout');
+  Storage.setItemSync(key, raw);
+  Storage.setItemSync(preferenceKey('account:A', 'heatmapView'), 'weekly');
+  await account();
+  expect(values().progressMuscleLayout).toBe('list');
+  expect(values().heatmapView).toBe('weekly');
+  expect(Storage.getItemSync(key)).toBe(raw);
+  expect(isPreferenceValue('progressMuscleLayout', raw)).toBe(false);
 });
 
 it.each(['daily', 'weekly'] as const)('preserves the saved %s view across relaunch and account switches', async view => {
