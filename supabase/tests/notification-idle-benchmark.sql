@@ -100,8 +100,8 @@ begin
     app_public.notification_intents,app_public.notification_deliveries,app_public.notification_installations;
 end $$;
 
--- p_count accepted pushes from member 2 to member 1, one a day apart within
--- the last 30 days: receipts settled, ticket kept until the 30-day prune.
+-- p_count accepted pushes from member 2 to member 1, spread evenly over the
+-- last 29 days: receipts settled, ticket kept until the 30-day prune.
 create function pg_temp.add_receipts(p_prefix text,p_count int) returns void language plpgsql as $$
 begin
   insert into app_public.notification_installations(id,capability_hash,user_id,auth_session_id,encryption_key,token,

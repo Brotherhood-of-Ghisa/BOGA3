@@ -1,16 +1,41 @@
--- With nobody training, both pg_cron sweeps read a bounded number of pages,
--- however much history exists.
+-- Two idle-sweep probes no longer read pages in proportion to history.
 --
--- group_eval_sweep called group_eval_rules_stale every run. Its body is a
+-- group_eval_sweep called group_eval_rules_stale every run. Its body was a
 -- non-inlined SQL function planned without its argument's value, so it read
--- every set fact to find none older than the recorded rules version. A fact
--- older than that version is a necessary condition for a stale session, and
--- the oldest version is one probe of group_set_facts_rules_version, so the
--- sweep now asks that first and calls the shared predicate only when it holds.
+-- every set fact to find none older than the recorded rules version. As
+-- PL/pgSQL it is planned with the value, so it reads only older facts through
+-- group_set_facts_rules_version. A fact older than that version is a necessary
+-- condition for a stale session, and the oldest version is one probe of the same
+-- index, so the sweep asks that first. Facts that are never requeued (their
+-- share is gone, or their job is parked) keep the probe true; the scan then
+-- reads just those.
 --
--- notification_prune_due found secrets to prune by joining every ticketed or
--- failed delivery of the last 30 days to its intent. A delivery now carries its
--- intent's expiry, kept equal by triggers, so the check is one index range.
+-- notification_prune_due found secrets to prune by joining ticketed or failed
+-- deliveries to their intents, which it read in full. A delivery now carries
+-- its intent's expiry, kept equal by triggers, so the check is one index range.
+
+create or replace function app_public.group_eval_rules_stale(p_rules_version integer, p_limit integer)
+returns table (member_user_id uuid, session_id text)
+language plpgsql
+stable
+security definer
+set search_path = app_public, pg_temp
+as $$
+#variable_conflict use_column
+begin
+  return query
+  select distinct f.member_user_id, f.session_id
+    from app_public.group_set_facts f
+   where f.rules_version < p_rules_version
+     and exists (
+       select 1 from app_public.group_session_shares sh
+        where sh.member_user_id = f.member_user_id and sh.session_id = f.session_id)
+     and not exists (
+       select 1 from app_public.group_eval_queue q
+        where q.kind = 'session' and q.member_user_id = f.member_user_id and q.session_id = f.session_id)
+   limit p_limit;
+end;
+$$;
 
 create or replace function app_public.group_eval_sweep()
 returns boolean language plpgsql volatile security definer set search_path = app_public, pg_temp as $$
