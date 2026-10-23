@@ -3,6 +3,7 @@ import {
   aggregateExerciseHistory,
   createExerciseHistoryRepository,
   type ExerciseHistoryAggregationInput,
+  type ExerciseHistorySessionRecordRow,
   type ExerciseHistorySessionRow,
   type ExerciseHistorySetRow,
   type ExerciseHistoryStore,
@@ -111,6 +112,7 @@ const buildInput = (
     allTimeBest: overrides.allTimeBest ?? NO_BEST,
     setsBySessionExerciseId: overrides.setsBySessionExerciseId ?? groupBy(setRows),
     tagsBySessionExerciseId: overrides.tagsBySessionExerciseId ?? groupBy(tagRows),
+    ...(overrides.recordsBySessionId ? { recordsBySessionId: overrides.recordsBySessionId } : {}),
   };
 };
 
@@ -399,6 +401,68 @@ describe('aggregateExerciseHistory', () => {
   });
 });
 
+describe('aggregateExerciseHistory records', () => {
+  // s1 holds two blocks of the exercise; s2 one. s1's 1RM set is in its
+  // second block, its top-weight set in its first.
+  const sessionsInPeriod = [
+    sessionRow({ sessionId: 's1', sessionExerciseId: 'se1a', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a' }),
+    sessionRow({ sessionId: 's1', sessionExerciseId: 'se1b', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a' }),
+    sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-15T16:00:00.000Z'), gymId: 'gym-a' }),
+  ];
+  const setsBySessionExerciseId = groupBy([
+    setRow({ setId: 'a1', sessionExerciseId: 'se1a', orderIndex: 0, weightValue: '120', repsValue: '2' }),
+    setRow({ setId: 'b1', sessionExerciseId: 'se1b', orderIndex: 0, weightValue: '100', repsValue: '10' }),
+    setRow({ setId: 'c1', sessionExerciseId: 'se2', orderIndex: 0, weightValue: '90', repsValue: '5' }),
+  ]);
+  const recordRow = (overrides: Partial<ExerciseHistorySessionRecordRow> & { sessionId: string }): ExerciseHistorySessionRecordRow => ({
+    bestE1rmKg: null, bestE1rmSetId: null, topWeightSetId: null, volumeKg: null,
+    prE1rm: false, prWeight: false, prVolume: false, ownPrE1rm: false, ownPrWeight: false, ownPrVolume: false,
+    ...overrides,
+  });
+  // Whole-exercise PRs on s1 only; s2 took its gym's own 1RM, not the whole exercise's.
+  const recordsBySessionId = new Map([
+    ['s1', recordRow({
+      sessionId: 's1', bestE1rmKg: 133.3, bestE1rmSetId: 'b1', topWeightSetId: 'a1', volumeKg: 1240,
+      prE1rm: true, prWeight: true, prVolume: true,
+    })],
+    ['s2', recordRow({ sessionId: 's2', bestE1rmKg: 101.3, bestE1rmSetId: 'c1', topWeightSetId: 'c1', volumeKg: 450, ownPrE1rm: true })],
+  ]);
+  const recordsOf = (summary: ReturnType<typeof aggregateExerciseHistory>) =>
+    Object.fromEntries(summary.sessions.map((entry) => [entry.sessionExerciseId, entry.records]));
+
+  it('marks the whole exercise\'s PRs with every gym in view: each set on its block, Volume on the first', () => {
+    const summary = aggregateExerciseHistory(buildInput({
+      sessionsInPeriod, setsBySessionExerciseId, tagsBySessionExerciseId: {}, recordsBySessionId,
+    }));
+    expect(recordsOf(summary)).toEqual({
+      se2: null,
+      se1a: { oneRepMax: null, topWeightSetId: 'a1', volumeKg: 1240 },
+      se1b: { oneRepMax: { setId: 'b1', valueKg: 133.3 }, topWeightSetId: null, volumeKg: null },
+    });
+  });
+
+  it('marks each session\'s own PRs with a gym chosen', () => {
+    const summary = aggregateExerciseHistory(buildInput({
+      sessionsInPeriod, setsBySessionExerciseId, tagsBySessionExerciseId: {}, recordsBySessionId, appliedGymId: 'gym-a',
+    }));
+    expect(recordsOf(summary)).toEqual({
+      se2: { oneRepMax: { setId: 'c1', valueKg: 101.3 }, topWeightSetId: null, volumeKg: null },
+      se1a: null,
+      se1b: null,
+    });
+  });
+
+  it('leaves records off a session without stored facts, and off every entry without a records read', () => {
+    const withoutS1 = aggregateExerciseHistory(buildInput({
+      sessionsInPeriod, setsBySessionExerciseId, tagsBySessionExerciseId: {},
+      recordsBySessionId: new Map([['s2', recordsBySessionId.get('s2')!]]), appliedGymId: 'gym-a',
+    }));
+    expect(recordsOf(withoutS1).se1a).toBeNull();
+    const unread = aggregateExerciseHistory(buildInput({ sessionsInPeriod, setsBySessionExerciseId, tagsBySessionExerciseId: {} }));
+    expect(unread.sessions.every((entry) => entry.records === undefined)).toBe(true);
+  });
+});
+
 describe('createExerciseHistoryRepository', () => {
   const buildStore = (
     overrides: Partial<ExerciseHistoryStore> = {}
@@ -409,7 +473,29 @@ describe('createExerciseHistoryRepository', () => {
     loadTagsForSessionExercises: jest.fn().mockResolvedValue([]),
     loadAllTimeBest: jest.fn().mockResolvedValue(NO_BEST),
     loadGymName: jest.fn().mockResolvedValue(null),
+    loadSessionRecords: jest.fn().mockResolvedValue([]),
     ...overrides,
+  });
+
+  it('reads every session\'s stored records for the exercise and marks the listed blocks', async () => {
+    const loadSessionRecords = jest.fn().mockResolvedValue([{
+      sessionId: 's1', bestE1rmKg: 116.7, bestE1rmSetId: 'st-1', topWeightSetId: 'st-1', volumeKg: 500,
+      prE1rm: true, prWeight: true, prVolume: false, ownPrE1rm: true, ownPrWeight: true, ownPrVolume: false,
+    }]);
+    const repo = createExerciseHistoryRepository(buildStore({
+      loadSessionsForExercise: jest.fn().mockResolvedValue([
+        sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
+      ]),
+      loadSetsForSessionExercises: jest.fn().mockResolvedValue([
+        setRow({ setId: 'st-1', sessionExerciseId: 'se1', orderIndex: 0 }),
+      ]),
+      loadSessionRecords,
+    }));
+    const summary = await repo.load({ exerciseDefinitionId: 'ex-bench', now: new Date('2026-05-13T12:00:00.000Z') });
+    expect(loadSessionRecords).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex-bench' });
+    expect(summary?.sessions[0]?.records).toEqual({
+      oneRepMax: { setId: 'st-1', valueKg: 116.7 }, topWeightSetId: 'st-1', volumeKg: null,
+    });
   });
 
   it('returns null when the exercise definition is missing', async () => {

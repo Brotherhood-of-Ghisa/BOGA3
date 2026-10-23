@@ -52,8 +52,9 @@ import { Icon } from '@/components/ui/icon';
 import { uiIconSize, uiRoles } from '@/components/ui/tokens';
 import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { upsertLocalGym } from '@/src/data/local-gyms';
-import { sessions } from '@/src/data/schema';
+import { exerciseDefinitions, sessions } from '@/src/data/schema';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import * as sessionFacts from '@/src/data/exercise-session-facts';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import {
@@ -807,6 +808,81 @@ describe('ExercisePageScreen', () => {
       expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`)
     );
     expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+  });
+
+  describe('Exercise history in the ⋮', () => {
+    const HISTORY = `/exercise-history?exerciseDefinitionId=${BENCH_DEF}`;
+    const splitBench = () => {
+      localDatabase().update(exerciseDefinitions).set({ splitByGym: true }).where(eq(exerciseDefinitions.id, BENCH_DEF)).run();
+    };
+    const openHistory = async () => {
+      fireEvent.press(screen.getByTestId('exercise-page-options'));
+      fireEvent.press(await screen.findByTestId('exercise-options-history'));
+      await waitFor(() => expect(mockRouter.push).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+      return mockRouter.push.mock.calls[0]?.[0];
+    };
+
+    it('opens on every gym for an exercise not split per gym', async () => {
+      await seedPage(() => atGym('gym-metroflex', 'Metroflex', [SESSION]));
+      await renderPage();
+      expect(await openHistory()).toBe(HISTORY);
+    });
+
+    it('opens on the session\'s gym for an exercise split per gym', async () => {
+      await seedPage(async () => {
+        await atGym('gym-metroflex', 'Metroflex', [SESSION, NEWER_HISTORY, OLDER_HISTORY]);
+        splitBench();
+      });
+      await renderPage();
+      expect(await openHistory()).toBe(`${HISTORY}&gymId=gym-metroflex`);
+    });
+
+    it('opens on the session\'s gym under Current gym only, split or not', async () => {
+      setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+      await seedPage(() => atGym('gym-metroflex', 'Metroflex', [SESSION, NEWER_HISTORY]));
+      await renderPage();
+      expect(await openHistory()).toBe(`${HISTORY}&gymId=gym-metroflex`);
+    });
+
+    it('says so, and opens nothing, when the split read fails', async () => {
+      jest.spyOn(sessionFacts, 'loadOwnBookGymId').mockRejectedValue(new Error('database is locked'));
+      await openPage();
+      fireEvent.press(screen.getByTestId('exercise-page-options'));
+      fireEvent.press(await screen.findByTestId('exercise-options-history'));
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Could not open history', 'database is locked'));
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it('writes pending edits before opening history', async () => {
+      await openPage();
+      fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+      expect(await openHistory()).toBe(HISTORY);
+      expect((await benchSets())[2]).toMatchObject({ weightValue: '90' });
+    });
+
+    it('stays on the page when the pending edits fail to save', async () => {
+      const failingClient: SessionExerciseDraftClient = {
+        ...defaultSessionExerciseDraftClient,
+        persistSessionDraftSnapshot: jest.fn().mockRejectedValue(new Error('disk full')),
+      };
+      await seedPage();
+      render(<ExercisePageScreen draftClient={failingClient} sessionExerciseId={BENCH} sessionId={SESSION} />);
+      await screen.findByTestId('exercise-page');
+      fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+      fireEvent.press(screen.getByTestId('exercise-page-options'));
+      fireEvent.press(await screen.findByTestId('exercise-options-history'));
+      await waitFor(() => expect(failingClient.persistSessionDraftSnapshot).toHaveBeenCalled());
+      await act(async () => { await Promise.resolve(); });
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it('opens on every gym when the session has no gym, even split', async () => {
+      setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+      await seedPage(splitBench);
+      await renderPage();
+      expect(await openHistory()).toBe(HISTORY);
+    });
   });
 
   it('writes pending edits before opening the Link screen, leaving the session as it reads', async () => {

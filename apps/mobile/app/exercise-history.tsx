@@ -42,9 +42,12 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
 import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
+import { historyBlockRecord } from '@/src/session-recorder/exercise-history-view';
 import {
+  cardRecordBand,
   EMPTY_FIGURE,
   formatSetRow,
+  recordFlagsFor,
 } from '@/src/session-recorder/session-view-model';
 
 type ExerciseHistoryPeriod = 'week' | 'progress' | 'history';
@@ -325,6 +328,10 @@ function SessionCard({
   const tags = entry.tagIds
     .map((id) => tagOptions.find((tag) => tag.tagDefinitionId === id))
     .filter((tag): tag is ExerciseHistoryTagOption => tag !== undefined);
+  // The records the session took when it was completed, in the book the gym
+  // filter names ([[gym.split-progress-prs]]), drawn as View Session draws
+  // them ([[set.row-figures]]).
+  const record = historyBlockRecord(entry);
   // Warm-ups read like working sets: the type column names them.
   const rows = entry.sets.map((set) =>
     formatSetRow({
@@ -334,6 +341,7 @@ function SessionCard({
       reps: parseSetReps(set.repsValue),
       setType: set.setType,
       done: true,
+      ...recordFlagsFor(record, set.setId),
     })
   );
 
@@ -344,6 +352,7 @@ function SessionCard({
       name={date}
       nameFace="figure"
       onPress={onPress}
+      record={cardRecordBand(record, entry.sessionExerciseId)}
       rowTestID={(row) => `exercise-history-set-row-${row.id}`}
       rows={rows}
       summary={

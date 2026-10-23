@@ -30,7 +30,9 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
+import { exerciseHistoryHref, exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
+import { loadOwnBookGymId } from '@/src/data/exercise-session-facts';
+import { exerciseHistoryOpeningGym } from '@/src/session-recorder/exercise-history-view';
 import {
   addSet,
   buildSetRows,
@@ -376,6 +378,31 @@ export function ExercisePageScreen({
   };
 
   /**
+   * Exercise history, opened on the gym [[gym.view-filter]] names
+   * (`exerciseHistoryOpeningGym`). Pending edits are written first, so a
+   * completed session being edited lists as it reads; a failed save stays on
+   * the page with its save error, as Link does. A failed read says so rather
+   * than opening on the wrong gym.
+   */
+  const onOpenHistory = () => {
+    setOpenSheet('none');
+    if (!exercise) return;
+    const { exerciseDefinitionId } = exercise;
+    void draft.flush()
+      .then(async (saved) => {
+        if (!saved) return;
+        const ownBookGymId = await loadOwnBookGymId(exerciseDefinitionId, currentGymId);
+        router.push(exerciseHistoryHref(exerciseDefinitionId, exerciseHistoryOpeningGym({
+          ownBookGymId,
+          scope: listPreferences.pastRecordsGymScope,
+          currentGymId,
+        })));
+      })
+      .catch((error: unknown) =>
+        Alert.alert('Could not open history', error instanceof Error ? error.message : 'Try again.'));
+  };
+
+  /**
    * Complete block: the sourced card's explicit resolution — the only
    * operation that advances the plan block, never attachment or confirming
    * alone. A refusal (no confirmed source-derived set yet) says so inline
@@ -530,6 +557,7 @@ export function ExercisePageScreen({
               }
             : undefined
         }
+        onOpenHistory={onOpenHistory}
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}

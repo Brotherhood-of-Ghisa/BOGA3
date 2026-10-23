@@ -150,7 +150,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>` | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
 | `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
-| `/session/<id>/exercise/<id>` | `/progress-history?exerciseDefinitionId=<id>` | the records panel's `Progress` (`progressHistoryHref`, `push`) |
+| `/session/<id>/exercise/<id>` | `/progress-history`, `/exercise-history` | the records panel's `Progress` (`progressHistoryHref`) and ⋮ `Exercise history` (`exerciseHistoryHref`, gym per [[gym.view-filter]]); `push` |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list or 3D-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
@@ -201,8 +201,7 @@ and `Add as new` editor, the exercise page's effort / options / swap sheets and
 its shared exercise editor, the Sessions row and active-session menus, and the
 record set row detail sheet on the Stream and the full board. A back *gesture* is disabled rather than handled where leaving
 would be wrong: the session view of a workout in progress and the completion
-summary both set `gestureEnabled: false`, so they are left only by the actions
-above.
+summary both set `gestureEnabled: false`.
 
 ## Header titles
 

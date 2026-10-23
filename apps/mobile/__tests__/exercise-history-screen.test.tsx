@@ -282,6 +282,20 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('275.0 × 5');
   });
 
+  it('marks each session\'s PRs as they happened, as View Session marks them', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    const onePr = 'exercise-history-session-card-maestro_m24_completion_one_pr_squat';
+    // Its 275 × 5 beat both records when it was completed: one band line, the
+    // set's figures in record.
+    expect(screen.getByTestId(`${onePr}-record-1`)).toHaveTextContent('New 1RM · 320.6 + top weight275.0 × 5');
+    expect(screen.queryByTestId(`${onePr}-record-2`)).toBeNull();
+    expect(screen.getByTestId('exercise-history-set-row-maestro_m24_completion_one_pr_squat_set-values'))
+      .toHaveStyle({ color: uiRoles.record });
+    // The oldest session set the records: a baseline is no PR.
+    expect(screen.queryByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a-record')).toBeNull();
+  });
+
   it('reloads when the period changes', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
     const history = (await historyRepository.loadExercisePerformanceHistory({

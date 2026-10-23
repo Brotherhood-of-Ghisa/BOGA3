@@ -107,9 +107,10 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 # Short and slow: under the 120pt release distance and the flick velocity.
+# The title row sits at ~66% with the sheet's four rows (signed out, unsourced).
 - swipe:
-    start: "50%,73%"
-    end: "50%,77%"
+    start: "50%,66%"
+    end: "50%,70%"
     duration: 900
 - waitForAnimationToEnd:
     timeout: 4000
