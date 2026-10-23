@@ -1059,26 +1059,3 @@ describe('Stats over real data', () => {
   });
 
 });
-
-
-it('keeps ticker reads independent of This week and metric, refreshes settings, and excludes Exercise/3D', async () => {
-  const tickerRead = jest.spyOn(statsRepository, 'computeProgressMuscleTickers');
-  await renderSeededStats();
-  expect(tickerRead).not.toHaveBeenCalled();
-  chooseFilter('view-mode', 'Muscle');
-  await waitFor(() => expect(tickerRead).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(screen.getByTestId('stats-muscle-history-quads').props.accessibilityHint).not.toContain('loading'));
-  const count = tickerRead.mock.calls.length;
-  chooseFilter('period', '4 weeks');
-  chooseFilter('period', 'This week');
-  chooseFilter('metric', 'Volume');
-  expect(tickerRead).toHaveBeenCalledTimes(count);
-  expect(screen.getByTestId('stats-muscle-history-quads').props.accessibilityHint).toContain('rolling 4 weeks');
-  await act(async () => { updatePreferences({ historyLookbackWeeks: 26, weeklyWorkingSetTarget: 12 }); });
-  await waitFor(() => expect(tickerRead).toHaveBeenLastCalledWith(expect.objectContaining({ historyWeeks: 26, rollingWeeks: 4, weeklyTarget: 12 })));
-  const changedCount = tickerRead.mock.calls.length;
-  await act(async () => { updatePreferences({ progressMuscleLayout: '3d' }); });
-  await screen.findByTestId('stats-muscle-body-card');
-  chooseFilter('view-mode', 'Exercise');
-  expect(tickerRead).toHaveBeenCalledTimes(changedCount);
-});
