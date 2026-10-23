@@ -72,7 +72,9 @@ affected comparison publication, outside its member loop. Baseline capture and
 publication commit atomically; failure retries asynchronous publication without
 failing personal sync. A publication builds its source graph once and shares
 it with its score writes and both capture passes for all workouts; raw sources
-are revalidated once, after all of its writes. Each pass rechecks live
+are revalidated once, after all of its writes, over the sets the rebuilt graph
+still reaches (its writes can end a reference), and the rebuilt graph's digest
+is the one persisted for readiness. Each pass rechecks live
 disclosure per workout and at its final boundary; a mismatch rolls back the
 publication. Within one statement (one snapshot) a capture rank, baseline or
 control asks disclosure once per member and definition, never per score row.

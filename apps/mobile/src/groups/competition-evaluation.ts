@@ -34,7 +34,9 @@ export type CompetitionSourceSet = Omit<CompetitionPerformanceSnapshot, 'reps'> 
   set_type: string | null;
   live: boolean;
   /** SQL-owned live membership, shared-session and current-link eligibility.
-   * Unlinked sources remain in the graph for record/certification validation. */
+   * An unlinked source is in the graph only while the comparison still reaches
+   * it (linked at the last apply, or holding a certification, record, entry or
+   * counting score), for record/certification validation. */
   counting: boolean;
   set_created_at_ms: number;
   /** SQL-only witness pins. Never copied to scores or public snapshots. */

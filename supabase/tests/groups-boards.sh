@@ -14,6 +14,9 @@
 #     comparison job (group_metric_eval_publish → group_metric_apply_member);
 #     a load-mode change rescores silently and a rules change publishes a new
 #     revision with one rules_change event;
+#   - a comparison's source graph holds only the sets it reaches (linked, or
+#     linked at the last apply, or referenced by set id), and an unlink's own
+#     publication completes and persists the digest of the graph it leaves;
 #   - working sets only ([[set.eligibility]]): a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board moves silently (forward only);
 #   - the provisional rule for active sessions (T8), D6 conversion, value-based
@@ -200,6 +203,16 @@ expect_since() {
 latest() { # latest <gx> <kind> <column-sql>
   run_psql "select $3 from app_public.group_events where group_exercise_id = '$1' and kind = '$2'
              order by seq desc limit 1;"
+}
+
+# graph_sets <gx> <member-label>: the member's set suffixes in the comparison's
+# source graph, comma-separated.
+graph_sets() {
+  local uid
+  case "$2" in A) uid="${ATHLETE_UID}" ;; R) uid="${RIVAL_UID}" ;; M) uid="${AWAY_UID}" ;; esac
+  run_psql "select coalesce(string_agg(replace(r ->> 'set_id', '${T}-', ''), ',' order by r ->> 'set_id'), '')
+              from jsonb_array_elements(app_public.group_metric_eval_source_graph('${GID}', '$1') -> 'sets') r
+             where r ->> 'member_user_id' = '${uid}';"
 }
 
 # --- sync_push builders -----------------------------------------------------------
@@ -604,14 +617,19 @@ sess "${RIVAL_TOKEN}" "${T}-s5r" completed "${DR5}" "r5r1:100:5"
 def "${ATHLETE_TOKEN}" "${DA5}" total_load
 def "${ATHLETE_TOKEN}" "${DA5B}" total_load
 next_session_at
-sess "${ATHLETE_TOKEN}" "${T}-s5a" completed "${DA5}" "r5a1:120:5"
+# r5a2 is a warm-up ([[set.eligibility]]), so only the board state reaches it once DA5 is unlinked.
+sess "${ATHLETE_TOKEN}" "${T}-s5a" completed "${DA5}" "r5a1:120:5" "r5a2:60:5:::warm_up"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s5b" completed "${DA5B}" "r5b1:50:5"
 drain "R5 setup"
+# A comparison's graph holds only the sets it reaches: shared but unlinked sets stay out.
+[[ "$(graph_sets "${GX5}" A):$(graph_sets "${GX5}" R)" == ":r5r1" ]] ||
+  fail "R5 the graph holds linked sets only, got A:R '$(graph_sets "${GX5}" A):$(graph_sets "${GX5}" R)'"
 
 mark
 link "${ATHLETE_TOKEN}" "${DA5}" "${GID}" "${GX5}"
 drain "R5 link"
+[[ "$(graph_sets "${GX5}" A)" == "r5a1,r5a2" ]] || fail "R5 a link brings its sets into the graph"
 expect_since "${GX5}" "link@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 link"
 expect_sql "R5 a retroactive link writes no record (P16)" \
   "select count(*) from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'record'
@@ -633,11 +651,20 @@ expect_since "${GX5}" "" "R5 a link that moves no entry writes no item"
 
 mark
 link "${ATHLETE_TOKEN}" "${DA5}" "${GID}" "${GX5}" deleted
+# Until it publishes, the board state still lists DA5: the unlink's own
+# publication sees the sets it unlinked.
+[[ "$(graph_sets "${GX5}" A)" == "r5a1,r5a2,r5b1" ]] || fail "R5 the unlinking publication still reaches the unlinked sets"
 drain "R5 unlink"
 expect_since "${GX5}" "unlink@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 unlink"
 expect_entry "${GX5}" A volume "250@r5b1" "R5 unlink falls back to the still-linked exercise"
 expect_sql "R5 unlink never voids a record" \
   "select count(*) from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'record_voided';" "0"
+# That publication ended r5a1's last reference; it still published, and
+# persisted the digest of the graph as it now stands, which readiness rebuilds.
+[[ "$(graph_sets "${GX5}" A)" == "r5b1" ]] || fail "R5 an unreferenced unlinked set leaves the graph after the unlink publishes"
+expect_sql "R5 the persisted source digest matches the graph after the unlink" \
+  "select p.source_digest = app_public.notification_comparison_digest('${GID}', '${GX5}')
+     from app_public.notification_comparison_publications p where p.group_exercise_id = '${GX5}';" "t"
 
 # Retarget within the group: the same deterministic link id moves GX5 → GX5B.
 mark
@@ -646,6 +673,24 @@ drain "R5 retarget"
 expect_since "${GX5}" "unlink@A" "R5 retarget leaves the old board (R stays #1)"
 expect_since "${GX5B}" "link@A,lead_change:link:volume@A,lead_change:link:e1rm@A" "R5 retarget joins the new board"
 expect_entry "${GX5}" A volume "" "R5 retarget: no entry left on the old board"
+[[ "$(graph_sets "${GX5}" A)" == "" ]] || fail "R5 retarget: the old graph keeps none of A's sets"
+
+# A record set moved to a never-linked exercise keeps its card: the graph
+# reaches it by set id, so its unchanged value still stands.
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-s5r2" completed "${DR5}" "r5r2:110:5"
+drain "R5 rival record"
+R5_RECORD="$(run_psql "select id from app_public.group_events where group_exercise_id = '${GX5}' and kind = 'record'
+  and set_id = '${T}-r5r2';")"
+[[ -n "${R5_RECORD}" ]] || fail "R5 r5r2 holds a record card"
+DU5="${T}-dU5"
+def "${RIVAL_TOKEN}" "${DU5}" total_load
+next_cuam
+push "${RIVAL_TOKEN}" "R5 r5r2's exercise moved to ${DU5}" "$(e_se "${T}-s5r2-se" "${T}-s5r2" "${DU5}" 0 "Lift" "${CUAM}")"
+drain "R5 record set moved to an unlinked exercise"
+[[ "$(graph_sets "${GX5}" R)" == "r5r1,r5r2" ]] || fail "R5 the moved record set stays in the graph by set id"
+expect_sql "R5 the moved record set's card stands" \
+  "select count(*) from app_public.group_events where related_event_id = '${R5_RECORD}' and kind = 'record_voided';" "0"
 pass "R5: link, unlink, retarget → link/unlink items, lead_change{link}, no records"
 
 # =============================================================================
