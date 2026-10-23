@@ -1031,15 +1031,48 @@ const writeCursorEntry = (tx: Transaction, layer: number, cursor: PullCursor): v
 type RpcResult = { data: unknown; error: { message?: string } | null };
 
 /**
+ * The longest one sync RPC may stay open before the cycle gives up on it. The
+ * server's statement timeout is far shorter, so a request still open by then
+ * has lost its connection without reporting an error (seen on iOS when the app
+ * was suspended mid-request). Without this bound the cycle never settles: it
+ * holds the local-data lock and keeps the scheduler RUNNING, which ignores every
+ * later sync request until the app is killed.
+ */
+export const SYNC_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Settles with `request`, or fails with INTERNAL once
+ * {@link SYNC_REQUEST_TIMEOUT_MS} passes so the next scheduler tick retries.
+ * The abandoned request is not cancelled. Letting it land late is safe because
+ * both RPCs are idempotent: a re-pushed row with the same `client_updated_at_ms`
+ * is a server no-op, and a pull cursor only advances after its page is applied.
+ */
+const withSyncRequestTimeout = async <T>(rpc: string, request: PromiseLike<T>): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new SyncCycleError('INTERNAL', `${rpc} timed out after ${SYNC_REQUEST_TIMEOUT_MS} ms`)),
+      SYNC_REQUEST_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([request, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
  * Posts a push batch. The named "entities" parameter maps the wire body
  * { entities: [...] } straight onto the RPC argument. Throws SyncCycleError on
  * any recognised failure so the caller can branch per error code.
  */
 const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client
-    .schema(SYNC_RPC_SCHEMA)
-    .rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
+  const { data, error } = (await withSyncRequestTimeout(
+    SYNC_PUSH_RPC,
+    client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PUSH_RPC, { entities }),
+  )) as RpcResult;
   const code = classifyRpcResult(error, data);
   if (code) {
     const message = error?.message ?? `sync push failed: ${code}`;
@@ -1060,11 +1093,14 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
  */
 const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResponse> => {
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PULL_RPC, {
-    layer,
-    cursor,
-    limit: BATCH_CAP,
-  })) as RpcResult;
+  const { data, error } = (await withSyncRequestTimeout(
+    SYNC_PULL_RPC,
+    client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PULL_RPC, {
+      layer,
+      cursor,
+      limit: BATCH_CAP,
+    }),
+  )) as RpcResult;
 
   const code = classifyRpcResult(error, data);
   if (code) {
@@ -1407,7 +1443,7 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
  * pull again, repeating until a full round changes nothing locally in either
  * direction. There is no round cap: the loop is bounded by convergence itself
- * (and, per leg, by each RPC's own request timeout), so it keeps draining as
+ * (and, per request, by SYNC_REQUEST_TIMEOUT_MS), so it keeps draining as
  * long as there is real work — a second device's live edit stream is followed,
  * not truncated, and a locally re-edited row keeps re-pushing its latest value.
  * The exit test counts rows ACTUALLY changed, not rows the server returned, so a
