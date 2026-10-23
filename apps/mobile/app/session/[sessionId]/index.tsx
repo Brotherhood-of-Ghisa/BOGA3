@@ -25,7 +25,9 @@ import { findNearbyGymSuggestions } from '@/src/location/gym-location-reads';
 import {
   beginSessionPosition,
   getSessionPosition,
-  subscribeSessionPosition,
+  getSessionPositionState,
+  subscribeSessionPositionState,
+  type SessionPositionState,
 } from '@/src/location/session-position';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { activeGymOptions, listGymDirectory, type SessionGymOption } from '@/src/session-recorder/gym-options';
@@ -140,6 +142,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
+  const developerMode = trainingPreferences.developerMode;
   const restTimer = useSessionRestTimer(sessionId, {
     defaultDurationSec: trainingPreferences.restTimerDurationSec,
     defaultRepeatingIntervalSec: trainingPreferences.repeatingTimerIntervalSec,
@@ -148,6 +151,9 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   });
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [gymPicker, setGymPicker] = useState<GymPickerState>(CLOSED_GYM_PICKER);
+  // The developer GPS panel's live view of the session's position acquisition;
+  // only subscribed while the gym sheet is open.
+  const [gpsState, setGpsState] = useState<SessionPositionState | null>(null);
   // Bumped on every open and close, so a lookup that resolves after the sheet
   // has closed (or reopened) is dropped.
   const gymPickerGenerationRef = useRef(0);
@@ -193,7 +199,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     // selected for the lifter. The suggestion reads the session's cached fix
     // (`beginSessionPosition`, started when the recorder opened, plus a read
     // here for a completed session being edited) and updates live while the
-    // sheet is open.
+    // sheet is open. The state listener also feeds the developer GPS panel.
     let directory: Awaited<ReturnType<typeof listGymDirectory>> | null = null;
     let position = getSessionPosition(sessionId);
     const applySuggestions = () => {
@@ -205,11 +211,16 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       setGymPicker((current) => ({ ...current, suggestions }));
     };
     gymPickerUnsubscribeRef.current?.();
-    gymPickerUnsubscribeRef.current = subscribeSessionPosition((latest) => {
-      position = latest;
+    gymPickerUnsubscribeRef.current = subscribeSessionPositionState(sessionId, (latest) => {
+      position = latest.position;
+      setGpsState(latest);
       applySuggestions();
     });
-    void beginSessionPosition(sessionId);
+    const initialState = getSessionPositionState(sessionId);
+    setGpsState(initialState);
+    // The sheet has an audience for the fix, so a spent acquisition — one that
+    // ran out of its retry budget before any read landed — is resumed.
+    void beginSessionPosition(sessionId, { resume: true });
 
     listGymDirectory()
       .then((loaded) => {
@@ -232,6 +243,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     gymPickerUnsubscribeRef.current?.();
     gymPickerUnsubscribeRef.current = null;
     setGymPicker(CLOSED_GYM_PICKER);
+    setGpsState(null);
   };
 
   // The recorder starts acquiring the session's fix the moment it opens, so
@@ -486,6 +498,11 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         visible={isOptionsVisible}
       />
       <SessionGymSheet
+        gpsPanel={developerMode ? {
+          state: gpsState,
+          nearbyGymCount: gymPicker.options?.length ?? null,
+          suggestionCount: gymPicker.suggestions.length,
+        } : undefined}
         onDismiss={closeGymPicker}
         onManage={openGymsScreen}
         onSelect={(gym) => void selectGym(gym)}

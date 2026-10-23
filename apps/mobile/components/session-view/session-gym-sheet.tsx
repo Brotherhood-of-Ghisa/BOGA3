@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { SessionGpsPanel, type SessionGpsPanelProps } from './session-gps-panel';
 import type { SessionGymOption } from '@/src/session-recorder/gym-options';
 
 // The list may take most of the screen; the sheet's handle and title stay.
@@ -20,6 +21,9 @@ type SessionGymSheetProps = {
   onSelect: (gym: SessionGymOption | null) => void;
   onManage: () => void;
   onDismiss: () => void;
+  // The developer GPS panel's inputs; `gpsPanel` is undefined unless the
+  // developer-mode flag is on, and the panel never renders without it.
+  gpsPanel?: SessionGpsPanelProps | null;
 };
 
 // Picks the session's gym. Nearby gyms come first as `Nearby · <gym>` (they
@@ -33,6 +37,7 @@ export function SessionGymSheet({
   onSelect,
   onManage,
   onDismiss,
+  gpsPanel,
 }: SessionGymSheetProps) {
   const { height } = useWindowDimensions();
   // Suggesting the gym the session already has would say nothing; its
@@ -57,6 +62,9 @@ export function SessionGymSheet({
 
   return (
     <Sheet dismissLabel="Dismiss gym picker" onDismiss={onDismiss} testID="session-view-gym-sheet" title="Gym" visible={visible}>
+      {gpsPanel ? (
+        <SessionGpsPanel nearbyGymCount={gpsPanel.nearbyGymCount} state={gpsPanel.state} suggestionCount={gpsPanel.suggestionCount} />
+      ) : null}
       <ScrollView style={{ maxHeight: height * LIST_SHARE_OF_SCREEN }} testID="session-view-gym-list">
         {options === null ? (
           <Text allowFontScaling={false} style={styles.message}>Loading gyms…</Text>

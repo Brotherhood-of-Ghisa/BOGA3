@@ -17,7 +17,7 @@ export function readScopedPreferences(profile: PreferenceProfile) {
   const valid: Partial<AccountLocalPreferences> = {};
   for (const field of preferenceFields) {
     const raw = Storage.getItemSync(preferenceKey(profile, field));
-    const value = field === 'showNeverDone' || field === 'restTimerAutoStart'
+    const value = field === 'showNeverDone' || field === 'restTimerAutoStart' || field === 'developerMode'
       ? raw === 'true' ? true : raw === 'false' ? false : null
       : textPreferenceFields.includes(field) ? raw : parseJsonPreference(raw);
     if (isPreferenceValue(field, value)) Object.assign(valid, { [field]: value });
