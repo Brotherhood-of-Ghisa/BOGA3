@@ -168,3 +168,29 @@ Deno.test('fresh bounded claims do not waste send or receipt leases on slow prov
     const result = await response.json(); equal(result.claimed,20); equal(result.receipts,20);
   } finally { Date.now=realNow; globalThis.fetch=realFetch; }
 });
+
+Deno.test('only a sweep-started run that did work records how much, and a failed record keeps the run', async () => {
+  const run = async (body: unknown, prepared: { jobs: unknown[]; admitted: number }, pending = true, recordFails = false) => {
+    const records: unknown[] = [];
+    const rpc: Rpc = async <T>(name: string, args?: Record<string, unknown>) => {
+      if (name === 'notification_work_pending') return pending as T;
+      if (name === 'notification_workout_prepare') return prepared as T;
+      if (name === 'notification_prune_due') return false as T;
+      if (name === 'sweep_record_work') { records.push(args); if (recordFails) throw new Error('down'); return null as T; }
+      if (name === 'notification_claim' || name === 'notification_receipt_claim') return { jobs: [], disabled: false } as T;
+      return true as T;
+    };
+    const response = await handleNotificationRequest(new Request('https://local/worker', {
+      method: 'POST', headers: { apikey: 'service-key' }, body: body === undefined ? undefined : JSON.stringify(body),
+    }), { serviceKeys: ['service-key'], rpc });
+    return { status: response.status, records };
+  };
+  const sweep = { source: 'sweep' };
+  equal(await run(sweep, { jobs: [], admitted: 2 }), { status: 200, records: [{ p_event: 'notification.sweep_work',
+    p_work: { admitted: 2, receipts: 0, sends: 0, pruned: false, outcomes: {} } }] });
+  equal(await run(sweep, { jobs: [], admitted: 0 }), { status: 200, records: [] });
+  equal(await run(sweep, { jobs: [], admitted: 0 }, false), { status: 200, records: [] });
+  equal(await run({}, { jobs: [], admitted: 2 }), { status: 200, records: [] });
+  equal(await run(undefined, { jobs: [], admitted: 2 }), { status: 200, records: [] });
+  equal((await run(sweep, { jobs: [], admitted: 1 }, true, true)).status, 200);
+});

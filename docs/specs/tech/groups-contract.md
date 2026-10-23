@@ -189,10 +189,10 @@ enqueue nothing. The evaluator never writes links: a bad server-written link
 stalls the member's pull.
 
 **Invocation.** A `pg_net` kick (one per transaction, after commit) starts work
-in seconds. A `pg_cron` sweep every 5 minutes is the backstop, slow on purpose:
-each run's `cron.job_run_details` row forces a hosted WAL archive. URL
-and secret live in Vault; with no URL the queue waits. Its caller is
-Postgres (shared secret, no JWT), never a client.
+in seconds. An hourly `pg_cron` sweep is the backstop, slow because each run
+forces a hosted WAL archive; its runs log work done (`app_logs`). URL and
+secret live in Vault; without a URL the queue waits. Postgres calls it (shared
+secret, no JWT), never a client.
 
 **Facts.** `group_set_facts` has one row per set of every shared session,
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`

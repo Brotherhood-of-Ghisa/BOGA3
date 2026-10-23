@@ -62,14 +62,18 @@ export const handleNotificationRequest = async (request: Request, dependencies: 
     return json(401, { error: 'UNAUTHORIZED' });
   }
   if (request.method === 'GET') return json(200, { ok: true });
+  // The hourly pg_cron sweep marks its calls; transaction kicks send an empty body.
+  const fromSweep = ((await request.json().catch(() => null)) as { source?: unknown } | null)?.source === 'sweep';
   const outcomes: Record<string, number> = {};
   const record = (outcome: string) => { outcomes[outcome] = (outcomes[outcome] ?? 0) + 1; };
   try {
     if (!await dependencies.rpc<boolean>('notification_work_pending')) {
       return json(200, { claimed: 0, receipts: 0, outcomes, idle: true });
     }
+    let admitted = 0;
     try {
-      const workouts = await dependencies.rpc<{ jobs: WorkoutJob[] }>('notification_workout_prepare', { p_limit: 20 });
+      const workouts = await dependencies.rpc<{ jobs: WorkoutJob[]; admitted?: number }>('notification_workout_prepare', { p_limit: 20 });
+      admitted = workouts.admitted ?? 0;
       for (const workout of workouts.jobs) {
         try {
           const accepted = await dependencies.rpc<boolean>('notification_workout_enqueue', {
@@ -103,7 +107,16 @@ export const handleNotificationRequest = async (request: Request, dependencies: 
         catch { record('send_save_failed'); }
       }));
     }
+    const pruned = fromSweep && await dependencies.rpc<boolean>('notification_prune_due');
     await dependencies.rpc('notification_prune');
+    // A sweep-started run that did anything records how much; its work stands
+    // even if the record fails.
+    const total = Object.values(outcomes).reduce((sum, n) => sum + n, 0);
+    if (fromSweep && (admitted + receiptCount + sendCount + total > 0 || pruned)) {
+      await dependencies.rpc('sweep_record_work', { p_event: 'notification.sweep_work', p_work: {
+        admitted, receipts: receiptCount, sends: sendCount, pruned, outcomes,
+      } }).catch(() => console.error('notification-worker: sweep work record failed'));
+    }
     return json(200, { claimed: sendCount, receipts: receiptCount, disabled, outcomes });
   } catch {
     // Provider/DB errors may contain tokens or private row data; retain only a fixed diagnostic.

@@ -229,7 +229,8 @@ allowlisted outcomes only, never tokens, ciphertext, names, secrets or raw error
 The deterministic sink is enabled only by the local configuration and handles
 synthetic tokens; the production adapter uses Expo's fixed HTTPS endpoints.
 Provider sending defaults off. A service-only due-work check gates both the
-five-minute backstop's HTTP invocation and duplicate worker requests. It keeps
+hourly backstop's HTTP invocation and duplicate worker requests; a worker run
+the backstop starts logs its work (`app_logs`) only when it did some. It keeps
 due sends, expired leases and deliveries, receipts (including exhausted or
 expired receipt windows), queued admissions and pruning independent from new-send
 enablement. Identical valid confirmations retain their generation without a
