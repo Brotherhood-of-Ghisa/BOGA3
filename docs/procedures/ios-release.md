@@ -34,10 +34,12 @@ it is required and schedules one run. `--every <hours>h` accepts any positive wh
 number of hours (such as `1h`, `4h`, `12h`, `24h` or `48h`), within the supported
 date range. Intervals stay fixed in UTC, starting now unless `--at` sets the first
 run. Runs are serial; after an overrun or late wake, the next interval is in the
-future. One checkout and slot serve the whole schedule. Each run has its own
+future. Each changed-source run creates its own detached checkout and slot, then
+releases both on success, failure or cancellation. Waiting and unchanged runs
+hold neither. Each run has its own
 artifact directory; the parent's `latest-run.txt` points at the current run, and
 its log includes all runs.
-A failure stops repetition, preserving the failed run for inspection. Starting a
+A failure stops repetition, preserving its logs and artifacts for inspection. Starting a
 new schedule after failure is a manual decision, especially after uncertain upload.
 
 `--dry-run` prints the plan and resolves the locally known ref without creating a
@@ -46,8 +48,9 @@ job; changing time/frequency means cancelling the old one and scheduling another
 The job cannot survive logout/reboot; keep the Mac logged in, lid open and signing
 keys accessible.
 
-Default jobs pull `origin/main` with `--ff-only` at execution, then record the
-actual SHA. Other `--ref` values stay pinned when scheduled. Tracked files matching
+Default jobs fetch remote `main` at execution, record its SHA, and create a fresh
+checkout at that commit. Local checkout history and uncommitted files cannot enter
+the build. Other `--ref` values stay pinned when scheduled. Tracked files matching
 this Mac's last successful upload for the same profile/backend skip deployment,
 build and submission. The first run builds; failed uploads preserve the local
 success record under the BOGA config directory (default
@@ -57,7 +60,7 @@ hosted project.
 
 ### Logs, cancellation and closeout
 
-The command prints PID, checkout and artifact paths. Use its exact artifact path:
+The command prints PID, temporary checkout parent and artifact paths. Use its exact artifact path:
 
 ```bash
 BOGA_RELEASE_RECORD='/paste/the/Artifacts-log/directory/here'
@@ -68,7 +71,8 @@ cat "$BOGA_RELEASE_RECORD/status"
 
 The log shows live progress. `status` starts as `scheduled`, then records the
 final stage/exit code when the worker ends. `commit.txt` appears after source
-selection. The IPA, identity and checksum remain in that artifact directory.
+selection; `checkout.txt` records the temporary source path if a checkout was
+needed. The IPA, identity and checksum remain in that artifact directory.
 Skipped/uploaded results exit 0; a nonzero exit needs investigation. Uploaded
 means the submission command completed; check Apple processing/tester availability
 separately. Inspect logs and remote state before retrying a failed or uncertain
@@ -80,8 +84,12 @@ While the job is pending or running, cancel its whole process group:
 kill -TERM -- "-$(cat "$BOGA_RELEASE_RECORD/pid")"
 ```
 
-After collecting the external artifacts and finishing with a stopped job, release
-its retained detached checkout using "Apply the optional tag and close out" below.
+Cleanup removes only the checkout created by that run, using the worktree lifecycle
+command. If cleanup fails (for example Docker is unavailable), the job reports the
+retained path and stops repetition. Keep logs and artifacts; finish that checkout's
+cleanup using "Apply the optional tag and close out" below.
+The saved runner starts from its persistent artifact directory and uses the main
+repository to fetch/create checkouts, so its launcher worktree can be removed.
 
 When notification deployment needs explanation, load
 `docs/specs/tech/notification-delivery-contract.md` ("Rollout boundary"). The

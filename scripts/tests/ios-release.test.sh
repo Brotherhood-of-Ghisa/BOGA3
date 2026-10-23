@@ -30,24 +30,48 @@ cat > "$FIXTURE/repo/.gitignore" <<'EOF'
 supabase/.env.hosted
 supabase/.temp/
 apps/mobile/.env.local
+.worktree-slot
 EOF
 cat > "$FIXTURE/repo/scripts/worktree-lib.sh" <<'EOF'
 boga_config_root() { echo "$FIXTURE/config"; }
+boga_registry_dir() { echo "$FIXTURE/config/worktrees/slots"; }
 boga_worktree_root() { echo "$FIXTURE/worktrees"; }
+boga_main_worktree_path() { echo "$FIXTURE/repo"; }
 EOF
 cat > "$FIXTURE/repo/boga" <<'EOF'
 #!/usr/bin/env bash
-if [[ "$*" == 'worktree start' ]]; then
-  echo 'boga worktree start' >> "$FIXTURE/calls"
+set -euo pipefail
+printf 'boga %s\n' "$*" >> "$FIXTURE/calls"
+if [[ "$*" == 'worktree release '* ]]; then
+  [[ "${FAIL_STAGE:-}" != cleanup ]] || exit 14
+  [[ "$3" == --slot && "$4" == 1 && "$5" == --force ]] || exit 15
+  target="$(cat "$FIXTURE/lease")"
+  "$REAL_GIT" -C "$FIXTURE/repo" worktree remove --force "$target"
+  rm "$FIXTURE/lease" "$FIXTURE/config/worktrees/slots/1"
   exit
 fi
 while (( $# )); do
-  case "$1" in --root) root="$2"; shift ;; --name) name="$2"; shift ;; esac
+  case "$1" in --root) root="$2"; shift ;; --name) name="$2"; shift ;; --from) sha="$2"; shift ;; esac
   shift
 done
-mkdir -p "$root/$name"
+"$REAL_GIT" -C "$FIXTURE/repo" worktree add --quiet --detach "$root/$name" "$sha"
+[[ "${FAIL_STAGE:-}" != create-before-lease ]] || exit 13
+printf '%s\n' "$root/$name" > "$FIXTURE/lease"
+printf 'path=%s\n' "$root/$name" > "$FIXTURE/config/worktrees/slots/1"
+[[ "${FAIL_STAGE:-}" != create-before-marker ]] || exit 13
+if [[ "${FAIL_STAGE:-}" == create-lookup-error ]]; then
+  mkdir "$FIXTURE/config/worktrees/slots/3"
+  exit 13
+fi
+echo 1 > "$root/$name/.worktree-slot"
+[[ "${FAIL_STAGE:-}" != create-after-lease ]] || exit 13
+mkdir -p "$root/$name/supabase/.temp"
+cp "$FIXTURE/repo/supabase/.env.hosted" "$root/$name/supabase/.env.hosted"
+if [[ "${FAIL_STAGE:-}" == dirty ]]; then echo dirty >> "$root/$name/apps/mobile/eas.json"; fi
 EOF
 chmod +x "$FIXTURE/repo/boga"
+mkdir -p "$FIXTURE/config/worktrees/slots"
+printf 'path=%s/worktrees/unrelated\n' "$FIXTURE" > "$FIXTURE/config/worktrees/slots/2"
 cat > "$FIXTURE/repo/supabase/.env.hosted" <<'EOF'
 SUPABASE_PROJECT_REF=abcdefghijklmnopqrst
 SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co
@@ -87,9 +111,9 @@ cat > "$FIXTURE/worker-request"
 EOF
 cat > "$FIXTURE/bin/git" <<'EOF'
 #!/usr/bin/env bash
-if [[ "${1:-}" == pull ]]; then
+if [[ "${1:-}" == fetch ]]; then
   printf 'git %s\n' "$*" >> "$FIXTURE/calls"
-  [[ "${FAIL_STAGE:-}" != pull ]] || exit 12
+  [[ "${FAIL_STAGE:-}" != fetch ]] || exit 12
 fi
 exec "$REAL_GIT" "$@"
 EOF
@@ -100,6 +124,7 @@ EOF
 cat > "$FIXTURE/bin/caffeinate" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" > "$FIXTURE/job-argv"
+pwd -P > "$FIXTURE/job-cwd"
 ps -o pgid= -p "$$" | tr -d ' ' > "$FIXTURE/job-group.tmp"
 mv "$FIXTURE/job-group.tmp" "$FIXTURE/job-group"
 EOF
@@ -113,7 +138,11 @@ case "$*" in
       "${FAKE_URL:-https://abcdefghijklmnopqrst.supabase.co}" > .env.local ;;
   'expo config --json') echo '{"version":"2.1.0","extra":{"releaseCodename":"Test","eas":{"projectId":"3c00cd23-0946-4eb6-bbf0-4542879cd314"}}}' ;;
   'eas-cli build '*)
-    [[ "${FAIL_STAGE:-}" != build ]] || exit 9
+    [[ "${FAIL_STAGE:-}" != build && ! -f "$FIXTURE/fail-build" ]] || exit 9
+    if [[ "${FAIL_STAGE:-}" == cancel-build ]]; then
+      touch "$FIXTURE/build-entered"
+      /bin/sleep 60
+    fi
     while [[ "$1" != --output ]]; do shift; done
     if [[ -f "$FIXTURE/overrun" ]]; then echo 110 > "$FIXTURE/clock"; rm "$FIXTURE/overrun"; fi
     printf 'fake IPA\n' > "$2" ;;
@@ -152,9 +181,15 @@ worker() {
   local name="$1"
   mkdir "$FIXTURE/$name"
   : > "$FIXTURE/calls"
-  printf 'release_root=%q\nsha=%q\nref=%q\nprofile=%q\nproject=abcdefghijklmnopqrst\nat_epoch=0\n' \
-    "$FIXTURE/repo" "$sha" "${2:-HEAD}" "${3:-prod}" > "$FIXTURE/$name/job.env"
-  bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/$name" > "$FIXTURE/$name/log" 2>&1
+  printf 'source_repo=%q\nrelease_parent=%q\nsha=%q\nref=%q\nprofile=%q\nproject=abcdefghijklmnopqrst\nat_epoch=0\n' \
+    "$FIXTURE/repo" "$FIXTURE/worktrees" "$sha" "${2:-HEAD}" "${3:-prod}" > "$FIXTURE/$name/job.env"
+  local result=0
+  bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/$name" > "$FIXTURE/$name/log" 2>&1 || result=$?
+  if [[ "${FAIL_STAGE:-}" != cleanup && "${FAIL_STAGE:-}" != create-lookup-error && -f "$FIXTURE/$name/checkout.txt" ]]; then
+    [[ ! -d "$(cat "$FIXTURE/$name/checkout.txt")" && ! -f "$FIXTURE/lease" && ! -f "$FIXTURE/config/worktrees/slots/1" ]] || fail 'checkout or slot leaked'
+  fi
+  [[ "$(cat "$FIXTURE/config/worktrees/slots/2")" == "path=$FIXTURE/worktrees/unrelated" ]] || fail 'another checkout lease changed'
+  return "$result"
 }
 
 worker success || { cat "$FIXTURE/success/log"; fail 'release failed'; }
@@ -170,7 +205,7 @@ assert_absent 'sb_publishable_wrong|sb_secret_wrong' "$FIXTURE/configuration.sql
 [[ "$(cat "$FIXTURE/calls")" != *'db reset'* && "$(cat "$FIXTURE/calls")" != *'--include-seed'* ]] || fail 'destructive deployment'
 [[ "$(cat "$success_file")" == "$initial_tree" ]] || fail 'successful upload did not save source tree'
 [[ "$(cat "$FIXTURE/success/commit.txt")" == "$sha" ]] || fail 'release commit not recorded'
-assert_absent 'git pull' "$FIXTURE/calls" 'explicit ref was pulled'
+assert_absent 'git fetch' "$FIXTURE/calls" 'explicit ref was fetched'
 assert_absent 'credential-must-not-leak' "$FIXTURE/success" 'credential leaked to artifacts'
 node - "$FIXTURE/calls" <<'JS'
 const assert = require('node:assert/strict');
@@ -193,19 +228,20 @@ assert_absent 'credential-must-not-leak' "$FIXTURE/legacy" 'legacy credential le
 
 worker unchanged origin/main || fail 'unchanged release failed'
 [[ "$(cat "$FIXTURE/unchanged/status")" == 'skipped;'* ]] || fail 'unchanged source not skipped'
-[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'unchanged release ran deployment commands'
-export FAIL_STAGE=pull
-if worker failed-pull origin/main; then fail 'failed pull treated as unchanged'; fi
+[[ "$(cat "$FIXTURE/calls")" == 'git fetch origin +refs/heads/main:refs/remotes/origin/main' ]] || fail 'unchanged release ran deployment commands'
+export FAIL_STAGE=fetch
+if worker failed-fetch origin/main; then fail 'failed fetch treated as unchanged'; fi
 unset FAIL_STAGE
-assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'failed pull started release'
+assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'failed fetch started release'
 git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit --allow-empty -qm 'same files'
 empty_sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
 git -C "$FIXTURE/repo" push -q origin HEAD:main
 git -C "$FIXTURE/repo" checkout -q --detach "$sha"
 worker empty-commit origin/main || fail 'empty-commit release failed'
 [[ "$(cat "$FIXTURE/empty-commit/status")" == 'skipped;'* ]] || fail 'empty commit rebuilt identical files'
-[[ "$(cat "$FIXTURE/empty-commit/commit.txt")" == "$empty_sha" ]] || fail 'pull did not advance checkout'
-[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'empty commit started release'
+[[ "$(cat "$FIXTURE/empty-commit/commit.txt")" == "$empty_sha" ]] || fail 'fetch did not select current main'
+[[ "$(cat "$FIXTURE/calls")" == 'git fetch origin +refs/heads/main:refs/remotes/origin/main' ]] || fail 'empty commit started release'
+git -C "$FIXTURE/repo" checkout -q --detach "$empty_sha"
 echo 'new source' > "$FIXTURE/repo/apps/mobile/release-input.txt"
 git -C "$FIXTURE/repo" add apps/mobile/release-input.txt
 git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm 'changed files'
@@ -221,6 +257,22 @@ for failure in migrations functions build submission; do
   fi
 done
 unset FAIL_STAGE
+for failure in create-before-lease create-before-marker create-after-lease; do
+  export FAIL_STAGE="$failure"
+  if worker "$failure"; then fail 'partial creation unexpectedly succeeded'; fi
+  [[ "$(cat "$FIXTURE/$failure/status")" == 'checkout (exit 13)' ]] || fail 'creation failure masked'
+  assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'partial checkout used for release'
+done
+unset FAIL_STAGE
+echo 'ios-release: registered lease without a marker is released'
+export FAIL_STAGE=create-lookup-error
+if worker lookup-error; then fail 'failed registry lookup unexpectedly succeeded'; fi
+unset FAIL_STAGE
+[[ -d "$(cat "$FIXTURE/lookup-error/checkout.txt")" && -f "$FIXTURE/lease" ]] || fail 'failed lookup lost checkout or lease'
+[[ "$(cat "$FIXTURE/lookup-error/status")" == 'checkout; checkout cleanup failed:'*'(exit 13)' ]] || fail 'failed lookup status missing'
+assert_absent 'boga worktree release|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'failed lookup continued cleanup or release'
+rmdir "$FIXTURE/config/worktrees/slots/3"
+"$FIXTURE/repo/boga" worktree release --slot 1 --force
 for failure in worker-auth keys; do
   export FAIL_STAGE="$failure"
   if worker "$failure"; then fail "$failure did not stop release"; fi
@@ -243,9 +295,16 @@ if worker duplicate-migration; then fail 'duplicate migration version accepted';
 assert_absent 'db query|db push|functions deploy|eas-cli build|eas-cli submit' "$FIXTURE/calls" 'deployment continued with duplicate migration versions'
 git -C "$FIXTURE/repo" reset -q --hard "$saved_sha"
 sha="$saved_sha"
+export FAIL_STAGE=dirty
+if worker dirty; then fail 'dirty release source accepted'; fi
+assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'dirty release started external commands'
+unset FAIL_STAGE
+# The developer's working files never enter the fresh release checkout.
 echo dirty >> "$FIXTURE/repo/apps/mobile/eas.json"
-if worker dirty origin/main; then fail 'dirty release source accepted'; fi
-[[ ! -s "$FIXTURE/calls" ]] || fail 'dirty release started external commands'
+export FAIL_STAGE=build
+if worker dirty-control; then fail 'fake build unexpectedly passed'; fi
+[[ "$(cat "$FIXTURE/dirty-control/status")" == 'build '* ]] || fail 'developer edits affected release source'
+unset FAIL_STAGE
 git -C "$FIXTURE/repo" checkout -- apps/mobile/eas.json
 export FAKE_URL=https://different-project.supabase.co
 if worker mismatch; then fail 'backend mismatch accepted'; fi
@@ -265,17 +324,18 @@ git -C "$FIXTURE/repo" checkout -q --detach "$initial_sha"
 sha="$initial_sha"
 worker refreshed origin/main || { cat "$FIXTURE/refreshed/log"; fail 'refreshed release failed'; }
 [[ "$(cat "$FIXTURE/refreshed/commit.txt")" == "$target_sha" ]] || fail 'new main was not released'
-[[ "$(cat "$success_file")" == "$(git -C "$FIXTURE/repo" rev-parse 'HEAD^{tree}')" ]] || fail 'new source baseline missing'
+[[ "$(cat "$success_file")" == "$(git -C "$FIXTURE/repo" rev-parse "$target_sha^{tree}")" ]] || fail 'new source baseline missing'
 node - "$FIXTURE/calls" <<'JS'
 const assert = require('node:assert/strict');
 const log = require('node:fs').readFileSync(process.argv[2], 'utf8');
-assert(log.indexOf('boga worktree start') > log.indexOf('git pull --ff-only origin main'));
-assert(log.indexOf('npm ci') > log.indexOf('boga worktree start'));
+assert(log.indexOf('boga worktree create') > log.indexOf('git fetch origin +refs/heads/main:refs/remotes/origin/main'));
+assert(log.indexOf('npm ci') > log.indexOf('boga worktree create'));
+assert(log.indexOf('boga worktree release') > log.indexOf('eas-cli submit'));
 assert(log.includes('eas-cli submit'));
 JS
 sha="$target_sha"
 worker repeated origin/main || fail 'repeated release failed'
-[[ "$(cat "$FIXTURE/calls")" == 'git pull --ff-only origin main' ]] || fail 'successful source rebuilt'
+[[ "$(cat "$FIXTURE/calls")" == 'git fetch origin +refs/heads/main:refs/remotes/origin/main' ]] || fail 'successful source rebuilt'
 export FAKE_BUNDLE=com.phano.boga3.dev
 worker preview HEAD preview || { cat "$FIXTURE/preview/log"; fail 'profile-specific first release failed'; }
 unset FAKE_BUNDLE
@@ -286,14 +346,16 @@ echo divergent > "$FIXTURE/repo/divergent.txt"
 git -C "$FIXTURE/repo" add divergent.txt
 git -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm divergent
 sha="$(git -C "$FIXTURE/repo" rev-parse HEAD)"
-if worker divergent origin/main; then fail 'divergent pull accepted'; fi
-assert_absent 'boga worktree start|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'divergent pull started release'
+rm "$success_file"
+worker divergent origin/main || { cat "$FIXTURE/divergent/log"; fail 'local divergence blocked fresh checkout'; }
+[[ "$(cat "$FIXTURE/divergent/commit.txt")" == "$target_sha" ]] || fail 'local divergent commit was released'
+[[ "$(git -C "$FIXTURE/repo" rev-parse HEAD)" == "$sha" ]] || fail 'developer checkout was changed'
 git -C "$FIXTURE/repo" checkout -q --detach "$target_sha"
 sha="$target_sha"
 
 git -C "$FIXTURE/repo" push -q --force origin "$initial_sha:main"
-if worker rewound origin/main; then fail 'rewound main accepted'; fi
-assert_absent 'boga worktree start|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'rewound main started release'
+worker rewound origin/main || { cat "$FIXTURE/rewound/log"; fail 'rewritten remote blocked fresh checkout'; }
+[[ "$(cat "$FIXTURE/rewound/commit.txt")" == "$initial_sha" ]] || fail 'rewritten main not selected'
 git -C "$FIXTURE/repo" push -q origin HEAD:main
 
 # Advance a fake clock to prove serial repeats, missed-slot skipping and failure stops.
@@ -314,14 +376,20 @@ count=0
 [[ ! -f "$FIXTURE/sleeps" ]] || count="$(cat "$FIXTURE/sleeps")"
 count=$((count + 1))
 printf '%s\n' "$count" > "$FIXTURE/sleeps"
-if (( count == 2 )); then echo dirty >> "$FIXTURE/repo/apps/mobile/release-input.txt"; fi
+if (( count == 2 )); then
+  echo changed-again >> "$FIXTURE/repo/apps/mobile/release-input.txt"
+  "$REAL_GIT" -C "$FIXTURE/repo" add apps/mobile/release-input.txt
+  "$REAL_GIT" -C "$FIXTURE/repo" -c user.name=Test -c user.email=test@example.com commit -qm changed-again
+  "$REAL_GIT" -C "$FIXTURE/repo" push -q --force origin HEAD:main
+  touch "$FIXTURE/fail-build"
+fi
 EOF
 chmod +x "$FIXTURE/bin/date" "$FIXTURE/bin/sleep"
 recurring_job() {
   mkdir "$FIXTURE/$1"
   cp "$FIXTURE/repo/scripts/ios-release.sh" "$FIXTURE/$1/runner.sh"
-  printf 'release_root=%q\nsha=%q\nref=origin/main\nprofile=prod\nproject=abcdefghijklmnopqrst\nat_epoch=%s\nrepeat_seconds=1\n' \
-    "$FIXTURE/repo" "$sha" "$2" > "$FIXTURE/$1/job.env"
+  printf 'source_repo=%q\nrelease_parent=%q\nsha=%q\nref=origin/main\nprofile=prod\nproject=abcdefghijklmnopqrst\nat_epoch=%s\nrepeat_seconds=1\n' \
+    "$FIXTURE/repo" "$FIXTURE/worktrees" "$sha" "$2" > "$FIXTURE/$1/job.env"
 }
 echo 100 > "$FIXTURE/clock"
 touch "$FIXTURE/overrun"
@@ -334,38 +402,53 @@ if repeat_seconds=999 bash "$FIXTURE/recurring/runner.sh" --run "$FIXTURE/recurr
   fail 'recurring job continued after failed run'
 fi
 [[ "$(cat "$FIXTURE/recurring/status")" == 'stopped after failed run;'*'(exit 1)' ]] || fail 'recurring failure status missing'
-[[ "$(grep -c 'npx eas-cli build' "$FIXTURE/calls")" == 1 ]] || fail 'unchanged source rebuilt'
+[[ "$(grep -c 'npx eas-cli build' "$FIXTURE/calls")" == 2 ]] || fail 'unexpected recurring build count'
 [[ "$(grep -c 'npx eas-cli submit' "$FIXTURE/calls")" == 1 ]] || fail 'recurring submission count wrong'
-[[ ! -d "$FIXTURE/worktrees" ]] || fail 'recurring job created additional worktrees'
+[[ -z "$(ls -A "$FIXTURE/worktrees")" && ! -f "$FIXTURE/lease" ]] || fail 'recurring checkout or slot leaked'
 node - "$FIXTURE/recurring" <<'JS'
 const fs = require('node:fs'), assert = require('node:assert/strict');
 const root = process.argv[2];
 const runs = fs.readdirSync(root + '/runs').map(name => root + '/runs/' + name);
 assert.equal(runs.length, 3);
 const statuses = runs.map(run => fs.readFileSync(run + '/status', 'utf8'));
-for (const stage of ['uploaded;', 'skipped;', 'source-update ']) {
+for (const stage of ['uploaded;', 'skipped;', 'build ']) {
   assert.equal(statuses.filter(status => status.startsWith(stage)).length, 1, stage);
 }
 const starts = runs.map(run => Number(fs.readFileSync(run + '/job.env', 'utf8').match(/^at_epoch=(\d+)$/m)[1]));
 assert.deepEqual(starts.sort((a, b) => a - b), [100, 111, 112]);
 assert(runs.includes(fs.readFileSync(root + '/latest-run.txt', 'utf8').trim()));
 assert(runs.every(run => fs.existsSync(run + '/release.log')));
+const checkouts = runs.filter(run => fs.existsSync(run + '/checkout.txt'))
+  .map(run => fs.readFileSync(run + '/checkout.txt', 'utf8').trim());
+assert.equal(checkouts.length, 2);
+assert.equal(new Set(checkouts).size, 2);
+assert(checkouts.every(path => !fs.existsSync(path)));
 JS
 assert_absent 'credential-must-not-leak' "$FIXTURE/recurring" 'recurring record leaked credentials'
 if bash "$FIXTURE/recurring/runner.sh" --run "$FIXTURE/recurring" >/dev/null 2>&1; then
   fail 'recurring scheduler ran twice'
 fi
-git -C "$FIXTURE/repo" checkout -- apps/mobile/release-input.txt
+rm "$FIXTURE/fail-build"
+git -C "$FIXTURE/repo" checkout -q --detach "$target_sha"
+git -C "$FIXTURE/repo" push -q --force origin HEAD:main
 sha="$target_sha"
 
-# Cancel a waiting recurring group, including its child worker and sleep.
-touch "$FIXTURE/block-sleep"
-recurring_job cancelled-recurring 200
-node - "$FIXTURE" <<'JS'
+# Cancel both a waiting job and an active build, including all child processes.
+for mode in waiting build; do
+  if [[ "$mode" == waiting ]]; then
+    touch "$FIXTURE/block-sleep"
+    marker=sleep-entered; first=200
+  else
+    rm "$FIXTURE/block-sleep" "$success_file"
+    export FAIL_STAGE=cancel-build
+    marker=build-entered; first=0
+  fi
+  recurring_job "cancelled-$mode" "$first"
+  node - "$FIXTURE" "cancelled-$mode" "$marker" <<'JS'
 const fs = require('node:fs'), assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { setTimeout: sleep } = require('node:timers/promises');
-const root = process.argv[2], record = root + '/cancelled-recurring';
+const root = process.argv[2], record = root + '/' + process.argv[3], marker = root + '/' + process.argv[4];
 const log = fs.openSync(record + '/log', 'a');
 const child = spawn('/bin/bash', [record + '/runner.sh', '--run', record], { detached: true, stdio: ['ignore', log, log] });
 fs.closeSync(log);
@@ -374,19 +457,37 @@ const exit = new Promise(resolve => child.once('exit', (code, signal) => { finis
 (async () => {
   try {
     const deadline = Date.now() + 5000;
-    while (!fs.existsSync(root + '/sleep-entered') && Date.now() < deadline && !finished) await sleep(10);
-    assert(fs.existsSync(root + '/sleep-entered'), 'recurring worker did not wait');
+    while (!fs.existsSync(marker) && Date.now() < deadline && !finished) await sleep(10);
+    assert(fs.existsSync(marker), 'worker did not reach cancellation stage');
     process.kill(-child.pid, 'SIGTERM');
     const result = await Promise.race([exit, sleep(5000, undefined, { ref: false }).then(() => { throw new Error('cancellation timed out'); })]);
     assert.equal(result.code, 143);
     assert(fs.readFileSync(record + '/status', 'utf8').includes('exit 143'));
     assert.equal(fs.readdirSync(record + '/runs').length, 1);
+    const run = record + '/runs/' + fs.readdirSync(record + '/runs')[0];
+    // Parent and child traps finish independently after a group signal.
+    while (!fs.existsSync(run + '/status') && Date.now() < deadline) await sleep(10);
+    assert(fs.readFileSync(run + '/status', 'utf8').includes('exit 143'));
+    if (fs.existsSync(run + '/checkout.txt')) {
+      assert(!fs.existsSync(fs.readFileSync(run + '/checkout.txt', 'utf8').trim()));
+      assert(!fs.existsSync(root + '/lease'));
+    }
   } finally {
     if (!finished) process.kill(-child.pid, 'SIGKILL');
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });
 JS
-rm "$FIXTURE/clock" "$FIXTURE/block-sleep"
+done
+unset FAIL_STAGE
+rm "$FIXTURE/clock"
+
+# Cleanup failure must be visible and cannot turn an upload into a clean exit.
+export FAIL_STAGE=cleanup
+if worker cleanup; then fail 'cleanup failure was hidden'; fi
+unset FAIL_STAGE
+[[ "$(cat "$FIXTURE/cleanup/status")" == 'uploaded;'*'checkout cleanup failed:'*'(exit 1)' ]] || fail 'cleanup failure status missing'
+[[ -d "$(cat "$FIXTURE/cleanup/checkout.txt")" && -f "$FIXTURE/lease" ]] || fail 'failed cleanup lost its checkout or lease'
+"$FIXTURE/repo/boga" worktree release --slot 1 --force
 
 for every in 1h 4h 12h 24h 48h; do
   "$FIXTURE/repo/scripts/ios-release.sh" --every "$every" --profile prod \
@@ -409,13 +510,18 @@ for at in '' 2020-01-01T01:00:00Z 2099-02-31T01:00:00Z 2099-10-18T01:00:00; do
     fail "invalid schedule accepted: $at"
   fi
 done
-"$FIXTURE/repo/scripts/ios-release.sh" --every 12h --profile prod --project-ref abcdefghijklmnopqrst \
+"$REAL_GIT" -C "$FIXTURE/repo" worktree add --quiet --detach "$FIXTURE/launcher" "$sha"
+cp "$FIXTURE/repo/supabase/.env.hosted" "$FIXTURE/launcher/supabase/.env.hosted"
+"$FIXTURE/launcher/scripts/ios-release.sh" --every 12h --profile prod --project-ref abcdefghijklmnopqrst \
   > "$FIXTURE/scheduled"
+"$REAL_GIT" -C "$FIXTURE/repo" worktree remove --force "$FIXTURE/launcher"
 for attempt in {1..50}; do
   [[ ! -f "$FIXTURE/job-group" ]] || break
   sleep 0.02
 done
 record=("$FIXTURE/config/releases/"ios-*)
+[[ "$(cat "$FIXTURE/job-cwd")" == "$(cd "${record[0]}" && pwd -P)" ]] || fail 'scheduler inherited removable launcher cwd'
+[[ "$(cat "${record[0]}/job.env")" == *"source_repo=$FIXTURE/repo"* ]] || fail 'scheduler depends on removed launcher'
 [[ "$(cat "$FIXTURE/job-group")" == "$(cat "${record[0]}/pid")" ]] || fail 'job lacks its own process group'
 [[ "$(cat "${record[0]}/job.env")" == *"sha=$sha"* ]] || fail 'scheduled starting commit not recorded'
 [[ "$(cat "${record[0]}/job.env")" == *'ref=origin/main'* ]] || fail 'main refresh not scheduled'
@@ -423,4 +529,4 @@ record=("$FIXTURE/config/releases/"ios-*)
 cmp "$FIXTURE/repo/scripts/ios-release.sh" "${record[0]}/runner.sh" || fail 'runner not preserved'
 [[ "$(cat "$FIXTURE/job-argv")" == *'--run '* ]] || fail 'worker not scheduled'
 assert_absent 'credential-must-not-leak' "${record[0]}" 'schedule persisted credentials'
-echo 'ios-release: serial repeats, missed intervals, recurring failure stops/cancellation, main refresh, unchanged-source skip, successful-upload baselines, ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'
+echo 'ios-release: fresh checkouts and cleanup, serial repeats, missed intervals, recurring failure stops/cancellation, main refresh, unchanged-source skip, successful-upload baselines, ordering, failure stops, identity, checksum, privacy, and scheduling validation passed'

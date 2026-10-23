@@ -211,7 +211,10 @@ and runs `git worktree remove --force`. If Docker is unavailable it fails and
 cleanup procedure it also takes `--slot <N>` (a lease whose owner is gone) and
 `--project-id <id>` (a Docker stack with no lease).
 
-No automatic cleanup exists, by design, and sessions do die before `release` —
+There is no reaper for other owners' worktrees. The scheduled iOS release worker
+calls `release --force` only for its own temporary checkout after each run; when
+changing that worker, load `docs/procedures/ios-release.md`.
+Sessions do die before `release` —
 archived, stopped, or the app quits. `./boga worktree ls` prints every lease,
 every Supabase stack in Docker, and every prunable git worktree with its PR
 state; the [cleanup procedure](../procedures/worktree-cleanup.md) is how any
