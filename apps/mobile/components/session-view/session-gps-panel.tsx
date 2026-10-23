@@ -109,7 +109,7 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: uiRoles.paper,
-    borderRadius: 12,
+    borderRadius: uiGeometry.radius.card,
     marginBottom: uiSpace.md,
     marginHorizontal: uiSpace.lg,
     padding: uiSpace.md,
