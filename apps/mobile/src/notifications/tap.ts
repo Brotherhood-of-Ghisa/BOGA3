@@ -1,4 +1,5 @@
 import { getCompetitionSession, GroupApiError } from '@/src/groups/api';
+import { logEvent } from '@/src/logging';
 import { getNotificationNativeAdapter } from './native-adapter';
 import { getNotificationAccount, getNotificationAccountRevision, subscribeNotificationAccount } from './auth-boundary';
 import type { NotificationEnvelope, NotificationProjection, NotificationTarget } from './types';
@@ -54,6 +55,103 @@ export const watchNotificationTapAccount = (): (() => void) => {
   return () => { unsubscribeAccount?.(); unsubscribeAccount = null; };
 };
 
+const logTapDecodeFailure = (
+  envelope: NotificationEnvelope,
+  native: ReturnType<typeof getNotificationNativeAdapter>,
+  userId: string,
+): void => {
+  let decrypted: unknown = null;
+  try { decrypted = native.decrypt(envelope); } catch { /* ignore */ }
+  const binding = native.readBinding();
+  const account = getNotificationAccount();
+  void logEvent({
+    level: 'warn',
+    event: 'notifications.tap_decode_failed',
+    message: 'Failed to decode or validate notification projection.',
+    context: {
+      envelopeBindingId: envelope.bindingId,
+      hasDecryptedValue: Boolean(decrypted),
+      isProjection: isNotificationProjection(decrypted),
+      bindingBindingId: binding?.bindingId,
+      bindingUserId: binding?.userId,
+      accountUserId: account?.userId,
+      inputUserId: userId,
+      bindingSessionMatch: binding?.authSessionId === account?.authSessionId,
+      envMatch: binding?.environment === native.environment,
+      expired: isRecord(decrypted) && typeof decrypted.expiresAt === 'number' ? decrypted.expiresAt <= Date.now() : undefined,
+    },
+  });
+};
+
+const decodeNotificationEnvelope = (
+  envelope: NotificationEnvelope,
+  native: ReturnType<typeof getNotificationNativeAdapter>,
+  userId: string,
+): NotificationProjection | null => {
+  try {
+    const value = native.decrypt(envelope);
+    const binding = native.readBinding();
+    const account = getNotificationAccount();
+    return isNotificationProjection(value) && value.bindingId === envelope.bindingId && value.recipientUserId === userId &&
+      binding?.bindingId === envelope.bindingId && binding.userId === userId && binding.environment === native.environment &&
+      account?.userId === userId && binding.authSessionId === account.authSessionId ? value : null;
+  } catch { return null; }
+};
+
+type PostFetchValidation = 'valid' | 'expired' | 'unbound' | 'mismatch';
+
+const verifyPostFetch = (
+  envelope: NotificationEnvelope,
+  projection: NotificationProjection,
+  native: ReturnType<typeof getNotificationNativeAdapter>,
+  userId: string,
+): PostFetchValidation => {
+  if (projection.expiresAt <= Date.now()) return 'expired';
+  const binding = native.readBinding();
+  const account = getNotificationAccount();
+  const bindingValid = binding &&
+    binding.userId === userId &&
+    binding.authSessionId === account?.authSessionId &&
+    binding.environment === native.environment;
+  if (!bindingValid) return 'unbound';
+  if (binding.bindingId === envelope.bindingId) {
+    const fresh = decodeNotificationEnvelope(envelope, native, userId);
+    if (!fresh || fresh.notificationId !== projection.notificationId || fresh.route.groupId !== projection.route.groupId ||
+      fresh.route.memberId !== projection.route.memberId || fresh.route.sessionId !== projection.route.sessionId) {
+      return 'mismatch';
+    }
+  }
+  return 'valid';
+};
+
+const recordTapOpened = (identity: string, projection: NotificationProjection, onOpen: (target: NotificationTarget) => void): void => {
+  opened.add(identity);
+  if (opened.size > 100) opened.delete(opened.values().next().value!);
+  discardPendingNotificationTap();
+  void logEvent({
+    level: 'info',
+    event: 'notifications.tap_opened',
+    context: { groupId: projection.route.groupId, sessionId: projection.route.sessionId, notificationId: projection.notificationId },
+  });
+  onOpen(projection.route);
+};
+
+const handleTapAuthError = (
+  error: unknown,
+  projection: NotificationProjection,
+  onUnavailable: (reason: 'offline' | 'unavailable') => void,
+): void => {
+  const offline = error instanceof GroupApiError && error.code === 'NETWORK';
+  if (!offline) discardPendingNotificationTap();
+  void logEvent({
+    level: offline ? 'info' : 'warn',
+    event: offline ? 'notifications.tap_offline' : 'notifications.tap_auth_failed',
+    message: error instanceof Error ? error.message : String(error),
+    context: { code: error instanceof GroupApiError ? error.code : undefined, groupId: projection.route.groupId, sessionId: projection.route.sessionId },
+  });
+  onUnavailable(offline ? 'offline' : 'unavailable');
+};
+
 export const processPendingNotificationTap = async (input: {
   userId: string | null; ready: boolean; onOpen: (target: NotificationTarget) => void;
   onUnavailable: (reason: 'offline' | 'unavailable') => void;
@@ -63,39 +161,38 @@ export const processPendingNotificationTap = async (input: {
   const accountRevision = getNotificationAccountRevision();
   const native = getNotificationNativeAdapter();
   const current = () => pending === envelope && accountRevision === getNotificationAccountRevision() && getNotificationAccount()?.userId === input.userId;
-  const decodeCurrent = (): NotificationProjection | null => {
-    try {
-      const value = native.decrypt(envelope);
-      const binding = native.readBinding();
-      const account = getNotificationAccount();
-      return isNotificationProjection(value) && value.bindingId === envelope.bindingId && value.recipientUserId === input.userId &&
-        binding?.bindingId === envelope.bindingId && binding.userId === input.userId && binding.environment === native.environment &&
-        account?.userId === input.userId && binding.authSessionId === account.authSessionId ? value : null;
-    } catch { return null; }
-  };
-  const projection = decodeCurrent();
-  if (!projection) { discardPendingNotificationTap(); input.onUnavailable('unavailable'); return; }
+  const projection = decodeNotificationEnvelope(envelope, native, input.userId);
+  if (!projection) {
+    logTapDecodeFailure(envelope, native, input.userId);
+    discardPendingNotificationTap();
+    input.onUnavailable('unavailable');
+    return;
+  }
   const identity = `${envelope.bindingId}:${projection.notificationId}`;
   if (opened.has(identity)) { discardPendingNotificationTap(); return; }
   processing = true;
   try {
     await getCompetitionSession(projection.route.groupId, projection.route.memberId, projection.route.sessionId);
-    // A key/account/expiry may have changed while the live authorization was in flight.
-    const fresh = decodeCurrent();
     if (!current()) return;
-    if (!fresh || fresh.notificationId !== projection.notificationId || fresh.route.groupId !== projection.route.groupId ||
-      fresh.route.memberId !== projection.route.memberId || fresh.route.sessionId !== projection.route.sessionId) {
-      discardPendingNotificationTap(); input.onUnavailable('unavailable'); return;
+    const postStatus = verifyPostFetch(envelope, projection, native, input.userId);
+    if (postStatus === 'expired' || postStatus === 'mismatch') {
+      void logEvent({
+        level: 'warn',
+        event: postStatus === 'expired' ? 'notifications.tap_expired_in_flight' : 'notifications.tap_revalidation_failed',
+        message: postStatus === 'expired' ? 'Notification expired during live authorization.' : 'Projection revalidation failed.',
+      });
+      discardPendingNotificationTap();
+      input.onUnavailable('unavailable');
+      return;
     }
-    opened.add(identity);
-    if (opened.size > 100) opened.delete(opened.values().next().value!);
-    discardPendingNotificationTap();
-    input.onOpen(fresh.route);
+    if (postStatus === 'unbound') {
+      void logEvent({ level: 'warn', event: 'notifications.tap_binding_invalidated', message: 'Device binding invalidated during live read.' });
+      discardPendingNotificationTap();
+      return;
+    }
+    recordTapOpened(identity, projection, input.onOpen);
   } catch (error) {
-    if (!current()) return;
-    const offline = error instanceof GroupApiError && error.code === 'NETWORK';
-    if (!offline) discardPendingNotificationTap();
-    input.onUnavailable(offline ? 'offline' : 'unavailable');
+    if (current()) handleTapAuthError(error, projection, input.onUnavailable);
   } finally {
     processing = false;
     if (pending && pending !== envelope) emit();

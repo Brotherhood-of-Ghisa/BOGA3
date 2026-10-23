@@ -43,6 +43,7 @@ jest.mock('expo-router', () => ({
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { uiRoles } from '@/components/ui/tokens';
+import { logEvent } from '@/src/logging';
 import { waitForGone } from './helpers/wait-for-gone';
 
 const currentRequest = () => mockProcess.mock.calls.at(-1)![0];
@@ -137,4 +138,15 @@ it('clears the prior account failure and ignores its late callback after an acco
   mockAuth.user = { id: 'recipient' };
   view.rerender(<NotificationTapBridge />);
   expect(screen.queryByTestId('notification-unavailable')).toBeNull();
+});
+
+it('logs unhandled error and shows unavailable when processing rejects', async () => {
+  mockProcess.mockRejectedValueOnce(new Error('crash in tap'));
+  render(<NotificationTapBridge />);
+  await waitFor(() => expect(screen.getByText('This session is no longer available')).toBeTruthy());
+  expect(logEvent).toHaveBeenCalledWith(expect.objectContaining({
+    level: 'error',
+    event: 'notifications.tap_unhandled_error',
+    message: 'crash in tap',
+  }));
 });
