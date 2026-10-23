@@ -34,6 +34,7 @@ apps/mobile/.env.local
 EOF
 cat > "$FIXTURE/repo/scripts/worktree-lib.sh" <<'EOF'
 boga_config_root() { echo "$FIXTURE/config"; }
+boga_registry_dir() { echo "$FIXTURE/config/worktrees/slots"; }
 boga_worktree_root() { echo "$FIXTURE/worktrees"; }
 boga_main_worktree_path() { echo "$FIXTURE/repo"; }
 EOF
@@ -43,9 +44,10 @@ set -euo pipefail
 printf 'boga %s\n' "$*" >> "$FIXTURE/calls"
 if [[ "$*" == 'worktree release '* ]]; then
   [[ "${FAIL_STAGE:-}" != cleanup ]] || exit 14
+  [[ "$3" == --slot && "$4" == 1 && "$5" == --force ]] || exit 15
   target="$(cat "$FIXTURE/lease")"
   "$REAL_GIT" -C "$FIXTURE/repo" worktree remove --force "$target"
-  rm "$FIXTURE/lease"
+  rm "$FIXTURE/lease" "$FIXTURE/config/worktrees/slots/1"
   exit
 fi
 while (( $# )); do
@@ -55,6 +57,12 @@ done
 "$REAL_GIT" -C "$FIXTURE/repo" worktree add --quiet --detach "$root/$name" "$sha"
 [[ "${FAIL_STAGE:-}" != create-before-lease ]] || exit 13
 printf '%s\n' "$root/$name" > "$FIXTURE/lease"
+printf 'path=%s\n' "$root/$name" > "$FIXTURE/config/worktrees/slots/1"
+[[ "${FAIL_STAGE:-}" != create-before-marker ]] || exit 13
+if [[ "${FAIL_STAGE:-}" == create-lookup-error ]]; then
+  mkdir "$FIXTURE/config/worktrees/slots/3"
+  exit 13
+fi
 echo 1 > "$root/$name/.worktree-slot"
 [[ "${FAIL_STAGE:-}" != create-after-lease ]] || exit 13
 mkdir -p "$root/$name/supabase/.temp"
@@ -62,6 +70,8 @@ cp "$FIXTURE/repo/supabase/.env.hosted" "$root/$name/supabase/.env.hosted"
 if [[ "${FAIL_STAGE:-}" == dirty ]]; then echo dirty >> "$root/$name/apps/mobile/eas.json"; fi
 EOF
 chmod +x "$FIXTURE/repo/boga"
+mkdir -p "$FIXTURE/config/worktrees/slots"
+printf 'path=%s/worktrees/unrelated\n' "$FIXTURE" > "$FIXTURE/config/worktrees/slots/2"
 cat > "$FIXTURE/repo/supabase/.env.hosted" <<'EOF'
 SUPABASE_PROJECT_REF=abcdefghijklmnopqrst
 SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co
@@ -175,9 +185,10 @@ worker() {
     "$FIXTURE/repo" "$FIXTURE/worktrees" "$sha" "${2:-HEAD}" "${3:-prod}" > "$FIXTURE/$name/job.env"
   local result=0
   bash "$FIXTURE/repo/scripts/ios-release.sh" --run "$FIXTURE/$name" > "$FIXTURE/$name/log" 2>&1 || result=$?
-  if [[ "${FAIL_STAGE:-}" != cleanup && -f "$FIXTURE/$name/checkout.txt" ]]; then
-    [[ ! -d "$(cat "$FIXTURE/$name/checkout.txt")" && ! -f "$FIXTURE/lease" ]] || fail 'checkout or slot leaked'
+  if [[ "${FAIL_STAGE:-}" != cleanup && "${FAIL_STAGE:-}" != create-lookup-error && -f "$FIXTURE/$name/checkout.txt" ]]; then
+    [[ ! -d "$(cat "$FIXTURE/$name/checkout.txt")" && ! -f "$FIXTURE/lease" && ! -f "$FIXTURE/config/worktrees/slots/1" ]] || fail 'checkout or slot leaked'
   fi
+  [[ "$(cat "$FIXTURE/config/worktrees/slots/2")" == "path=$FIXTURE/worktrees/unrelated" ]] || fail 'another checkout lease changed'
   return "$result"
 }
 
@@ -246,13 +257,22 @@ for failure in migrations functions build submission; do
   fi
 done
 unset FAIL_STAGE
-for failure in create-before-lease create-after-lease; do
+for failure in create-before-lease create-before-marker create-after-lease; do
   export FAIL_STAGE="$failure"
   if worker "$failure"; then fail 'partial creation unexpectedly succeeded'; fi
   [[ "$(cat "$FIXTURE/$failure/status")" == 'checkout (exit 13)' ]] || fail 'creation failure masked'
   assert_absent 'npm ci|supabase|eas-cli' "$FIXTURE/calls" 'partial checkout used for release'
 done
 unset FAIL_STAGE
+echo 'ios-release: registered lease without a marker is released'
+export FAIL_STAGE=create-lookup-error
+if worker lookup-error; then fail 'failed registry lookup unexpectedly succeeded'; fi
+unset FAIL_STAGE
+[[ -d "$(cat "$FIXTURE/lookup-error/checkout.txt")" && -f "$FIXTURE/lease" ]] || fail 'failed lookup lost checkout or lease'
+[[ "$(cat "$FIXTURE/lookup-error/status")" == 'checkout; checkout cleanup failed:'*'(exit 13)' ]] || fail 'failed lookup status missing'
+assert_absent 'boga worktree release|npm ci|supabase|eas-cli' "$FIXTURE/calls" 'failed lookup continued cleanup or release'
+rmdir "$FIXTURE/config/worktrees/slots/3"
+"$FIXTURE/repo/boga" worktree release --slot 1 --force
 for failure in worker-auth keys; do
   export FAIL_STAGE="$failure"
   if worker "$failure"; then fail "$failure did not stop release"; fi

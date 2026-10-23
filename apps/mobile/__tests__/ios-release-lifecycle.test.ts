@@ -7,4 +7,5 @@ it('releases remote main from isolated temporary checkouts and keeps durable art
     timeout: 60000,
   });
   expect(output).toContain('fresh checkouts and cleanup');
+  expect(output).toContain('registered lease without a marker is released');
 }, 65000);

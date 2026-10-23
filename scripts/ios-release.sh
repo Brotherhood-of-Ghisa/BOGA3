@@ -144,12 +144,26 @@ finish_release() {
   trap - EXIT
   if [[ -n "$release_root" && -d "$release_root" ]]; then
     echo "[ios-release] Removing temporary checkout: $release_root"
-    if ! (cd "$source_repo" && if [[ -f "$release_root/.worktree-slot" ]]; then
-      ./boga worktree release --slot "$(cat "$release_root/.worktree-slot")" --force
-    else
-      # Creation can fail before a slot is allocated.
-      git worktree remove --force "$release_root"
-    fi); then
+    if ! (
+      cd "$source_repo" || exit
+      local slot
+      # The registry is written before .worktree-slot; cancellation can leave only it.
+      slot="$(node - "$(boga_registry_dir)" "$release_root" <<'JS'
+const fs = require('node:fs');
+const path = require('node:path');
+const [registry, checkout] = process.argv.slice(2);
+const matches = fs.readdirSync(registry).filter(name => /^\d+$/.test(name)).filter(name =>
+  fs.readFileSync(path.join(registry, name), 'utf8').split('\n').includes(`path=${checkout}`));
+if (matches.length > 1) throw new Error('Multiple slot leases for release checkout');
+process.stdout.write(matches[0] ?? '');
+JS
+      )" || exit
+      if [[ -n "$slot" ]]; then
+        ./boga worktree release --slot "$slot" --force
+      else
+        git worktree remove --force "$release_root"
+      fi
+    ); then
       stage="$stage; checkout cleanup failed: $release_root"
       (( result != 0 )) || result=1
       echo "[ios-release] $stage" >&2
