@@ -98,9 +98,13 @@ for table in notification_config notification_installations notification_prefere
   done
 done
 rpc "${A_TOKEN}" notification_claim '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail 'app can invoke worker RPC'
-for worker_rpc in notification_work_pending notification_admit_moments; do
+for worker_rpc in notification_work_pending notification_admit_moments sweep_record_work; do
   rpc "${A_TOKEN}" "${worker_rpc}" '{}'; [[ ! "${STATUS}" =~ ^2 ]] || fail "app can invoke ${worker_rpc}"
 done
+rpc "${SERVICE_ROLE_KEY}" sweep_record_work '{"p_event":"notification.sweep_work","p_work":[]}'
+[[ "${STATUS}" =~ ^4 ]] || fail "a sweep work record must be an object: HTTP ${STATUS}"
+rpc "${SERVICE_ROLE_KEY}" sweep_record_work '{"p_event":"app.anything","p_work":{}}'
+[[ "${STATUS}" =~ ^4 ]] || fail "a sweep work record takes only the two sweep events: HTTP ${STATUS}"
 
 EVENT_AT="$(run_psql "select now()::text;")"
 CONTRIBUTIONS="[{\"group_id\":\"${GROUP_ID}\",\"best_count\":2,\"rank_count\":3}]"
@@ -242,6 +246,10 @@ rpc "${SERVICE_ROLE_KEY}" notification_receipt_claim '{}'; expect_ok 'exhausted 
     if current_setting('boga.notification_kicked',true) is distinct from 'true' then raise exception 'later due row lost transaction kick'; end if;
   end \$\$;
   select app_public.notification_sweep() is not null;
+  do \$\$ begin
+    if (select convert_from(body,'utf8')::jsonb->>'source' from net.http_request_queue order by id desc limit 1)
+        is distinct from 'sweep' then raise exception 'sweep worker call not marked as the sweep'; end if;
+  end \$\$;
   update app_public.notification_config set sending_enabled=true,provider='local';
   update app_public.notification_deliveries set state='pending',available_at=now() where id=${CD};
   do \$\$ begin perform set_config('boga.notification_kicked','false',true); end \$\$;

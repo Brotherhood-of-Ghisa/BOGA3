@@ -22,7 +22,9 @@ const mirrorSource = readFileSync(path.join(__dirname, '../scripts/perf/groups/g
 const names = (source: string, pattern: RegExp) => [...source.matchAll(pattern)].map((match) => match[1]);
 
 test('the mirror calls the Edge drain RPCs in the same source order', () => {
-  const edge = names(edgeSource, /db,\s*'([a-z_]+)'/g).filter((name) => name !== 'group_eval_check_secret');
+  // Authorization and the sweep's work record are not drain work.
+  const edge = names(edgeSource, /db,\s*'([a-z_]+)'/g)
+    .filter((name) => name !== 'group_eval_check_secret' && name !== 'sweep_record_work');
   const mirror = names(mirrorSource, /rpc(?:<[^(]*>)?\(\s*'([a-z_]+)'/g);
   expect(edge.length).toBeGreaterThan(5);
   expect(mirror).toEqual(edge);

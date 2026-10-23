@@ -85,8 +85,11 @@ outran pg_net's timeout, and retries.
 Its idle window points the notification worker's Vault URL at the slot's
 Kong, as hosted is configured, runs both sweeps on a 10-second schedule for a
 few ticks, and scales them to their real schedules. The projected forced WAL
-archives are the 2-minute windows of an hour holding a WAL-writing tick (one
-16 MB segment each under `archive_timeout = 2min`).
+archives are the 2-minute windows of an hour holding a tick (one 16 MB segment
+each under `archive_timeout = 2min`), times the share of ticks that advanced
+the WAL position, sampled every 2 s. While pg_cron logs every run, every tick
+writes WAL: `cron.log_run` is a server-start setting outside Supabase's
+configurable Postgres settings.
 
 ## Reading a report
 

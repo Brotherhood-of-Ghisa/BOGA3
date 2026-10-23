@@ -142,6 +142,16 @@ drain_ok() {
   check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 7'
 }
 
+# The drain as the pg_cron sweep starts it: same work, marked as the sweep's.
+sweep_drain_ok() {
+  http_call -X POST -H "${GROUP_CONTRACT_HEADER}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    --data '{"source":"sweep"}' "${API_URL}/functions/v1/group-eval"
+  expect_ok "group-eval sweep drain: $1"
+  check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 7'
+}
+
 # mine: the athlete's jobs in the last drain, keyed by session id or group exercise id.
 mine() {
   jq -c --arg u "${ATHLETE_UID}" \
@@ -293,7 +303,7 @@ expect_sql "enqueue triggers on the five Sync v2 tables" \
   "app_public.exercise_definitions.exercise_definitions_group_eval_enqueue,app_public.exercise_group_links.exercise_group_links_group_eval_enqueue,app_public.exercise_sets.exercise_sets_group_eval_enqueue,app_public.session_exercises.session_exercises_group_eval_enqueue,app_public.sessions.sessions_group_z_eval_enqueue"
 expect_sql "the sweep cron job" \
   "select schedule || '|' || command from cron.job where jobname = 'group-eval-sweep';" \
-  "*/5 * * * *|select app_public.group_eval_sweep()"
+  "0 * * * *|select app_public.group_eval_sweep()"
 expect_sql "no server function writes exercise_group_links beyond sync_push and dev_wipe_my_data" \
   "select string_agg(distinct p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app_public', 'public')
@@ -704,20 +714,48 @@ expect_sql "every bulk session is normalized" \
   "select count(distinct session_id) from app_public.group_set_facts
     where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" "${BULK}"
 expect_sql "the sweep does not kick when facts are current" "select app_public.group_eval_sweep();" "f"
+# An idle sweep reads one index probe, not every fact: the stale-session scan
+# runs only once some fact is older than the recorded version.
+expect_sql "the sweep scans for stale sessions only when an older fact exists" \
+  "begin; set local track_functions = 'all';
+   update app_public.group_set_facts set rules_version = s.rules_version
+     from app_public.group_eval_rules_state s where group_set_facts.rules_version < s.rules_version;
+   select app_public.group_eval_sweep();
+   select coalesce(sum(calls), 0) from pg_stat_xact_user_functions
+    where funcid = 'app_public.group_eval_rules_stale(integer,integer)'::regprocedure;
+   update app_public.group_set_facts set rules_version = s.rules_version - 1
+     from app_public.group_eval_rules_state s
+    where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-bulk-1';
+   select app_public.group_eval_sweep();
+   select coalesce(sum(calls), 0) from pg_stat_xact_user_functions
+    where funcid = 'app_public.group_eval_rules_stale(integer,integer)'::regprocedure;
+   rollback;" "f
+0
+t
+1"
 # Facts as the previous rules version wrote them.
 run_psql "update app_public.group_set_facts set rules_version = 5
            where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" >/dev/null
 RUNS=0
 REQUEUED=()
+SWEEP_SINCE="$(run_psql "select clock_timestamp()::text;")"
 while [[ "$(run_psql "select app_public.group_eval_sweep();")" == "t" ]]; do
   (( RUNS < 5 )) || fail "the sweep still kicks after 5 runs; stale sessions: $(bulk_stale)"
-  drain_ok "rules bulk run $(( RUNS + 1 ))"
+  sweep_drain_ok "rules bulk run $(( RUNS + 1 ))"
   REQUEUED+=("$(jq -r '.rules_requeued' <<<"${BODY}")")
   RUNS=$(( RUNS + 1 ))
 done
 [[ "$(bulk_stale)" == "0" ]] || fail "the sweep stopped kicking with $(bulk_stale) stale bulk sessions left"
 [[ "${REQUEUED[*]}" == "50 1" ]] || fail "a bulk rules bump: expected requeues '50 1', got '${REQUEUED[*]}'"
 pass "a rules bump over ${BULK} stale sessions finishes through the sweep alone"
+sweep_drain_ok "idle sweep run"
+check "an idle sweep run does nothing" '.claimed == 0 and .rules_requeued == 0'
+# The sweep's own pg_net kicks race these drains, so any of them may have done
+# the work: some record exists, and none records a run that did nothing.
+expect_sql "sweep-started runs record their work, and only when they did some" \
+  "select count(*) > 0 and bool_and((context->>'rules_requeued')::int + (context->>'claimed')::int > 0)
+          and bool_and(level = 'info' and source = 'backend' and user_id is null)
+     from public.app_logs where event = 'group.eval_sweep_work' and created_at >= '${SWEEP_SINCE}';" "t"
 
 # =============================================================================
 echo "[${LANE_LABEL}] failure isolation"

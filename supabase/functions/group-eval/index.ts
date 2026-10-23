@@ -168,6 +168,8 @@ export const handleRequest = async (request: Request): Promise<Response> => {
     if (authorized !== true) {
       return json(401, { error: 'UNAUTHORIZED' });
     }
+    // The hourly pg_cron sweep marks its kicks; member kicks send an empty body.
+    const fromSweep = ((await request.json().catch(() => null)) as { source?: unknown } | null)?.source === 'sweep';
 
     const rulesRequeued = await rpc<number>(db, 'group_eval_requeue_rules', {
       p_rules_version: GROUP_EVAL_RULES_VERSION,
@@ -196,14 +198,23 @@ export const handleRequest = async (request: Request): Promise<Response> => {
     }
     const count = (outcome: JobResult['outcome']) =>
       jobs.filter((job) => job.outcome === outcome).length + metricJobs.filter((job) => job.outcome === outcome).length;
-    return json(200, {
-      rules_version: GROUP_EVAL_RULES_VERSION,
+    const work = {
       rules_requeued: rulesRequeued,
       claimed: jobs.length + metricJobs.length,
       metric_claimed: metricJobs.length,
       completed: count('completed'),
       requeued: count('requeued'),
       failed: count('failed'),
+    };
+    // A sweep-started run that did anything records how much; its drain stands
+    // even if the record fails.
+    if (fromSweep && work.rules_requeued + work.claimed > 0) {
+      await rpc(db, 'sweep_record_work', { p_event: 'group.eval_sweep_work', p_work: work })
+        .catch(() => console.error('group-eval: sweep work record failed'));
+    }
+    return json(200, {
+      rules_version: GROUP_EVAL_RULES_VERSION,
+      ...work,
       jobs,
       metric_jobs: metricJobs,
     });
