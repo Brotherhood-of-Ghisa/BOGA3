@@ -716,7 +716,34 @@ expect_sql 'a repeated evaluation score is rejected' "begin;
     if sqlerrm<>'VALIDATION: duplicate evaluation scores' then raise; end if;
   end; \$\$;
   select true; rollback;" t
-pass 'publication rewrites only changed score rows, keeps unchanged write tokens and rejects repeated scores'
+# Each score must match its own source row in the graph, found by key.
+expect_sql 'a score that matches no graph source is rejected' "begin;
+  do \$\$ declare q app_public.group_metric_eval_queue; graph jsonb; score jsonb; bad jsonb;
+  begin
+    graph:=app_public.group_metric_eval_source_graph('${GID}','${GX}');
+    select jsonb_build_object('member_user_id',s.member_user_id,'set_id',s.set_id,'session_id',s.session_id,
+      'session_exercise_id',s.session_exercise_id,'exercise_definition_id',s.exercise_definition_id,
+      'metric',s.metric,'unit',s.unit,'working',true,'value',s.value,'fingerprint',s.fingerprint) into strict score
+      from app_public.group_metric_set_scores s
+      join app_public.group_exercises ge on ge.id=s.group_exercise_id and ge.rules_revision=s.rules_revision
+      where s.group_exercise_id='${GX}' and s.counting order by s.member_user_id,s.set_id,s.metric limit 1;
+    foreach bad in array array[jsonb_build_object('fingerprint','0'),jsonb_build_object('set_id','${T}-no-such-set'),
+      jsonb_build_object('session_id','${T}-no-such-session')] loop
+      begin
+        perform app_public.group_metric_eval_enqueue('${GID}','${GX}','set');
+        update app_public.group_metric_eval_queue set claim_id=gen_random_uuid(),claimed_until=now()+interval '1 minute'
+          where group_exercise_id='${GX}' returning * into strict q;
+        perform app_public.group_metric_eval_publish(q.id,q.generation,q.claim_id,jsonb_build_object('contract_version',4,
+          'group_id','${GID}','group_exercise_id','${GX}','rules_revision',graph->'rules'->'rules_revision',
+          'source_token',graph->'source_token','scores',jsonb_build_array(score||bad)));
+        raise exception 'a mismatched score published: %',bad;
+      exception when sqlstate 'P0001' then
+        if sqlerrm<>'VALIDATION: evaluation does not match source graph' then raise; end if;
+      end;
+    end loop;
+  end; \$\$;
+  select true; rollback;" t
+pass 'publication rewrites only changed score rows, keeps unchanged write tokens and rejects repeated or mismatched scores'
 
 # Week summary: the latest session's records carry only the `record`
 # values of the boards they took #1 on, one group record each. On a fresh

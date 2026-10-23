@@ -26,18 +26,17 @@ through `sync_push`. Nothing is copied: group reads read through to the
 member's own live Sync v2 rows. So the group owns a permanent record that
 nothing recomputes from membership; sessions update until complete; edits,
 deletes and undeletes flow through; membership at logging time decides; and
-personal sync never changes (no second push path, every group trigger on a
-Sync v2 table failure-isolated).
+personal sync never changes (no second push path; triggers failure-isolated).
 
 The stream is one persistent table, `group_events`. All access goes through
 `SECURITY DEFINER` RPCs. Devices pull (focus, 30 s poll, pull-to-refresh) into
 a disposable cache; there is no Realtime. The `group-eval` Edge Function
 normalizes shared sets with the app's TS and materializes the boards.
 
-Rejected: per-group session copies and client-pushed projections (duplicated
-state); membership-window reads (no durable share record); synced group rows
-(per-owner LWW cannot serve multiple readers); an Edge API (authorization
-belongs in the database).
+Rejected: per-group session copies or client-pushed projections (duplicated
+state), membership-window reads (no durable share), synced group rows
+(per-owner LWW cannot serve many readers), an Edge API (authorization belongs
+in the database).
 
 ## Server rules
 
@@ -162,7 +161,7 @@ screens' TS. Counts come only from permitted set context: `Sets` as
 shows reps and effort, never a load figure. The friend view's `Volume` sums
 only ordinary exercises' volume-included sets ([[set.eligibility]],
 [[copy.no-inline-explanation]]): hidden kg never enters it, so nothing is
-recovered by subtraction; `—` with none. Nothing is mirrored in SQL: SQL mirrors once duplicated set
+recovered by subtraction; `—` with none. Nothing is mirrored in SQL, which once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted
 live set. Ordinary rows retain logged kg; Volume uses the source entry factor for total
 load, independently of target mode. They never read a personal preference,
@@ -204,8 +203,7 @@ is the one implementation of the group set rules; device session cards use
 the same kernel.
 `fingerprint` hashes raw synced values and interprets nothing. `working` is
 the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
-policy); readers read it as `working is not false`, so a non-working
-set is excluded. A set-rule or kernel change bumps
+policy); readers read it as `working is not false`. A set-rule or kernel change bumps
 `GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
 `rules` recompute, a bounded batch per run. Each run records its version
 (`group_eval_rules_state`); the sweep kicks while older facts lack a queued
@@ -285,9 +283,10 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
 - A contribution or target load-mode change bumps the revision and rebuilds the
   comparison. A preference toggle rebuilds only positive-contribution
   comparisons; at zero it is a no-op (same revision, scores, witnesses).
-- The worker scores the whole graph with the TS kernel's strict `group`
-  policy; SQL does no bodyweight or Wathan math. Non-working scores are stored
-  with `counting = false`.
+- The source graph holds only reached sets: the session-job reach above,
+  plus entries and counting scores, by set id. The worker scores it with the
+  TS kernel's strict `group` policy; SQL does no bodyweight or Wathan math.
+  Non-working scores store `counting = false`.
 - **Coherent publication:** a claim carries generation, claim id and lease;
   publishing rechecks them, the revision and the source hash under group,
   advisory, queue and projection locks. A stale result writes nothing; readers
