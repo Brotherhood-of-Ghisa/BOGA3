@@ -90,8 +90,8 @@
 - Applies to the one token vocabulary in `apps/mobile/components/ui/tokens.ts`
   (`uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`,
   `uiBorder`; `docs/specs/ui/design-language.md` §2–§4).
-- `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight type
-  rungs and their line-heights, the colour roles named in §2, the geometry of
+- `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight ordinary type
+  rungs plus the fullscreen timer figure and their line-heights, the colour roles named in §2, the geometry of
   §4 and the embedded faces of §3; and that `record !== accent` and `record`
   clears 4.5:1 on `paper`, `surface` and `record-wash`; and that `tokens.ts`
   exports exactly that vocabulary. Change a value there and in the spec

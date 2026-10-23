@@ -54,7 +54,7 @@ export const uiSpace = {
   xxl: 32,
 } as const;
 
-// Eight sizes, down from the fourteen that used to ship. `base` stays at 14:
+// Eight ordinary sizes plus the fullscreen timer figure. `base` stays at 14:
 // density while logging was chosen over gym-floor legibility. `xxs` (10) was
 // added 2026-09-22 for micro-labels — legends, units, tertiary labels — which
 // were first drawn at 8/9px; both lift to 10 rather than earning
@@ -70,6 +70,7 @@ export const uiTypography = {
     lg: 16,
     xl: 18,
     xxl: 24,
+    timer: 104,
   },
   // One line-height per size, so vertical rhythm stops depending on whatever
   // leading the platform font happens to supply. Keyed to `size`.
@@ -82,6 +83,7 @@ export const uiTypography = {
     lg: 22,
     xl: 24,
     xxl: 30,
+    timer: 124,
   },
   weight: {
     regular: '400',

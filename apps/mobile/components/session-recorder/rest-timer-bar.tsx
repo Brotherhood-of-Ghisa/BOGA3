@@ -12,6 +12,8 @@ import {
   type TimerMode,
 } from '@/src/session-recorder/rest-timer';
 
+import { RepeatingTimerFocus } from './repeating-timer-focus';
+
 export type RestTimerBarProps = {
   view: RestTimerView;
   onAdjust: (deltaSec: number) => void;
@@ -31,7 +33,8 @@ const MODE_OPTIONS: readonly SegmentedControlOption<TimerMode>[] = [
  * The active-session timer strip rendered directly below `ExerciseTopBar` and
  * `SessionTopBar`. Supports both Rest timer (fixed countdown per set) and
  * Repeating timer (generalised EMOM interval with drift-free round tracking).
- * Preparation precedes round 1; repeating controls sit below the readout.
+ * Preparation precedes round 1; tapping the repeating readout expands the same
+ * timer fullscreen in either host. Collapsing never dismisses or pauses it.
  */
 export function RestTimerBar({
   view,
@@ -72,7 +75,16 @@ export function RestTimerBar({
         />
       </View>
       <View style={[styles.actionRow, isRepeating ? styles.repeatingActionRow : null]}>
-        <TimerReadout view={view} />
+        {isRepeating ? (
+          <RepeatingTimerFocus
+            key={view.sessionId}
+            onAdjust={onAdjust}
+            onReset={onResetRepeating ?? onRestart}
+            onToggle={onToggleRepeating ?? onRestart}
+            view={view}>
+            <TimerReadout view={view} />
+          </RepeatingTimerFocus>
+        ) : <TimerReadout view={view} />}
         <View style={styles.controls}>
           <ActionButton
             accessibilityLabel={`Subtract ${stepSec} seconds`}
@@ -153,7 +165,7 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
       <Text
         allowFontScaling={false}
         accessibilityLabel={countdownLabel}
-        accessibilityLiveRegion="polite"
+        accessibilityLiveRegion={isRepeating ? 'none' : 'polite'}
         style={styles.countdown}
         testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
         {view.formatted}

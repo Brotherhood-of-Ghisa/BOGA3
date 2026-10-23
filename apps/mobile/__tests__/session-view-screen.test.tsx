@@ -744,6 +744,13 @@ describe('Session view', () => {
     if (mode === 'repeating') {
       fireEvent.press(screen.getByTestId('timer-mode-selector-repeating'));
       expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent('Get ready');
+      fireEvent.press(screen.getByTestId('repeating-timer-expand'));
+      expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:15');
+      fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
+      const paused = getRestTimerEntry();
+      fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
+      expect(screen.queryByTestId('repeating-timer-focus')).toBeNull();
+      expect(getRestTimerEntry()).toBe(paused);
     }
     const countdownId = mode === 'repeating' ? 'repeating-timer-countdown' : 'rest-timer-countdown';
     const countdown = mode === 'repeating' ? '0:15' : '1:30';
@@ -753,6 +760,16 @@ describe('Session view', () => {
     render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
     expect(screen.getByTestId(countdownId)).toHaveTextContent(countdown);
+    if (mode === 'repeating') {
+      fireEvent.press(screen.getByTestId('repeating-timer-expand'));
+      expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Start');
+      fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
+      fireEvent.press(screen.getByTestId('repeating-timer-focus-plus'));
+      expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('1:15');
+      expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:15');
+      fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
+      expect(getRestTimerEntry()).toMatchObject({ intervalSec: 75, pausedAtMs: null });
+    }
 
     // Returning to the session view and abandoning the session clears the timer.
     screen.unmount();

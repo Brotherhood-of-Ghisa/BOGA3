@@ -8,12 +8,12 @@ import * as tokens from '@/components/ui/tokens';
 // floor, and the one vocabulary (the retired scales never come back).
 
 describe('design-language tokens', () => {
-  it('has eight type rungs, `xxs` 10 the smallest, each with a line-height', () => {
-    expect(uiTypography.size).toEqual({ xxs: 10, xs: 11, sm: 12, md: 13, base: 14, lg: 16, xl: 18, xxl: 24 });
-    expect(uiTypography.lineHeight).toEqual({ xxs: 14, xs: 15, sm: 16, md: 18, base: 20, lg: 22, xl: 24, xxl: 30 });
+  it('has eight ordinary type rungs and a fullscreen timer figure, each with a line-height', () => {
+    expect(uiTypography.size).toEqual({ xxs: 10, xs: 11, sm: 12, md: 13, base: 14, lg: 16, xl: 18, xxl: 24, timer: 104 });
+    expect(uiTypography.lineHeight).toEqual({ xxs: 14, xs: 15, sm: 16, md: 18, base: 20, lg: 22, xl: 24, xxl: 30, timer: 124 });
 
     const sizes = Object.values(uiTypography.size);
-    expect(sizes).toHaveLength(8);
+    expect(sizes).toHaveLength(9);
     expect(Math.min(...sizes)).toBe(uiTypography.size.xxs);
     // Every size has a line-height, keyed by the same name.
     expect(Object.keys(uiTypography.lineHeight).sort()).toEqual(
