@@ -11,8 +11,9 @@ import {
 } from '@/components/stats/history-view';
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
-import { GymPickerButton, GymPickerSheet, type GymPickerSheetProps } from '@/components/gyms/gym-picker';
-import { decodeGymRouteParam, encodeGymRouteParam, showsGymPicker } from '@/src/utils/gym-scope-route';
+import { GymPicker, type GymPickerSheetProps } from '@/components/gyms/gym-picker';
+import { ProgressFilters } from '@/components/stats/progress-filters';
+import { decodeGymRouteParam, encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
 } from '@/components/ui';
@@ -27,8 +28,9 @@ import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 // One exercise's or one muscle's history, pushed from Progress. The subject is
-// the page's native title, and the view and metric selectors sit in one row
-// above the chart. The header's ⋮ holds the Timeline's focused week's sessions
+// the page's native title, and the view selector, metric chip and gym sit in
+// one row above the chart; a muscle's gym and secondary sets share a Filters
+// sheet there. The header's ⋮ holds the Timeline's focused week's sessions
 // and, for an exercise, its session history, RM curve and counted muscles. The
 // params carry an id, never a name: the page resolves the name from the
 // exercise catalogue cache, which also decides the unavailable state
@@ -64,6 +66,17 @@ export const resolveHistorySubject = (params: {
   return null;
 };
 
+/** The route's subject with this visit's gym and secondary-set choices over it. */
+const withChoices = (subject: HistorySubject | null, gym: { gymId: string | null | undefined } | null,
+  countSecondary: boolean | null): HistorySubject | null => {
+  if (!subject) return null;
+  const scoped = gym === null ? subject : { ...subject, gymId: gym.gymId };
+  if (scoped.kind !== 'muscle' || countSecondary === null) return scoped;
+  const counted = { ...scoped };
+  delete counted.countSecondary;
+  return countSecondary ? counted : { ...counted, countSecondary: false };
+};
+
 /**
  * The metric Progress was showing, carried over by its link. An absent or
  * unknown value opens the page on Volume, as a direct link always has.
@@ -84,13 +97,12 @@ type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondar
 
 const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary' } as const;
 
-/** The history page's gym ([[gym.view-filter]]), chosen from the header. */
+/** The history page's gym ([[gym.view-filter]]), chosen in the selector row. */
 type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChange' | 'allSessionCount'>;
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-// The gym button sits beside it, so no row is added for it.
-function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, gym }: {
+function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve }: {
   title: string;
   week: FocusedTimelineWeek | null;
   muscles: readonly HistoryMuscleLink[];
@@ -98,11 +110,8 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenH
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenHistory?: () => void;
   onOpenCurve?: () => void;
-  gym?: HistoryGymChoice;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
-  const [gymVisible, setGymVisible] = useState(false);
-  const showsGym = gym !== undefined && showsGymPicker(gym.value, gym.options);
   const sessionsWeek = week?.hasTraining ? week : null;
   const openWeek = () => {
     setOptionsVisible(false);
@@ -120,25 +129,17 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenH
           title,
           // Named either way — options are merged across renders, so leaving
           // the key out would keep the last button on screen.
-          headerRight: hasOptions || showsGym ? () => (
-            <View style={styles.headerItems}>
-              {gym ? <GymPickerButton onPress={() => setGymVisible(true)} options={gym.options} size="compact"
-                testID="stats-exercise-history-gym" value={gym.value} /> : null}
-              {hasOptions ? (
-                <IconButton
-                  nativeHeader
-                  accessibilityLabel="Options"
-                  name="more-vertical"
-                  onPress={() => setOptionsVisible(true)}
-                  testID="progress-history-options-button"
-                />
-              ) : null}
-            </View>
+          headerRight: hasOptions ? () => (
+            <IconButton
+              nativeHeader
+              accessibilityLabel="Options"
+              name="more-vertical"
+              onPress={() => setOptionsVisible(true)}
+              testID="progress-history-options-button"
+            />
           ) : undefined,
         }}
       />
-      {gym ? <GymPickerSheet {...gym} onClose={() => setGymVisible(false)}
-        testID="stats-exercise-history-gym" visible={gymVisible} /> : null}
       <Sheet
         dismissLabel="Dismiss history options"
         onDismiss={() => setOptionsVisible(false)}
@@ -208,12 +209,11 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
   // The Timeline's focused week, reported by the chart: the ⋮ opens its sessions.
   const [focusedWeek, setFocusedWeek] = useState<FocusedTimelineWeek | null>(null);
-  // The gym: the one it was opened on, until the picker changes it.
+  // The gym and, on a muscle, secondary sets ([[muscle.secondary-filter]]):
+  // the ones it was opened on, until this visit changes them.
   const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
-  const subject = useMemo<HistorySubject | null>(
-    () => routeSubject && chosenGym !== null ? { ...routeSubject, gymId: chosenGym.gymId } : routeSubject,
-    [routeSubject, chosenGym]
-  );
+  const [chosenSecondary, setChosenSecondary] = useState<boolean | null>(null);
+  const subject = useMemo(() => withChoices(routeSubject, chosenGym, chosenSecondary), [routeSubject, chosenGym, chosenSecondary]);
   const gymId = subject?.gymId;
 
   // The catalogue is the one name source for both kinds, and it is already
@@ -283,6 +283,12 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     );
   }
 
+  const gym: HistoryGymChoice = {
+    value: gymId,
+    options: history.gyms,
+    onChange: next => setChosenGym({ gymId: next }),
+    allSessionCount: history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0),
+  };
   const shared = {
     dailyMetrics: history.daily,
     errorMessage: history.error,
@@ -321,12 +327,6 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}
         week={focusedWeek}
-        gym={{
-          value: gymId,
-          options: history.gyms,
-          onChange: next => setChosenGym({ gymId: next }),
-          allSessionCount: history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0),
-        }}
       />
       {/* The view selector writes a preference; this is the only screen that
           now offers it, so a failed save says so here, with its Retry. */}
@@ -346,6 +346,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         <HistoryView
           {...shared}
           kind="muscle"
+          filters={<ProgressFilters testID="progress-history-filters" gym={gym}
+            secondary={{ value: subject.countSecondary !== false, onChange: setChosenSecondary }} />}
           metric={muscleMetric}
           metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
           muscleTargets={muscleTargets}
@@ -355,6 +357,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         <HistoryView
           {...shared}
           kind="exercise"
+          filters={<GymPicker {...gym} size="compact" testID="stats-exercise-history-gym" />}
           metric={exerciseMetric}
           metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
           onSelectMetric={setExerciseMetric}
@@ -387,6 +390,5 @@ export default function ProgressHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
-  headerItems: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   notice: { paddingHorizontal: uiSpace.lg, paddingBottom: uiSpace.md },
 });

@@ -782,6 +782,23 @@ describe('ToggleChip', () => {
     expect(onChange).toHaveBeenLastCalledWith('workingSetCount');
   });
 
+  it('steps through more than two values in order, wrapping from the last to the first', () => {
+    const four = [
+      { value: 'totalVolume', label: 'Volume' }, { value: 'workingSetCount', label: 'Sets' },
+      { value: 'estimatedRM1', label: '1RM' }, { value: 'highestWeight', label: 'Top weight' },
+    ] as const;
+    const onChange = jest.fn();
+    const { rerender } = render(<ToggleChip accessibilityLabel="Effort metric" onChange={onChange}
+      options={four} testID="metric" value="estimatedRM1" />);
+    expect(screen.getByTestId('metric').props.accessibilityLabel).toBe('Effort metric: 1RM. Activate to show Top weight.');
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenLastCalledWith('highestWeight');
+    rerender(<ToggleChip accessibilityLabel="Effort metric" onChange={onChange}
+      options={four} testID="metric" value="highestWeight" />);
+    fireEvent.press(screen.getByTestId('metric'));
+    expect(onChange).toHaveBeenLastCalledWith('totalVolume');
+  });
+
   it('is an equal-width outline control that keeps a 44pt target at 28pt drawn', () => {
     render(<ToggleChip accessibilityLabel="Progress metric" onChange={jest.fn()}
       options={OPTIONS} testID="metric" value="workingSetCount" />);

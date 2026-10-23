@@ -26,11 +26,11 @@ Signature: `primary + ½ secondary`
 
 ### muscle.map-area · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.progress-layout · presentation · accepted
 
@@ -52,13 +52,12 @@ Code: `apps/mobile/components/preferences/progress-settings.tsx`,
 
 ### muscle.secondary-filter · presentation · accepted
 
-Progress's Filters offer `Count secondary sets`, on at each visit. Off,
-Progress's muscle figures, 3D shading and the muscle history it opens count
-primary work only; session totals and exercise figures stay. Approved 2026-10-23.
+Progress and muscle history Filters offer `Count secondary sets`, on each visit;
+history opens on Progress's choice. Off, muscle figures count primary work only.
+Approved 2026-10-23.
 
-Why: direct muscle work, without secondary ½ credit.
+Why: direct muscle work alone.
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
-Signature: `Count secondary sets`
 
 ### muscle.comparison-primary-only · presentation · accepted
 
@@ -76,11 +75,11 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 
 ### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.catalog-names · presentation · accepted
 

@@ -201,7 +201,8 @@ appId: com.dinoderek.mobile
     id: "stats-exercise-list-empty"
 - takeScreenshot: "05-data-runtime-smoke-exercise-list"
 # 6. An exercise row pushes its own history page, titled by the exercise, with
-# the view and metric selectors in one row above the chart.
+# the view selector and metric chip in one row above the chart. The chip steps
+# through the metrics; it opens on Progress's, so tap until it reads Sets.
 - tapOn:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - extendedWaitUntil:
@@ -211,7 +212,15 @@ appId: com.dinoderek.mobile
 - assertVisible: "Barbell Back Squat"
 - tapOn:
     id: "stats-exercise-history-view-chip-daily"
-- tapOn:
+- repeat:
+    while:
+      notVisible:
+        id: "stats-exercise-history-metric-chip-workingSetCount"
+    times: 4
+    commands:
+      - tapOn:
+          id: "stats-exercise-history-metric-chip"
+- assertVisible:
     id: "stats-exercise-history-metric-chip-workingSetCount"
 - takeScreenshot: "06-history-page-grid"
 # 7. Today's tile holds the one Squat session this flow logged: it opens it,

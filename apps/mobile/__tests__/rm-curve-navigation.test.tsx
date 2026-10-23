@@ -111,7 +111,8 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   await screen.findByTestId('progress-history-screen');
   expect(route.getPathname()).toBe('/progress-history');
   expect(screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true })).toHaveTextContent(week);
-  expect(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+  // The metric chip still shows Sets: its label is the metric in force.
+  expect(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount')).toHaveTextContent('Sets');
   expect(localDataClient().prepare("SELECT * FROM exercise_sets WHERE id = 'draft-set'").get()).toEqual(draft);
 });
 

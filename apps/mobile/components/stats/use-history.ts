@@ -46,8 +46,8 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const gymId = subject?.gymId;
   const gymKey = encodeGymRouteParam(gymId) ?? '';
   const primaryOnly = subject?.kind === 'muscle' && subject.countSecondary === false;
-  const subjectKey = `${kind ?? ''}:${id ?? ''}:${primaryOnly ? 'primary:' : ''}${accountRevision}`;
-  const context = `${subjectKey}:${gymKey}:${weeks}:${revision}`;
+  const subjectKey = `${kind ?? ''}:${id ?? ''}:${accountRevision}`;
+  const context = `${subjectKey}:${gymKey}:${primaryOnly ? 'primary' : 'all'}:${weeks}:${revision}`;
   const [loading, setLoading] = useState(id !== null);
   const [loaded, setLoaded] = useState<{
     context: string; subjectKey: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
@@ -85,8 +85,8 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const error = failure?.context === context ? failure.message : null;
   return {
     daily: current?.daily ?? [], weekly: current?.weekly ?? [],
-    // The gym choices outlive a gym change on the same subject, so the picker
-    // stays put while the newly chosen gym loads.
+    // The gym choices outlive a gym or secondary-set change on the same
+    // subject, so the picker stays put while the new read loads.
     gyms: loaded?.subjectKey === subjectKey ? loaded.gyms : NO_GYMS,
     loading: id !== null && (loading || (!current && !error)),
     error,

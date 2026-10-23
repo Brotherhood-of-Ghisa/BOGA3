@@ -17,7 +17,11 @@ export type ProgressFiltersProps = {
   /** Secondary work in muscle figures ([[muscle.secondary-filter]]); absent where none shows. */
   secondary?: Toggle;
   /** The view's gym ([[gym.view-filter]]), three-state; offered only as `showsGymPicker` says. */
-  gym?: { value: string | null | undefined; options: readonly GymScopeOption[]; onChange: (gymId: string | null | undefined) => void };
+  gym?: {
+    value: string | null | undefined; options: readonly GymScopeOption[]; onChange: (gymId: string | null | undefined) => void;
+    /** Sessions in the whole view, beside `All gyms`, when the options count theirs. */
+    allSessionCount?: number;
+  };
   /** The button's: the sheet is `<testID>-sheet`. */
   testID: string;
 };
@@ -30,8 +34,8 @@ export const changedFilters = ({ grouping, secondary, gym }: Omit<ProgressFilter
 ];
 
 /**
- * Progress's view choices behind one button: family grouping, secondary sets
- * and the gym. The button fills while any choice is off its opening value;
+ * Progress's view choices behind one button — family grouping, secondary sets
+ * and the gym — also a muscle history page's gym and secondary sets. The button fills while any choice is off its opening value;
  * the sheet stays open across choices, and holds only the ones the view
  * offers. With none, there is no button.
  */
@@ -73,7 +77,8 @@ export function ProgressFilters({ grouping, secondary, gym, testID }: ProgressFi
             testID="stats-secondary-toggle" value={secondary.value} /> : null}
           {offeredGym ? <>
             <Text accessibilityRole="header" allowFontScaling={false} style={styles.sectionLabel}>Gym</Text>
-            <GymScopeChoices onChoose={offeredGym.onChange} options={offeredGym.options} testID="stats-gym" value={offeredGym.value} />
+            <GymScopeChoices allSessionCount={offeredGym.allSessionCount} onChoose={offeredGym.onChange} options={offeredGym.options}
+              testID="stats-gym" value={offeredGym.value} />
           </> : null}
         </ScrollView>
       </Sheet>
