@@ -1,9 +1,7 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
-import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
-import { drainExerciseSessionFacts } from './exercise-session-facts';
-import { aggregateProgressMuscleTickers, muscleTickerBounds, type MuscleTickerOptions, type MuscleTrainingStarts } from './progress-muscle-tickers';
+import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { selectDatedInProgressSession } from './in-progress-session';
@@ -26,7 +24,6 @@ import {
 } from './muscle-analytics';
 import {
   exerciseDefinitions,
-  exerciseSessionFacts,
   exerciseMuscleMappings,
   exerciseSets,
   gyms,
@@ -80,14 +77,14 @@ export type StatsSummary = {
 
 export type ProgressComparisons = StatsSummary & { muscles: ProgressMuscleComparison[] };
 
-export type StatsAggregationInput = MuscleAnalyticsInput & { muscleTrainingStarts?: MuscleTrainingStarts };
+export type StatsAggregationInput = MuscleAnalyticsInput;
 
 export type StatsStore = {
   /**
    * The completed sessions in `[start, end)`. Given `now`, also the workout in
    * progress, dated where finishing it now would date it (§2).
    */
-  loadAggregationInput(input: { start: Date; end: Date; now?: Date; muscleTrainingStarts?: { gymId?: string | null } }): Promise<StatsAggregationInput>;
+  loadAggregationInput(input: { start: Date; end: Date; now?: Date }): Promise<StatsAggregationInput>;
   loadMuscleGroupTaxonomy(): Promise<StatsAggregationInput['muscleGroups']>;
 };
 
@@ -247,27 +244,10 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 };
 
 export const createDrizzleStatsStore = (): StatsStore => ({
-  async loadAggregationInput({ start, end, now, muscleTrainingStarts }) {
+  async loadAggregationInput({ start, end, now }) {
     const database = await bootstrapLocalDataLayer();
-    // Facts and raw graph are read synchronously from the same current policy.
-    if (muscleTrainingStarts) drainExerciseSessionFacts(database);
     return database.transaction((transaction) => {
       const database = transaction;
-      const trainingStarts = muscleTrainingStarts ? Object.fromEntries(database
-        .select({ id: exerciseMuscleMappings.muscleGroupId,
-          firstSets: sql<number | null>`min(case when ${exerciseSessionFacts.workingSets} > 0 then ${exerciseSessionFacts.achievedAt} end)`,
-          firstVolume: sql<number | null>`min(case when ${exerciseSessionFacts.volumeSets} > 0 then ${exerciseSessionFacts.achievedAt} end)` })
-        .from(exerciseSessionFacts)
-        .innerJoin(sessions, eq(sessions.id, exerciseSessionFacts.sessionId))
-        .innerJoin(exerciseMuscleMappings, eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseSessionFacts.exerciseDefinitionId))
-        .where(and(isNull(sessions.deletedAt), eq(sessions.status, 'completed'),
-          lt(exerciseSessionFacts.achievedAt, end), isNull(exerciseMuscleMappings.deletedAt), ne(exerciseMuscleMappings.role, 'stabilizer'),
-          or(gt(exerciseSessionFacts.workingSets, 0), gt(exerciseSessionFacts.volumeSets, 0)),
-          muscleTrainingStarts.gymId === undefined ? undefined : muscleTrainingStarts.gymId === null
-            ? isNull(sessions.gymId) : eq(sessions.gymId, muscleTrainingStarts.gymId)))
-        .groupBy(exerciseMuscleMappings.muscleGroupId).all()
-        .map(row => [row.id, { workingSetCount: row.firstSets === null ? undefined : new Date(row.firstSets),
-          totalVolume: row.firstVolume === null ? undefined : new Date(row.firstVolume) }])) : undefined;
       const bodyweightCalculationsEnabled = database
         .select({ enabled: userSettings.bodyweightCalculationsEnabled })
         .from(userSettings)
@@ -401,7 +381,6 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           : [];
 
       return {
-        muscleTrainingStarts: trainingStarts,
         bodyweightCalculationsEnabled,
         effortPolicy: getPersonalEffortPolicy(),
         sessions: sessionsInPeriod,
@@ -444,13 +423,6 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       current: { period: currentPeriod, totals: aggregateStats(inputInGym(currentInput, options.gymId)) },
       previous: { period: previousPeriod, totals: aggregateStats(inputInGym(previousInput, options.gymId)) },
     };
-  },
-  async computeMuscleTickers(options: MuscleTickerOptions) {
-    const clocked = { ...options, now: options.now ?? new Date() };
-    const bounds = muscleTickerBounds(clocked);
-    const input = await store.loadAggregationInput({ start: bounds.readStart, end: bounds.end,
-      muscleTrainingStarts: { gymId: options.gymId } });
-    return aggregateProgressMuscleTickers(inputInGym(input, options.gymId), clocked, input.muscleTrainingStarts ?? {});
   },
   async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
     const periods = comparisonPeriods(options);
@@ -533,5 +505,3 @@ export const computeSelectedMuscleDailyEffortMetrics =
   defaultStatsRepository.computeSelectedMuscleDailyEffortMetrics;
 
 export const computeSelectedMuscleHistoryEffort = defaultStatsRepository.computeSelectedMuscleHistoryEffort;
-
-export const computeProgressMuscleTickers = defaultStatsRepository.computeMuscleTickers;
