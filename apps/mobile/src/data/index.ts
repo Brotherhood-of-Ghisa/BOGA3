@@ -188,3 +188,6 @@ export {
   type LoadRecentExerciseBlocksOptions,
   type LoadSuggestedExercisePlanOptions,
 } from './exercise-block-history';
+
+export { computeProgressMuscleTickers } from './stats';
+export type { ProgressMuscleTickers, MuscleTickerSeries } from './progress-muscle-tickers';
