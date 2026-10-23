@@ -7,7 +7,7 @@ Decided 2026-10-09.
 
 A repeated mapping counts at its strongest role. Totals use half-steps (`1.5`),
 unlike the session's physical `Sets` ([[set.count-display]]). Whether to show
-secondaries is separate.
+secondaries is separate ([[muscle.secondary-filter]]).
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -49,6 +49,16 @@ individual exercises without subtotals.
 Why: keep List/3D choice in Settings and shade the 3D body by relative distribution.
 Code: `apps/mobile/components/preferences/progress-settings.tsx`,
 `apps/mobile/components/stats/muscle-body-projection.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
+
+### muscle.secondary-filter · presentation · accepted
+
+Progress's Filters offer `Count secondary sets`, on at each visit. Off,
+Progress's muscle figures, 3D shading and the muscle history it opens count
+primary work only; session totals and exercise figures stay. Approved 2026-10-23.
+
+Why: direct muscle work, without secondary ½ credit.
+Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
+Signature: `Count secondary sets`
 
 ### muscle.comparison-primary-only · presentation · accepted
 

@@ -49,3 +49,16 @@ it('keeps known zero Volume and empty muscles while rejecting an absent selectio
   expect(buildExerciseBodyMuscle({ ...input, muscleGroupId: null })).toBeNull();
   expect(buildExerciseBodyMuscle({ ...input, muscleGroupId: 'missing' })).toBeNull();
 });
+
+it('drops secondary work from the body and the selected muscle when secondary sets are hidden', () => {
+  const input = { items: [item('curl'), item('press')], countSecondary: false,
+    exercises: [definition('curl', ['biceps'], ['triceps']), definition('press', [], ['biceps'])],
+    muscles: [muscle('biceps'), muscle('triceps')] };
+  const [biceps, triceps] = buildExerciseBodyMuscles(input);
+  expect(biceps.current).toEqual(period(6, 100));
+  expect(triceps.current).toEqual(period());
+  const selected = buildExerciseBodyMuscle({ ...input, muscleGroupId: 'biceps' })!;
+  expect(selected.exercises.map(entry => entry.item.id)).toEqual(['curl']);
+  expect(selected.secondary).toEqual([]);
+  expect(buildExerciseBodyMuscle({ ...input, muscleGroupId: 'triceps' })).toMatchObject({ exercises: [], secondary: [] });
+});

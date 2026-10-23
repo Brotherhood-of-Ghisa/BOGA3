@@ -169,6 +169,14 @@ describe('resolveHistorySubject', () => {
     }
   });
 
+  it('reads a muscle\'s hidden secondary sets back from its href, and ignores them on an exercise', () => {
+    const params = (href: string) => Object.fromEntries(new URLSearchParams(href.split('?')[1]));
+    expect(resolveHistorySubject(params(String(progressHistoryHref({ muscleGroupId: 'quads', countSecondary: false })))))
+      .toEqual({ kind: 'muscle', id: 'quads', countSecondary: false });
+    expect(resolveHistorySubject({ muscleGroupId: 'quads', secondary: 'shown' })).toEqual({ kind: 'muscle', id: 'quads' });
+    expect(resolveHistorySubject({ exerciseDefinitionId: 'lift', secondary: 'hidden' })).toEqual({ kind: 'exercise', id: 'lift' });
+  });
+
   it.each(['gym a/b', null, undefined])('round-trips muscle gym scope %s', gymId => {
     const params = Object.fromEntries(new URLSearchParams(String(progressHistoryHref({ muscleGroupId: 'quads', gymId })).split('?')[1]));
     expect(resolveHistorySubject(params)).toEqual({ kind: 'muscle', id: 'quads', ...(gymId === undefined ? {} : { gymId }) });

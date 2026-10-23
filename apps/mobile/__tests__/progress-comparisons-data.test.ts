@@ -287,3 +287,43 @@ it('reads exact first eligible muscle dates beyond the bounded graph, per gym, a
   expect(changed.muscles.back.totalVolume.observations[0].value).toBeNull();
   expect(changed.muscles.back.workingSetCount.observations[0].value).toBe(1);
 });
+
+// [[muscle.secondary-filter]]: Back is secondary on `lift`, primary on `volume-only` and `previous-only`.
+it('counts primary work only when secondary sets are hidden, in both periods, contributors, tickers and history', async () => {
+  const counted = await readAndReconcile();
+  const hidden = await computeProgressComparisons({ ...options, countSecondary: false });
+  const oracle = await computeStatsSummary({ ...options, countSecondary: false });
+  const back = hidden.muscles.find(muscle => muscle.muscleGroupId === 'back')!;
+  expect(counted.current.workingSetCount).toBe(1);
+  expect(back).toMatchObject({ current: { workingSetCount: 0, totalVolume: 0 }, previous: { workingSetCount: 1, totalVolume: 0 } });
+  expect(back.exercises.map(row => row.exerciseDefinitionId)).toEqual(['previous-only']);
+  expect(oracle.current.totals.muscleFamilies.flatMap(family => family.muscles).find(row => row.muscleGroupId === 'back'))
+    .toMatchObject({ workingSetCount: 0, totalVolume: 0 });
+  // Session and set totals count no muscle, so they do not move.
+  const all = await computeProgressComparisons(options);
+  expect(hidden.current.totals).toMatchObject({ sessionCount: all.current.totals.sessionCount, workingSetCount: all.current.totals.workingSetCount });
+
+  const bounds = { start: hidden.previous.period.start, end: now, now, muscleGroupIds: ['back'] };
+  const sum = (days: { workingSetCount: number }[]) => days.reduce((total, day) => total + day.workingSetCount, 0);
+  expect(sum((await computeSelectedMuscleHistoryEffort(bounds)).daily)).toBe(2.5);
+  const history = await computeSelectedMuscleHistoryEffort({ ...bounds, countSecondary: false });
+  expect(sum(history.daily)).toBe(1);
+  expect(history.gyms).toEqual([{ gymId: null, name: null, sessionCount: 1 }]);
+  expect((await computeSelectedMuscleDailyEffort({ ...bounds, countSecondary: false })).flatMap(day => day.contributions)
+    .map(row => row.exerciseDefinitionId)).toEqual(['previous-only']);
+
+  // A secondary-only first session no longer starts the muscle's training.
+  const completedAt = new Date('2020-01-06T10:00:00Z');
+  const db = mockFixture.database;
+  db.insert(sessions).values({ id: 'first', status: 'completed', startedAt: completedAt, completedAt }).run();
+  db.insert(sessionExercises).values({ id: 'first-block', sessionId: 'first', exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
+  db.insert(exerciseSets).values({ id: 'first-set', sessionExerciseId: 'first-block', orderIndex: 0,
+    weightValue: '40', repsValue: '5', setType: 'rir_2' }).run();
+  const config = { historyWeeks: 2, rollingWeeks: 1, weeklyTarget: 8, now };
+  const values = async (countSecondary?: boolean) => (await computeProgressMuscleTickers({ ...config, countSecondary }))
+    .muscles.back?.workingSetCount.observations.map(row => row.value);
+  // Counted, the 2020 session completes both windows; hidden, only the primary
+  // day is observed, and it is incomplete without that earlier start.
+  expect(await values()).toEqual([1.5, 2.5]);
+  expect(await values(false)).toEqual([null]);
+});

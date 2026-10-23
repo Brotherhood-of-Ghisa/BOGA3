@@ -45,6 +45,13 @@ describe('history hrefs', () => {
     }
   });
 
+  it('carries a muscle\'s hidden secondary sets, and nothing for an exercise or when they count', () => {
+    expect(progressHistoryHref({ muscleGroupId: 'quads', gymId: null, countSecondary: false }, 'workingSetCount', 'timeline'))
+      .toBe('/progress-history?muscleGroupId=quads&metric=sets&gymId=no-gym&secondary=hidden&view=timeline');
+    expect(progressHistoryHref({ muscleGroupId: 'quads', countSecondary: true })).toBe('/progress-history?muscleGroupId=quads');
+    expect(progressHistoryHref({ exerciseDefinitionId: 'lift' })).toBe('/progress-history?exerciseDefinitionId=lift');
+  });
+
   it('encodes what it carries', () => {
     expect(completedSessionHref('a/b c')).toBe('/completed-session/a%2Fb%20c');
     expect(sessionsWeekHref('2026-10-05')).toBe('/sessions?week=2026-10-05');

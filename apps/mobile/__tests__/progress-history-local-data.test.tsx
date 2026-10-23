@@ -537,6 +537,20 @@ describe('The history page over real data', () => {
     }
   });
 
+  it('counts only primary work, chart and week list alike, when Progress hid secondary sets', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    // Quads keeps its real sets but only as a secondary mapping ([[muscle.secondary-filter]]).
+    localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    const history = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
+    const week = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort');
+    await openHistory({ muscleGroupId: 'quads', secondary: 'hidden' });
+    await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
+    await waitFor(() => expect(week).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
+    expect(await screen.findByTestId('stats-muscle-history-empty')).toBeTruthy();
+    expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
+  });
+
   it('retries a failed muscle history read without leaving the page', async () => {
     jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort').mockRejectedValueOnce(new Error('Weekly boom'));
     await loadMaestroFixture('exercise-block-history');

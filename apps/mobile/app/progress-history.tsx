@@ -20,7 +20,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
 import { exerciseCountedMuscles } from '@/src/exercise-catalog/exercise-muscles';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
@@ -51,6 +51,7 @@ export const resolveHistorySubject = (params: {
   exerciseDefinitionId?: string | string[];
   muscleGroupId?: string | string[];
   gymId?: string | string[];
+  secondary?: string | string[];
 }): HistorySubject | null => {
   const exerciseDefinitionId = firstRouteParam(params.exerciseDefinitionId);
   const muscleGroupId = firstRouteParam(params.muscleGroupId);
@@ -58,7 +59,8 @@ export const resolveHistorySubject = (params: {
   const gymId = decodeGymRouteParam(firstRouteParam(params.gymId));
   const scope = gymId === undefined ? {} : { gymId };
   if (exerciseDefinitionId) return { kind: 'exercise', id: exerciseDefinitionId, ...scope };
-  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope };
+  const primaryOnly = firstRouteParam(params.secondary) === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM;
+  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope, ...(primaryOnly ? { countSecondary: false } : {}) };
   return null;
 };
 
@@ -301,7 +303,9 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     view: entryView ?? pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
     timeline: {
-      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id], gymId } : { exerciseDefinitionId: subject.id, gymId },
+      weekSetsTarget: subject.kind === 'muscle'
+        ? { muscleGroupIds: [subject.id], gymId, ...(subject.countSecondary === false ? { countSecondary: false } : {}) }
+        : { exerciseDefinitionId: subject.id, gymId },
       onOpenSession: openSession,
       exerciseLink,
     },
@@ -367,6 +371,7 @@ export default function ProgressHistoryRoute() {
     metric?: string | string[];
     view?: string | string[];
     gymId?: string | string[];
+    secondary?: string | string[];
   }>();
   const subject = resolveHistorySubject(params);
   const metric = resolveHistoryMetric(params.metric);
@@ -376,7 +381,9 @@ export default function ProgressHistoryRoute() {
   // while it is mounted: new params are a new page, opening on their own
   // metric and week rather than keeping the last link's.
   const gym = encodeGymRouteParam(subject?.gymId) ?? '';
-  return <ProgressHistoryScreen initialMetric={metric} initialView={view} key={`${subject?.kind}:${subject?.id}:${metric}:${view}:${gym}`} subject={subject} />;
+  const primaryOnly = subject?.kind === 'muscle' && subject.countSecondary === false;
+  return <ProgressHistoryScreen initialMetric={metric} initialView={view}
+    key={`${subject?.kind}:${subject?.id}:${metric}:${view}:${gym}:${primaryOnly}`} subject={subject} />;
 }
 
 const styles = StyleSheet.create({

@@ -105,15 +105,6 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
 export function GymPickerSheet({
   visible, onClose, onChange, onDismissed, value, options, allSessionCount, testID,
 }: GymPickerSheetProps) {
-  const choices: Choice[] = [
-    { key: 'all', gymId: undefined, label: ALL_GYMS_LABEL, count: allSessionCount },
-    ...offeredOptions(value, options).map((option) => ({
-      key: option.gymId ?? 'no-gym',
-      gymId: option.gymId,
-      label: gymOptionLabel(option),
-      count: option.sessionCount,
-    })),
-  ];
   const choose = (gymId: string | null | undefined) => {
     onClose();
     if (gymId !== value) onChange(gymId);
@@ -127,25 +118,50 @@ export function GymPickerSheet({
       title="Gym"
       visible={visible}>
       <ScrollView>
-        {choices.map((choice) => {
-          const checked = choice.gymId === value;
-          return (
-            <ListRow
-              accessibilityLabel={choice.count === undefined ? choice.label : `${choice.label}, ${choice.count} sessions`}
-              checked={checked}
-              key={choice.key}
-              leading={<Icon name={checked ? 'radio-on' : 'radio-off'} />}
-              meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={styles.count}>{choice.count}</Text>}
-              onPress={() => choose(choice.gymId)}
-              testID={`${testID}-option-${choice.key}`}>
-              <Text allowFontScaling={false} style={styles.label}>{choice.label}</Text>
-            </ListRow>
-          );
-        })}
+        <GymScopeChoices allSessionCount={allSessionCount} onChoose={choose} options={options} testID={testID} value={value} />
       </ScrollView>
     </Sheet>
   );
 }
+
+export type GymScopeChoicesProps = GymScopeChoiceProps & Pick<GymPickerSheetProps, 'allSessionCount' | 'testID'> & {
+  onChoose: (gymId: string | null | undefined) => void;
+};
+
+/**
+ * The picker's radio rows, `All gyms` then each option, for a sheet that holds
+ * them among other choices; its rows are `<testID>-option-<gym>`.
+ */
+export function GymScopeChoices({ value, options, allSessionCount, onChoose, testID }: GymScopeChoicesProps) {
+  const choices: Choice[] = [
+    { key: 'all', gymId: undefined, label: ALL_GYMS_LABEL, count: allSessionCount },
+    ...offeredOptions(value, options).map((option) => ({
+      key: option.gymId ?? 'no-gym',
+      gymId: option.gymId,
+      label: gymOptionLabel(option),
+      count: option.sessionCount,
+    })),
+  ];
+  return choices.map((choice) => {
+    const checked = choice.gymId === value;
+    return (
+      <ListRow
+        accessibilityLabel={choice.count === undefined ? choice.label : `${choice.label}, ${choice.count} sessions`}
+        checked={checked}
+        key={choice.key}
+        leading={<Icon name={checked ? 'radio-on' : 'radio-off'} />}
+        meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={styles.count}>{choice.count}</Text>}
+        onPress={() => onChoose(choice.gymId)}
+        testID={`${testID}-option-${choice.key}`}>
+        <Text allowFontScaling={false} style={styles.label}>{choice.label}</Text>
+      </ListRow>
+    );
+  });
+}
+
+/** Whether a view offers its gym choice at all (`showsGymPicker`, counting a chosen gym the options lost). */
+export const offersGymChoice = (value: string | null | undefined, options: readonly GymScopeOption[]): boolean =>
+  showsGymPicker(value, offeredOptions(value, options));
 
 const HINT = 'Chooses the gym this view counts';
 
