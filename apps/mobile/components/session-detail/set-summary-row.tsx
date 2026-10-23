@@ -9,17 +9,19 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).
-export function SetSummaryRow({ row, testID, hideDerivedMetrics = false }: { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean }) {
+// Group percentages wrap with stacked stats, leaving ordinary rows compact.
+export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, stackedMetrics = false }:
+  { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; stackedMetrics?: boolean }) {
   const state = row.done ? 'realised' : 'planned';
   return (
-    <View style={styles.setRow} testID={testID}>
+    <View style={[styles.setRow, stackedMetrics && styles.stackedRow]} testID={testID}>
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
         {row.typeLabel}
       </Text>
       <Text
         allowFontScaling={false}
         numberOfLines={1}
-        style={[styles.weightReps, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
+        style={[styles.weightReps, stackedMetrics && styles.stackedWeight, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
         testID={`${testID}-values`}>
         {row.weightReps}
       </Text>
@@ -27,16 +29,16 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false }: { row
       <Stat
         emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
         label="1RM"
-        layout="inline"
-        rank="primary"
+        layout={stackedMetrics ? 'stacked' : 'inline'}
+        rank={stackedMetrics ? 'secondary' : 'primary'}
         state={state}
         testID={`${testID}-1rm`}
         value={row.oneRepMax}
       />
       <Stat
         label="Vol"
-        layout="inline"
-        rank="primary"
+        layout={stackedMetrics ? 'stacked' : 'inline'}
+        rank={stackedMetrics ? 'secondary' : 'primary'}
         state={state}
         testID={`${testID}-vol`}
         value={row.volume}
@@ -47,6 +49,8 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false }: { row
 }
 
 const styles = StyleSheet.create({
+  stackedRow: { flexWrap: 'wrap' },
+  stackedWeight: { flexBasis: '80%' },
   setRow: {
     flexDirection: 'row',
     alignItems: 'baseline',

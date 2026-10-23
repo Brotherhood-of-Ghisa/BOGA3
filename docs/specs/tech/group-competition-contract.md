@@ -76,7 +76,18 @@ scope, state and cursor. Rebuilding is empty, without old/new mixed rows.
 performed-set and certification shapes. Unknown nested fields fail decoding.
 
 Normalized performed-set context contains source/session/set identity, reps,
-performed state, source distribution, achieved instant and ordering. It has no
+performed state, source distribution, achieved instant and ordering. Opt-in
+`x-boga-group-set-metrics: 1` responses add an exact nullable
+`normalized_metrics` object under [[groups.normalized-set-display]]; absent capability
+keeps legacy shapes. Updated clients accept both exact shapes and evict prior
+cache generations. Its fields are `added_load_percent_bw`, `e1rm_percent_bw` and
+`volume_percent_bw_reps`, nullable finite nonnegative numbers. The private display
+helper reads current published per-set scores, including nonworking projections;
+it neither resolves readings nor changes scores, rules versions or audits.
+Additional load is normalized Volume / reps minus the group's contribution
+percentage, floored at zero for floating-point cancellation. Queued rebuilds,
+source mismatches and ambiguous multi-group session projections return null;
+old event performances never receive a changed source's projection. It has no
 raw added-load kg, kg volume, effective absolute 1RM, private reading ID/date/kg/
 provenance, dependency digest or original absolute audit. Ordinary context may
 include logged Weight. Public certification state retains ID, witness, time,
@@ -196,7 +207,7 @@ contain no absolute volume field that could recover a redacted contribution.
 
 Kernel upgrades rescore live comparisons silently, preserving immutable record
 and certification audits and advancing private record baselines. Personal facts,
-evaluator rules and coaching revisions must advance; device cache generation 6
+evaluator rules and coaching revisions must advance; device cache generation 7
 evicts old projections. When deploying the total-load upgrade, follow the
 [rule-upgrade procedure](../../procedures/rule-upgrade.md): apply rule-refresh SQL,
 deploy the updated evaluator and coaching functions, kick the evaluator once,

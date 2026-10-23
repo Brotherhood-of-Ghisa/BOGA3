@@ -1,6 +1,7 @@
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
+import type { NormalizedSetMetrics } from './competition-set-display.ts';
 
 export type CompetitionRulesWire = {
   bodyweight_calculations_enabled: boolean;
@@ -21,7 +22,7 @@ export type CompetitionPerformanceWire = {
   achieved_at_ms: number;
   exercise_order_index: number;
   set_order_index: number;
-} & ({ visibility: 'normalized' } | { visibility: 'ordinary'; weight_value: string });
+} & ({ visibility: 'normalized'; normalized_metrics?: NormalizedSetMetrics | null } | { visibility: 'ordinary'; weight_value: string });
 
 /** Current projection state; original observed values remain server-only audit. */
 export type CompetitionCertificationWire = {
@@ -110,7 +111,7 @@ export type CompetitionSessionSetWire = {
 export type CompetitionSessionExerciseWire = {
   session_exercise_id: string; exercise_definition_id: string | null; load_input_mode: LoadInputMode | null;
   name: string; machine_name: string | null; order_index: number;
-} & ({ visibility: 'normalized'; sets: CompetitionSessionSetWire[] }
+} & ({ visibility: 'normalized'; sets: (CompetitionSessionSetWire & { normalized_metrics?: NormalizedSetMetrics | null })[] }
   | { visibility: 'ordinary'; sets: (CompetitionSessionSetWire & { weight_value: string })[] });
 export type CompetitionSessionWire = {
   member: GroupMemberRef; session_id: string; gym_name: string | null; status: 'draft' | 'active' | 'completed';

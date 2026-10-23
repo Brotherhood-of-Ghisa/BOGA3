@@ -96,6 +96,12 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const detail=await as(owner,() => getCompetitionSession(groupId,member.userId,sessionId));
   expect(detail.session.exercises[0].visibility).toBe('normalized');
   expect(detail.session.exercises[0].sets[0]).not.toHaveProperty('weight_value');
+  expect(detail.session.exercises[0].sets[0]).toMatchObject({ normalized_metrics: {
+    added_load_percent_bw: 25, volume_percent_bw_reps: 625, e1rm_percent_bw: rm.entries[0].value,
+  } });
+  expect(board.entries[0].performance).toMatchObject({ normalized_metrics: {
+    added_load_percent_bw: 25, volume_percent_bw_reps: 625,
+  } });
   const { records }=await as(owner,() => getCompetitionSessionRecords(groupId,member.userId,sessionId));
   expect(records).toHaveLength(1);
   expect(records[0].event).toMatchObject({ kind: 'record',set_id: setId,visibility: 'normalized' });

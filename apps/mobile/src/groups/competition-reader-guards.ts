@@ -1,3 +1,5 @@
+import { isNormalizedSetMetrics } from './competition-set-display.ts';
+
 // Exact schemas are a privacy boundary, including every nested history/session.
 import { isCompetitionMetric } from './competition-contract.ts';
 import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
@@ -99,7 +101,9 @@ export function isCompetitionHistoryWire(v: unknown): v is CompetitionHistoryWir
 }
 function sessionSet(v: unknown, normalized: boolean): boolean {
   const fields = ['set_id','order_index','reps_value','set_type','performance_status'];
-  return exact(v,normalized ? fields : [...fields,'weight_value']) && id(v.set_id) && count(v.order_index) && text(v.reps_value) &&
+  const extended = normalized && v !== null && typeof v === 'object' && Object.hasOwn(v, 'normalized_metrics');
+  return exact(v,normalized ? [...fields, ...(extended ? ['normalized_metrics'] : [])] : [...fields,'weight_value']) &&
+    (!extended || isNormalizedSetMetrics(v.normalized_metrics)) && id(v.set_id) && count(v.order_index) && text(v.reps_value) &&
     nullableText(v.set_type) && nullableText(v.performance_status) && (normalized || text(v.weight_value));
 }
 function sessionExercise(v: unknown): boolean {

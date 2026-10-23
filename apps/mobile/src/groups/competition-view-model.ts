@@ -29,14 +29,18 @@ export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'un
   return formatCompetitionFigure(score.value,score.unit);
 }
 export function formatCompetitionPerformance(performance: CompetitionPerformanceWire): string {
-  if (performance.visibility === 'normalized') return `${performance.reps} reps`;
+  if (performance.visibility === 'normalized') return formatSetFigure(performance);
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
   const value = Number(performance.weight_value);
   return `Weight ${Number.isFinite(value) ? formatWeight(value) : performance.weight_value}${distribution} × ${performance.reps}`;
 }
 /** A performed set as the session cards show it: `120.0 × 5`, `20.0 × 5 per side`; `5 reps` where the group hides loads. */
 export function formatSetFigure(performance: CompetitionPerformanceWire): string {
-  if (performance.visibility === 'normalized') return `${performance.reps} reps`;
+  if (performance.visibility === 'normalized') {
+    const added = performance.normalized_metrics?.added_load_percent_bw;
+    return added === null || added === undefined ? `${performance.reps} reps`
+      : `${formatCompetitionFigure(added, 'percent_bw')} × ${performance.reps}`;
+  }
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
   const value = Number(performance.weight_value);
   return `${Number.isFinite(value) ? formatWeight(value) : performance.weight_value} × ${performance.reps}${distribution}`;

@@ -1,3 +1,5 @@
+import { isNormalizedSetMetrics } from './competition-set-display.ts';
+
 // Closed protocol-4 schemas prevent cache/history fields from smuggling kg/B.
 import { isCompetitionMetric, isCompetitionValue, validateCompetitionRules } from './competition-contract.ts';
 import type { CompetitionBoardWire, CompetitionPerformanceWire,
@@ -23,8 +25,9 @@ export function isCompetitionRulesWire(value: unknown): value is CompetitionRule
       bodyweightContribution: value.bodyweight_contribution, defaultMetric: value.default_metric }).ok;
 }
 export function isCompetitionPerformanceWire(value: unknown, normalized: boolean): value is CompetitionPerformanceWire {
-  const fields = normalized ? PERFORMANCE : [...PERFORMANCE, 'weight_value'];
-  if (!exact(value, fields) || value.visibility !== (normalized ? 'normalized' : 'ordinary')) return false;
+  const extended = normalized && record(value) && Object.hasOwn(value, 'normalized_metrics');
+  const fields = normalized ? [...PERFORMANCE, ...(extended ? ['normalized_metrics'] : [])] : [...PERFORMANCE, 'weight_value'];
+  if (!exact(value, fields) || extended && !isNormalizedSetMetrics(value.normalized_metrics) || value.visibility !== (normalized ? 'normalized' : 'ordinary')) return false;
   return ['session_id','session_exercise_id','exercise_definition_id','set_id'].every(field => id(value[field])) &&
     integer(value.reps) && value.reps > 0 && value.performance_status === null &&
     ['total_load','per_side_load'].includes(String(value.source_load_input_mode)) && integer(value.achieved_at_ms) &&

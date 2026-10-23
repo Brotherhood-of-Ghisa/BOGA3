@@ -157,15 +157,12 @@ Session cards and the friend view count on the viewing device
 (`buildCompetitionSession`,
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
 screens' TS. Counts come only from permitted set context: `Sets` as
-[[set.count-display]], `exercises` those holding a working set. A normalized exercise
-shows reps and effort, never a load figure. The friend view's `Volume` sums
-only ordinary exercises' volume-included sets ([[set.eligibility]],
-[[copy.no-inline-explanation]]): hidden kg never enters it, so nothing is
-recovered by subtraction; `—` with none. Nothing is mirrored in SQL, which once duplicated set
-rules in two languages. The cost: a co-member's device receives every permitted
-live set. Ordinary rows retain logged kg; Volume uses the source entry factor for total
-load, independently of target mode. They never read a personal preference,
-contribution or reading.
+[[set.count-display]], `exercises` those holding a working set. Normalized
+figures and totals follow [[groups.normalized-set-display]]; ordinary Volume
+uses [[set.eligibility]]. The device uses the source entry factor for total
+load, independently of target mode. No set rules are mirrored in SQL; each
+co-member's device receives permitted live sets and safe published projections,
+never a personal preference, contribution or reading.
 
 ## Evaluator
 

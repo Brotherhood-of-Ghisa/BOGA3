@@ -114,6 +114,13 @@ rpc_with_contract() {
   http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $2" ${contract[@]+"${contract[@]}"} \
     -H "Content-Type: application/json" -H "Content-Profile: app_public" --data "$4" "${API_URL}/rest/v1/rpc/$3"
 }
+# Opt-in display projection; rpc keeps exercising the legacy response shape.
+rpc_display() {
+  http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $1" \
+    -H 'x-boga-group-contract: 4' -H 'x-boga-group-set-metrics: 1' \
+    -H 'Content-Type: application/json' -H 'Content-Profile: app_public' \
+    --data "$3" "${API_URL}/rest/v1/rpc/$2"
+}
 # One decoder process for the whole body (a node start per call was ~70 ms, over
 # 200 calls). Each call writes "<guard>\t<compact JSON>" and blocks on its own
 # verdict line, so a failure stops the body at the call that caused it; a dead
@@ -326,6 +333,47 @@ check 'full session redacts normalized sets, retains unrelated ordinary context 
   'all(.session.exercises[]|select(.visibility=="normalized");all(.sets[];has("weight_value")|not))
    and any(.session.exercises[]|select(.visibility=="ordinary")|.sets[];.weight_value=="50")
    and (.session|has("volume_kg_reps")|not)'
+check 'legacy clients keep the original exact set shape' \
+  'all(.session.exercises[].sets[];has("normalized_metrics")|not)'
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'normalized display'; assert_wire isCompetitionSessionDetailWire
+check 'normalized set shows the published Volume and additional load percentages only' \
+  '(.session.exercises[]|select(.name=="Pull-up").sets[0].normalized_metrics|
+    ((.added_load_percent_bw-22.22222222222222|fabs)<0.000000001) and
+    ((.volume_percent_bw_reps-611.1111111111111|fabs)<0.000000001) and .e1rm_percent_bw>100)
+   and all(.session.exercises[]|select(.visibility=="ordinary").sets[];has("normalized_metrics")|not)
+   and ([paths|select(.[-1]|IN("weight_kg","body_weight_kg","reading_pin","body_weight_measurement_id","fingerprint"))]|length==0)'
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${NEVER_UID}" --arg s "${T}-NEVER" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'missing display'; assert_wire isCompetitionSessionDetailWire
+check 'missing bound context exposes no private reason or fabricated zero' '.session.exercises[0].sets[0].normalized_metrics==null'
+rpc_display "${OWNER_TOKEN}" group_competition_board "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"volume",p_certified:false}')"; expect_ok 'board display'; assert_wire isCompetitionBoardWire
+check 'board detail uses the same normalized set display' \
+  'all(.entries[];.performance.normalized_metrics.added_load_percent_bw>0 and (.performance|has("weight_value")|not))'
+rpc_display "${OWNER_TOKEN}" group_competition_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"; expect_ok 'stream display'; assert_wire isCompetitionStreamWire
+check 'stream record projections contain no private absolute inputs' \
+  '([paths|select(.[-1]|IN("body_weight_kg","body_weight_measurement_id","reading_pin","fingerprint"))]|length==0)'
+rpc_display "${OUTSIDER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'opt-in does not bypass membership'
+expect_sql 'ambiguous multi-group display is omitted' "select app_public.group_competition_set_display(array['${GID}'::uuid,'${GID}'::uuid],'${ATHLETE_UID}','${T}-ATHLETE-set') is null;" t
+expect_sql 'enqueue display fence' "select app_public.group_metric_eval_enqueue('${GID}','${GX}','set');" t
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'queued display'
+check 'pending evaluation hides stale projections and retains reps' \
+  '.session.exercises[0].sets[0]|.normalized_metrics==null and .reps_value=="5"'
+drain 'display fence'
+next_cuam; push "${ATHLETE_TOKEN}" 'performed warm-up display' \
+  "$(e_set "${T}-warm-display" "${T}-ATHLETE-se" 2 0 5 '' "${CUAM}" null warm_up)"
+drain 'warm-up display'
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'warm-up display'; assert_wire isCompetitionSessionDetailWire
+check 'performed warm-ups show row figures without entering boards' \
+  'any(.session.exercises[].sets[];.set_type=="warm_up" and .normalized_metrics.added_load_percent_bw==0 and .normalized_metrics.volume_percent_bw_reps==500)'
+next_cuam; push "${ATHLETE_TOKEN}" 'remove temporary warm-up' \
+  "$(e_set "${T}-warm-display" "${T}-ATHLETE-se" 2 0 5 '' "${CUAM}" "${CUAM}" warm_up)"
+drain 'remove display fixture'
+expect_sql 'empty request headers keep the legacy display shape' "select set_config('request.headers','',false) is not null and not app_public.group_competition_set_display_enabled();" t
+expect_sql 'display helpers remain private' "select has_function_privilege('authenticated','app_public.group_competition_set_display(uuid[],uuid,text)','execute');" f
 rpc "${OWNER_TOKEN}" group_competition_week_summary "$(jq -nc --arg g "${GID}" --argjson s "$((START-1000))" --argjson e "$((START+86400000))" \
   '{p_group_id:$g,p_window_start_ms:$s,p_window_end_ms:$e}')"; expect_ok week; assert_wire isCompetitionWeekSummaryWire
 check 'week scores redacted, counts retained, no subtraction total' '.members|length==4'
@@ -431,6 +479,11 @@ for mode in per_side_load total_load; do
   OLD_WITNESS="${V_PUBLIC}"; pair
   [[ "${V_PUBLIC}" != "${OLD_WITNESS}" ]] || fail 'a source correction revived its previous witness'
   retained "fresh witness for source ${mode}"
+  rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+    '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'source-mode display'
+  expected_added=22.22222222222222; [[ "${mode}" != per_side_load ]] || expected_added=44.44444444444444
+  check 'source per-side load is doubled exactly once for display' \
+    '(.session.exercises[0].sets[0].normalized_metrics.added_load_percent_bw-$expected|fabs)<0.000000001' --argjson expected "${expected_added}"
 done
 for metric in volume e1rm; do
   board "${metric}"; check 'source restored to normalized units' 'all(.entries[];.unit=="percent_bw_reps" or .unit=="percent_bw")'
@@ -459,6 +512,11 @@ before="$(run_psql "select count(*) from app_public.group_metric_eval_queue wher
 reading value "${MAIN_READING}" "${START}" 91
 expect_sql 'a reading edit queues nothing' "select count(*) from app_public.group_metric_eval_queue where group_id='${GID}';" "${before}"
 drain value; bound value
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'bound display after reading edit'
+check 'a private reading correction does not change display independently of its board' \
+  '(.session.exercises[0].sets[0].normalized_metrics.volume_percent_bw_reps-$expected|fabs)<0.000000001' --argjson expected "${BOUND_VOLUME}"
+
 reading restored "${MAIN_READING}" "${START}" 90; drain restored; bound 'value restored'
 reading date "${MAIN_READING}" "$((START-1))" 90; drain date; bound 'date changed with same kg'
 reading future-date "${MAIN_READING}" "$((START+100))" 90; drain 'date moved beyond session'; bound 'date leaves session interval'
@@ -588,6 +646,11 @@ check 'full precision ranks unequal values ahead of UUID/time tie breakers' \
 for weight in 0 ''; do
   next_cuam; push "${ATHLETE_TOKEN}" 'unweighted normalized performed set' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 "${weight}" 5 '' "${CUAM}" null rir_0)"
   drain unweighted; board volume; check 'unweighted bodyweight Volume is eligible' 'any(.entries[];.member.user_id==$u and .value==500)' --arg u "${ATHLETE_UID}"
+  rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+    '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'zero added-load display'
+  check 'zero and blank added load display numeric zero with bodyweight Volume' \
+    '.session.exercises[0].sets[0].normalized_metrics|.added_load_percent_bw==0 and .volume_percent_bw_reps==500'
+
 done
 pair
 # Manual lifecycle permissions and original IDs stay exact through the safe API.

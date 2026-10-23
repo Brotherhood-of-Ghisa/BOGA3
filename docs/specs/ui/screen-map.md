@@ -142,9 +142,9 @@ addressable, each resolving to a canonical owner for tab selection.
 - `presentation=completion` does **not** link to muscle analytics, its share
   image excludes gym and location, and optional historical enrichment can
   never block it.
-- A friend's session shows **no record band** (their history is not on this
-  device) and no edit / delete / append; its normalized exercise cards omit raw
-  load and derived absolute metrics while ordinary cards keep permitted kg.
+- A friend's session is read-only, with group #1 bands ([[set.row-figures]])
+  and normalized rows under [[groups.normalized-set-display]]; ordinary cards
+  retain permitted load.
 - Invite codes and leaderboard rows are read **online only, never cached**; the
   group stream and the podiums are cached and render offline behind the offline
   marker, never showing an earlier week as if it were this one.
@@ -190,5 +190,5 @@ addressable, each resolving to a canonical owner for tab selection.
   `Bodyweight contribution (%)`; linking never changes personal settings or
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
   boards and podiums follow [[copy.no-weight-unit]]; record detail and history
-  retain public witness state and original wire units, and normalized sessions omit raw loads and all session aggregate
-  volume. See `docs/specs/tech/group-competition-contract.md`.
+  retain public witness state and original wire units. Normalized rows follow
+  [[groups.normalized-set-display]]. See `docs/specs/tech/group-competition-contract.md`.

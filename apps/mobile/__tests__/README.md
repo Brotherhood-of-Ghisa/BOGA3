@@ -184,7 +184,7 @@ single-set Volume, effective total-load 1RM normalization with the same dated B,
 physical source distribution, ordinary target conversion, missing/invalid/zero
 omission, full-precision scores and exact public allowlists. Nested kg/private
 fields, dependency digests and unsupported units/versions must fail decoding.
-`groups-cache.test.ts` proves group-scoped version-6 session keys and account-only
+`groups-cache.test.ts` proves group-scoped version-7 session keys and account-only
 whole-group-cache eviction across generations. The backend competition fixture
 runs the actual negotiation response through the mobile decoder and proves
 anonymous/OAuth/outsider/unsupported-protocol denial.
@@ -195,7 +195,7 @@ rejection and server-normalized write responses.
 The backend competition fixture tests both-metric bound reading contexts,
 exact witness audit, SQL-seeded protocol-3 history, paired-reader privacy and
 publication failure/fence behavior. Current safe UI tests cover explicit units,
-normalized details/full sessions,
+normalized details/full sessions (legacy reps-only and opt-in percentages),
 account and generation races, unknown disclosure retirement, SQL cleanup failure,
 positive/c=0 rule review, decimal name-only saves and saved confirmation guards.
 `groups-competition-api-live.test.ts` runs every safe client RPC against the

@@ -144,3 +144,24 @@ describe('buildStreamRecordSheet', () => {
     expect(model.metrics).toEqual([{ metric: 'weight', label: 'Weight', value: '100.0' }]);
   });
 });
+
+
+test.each([0, 25])('normalized sets show %s percent added load and published derived figures', added => {
+  const metrics = { added_load_percent_bw: added, e1rm_percent_bw: 145.728, volume_percent_bw_reps: 625 };
+  const exercise = competitionSession.session.exercises[0];
+  const session = { ...competitionSession.session, exercises: [{ ...exercise, visibility: 'normalized' as const,
+    sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] };
+  const model = buildCompetitionSession(session);
+  expect(model).toMatchObject({ volume: '—', setCount: 1, cards: [{ hideDerivedMetrics: false, stackedMetrics: true,
+    rows: [{ weightReps: `${added}.0 %BW × 5`, oneRepMax: '145.7 %BW', volume: '625.0 %BW·reps' }] }] });
+  expect(formatCompetitionPerformance({ ...competitionRow.performance, visibility: 'normalized', normalized_metrics: metrics }))
+    .toBe(`${added}.0 %BW × 5`);
+});
+
+test('an unavailable normalized projection retains reps without inventing a zero or a total', () => {
+  const exercise = competitionSession.session.exercises[0];
+  const input = { ...competitionSession.session, exercises: [{ ...exercise, visibility: 'normalized' as const,
+    sets: exercise.sets.map(set => ({ ...set, normalized_metrics: null })) }] };
+  expect(buildCompetitionSession(input)).toMatchObject({ volume: '—', cards: [{ hideDerivedMetrics: true,
+    rows: [{ weightReps: '5 reps', oneRepMax: '—', volume: '—' }] }] });
+});

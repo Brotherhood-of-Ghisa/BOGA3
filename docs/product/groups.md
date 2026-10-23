@@ -16,7 +16,16 @@ or set a record) on a live group exercise. One certification per set:
 | Group target-mode, formula or private bodyweight preference/contribution/reading changes | Preserve unchanged witnesses |
 | After it ends | Only a new certification re-certifies the set |
 
-Why: a witness watched a set being lifted, and every figure from that set is
-equally true or untrue; certifying it metric by metric let one set be
-half-certified, by different people.
-Code: `group_competition_certify` and the witness-end trigger in `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `setCertification` in `apps/mobile/src/groups/competition-session-records-view-model.ts`.
+Why: one witness attests one performance.
+Code: `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `apps/mobile/src/groups/competition-session-records-view-model.ts`.
+
+
+### groups.normalized-set-display · presentation · accepted
+
+Normalized group sets show total external load and effective 1RM as `%BW`, and
+Volume as `%BW·reps`, using bound group scores. Known zero stays numeric;
+unavailable projections retain reps/effort. Never expose private inputs or mix
+normalized Volume into absolute totals.
+
+Why: private load display.
+Code: `apps/mobile/src/groups/competition-session-view-model.ts`.
