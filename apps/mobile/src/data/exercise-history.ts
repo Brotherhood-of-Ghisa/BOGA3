@@ -14,7 +14,7 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import { loadExerciseBests } from './exercise-session-facts';
+import { loadExerciseBests, loadExerciseSessionFacts } from './exercise-session-facts';
 import {
   exerciseDefinitions,
   exerciseSets,
@@ -56,6 +56,37 @@ export type ExerciseHistorySessionEntry = ResolvedSessionWeight & {
   totalVolume: number | null;
   loadContext?: LoadContext;
   topWeightSet: { weight: number; reps: number } | null;
+  /** The records this block took when its session was completed; full history reads only. */
+  records?: ExerciseHistoryBlockRecords | null;
+};
+
+/**
+ * The records one block took as they happened: its session's stored PR flags
+ * (`exercise_session_facts`). With every gym in view they are the whole
+ * exercise's (`pr_*`); with a gym chosen, the session's own (`own_pr_*`) —
+ * a split exercise's gym book ([[gym.split-progress-prs]]). A strength record
+ * belongs to the block holding its set; Volume to the session's first listed
+ * block of the exercise.
+ */
+export type ExerciseHistoryBlockRecords = {
+  oneRepMax: { setId: string; valueKg: number } | null;
+  topWeightSetId: string | null;
+  volumeKg: number | null;
+};
+
+/** One session's stored bests and PR flags for the exercise. */
+export type ExerciseHistorySessionRecordRow = {
+  sessionId: string;
+  bestE1rmKg: number | null;
+  bestE1rmSetId: string | null;
+  topWeightSetId: string | null;
+  volumeKg: number | null;
+  prE1rm: boolean;
+  prWeight: boolean;
+  prVolume: boolean;
+  ownPrE1rm: boolean;
+  ownPrWeight: boolean;
+  ownPrVolume: boolean;
 };
 
 export type ExerciseHistoryTagOption = {
@@ -149,6 +180,8 @@ export type ExerciseHistoryAggregationInput = {
   allTimeBest: ExerciseHistoryBest;
   setsBySessionExerciseId: Record<string, ExerciseHistorySetRow[]>;
   tagsBySessionExerciseId: Record<string, ExerciseHistoryTagRow[]>;
+  /** By session id; a session without a row shows no records. */
+  recordsBySessionId?: ReadonlyMap<string, ExerciseHistorySessionRecordRow>;
 };
 
 export type ExerciseHistoryStore = {
@@ -180,6 +213,10 @@ export type ExerciseHistoryStore = {
   loadTagsForSessionExercises(input: {
     sessionExerciseIds: string[];
   }): Promise<ExerciseHistoryTagRow[]>;
+  /** Every completed session's stored bests and PR flags for the exercise. */
+  loadSessionRecords(input: {
+    exerciseDefinitionId: string;
+  }): Promise<ExerciseHistorySessionRecordRow[]>;
 };
 
 export type LoadExercisePerformanceHistoryOptions = {
@@ -340,6 +377,41 @@ const buildGymOptions = (
   });
 };
 
+/** The PR flags a view reads ([[gym.split-progress-prs]]). */
+const sessionPrFlags = (row: ExerciseHistorySessionRecordRow, own: boolean) =>
+  own
+    ? { e1rm: row.ownPrE1rm, weight: row.ownPrWeight, volume: row.ownPrVolume }
+    : { e1rm: row.prE1rm, weight: row.prWeight, volume: row.prVolume };
+
+/**
+ * Each block's records (`ExerciseHistoryBlockRecords`): a strength record on
+ * the block holding its set, Volume on the session's first listed block.
+ * Entries arrive in session then block order.
+ */
+const withBlockRecords = (
+  entries: ExerciseHistorySessionEntry[],
+  recordsBySessionId: ReadonlyMap<string, ExerciseHistorySessionRecordRow>,
+  own: boolean
+): ExerciseHistorySessionEntry[] => {
+  const volumePlaced = new Set<string>();
+  return entries.map((entry) => {
+    const row = recordsBySessionId.get(entry.sessionId);
+    if (!row) return { ...entry, records: null };
+    const flags = sessionPrFlags(row, own);
+    const holds = (setId: string | null): setId is string =>
+      setId !== null && entry.sets.some((set) => set.setId === setId);
+    const firstBlock = !volumePlaced.has(entry.sessionId);
+    volumePlaced.add(entry.sessionId);
+    const oneRepMax = flags.e1rm && row.bestE1rmKg !== null && holds(row.bestE1rmSetId)
+      ? { setId: row.bestE1rmSetId, valueKg: row.bestE1rmKg }
+      : null;
+    const topWeightSetId = flags.weight && holds(row.topWeightSetId) ? row.topWeightSetId : null;
+    const volumeKg = flags.volume && firstBlock ? row.volumeKg : null;
+    const records = oneRepMax || topWeightSetId || volumeKg !== null ? { oneRepMax, topWeightSetId, volumeKg } : null;
+    return { ...entry, records };
+  });
+};
+
 export const aggregateExerciseHistory = (
   input: ExerciseHistoryAggregationInput
 ): ExerciseHistorySummary => {
@@ -394,7 +466,9 @@ export const aggregateExerciseHistory = (
     appliedGymId,
     tagOptions,
     gymOptions,
-    sessions,
+    sessions: input.recordsBySessionId
+      ? withBlockRecords(sessions, input.recordsBySessionId, appliedGymId !== undefined)
+      : sessions,
     allTimeBest: input.allTimeBest,
   };
 };
@@ -551,6 +625,9 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       deletedAt: row.deletedAt ?? null,
     }));
   },
+  async loadSessionRecords({ exerciseDefinitionId }) {
+    return loadExerciseSessionFacts(exerciseDefinitionId);
+  },
 });
 
 export const createExerciseHistoryRepository = (
@@ -584,9 +661,10 @@ export const createExerciseHistoryRepository = (
     ]);
 
     const sessionExerciseIds = sessionsInPeriod.map((row) => row.sessionExerciseId);
-    const [setRows, tagRows] = await Promise.all([
+    const [setRows, tagRows, recordRows] = await Promise.all([
       store.loadSetsForSessionExercises({ sessionExerciseIds }),
       store.loadTagsForSessionExercises({ sessionExerciseIds }),
+      store.loadSessionRecords({ exerciseDefinitionId: options.exerciseDefinitionId }),
     ]);
 
     return aggregateExerciseHistory({
@@ -599,6 +677,7 @@ export const createExerciseHistoryRepository = (
       allTimeBest,
       setsBySessionExerciseId: groupBySessionExerciseId(setRows),
       tagsBySessionExerciseId: groupBySessionExerciseId(tagRows),
+      recordsBySessionId: new Map(recordRows.map((row) => [row.sessionId, row])),
     });
   },
   /** One completed session's blocks of the exercise, in block order, without tags. */

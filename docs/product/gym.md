@@ -40,23 +40,27 @@ Code: `EXERCISE_WRITE_RULES` in `services/boga-mcp/src/tools.ts`.
 Both Progress tables, exercise and muscle history, catalog stats and the exercise
 heatmap offer a gym picker, split or not, opening on all gyms. A chosen gym counts
 only its sessions; no gym is a separate choice. History links carry that scope.
-Muscle 3D remains all gyms.
+From the exercise page, history opens on the session's gym, if any, when
+the exercise is split or `Current gym only` is on. Muscle 3D remains all gyms.
 
 Why: gym scope answers where the effort happened; splitting only changes which
 PRs show ([[gym.split-progress-prs]]). Approved 2026-10-18;
-Muscle tables and history approved 2026-10-22.
-Code: `GymPicker` in `apps/mobile/components/gyms/gym-picker.tsx`.
+muscle tables and history 2026-10-22; exercise-page entry 2026-10-23.
+Code: `GymPicker` in `apps/mobile/components/gyms/gym-picker.tsx`;
+`exerciseHistoryOpeningGym` in `apps/mobile/src/session-recorder/exercise-history-view.ts`.
 
 ### gym.split-progress-prs · presentation · accepted
 
-A split exercise's gym PRs show in Progress when that gym is chosen: a view
-with a gym chosen marks each session's own PRs — that gym's — and a view of
-every gym marks the whole exercise's. No setting. Showing gym PRs and
+A split exercise's gym PRs show in Progress and exercise history when that gym
+is chosen: a view with a gym chosen marks each session's own PRs — that gym's —
+and a view of every gym marks the whole exercise's. No setting. Showing gym PRs and
 whole-exercise PRs side by side is parked.
 
 Why: choosing the gym is the question "what are my PRs here", so no second
-switch is needed. Approved 2026-10-18 (mock option A).
-Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`.
+switch is needed. Approved 2026-10-18 (mock option A); exercise history
+2026-10-23.
+Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`;
+`withBlockRecords` in `apps/mobile/src/data/exercise-history.ts`.
 
 ### gym.split-label · presentation · superseded-by: gym.split
 

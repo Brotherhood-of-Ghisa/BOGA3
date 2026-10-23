@@ -8,7 +8,7 @@ import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-ty
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { deriveExercisePersonalRecord, type ExercisePersonalRecord } from '@/src/session-insights';
-import { recordBandLines, type RecordLine } from '@/src/session-insights/record-band';
+import { recordBandLines, type BandRecord, type RecordLine } from '@/src/session-insights/record-band';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
@@ -104,7 +104,7 @@ export const formatSetRow = ({
 
 /** A row's record flags: which of its figures took a record. */
 export const recordFlagsFor = (
-  record: ExercisePersonalRecord | null,
+  record: Pick<ExercisePersonalRecord, 'sets'> | null,
   setId: string,
 ): Pick<SessionViewSetRow, 'oneRepMaxRecord' | 'weightRecord'> => {
   const recordSet = record?.sets.find((set) => set.setId === setId);
@@ -115,7 +115,7 @@ export const recordFlagsFor = (
 };
 
 /** The card's band: the records held by this block of the exercise. */
-export const cardRecordBand = (record: ExercisePersonalRecord | null, blockId: string): RecordLine[] =>
+export const cardRecordBand = (record: BandRecord | null, blockId: string): RecordLine[] =>
   record === null ? [] : recordBandLines(record, blockId);
 
 type ShownValues = { weight: number | null; reps: number | null; setType: string | null };

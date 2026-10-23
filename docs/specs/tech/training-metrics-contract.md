@@ -211,12 +211,12 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 | Screen | Records shown |
 | --- | --- |
 | Exercise page records panel, exercise history `All-time bests` | All three holders of the bucket, each with its session and gym |
-| Exercise page set list, session view, completed-session cards and completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`) |
+| Exercise page set list, session view, completed-session and exercise history cards, completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`; history from the facts, `own_pr_*` with a gym chosen, `historyBlockRecord`) |
 | Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
 | Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
 
 Every screen that shows a record set highlights it as [[set.row-figures]]
-says: the 1RM record's 1RM and the Weight record's Weight. Every band reads the same words
+says. Every band reads the same words
 (`session-insights/record-band.ts`).
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow

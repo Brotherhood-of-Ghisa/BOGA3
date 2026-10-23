@@ -556,6 +556,20 @@ export const loadEarlierBestsByDefinition = async (
   return bests;
 };
 
+/**
+ * The gym whose own book one exercise reads at `gymId` ([[gym.split]]): that
+ * gym on an exercise split per gym, else `null` — the whole exercise, as for
+ * no gym. The exercise page opens history on it.
+ */
+export const loadOwnBookGymId = async (
+  exerciseDefinitionId: string,
+  gymId: string | null,
+): Promise<string | null> => {
+  const database = await bootstrapLocalDataLayer();
+  const splitByGym = loadSplitByGym(database, [exerciseDefinitionId]).get(exerciseDefinitionId) ?? false;
+  return isPooledGymBucket(reportingBucket({ splitByGym }, gymId)) ? null : gymId;
+};
+
 /** Where a block is being planned: in a session (its gym), or at a plan's gym. */
 export type GymBookContext = { inSessionId: string } | { gymId: string | null };
 

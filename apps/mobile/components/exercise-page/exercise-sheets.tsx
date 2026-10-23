@@ -58,6 +58,8 @@ type ExerciseOptionsSheetProps = {
   exerciseName: string;
   onEdit: () => void;
   onSwap: () => void;
+  // Opens this exercise's session-by-session history.
+  onOpenHistory: () => void;
   // Signed in only: opens the Link screen for this exercise (product E0.3).
   onLink?: () => void;
   onRemove: () => void;
@@ -67,14 +69,15 @@ type ExerciseOptionsSheetProps = {
   onDismiss: () => void;
 };
 
-// The exercise's ⋮: Edit / Swap / Link to group exercise… / Complete block
-// (sourced cards) / Remove from session. Removing lives here, not on the
+// The exercise's ⋮: Edit / Swap / Exercise history / Link to group exercise… /
+// Complete block (sourced cards) / Remove from session. Removing lives here, not on the
 // session view's card (spec 08, "Read-only link card pattern").
 export function ExerciseOptionsSheet({
   visible,
   exerciseName,
   onEdit,
   onSwap,
+  onOpenHistory,
   onLink,
   onRemove,
   onCompleteBlock,
@@ -106,6 +109,12 @@ export function ExerciseOptionsSheet({
         leading={<Icon color={uiRoles.ink} name="swap" />}
         onPress={onSwap}
         testID="exercise-options-swap"
+      />
+      <ListRow
+        label="Exercise history"
+        leading={<Icon color={uiRoles.ink} name="list" />}
+        onPress={onOpenHistory}
+        testID="exercise-options-history"
       />
       {onLink ? (
         <ListRow

@@ -30,11 +30,14 @@ const bandSetLine = (set: ExerciseRecordSet): RecordLine => {
   return { key: set.setId, label: 'New top weight', set: figures, spoken: `new top weight ${figures}` };
 };
 
+/** What a card's band reads of a record: its sets, its Volume and the block that shows Volume. */
+export type BandRecord = Pick<ExercisePersonalRecord, 'sessionExerciseId' | 'sets' | 'volume'>;
+
 /**
  * A card's `record` band, one line per record: those whose set is in the
  * block, and the Volume record on the exercise's first block.
  */
-export const recordBandLines = (record: ExercisePersonalRecord, blockId: string): RecordLine[] => {
+export const recordBandLines = (record: BandRecord, blockId: string): RecordLine[] => {
   const lines = record.sets.filter((set) => set.sessionExerciseId === blockId).map(bandSetLine);
   if (record.volume !== null && record.sessionExerciseId === blockId) {
     const value = formatVolume(record.volume);
