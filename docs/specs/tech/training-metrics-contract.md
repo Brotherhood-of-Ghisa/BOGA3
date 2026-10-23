@@ -321,6 +321,11 @@ percentage overflows. Row
 percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
 
+Muscle List tickers implement [[comparison.muscle-ticker-window]] and
+[[comparison.muscle-ticker-reference]] in `src/data/progress-muscle-tickers.ts`,
+sharing bounded raw aggregation and policy-refreshed first-training facts.
+Their history reads use completed sessions only.
+
 No derived figure is written back to a set or session.
 
 **Display** (`format.ts`). Every figure has one format on every screen, the
