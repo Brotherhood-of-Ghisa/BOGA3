@@ -18,6 +18,7 @@ import { NOTIFICATION_WORKER_URL, pushEntities } from './tier1.ts';
 
 const TAG = '/* groups-perf */';
 const DRAIN_TIMEOUT_MS = 300000;
+const STATS_FLUSH_MS = 11000;
 const LINKED_EXERCISES = [
   { ex: 0, name: 'Bench press', weight: (k: number) => (k === 0 ? '50' : '82.5'), reps: '5' },
   { ex: 1, name: 'Back squat', weight: (k: number) => (k === 0 ? '60' : '110'), reps: '5' },
@@ -409,7 +410,9 @@ export class Tier2Run {
       const [active] = (await this.admin.query(`${TAG} select count(*)::int as n from pg_stat_activity
         where datname = current_database() and state = 'active' and query ilike '%app_public%' and query not like '%groups-perf%'`)).rows;
       if ((await this.pendingJobs()) === 0 && active.n === 0) {
-        await sleep(1500);
+        // An idle backend flushes its table counters up to 10 s late
+        // (PGSTAT_IDLE_INTERVAL); without the wait they land in the next window.
+        await sleep(STATS_FLUSH_MS);
         return;
       }
       await sleep(500);
