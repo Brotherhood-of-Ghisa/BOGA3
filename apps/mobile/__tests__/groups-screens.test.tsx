@@ -814,6 +814,21 @@ describe("Friend's session view", () => {
     expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
   });
 
+  it('shows normalized additional load, 1RM and Volume without leaking absolute values or a mixed total', async () => {
+    const safe = sessionDetail();
+    api.getCompetitionSession.mockResolvedValue({ ...safe, session: { ...safe.session, exercises: safe.session.exercises.map(exercise => ({
+      ...exercise, visibility: 'normalized', sets: exercise.sets.map(set => ({ set_id: set.set_id, order_index: set.order_index,
+        reps_value: set.reps_value, set_type: set.set_type, performance_status: set.performance_status,
+        normalized_metrics: { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 } })) })) } });
+    render(<GroupSessionRoute />);
+    const row = await screen.findByTestId('group-session-set-row-set-2');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values').props.children).toBe('25.0 %BW × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-1rm').props.accessibilityLabel).toBe('1RM 145.7 %BW');
+    expect(within(row).getByTestId('group-session-set-row-set-2-vol').props.accessibilityLabel).toBe('Vol 625.0 %BW·reps');
+    expect(screen.queryByText(/102.5|110.0|kg/)).toBeNull();
+    expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
+  });
+
   it('lists the #1 records, frozen, with who passed them since, a board link, and one-tap Certify', async () => {
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
     api.certifyCompetition.mockResolvedValue({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') });

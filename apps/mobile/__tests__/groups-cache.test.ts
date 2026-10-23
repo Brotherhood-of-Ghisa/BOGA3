@@ -16,10 +16,10 @@ const periodTotals = (groupId: string) => ({ contract_version: 4,group_id: group
 beforeEach(() => { fixture=createInMemoryDatabase(); });
 afterEach(() => fixture.close());
 
-it('uses generation six and binds sessions to the authorized group', () => {
+it('uses generation seven and binds sessions to the authorized group', () => {
   expect(groupCacheKeys).toBe(competitionCacheKeys);
-  expect(groupCacheKeys.mine).toBe('groups:v6:mine');
-  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v6:g1:other:s1');
+  expect(groupCacheKeys.mine).toBe('groups:v7:mine');
+  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v7:g1:other:s1');
   expect(groupCacheKeys.session('g2','other','s1')).not.toBe(groupCacheKeys.session('g1','other','s1'));
   expect(groupCacheKeys).not.toHaveProperty('streamAll');
 });
@@ -57,7 +57,7 @@ it('upserts owner and fetch time without exposing the earlier account', () => {
   expect(readGroupCache(fixture.database,groupCacheKeys.mine,'u1')).toBeNull();
   expect(readGroupCache(fixture.database,groupCacheKeys.mine,'u2')).toEqual({ payload,fetchedAtMs: 2000 });
 });
-it.each(['v1','v2','v3','v4','v5'])('deletes prior generation %s before hydration', version => {
+it.each(['v1','v2','v3','v4','v5','v6'])('deletes prior generation %s before hydration', version => {
   raw(`stream:${version}:g1`,{ normalized_load_kg: 91 });
   raw(`stream:${version}:g2`,{ private_audit: true },'u2');
   expect(readGroupCache(fixture.database,groupCacheKeys.stream('g1'),'u1')).toBeNull();
@@ -201,4 +201,20 @@ it('online-only absolute boards keep the disclosure flag until projection retire
   expect(getCompetitionCacheGeneration('u1')).toBe(epoch+1);
   observeGroupCompetitionPolicy(fixture.database,'g1','u1',{ ...competitionSession,session: { ...competitionSession.session,session_id: 'next' } });
   expect(getCompetitionCacheGeneration('u1')).toBe(epoch+1);
+});
+
+
+it('round-trips safe normalized projections and rejects a private nested counterpart', () => {
+  const exercise = competitionSession.session.exercises[0];
+  const metrics = { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 };
+  const payload = { ...competitionSession, session: { ...competitionSession.session, exercises: [{ ...exercise,
+    visibility: 'normalized' as const, sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] } };
+  const key = groupCacheKeys.session('g1', 'other', 's1');
+  put(key, payload);
+  expect(readGroupCache(fixture.database, key, 'u1')?.payload).toEqual(payload);
+  const poisoned = { ...payload, session: { ...payload.session, exercises: [{ ...payload.session.exercises[0],
+    sets: exercise.sets.map(set => ({ ...set, normalized_metrics: { ...metrics, body_weight_kg: 80 } })) }] } };
+  expect(() => put(key, poisoned)).toThrow('Unsafe group cache payload.');
+  raw('session:v6:g1:other:old', payload);
+  expect(readGroupCache(fixture.database, 'session:v6:g1:other:old', 'u1')).toBeNull();
 });
