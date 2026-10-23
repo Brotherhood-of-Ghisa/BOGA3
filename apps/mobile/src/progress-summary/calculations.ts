@@ -6,9 +6,9 @@ import { countedMuscleAnalyticsSessionIds, countMuscleAnalyticsWorkingSets } fro
 import type { StatsAggregationInput } from '@/src/data/stats';
 import type { RecordKind } from '@/src/exercise-calculations/records';
 import {
-  daysInLocalMonth,
   isInWindow,
-  localMonthWindow,
+  localDaysBetween,
+  localPeriodWindow,
   localWeekWindow,
   startOfLocalDay,
   type LocalWindow,
@@ -27,22 +27,24 @@ export type TodayProgressWeek = {
   previous: ProgressCounts;
 };
 
-export type TodayProgressMonth = {
+export type TodayProgressPeriod = {
+  /** The fixed period holding today ([[comparison.window]]). */
   window: LocalWindow;
-  dayOfMonth: number;
-  daysInMonth: number;
-  /** Working sets through each day so far: index 0 is the 1st, the last is today. */
+  weeks: number;
+  /** Today's day of the period: 1 on its first day. */
+  dayOfPeriod: number;
+  daysInPeriod: number;
+  /** Working sets through each day so far: index 0 is the first day, the last is today. */
   cumulativeWorkingSets: number[];
-  /** The 1st through the end of today. */
+  /** The first day through the end of today. */
   toDate: ProgressCounts;
-  /** Linear: working sets so far per elapsed day (today included) over the whole month. */
+  /** Linear: working sets so far per elapsed day (today included) over the whole period. */
   projectedWorkingSets: number;
   previous: {
     window: LocalWindow;
-    daysInMonth: number;
-    /** Working sets through each day of the whole previous month. */
+    /** Working sets through each day of the whole previous period. */
     cumulativeWorkingSets: number[];
-    /** Through the same day of month, or its last day when the month is shorter. */
+    /** Through the same day of the period. */
     toSameDay: ProgressCounts;
     total: ProgressCounts;
   };
@@ -75,12 +77,14 @@ export type TodayProgress =
   | {
       status: 'ready';
       week: TodayProgressWeek;
-      month: TodayProgressMonth;
+      period: TodayProgressPeriod;
       latest: LatestSessionSummary;
     };
 
 export type TodayProgressInput = {
   now: Date;
+  /** Settings' Progress period, in weeks. */
+  periodWeeks: number;
   /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now)`. */
   sessions: ProgressSession[];
   /** `completed_at` of each PR over the same range: one per record kind (`sessionRecordKinds`). */
@@ -89,14 +93,14 @@ export type TodayProgressInput = {
   latest: LatestSessionSummary | null;
 };
 
-/** The one range that covers last week, this week, last month and this month. */
-export const todayProgressLoadWindow = (now: Date): LocalWindow => {
-  const windows = [localWeekWindow(now, -1), localWeekWindow(now), localMonthWindow(now, -1), localMonthWindow(now)];
-  return {
-    start: new Date(Math.min(...windows.map((window) => window.start.getTime()))),
-    end: new Date(Math.max(...windows.map((window) => window.end.getTime()))),
-  };
-};
+/**
+ * The one range that covers the previous period and this one, which always
+ * hold last week and this week too: a period is whole Monday–Sunday weeks.
+ */
+export const todayProgressLoadWindow = (now: Date, periodWeeks: number): LocalWindow => ({
+  start: localPeriodWindow(now, periodWeeks, -1).start,
+  end: localPeriodWindow(now, periodWeeks).end,
+});
 
 const groupBy = <T>(items: readonly T[], keyOf: (item: T) => string | undefined): Map<string, T[]> => {
   const groups = new Map<string, T[]>();
@@ -140,36 +144,34 @@ const countIn = (input: TodayProgressInput, window: LocalWindow): ProgressCounts
   };
 };
 
-const cumulativeByDay = (sessions: ProgressSession[], month: LocalWindow, days: number): number[] => {
+const cumulativeByDay = (sessions: ProgressSession[], period: LocalWindow, days: number): number[] => {
   const perDay = new Array<number>(days).fill(0);
   for (const session of sessions) {
-    if (isInWindow(session.completedAt, month)) perDay[session.completedAt.getDate() - 1] += session.workingSets;
+    if (isInWindow(session.completedAt, period)) perDay[localDaysBetween(period.start, session.completedAt)] += session.workingSets;
   }
   let running = 0;
   return perDay.map((count) => (running += count));
 };
 
-const deriveMonth = (input: TodayProgressInput): TodayProgressMonth => {
-  const { now } = input;
-  const window = localMonthWindow(now);
-  const previousWindow = localMonthWindow(now, -1);
-  const dayOfMonth = now.getDate();
-  const daysInMonth = daysInLocalMonth(window.start);
-  const previousDays = daysInLocalMonth(previousWindow.start);
-  const sameDay = Math.min(dayOfMonth, previousDays);
+const derivePeriod = (input: TodayProgressInput): TodayProgressPeriod => {
+  const { now, periodWeeks } = input;
+  const window = localPeriodWindow(now, periodWeeks);
+  const previousWindow = localPeriodWindow(now, periodWeeks, -1);
+  const daysInPeriod = periodWeeks * 7;
+  const dayOfPeriod = localDaysBetween(window.start, now) + 1;
   const toDate = countIn(input, { start: window.start, end: startOfLocalDay(now, 1) });
   return {
     window,
-    dayOfMonth,
-    daysInMonth,
-    cumulativeWorkingSets: cumulativeByDay(input.sessions, window, daysInMonth).slice(0, dayOfMonth),
+    weeks: periodWeeks,
+    dayOfPeriod,
+    daysInPeriod,
+    cumulativeWorkingSets: cumulativeByDay(input.sessions, window, daysInPeriod).slice(0, dayOfPeriod),
     toDate,
-    projectedWorkingSets: Math.round((toDate.workingSets / dayOfMonth) * daysInMonth),
+    projectedWorkingSets: Math.round((toDate.workingSets / dayOfPeriod) * daysInPeriod),
     previous: {
       window: previousWindow,
-      daysInMonth: previousDays,
-      cumulativeWorkingSets: cumulativeByDay(input.sessions, previousWindow, previousDays),
-      toSameDay: countIn(input, { start: previousWindow.start, end: startOfLocalDay(previousWindow.start, sameDay) }),
+      cumulativeWorkingSets: cumulativeByDay(input.sessions, previousWindow, daysInPeriod),
+      toSameDay: countIn(input, { start: previousWindow.start, end: startOfLocalDay(previousWindow.start, dayOfPeriod) }),
       total: countIn(input, previousWindow),
     },
   };
@@ -185,7 +187,7 @@ export const deriveTodayProgress = (input: TodayProgressInput): TodayProgress =>
       current: countIn(input, { start: week.start, end: input.now }),
       previous: countIn(input, localWeekWindow(input.now, -1)),
     },
-    month: deriveMonth(input),
+    period: derivePeriod(input),
     latest: input.latest,
   };
 };

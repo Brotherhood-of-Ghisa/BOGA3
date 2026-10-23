@@ -122,11 +122,11 @@ const instantWindow = (instant: Date): LocalWindow => ({
 export const createTodayProgressRepository = (
   store: ProgressSummaryStore = createDrizzleProgressSummaryStore(),
 ) => ({
-  async loadTodayProgress(now: Date = new Date()): Promise<TodayProgress> {
+  async loadTodayProgress(now: Date, periodWeeks: number): Promise<TodayProgress> {
     const latest = await store.loadLatestCompletedSession();
-    if (latest === null) return deriveTodayProgress({ now, sessions: [], prAchievedAt: [], latest: null });
+    if (latest === null) return deriveTodayProgress({ now, periodWeeks, sessions: [], prAchievedAt: [], latest: null });
 
-    const range = todayProgressLoadWindow(now);
+    const range = todayProgressLoadWindow(now, periodWeeks);
     const [aggregation, recordFacts] = await Promise.all([
       // The workout in progress counts in this week and month (§2).
       store.loadAggregationInput({ ...range, now }),
@@ -142,6 +142,7 @@ export const createTodayProgressRepository = (
         ]);
     return deriveTodayProgress({
       now,
+      periodWeeks,
       sessions: sessionsInRange,
       prAchievedAt: recordFacts.map((fact) => fact.achievedAt),
       latest: {
