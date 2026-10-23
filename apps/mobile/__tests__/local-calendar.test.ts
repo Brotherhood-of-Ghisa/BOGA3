@@ -1,13 +1,14 @@
 /**
  * Local calendar windows. The suite runs in Europe/London (jest.config.js):
  * in 2026 the clocks go forward on Sunday 29 March and back on Sunday
- * 25 October, so the weeks and months holding those days are 1 h short or long.
+ * 25 October, so the weeks and periods holding those days are 1 h short or long.
  */
 import {
-  daysInLocalMonth,
   isInWindow,
-  localMonthWindow,
+  localDaysBetween,
+  localPeriodWindow,
   localWeekWindow,
+  periodAnchor,
   startOfLocalDay,
 } from '@/src/utils/local-calendar';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
@@ -56,24 +57,57 @@ describe('localWeekWindow', () => {
   });
 });
 
-describe('localMonthWindow', () => {
-  it('runs from the 1st 00:00 to the next 1st 00:00, local, across a DST change', () => {
-    const march = localMonthWindow(local(2026, 3, 15));
-    expect(march).toEqual({ start: local(2026, 3, 1), end: local(2026, 4, 1) });
-    expect(march.end.toISOString()).toBe('2026-03-31T23:00:00.000Z');
-    expect(lengthInHours(march)).toBe(31 * 24 - 1);
+describe('localPeriodWindow', () => {
+  it('starts at Monday 29 December 2025, the first day of ISO week 1 of 2026', () => {
+    expect(periodAnchor()).toEqual(local(2025, 12, 29));
+    expect(periodAnchor().getDay()).toBe(1);
+    expect(localPeriodWindow(local(2025, 12, 29), 4)).toEqual({ start: local(2025, 12, 29), end: local(2026, 1, 26) });
+    expect(localPeriodWindow(local(2025, 12, 28, 23, 59), 4)).toEqual({ start: local(2025, 12, 1), end: local(2025, 12, 29) });
   });
 
-  it('steps back to the previous month across a year boundary', () => {
-    expect(localMonthWindow(local(2026, 1, 1, 0, 30), -1)).toEqual({ start: local(2025, 12, 1), end: local(2026, 1, 1) });
+  it('places today, Friday 23 October 2026, in the 4-week period from 5 October, local, across the autumn change', () => {
+    const now = local(2026, 10, 23, 9);
+    const period = localPeriodWindow(now, 4);
+    expect(period).toEqual({ start: local(2026, 10, 5), end: local(2026, 11, 2) });
+    expect(lengthInHours(period)).toBe(28 * 24 + 1);
+    expect(localPeriodWindow(now, 4, -1)).toEqual({ start: local(2026, 9, 7), end: local(2026, 10, 5) });
+  });
+
+  it.each([
+    [2, local(2026, 10, 19), local(2026, 11, 2)],
+    [6, local(2026, 10, 19), local(2026, 11, 30)],
+    [52, local(2025, 12, 29), local(2026, 12, 28)],
+  ])('lays %i-week periods from the anchor, so changing the length moves the edges', (weeks, start, end) => {
+    expect(localPeriodWindow(local(2026, 10, 23, 9), weeks)).toEqual({ start, end });
+  });
+
+  it('is the calendar week when a period is one week', () => {
+    for (const now of [local(2025, 6, 4, 9), local(2026, 3, 29, 23, 59), local(2026, 10, 23, 9), local(2027, 1, 3)]) {
+      expect(localPeriodWindow(now, 1)).toEqual(localWeekWindow(now));
+    }
+  });
+
+  it('runs on through a 53-week ISO year without resetting at New Year', () => {
+    // 2026 has 53 ISO weeks; Monday 4 January 2027, ISO week 1 of 2027, falls mid-period.
+    expect(localPeriodWindow(local(2027, 1, 4, 12), 4)).toEqual({ start: local(2026, 12, 28), end: local(2027, 1, 25) });
+    expect(localPeriodWindow(local(2027, 1, 4, 12), 4, -1)).toEqual({ start: local(2026, 11, 30), end: local(2026, 12, 28) });
+  });
+
+  it('extends back before the anchor', () => {
+    expect(localPeriodWindow(local(2025, 11, 15, 12), 4)).toEqual({ start: local(2025, 11, 3), end: local(2025, 12, 1) });
+  });
+
+  it('rejects a length that is not a whole number of weeks', () => {
+    expect(() => localPeriodWindow(local(2026, 10, 23), 0)).toThrow('positive whole number');
+    expect(() => localPeriodWindow(local(2026, 10, 23), 1.5)).toThrow('positive whole number');
   });
 });
 
 describe('day helpers', () => {
-  it('counts the days in a month, leap years included', () => {
-    expect(daysInLocalMonth(local(2026, 2, 10))).toBe(28);
-    expect(daysInLocalMonth(local(2028, 2, 10))).toBe(29);
-    expect(daysInLocalMonth(local(2026, 10, 31, 23, 59))).toBe(31);
+  it('counts whole local days between two dates, across both DST changes and backwards', () => {
+    expect(localDaysBetween(local(2026, 3, 28, 12), local(2026, 3, 30, 1))).toBe(2);
+    expect(localDaysBetween(local(2026, 10, 24, 23, 59), local(2026, 10, 26))).toBe(2);
+    expect(localDaysBetween(local(2026, 1, 1), local(2025, 12, 29, 23))).toBe(-3);
   });
 
   it('finds local midnight a number of days on, across the spring change', () => {
@@ -91,9 +125,9 @@ describe('day helpers', () => {
   it('rejects an invalid date', () => {
     const invalid = new Date(Number.NaN);
     expect(() => localWeekWindow(invalid)).toThrow('valid Date');
-    expect(() => localMonthWindow(invalid)).toThrow('valid Date');
+    expect(() => localPeriodWindow(invalid, 4)).toThrow('valid Date');
     expect(() => startOfLocalDay(invalid)).toThrow('valid Date');
-    expect(() => daysInLocalMonth(invalid)).toThrow('valid Date');
+    expect(() => localDaysBetween(invalid, invalid)).toThrow('valid Date');
   });
 });
 

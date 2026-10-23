@@ -1,6 +1,6 @@
 /**
  * Today's progress figures, pure. The suite runs in Europe/London
- * (jest.config.js), so the windows are local calendar weeks and months there.
+ * (jest.config.js), so the windows are local calendar weeks and periods there.
  * Which sets count, and which sessions load, are covered over a real database
  * in `progress-summary-repository.test.ts`.
  */
@@ -38,7 +38,7 @@ const ready = (progress: TodayProgress) => {
 
 describe('deriveTodayProgress', () => {
   it('returns an explicit empty state when there is no completed session', () => {
-    expect(deriveTodayProgress({ now: local(2026, 3, 15), sessions: [], prAchievedAt: [], latest: null }))
+    expect(deriveTodayProgress({ now: local(2026, 3, 15), periodWeeks: 4, sessions: [], prAchievedAt: [], latest: null }))
       .toEqual({ status: 'empty' });
   });
 
@@ -47,6 +47,7 @@ describe('deriveTodayProgress', () => {
     const monday = local(2026, 3, 16);
     const { week } = ready(deriveTodayProgress({
       now,
+      periodWeeks: 4,
       sessions: [
         session('last-mon', local(2026, 3, 9, 7), 10),
         session('last-sun', justBefore(monday), 8),
@@ -66,95 +67,94 @@ describe('deriveTodayProgress', () => {
     expect(week.previous).toEqual({ sessions: 2, workingSets: 18, prs: 2 });
   });
 
-  it('builds this month by day to today, the previous month by day in full, and compares at the same day', () => {
-    const now = local(2026, 3, 10, 20);
+  it('builds this period by day to today, the previous period by day in full, and compares at the same day', () => {
+    // Friday 23 October 2026, 4-week periods: this one runs 5 Oct – 1 Nov, the previous 7 Sep – 4 Oct.
+    const now = local(2026, 10, 23, 20);
     const progress = ready(deriveTodayProgress({
       now,
+      periodWeeks: 4,
       sessions: [
-        session('feb-1', local(2026, 2, 1), 4), // the month's first instant
-        session('feb-3', local(2026, 2, 3, 18), 6),
-        session('feb-10-late', local(2026, 2, 10, 23, 59), 5), // still the same day
-        session('feb-11', local(2026, 2, 11), 7), // past the same day
-        session('feb-28', justBefore(local(2026, 3, 1)), 3),
-        session('mar-1', local(2026, 3, 1), 8),
-        session('mar-4', local(2026, 3, 4, 18), 12),
-        session('mar-10', local(2026, 3, 10, 9), 10),
-        session('mar-11', local(2026, 3, 11, 9), 50), // after today: not "to date"
+        session('before', justBefore(local(2026, 9, 7)), 99),
+        session('sep-7', local(2026, 9, 7), 4), // the previous period's first instant
+        session('sep-9', local(2026, 9, 9, 18), 6),
+        session('sep-25-late', local(2026, 9, 25, 23, 59), 5), // day 19, still the same day
+        session('sep-26', local(2026, 9, 26), 7), // past the same day
+        session('oct-4', justBefore(local(2026, 10, 5)), 3),
+        session('oct-5', local(2026, 10, 5), 8),
+        session('oct-8', local(2026, 10, 8, 18), 12),
+        session('oct-23', local(2026, 10, 23, 9), 10),
+        session('oct-24', local(2026, 10, 24, 9), 50), // after today: not "to date"
       ],
-      prAchievedAt: [local(2026, 2, 3, 18), local(2026, 2, 11), local(2026, 3, 1), local(2026, 3, 4, 18)],
+      prAchievedAt: [local(2026, 9, 9, 18), local(2026, 9, 26), local(2026, 10, 5), local(2026, 10, 8, 18)],
       latest: LATEST,
     }));
-    const { month } = progress;
+    const { period } = progress;
 
-    expect(month.window).toEqual({ start: local(2026, 3, 1), end: local(2026, 4, 1) });
-    expect([month.dayOfMonth, month.daysInMonth]).toEqual([10, 31]);
-    expect(month.cumulativeWorkingSets).toEqual([8, 8, 8, 20, 20, 20, 20, 20, 20, 30]);
-    expect(month.toDate).toEqual({ sessions: 3, workingSets: 30, prs: 2 });
-    expect(month.projectedWorkingSets).toBe(93); // 30 / 10 days × 31
+    expect(period.window).toEqual({ start: local(2026, 10, 5), end: local(2026, 11, 2) });
+    expect([period.weeks, period.dayOfPeriod, period.daysInPeriod]).toEqual([4, 19, 28]);
+    expect(period.cumulativeWorkingSets).toEqual([8, 8, 8, ...Array(15).fill(20), 30]);
+    expect(period.toDate).toEqual({ sessions: 3, workingSets: 30, prs: 2 });
+    expect(period.projectedWorkingSets).toBe(44); // 30 / 19 days × 28
 
-    expect(month.previous.window).toEqual({ start: local(2026, 2, 1), end: local(2026, 3, 1) });
-    expect(month.previous.daysInMonth).toBe(28);
-    expect(month.previous.cumulativeWorkingSets).toHaveLength(28);
-    expect(month.previous.cumulativeWorkingSets.slice(0, 11)).toEqual([4, 4, 10, 10, 10, 10, 10, 10, 10, 15, 22]);
-    expect(month.previous.cumulativeWorkingSets[27]).toBe(25);
-    expect(month.previous.toSameDay).toEqual({ sessions: 3, workingSets: 15, prs: 1 });
-    expect(month.previous.total).toEqual({ sessions: 5, workingSets: 25, prs: 2 });
+    expect(period.previous.window).toEqual({ start: local(2026, 9, 7), end: local(2026, 10, 5) });
+    expect(period.previous.cumulativeWorkingSets).toHaveLength(28);
+    expect(period.previous.cumulativeWorkingSets.slice(0, 20)).toEqual([4, 4, ...Array(16).fill(10), 15, 22]);
+    expect(period.previous.cumulativeWorkingSets[27]).toBe(25);
+    expect(period.previous.toSameDay).toEqual({ sessions: 3, workingSets: 15, prs: 1 });
+    expect(period.previous.total).toEqual({ sessions: 5, workingSets: 25, prs: 2 });
     expect(progress.latest).toBe(LATEST);
   });
 
-  it('compares against the previous month\'s last day when that month is shorter', () => {
-    const { month } = ready(deriveTodayProgress({
-      now: local(2026, 3, 31, 8),
-      sessions: [session('feb-28', local(2026, 2, 28, 18), 9), session('mar-31', local(2026, 3, 31, 7), 4)],
-      prAchievedAt: [],
-      latest: LATEST,
+  it.each([
+    [1, local(2026, 10, 19), local(2026, 10, 26), 5],
+    [6, local(2026, 10, 19), local(2026, 11, 30), 5],
+  ])('takes its length from the Progress period: %i weeks', (periodWeeks, start, end, dayOfPeriod) => {
+    const { period } = ready(deriveTodayProgress({
+      now: local(2026, 10, 23, 9), periodWeeks, sessions: [], prAchievedAt: [], latest: LATEST,
     }));
-
-    expect(month.cumulativeWorkingSets).toHaveLength(31);
-    expect(month.cumulativeWorkingSets[30]).toBe(4);
-    expect(month.previous.toSameDay).toEqual(month.previous.total);
-    expect(month.previous.toSameDay.workingSets).toBe(9);
-    expect(month.projectedWorkingSets).toBe(4);
+    expect(period.window).toEqual({ start, end });
+    expect(period.previous.window.end).toEqual(start);
+    expect(period.dayOfPeriod).toBe(dayOfPeriod);
+    expect(period.previous.cumulativeWorkingSets).toHaveLength(periodWeeks * 7);
   });
 
-  it.each([local(2026, 3, 29, 12), local(2026, 10, 25, 12)])('keeps month-day indices across DST: %s', now => {
+  it.each([local(2026, 3, 29, 12), local(2026, 10, 25, 12)])('keeps day indices across DST: %s', now => {
     const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 18);
-    const { month } = ready(deriveTodayProgress({
-      now, latest: LATEST, prAchievedAt: [],
+    const { period } = ready(deriveTodayProgress({
+      now, periodWeeks: 4, latest: LATEST, prAchievedAt: [],
       sessions: [session('yesterday', yesterday, 7), session('today', now, 3)],
     }));
-    expect(month.cumulativeWorkingSets).toEqual([...Array(now.getDate() - 2).fill(0), 7, 10]);
-    expect(month.toDate.workingSets).toBe(10);
-    expect(month.daysInMonth).toBe(31);
+    expect(period.cumulativeWorkingSets).toEqual([...Array(period.dayOfPeriod - 2).fill(0), 7, 10]);
+    expect(period.toDate.workingSets).toBe(10);
   });
 
-  it('projects from the first day and reports zero with nothing logged this month', () => {
+  it('projects from the first day and reports zero with nothing logged this period', () => {
     const dayOne = ready(deriveTodayProgress({
-      now: local(2026, 4, 1, 9),
-      sessions: [session('apr-1', local(2026, 4, 1, 8), 20)],
+      now: local(2026, 11, 2, 9), // Monday: a new 4-week period
+      periodWeeks: 4,
+      sessions: [session('nov-2', local(2026, 11, 2, 8), 20)],
       prAchievedAt: [],
       latest: LATEST,
     }));
-    expect(dayOne.month.projectedWorkingSets).toBe(600); // 20 × 30 days
+    expect(dayOne.period.dayOfPeriod).toBe(1);
+    expect(dayOne.period.projectedWorkingSets).toBe(560); // 20 × 28 days
 
-    const quiet = ready(deriveTodayProgress({ now: local(2026, 4, 12), sessions: [], prAchievedAt: [], latest: LATEST }));
-    expect(quiet.month.toDate).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
-    expect(quiet.month.projectedWorkingSets).toBe(0);
-    expect(quiet.month.cumulativeWorkingSets).toEqual(new Array(12).fill(0));
+    const quiet = ready(deriveTodayProgress({ now: local(2026, 11, 13), periodWeeks: 4, sessions: [], prAchievedAt: [], latest: LATEST }));
+    expect(quiet.period.toDate).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(quiet.period.projectedWorkingSets).toBe(0);
+    expect(quiet.period.cumulativeWorkingSets).toEqual(new Array(12).fill(0));
   });
 });
 
 describe('todayProgressLoadWindow', () => {
-  it('starts at the previous month, which always holds last week\'s Monday', () => {
-    // Thursday 1 Oct: last week starts Monday 21 Sep.
-    expect(todayProgressLoadWindow(local(2026, 10, 1, 9))).toEqual({ start: local(2026, 9, 1), end: local(2026, 11, 1) });
-    // Monday 1 March 2027: last week starts Monday 22 Feb.
-    expect(todayProgressLoadWindow(local(2027, 3, 1))).toEqual({ start: local(2027, 2, 1), end: local(2027, 4, 1) });
+  it('runs from the previous period\'s first day to the end of this one', () => {
+    expect(todayProgressLoadWindow(local(2026, 10, 23, 9), 4)).toEqual({ start: local(2026, 9, 7), end: local(2026, 11, 2) });
+    expect(todayProgressLoadWindow(local(2026, 11, 2), 4)).toEqual({ start: local(2026, 10, 5), end: local(2026, 11, 30) });
   });
 
-  it('runs to the end of a week that crosses into next month', () => {
-    // Thursday 29 Oct 2026: this week ends Monday 2 Nov.
-    expect(todayProgressLoadWindow(local(2026, 10, 29, 9))).toEqual({ start: local(2026, 9, 1), end: local(2026, 11, 2) });
+  it('is last week and this week when a period is one week', () => {
+    // Thursday 29 Oct 2026: last week starts Monday 19 Oct; this week ends Monday 2 Nov.
+    expect(todayProgressLoadWindow(local(2026, 10, 29, 9), 1)).toEqual({ start: local(2026, 10, 19), end: local(2026, 11, 2) });
   });
 });
 

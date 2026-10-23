@@ -13,12 +13,12 @@ More means improvement. Shared direction colours supplement the sign; colour is 
 Today's week figures show none: each fills a bar in laps of last week's total.
 
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
-Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/month-pace.tsx`.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`.
 
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
-alternatives: one calendar week and Today’s calendar-month pace. Comparisons
+alternatives: one calendar week and Today’s periods. Comparisons
 default to Progress; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 
@@ -39,10 +39,10 @@ Weeks start Monday, local time.
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
-| Today, month pace | this calendar month through today | the previous month through the same day (its last day when shorter); its full total and daily series also appear |
+| Today, period pace | N-week periods from Mon 29 Dec 2025: this one through today | the previous period through the same day; its full total and daily series also appear |
 
 Why: include the unfinished week; Today's bar targets last week's whole total.
-Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and month windows in `apps/mobile/src/progress-summary/calculations.ts`.
+Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and period windows in `apps/mobile/src/progress-summary/calculations.ts`.
 
 ### comparison.history-window · definition · accepted
 
