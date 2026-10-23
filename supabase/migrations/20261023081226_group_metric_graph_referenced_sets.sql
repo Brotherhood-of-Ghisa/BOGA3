@@ -31,6 +31,17 @@
 --
 -- Every live comparison is queued once (a silent 'rules' cause) so its score
 -- rows outside the reach are deleted and its persisted digest is refreshed.
+-- Confirmed workouts awaiting their summary keep a current context digest.
+
+-- A confirmed workout still awaiting its summary is ready only while its
+-- stored context digest (hashing its sessions' graph rows) is current. The
+-- graph's shape changes below, so the digests current now are re-stamped
+-- after it; others still wait for the app to confirm again.
+create temporary table graph_reach_current_contexts as
+select w.member_user_id,w.session_id from app_public.notification_workouts w
+where w.eligible and w.confirmed_at is not null and w.enqueued_generation<w.generation
+  and w.completion_at+interval '24 hours'>now()
+  and w.context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id);
 
 create or replace function app_public.group_metric_eval_source_graph(p_group_id uuid, p_group_exercise_id uuid)
 returns jsonb language plpgsql stable security definer set search_path=app_public,pg_temp as $$
@@ -60,13 +71,7 @@ begin
     join app_public.group_metric_board_state st on st.group_exercise_id=t.id and st.rules_revision=t.rules_revision
     join members m on m.member_user_id=st.member_user_id
     cross join lateral unnest(st.linked_definition_ids) d(exercise_definition_id)
-  ), reach_sets as (
-    select es.owner_user_id as member_user_id,es.id as set_id
-    from reach_definitions d
-    join app_public.session_exercises se on se.owner_user_id=d.member_user_id
-      and se.exercise_definition_id=d.exercise_definition_id
-    join app_public.exercise_sets es on es.owner_user_id=se.owner_user_id and es.session_exercise_id=se.id
-    union
+  ), reach_set_ids as (
     select c.member_user_id,c.set_id from target t
     join app_public.group_metric_certifications c on c.group_exercise_id=t.id and c.ended_at is null
     union
@@ -122,13 +127,11 @@ begin
         )::text,'sha256'),'hex'))
     ) as row,s.owner_user_id as member_user_id,es.id as set_id
     from target t
-    join reach_sets r on true
-    join members m on m.member_user_id=r.member_user_id
-    join app_public.exercise_sets es on es.owner_user_id=r.member_user_id and es.id=r.set_id
-    join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
-    join app_public.sessions s on s.owner_user_id=se.owner_user_id and s.id=se.session_id
     join app_public.group_session_shares sh on sh.group_id=t.group_id
-      and sh.member_user_id=s.owner_user_id and sh.session_id=s.id
+    join members m on m.member_user_id=sh.member_user_id
+    join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id
+    join app_public.session_exercises se on se.owner_user_id=s.owner_user_id and se.session_id=s.id
+    join app_public.exercise_sets es on es.owner_user_id=se.owner_user_id and es.session_exercise_id=se.id
     left join app_public.exercise_definitions ed on ed.owner_user_id=se.owner_user_id
       and ed.id=se.exercise_definition_id
     left join lateral (
@@ -138,6 +141,10 @@ begin
             and b.source_key=app_public.group_set_body_weight_key(es,s.started_at)),
           app_public.session_weight_as_of(s.owner_user_id,s.started_at)) end as context
     ) bw on true
+    -- The shares-driven join is the plan the full graph always had; only
+    -- reached rows are built. Uncorrelated IN lists plan as hashed subplans.
+    where (s.owner_user_id,se.exercise_definition_id) in (select member_user_id,exercise_definition_id from reach_definitions)
+      or (es.owner_user_id,es.id) in (select member_user_id,set_id from reach_set_ids)
   )
   select jsonb_build_object(
     'group_id',t.group_id,'group_exercise_id',t.id,'name',t.name,
@@ -175,6 +182,12 @@ begin
 end;
 $$;
 revoke all on function app_public.group_metric_eval_source_graph(uuid,uuid) from public,anon,authenticated,service_role;
+
+update app_public.notification_workouts w
+   set context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id)
+  from graph_reach_current_contexts c
+ where c.member_user_id=w.member_user_id and c.session_id=w.session_id;
+drop table graph_reach_current_contexts;
 
 -- p_graph's sets that p_current still reaches: rows linked when p_graph was
 -- built (a link change since moves p_current's members anyway), or rows

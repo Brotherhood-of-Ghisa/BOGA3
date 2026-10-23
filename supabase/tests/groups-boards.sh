@@ -617,7 +617,7 @@ sess "${RIVAL_TOKEN}" "${T}-s5r" completed "${DR5}" "r5r1:100:5"
 def "${ATHLETE_TOKEN}" "${DA5}" total_load
 def "${ATHLETE_TOKEN}" "${DA5B}" total_load
 next_session_at
-# r5a2 is a warm-up: it never counts, so only the board state reaches it once DA5 is unlinked.
+# r5a2 is a warm-up ([[set.eligibility]]), so only the board state reaches it once DA5 is unlinked.
 sess "${ATHLETE_TOKEN}" "${T}-s5a" completed "${DA5}" "r5a1:120:5" "r5a2:60:5:::warm_up"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s5b" completed "${DA5B}" "r5b1:50:5"
