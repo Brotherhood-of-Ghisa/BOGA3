@@ -7,8 +7,9 @@
 -- 1 year. Each publish builds it twice, prepare once, and readiness twice per
 -- target.
 --
--- Now a member's set is in the graph when the comparison reaches it, the
--- reach group_eval_complete (20261022090000) already queues by:
+-- Now a member's set is in the graph when the comparison reaches it: the
+-- reach group_eval_complete (20261022090000) queues by, plus current board
+-- entries, counting scores and legacy certifications:
 --   - its exercise definition is linked to the target, or was linked at the
 --     member's last apply (board state's linked_definition_ids), so the
 --     first publish after an unlink still sees what it unlinked;
@@ -33,14 +34,20 @@
 -- rows outside the reach are deleted and its persisted digest is refreshed.
 -- Confirmed workouts awaiting their summary keep a current context digest.
 
--- A confirmed workout still awaiting its summary is ready only while its
--- stored context digest (hashing its sessions' graph rows) is current. The
--- graph's shape changes below, so the digests current now are re-stamped
--- after it; others still wait for the app to confirm again.
+-- A confirmed workout whose summary is not yet prepared or delivered is
+-- ready (and sendable) only while its stored context digest (hashing its
+-- sessions' graph rows) is current. The graph's shape changes below, so the
+-- digests current now are re-stamped after it; others still wait for the app
+-- to confirm again. The candidates are notification_pending_completions'.
 create temporary table graph_reach_current_contexts as
 select w.member_user_id,w.session_id from app_public.notification_workouts w
-where w.eligible and w.confirmed_at is not null and w.enqueued_generation<w.generation
+where w.eligible and w.confirmed_at is not null
   and w.completion_at+interval '24 hours'>now()
+  and (w.enqueued_generation<w.generation or exists(
+    select 1 from app_public.notification_intents n
+    join app_public.notification_deliveries d on d.intent_id=n.id
+    where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id and n.kind='completion'
+      and d.state in ('pending','retry','disabled','leased','sending')))
   and w.context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id);
 
 create or replace function app_public.group_metric_eval_source_graph(p_group_id uuid, p_group_exercise_id uuid)
