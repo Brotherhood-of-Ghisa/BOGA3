@@ -34,9 +34,11 @@ changes.
 ```
 
 The command sets up a background job and prints its PID and log location. Each run
-pulls `main`, applies migrations, deploys the backend, builds the app and uploads
-it to Apple. Unchanged source skips that run. Recurring runs share one release
-checkout and stop after any failure; inspect the logs before scheduling again.
+fetches remote `main` into a fresh temporary directory, applies migrations,
+deploys the backend, builds the app and uploads it to Apple. Unchanged source
+skips that run. Each run removes its source directory and slot when it finishes,
+fails or is cancelled. Logs and IPAs stay saved under `~/.config/boga/releases/`.
+Recurring jobs stop after any failure; inspect the logs before scheduling again.
 
 To stop all future runs, use the printed PID:
 

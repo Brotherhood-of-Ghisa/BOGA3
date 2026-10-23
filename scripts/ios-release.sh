@@ -15,8 +15,8 @@ Usage: ./boga ios release [--at <UTC time|now>] [--every <hours>h]
 Example: ./boga ios release --at 2026-10-18T01:00:00Z --profile prod \
            --project-ref <your-project-ref>
 
-Creates a detached release worktree and a background job on this Mac. At run time,
-the default origin/main is pulled with --ff-only; other --ref values stay pinned.
+Creates a background job on this Mac. Each run fetches origin/main into a fresh
+detached release worktree; other --ref values stay pinned when scheduled.
 If the tracked tree matches this Mac's last successful upload for the same profile
 and backend, skip the release. Otherwise:
   1. Pin the source, install mobile dependencies, and check the EAS/backend identity.
@@ -26,7 +26,7 @@ and backend, skip the release. Otherwise:
 
 Without --every, --at is required and schedules one run. --every accepts any positive
 whole number of hours (e.g. 1h, 4h, 12h, 24h, 48h), starting now unless --at sets
-the first run. It reuses one checkout, retains a separate record per run, and stops
+the first run. It creates a fresh checkout, retains a separate record per run, and stops
 on any failure. Extra missed intervals are skipped. Repetition stops on
 cancellation, logout or reboot.
 
@@ -38,10 +38,10 @@ EAS login/signing/submission credentials must already work non-interactively.
 The selected EAS environment must contain readable
 EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY values.
 
-The job prints its PID, checkout, and persistent log/artifact directory. Cancel
-with kill -TERM -- -<PID> (the entire job process group). It keeps the checkout
-on success/failure for inspection; run ./boga worktree release --force there
-after finishing with its external artifacts.
+The job prints its PID and persistent log/artifact directory. Cancel with
+kill -TERM -- -<PID> (the entire job process group). Each run removes its own
+checkout and slot on success, failure or cancellation; logs and IPAs stay saved.
+If cleanup fails, the job stops and reports the retained checkout for inspection.
 The Mac must stay powered on, logged in, lid open, and able to access signing keys.
 The background job does not survive logout/reboot. No Render/consent-site
 deployments or hosted device tests. New notification config has sending disabled;
@@ -139,13 +139,36 @@ JS
   fi
 )
 
+finish_release() {
+  local result=$?
+  trap - EXIT
+  if [[ -n "$release_root" && -d "$release_root" ]]; then
+    echo "[ios-release] Removing temporary checkout: $release_root"
+    if ! (cd "$source_repo" && if [[ -f "$release_root/.worktree-slot" ]]; then
+      ./boga worktree release --slot "$(cat "$release_root/.worktree-slot")" --force
+    else
+      # Creation can fail before a slot is allocated.
+      git worktree remove --force "$release_root"
+    fi); then
+      stage="$stage; checkout cleanup failed: $release_root"
+      (( result != 0 )) || result=1
+      echo "[ios-release] $stage" >&2
+    fi
+  fi
+  if [[ -n "$lock" ]]; then rmdir "$lock" || result=1; fi
+  printf '%s (exit %s)\n' "$stage" "$result" > "$record/status"
+  exit "$result"
+}
+
 run_release() {
   record="$1"
   source "$record/job.env"
   mkdir "$record/started" || fail 'job already started; inspect its status before retrying'
   stage=waiting
   lock=''
-  trap 'result=$?; printf "%s (exit %s)\n" "$stage" "$result" > "$record/status"; if [[ -n "$lock" ]]; then rmdir "$lock"; fi' EXIT
+  release_root=''
+  # Group cancellation also kills tee; cleanup must write to a durable file.
+  trap 'finish_release >> "$record/release.log" 2>&1' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   local remaining
@@ -154,31 +177,33 @@ run_release() {
     (( remaining > 60 )) && remaining=60
     (( remaining > 0 )) && sleep "$remaining"
   done
-  cd "$release_root"
+  cd "$source_repo"
   source scripts/worktree-lib.sh
   mkdir -p "$(boga_config_root)/releases/locks"
   local candidate_lock="$(boga_config_root)/releases/locks/$project"
   mkdir "$candidate_lock" || fail 'another release holds this backend lock'
   lock="$candidate_lock"
   stage=source-update
-  assert_source
-  local scheduled_sha="$sha" source_tree success_file
+  local source_tree success_file
   if [[ "$ref" == origin/main ]]; then
-    git pull --ff-only origin main
-    sha="$(git rev-parse HEAD)"
-    [[ "$sha" == "$(git rev-parse FETCH_HEAD)" ]] || fail 'origin/main moved behind this checkout; reschedule the release'
-    assert_source
+    git fetch origin +refs/heads/main:refs/remotes/origin/main
+    sha="$(git rev-parse 'origin/main^{commit}')"
   fi
   printf '%s\n' "$sha" > "$record/commit.txt"
-  source_tree="$(git rev-parse 'HEAD^{tree}')"
+  source_tree="$(git rev-parse "$sha^{tree}")"
   success_file="$(boga_config_root)/releases/last-uploaded-${project}-${profile}.tree"
   if [[ -f "$success_file" && "$(cat "$success_file")" == "$source_tree" ]]; then
     stage='skipped; tracked source unchanged since last successful upload'
     echo "[ios-release] $stage. Commit: $sha"
     return
   fi
-  # Refresh generated config when the pull changed its checked-in template.
-  if [[ "$sha" != "$scheduled_sha" ]]; then ./boga worktree start; fi
+  stage=checkout
+  mkdir -p "$release_parent"
+  release_root="$(mktemp -d "$release_parent/ios-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")"
+  rmdir "$release_root"
+  printf '%s\n' "$release_root" > "$record/checkout.txt"
+  ./boga worktree create --detach --from "$sha" --root "$release_parent" --name "$(basename "$release_root")"
+  cd "$release_root"
   stage=preflight
   assert_source
   load_hosted_env
@@ -265,7 +290,7 @@ repeat_release() {
   local run_dir name
   while true; do
     run_dir="$(mktemp -d "$record/runs/run.XXXXXX")"
-    for name in release_root sha ref profile project at_epoch; do
+    for name in source_repo release_parent sha ref profile project at_epoch; do
       printf '%s=%q\n' "$name" "${!name}"
     done > "$run_dir/job.env"
     printf '%s\n' "$run_dir" > "$record/latest-run.txt"
@@ -273,9 +298,7 @@ repeat_release() {
     printf '%s\n' "$stage" > "$record/status"
     echo "[ios-release] Next run: $(node -p 'new Date(Number(process.argv[1])*1000).toISOString()' "$at_epoch"); artifacts: $run_dir"
     # A separate shell preserves fail-fast behavior inside the conditional pipeline.
-    if /bin/bash "$record/runner.sh" --run "$run_dir" 2>&1 | tee "$run_dir/release.log"; then
-      sha="$(cat "$run_dir/commit.txt")"
-    else
+    if ! /bin/bash "$record/runner.sh" --run "$run_dir" 2>&1 | tee -a "$run_dir/release.log"; then
       stage="stopped after failed run; inspect $run_dir"
       return 1
     fi
@@ -346,7 +369,7 @@ sha="$(git rev-parse --verify --end-of-options "$ref^{commit}")"
 printf '[ios-release] %s at %s; starting commit %s; backend %s\n' "$profile" "$at" "$sha" "$project"
 if (( repeat_seconds > 0 )); then echo "[ios-release] Repeats every $every; stops on failure or cancellation."; fi
 if (( dry )); then
-  echo '[ios-release] Plan: pull origin/main at run time (other refs pinned) → skip unchanged source → migrate → deploy all functions → configure workers → local build → inspect IPA → submit. No gates. No job created.'
+  echo '[ios-release] Plan: fetch origin/main at run time (other refs pinned) → skip unchanged source → fresh checkout → migrate → deploy all functions → configure workers → local build → inspect IPA → submit → remove checkout. No gates. No job created.'
   exit
 fi
 [[ "$(uname -s)" == Darwin ]] || fail 'local iOS releases require macOS'
@@ -357,11 +380,9 @@ record="$(mktemp -d "$(boga_config_root)/releases/ios-$(date -u +%Y%m%dT%H%M%SZ)
 release_parent="$(boga_worktree_root)"
 mkdir -p "$release_parent"
 release_parent="$(cd "$release_parent" && pwd)"
-release_name="$(basename "$record")"
-release_root="$release_parent/$release_name"
-./boga worktree create --detach --from "$sha" --root "$release_parent" --name "$release_name"
+source_repo="$(boga_main_worktree_path "$PWD")"
 cp "$script" "$record/runner.sh"
-for name in release_root sha ref profile project at_epoch repeat_seconds; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
+for name in source_repo release_parent sha ref profile project at_epoch repeat_seconds; do printf '%s=%q\n' "$name" "${!name}"; done > "$record/job.env"
 printf 'scheduled\n' > "$record/status"
 # shortcut: in-memory schedules cannot survive reboot/logout; use launchd if persistence is required.
 node - "$record" <<'JS'
@@ -370,7 +391,7 @@ const { spawn } = require('node:child_process');
 const record = process.argv[2];
 const log = fs.openSync(`${record}/release.log`, 'a');
 const job = spawn('caffeinate', ['-i', '/bin/bash', `${record}/runner.sh`, '--run', record],
-  { detached: true, stdio: ['ignore', log, log] });
+  { cwd: record, detached: true, stdio: ['ignore', log, log] });
 job.on('error', () => { console.error('Could not start scheduled release'); process.exitCode = 1; });
 job.once('spawn', () => {
   fs.writeFileSync(`${record}/pid`, `${job.pid}\n`);
@@ -378,4 +399,4 @@ job.once('spawn', () => {
 });
 fs.closeSync(log);
 JS
-printf '[ios-release] PID: %s\nCheckout: %s\nArtifacts/log: %s\n' "$(cat "$record/pid")" "$release_root" "$record"
+printf '[ios-release] PID: %s\nTemporary checkouts: %s/ios-* (removed after each run)\nArtifacts/log: %s\n' "$(cat "$record/pid")" "$release_parent" "$record"
