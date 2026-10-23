@@ -1,4 +1,4 @@
-import { Fragment, useRef, type ComponentRef } from 'react';
+import { Fragment, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
@@ -10,6 +10,9 @@ import {
 } from './comparison-columns';
 import { StatsTable, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
 
+import type { ProgressMuscleTickers, MuscleTickerSeries } from '@/src/data/progress-muscle-tickers';
+import { useDateFormat } from '@/src/preferences/hooks';
+import { MuscleTicker, muscleTickerDescription, type MuscleTickerStatus } from './muscle-ticker';
 import { EXERCISE_LIST_FAMILY_ORDER } from '@/src/exercise-catalog/list-model';
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
 
@@ -19,6 +22,7 @@ export type ProgressTableMetric = ProgressMetric;
 
 export type ProgressTablesProps = {
   muscles: ProgressMuscleComparison[]; metric: ProgressTableMetric; selectedId: string | null;
+  tickers?: ProgressMuscleTickers | null; tickerWeeks?: number; tickerStatus?: MuscleTickerStatus;
   grouped?: boolean; searchQuery?: string; sortMode?: MuscleSortMode;
   onSort?: (header: MuscleSortHeader) => void;
   onSelect: (id: string) => void;
@@ -63,7 +67,8 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 // Name links and contribution disclosures stay separate 44pt targets.
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
-    grouped = true, searchQuery = '', sortMode = 'now-desc', onSort } = props;
+    grouped = true, searchQuery = '', sortMode = 'now-desc', onSort, tickers, tickerWeeks = 4, tickerStatus = 'loaded' } = props;
+  const [tableWidth, setTableWidth] = useState(0);
   const words = normalizeExerciseSearchWords(searchQuery);
   const rows = sortProgressMuscles(muscles.filter(row => exerciseSearchTextMatches(words,
     `${row.displayName} ${row.familyName}`.toLowerCase())), sortMode, metric, grouped);
@@ -71,7 +76,7 @@ export function ProgressTables(props: ProgressTablesProps) {
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, true);
-  return <StatsTable testID="stats-muscle-table">
+  return <View onLayout={event => setTableWidth(event.nativeEvent.layout.width)} testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
     <ComparisonHeaders layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
       column={(column, columnWidth) => <MuscleSortHeaderCell header={column.key} label={column.label}
@@ -83,14 +88,15 @@ export function ProgressTables(props: ProgressTablesProps) {
       <View style={row.muscleGroupId === selectedId ? styles.selected : undefined}
         testID={`stats-muscle-block-${row.muscleGroupId}`}>
         <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
-          onSelect={onSelect} onHistory={onMuscleHistory} />
+          onSelect={onSelect} onHistory={onMuscleHistory} ticker={tickers?.muscles[row.muscleGroupId]?.[metric]}
+          tickerWindow={tickers} tickerStatus={tickerStatus} tickerWeeks={tickerWeeks} tickerWidthCap={tableWidth / 3} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
           <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
       </View>
     </Fragment>)}
-  </StatsTable>;
+  </StatsTable></View>;
 }
 
 // Both presentations keep one contribution-row and empty-state implementation.
@@ -139,10 +145,13 @@ function Headers({ name, layout, metric, testID }: {
     name={<StatsTableHeaderLabel label={name} />} />;
 }
 
-function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
+function MuscleRow({ row, metric, layout, selected, onSelect, onHistory, ticker, tickerWindow, tickerWeeks, tickerWidthCap, tickerStatus }: {
   row: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout; selected: boolean;
   onSelect: ProgressTablesProps['onSelect']; onHistory: ProgressTablesProps['onMuscleHistory'];
+  ticker?: MuscleTickerSeries; tickerWindow?: ProgressMuscleTickers | null; tickerWeeks: number; tickerWidthCap: number; tickerStatus: MuscleTickerStatus;
 }) {
+  const [nameWidth, setNameWidth] = useState(0);
+  const dateFormat = useDateFormat();
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
@@ -153,8 +162,12 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
       <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
     </Pressable>}>
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
+      accessibilityHint={muscleTickerDescription(ticker, tickerWeeks, metric, dateFormat, tickerStatus)}
+      onLayout={event => setNameWidth(event.nativeEvent.layout.width)}
       onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
       <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
+      {ticker && tickerWindow ? <MuscleTicker series={ticker} start={tickerWindow.start} end={tickerWindow.end}
+        width={Math.min(tickerWidthCap, nameWidth)} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
     </Pressable>
     {layout.stacked ? values : null}
   </ListRow>;

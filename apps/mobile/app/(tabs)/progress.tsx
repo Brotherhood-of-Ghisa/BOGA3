@@ -62,6 +62,9 @@ import {
 } from '@/components/stats/stats-table';
 import { type ProgressPeriod, useProgressFilters } from '@/components/stats/use-progress-filters';
 import { progressHistoryHref } from '@/src/navigation/routes';
+import type { MuscleTickerStatus } from '@/components/stats/muscle-ticker';
+import { useMuscleTickers } from '@/components/stats/use-muscle-tickers';
+import type { ProgressMuscleTickers } from '@/src/data/progress-muscle-tickers';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -208,6 +211,8 @@ export const sortExerciseListItems = (
 
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
+  muscleTickers?: ProgressMuscleTickers | null;
+  muscleTickerStatus?: MuscleTickerStatus;
   onRetry?: () => void;
   period: ProgressPeriod;
   targetWindowWeeks?: number;
@@ -267,6 +272,8 @@ function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup
 
 export function StatsScreenShell({
   summary,
+  muscleTickers,
+  muscleTickerStatus,
   onRetry,
   period,
   targetWindowWeeks = 4,
@@ -397,6 +404,7 @@ export function StatsScreenShell({
           exercises={exerciseMappings} muscles={summary?.muscles ?? []}
           items={filteredExerciseListItems}
           selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
+          tickers={muscleTickers} tickerStatus={muscleTickerStatus} tickerWeeks={targetWindowWeeks}
           grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
@@ -611,6 +619,7 @@ function StatsContent() {
   const revision = useBodyWeightContextRevision();
   const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload, summaryGymId);
+  const tickers = useMuscleTickers(filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list', summaryGymId);
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
@@ -632,7 +641,7 @@ function StatsContent() {
     const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(catalog.muscleGroups);
     return new Map(catalog.exercises.map(item => [item.id, buildExerciseCatalogSearchText(item, muscleGroupsById)]));
   }, [catalog.exercises, catalog.muscleGroups]);
-  return <StatsScreenShell {...summary} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
+  return <StatsScreenShell {...summary} muscleTickers={tickers.data} muscleTickerStatus={tickers.status} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
     exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
