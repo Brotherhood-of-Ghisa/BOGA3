@@ -332,6 +332,28 @@ describe('Today: the day changing while it is open', () => {
     act(() => jest.advanceTimersByTime(48 * 60 * 60 * 1000));
     expect(loadProgress).toHaveBeenCalledTimes(3);
   });
+
+  it('aims the midnight read again when the app returns to the foreground', () => {
+    let onAppState: ((state: AppStateStatus) => void) | undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      onAppState = listener as (state: AppStateStatus) => void;
+      return { remove: jest.fn() };
+    });
+    jest.useFakeTimers({ now: NOW });
+    const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
+    render(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
+
+    // Suspended at noon, back at 22:00 the same day with the clock moved but the timer not counted.
+    jest.setSystemTime(local(2026, 10, 16, 22));
+    act(() => onAppState?.('active'));
+    expect(loadProgress).toHaveBeenCalledTimes(2);
+    // Two hours on is midnight: one read, not the stale 12-hour one.
+    act(() => jest.advanceTimersByTime(2 * 60 * 60 * 1000));
+    expect(loadProgress).toHaveBeenCalledTimes(3);
+    expect(loadProgress.mock.calls[2][0]).toEqual(local(2026, 10, 17));
+    act(() => jest.advanceTimersByTime(10 * 60 * 60 * 1000));
+    expect(loadProgress).toHaveBeenCalledTimes(3);
+  });
 });
 
 

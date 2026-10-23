@@ -90,8 +90,8 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 
 // The fixed period ([[comparison.window]]): its range against the previous
 // period's; its working sets so far against the previous period at the same
-// day (a signed absolute difference, never a percentage) beside the previous
-// period's whole total; and the cumulative lines by day.
+// day ([[comparison.change-display]]) beside the previous period's whole
+// total; and the cumulative lines by day.
 export function PeriodPace({ period }: { period: TodayProgressPeriod }) {
   const dateFormat = useDateFormat();
   const [width, setWidth] = useState(FALLBACK_CHART_WIDTH);

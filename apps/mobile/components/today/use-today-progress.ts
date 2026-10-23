@@ -64,11 +64,9 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
   useEffect(() => {
     if (!isFocused) return;
     void read();
-    const foreground = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void read();
-    });
     let midnight: ReturnType<typeof setTimeout> | undefined;
     const readAtMidnight = () => {
+      clearTimeout(midnight);
       const current = nowRef.current();
       midnight = setTimeout(() => {
         void read();
@@ -76,6 +74,12 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
       }, startOfLocalDay(current, 1).getTime() - current.getTime());
     };
     readAtMidnight();
+    // A suspended app's timer may not count the time away: aim it again on return.
+    const foreground = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      void read();
+      readAtMidnight();
+    });
     return () => {
       generationRef.current += 1;
       foreground.remove();

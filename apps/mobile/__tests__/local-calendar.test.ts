@@ -8,7 +8,7 @@ import {
   localDaysBetween,
   localPeriodWindow,
   localWeekWindow,
-  PERIOD_ANCHOR,
+  periodAnchor,
   startOfLocalDay,
 } from '@/src/utils/local-calendar';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
@@ -59,8 +59,8 @@ describe('localWeekWindow', () => {
 
 describe('localPeriodWindow', () => {
   it('starts at Monday 29 December 2025, the first day of ISO week 1 of 2026', () => {
-    expect(PERIOD_ANCHOR).toEqual(local(2025, 12, 29));
-    expect(PERIOD_ANCHOR.getDay()).toBe(1);
+    expect(periodAnchor()).toEqual(local(2025, 12, 29));
+    expect(periodAnchor().getDay()).toBe(1);
     expect(localPeriodWindow(local(2025, 12, 29), 4)).toEqual({ start: local(2025, 12, 29), end: local(2026, 1, 26) });
     expect(localPeriodWindow(local(2025, 12, 28, 23, 59), 4)).toEqual({ start: local(2025, 12, 1), end: local(2025, 12, 29) });
   });
