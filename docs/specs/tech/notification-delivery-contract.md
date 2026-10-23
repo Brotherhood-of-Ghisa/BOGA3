@@ -74,7 +74,9 @@ failing personal sync. A publication builds its source graph once and shares
 it with its score writes and both capture passes for all workouts; raw sources
 are revalidated once, after all of its writes. Each pass rechecks live
 disclosure per workout and at its final boundary; a mismatch rolls back the
-publication. Standalone rank/capture helpers still resolve current sources and
+publication. Within one statement (one snapshot) a capture rank, baseline or
+control asks disclosure once per member and definition, never per score row.
+Standalone rank/capture helpers still resolve current sources and
 revalidate them at both boundaries.
 Final net movements are intersected with a same-direction
 causal comparison that restores its original published contribution while

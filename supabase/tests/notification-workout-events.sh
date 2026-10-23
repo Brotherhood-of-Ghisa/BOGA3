@@ -1013,11 +1013,15 @@ assert_sql 'retry captures one coherent actual board for both workouts' "select 
   where member_user_id='${B_UID}' and session_id in('${COMMON_A}','${COMMON_B}') and group_exercise_id='${X1}';"
 # A publication builds its source graph twice: once before its writes and once
 # for the final source check, which still rejects a source moved after the first.
+# Next to a bodyweight-aware comparison, capture asks disclosure once per
+# definition per statement (32 calls a publish), never once per score row: the
+# per-row form made 20,824 calls over this 1,300-set history.
 PUBLISH_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
   <"${SUPABASE_DIR}/tests/group-metric-publish-benchmark.sql" | grep '^\[')" || fail 'publish benchmark fixture failed'
-jq -e 'length==4 and all(.[];.graph_calls==2) and all(.[0:3][];.completed==true and .rejected==null)
-  and .[3].rejected=="P0001 notification capture source moved"' <<<"${PUBLISH_SAMPLES}" >/dev/null ||
-  fail "publish graph reuse or late source check regressed: ${PUBLISH_SAMPLES}"
+jq -e 'length==5 and all(.[];.graph_calls==2) and all(.[0:3][],.[4];.completed==true and .rejected==null)
+  and .[3].rejected=="P0001 notification capture source moved" and .[4].step=="disclosure"
+  and all(.[];.redaction_calls<=40)' <<<"${PUBLISH_SAMPLES}" >/dev/null ||
+  fail "publish graph reuse, late source check or disclosure reuse regressed: ${PUBLISH_SAMPLES}"
 # With nobody training, a sweep writes nothing and calls no worker, and worker
 # preparation reads the same few pages however many workouts and sessions exist.
 IDLE_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
