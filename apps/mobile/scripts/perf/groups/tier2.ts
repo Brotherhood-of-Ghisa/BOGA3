@@ -5,8 +5,8 @@
 // runs. Last, both pg_cron sweeps run on a 10-second schedule for a few ticks
 // to measure idle cost with cron's own bookkeeping. Counters come from
 // pg_stat_statements (top-level statements, the harness's own tagged and
-// excluded), pg_stat_user_tables, the WAL position and pg_stat_activity
-// samples. Everything the run changes is restored and its data deleted.
+// excluded), pg_stat_user_tables, the WAL position (also sampled per idle
+// tick) and pg_stat_activity samples. Everything the run changes is restored and its data deleted.
 
 import crypto from 'node:crypto';
 
@@ -105,6 +105,25 @@ export const percentile = (values: readonly number[], p: number): number | null 
 /** Distinct 2-minute windows in an hour holding a WAL-writing tick: the forced archives archive_timeout=2min costs. */
 export const forcedArchivesPerHour = (minutesWithWal: readonly number[]): number =>
   new Set(minutesWithWal.map((minute) => Math.floor(minute / 2))).size;
+
+/** One poll of the idle window: cron runs finished so far, and WAL bytes written since the window began. */
+export type TickSample = { runs: number; walBytes: number };
+
+/**
+ * The forced archives of an hour whose ticks fire in `minutes`: its 2-minute
+ * windows holding a tick, times the share of polls that saw a tick finish and
+ * the WAL position advance. A run that wrote nothing forces no archive.
+ */
+export const projectedForcedArchives = (samples: readonly TickSample[], minutes: readonly number[]): number => {
+  let ticked = 0;
+  let wrote = 0;
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i].runs === samples[i - 1].runs) continue;
+    ticked += 1;
+    if (samples[i].walBytes > samples[i - 1].walBytes) wrote += 1;
+  }
+  return ticked === 0 ? 0 : Math.round((forcedArchivesPerHour(minutes) * wrote) / ticked);
+};
 
 type Snapshot = {
   at: number;
@@ -470,10 +489,19 @@ export class Tier2Run {
     if (new Set(rates).size > 1) throw new Error(`cron jobs run at different rates (${rates.join(', ')}); measure them one at a time`);
     const before = await snapshot(this.admin);
     for (const job of jobs) await this.admin.query(`${TAG} select cron.alter_job($1, schedule => '10 seconds')`, [job.jobid]);
+    const samples: TickSample[] = [];
+    const sample = async () => {
+      const [row] = (await this.admin.query(`${TAG} select count(*) filter (where status in ('succeeded','failed'))::int as runs,
+        pg_wal_lsn_diff(pg_current_wal_lsn(), $1::pg_lsn)::float8 as wal from cron.job_run_details where runid > $2`,
+      [before.lsn, before.cronRunId])).rows;
+      samples.push({ runs: row.runs, walBytes: row.wal });
+    };
+    await sample();
     const deadline = Date.now() + this.options.idleTicks * 10000 + 60000;
     let ticks: Record<string, number> = {};
     while (Date.now() < deadline) {
       await sleep(2000);
+      await sample();
       const rows = (await this.admin.query(`${TAG} select j.jobname, count(*)::int as n from cron.job_run_details d join cron.job j using (jobid)
         where d.runid > $1 group by 1`, [before.cronRunId])).rows;
       ticks = Object.fromEntries(rows.map((row) => [row.jobname as string, row.n as number]));
@@ -486,10 +514,9 @@ export class Tier2Run {
     const meanTicks = jobs.reduce((sum, job) => sum + (counters.cronRuns[job.jobname] ?? 0), 0) / Math.max(1, jobs.length);
     if (meanTicks === 0) throw new Error('no cron tick ran during the idle window');
     const perHour = scaleWindow(counters, rates[0] / meanTicks);
-    const walMinutes = counters.walBytes > 0 ? jobs.flatMap((job) => cronMinutes(job.schedule)) : [];
     return {
       ticks: counters.cronRuns, schedules: Object.fromEntries(jobs.map((job) => [job.jobname, job.schedule])), perHour,
-      forcedArchivesPerHour: forcedArchivesPerHour(walMinutes),
+      forcedArchivesPerHour: projectedForcedArchives(samples, jobs.flatMap((job) => cronMinutes(job.schedule))),
     };
   }
 

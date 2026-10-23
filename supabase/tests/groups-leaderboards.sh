@@ -704,6 +704,25 @@ expect_sql "every bulk session is normalized" \
   "select count(distinct session_id) from app_public.group_set_facts
     where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" "${BULK}"
 expect_sql "the sweep does not kick when facts are current" "select app_public.group_eval_sweep();" "f"
+# An idle sweep reads one index probe, not every fact: the stale-session scan
+# runs only once some fact is older than the recorded version.
+expect_sql "the sweep scans for stale sessions only when an older fact exists" \
+  "begin; set local track_functions = 'all';
+   update app_public.group_set_facts set rules_version = s.rules_version
+     from app_public.group_eval_rules_state s where group_set_facts.rules_version < s.rules_version;
+   select app_public.group_eval_sweep();
+   select coalesce(sum(calls), 0) from pg_stat_xact_user_functions
+    where funcid = 'app_public.group_eval_rules_stale(integer,integer)'::regprocedure;
+   update app_public.group_set_facts set rules_version = s.rules_version - 1
+     from app_public.group_eval_rules_state s
+    where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-bulk-1';
+   select app_public.group_eval_sweep();
+   select coalesce(sum(calls), 0) from pg_stat_xact_user_functions
+    where funcid = 'app_public.group_eval_rules_stale(integer,integer)'::regprocedure;
+   rollback;" "f
+0
+t
+1"
 # Facts as the previous rules version wrote them.
 run_psql "update app_public.group_set_facts set rules_version = 5
            where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" >/dev/null

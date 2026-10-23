@@ -9,7 +9,9 @@ import { cronMinutes, runsPerHour } from '../scripts/perf/groups/cron';
 import { FIXTURE_EXERCISES, FIXTURE_SPLITS, fixtureStatements, validateFixtureSpec } from '../scripts/perf/groups/fixture';
 import { rpcCall } from '../scripts/perf/groups/session';
 import { pushEntities, scenarioIncomplete, type StepResult } from '../scripts/perf/groups/tier1';
-import { forcedArchivesPerHour, mintToken, percentile, scaleWindow, statementFunction, type WindowCounters } from '../scripts/perf/groups/tier2';
+import {
+  forcedArchivesPerHour, mintToken, percentile, projectedForcedArchives, scaleWindow, statementFunction, type WindowCounters,
+} from '../scripts/perf/groups/tier2';
 
 describe('cron rates', () => {
   test.each([
@@ -42,6 +44,17 @@ describe('cron rates', () => {
     expect(forcedArchivesPerHour(cronMinutes('*/5 * * * *'))).toBe(12);
     expect(forcedArchivesPerHour([0, 1, 2, 3])).toBe(2);
     expect(forcedArchivesPerHour([])).toBe(0);
+  });
+
+  test('projected forced archives count only the ticks that advanced the WAL position', () => {
+    const minutes = cronMinutes('*/5 * * * *');
+    const poll = (runs: number, walBytes: number) => ({ runs, walBytes });
+    // Every finished tick wrote: every window with a tick forces an archive.
+    expect(projectedForcedArchives([poll(0, 0), poll(2, 900), poll(4, 1800)], minutes)).toBe(12);
+    // Polls with no finished tick are not ticks, whatever WAL they saw.
+    expect(projectedForcedArchives([poll(0, 0), poll(0, 500), poll(2, 500), poll(4, 900)], minutes)).toBe(6);
+    expect(projectedForcedArchives([poll(0, 0), poll(2, 0), poll(4, 0)], minutes)).toBe(0);
+    expect(projectedForcedArchives([poll(0, 0)], minutes)).toBe(0);
   });
 });
 

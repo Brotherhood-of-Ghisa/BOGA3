@@ -1023,12 +1023,14 @@ jq -e 'length==5 and all(.[];.graph_calls==2) and all(.[0:3][],.[4];.completed==
   and all(.[];.redaction_calls<=40)' <<<"${PUBLISH_SAMPLES}" >/dev/null ||
   fail "publish graph reuse, late source check or disclosure reuse regressed: ${PUBLISH_SAMPLES}"
 # With nobody training, a sweep writes nothing and calls no worker, and worker
-# preparation reads the same few pages however many workouts and sessions exist.
+# preparation reads the same few pages however many workouts, sessions and
+# accepted pushes exist.
 IDLE_SAMPLES="$(docker exec -i "${DB_CONTAINER}" psql -X -U postgres -d postgres -Atq -v ON_ERROR_STOP=1 -f - \
   <"${SUPABASE_DIR}/tests/notification-idle-benchmark.sql" | grep '^\[')" || fail 'idle benchmark fixture failed'
-jq -e 'length==7 and all(.[0:6][];.rows_written==0 and .proof_calls==0 and .graph_calls==0 and .worker_posts==0 and .temp_pages==0)
-  and all(.[]|select(.step=="prepare");.pages<=20) and all(.[]|select(.step=="sweep");.pages<=1000)
-  and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25 and .[6].worker_posts==1' <<<"${IDLE_SAMPLES}" >/dev/null ||
+jq -e 'length==9 and all(.[0:8][];.rows_written==0 and .proof_calls==0 and .graph_calls==0 and .worker_posts==0 and .temp_pages==0)
+  and all(.[]|select(.step=="prepare");.pages<=20) and all(.[]|select(.step|test("sweep$"));.pages<=1000)
+  and .[4].sessions>2*.[2].sessions and .[4].pages<=.[2].pages*1.25
+  and ([.[]|select(.step=="receipts_sweep")]|length==2 and .[1].pages<=.[0].pages+5) and .[8].worker_posts==1' <<<"${IDLE_SAMPLES}" >/dev/null ||
   fail "idle notification background regressed: ${IDLE_SAMPLES}"
 printf '[notification-workout-events] idle benchmark (server-wide WAL is diagnostic): %s\n' "${IDLE_SAMPLES}"
 # Restore each workout's original published contribution when testing which movement that workout caused.

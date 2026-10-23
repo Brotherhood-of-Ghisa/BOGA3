@@ -6,7 +6,9 @@
 -- output: an idle sweep writes nothing and calls no worker, and preparation
 -- work does not grow with recent workouts or history. Each sample reports
 -- buffer pages (EXPLAIN BUFFERS, nested calls included), rows written, proof/graph
--- calls and worker posts. Server-wide WAL growth is diagnostic only. It touches
+-- calls and worker posts. Server-wide WAL growth is diagnostic only. Accepted
+-- pushes of the last 30 days stay ticketed until pruning, so the idle sweep is
+-- measured again over 100 and then 1,000 of them. It touches
 -- no admission internals, so it also measures schemas that predate them. A final positive control starts a workout, so that sweep
 -- must call the worker. It empties the notification tables first, inside its
 -- rolled-back transaction, so other fixtures' work cannot make the sweep due.
@@ -98,6 +100,26 @@ begin
     app_public.notification_intents,app_public.notification_deliveries,app_public.notification_installations;
 end $$;
 
+-- p_count accepted pushes from member 2 to member 1, one a day apart within
+-- the last 30 days: receipts settled, ticket kept until the 30-day prune.
+create function pg_temp.add_receipts(p_prefix text,p_count int) returns void language plpgsql as $$
+begin
+  insert into app_public.notification_installations(id,capability_hash,user_id,auth_session_id,encryption_key,token,
+    environment,project_id,bundle_id,permission,opted_in)
+  select gen_random_uuid(),'\x00',m.member,gen_random_uuid(),'idle-key','idle-token-'||m.member::text,
+    'development',gen_random_uuid(),'idle.benchmark',true,true from idle_members m
+  where m.n=1 and not exists(select 1 from app_public.notification_installations i where i.user_id=m.member);
+  insert into app_public.notification_intents(recipient_user_id,lifter_user_id,session_id,kind,event_at,expires_at)
+  select r.member,l.member,p_prefix||'-'||k,'completion',now()-make_interval(hours=>24+k*24*29/p_count),
+    now()-make_interval(hours=>k*24*29/p_count)
+  from idle_members r join idle_members l on l.n=2 cross join generate_series(1,p_count) k where r.n=1;
+  insert into app_public.notification_deliveries(intent_id,installation_id,binding_id,generation,state,provider,ticket_id,ticket_at)
+  select n.id,i.id,i.binding_id,1,'receipt_ok','local','ticket-'||n.id,n.event_at+interval '1 minute'
+  from app_public.notification_intents n join idle_members r on r.member=n.recipient_user_id
+  join app_public.notification_installations i on i.user_id=r.member where n.session_id like p_prefix||'-%';
+  analyze app_public.notification_intents,app_public.notification_deliveries,app_public.notification_installations;
+end $$;
+
 create temporary table idle_samples(step text,sessions int,recent int,pages bigint,temp_pages bigint,
   rows_written bigint,wal_kb numeric,worker_posts bigint,proof_calls bigint,graph_calls bigint);
 create function pg_temp.measure(p_step text,p_sql text) returns void language plpgsql as $$
@@ -145,6 +167,15 @@ select pg_temp.add_sessions('history-b',120,(select stamp from idle_fixture)-864
 select pg_temp.settle();
 select pg_temp.measure('sweep','select app_public.notification_sweep()');
 select pg_temp.measure('prepare','select app_public.notification_workout_prepare(20)');
+-- A month of accepted pushes, then ten times as many: the idle sweep must not
+-- read more. Each is measured warm, so a few pages of growth are not lost in
+-- the catalog reloads the fixture's analyze causes.
+select pg_temp.add_receipts('receipts-a',100);
+select app_public.notification_sweep();
+select pg_temp.measure('receipts_sweep','select app_public.notification_sweep()');
+select pg_temp.add_receipts('receipts-b',900);
+select app_public.notification_sweep();
+select pg_temp.measure('receipts_sweep','select app_public.notification_sweep()');
 -- Positive control: a workout starting now makes the next sweep call the worker.
 insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
 select m.member,'starting-now','active',f.stamp,f.stamp,f.stamp,f.stamp from idle_fixture f join idle_members m on m.n=2;
