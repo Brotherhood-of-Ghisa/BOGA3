@@ -71,10 +71,11 @@ describe('week blocks and groups', () => {
 });
 
 describe('useWeekSets over local data', () => {
-  // 9 Oct 2026 10:00 is a Friday: this month's sessions on the 1st, 3rd, 5th, 7th and this morning.
+  // 9 Oct 2026 10:00 is a Friday in the 4-week period from 5 Oct: sessions on the 5th, 7th and this morning;
+  // the previous period's every third day from 8 Sep reaches 29 Sep and 2 Oct.
   const seed = async () => {
     await bootLocalApp();
-    await act(async () => { await seedTodayProgressFixture({ now: new Date(2026, 9, 9, 10) }); });
+    await act(async () => { await seedTodayProgressFixture({ now: new Date(2026, 9, 9, 10), periodWeeks: 4 }); });
   };
 
   it('reads the selected week of an exercise, then of a muscle', async () => {
@@ -85,19 +86,19 @@ describe('useWeekSets over local data', () => {
     expect(result.current.groups.map(group => [group.title, group.detail, group.workingSetCount, group.rows.length])).toEqual([
       ['05-10-2026', 'Canal Street Gym', 3, 3], ['07-10-2026', 'Canal Street Gym', 3, 3], ['09-10-2026', 'Canal Street Gym', 3, 3],
     ]);
-    // Bench steps up to 87.5 on 5 Oct: as on View Session, the record set is highlighted and the card's band
-    // carries one line for it (1RM and top weight) and a separate Volume line; the repeats that week hold none.
+    // Bench steps up to 87.5 this morning: as on View Session, the record set is highlighted and the card's band
+    // carries one line for it (1RM and top weight) and a separate Volume line; the earlier sessions that week hold none.
     const [first, second, third] = result.current.groups;
-    expect(first.record.map(line => line.label)).toEqual([expect.stringMatching(/^New 1RM · [\d.]+ \+ top weight$/), expect.stringMatching(/^New volume record · /)]);
-    expect(first.record[0].set).toBe('87.5 × 5');
-    expect(first.rows.map(row => [row.oneRepMaxRecord, row.weightRecord])).toEqual([[true, true], [false, false], [false, false]]);
-    expect([second.record, third.record]).toEqual([[], []]);
+    expect(third.record.map(line => line.label)).toEqual([expect.stringMatching(/^New 1RM · [\d.]+ \+ top weight$/), expect.stringMatching(/^New volume record · /)]);
+    expect(third.record[0].set).toBe('87.5 × 5');
+    expect(third.rows.map(row => [row.oneRepMaxRecord, row.weightRecord])).toEqual([[true, true], [false, false], [false, false]]);
+    expect([first.record, second.record]).toEqual([[], []]);
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: '2026-09-28' });
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.groups.map(group => [group.title, group.detail])).toEqual([
-      ['Barbell Bench Press', '29-09-2026'], ['Barbell Bench Press', '01-10-2026'], ['Barbell Bench Press', '03-10-2026'],
+      ['Barbell Bench Press', '29-09-2026'], ['Barbell Bench Press', '02-10-2026'],
     ]);
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: null });

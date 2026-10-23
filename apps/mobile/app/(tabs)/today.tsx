@@ -149,7 +149,7 @@ function TodayProgressSection({
       <Card>
         <StatePanel
           action={{ label: 'Open Train', onPress: onOpenTrain, testID: 'today-empty-open-train' }}
-          body="Log a workout and your sessions, working sets and PRs show up here, against last month."
+          body="Log a workout and your sessions, working sets and PRs show up here, against your last period."
           fill={false}
           testID="today-progress-empty"
           title="Your week starts here"

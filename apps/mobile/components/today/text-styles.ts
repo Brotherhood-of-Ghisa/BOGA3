@@ -15,7 +15,7 @@ export const todayText = StyleSheet.create({
     textTransform: 'uppercase',
     color: uiRoles.inkMuted,
   },
-  // A block's own label (`This week`, `October so far`, `Latest session`).
+  // A block's own label (`This week`, the period's range, `Latest session`).
   microLabelStrong: {
     color: uiRoles.ink,
   },
@@ -29,7 +29,7 @@ export const todayText = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxl,
     color: uiRoles.ink,
   },
-  // The month's difference, beside its headline.
+  // The period's difference, beside its headline, and the last period's total.
   differenceFigure: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '700',

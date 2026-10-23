@@ -1,6 +1,6 @@
 /**
- * Calendar windows in the device's time zone: Monday-start weeks and calendar
- * months. Each window is half-open, `start <= t < end`, and both edges are
+ * Calendar windows in the device's time zone: Monday-start weeks and fixed
+ * periods of whole weeks. Each window is half-open, `start <= t < end`, and both edges are
  * built from local date fields, so a DST change lengthens or shortens the
  * window instead of moving its edges off local midnight.
  */
@@ -28,20 +28,32 @@ export const localWeekWindow = (now: Date, offset = 0): LocalWindow => {
   };
 };
 
-/** The 1st 00:00 to the next month's 1st 00:00 around `now`; `offset` -1 is last month. */
-export const localMonthWindow = (now: Date, offset = 0): LocalWindow => {
-  ensureValidDate(now);
-  return {
-    start: new Date(now.getFullYear(), now.getMonth() + offset, 1),
-    end: new Date(now.getFullYear(), now.getMonth() + offset + 1, 1),
-  };
-};
-
-/** Days in the local month that `date` falls in. */
-export const daysInLocalMonth = (date: Date): number => {
-  ensureValidDate(date);
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-};
-
 export const isInWindow = (instant: Date, window: LocalWindow): boolean =>
   instant.getTime() >= window.start.getTime() && instant.getTime() < window.end.getTime();
+
+/** Monday 29 December 2025, the first day of ISO week 1 of 2026: the first day of a Today period. */
+export const PERIOD_ANCHOR = new Date(2025, 11, 29);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Whole local calendar days from `from`'s day to `to`'s day; DST never shifts the count. */
+export const localDaysBetween = (from: Date, to: Date): number => {
+  ensureValidDate(from);
+  ensureValidDate(to);
+  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((day(to) - day(from)) / DAY_MS);
+};
+
+/**
+ * The fixed `weeks`-week period around `now` ([[comparison.window]]): periods
+ * run back to back from `PERIOD_ANCHOR` (and before it), never resetting at a
+ * new year. `offset` -1 is the previous period.
+ */
+export const localPeriodWindow = (now: Date, weeks: number, offset = 0): LocalWindow => {
+  if (!Number.isInteger(weeks) || weeks < 1) throw new Error('weeks must be a positive whole number');
+  const days = weeks * 7;
+  const index = Math.floor(localDaysBetween(PERIOD_ANCHOR, now) / days) + offset;
+  const anchor = (shift: number) =>
+    new Date(PERIOD_ANCHOR.getFullYear(), PERIOD_ANCHOR.getMonth(), PERIOD_ANCHOR.getDate() + shift);
+  return { start: anchor(index * days), end: anchor((index + 1) * days) };
+};

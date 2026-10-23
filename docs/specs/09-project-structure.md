@@ -210,7 +210,7 @@ Define the canonical repository structure, path ownership, and placement convent
     one reserved value (`NO_GYM_ROUTE_PARAM`) and decode it straight back. The
     coaching API has no no-gym scope ([[gym.split]]) and rejects `none`.
 - `apps/mobile/src/utils/local-calendar.ts`
-  - canonical local calendar windows: Monday-start weeks and calendar months in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
+  - canonical local calendar windows: Monday-start weeks and Today's fixed periods of whole weeks in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
   - Jest runs in `Europe/London` (pinned in `apps/mobile/jest.config.js`, locally and in CI), so calendar tests cover both DST changes.
 - `e2e/` (reserved)
   - reserved for cross-stack orchestration/tests that span mobile + backend.

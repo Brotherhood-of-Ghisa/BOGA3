@@ -8,7 +8,7 @@ export {
   type SessionPersonalRecord,
   type TodayProgress,
   type TodayProgressInput,
-  type TodayProgressMonth,
+  type TodayProgressPeriod,
   type TodayProgressWeek,
 } from './calculations';
 export {

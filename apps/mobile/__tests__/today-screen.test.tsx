@@ -13,6 +13,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -127,7 +128,7 @@ describe('Today: the Progress card over real data', () => {
 
     expect(text('today-progress-empty')).toBeTruthy();
     expect(screen.getByText('Your week starts here')).toBeTruthy();
-    expect(screen.getByText('Log a workout and your sessions, working sets and PRs show up here, against last month.')).toBeTruthy();
+    expect(screen.getByText('Log a workout and your sessions, working sets and PRs show up here, against your last period.')).toBeTruthy();
     expect(screen.queryByTestId('today-progress-card')).toBeNull();
 
     fireEvent.press(text('today-empty-open-train'));
@@ -163,42 +164,48 @@ describe('Today: the Progress card over real data', () => {
     expect(prs.fill).toHaveStyle({ width: '100%' });
   });
 
-  it('keeps the calendar month when the configured Progress period changes', async () => {
+  it('compares this fixed period so far with the previous period at the same day', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+
+    // 4-week periods from Monday 29 Dec 2025: Friday 16 Oct is day 12 of 5 Oct – 1 Nov.
+    expect(text('today-progress-period-range')).toHaveTextContent('05-10-2026 – 01-11-2026');
+    expect(text('today-progress-period-previous-range')).toHaveTextContent('vs 07-09-2026 – 04-10-2026');
+    // This period: 3 sessions, 18 working sets. The previous one to its 12th day (18 Sep): none; all of it: 20 Sep's 6.
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+18');
+    // Ahead of the pace is an improvement, in the one colour every change
+    // figure uses for one (`design-language.md` §6).
+    expect(text('today-progress-period-difference')).toHaveStyle({ color: uiRoles.gain });
+    expect(text('today-progress-period-pace')).toHaveTextContent("ahead of last period's pace");
+    expect(text('today-progress-period-previous-total')).toHaveTextContent('6 sets');
+    // The spoken label carries the projection the chart draws (18 over 12 days, across 28: 42).
+    expect(text('today-progress-chart')).toHaveProp(
+      'accessibilityLabel',
+      'Cumulative sets: this period 18 by day 12 of 28 against the last period 0 by day 12; the last period finished at 6. On course for 42.',
+    );
+    expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'image');
+  });
+
+  it("takes the period from Settings' Progress period and reads again when it changes", async () => {
     await bootLocalApp();
     await logHistory();
     act(() => updatePreferences({ targetWindowWeeks: 3 }));
     const loadProgress = jest.fn(loadTodayProgress);
     await renderToday({ loadProgress });
-    expect(screen.getByText('October so far')).toBeTruthy();
-    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
+
+    // 3 weeks: 28 Sep – 18 Oct against 7 – 27 Sep; 20 Sep falls before day 19.
+    expect(text('today-progress-period-range')).toHaveTextContent('28-09-2026 – 18-10-2026');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+12');
+
     act(() => updatePreferences({ targetWindowWeeks: 1 }));
-    expect(screen.getByText('October so far')).toBeTruthy();
-    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
-    expect(loadProgress).toHaveBeenCalledTimes(1);
-    expect(text('today-progress-chart').props.accessibilityLabel).toContain('October 18 by the 16th');
-  });
-
-  it('compares the month so far with the previous month at the same day', async () => {
-    await bootLocalApp();
-    await logHistory();
-    await renderToday();
-
-    // October: 3 sessions, 18 working sets, 6 PRs. September to the 16th: 1, 6, 0; all of it: 2, 12, 3.
-    expect(screen.getByText('October so far')).toBeTruthy();
-    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
-    expect(text('today-progress-month-difference')).toHaveTextContent('+12');
-    // Ahead of the pace is an improvement, in the one colour every change
-    // figure uses for one (`design-language.md` §6).
-    expect(text('today-progress-month-difference')).toHaveStyle({ color: uiRoles.gain });
-    expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
-    // No summary line under the chart; its spoken label still carries the
-    // projection the chart draws (18 over 16 days, across 31: 34.9 → 35).
-    expect(screen.queryByTestId('today-progress-month-summary')).toBeNull();
-    expect(text('today-progress-chart')).toHaveProp(
-      'accessibilityLabel',
-      'Cumulative sets: October 18 by the 16th against September 6 by the 16th; September finished at 12. On course for 35.',
-    );
-    expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'image');
+    // 1 week is the calendar week: 15 Oct's 6 sets against last week's 12 by Friday.
+    await waitFor(() => expect(text('today-progress-period-range')).toHaveTextContent('12-10-2026 – 18-10-2026'));
+    expect(text('today-progress-period-difference')).toHaveTextContent('−6');
+    expect(text('today-progress-period-pace')).toHaveTextContent("behind last period's pace");
+    expect(loadProgress.mock.calls).toEqual([[NOW, 3], [NOW, 1]]);
   });
 
   it('shows the latest completed session and opens it, all sessions and the Progress tab', async () => {
@@ -269,22 +276,78 @@ describe('Today: the Progress card over real data', () => {
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15-10-2026 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
-    expect(loadProgress).toHaveBeenLastCalledWith(NOW);
+    expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4);
+  });
+
+  it('reads again when the app returns to the foreground, so a new day moves the windows', async () => {
+    let onAppState: ((state: AppStateStatus) => void) | undefined;
+    const remove = jest.fn();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      onAppState = listener as (state: AppStateStatus) => void;
+      return { remove };
+    });
+    await bootLocalApp();
+    await logHistory();
+    let current = NOW;
+    const loadProgress = jest.fn(loadTodayProgress);
+    const view = await renderToday({ loadProgress, now: () => current });
+    expect(text('today-progress-week-range')).toHaveTextContent('12-10-2026 – 18-10-2026');
+
+    // Opened again on Monday 19 October: a new week, day 15 of the period.
+    current = local(2026, 10, 19, 8);
+    act(() => onAppState?.('background'));
+    expect(loadProgress).toHaveBeenCalledTimes(1);
+    act(() => onAppState?.('active'));
+    await waitFor(() => expect(text('today-progress-week-range')).toHaveTextContent('19-10-2026 – 25-10-2026'));
+    expect(text('today-progress-chart').props.accessibilityLabel).toContain('by day 15 of 28');
+    expect(loadProgress).toHaveBeenLastCalledWith(current, 4);
+
+    view.unmount();
+    expect(remove).toHaveBeenCalled();
   });
 });
 
+describe('Today: the day changing while it is open', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('reads again at each local midnight while focused, and stops when unfocused', () => {
+    jest.useFakeTimers({ now: NOW });
+    const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
+    const view = render(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
+    expect(loadProgress).toHaveBeenCalledTimes(1);
+
+    // Noon to a minute before midnight: no read; midnight: one, dated the new day.
+    act(() => jest.advanceTimersByTime(12 * 60 * 60 * 1000 - 60_000));
+    expect(loadProgress).toHaveBeenCalledTimes(1);
+    act(() => jest.advanceTimersByTime(60_000));
+    expect(loadProgress).toHaveBeenCalledTimes(2);
+    expect(loadProgress.mock.calls[1][0]).toEqual(local(2026, 10, 17));
+    // And again the next midnight.
+    act(() => jest.advanceTimersByTime(24 * 60 * 60 * 1000));
+    expect(loadProgress).toHaveBeenCalledTimes(3);
+
+    view.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
+    act(() => jest.advanceTimersByTime(48 * 60 * 60 * 1000));
+    expect(loadProgress).toHaveBeenCalledTimes(3);
+  });
+});
+
+
 describe('Today: the today-progress harness fixture', () => {
-  it('draws every part of the card, ahead of the previous month', async () => {
+  it('draws every part of the card, ahead of the previous period', async () => {
     await bootLocalApp();
-    // Sep: every third day from the 2nd (10). Oct: every other day from the 1st to the 15th (8), and this morning.
-    await expect(seedTodayProgressFixture({ now: NOW })).resolves.toMatchObject({ sessionCount: 19 });
+    // 7 Sep – 4 Oct: every third day from its 2nd (9). 5 Oct on: every other day to the 15th (6), and this morning.
+    await expect(seedTodayProgressFixture({ now: NOW, periodWeeks: 4 })).resolves.toMatchObject({ sessionCount: 16 });
     await renderToday();
 
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('3');
     expect(text('today-progress-week-sessions-previous')).toHaveTextContent('vs 4 last wk');
     // One bench climb this week: its 1RM, Weight and Volume.
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
-    expect(text('today-progress-month-difference')).toHaveTextContent('+36');
+    // 7 sessions of 9 sets by day 12 against 4 (8, 11, 14 and 17 Sep).
+    expect(text('today-progress-period-difference')).toHaveTextContent('+27');
     expect(text('today-latest-session-start')).toHaveTextContent('16-10-2026 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');
   });
@@ -315,7 +378,7 @@ describe('Today: progress read states', () => {
   });
 
   it('does not read while unfocused', async () => {
-    const loadProgress = jest.fn<Promise<TodayProgress>, [Date]>().mockResolvedValue({ status: 'empty' });
+    const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
     await bootLocalApp();
     render(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
 

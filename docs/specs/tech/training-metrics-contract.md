@@ -73,7 +73,7 @@ volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
 
 **The workout in progress.** Progress's tables, `/progress-history` and
-Today's week and calendar month also count the active session the recorder opens, dated
+Today's week and period also count the active session the recorder opens, dated
 the instant before the read: where finishing it now would date it. It takes no
 PR until completed. Lists (the week drill-down, Sessions, Today's latest
 session), records, the catalogue, groups and coaching read completed sessions
@@ -113,7 +113,7 @@ way.
 | Figure | Scope |
 | --- | --- |
 | Stats `Sessions` and its previous-period delta | whole session |
-| Today week and calendar month `Sessions` | whole session |
+| Today week and period `Sessions` | whole session |
 | Exercise row `Last:` and `<n> sessions`, favourites, Stats exercise table session count | per exercise |
 | Exercise and muscle heatmap cells, exercise block history (and its `limit`), session-comparison baselines | per exercise / per muscle |
 | Exercise session facts rows | per exercise, with either working or volume-included sets; rows with zero working sets do not imply a counted session |
