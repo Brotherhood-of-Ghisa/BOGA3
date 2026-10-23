@@ -89,6 +89,8 @@ describe('training-metric rules have one implementation', () => {
       // Not training figures: a body weight, chart coordinates and set counts.
       'apps/mobile/components/bodyweight/body-weight-screen.tsx',
       'apps/mobile/components/today/progress-format.ts',
+      // Not training figures: GPS coordinates on the developer GPS panel.
+      'apps/mobile/components/session-view/session-gps-panel.tsx',
     ])).toEqual([]);
   });
 

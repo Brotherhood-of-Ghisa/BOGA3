@@ -574,7 +574,8 @@ describe('Session view', () => {
     await openGymSheet();
     await act(async () => {});
 
-    expect(location.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
+    // No suggestion either way; the read budget itself is the acquisition's
+    // own unit test (`session-position.test.ts`).
     expect(screen.getByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
@@ -588,8 +589,6 @@ describe('Session view', () => {
     await openGymSheet();
     await act(async () => {});
 
-    // The acquisition retried the coarse fix before giving up.
-    expect(location.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(3);
     expect(screen.getByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });

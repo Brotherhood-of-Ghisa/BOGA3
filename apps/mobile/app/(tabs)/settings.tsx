@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
@@ -32,7 +32,7 @@ import {
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
@@ -272,6 +272,24 @@ export default function SettingsScreen() {
       </View>
 
       <ProgressSettings key={user ? `account:${user.id}` : 'local'} state={preferences} />
+
+      <View style={styles.section} testID="settings-section-developer-mode">
+        <SectionLabel title="Developer" />
+        <Card>
+          <View style={styles.preference}>
+            <Text allowFontScaling={false} style={styles.fieldLabel}>Developer mode</Text>
+            <Switch
+              accessibilityLabel="Developer mode"
+              onValueChange={(developerMode) => updatePreferences({ developerMode })}
+              testID="settings-developer-mode-switch"
+              value={listPreferences.developerMode}
+            />
+          </View>
+          <Text allowFontScaling={false} style={styles.bodyMuted} testID="settings-developer-mode-description">
+            Shows a GPS diagnostics panel in the session gym picker.
+          </Text>
+        </Card>
+      </View>
 
       <View style={styles.section} testID="settings-section-data-sync">
         <SectionLabel title="Data & sync" />

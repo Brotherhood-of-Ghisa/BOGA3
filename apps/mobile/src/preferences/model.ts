@@ -40,6 +40,7 @@ export type AccountLocalPreferences = {
   restTimerAutoStart: boolean;
   restTimerDurationSec: number;
   repeatingTimerIntervalSec: number;
+  developerMode: boolean;
 };
 export type ExerciseListPreferences = Pick<AccountLocalPreferences, 'sort' | 'showNeverDone' | 'dateFormat' | 'pastRecordsGymScope'>;
 
@@ -66,6 +67,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   restTimerAutoStart: true,
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
   repeatingTimerIntervalSec: DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
+  developerMode: false,
 };
 
 export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFERENCES) as (keyof ExerciseListPreferences)[];
@@ -96,6 +98,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: `Rest timer must be a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`,
+  developerMode: 'Choose whether to show developer tools.',
   repeatingTimerIntervalSec: `Repeating interval must be a whole number of seconds from ${MIN_REPEATING_TIMER_INTERVAL_SECONDS} to ${MAX_REPEATING_TIMER_INTERVAL_SECONDS}.`,
 };
 
@@ -105,7 +108,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
   switch (field) {
     case 'sort': return value === 'name' || value === 'favourite';
     case 'showNeverDone':
-    case 'restTimerAutoStart': return typeof value === 'boolean';
+    case 'restTimerAutoStart':
+    case 'developerMode': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
     case 'weeklyWorkingSetTarget': return isPositiveSafeInteger(value);
