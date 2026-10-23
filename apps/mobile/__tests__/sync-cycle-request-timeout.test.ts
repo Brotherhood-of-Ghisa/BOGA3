@@ -1,14 +1,13 @@
 /**
- * Per-request timeout for the sync RPCs. A request whose connection dies
- * without an error (seen on iOS after the app was suspended mid-request) must
- * not hold the cycle open forever: the cycle ends INTERNAL after
- * SYNC_REQUEST_TIMEOUT_MS with dirty bits and cursors untouched, and the next
- * cycle re-sends the same rows and converges — safe even if the abandoned
- * request lands late, because a re-pushed row at the same timestamp is a
- * server no-op.
+ * A sync RPC cut off by the client's request timeout (see
+ * auth-fetch-with-timeout.test.ts) comes back as postgrest's status-0 error.
+ * The cycle must end INTERNAL with dirty bits and cursors untouched, and the
+ * next cycle re-sends the same rows and converges: a re-pushed row at the
+ * same timestamp is a server no-op, so a push the server did commit before
+ * its response was lost is safe to repeat.
  *
  * Driver: a real in-memory better-sqlite3 database; the Supabase RPC is
- * stubbed and Jest fake timers drive the deadline.
+ * stubbed.
  */
 
 import { eq } from 'drizzle-orm';
@@ -22,7 +21,8 @@ import {
   __resetCycleErrorSignalForTests,
   getCycleErrorCode,
 } from '@/src/sync/cycle-error-signal';
-import { runSyncCycle, SYNC_REQUEST_TIMEOUT_MS, type WireEntity } from '@/src/sync/cycle';
+import { SUPABASE_REQUEST_TIMEOUT_MS } from '@/src/auth/fetch-with-timeout';
+import { runSyncCycle, type WireEntity } from '@/src/sync/cycle';
 
 import {
   createInMemoryDatabase,
@@ -61,7 +61,6 @@ let fixture: InMemoryDatabaseFixture;
 let database: InMemoryTestDatabase;
 
 beforeEach(() => {
-  jest.useFakeTimers();
   __resetClockForTests();
   __resetAuthRequiredSignalForTests();
   __resetCycleErrorSignalForTests();
@@ -81,7 +80,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.useRealTimers();
   fixture.close();
   mockBootstrapState.database = null;
   __resetClockForTests();
@@ -91,7 +89,13 @@ afterEach(() => {
 
 const emptyPage = { data: { entities: [], next_cursor: null, has_more: false }, error: null };
 const pushOk = { data: { ok: true, server_received_at: '2026-05-29T10:00:00.000Z' }, error: null };
-const never = () => new Promise<never>(() => undefined);
+const timeoutMessage = `SupabaseRequestTimeoutError: Supabase request timed out after ${SUPABASE_REQUEST_TIMEOUT_MS} ms`;
+/** What postgrest-js resolves when the client's fetch rejects with the timeout. */
+const timedOut = {
+  data: null,
+  error: { message: timeoutMessage, details: '', hint: '', code: '' },
+  status: 0,
+};
 
 const isGymDirty = (): boolean | undefined =>
   database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get()?.localDirty;
@@ -109,73 +113,39 @@ const cycleResultMessages = (): unknown[] =>
     .filter((params) => params.event === 'sync.cycle_result')
     .map((params) => (params.context as { exception_message?: unknown }).exception_message);
 
-/** Starts a cycle and reports whether it has settled, so a test can assert it is still waiting. */
-const startCycle = () => {
-  const state = { settled: false };
-  const outcome = runSyncCycle().finally(() => {
-    state.settled = true;
-  });
-  return { outcome, state };
-};
-
-describe('sync request timeout', () => {
-  it('ends the cycle INTERNAL when a pull never answers, keeping dirty rows and cursors', async () => {
-    mockRpc.mockImplementation((name: string) => (name === 'sync_pull' ? never() : Promise.resolve(pushOk)));
+describe('a sync request cut off by the client timeout', () => {
+  it('ends the cycle INTERNAL when a pull times out, keeping dirty rows and cursors', async () => {
+    mockRpc.mockImplementation((name: string) => Promise.resolve(name === 'sync_pull' ? timedOut : pushOk));
     const cursorBefore = readPullCursor();
 
-    const { outcome, state } = startCycle();
-    await jest.advanceTimersByTimeAsync(SYNC_REQUEST_TIMEOUT_MS - 1);
-    expect(state.settled).toBe(false);
-
-    await jest.advanceTimersByTimeAsync(1);
-    await expect(outcome).resolves.toBe('internal');
+    await expect(runSyncCycle()).resolves.toBe('internal');
 
     expect(getCycleErrorCode()).toBe('INTERNAL');
-    expect(cycleResultMessages()).toEqual([expect.stringContaining('sync_pull timed out after 30000 ms')]);
+    expect(cycleResultMessages()).toEqual([expect.stringContaining(timeoutMessage)]);
     expect(isGymDirty()).toBe(true);
     expect(readPullCursor()).toEqual(cursorBefore);
     expect(mockRpc.mock.calls.some(([name]) => name === 'sync_push')).toBe(false);
   });
 
-  it('retries a push that never answered and converges even when the abandoned push lands late', async () => {
-    let answerLatePush: (value: typeof pushOk) => void = () => undefined;
-    mockRpc.mockImplementation((name: string) =>
-      name === 'sync_pull'
-        ? Promise.resolve(emptyPage)
-        : new Promise((resolve) => {
-            answerLatePush = resolve;
-          }),
-    );
-
-    const first = startCycle();
-    await jest.advanceTimersByTimeAsync(SYNC_REQUEST_TIMEOUT_MS);
-    await expect(first.outcome).resolves.toBe('internal');
-    expect(cycleResultMessages()).toEqual([expect.stringContaining('sync_push timed out after 30000 ms')]);
-    expect(isGymDirty()).toBe(true);
-
-    // The server finally answers the abandoned push: nothing is listening, so
-    // local state is untouched and the row stays dirty for the retry.
-    answerLatePush(pushOk);
-    await jest.advanceTimersByTimeAsync(0);
-    expect(isGymDirty()).toBe(true);
-
+  it('re-sends a timed-out push unchanged on the next cycle and converges', async () => {
     const pushed: WireEntity[][] = [];
+    let pushAnswer = timedOut as typeof timedOut | typeof pushOk;
     mockRpc.mockImplementation((name: string, args: { entities?: WireEntity[] }) => {
       if (name === 'sync_pull') return Promise.resolve(emptyPage);
       pushed.push(args.entities ?? []);
-      return Promise.resolve(pushOk);
+      return Promise.resolve(pushAnswer);
     });
 
+    await expect(runSyncCycle()).resolves.toBe('internal');
+    expect(cycleResultMessages()).toEqual([expect.stringContaining(timeoutMessage)]);
+    expect(isGymDirty()).toBe(true);
+
+    pushAnswer = pushOk;
     await expect(runSyncCycle()).resolves.toBe('converged');
-    expect(pushed[0]).toEqual([expect.objectContaining({ type: 'gyms', id: 'gym-local', client_updated_at_ms: 50 })]);
+
+    expect(pushed).toHaveLength(2);
+    expect(pushed[1]).toEqual(pushed[0]);
+    expect(pushed[1]).toEqual([expect.objectContaining({ type: 'gyms', id: 'gym-local', client_updated_at_ms: 50 })]);
     expect(isGymDirty()).toBe(false);
-  });
-
-  it('leaves no timer behind when every request answers in time', async () => {
-    mockRpc.mockImplementation((name: string) => Promise.resolve(name === 'sync_pull' ? emptyPage : pushOk));
-
-    await expect(runSyncCycle()).resolves.toBe('converged');
-
-    expect(jest.getTimerCount()).toBe(0);
   });
 });

@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { getAuthStorageKey } from '@/src/utils/app-flavor';
 
+import { createFetchWithTimeout } from './fetch-with-timeout';
 import { getAuthStorageAdapter } from './storage';
 
 export type MobileAuthRuntimeConfig = {
@@ -73,7 +74,10 @@ export const getSupabaseMobileClient = () => {
   supabaseClient = createClient(config.url, config.anonKey, {
     // Sync v4: the 16-entity / five-layer planning topology. The server
     // rejects older protocols with UPDATE_REQUIRED before any row moves.
-    global: { headers: { 'x-boga-sync-protocol': '4' } },
+    // Every request (RPCs and the auth token refresh alike) is bounded by
+    // SUPABASE_REQUEST_TIMEOUT_MS, so a dead connection fails instead of
+    // hanging its caller.
+    global: { headers: { 'x-boga-sync-protocol': '4' }, fetch: createFetchWithTimeout() },
     auth: {
       storage: getAuthStorageAdapter(),
       // Pin the session storage key to the deployment flavor instead of letting
