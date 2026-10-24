@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, within } from '@testing-library/react-native';
 import { aggregateProgressMuscleTickers, muscleTickerBounds, type MuscleTickerSeries } from '@/src/data/progress-muscle-tickers';
 import { aggregateStats } from '@/src/data/stats';
 import { shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
@@ -151,13 +151,19 @@ const rowProps = { muscles: [muscleRow], metric: 'workingSetCount' as const, sel
   onSelect: jest.fn(), onMuscleHistory: jest.fn(), onExerciseHistory: jest.fn(), tickers: tickerData, tickerWeeks: 4 };
 const layout = (id: string, width: number) => act(() => { fireEvent(screen.getByTestId(id), 'layout', { nativeEvent: { layout: { width, height: 100, x: 0, y: 0 } } }); });
 
-it('caps the entire plot at measured table/3 and name width while preserving independent controls and contribution rows', () => {
+it('keeps history beside two-line names, caps the plot and preserves independent controls and paired contributions', () => {
   render(<ProgressTables {...rowProps} />);
   layout('stats-muscle-table-container', 300);
-  layout('stats-muscle-history-back', 160);
+  layout('stats-muscle-history-back', 400);
   expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(100);
   layout('stats-muscle-history-back', 72);
-  expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(72);
+  expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(10);
+  expect(screen.getByTestId('stats-muscle-history-back')).toHaveStyle({ flexDirection: 'row', minHeight: 44 });
+  expect(within(screen.getByTestId('stats-muscle-history-back')).getByText('Back')).toHaveProp('numberOfLines', 2);
+  expect(within(screen.getByTestId('stats-muscle-row-back-periods')).getByTestId('stats-muscle-row-back-previous')).toHaveTextContent('1');
+  expect(screen.getByTestId('stats-contribution-lift-periods')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
+  expect(screen.getAllByRole('header', { name: 'Previous, working sets' })).toHaveLength(2);
   expect(screen.queryByTestId('stats-muscle-ticker-lift')).toBeNull();
   fireEvent.press(screen.getByTestId('stats-muscle-select-back'));
   expect(rowProps.onSelect).toHaveBeenCalledWith('back');
@@ -165,10 +171,33 @@ it('caps the entire plot at measured table/3 and name width while preserving ind
   expect(rowProps.onMuscleHistory).toHaveBeenCalled();
 });
 
+it.each(['pending', 'error', 'loaded'] as const)('keeps comparisons and both actions reachable when ticker data is %s', tickerStatus => {
+  render(<ProgressTables {...rowProps} tickers={null} tickerStatus={tickerStatus} />);
+  expect(screen.queryByTestId('stats-muscle-ticker-back')).toBeNull();
+  expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent('1');
+  expect(screen.getByTestId('stats-muscle-row-back-previous')).toHaveTextContent('1');
+  fireEvent.press(screen.getByRole('link', { name: 'Open Back history' }));
+  expect(rowProps.onMuscleHistory).toHaveBeenLastCalledWith(muscleRow, expect.anything());
+  fireEvent.press(screen.getByRole('button', { name: 'Hide Back contributions' }));
+  expect(rowProps.onSelect).toHaveBeenLastCalledWith('back');
+});
+
+it('draws no chart for incomplete observations and keeps full accessible names', () => {
+  const displayName = 'An exceptionally long muscle name';
+  render(<ProgressTables {...rowProps} muscles={[{ ...muscleRow, displayName }]}
+    tickers={{ ...tickerData, muscles: { back: { workingSetCount: series([null]), totalVolume: series([null]) } } }} />);
+  layout('stats-muscle-table-container', 300);
+  layout('stats-muscle-history-back', 160);
+  expect(screen.queryByTestId('stats-muscle-ticker-back')).toBeNull();
+  expect(screen.getByRole('link', { name: `Open ${displayName} history` })).toBeTruthy();
+  expect(screen.getByRole('button', { name: `Hide ${displayName} contributions` })).toHaveStyle({ minHeight: 44, width: 44 });
+});
+
 it('keeps 3D contributors free of tickers even when ticker data is supplied', () => {
   render(<ProgressMuscleView {...rowProps} muscleLayout="3d" />);
   expect(screen.queryByTestId('stats-muscle-table-container')).toBeNull();
   expect(screen.queryByTestId('stats-muscle-ticker-back')).toBeNull();
+  expect(screen.queryByTestId('stats-contribution-lift-periods')).toBeNull();
 });
 
 

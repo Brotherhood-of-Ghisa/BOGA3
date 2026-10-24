@@ -1,6 +1,6 @@
 import { Fragment, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import { Icon, ListRow, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
@@ -64,7 +64,8 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 };
 
 // Family headers carry no totals: overlapping muscle rows cannot be summed.
-// Name links and contribution disclosures stay separate 44pt targets.
+// List rows pair Now over Previous, with history beside the name. Only Now
+// sorts the paired periods; history and disclosure keep separate 44pt targets.
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
     grouped = true, searchQuery = '', sortMode = 'now-desc', onSort, tickers, tickerWeeks = 4, tickerStatus = 'loaded' } = props;
@@ -75,7 +76,10 @@ export function ProgressTables(props: ProgressTablesProps) {
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, true);
+  const layout: ComparisonLayout = {
+    ...resolveComparisonLayout(tableWidth ? tableWidth + uiSpace.lg * 2 : width, [...rows, ...exercises], metric, true, true),
+    stacked: false, pairedPeriods: true,
+  };
   return <View onLayout={event => setTableWidth(event.nativeEvent.layout.width)} testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
     <ComparisonHeaders layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
@@ -85,8 +89,7 @@ export function ProgressTables(props: ProgressTablesProps) {
     {rows.map((row, index) => <Fragment key={row.muscleGroupId}>
       {grouped && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
         <StatsTableFamily name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
-      <View style={row.muscleGroupId === selectedId ? styles.selected : undefined}
-        testID={`stats-muscle-block-${row.muscleGroupId}`}>
+      <View testID={`stats-muscle-block-${row.muscleGroupId}`}>
         <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
           onSelect={onSelect} onHistory={onMuscleHistory} ticker={tickers?.muscles[row.muscleGroupId]?.[metric]}
           tickerWindow={tickers} tickerStatus={tickerStatus} tickerWeeks={tickerWeeks} tickerWidthCap={tableWidth / 3} />
@@ -94,6 +97,7 @@ export function ProgressTables(props: ProgressTablesProps) {
           testID="stats-contributions" style={styles.contributions}>
           <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
+        {row.muscleGroupId === selectedId ? <View pointerEvents="none" style={styles.selected} /> : null}
       </View>
     </Fragment>)}
   </StatsTable></View>;
@@ -155,22 +159,22 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory, ticker,
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values}
-    trailing={<Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
-      accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
-      testID={`stats-muscle-select-${row.muscleGroupId}`}>
-      <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
-    </Pressable>}>
+  return <View style={styles.compactRow} testID={prefix}>
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       accessibilityHint={muscleTickerDescription(ticker, tickerWeeks, metric, dateFormat, tickerStatus)}
       onLayout={event => setNameWidth(event.nativeEvent.layout.width)}
-      onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
-      <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
+      onPress={() => onHistory(row, name.current)} style={[styles.nameLink, styles.inlineHistory]} testID={`stats-muscle-history-${row.muscleGroupId}`}>
+      <Text allowFontScaling={false} numberOfLines={2} style={[statsTableStyles.name, styles.compactName]}>{row.displayName}</Text>
       {ticker && tickerWindow ? <MuscleTicker series={ticker} start={tickerWindow.start} end={tickerWindow.end}
-        width={Math.min(tickerWidthCap, nameWidth)} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
+        width={Math.min(tickerWidthCap, Math.max(0, nameWidth - uiGeometry.tapTarget - uiSpace.sm) * 0.5)} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
     </Pressable>
-    {layout.stacked ? values : null}
-  </ListRow>;
+    {values}
+    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
+      accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
+      testID={`stats-muscle-select-${row.muscleGroupId}`}>
+      <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
+    </Pressable>
+  </View>;
 }
 
 function ExerciseRow({ row, metric, layout, onHistory, hideRole }: {
@@ -181,13 +185,17 @@ function ExerciseRow({ row, metric, layout, onHistory, hideRole }: {
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
   // No control of its own, and the chevron's axis still kept clear, so a
   // contributor's figures stay under its muscle's.
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={null}>
-    <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
+  const history = <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
-      <Text allowFontScaling={false} style={statsTableStyles.name}>{row.displayName}</Text>
+      <Text allowFontScaling={false} numberOfLines={layout.pairedPeriods ? 2 : undefined} style={statsTableStyles.name}>{row.displayName}</Text>
       {hideRole ? null : <Text allowFontScaling={false} style={styles.role}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>}
-    </Pressable>
-    {layout.stacked ? values : null}
+    </Pressable>;
+  if (layout.pairedPeriods) return <View style={styles.compactRow} testID={prefix}>
+    <View style={statsTableStyles.nameCell}>{history}</View>
+    {values}<View style={styles.chevron} />
+  </View>;
+  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={null}>
+    {history}{layout.stacked ? values : null}
   </ListRow>;
 }
 
@@ -195,7 +203,11 @@ const styles = StyleSheet.create({
   contributions: { backgroundColor: uiRoles.ruleSoft, borderTopWidth: uiBorder.width,
     borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
   // The selected muscle keeps its ink rule, and its contributions hang off it.
-  selected: { borderLeftWidth: uiBorder.width * 3, borderLeftColor: uiRoles.ink },
+  selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: uiRoles.ink },
+  compactRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, paddingHorizontal: uiSpace.md,
+    minHeight: uiGeometry.tapTarget, borderTopWidth: uiBorder.width, borderTopColor: uiRoles.ruleSoft },
+  inlineHistory: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
+  compactName: { flex: 1, minWidth: 0 },
   nameLink: { minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center' },
   chevron: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   role: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
