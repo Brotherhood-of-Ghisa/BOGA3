@@ -1,6 +1,6 @@
 import { asc, eq, isNull } from 'drizzle-orm';
 
-import { bootstrapLocalDataLayer } from './bootstrap';
+import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { BROAD_MUSCLE_PRESET, buildMuscleReportAssignment, type MuscleReportRow } from './muscle-report-presets';
 import { muscleGroups } from './schema';
@@ -67,10 +67,8 @@ export const buildSettingsMuscleSections = (rows: readonly MuscleReportRow[]): S
   return [...sections].map(([family, members]) => ({ family, showHeader: members.length >= 2, muscles: members }));
 };
 
-/** The user's live anatomy entries with their setup columns. */
-export const listMuscleReportRows = async (): Promise<MuscleReportRow[]> => {
-  const database = await bootstrapLocalDataLayer();
-  return database
+const selectRows = (database: Pick<LocalDatabase, 'select'>): MuscleReportRow[] =>
+  database
     .select({
       id: muscleGroups.id,
       displayName: muscleGroups.displayName,
@@ -83,16 +81,18 @@ export const listMuscleReportRows = async (): Promise<MuscleReportRow[]> => {
     .where(isNull(muscleGroups.deletedAt))
     .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))
     .all();
-};
+
+/** The user's live anatomy entries with their setup columns. */
+export const listMuscleReportRows = async (): Promise<MuscleReportRow[]> =>
+  selectRows(await bootstrapLocalDataLayer());
 
 /** Writes `setup(id)` onto every live row it changes; unchanged rows stay clean. */
 const writeRowSetups = async (setup: (row: MuscleReportRow) => RowSetup | null): Promise<void> => {
   const database = await bootstrapLocalDataLayer();
-  const rows = await listMuscleReportRows();
   const now = new Date();
   const changed = database.transaction((tx) => {
     let count = 0;
-    for (const row of rows) {
+    for (const row of selectRows(tx)) {
       const next = setup(row);
       if (!next || (next.reportGroup === row.reportGroup && next.tracked === row.tracked)) continue;
       tx.update(muscleGroups)

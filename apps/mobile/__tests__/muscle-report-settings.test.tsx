@@ -205,7 +205,7 @@ describe('Settings → Progress → Muscles', () => {
     await screen.findByTestId('settings-muscle-preset-row');
     expect(selected('detailed')).toBe(false);
     expect(selected('broad')).toBe(false);
-    expect(screen.getByTestId('settings-muscle-preset-hint')).toHaveTextContent(/neither preset/);
+    expect(screen.getByTestId('settings-muscle-custom')).toHaveTextContent('Custom');
     fireEvent.press(screen.getByTestId('settings-muscle-preset-detailed'));
     await waitFor(() => expect(selected('detailed')).toBe(true));
     expect(stored().get('biceps')?.reportGroup).toBeNull();
@@ -217,6 +217,7 @@ describe('Settings → Progress → Muscles', () => {
     fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
     await screen.findByText('Couldn’t save the change. Try again.');
     expect(selected('detailed')).toBe(true);
+    expect(screen.queryByText('Retry')).toBeNull();
     write.mockRestore();
     fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
     await waitFor(() => expect(selected('broad')).toBe(true));
