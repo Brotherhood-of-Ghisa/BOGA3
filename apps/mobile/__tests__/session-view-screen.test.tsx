@@ -20,7 +20,7 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { Alert } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -83,7 +83,9 @@ import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
-import { gyms, sessions } from '@/src/data/schema';
+import { gyms, muscleGroups, sessions } from '@/src/data/schema';
+import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
 import * as sessionDrafts from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -1274,6 +1276,21 @@ describe('Session vs history', () => {
     expect(screen.queryByTestId(`session-insight-exercise-${BENCH}`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-insight-comparison-unavailable-muscle')).toHaveTextContent(/Pectoralis/);
+  });
+
+  it('groups the open session by the user\'s muscles under Broad', async () => {
+    await seed();
+    for (const muscle of BROAD_MUSCLE_PRESET.muscles) {
+      localDatabase().update(muscleGroups).set({ reportGroup: muscle.key }).where(inArray(muscleGroups.id, [...muscle.entries])).run();
+    }
+    invalidateExerciseCatalogCache();
+    render(<SessionCompareScreen sessionId={SESSION} />);
+
+    await screen.findByTestId('session-insight-comparison-unavailable-exercise');
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    const pooled = await screen.findByTestId('session-insight-comparison-unavailable-muscle');
+    expect(pooled).toHaveTextContent(/Chest/);
+    expect(pooled).not.toHaveTextContent(/Pectoralis/);
   });
 
   it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
