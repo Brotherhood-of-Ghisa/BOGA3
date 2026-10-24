@@ -3,6 +3,7 @@ import { Card, SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from 
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { EffortSettings } from './effort-settings';
+import { MuscleSettingsRow } from './muscle-settings';
 import { PreferenceNumberField } from './number-field';
 
 export function ProgressSettings({ state }: { state: AccountLocalPreferenceState }) {
@@ -28,6 +29,7 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
         value={pending.historyLookbackWeeks ?? values.historyLookbackWeeks}
         onCommit={historyLookbackWeeks => updatePreferences({ historyLookbackWeeks })} />
     </Card>
+    <Card style={styles.card}><MuscleSettingsRow /></Card>
     <Card style={styles.card}><EffortSettings values={{ ...values, ...pending }} /></Card>
   </View>;
 }
