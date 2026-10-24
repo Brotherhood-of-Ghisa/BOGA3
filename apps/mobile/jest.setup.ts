@@ -1,4 +1,5 @@
 import { cleanup, configure } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 
 import { createUncaughtErrorSink } from '@/__tests__/helpers/uncaught-react-errors';
 import {
@@ -10,6 +11,7 @@ import {
 configure({ asyncUtilTimeout: 5000 });
 
 beforeEach(() => {
+  AppState.currentState = 'active';
   __resetAccountLocalPreferencesForTests();
   // The kv-store mock below keeps one store per test file; start each test
   // empty. The launch theme was read at import, before any test.
@@ -49,6 +51,15 @@ afterEach(() => {
 // Worklets installs its native runtime on import; Jest has none, so any suite
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+
+// The timer store is exercised without retaining native audio or screen locks.
+// Its native adapter suite unmocks this boundary and checks the Expo calls.
+jest.mock('@/src/session-recorder/repeating-timer-native', () => ({
+  prepareRepeatingTimerAudio: jest.fn(),
+  playRepeatingTimerCue: jest.fn(),
+  stopRepeatingTimerAudio: jest.fn(),
+  setRepeatingTimerAwake: jest.fn(),
+}));
 
 // Notifications cross the native boundary here; service/controller suites inject its outcomes.
 jest.mock('expo-notifications', () => ({

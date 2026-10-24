@@ -472,6 +472,11 @@ describe('Sheet', () => {
 });
 
 describe('ActionButton', () => {
+  it('enlarges the fullscreen primary action using the house tokens', () => {
+    render(<ActionButton label="Pause" onPress={jest.fn()} size="large" testID="large" variant="primary" />);
+    expect(flatStyle(screen.getByTestId('large')).minHeight).toBe(uiGeometry.tapTarget + uiSpace.xl);
+    expect(flatStyle(screen.getByText('Pause'))).toMatchObject({ fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl });
+  });
   it('draws the one primary on accent, at the control radius and tap-target height', () => {
     const onPress = jest.fn();
     render(<ActionButton label="Edit" onPress={onPress} testID="button" variant="primary" />);

@@ -764,7 +764,7 @@ describe('Session view', () => {
     expect(screen.getByTestId(countdownId)).toHaveTextContent(countdown);
     if (mode === 'repeating') {
       fireEvent.press(screen.getByTestId('repeating-timer-expand'));
-      expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Start');
+      expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Resume');
       fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
       fireEvent.press(screen.getByTestId('repeating-timer-focus-plus'));
       expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('1:15');

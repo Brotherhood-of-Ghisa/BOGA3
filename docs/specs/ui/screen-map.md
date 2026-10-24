@@ -131,7 +131,7 @@ addressable, each resolving to a canonical owner for tab selection.
 
 - **Train never offers Resume.** A workout in progress is *opened*: the Train
   tab goes to it (`mainTabDestination`), and `/train` reached another way
-  replaces itself with it. There is no Resume button anywhere.
+  replaces itself with it.
 - Session-view and exercise-page edits **autosave losslessly** (every row
   kept); only `Finish` / `Done` drop unconfirmed rows (`../05-data-model.md`).
   Both run the shared cleanup prompts, and invalid set values block them.
@@ -196,4 +196,7 @@ addressable, each resolving to a canonical owner for tab selection.
 The session and exercise timer strips expand their repeating readout fullscreen
 (`components/session-recorder/repeating-timer-focus.tsx`). Close, Back and
 accessibility escape collapse without changing the timer; the strip’s dismiss
-control remains separate. This is in-route state, not a new route.
+control remains separate. Phase sits above the countdown-only ring, followed by
+interval controls, a wide Pause/Resume action and bottom Reset. Both presentations
+share the store and [[timer.repeating-cues]] / [[timer.foreground-awake]].
+This is in-route state, not a new route.
