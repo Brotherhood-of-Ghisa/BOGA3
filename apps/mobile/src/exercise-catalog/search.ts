@@ -3,6 +3,9 @@ import {
   SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
 } from '@/src/data/exercise-catalog-seeds';
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
+
+import { reportedMappings } from './muscle-setup';
 
 export const normalizeExerciseSearchWords = (value: string): string[] =>
   value
@@ -23,11 +26,19 @@ export type IndexedExerciseCatalogExercise = ExerciseCatalogExercise & {
   searchText: string;
 };
 
+/**
+ * What an exercise search matches: the exercise name and its primary muscles'
+ * names and families. Given the user's assignment, those are the user's muscles
+ * (looked up in `muscleGroupsById` by muscle id), so no entry inside a merged
+ * muscle and no untracked muscle matches ([[muscle.no-breakdown]]).
+ */
 export const buildExerciseCatalogSearchText = (
   exercise: Pick<ExerciseCatalogExercise, 'name' | 'mappings'>,
-  muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>
+  muscleGroupsById: Record<string, Pick<ExerciseCatalogMuscleGroup, 'displayName' | 'familyName'>>,
+  assignment?: MuscleReportAssignment
 ): string => {
-  const muscleTerms = exercise.mappings.flatMap((mapping) => {
+  const mappings = assignment ? reportedMappings(exercise.mappings, assignment) : exercise.mappings;
+  const muscleTerms = mappings.flatMap((mapping) => {
     if (mapping.role !== 'primary') {
       return [];
     }
