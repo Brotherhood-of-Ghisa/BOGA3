@@ -211,12 +211,12 @@ SEED_PAYLOAD="$(jq -nc \
     {type: "muscle_groups", id: ("pd-" + $tag + "-mg-1"),
      client_updated_at_ms: ($b + 52),
      fields: {display_name: "Pectorals", family_name: "chest",
-              sort_order: 0, is_editable: 0,
+              sort_order: 0, is_editable: 0, report_group: null, tracked: 1,
               created_at: ($b + 52), updated_at: ($b + 52), deleted_at: null}},
     {type: "muscle_groups", id: ("pd-" + $tag + "-mg-2"),
      client_updated_at_ms: ($b + 54),
      fields: {display_name: "Quadriceps", family_name: "legs",
-              sort_order: 1, is_editable: 0,
+              sort_order: 1, is_editable: 0, report_group: "legs", tracked: 0,
               created_at: ($b + 54), updated_at: ($b + 54), deleted_at: null}},
 
     # Layer 2 — sessions (parent for the Layer 3 session_exercises below).

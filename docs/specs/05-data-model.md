@@ -22,8 +22,7 @@ Code owns columns/checks/FKs; this doc owns layering, sync scope and invariants.
    data is the event.
 
 Starter taxonomies sync as ordinary per-user entities. Group projections and
-calculated metrics stay outside the mirror: no derived Volume/1RM column is
-ever stored.
+calculated metrics stay outside the mirror.
 
 Load [`tech/bodyweight-load-contract.md`](tech/bodyweight-load-contract.md)
 when changing bodyweight storage or policy. Its data-model consequence:
@@ -292,6 +291,10 @@ the data-model-level invariants.
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row, which stays isolated and reports no
    history. The session-share PNG is not a database or sync entity.
+10. **A user's muscle setup is `in sync scope`:** `muscle_groups.report_group`
+   (the key of the muscle an entry reports under; null = itself) and `tracked`
+   (default 1). Null and 1 mean per-entry reporting: no backfill. Catalogue
+   seeding and bundle migrations never write either.
 
 ### Entity coverage (Sync v2)
 
@@ -326,9 +329,8 @@ additive column never moves the protocol version: `sync_push` reads named keys
 only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a branch guarding on `_fields ? '<key>'` does, which a new column
 needs so an older writer cannot clear it.
-Server-first additions must also preserve old writers that omit new fields and
-keep unknown entity types out of old-reader pulls: columns alone are not a
-compatibility policy. The kg-only rename was a protocol-3 cutover, not an
+Server-first additions must also keep unknown entity types out of old-reader
+pulls. The kg-only rename was a protocol-3 cutover, not an
 additive change.
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, run by

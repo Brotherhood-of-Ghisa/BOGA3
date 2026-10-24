@@ -32,7 +32,8 @@ and does not offer server-sent event sessions.
 
 Eight read-only tools:
 - `get_training_profile` — training preferences, equipment, gyms.
-- `list_muscles` — the muscle ids exercise mappings name.
+- `list_muscles` — the muscle ids exercise mappings name, each with the
+  person's `report_group` and `tracked` setup.
 - `search_exercises` — database-side filter by name, muscle, equipment; each
   exercise carries `split_by_gym`, `deleted` and its `revision`.
 - `get_exercise_context` — compact recent preview, lifetime PRs and totals.

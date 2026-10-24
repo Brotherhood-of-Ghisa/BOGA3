@@ -545,10 +545,17 @@ interface FieldSpec {
   /** camelCase Drizzle property name on the row object. */
   prop: string;
   kind: 'scalar' | 'timestamp';
+  /**
+   * The pull keeps the local value when an envelope omits the key (a server
+   * predating the column), mirroring the push RPC's omitted-field
+   * preservation: an insert takes the column default, an update leaves it.
+   */
+  keepWhenAbsent?: true;
 }
 
 const TS = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'timestamp' });
 const SC = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'scalar' });
+const KEEP = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'scalar', keepWhenAbsent: true });
 
 /**
  * For each entity, the ordered list of typed columns that appear in the wire
@@ -638,6 +645,8 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('family_name', 'familyName'),
     SC('sort_order', 'sortOrder'),
     SC('is_editable', 'isEditable'),
+    KEEP('report_group', 'reportGroup'),
+    KEEP('tracked', 'tracked'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -800,6 +809,9 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
     localUpdatedAtMs: envelope.client_updated_at_ms,
   };
   for (const spec of ENTITY_FIELDS[type]) {
+    if (spec.keepWhenAbsent && !(spec.wireKey in envelope.fields)) {
+      continue;
+    }
     values[spec.prop] = fromWireValue(envelope.fields[spec.wireKey] ?? null, spec.kind);
   }
   if (

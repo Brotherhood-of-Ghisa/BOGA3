@@ -432,14 +432,14 @@ run_psql "
       ('${USER_B_UUID}'::uuid,'${EXERCISE_B}','User B Secret Lift','total_load',${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.muscle_groups
       (owner_user_id,id,display_name,family_name,sort_order,is_editable,
-       created_at,updated_at,client_updated_at_ms)
+       report_group,tracked,created_at,updated_at,client_updated_at_ms)
     values
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A}','Pectorals','chest',0,0,
-       ${NOW_MS},${NOW_MS},${NOW_MS}),
+       null,1,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A2}','Triceps','arms',1,0,
-       ${NOW_MS},${NOW_MS},${NOW_MS}),
+       'arms',0,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_B_UUID}'::uuid,'${MUSCLE_B}','User B Muscle','arms',0,0,
-       ${NOW_MS},${NOW_MS},${NOW_MS});
+       null,1,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_muscle_mappings
       (owner_user_id,id,exercise_definition_id,muscle_group_id,weight,role,
        created_at,updated_at,client_updated_at_ms)
@@ -1294,6 +1294,10 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_
   and (.data.muscles | map(.id) | index($b)) == null
   and (.data.muscles[] | select(.id == $a) | .family) == "chest"
 ' >/dev/null || fail "muscle list is not the owner taxonomy"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
+  (.data.muscles[] | select(.id == $a) | {report_group, tracked}) == {report_group: null, tracked: true}
+  and (.data.muscles[] | select(.id == $a2) | {report_group, tracked}) == {report_group: "arms", tracked: false}
+' >/dev/null || fail "muscle list does not carry each entry's report group and tracked state"
 agent_get "exercises?query=Agent%20A%20Bench"
 assert_status "200" "catalog view"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg ex "${EXERCISE_A}" --argjson rev "${NOW_MS}" '

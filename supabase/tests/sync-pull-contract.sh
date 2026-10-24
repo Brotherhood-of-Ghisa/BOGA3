@@ -386,6 +386,9 @@ run_psql_sql "
   -- Parent for the exercise_muscle_mappings row below (composite FK target).
   insert into app_public.muscle_groups (owner_user_id, id, display_name, family_name, sort_order, is_editable, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-mg', 'Pectorals', 'chest', 0, 0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  -- A second entry carrying a muscle setup (the first keeps the defaults).
+  insert into app_public.muscle_groups (owner_user_id, id, display_name, family_name, sort_order, is_editable, report_group, tracked, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-mg-set', 'Serratus', 'chest', 1, 0, 'chest', 0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
   -- Layer 1: exercise_muscle_mappings, exercise_tag_definitions,
   -- exercise_group_links.
@@ -446,6 +449,25 @@ collect_fixture_types_for_layer 0
 L0_TYPES="${LAYER_TYPES}"
 [[ "${L0_TYPES}" == '["exercise_definitions","gyms","muscle_groups"]' ]] \
   || fail "scenario 3 layer 0: expected {gyms, exercise_definitions, muscle_groups}, got ${L0_TYPES}"
+
+# Both muscle setup columns are projected with their stored values, so a
+# column the projection forgets cannot round-trip.
+L0_MUSCLES='[]'
+cursor='null'
+while :; do
+  sync_pull "$(jq -nc --argjson cursor "${cursor}" '{layer:0,cursor:$cursor,limit:200}')"
+  assert_status "200" "scenario 3 muscle setup status"
+  L0_MUSCLES="$(jq -c --argjson previous "${L0_MUSCLES}" --arg prefix "pull-${RUN_TAG}-l0-mg" \
+    '$previous + [.entities[] | select(.type == "muscle_groups" and (.id | startswith($prefix)))
+      | {id, report_group: .fields.report_group, tracked: .fields.tracked}]' <<<"${REQUEST_BODY}")"
+  [[ "$(jq -r '.has_more' <<<"${REQUEST_BODY}")" == 'true' ]] || break
+  cursor="$(jq -c '.next_cursor' <<<"${REQUEST_BODY}")"
+done
+jq -e --arg tag "${RUN_TAG}" '(sort_by(.id)) == [
+    {id: ("pull-" + $tag + "-l0-mg"), report_group: null, tracked: 1},
+    {id: ("pull-" + $tag + "-l0-mg-set"), report_group: "chest", tracked: 0}
+  ]' <<<"${L0_MUSCLES}" >/dev/null \
+  || fail "scenario 3 layer 0: muscle setup not projected, got ${L0_MUSCLES}"
 
 collect_fixture_types_for_layer 1
 L1_TYPES="${LAYER_TYPES}"

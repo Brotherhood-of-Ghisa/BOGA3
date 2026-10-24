@@ -35,6 +35,7 @@ import {
 import {
   CURRENT_APP_VERSION,
   readSeedsAppliedMarker,
+  SYSTEM_MUSCLE_GROUP_SEEDS,
 } from '@/src/data/exercise-catalog-seeds';
 import { exerciseDefinitions, muscleGroups, syncRuntimeState } from '@/src/data/schema';
 import { subscribeToExerciseCatalogInvalidation } from '@/src/exercise-catalog/invalidation';
@@ -272,6 +273,44 @@ describe('bundle-migration runtime loop', () => {
       runBundleMigrations(asLocalDatabase(fixture));
 
       expect(fixture.database.select().from(muscleGroups).all()).toEqual(rows);
+    });
+
+    it('never writes report_group or tracked, across every shipped migration', () => {
+      // A generation-1 catalog with the user's muscle setup on every entry: the
+      // migrations rename some of these rows and insert the six absent ones.
+      const RENAMED_FROM: Record<string, string> = {
+        back_upper: 'Upper Back (Rhomboids + Mid Traps)',
+        chest: 'Chest',
+        forearms_grip: 'Forearms / Grip',
+        abs_rectus: 'Abs (Rectus Abdominis)',
+        hip_abductors: 'Hip Abductors (Glute Med/Min)',
+      };
+      const INSERTED = new Set([
+        'tibialis_anterior', 'hip_flexors', 'rotator_cuff', 'serratus_anterior', 'traps_lower', 'brachialis',
+      ]);
+      for (const seed of SYSTEM_MUSCLE_GROUP_SEEDS.filter((row) => !INSERTED.has(row.id))) {
+        fixture.database.insert(muscleGroups).values({
+          ...seed,
+          displayName: RENAMED_FROM[seed.id] ?? seed.displayName,
+          reportGroup: 'held_group',
+          tracked: 0,
+        }).run();
+      }
+      setMarker(fixture, 1);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      const rows = fixture.database.select().from(muscleGroups).all();
+      expect(rows).toHaveLength(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+      for (const row of rows) {
+        const seed = SYSTEM_MUSCLE_GROUP_SEEDS.find((candidate) => candidate.id === row.id);
+        expect(row.displayName).toBe(seed?.displayName);
+        expect({ id: row.id, reportGroup: row.reportGroup, tracked: row.tracked }).toEqual(
+          INSERTED.has(row.id)
+            ? { id: row.id, reportGroup: null, tracked: 1 }
+            : { id: row.id, reportGroup: 'held_group', tracked: 0 }
+        );
+      }
     });
 
     it.each([null, new Date('2026-10-01T12:00:00.000Z')])(

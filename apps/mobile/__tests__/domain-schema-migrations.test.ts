@@ -139,8 +139,9 @@ describe('domain schema and runtime migrations', () => {
     // m0018 drops the facts' volume completeness flag, m0019 drops the plan
     // block's machine snapshot, m0020 adds the gym-split flag, m0021 adds
     // the facts' reporting bucket with the triggers that keep it fresh, and
-    // m0022 adds last_modified_by across the four authored plan tables.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(23);
+    // m0022 adds last_modified_by across the four authored plan tables, and
+    // m0023 adds the muscle report group and tracked flag.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(24);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -193,7 +194,43 @@ describe('domain schema and runtime migrations', () => {
       'm0020',
       'm0021',
       'm0022',
+      'm0023',
     ]);
+  });
+
+  it('adds the muscle report group and tracked flag in m0023, keeping every row', () => {
+    // Additive columns paired with the server migration that added them to
+    // app_public.muscle_groups (spec 05, "Client schema drift rule"). Null and 1
+    // mean the entry is its own, tracked muscle, so an upgrade changes no figure.
+    const { m0023, ...earlier } = localRuntimeMigrations.migrations;
+    const client = new Database(':memory:');
+    client.pragma('foreign_keys = ON');
+    applyMigrationBundle(client, {
+      journal: {
+        entries: localRuntimeMigrations.journal.entries.filter((entry) => entry.idx < 23),
+      },
+      migrations: earlier,
+    });
+    client.prepare(
+      "insert into muscle_groups (id, display_name, family_name, sort_order, is_editable) values ('lats', 'Lats', 'Back', 3, 0)"
+    ).run();
+    client.prepare(
+      "insert into exercise_definitions (id, name) values ('pulldown', 'Pulldown')"
+    ).run();
+    client.prepare(
+      "insert into exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) values ('pulldown:lats', 'pulldown', 'lats', 1, 'primary')"
+    ).run();
+
+    m0023.split('--> statement-breakpoint').forEach((chunk) => client.prepare(chunk).run());
+
+    expect(client.prepare('select id, display_name, report_group, tracked from muscle_groups').all()).toEqual([
+      { id: 'lats', display_name: 'Lats', report_group: null, tracked: 1 },
+    ]);
+    expect(client.prepare('select count(*) as n from exercise_muscle_mappings').get()).toEqual({ n: 1 });
+    expect(() =>
+      client.prepare("update muscle_groups set tracked = 2 where id = 'lats'").run()
+    ).toThrow(/muscle_groups_tracked_boolean_guard/);
+    client.close();
   });
 
   it('adds last_modified_by to the four authored plan tables in m0022', () => {
@@ -350,7 +387,7 @@ describe('domain schema and runtime migrations', () => {
   });
 });
 
-describe('muscle_groups lives in the squashed baseline and adds no migration of its own', () => {
+describe('muscle_groups is created by the squashed baseline and only gains columns after it', () => {
   // The synced-entity muscle_groups shape ships inside the squashed baseline
   // (the `0000_living_bucky` baseline), NOT as a follow-up incremental
   // migration. The follow-up that DOES exist on the journal is the unrelated
@@ -386,20 +423,24 @@ describe('muscle_groups lives in the squashed baseline and adds no migration of 
     expect(baselineMigration).not.toContain('muscle_groups_non_editable_guard');
   });
 
-  it('introduces no muscle_groups-specific incremental migration after the baseline', () => {
-    // Every follow-up migration after the baseline (idx > 0) must NOT create,
-    // alter, or otherwise carry a muscle_groups DDL statement — the taxonomy's
-    // whole shape lives in the baseline. (The journal legitimately carries the
-    // unrelated sync-quarantine follow-up; that is the only post-baseline entry
-    // and it touches no entity table.)
+  it('never rebuilds muscle_groups after the baseline: follow-ups only add columns', () => {
+    // muscle_groups is the FK parent of every exercise mapping, so a follow-up
+    // migration may only `ADD` a column to it. A drizzle-kit table rebuild
+    // (create `__new_muscle_groups`, copy, drop) would drop the parent under
+    // enforced FKs.
     const followUps = localRuntimeMigrations.journal.entries
       .filter((entry) => entry.idx > 0)
       .map((entry) => `m${String(entry.idx).padStart(4, '0')}`);
 
     for (const key of followUps) {
       const sql = (localRuntimeMigrations.migrations as Record<string, string | undefined>)[key] ?? '';
-      expect(sql).not.toContain('`muscle_groups`');
-      expect(sql).not.toContain('muscle_groups');
+      const statements = sql
+        .split('--> statement-breakpoint')
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk.includes('muscle_groups'));
+      for (const statement of statements) {
+        expect(statement).toMatch(/^ALTER TABLE `muscle_groups` ADD `[a-z_]+` /);
+      }
     }
   });
 });

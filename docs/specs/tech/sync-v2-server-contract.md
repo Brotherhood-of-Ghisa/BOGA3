@@ -111,6 +111,8 @@ listed here:
 
 - **`session_exercise_tags`** has no client `updated_at`; it still carries the
   universal server columns.
+- **`muscle_groups.report_group` and `tracked`** keep their value when a push,
+  or a pull on the client, omits the key (`split_by_gym` does on push).
 - **`user_settings`** is a singleton whose client id is `settings`. The
   singleton is client-enforced; the server is a plain LWW mirror.
 - **`exercise_group_links`** is the member's own data, not a group table. Only
@@ -184,10 +186,9 @@ Any order within a layer is safe because no FK joins two tables in one layer
 and every FK points to a strictly earlier layer (or is a self-edge). The drift
 checker asserts both against the live FK graph, and that every entity sits in
 exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together.  moved
-`sessions` L1→L2, `session_exercises` L2→L3 and `exercise_sets` L3→L4; an
-upgraded client resets `pull_cursor` and the server gates the new mapping on
-protocol 4 (`docs/specs/tech/session-planning-contract.md`).
+`topo-order.ts` and the `sync_pull` layer mapping together. Protocol 4
+moved the session chain down a layer; an upgraded client resets `pull_cursor`
+(`docs/specs/tech/session-planning-contract.md`).
 
 ## Drift checker
 
@@ -202,9 +203,7 @@ holds the algorithm, flags and exit codes. It guarantees:
 - The topological layers match the FK graph.
 
 Local-only client columns are exempt through
-`apps/mobile/src/data/schema/sync-extras.json`. The rule that a domain column
-must land on the server first is owned by `docs/specs/05-data-model.md`
-("Client schema drift rule").
+`apps/mobile/src/data/schema/sync-extras.json`.
 
 ---
 
