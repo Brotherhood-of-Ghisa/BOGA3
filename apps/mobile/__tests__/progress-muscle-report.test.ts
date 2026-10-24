@@ -20,10 +20,11 @@ import {
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import { broadMuscleReport, broadMuscleRows } from './helpers/broad-muscle-report';
 
-const BROAD = broadMuscleReport(['calves']);
 const MERGED_BACK = ['back_upper', 'traps_upper', 'traps_lower'];
-// Broad leaves three untracked; this setup also switches Calves off.
-const UNTRACKED = ['rotator_cuff', 'forearms_grip', 'spinal_erectors', 'calves'];
+const UNTRACKED_ENTRIES = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
+const UNTRACKED = [...UNTRACKED_ENTRIES, 'calves'];
+// Broad with Calves and the three entries it leaves unmerged switched off by the user.
+const BROAD = broadMuscleReport(UNTRACKED);
 
 const catalogById = Object.fromEntries(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => [seed.id, seed])) as
   unknown as Record<string, ExerciseCatalogMuscleGroup>;
@@ -142,7 +143,7 @@ describe('the user’s muscles in catalogue helpers', () => {
     expect(reportedMuscleName(BROAD, catalogById, 'back_lats')).toBe('Back');
     expect(reportedMuscleName(BROAD, catalogById, 'back_upper')).toBeNull();
     expect(reportedMuscleName(BROAD, catalogById, 'forearms_grip')).toBeNull();
-    expect(reportedMuscleName(broadMuscleReport(['calves']), catalogById, 'calves')).toBeNull();
+    expect(reportedMuscleName(BROAD, catalogById, 'calves')).toBeNull();
     expect(reportedMuscleName(BROAD, catalogById, 'glutes_max')).toBe('Glutes & Hams');
     expect(reportedMuscleName(BROAD, catalogById, 'unknown')).toBeNull();
   });

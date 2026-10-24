@@ -60,7 +60,7 @@ const TRACKED_BROAD = ['chest', 'delts_front', 'delts_lateral', 'delts_rear', 'b
 
 const choose = async (setup: 'broad' | 'detailed') => {
   await loadMaestroFixture('exercise-block-history');
-  if (setup === 'broad') chooseBroadLocally(localDataClient(), ['calves']);
+  if (setup === 'broad') chooseBroadLocally(localDataClient(), ['calves', ...UNTRACKED]);
   await act(async () => invalidateExerciseCatalogCache());
 };
 
@@ -104,6 +104,16 @@ describe('Progress muscle list under Broad', () => {
     expect(screen.getByLabelText('Open Back history')).toBeTruthy();
     expect(screen.getByLabelText('Open Glutes & Hams history')).toBeTruthy();
     expect(screen.queryByText('Lats')).toBeNull();
+  });
+
+  it('leaves the entries Broad does not merge as muscles of their own until the user switches them off', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    chooseBroadLocally(localDataClient());
+    await act(async () => invalidateExerciseCatalogCache());
+    await renderProgress('muscle');
+    await waitFor(() => expect(muscleBlocks().length).toBe(14));
+    expect(muscleBlocks()).toEqual(expect.arrayContaining(['rotator_cuff', 'forearms_grip', 'spinal_erectors', 'calves']));
+    expect(muscleBlocks()).not.toContain('serratus_anterior');
   });
 
   it('counts a squat once per muscle: Quads at its primary role, Glutes & Hams at half', async () => {

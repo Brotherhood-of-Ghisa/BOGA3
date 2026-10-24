@@ -114,7 +114,7 @@ are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
 Code: `resolveEditorMappings`: `apps/mobile/src/exercise-catalog/editor-model.ts`; `buildMuscleSetup`: `apps/mobile/src/exercise-catalog/muscle-setup.ts`; `apps/mobile/src/exercise-catalog/reported-muscles.ts`.
-Pending: session screens.
+Pending: sessions.
 
 ### muscle.untracked · definition · accepted
 
@@ -122,7 +122,7 @@ An untracked muscle adds nothing to any muscle figure and is not shown. Exercise
 figures (sets, Volume, records, 1RM) do not change. No line reports the dropped work.
 
 Why: the user chose not to follow that muscle.
-Pending: session screens.
+Pending: sessions.
 
 ### muscle.family-sections · presentation · accepted
 

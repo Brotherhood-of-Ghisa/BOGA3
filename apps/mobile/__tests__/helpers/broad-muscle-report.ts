@@ -1,14 +1,18 @@
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { BROAD_MUSCLE_PRESET, buildMuscleReportAssignment, type MuscleReportRow } from '@/src/data/muscle-report-presets';
 
-/** The catalogue's rows after choosing Broad, optionally with more muscles switched off by anchor id. */
+/**
+ * The catalogue's rows after choosing Broad, with muscles switched off by id: a
+ * Broad muscle's anchor switches all its entries off; any other id, that entry.
+ * Broad itself leaves every entry tracked.
+ */
 export const broadMuscleRows = (switchedOff: readonly string[] = []): MuscleReportRow[] => {
   const groupOf = new Map(BROAD_MUSCLE_PRESET.muscles.flatMap(muscle => muscle.entries.map(entry => [entry, muscle.key] as const)));
   const offEntries = new Set(BROAD_MUSCLE_PRESET.muscles.filter(muscle => switchedOff.includes(muscle.anchor))
     .flatMap(muscle => muscle.entries));
   return SYSTEM_MUSCLE_GROUP_SEEDS.map(({ id, displayName, familyName, sortOrder }) => ({
     id, displayName, familyName, sortOrder, reportGroup: groupOf.get(id) ?? null,
-    tracked: BROAD_MUSCLE_PRESET.untracked.includes(id) || offEntries.has(id) ? 0 : 1,
+    tracked: switchedOff.includes(id) || offEntries.has(id) ? 0 : 1,
   }));
 };
 
