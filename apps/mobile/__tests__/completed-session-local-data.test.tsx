@@ -16,7 +16,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -77,7 +77,9 @@ import {
 import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { uiRoles } from '@/components/ui/tokens';
-import { exerciseDefinitions, exerciseSets, sessions } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSets, muscleGroups, sessions } from '@/src/data/schema';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
@@ -116,11 +118,13 @@ const triggerFocus = () => {
 const openSession = async (
   params: Record<string, string>,
   fixture: 'exercise-block-history' | 'completion-two-prs' = 'exercise-block-history',
-  afterSeed?: () => void
+  afterSeed?: () => void,
+  afterBoot?: () => void
 ) => {
   await loadMaestroFixture(fixture);
   afterSeed?.();
   await bootLocalApp();
+  afterBoot?.();
   mockParams = params;
   render(<CompletedSessionDetailRoute />);
   // Loaded: the presentation, the detail summary, or one of the missing-session exits.
@@ -401,6 +405,26 @@ describe('completion presentation over real data', () => {
 });
 
 describe('completed-session detail over real data', () => {
+  it('reports the user\'s muscles under Broad, in the breakdown and the comparison', async () => {
+    await openSession({ sessionId: ONE_PR, presentation: 'summary' }, 'exercise-block-history', undefined, () => {
+      for (const muscle of BROAD_MUSCLE_PRESET.muscles) {
+        localDatabase().update(muscleGroups).set({ reportGroup: muscle.key }).where(inArray(muscleGroups.id, [...muscle.entries])).run();
+      }
+      localDatabase().update(muscleGroups).set({ tracked: 0 }).where(inArray(muscleGroups.id, [...BROAD_MUSCLE_PRESET.untracked])).run();
+      invalidateExerciseCatalogCache();
+    });
+
+    // The squat maps Quads primary, Glute Max and Adductors secondary: Glutes & Hams once, at half.
+    expect(await screen.findByTestId('session-completion-muscle-glutes_max')).toHaveTextContent(/^Glutes & Hams—10\.5$/);
+    expect(screen.getByTestId('session-completion-muscle-quads')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-muscle-adductors')).toBeNull();
+    expect(screen.queryByTestId('session-completion-muscle-spinal_erectors')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(await screen.findByTestId('session-completion-muscle-comparison-quads')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-muscle-comparison-glutes_max')).toBeNull();
+  });
+
   it('opens the Summary with the record, switches grouping locally, and lists the sets', async () => {
     await openSession({ sessionId: ONE_PR, presentation: 'summary' });
 

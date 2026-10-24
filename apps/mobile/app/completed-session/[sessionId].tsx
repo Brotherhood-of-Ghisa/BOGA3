@@ -43,6 +43,7 @@ import {
   buildSessionBreakdownExerciseRows,
   buildSessionBreakdownMuscleRows,
   loadCompletedSessionInsights,
+  sessionMuscleCatalogOfExercises,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
 } from '@/src/session-insights';
@@ -402,22 +403,23 @@ export function CompletedSessionDetailScreenShell({
       })) ?? [],
     [session]
   );
-  const catalogMuscleMappings = useMemo(
+  // The user's muscles ([[muscle.report-groups]]): the same reading the live
+  // insights use, so one session's figures match in both places.
+  const sessionMuscleCatalog = useMemo(
     () =>
       exerciseCatalog.status === 'ready'
-        ? exerciseCatalog.exercises.flatMap((exercise) =>
-            exercise.mappings.map((mapping) => ({
-              exerciseDefinitionId: exercise.id,
-              muscleGroupId: mapping.muscleGroupId,
-              role: mapping.role,
-              weight: mapping.weight,
-            }))
+        ? sessionMuscleCatalogOfExercises(
+            exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup.assignment
           )
-        : [],
-    [exerciseCatalog.exercises, exerciseCatalog.status]
+        : null,
+    [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status]
+  );
+  const catalogMuscleMappings = useMemo(
+    () => sessionMuscleCatalog?.muscleMappings ?? [],
+    [sessionMuscleCatalog]
   );
   const sessionMuscleSummary = useMemo(() => {
-    if (!session || exerciseCatalog.status !== 'ready') {
+    if (!session || !sessionMuscleCatalog) {
       return null;
     }
 
@@ -426,22 +428,9 @@ export function CompletedSessionDetailScreenShell({
       sessionAt: new Date(session.completedAt),
       bodyWeightKg: session.bodyWeightKg,
       exercises: sessionInsightExercises,
-      exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
-        id: exercise.id,
-        loadInputMode: exercise.loadInputMode ?? 'total_load',
-        bodyweightContribution: exercise.bodyweightContribution,
-      })),
-      muscleMappings: catalogMuscleMappings,
-      muscleGroups: exerciseCatalog.muscleGroups,
+      ...sessionMuscleCatalog,
     });
-  }, [
-    catalogMuscleMappings,
-    exerciseCatalog.exercises,
-    exerciseCatalog.muscleGroups,
-    exerciseCatalog.status,
-    session,
-    sessionInsightExercises,
-  ]);
+  }, [session, sessionInsightExercises, sessionMuscleCatalog]);
 
   const completionPersonalRecords = useMemo(
     () => completedInsights?.personalRecords ?? [],
