@@ -4,10 +4,11 @@ jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'), getCompetitionSession: (...args: unknown[]) => mockSessionRead(...args),
 }));
 import { GroupApiError } from '@/src/groups/api';
+import { clearRecentLogs, getRecentLogs } from '@/src/logging/buffer';
 import { __setNotificationNativeAdapterForTests } from '@/src/notifications/native-adapter';
 import { __resetNotificationsForTests, discardPendingNotificationTap, getPendingNotificationTapRevision,
   processPendingNotificationTap, subscribePendingNotificationTap } from '@/src/notifications';
-import { setNotificationAccount } from '@/src/notifications/auth-boundary';
+import { notificationSessionIdentity, setNotificationAccount } from '@/src/notifications/auth-boundary';
 import { isNotificationProjection, notificationEnvelope, receiveNotificationTap, watchNotificationTapAccount } from '@/src/notifications/tap';
 import { fakeNotificationNative, notificationBinding, notificationEnvelopeFixture, notificationProjectionFixture,
   notificationSession, notificationUser } from './helpers/notification-native';
@@ -108,4 +109,89 @@ test.each(['Started a workout at Main Gym', 'Finished a workout at Main Gym', 'F
 });
 test.each(['Started a workout at ', `Finished a workout at ${'a'.repeat(101)}`, 'Finished a workout at Main\nGym'])('rejects malformed workout location: %s', heading => {
   expect(isNotificationProjection({ ...notificationProjectionFixture(), heading })).toBe(false);
+});
+
+test('notificationSessionIdentity decodes unpadded base64url JWTs across all mod-4 lengths', () => {
+  for (const sessionId of ['s1', 's12', 's123', 's1234', 'uuid-with-_-and-dash']) {
+    const json = JSON.stringify({ session_id: sessionId });
+    const unpadded = Buffer.from(json).toString('base64url');
+    const token = `header.${unpadded}.signature`;
+    const identity = notificationSessionIdentity({
+      access_token: token,
+      user: { id: notificationUser },
+    } as any);
+    expect(identity).toEqual({ userId: notificationUser, authSessionId: sessionId });
+  }
+});
+
+test('notificationSessionIdentity rejects malformed tokens and missing session_id', () => {
+  expect(notificationSessionIdentity(null)).toBeNull();
+  expect(notificationSessionIdentity({ access_token: '' } as any)).toBeNull();
+  expect(notificationSessionIdentity({ access_token: 'no-dots' } as any)).toBeNull();
+  const noSessionId = `header.${Buffer.from(JSON.stringify({ other: 'value' })).toString('base64url')}.sig`;
+  expect(notificationSessionIdentity({ access_token: noSessionId, user: { id: notificationUser } } as any)).toBeNull();
+  const invalidJson = `header.${Buffer.from('not-json').toString('base64url')}.sig`;
+  expect(notificationSessionIdentity({ access_token: invalidJson, user: { id: notificationUser } } as any)).toBeNull();
+});
+
+test('binding rotation for the same user and session during live read still navigates to route', async () => {
+  let finish!: () => void;
+  mockSessionRead.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  receiveNotificationTap(notificationEnvelopeFixture);
+  const pending = process();
+  native.activateBinding({
+    installationId: '77777777-7777-4777-8777-777777777777',
+    userId: notificationUser,
+    authSessionId: notificationSession,
+    bindingId: '88888888-8888-4888-8888-888888888888',
+    environment: 'preview',
+    encryptionKey: 'rotated-key',
+  });
+  finish();
+  await pending;
+  expect(onOpen).toHaveBeenCalledWith(notificationProjectionFixture().route);
+  expect(onUnavailable).not.toHaveBeenCalled();
+});
+
+test('binding invalidation during live read discards tap and does not navigate', async () => {
+  let finish!: () => void;
+  mockSessionRead.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  receiveNotificationTap(notificationEnvelopeFixture);
+  const pending = process();
+  native.invalidateBinding();
+  finish();
+  await pending;
+  expect(onOpen).not.toHaveBeenCalled();
+});
+
+test('expiry occurring during live read marks notification unavailable', async () => {
+  let finish!: () => void;
+  mockSessionRead.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  const expiring = { ...notificationProjectionFixture(), expiresAt: Date.now() + 15 };
+  native.decrypt = jest.fn(() => expiring);
+  receiveNotificationTap(notificationEnvelopeFixture);
+  const pending = process();
+  await new Promise(r => setTimeout(r, 25));
+  finish();
+  await pending;
+  expect(onUnavailable).toHaveBeenCalledWith('unavailable');
+  expect(onOpen).not.toHaveBeenCalled();
+});
+
+test('emits diagnostic logs on decode failure and successful tap open', async () => {
+  clearRecentLogs();
+  receiveNotificationTap(notificationEnvelopeFixture);
+  await process();
+  expect(getRecentLogs().some(log => log.event === 'notifications.tap_opened')).toBe(true);
+
+  clearRecentLogs();
+  native.decrypt = jest.fn(() => null);
+  receiveNotificationTap(notificationEnvelopeFixture);
+  await process();
+  const decodeFailure = getRecentLogs().find(log => log.event === 'notifications.tap_decode_failed');
+  expect(decodeFailure).toBeDefined();
+  expect(decodeFailure?.context).toMatchObject({
+    envelopeBindingId: notificationEnvelopeFixture.bindingId,
+    hasDecryptedValue: false,
+  });
 });

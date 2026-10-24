@@ -8,10 +8,13 @@ let initialized = false;
 
 /** JWT data only detects identity transitions; live RPCs remain the authority. */
 export const notificationSessionIdentity = (session: Session | null): NotificationAccount | null => {
-  if (!session) return null;
+  if (!session?.access_token) return null;
   try {
     const payload = session.access_token.split('.')[1];
-    const claim = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const claim = JSON.parse(atob(padded));
     return typeof claim.session_id === 'string' ? { userId: session.user.id, authSessionId: claim.session_id } : null;
   } catch { return null; }
 };

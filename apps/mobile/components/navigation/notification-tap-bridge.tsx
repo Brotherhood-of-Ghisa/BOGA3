@@ -61,7 +61,14 @@ export function NotificationTapBridge() {
 
   useEffect(() => {
     void processPendingNotificationTap({ userId, ready, onOpen, onUnavailable: showUnavailable })
-      .catch(() => showUnavailable('unavailable'));
+      .catch((error) => {
+        void logEvent({
+          level: 'error',
+          event: 'notifications.tap_unhandled_error',
+          message: error instanceof Error ? error.message : String(error),
+        });
+        showUnavailable('unavailable');
+      });
   }, [onOpen, ready, retry, revision, showUnavailable, userId]);
 
   const dismiss = () => {
