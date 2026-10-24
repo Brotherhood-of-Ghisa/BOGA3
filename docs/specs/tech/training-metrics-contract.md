@@ -297,8 +297,8 @@ global total. Every figure is an exact half-step, shown unrounded. Nothing is
 stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
 them. The window's own working-set total stays a count of physical sets.
 
-**The user's muscles.** Muscle reads apply `applyMuscleReport`
-(`muscle-analytics.ts`) after `withoutSecondaryMappings`, as surfaces adopt it.
+**The user's muscles.** Surfaces reading the muscle setup apply
+`applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
 It re-keys mappings from entry to muscle ([[muscle.report-groups]]), keeps one
 per exercise and muscle at the strongest role (Volume counts once) and drops
 untracked muscles ([[muscle.untracked]]). A merged muscle takes its anchor's id;

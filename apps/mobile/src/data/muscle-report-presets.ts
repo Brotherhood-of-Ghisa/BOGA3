@@ -71,7 +71,7 @@ export const buildMuscleReportAssignment = (rows: readonly MuscleReportRow[]): M
         id: broad.anchor, displayName: broad.label, familyName: broad.family,
         sortOrder: sortOrderByKey.get(broad.key) ?? row.sortOrder,
       }
-      : row;
+      : { id: row.id, displayName: row.displayName, familyName: row.familyName, sortOrder: row.sortOrder };
     return [row.id, { muscle, tracked: row.tracked === true || row.tracked === 1 }];
   }));
 };
