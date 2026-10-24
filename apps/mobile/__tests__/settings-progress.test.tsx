@@ -13,7 +13,12 @@ jest.mock('expo-router', () => ({
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import SettingsRoute from '../app/(tabs)/settings';
+import {
+  DataSyncSettingsScreen,
+  EffortSettingsScreen,
+  ProgressSettingsScreen,
+  RestTimerSettingsScreen,
+} from '@/components/settings/sub-pages';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
@@ -21,10 +26,27 @@ import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 
 const values = () => getAccountLocalPreferenceState().values;
+// Settings' sub pages that edit preferences, beside Data & sync, which reports
+// every preference error and retries it with Refresh.
+const SettingsPages = () => (
+  <>
+    <ProgressSettingsScreen />
+    <EffortSettingsScreen />
+    <RestTimerSettingsScreen />
+    <DataSyncSettingsScreen />
+  </>
+);
+const ProgressSettingsAndPage = () => (
+  <>
+    <ProgressSettingsScreen />
+    <DataSyncSettingsScreen />
+    <ProgressRoute />
+  </>
+);
 const openSettings = async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<SettingsRoute />);
+  render(<SettingsPages />);
   await waitFor(() => expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '4'));
 };
 const editNumber = (id: string, value: string) => {
@@ -38,7 +60,7 @@ const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  const page = render(<><SettingsRoute /><ProgressRoute /></>);
+  const page = render(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-table');
   return page;
 };
@@ -65,7 +87,7 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   __resetAccountLocalPreferencesForTests();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<><SettingsRoute /><ProgressRoute /></>);
+  render(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-body-card');
   expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
   fireEvent.press(screen.getByTestId('settings-muscle-view-list'));
@@ -103,7 +125,7 @@ it('restores the shared Exercise layout per account without carrying another acc
     setAccountLocalPreferenceAccount('B', true);
     await ensureAccountLocalPreferencesLoaded();
   });
-  page.rerender(<><SettingsRoute /><ProgressRoute /></>);
+  page.rerender(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-table');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
@@ -115,7 +137,7 @@ it('restores the shared Exercise layout per account without carrying another acc
     setAccountLocalPreferenceAccount('A', true);
     await ensureAccountLocalPreferencesLoaded();
   });
-  page.rerender(<><SettingsRoute /><ProgressRoute /></>);
+  page.rerender(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-body-card');
   expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
 });
@@ -131,8 +153,8 @@ it('saves both window settings, and retains invalid numeric drafts in the centra
   editNumber('settings-target-window', '1.5');
   expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '1.5');
   expect(values().targetWindowWeeks).toBe(1);
-  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error')).toHaveTextContent(/from 1 to 52/);
-  expect(within(screen.getByTestId('settings-section-progress')).queryByText(/from 1 to 52/)).toBeNull();
+  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error')).toHaveTextContent(/from 1 to 52/);
+  expect(within(screen.getByTestId('settings-progress-screen')).queryByText(/from 1 to 52/)).toBeNull();
   editNumber('settings-target-window', '4');
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
@@ -165,12 +187,23 @@ it('edits one shared weekly target inline and retains invalid drafts in the cent
   editNumber(id, '0');
   expect(values().weeklyWorkingSetTarget).toBe(12);
   expect(screen.getByTestId(id)).toHaveProp('value', '0');
-  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
     .toHaveTextContent(/positive whole number/);
-  expect(within(screen.getByTestId('settings-section-progress')).queryByText(/positive whole number/)).toBeNull();
+  expect(within(screen.getByTestId('settings-progress-screen')).queryByText(/positive whole number/)).toBeNull();
   editNumber(id, '8');
   expect(values().weeklyWorkingSetTarget).toBe(8);
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+});
+
+it('keeps the effort choices on their own page, not under Progress', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<ProgressSettingsScreen />);
+  await waitFor(() => expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '4'));
+  expect(screen.queryByTestId('settings-effort-selections')).toBeNull();
+  screen.unmount();
+  render(<EffortSettingsScreen />);
+  expect(screen.getByTestId('settings-effort-selections')).toBeTruthy();
 });
 
 it('offers nine fixed labels and independent Display, Working set and Volume controls with no Add', async () => {
@@ -211,7 +244,7 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('edits rest timer auto-start and duration in Preferences and surfaces invalid durations in the centralized error flow', async () => {
+it('edits rest timer auto-start and duration on its page and surfaces invalid durations in the centralized error flow', async () => {
   await openSettings();
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
   expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
@@ -227,7 +260,7 @@ it('edits rest timer auto-start and duration in Preferences and surfaces invalid
   editNumber('settings-rest-timer-duration', '10');
   expect(values().restTimerDurationSec).toBe(150);
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '10');
-  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
     .toHaveTextContent(/from 15 to 600/);
 
   editNumber('settings-rest-timer-duration', '90');
@@ -240,7 +273,7 @@ it('edits rest timer auto-start and duration in Preferences and surfaces invalid
   editNumber('settings-repeating-timer-interval', '5');
   expect(values().repeatingTimerIntervalSec).toBe(45);
   expect(screen.getByTestId('settings-repeating-timer-interval')).toHaveProp('value', '5');
-  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
     .toHaveTextContent(/from 15 to 600/);
 
   editNumber('settings-repeating-timer-interval', '60');

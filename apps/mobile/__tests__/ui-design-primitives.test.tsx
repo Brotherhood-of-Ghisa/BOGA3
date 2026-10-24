@@ -21,6 +21,7 @@ import {
   ListRow,
   Notice,
   PageHeader,
+  TitleBar,
   ScreenScroll,
   SearchField,
   SectionHeader,
@@ -958,6 +959,26 @@ describe('PageHeader / SectionHeader', () => {
       fontWeight: '800',
       fontSize: uiTypography.size.xxl,
     });
+  });
+
+  it('draws a top bar on one line: back, an Archivo 700 title at xl, then actions', () => {
+    render(
+      <TitleBar
+        actions={<Text testID="actions">⋮</Text>}
+        back={<Text testID="back">‹</Text>}
+        testID="bar"
+        title="A long screen title that must not wrap"
+      />,
+    );
+    const title = screen.getByRole('header', { name: 'A long screen title that must not wrap' });
+    expect(title.props.numberOfLines).toBe(1);
+    expect(flatStyle(title)).toMatchObject({ fontFamily: 'Archivo', fontWeight: '700', fontSize: uiTypography.size.xl });
+    expect(flatStyle(screen.getByTestId('bar')).flexDirection).toBe('row');
+    const order = screen.getByTestId('bar').findAll(
+      (node) => ['back', 'actions'].includes(node.props.testID) || node.props.accessibilityRole === 'header',
+      { deep: true },
+    ).map((node) => node.props.testID ?? 'title');
+    expect(order.filter((id, index) => order.indexOf(id) === index)).toEqual(['back', 'title', 'actions']);
   });
 
   it('heads a section with an optional caps text action, never a primary', () => {

@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "app/(tabs)/settings.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "app/completed-session/[sessionId].tsx": {
     "max-lines-per-function": {
       "count": 1

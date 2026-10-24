@@ -73,7 +73,14 @@ export function RootStack() {
         <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="exercise-share" options={{ title: 'Shared exercise' }} />
-        <Stack.Screen name="body-weight" options={{ title: 'Body weight' }} />
+        <Stack.Screen name="body-weight" options={{ title: 'Bodyweight' }} />
+        {/* Settings' sub pages, one per Settings card. */}
+        <Stack.Screen name="settings-rest-timer" options={{ title: 'Rest timer' }} />
+        <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
+        <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
+        <Stack.Screen name="settings-other" options={{ title: 'Other' }} />
+        <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
+        <Stack.Screen name="settings-developer-tools" options={{ title: 'Developer tools' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
         <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />

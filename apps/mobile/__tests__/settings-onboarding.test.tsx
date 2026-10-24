@@ -1,24 +1,18 @@
 /* eslint-disable import/first */
 
 /**
- * The Settings onboarding surface: section order, release metadata, the
- * external setup link and the signed-out state. Nothing here reads or writes
- * app data; the screen runs over the in-memory SQLite fixture
- * (helpers/local-data.ts) with its real preferences store. Replaced: the
- * router, the system browser, the auth hook, dev mode, build metadata and the
- * native navigation focus lifecycle.
+ * The Settings list: its cards in order, the sub page each card pushes, the
+ * status line under each label, release metadata and the signed-out state.
+ * Nothing here reads or writes app data; the screen runs over the in-memory
+ * SQLite fixture (helpers/local-data.ts) with its real preferences store.
+ * Replaced: the router, the auth hook, dev mode, build metadata, the sync
+ * status read and the native navigation focus lifecycle. Connecting an AI
+ * coach lives on More (more-screen.test.tsx), not here.
  */
 
-const mockOpenUrl = jest.fn();
 const mockPush = jest.fn();
 const mockUseAuth = jest.fn();
-
-jest.mock('expo-linking', () => ({
-  openURL: (...args: unknown[]) => mockOpenUrl(...args),
-}));
-
-// Reading entry/navigation is covered by bodyweight-screen.test.tsx.
-jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
+const mockGetSyncStatus = jest.fn();
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
@@ -39,8 +33,8 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
-jest.mock('@/src/utils/agent-connect', () => ({
-  getAgentConnectUrl: () => 'https://setup.example.test/connect',
+jest.mock('@/src/sync/sync-status', () => ({
+  getSyncStatus: () => mockGetSyncStatus(),
 }));
 
 jest.mock('@/src/utils/isDevMode', () => ({
@@ -57,24 +51,58 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
   }),
 }));
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import SettingsRoute from '../app/(tabs)/settings';
+import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
 import {
   __resetExerciseListPreferencesForTests,
   ensureExerciseListPreferencesLoaded,
 } from '@/src/exercise-catalog/list-preferences';
+import { updatePreferences } from '@/src/preferences/hooks';
+import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
-import { waitForGone } from './helpers/wait-for-gone';
 
-// The preferences card reads its store on mount; load it first so the read
-// lands in the test.
+const snapshot = (overrides: Partial<SyncStatusSnapshot> = {}): SyncStatusSnapshot => ({
+  lastSuccessAtMs: 1_700_000_000_000,
+  dirtyCount: 0,
+  errorMessage: null,
+  authRequired: false,
+  networkState: 'online',
+  bootstrapCompleted: true,
+  blockedRowCount: 0,
+  ...overrides,
+});
+
+// The preferences store is read on mount; load it first so the read lands in
+// the test.
 const renderSettings = async () => {
   await ensureExerciseListPreferencesLoaded();
-  return render(<SettingsRoute />);
+  const result = render(<SettingsRoute />);
+  // The sync status and bodyweight reads resolve after mount; land them in act.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  return result;
 };
 
-describe('settings onboarding surface', () => {
+const statusOf = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel as string;
+
+const CARD_ORDER = [
+  'settings-profile-row',
+  'settings-appearance-row',
+  'settings-body-weight-row',
+  'settings-rest-timer-row',
+  'settings-notifications-row',
+  'settings-progress-row',
+  'settings-effort-row',
+  'settings-developer-tools-row',
+  'settings-data-sync-row',
+  'settings-other-row',
+  'settings-about-card',
+];
+
+describe('the Settings list', () => {
   afterEach(() => {
     closeLocalData();
   });
@@ -82,82 +110,113 @@ describe('settings onboarding surface', () => {
   beforeEach(() => {
     resetLocalData();
     __resetExerciseListPreferencesForTests();
-    mockOpenUrl.mockReset().mockResolvedValue(true);
     mockPush.mockReset();
+    mockGetSyncStatus.mockReset().mockResolvedValue(snapshot());
     mockUseAuth.mockReset().mockReturnValue({
       user: { email: 'member@example.test', id: 'user-1' },
     });
   });
 
-  it('renders the visible title and agreed signed-in section order with release metadata', async () => {
+  it('shows the title, every card in the agreed order and the release metadata', async () => {
     const result = await renderSettings();
     const tree = JSON.stringify(result.toJSON());
-    const orderedSectionIds = [
-      'settings-section-account',
-      'settings-section-ai-coaching',
-      'settings-section-preferences',
-      'settings-section-notifications',
-      'settings-section-data-sync',
-      'settings-section-about',
-      'settings-section-developer-tools',
-    ];
+    const positions = CARD_ORDER.map((id) => tree.indexOf(`"testID":"${id}"`));
 
     expect(screen.getByText('Settings')).toBeTruthy();
-    expect(orderedSectionIds.map((id) => tree.indexOf(id))).toEqual(
-      orderedSectionIds.map((id) => expect.any(Number)),
-    );
-    for (let index = 1; index < orderedSectionIds.length; index += 1) {
-      expect(tree.indexOf(orderedSectionIds[index])).toBeGreaterThan(
-        tree.indexOf(orderedSectionIds[index - 1]),
-      );
-    }
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     expect(screen.getByText('member@example.test')).toBeTruthy();
-    expect(screen.getByText('Version 1.2.3 (build 45)')).toBeTruthy();
-    expect(screen.getByText('Release Ziocleziano')).toBeTruthy();
-    expect(screen.getByText('Flavor Preview')).toBeTruthy();
-    expect(within(screen.getByTestId('settings-section-notifications')).getByTestId('settings-notifications-row')).toBeTruthy();
-    expect(within(screen.getByTestId('settings-section-preferences')).queryByTestId('settings-notifications-row')).toBeNull();
+    const about = within(screen.getByTestId('settings-about-card'));
+    expect(about.getByText('Version 1.2.3 (build 45)')).toBeTruthy();
+    expect(about.getByText('Release Ziocleziano')).toBeTruthy();
+    expect(about.getByText('Flavor Preview')).toBeTruthy();
+    // Connecting an AI coach moved to More.
+    expect(screen.queryByTestId('settings-connect-agent-row')).toBeNull();
+    expect(screen.queryByTestId('settings-connected-agents-row')).toBeNull();
+    await waitFor(() => expect(statusOf('settings-data-sync-row')).toBe('Data & sync, Up to date'));
   });
 
-  it('opens the public setup page as an external link', async () => {
+  it.each([
+    ['settings-profile-row', '/profile'],
+    ['settings-body-weight-row', '/body-weight'],
+    ['settings-rest-timer-row', '/settings-rest-timer'],
+    ['settings-progress-row', '/settings-progress'],
+    ['settings-effort-row', '/settings-effort'],
+    ['settings-developer-tools-row', '/settings-developer-tools'],
+    ['settings-data-sync-row', '/settings-data-sync'],
+    ['settings-other-row', '/settings-other'],
+  ])('%s opens %s', async (testID, route) => {
+    await renderSettings();
+    fireEvent.press(screen.getByTestId(testID));
+    expect(mockPush).toHaveBeenCalledWith(route);
+  });
+
+  it('presses nothing from the About card', async () => {
+    await renderSettings();
+    fireEvent.press(screen.getByTestId('settings-about-card'));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('summarises what each sub page has set under its label', async () => {
     await renderSettings();
 
-    const connectRow = screen.getByTestId('settings-connect-agent-row');
-    expect(connectRow.props.accessibilityRole).toBe('link');
-    expect(connectRow.props.accessibilityHint).toContain('system browser');
-    fireEvent.press(connectRow);
+    expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 90 s · Auto-start on');
+    expect(statusOf('settings-progress-row')).toBe('Progress, List · 4-week period');
+    expect(statusOf('settings-effort-row')).toBe('Effort, Default');
+    expect(statusOf('settings-other-row')).toBe('Other, DD-MM-YYYY');
+    expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode off');
 
     await waitFor(() => {
-      expect(mockOpenUrl).toHaveBeenCalledWith('https://setup.example.test/connect');
+      updatePreferences({
+        restTimerDurationSec: 120,
+        restTimerAutoStart: false,
+        progressMuscleLayout: '3d',
+        targetWindowWeeks: 6,
+        displayEfforts: ['rir_0'],
+        dateFormat: 'YYYY-MM-DD',
+      });
+      expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 120 s · Auto-start off');
+    });
+    expect(statusOf('settings-progress-row')).toBe('Progress, 3D · 6-week period');
+    expect(statusOf('settings-effort-row')).toBe('Effort, Custom');
+    expect(statusOf('settings-other-row')).toBe('Other, YYYY-MM-DD');
+  });
+
+  it('keeps the Developer mode switch off the list, naming its state on Developer tools', async () => {
+    await renderSettings();
+    expect(screen.queryByTestId('settings-developer-mode-switch')).toBeNull();
+
+    await waitFor(() => {
+      updatePreferences({ developerMode: true });
+      expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode on');
     });
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('keeps a failed browser launch inline and retryable', async () => {
-    mockOpenUrl.mockRejectedValueOnce(new Error('No browser'));
+  it.each<[string, Partial<SyncStatusSnapshot>, string]>([
+    ['an error from the latest cycle', { errorMessage: 'boom' }, 'Error'],
+    ['a sign-in the cycle needs', { authRequired: true }, 'Error'],
+    ['no network', { networkState: 'offline', dirtyCount: 3 }, 'Offline'],
+    ['unpushed changes', { dirtyCount: 3 }, '3 pending'],
+    ['no cycle yet', { lastSuccessAtMs: null }, 'Not synced yet'],
+  ])('reads Data & sync status for %s', async (_case, overrides, status) => {
+    mockGetSyncStatus.mockResolvedValue(snapshot(overrides));
     await renderSettings();
-
-    fireEvent.press(screen.getByTestId('settings-connect-agent-row'));
-    expect(await screen.findByText('Couldn’t open the setup page. Try again.')).toBeTruthy();
-
-    mockOpenUrl.mockResolvedValueOnce(true);
-    fireEvent.press(screen.getByTestId('settings-connect-agent-row'));
-
-    await waitFor(() => expect(mockOpenUrl).toHaveBeenCalledTimes(2));
-    await waitForGone(() => screen.queryByTestId('settings-connect-agent-error'));
+    await waitFor(() => expect(statusOf('settings-data-sync-row')).toBe(`Data & sync, ${status}`));
   });
 
-  it('keeps signed-in-only management hidden while leaving setup and sync guidance useful', async () => {
+  it('shows the signed-out list and sync guidance', async () => {
     mockUseAuth.mockReturnValue({ user: null });
     await renderSettings();
 
-    expect(screen.getByTestId('settings-profile-row')).toBeTruthy();
+    expect(statusOf('settings-profile-row')).toBe('Account, Signed out');
+    expect(statusOf('settings-data-sync-row')).toBe('Data & sync, Signed out');
+    expect(mockGetSyncStatus).not.toHaveBeenCalled();
     expect(screen.queryByText('Sign in and manage your account.')).toBeNull();
-    expect(screen.queryByText('See setup instructions for your MCP-compatible client.')).toBeNull();
-    expect(screen.queryByText(/Coaches get read-only training access/)).toBeNull();
-    expect(screen.queryByText(/Configure how dates and other details/)).toBeNull();
-    expect(screen.getByTestId('settings-connect-agent-row')).toBeTruthy();
-    expect(screen.queryByTestId('settings-connected-agents-row')).toBeNull();
+    expect(screen.queryByTestId('settings-connect-agent-row')).toBeNull();
+    screen.unmount();
+
+    render(<DataSyncSettingsScreen />);
     expect(screen.getByTestId('settings-sync-signed-out-card')).toBeTruthy();
   });
 });

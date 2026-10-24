@@ -11,7 +11,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
 import { Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
 
@@ -376,14 +376,18 @@ describe('ExerciseCatalogScreen', () => {
   });
 
   describe('design language', () => {
-    it('titles the screen Exercises, with + as its one accent and visible shared controls', async () => {
+    it('titles the screen Exercises in one bar with its ⋮, with a labelled Add as its one accent', async () => {
+      mockSearchParams = { source: 'more' };
       await openCatalog();
 
-      expect(screen.getByRole('header', { name: 'Exercises' })).toBeTruthy();
-      expect(screen.getByTestId('exercise-catalog-title')).toBeTruthy();
+      const titleBar = within(screen.getByTestId('exercise-catalog-title'));
+      expect(titleBar.getByRole('header', { name: 'Exercises' })).toBeTruthy();
+      expect(titleBar.getByTestId('back-to-more-button')).toBeTruthy();
+      expect(titleBar.getByLabelText('Exercise catalog options')).toBeTruthy();
       const accents = accentGrounds();
       expect(accents).toHaveLength(1);
       expect(accents[0].props.testID).toBe('create-new-exercise-button');
+      expect(within(accents[0]).getByText('Add')).toBeTruthy();
 
       expect(screen.getByLabelText('Sort: Favourite')).toBeTruthy();
       expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: true });

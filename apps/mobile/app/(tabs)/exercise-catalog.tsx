@@ -10,12 +10,13 @@ import {
   useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
 import { GymPicker } from '@/components/gyms/gym-picker';
+import { ActionButton } from '@/components/ui/action-button';
 import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { ListRow } from '@/components/ui/list-row';
 import { Notice } from '@/components/ui/notice';
-import { PageHeader } from '@/components/ui/page-header';
+import { TitleBar } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
@@ -320,10 +321,19 @@ export default function ExerciseCatalogScreen() {
   return (
     <Screen style={styles.screen} testID="exercise-catalog-screen">
       <View style={styles.pinnedTopRegion}>
-        <MoreHubBackButton />
-        <View testID="exercise-catalog-title">
-          <PageHeader title="Exercises" />
-        </View>
+        <TitleBar
+          actions={
+            <IconButton
+              accessibilityLabel="Exercise catalog options"
+              name="more-vertical"
+              onPress={openFilters}
+              testID="exercise-catalog-options-button"
+            />
+          }
+          back={<MoreHubBackButton />}
+          testID="exercise-catalog-title"
+          title="Exercises"
+        />
         <View style={styles.topActionRow}>
           <View style={styles.search}>
             <SearchField
@@ -334,18 +344,12 @@ export default function ExerciseCatalogScreen() {
               value={exerciseSearchValue}
             />
           </View>
-          <IconButton
+          <ActionButton
             accessibilityLabel="Create new exercise"
-            name="plus"
+            label="Add"
             onPress={startNewExercise}
             testID="create-new-exercise-button"
-            tone="accent"
-          />
-          <IconButton
-            accessibilityLabel="Exercise catalog options"
-            name="more-vertical"
-            onPress={openFilters}
-            testID="exercise-catalog-options-button"
+            variant="primary"
           />
         </View>
         <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>

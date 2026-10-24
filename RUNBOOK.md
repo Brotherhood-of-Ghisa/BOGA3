@@ -246,7 +246,7 @@ it only with a token issued by this worktree's local Supabase. Never paste a
 token into a committed file, shell history, task note or log. Hosted smoke runs
 from the hosting platform — `docs/runbook-hosted-operations.md`.
 
-**Connected agents.** In a signed-in build, Settings → Connected agents lists
+**Connected agents.** In a signed-in build, More → Connect an AI (once an agent is connected) lists
 each active grant with its client name, grant time and most recent
 metadata-only access. **Revoke access** confirms, then uses Supabase Auth grant
 revocation; subsequent MCP/API calls with the old token must return `401`. If

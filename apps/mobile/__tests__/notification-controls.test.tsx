@@ -17,10 +17,15 @@ jest.mock('@/src/auth/supabase', () => ({
 }));
 const mockPush = jest.fn();
 let mockUserId: string | null = '11111111-1111-4111-8111-111111111111';
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useLocalSearchParams: () => ({}) }));
+jest.mock('expo-router', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
+  useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => ({}),
+}));
 jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: mockUserId ? { id: mockUserId } : null }) }));
 jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
-jest.mock('@/components/sync-status/sync-status-panel', () => ({ SyncStatusPanel: () => null }));
+jest.mock('@/components/sync-status/use-sync-status', () => ({ useSyncStatusSnapshot: () => null }));
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- shared native database boundary.
   require('./helpers/local-data').localDataBootstrapModule());

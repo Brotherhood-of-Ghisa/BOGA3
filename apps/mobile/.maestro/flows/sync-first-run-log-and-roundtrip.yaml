@@ -146,10 +146,10 @@ appId: com.dinoderek.mobile
 # Back is the Broad muscle on its anchor entry's id, so its label tells the
 # presets apart. The sheet's backdrop is hidden from the modal accessibility
 # tree, so the dismiss taps the exposed region above the panel.
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - extendedWaitUntil:
     visible:
-      id: "settings-screen"
+      id: "settings-progress-screen"
     timeout: 15000
 - scrollUntilVisible:
     element:
@@ -186,14 +186,8 @@ appId: com.dinoderek.mobile
 # the reading and the muscle rows. Pending changes reaching 0 is the upload
 # proof AND the barrier for the wipe below: without it clearState can beat the
 # push. The id+text matcher targets the dirty-count field, so an unrelated "0"
-# cannot satisfy it. The card sits below the fold, out of the hierarchy until
-# scrolled to.
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-dirty-count"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
+# cannot satisfy it. The count is on Settings → Data & sync.
+- openLink: "boga3://settings-data-sync"
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-dirty-count"
@@ -261,10 +255,10 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "19-first-run-roundtrip-reading-restored"
 # And the account's muscle setup: still Broad, Calves still off.
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - extendedWaitUntil:
     visible:
-      id: "settings-screen"
+      id: "settings-progress-screen"
     timeout: 15000
 - scrollUntilVisible:
     element:
