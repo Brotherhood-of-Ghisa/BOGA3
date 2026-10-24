@@ -46,8 +46,10 @@ export type WeekBoardRowViewModel = {
 
 export type WeekBoardViewModel = {
   rows: WeekBoardRowViewModel[];
-  /** The caller's own line, only when they are outside the top three rows. */
+  /** The caller's own line, only when they are outside the rows shown. */
   me: { rankLabel: string; workingSets: number; groupRecords: number } | null;
+  /** Ranked members past the rows shown, the caller's own line not counted. */
+  hiddenCount: number;
 };
 
 const toBoardRow = (row: GroupWeekBoardRow, topWorkingSets: number, myUserId: string): WeekBoardRowViewModel => ({
@@ -63,14 +65,16 @@ const toBoardRow = (row: GroupWeekBoardRow, topWorkingSets: number, myUserId: st
 
 /**
  * The server ranks every current member (ties share a rank); the board keeps
- * its first three rows. The caller is found by user id, so a tie at third
- * place can still put them on their own line, at that shared rank.
+ * its first `size` rows — three, or as many as Today's cards layout has room
+ * for. The caller is found by user id, so a tie at the last row shown can
+ * still put them on their own line, at that shared rank.
  */
-export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string): WeekBoardViewModel => {
+export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string, size = WEEK_BOARD_SIZE): WeekBoardViewModel => {
   const topWorkingSets = members[0]?.working_sets ?? 0;
-  const rows = members.slice(0, WEEK_BOARD_SIZE).map((row) => toBoardRow(row, topWorkingSets, myUserId));
+  const rows = members.slice(0, Math.max(0, size)).map((row) => toBoardRow(row, topWorkingSets, myUserId));
   const mine = rows.some((row) => row.isMe) ? undefined : members.find((row) => row.member.user_id === myUserId);
   return {
+    hiddenCount: members.length - rows.length - (mine ? 1 : 0),
     rows,
     me: mine
       ? { rankLabel: formatOrdinal(mine.rank), workingSets: mine.working_sets, groupRecords: mine.group_records }

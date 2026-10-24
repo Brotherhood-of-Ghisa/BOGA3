@@ -262,3 +262,15 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   expect(select).not.toHaveBeenCalled();
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
+
+it('switches Today between List and Cards in Preferences, saved per account', async () => {
+  await openSettings();
+  const selector = within(screen.getByTestId('settings-today-layout-row'));
+  expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['Show Today as a list', 'Show Today as cards']);
+  expect(values().todayLayout).toBe('list');
+  fireEvent.press(screen.getByTestId('settings-today-layout-cards'));
+  expect(values().todayLayout).toBe('cards');
+  expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout')).toBe('cards');
+  fireEvent.press(screen.getByTestId('settings-today-layout-list'));
+  expect(values().todayLayout).toBe('list');
+});

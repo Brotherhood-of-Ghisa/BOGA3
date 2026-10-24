@@ -134,6 +134,11 @@ Use this section as the single source of truth for reusable UX patterns.
    - Usage: `Information` (`components/ui/information.tsx`), used by `components/rm-curve/help.tsx` beside the chart title.
    - Rules: an accessible label names the topic; the button keeps a full mobile tap target. The existing `Sheet` holds short, plain-language sections in a scrolling body and uses its standard dismissal gestures, backdrop and accessible escape. Opening or dismissing changes no chart choice or selection.
 
+15. Fit-to-height card pager pattern
+   - Intent: show a few summaries one screen each, with nothing to scroll.
+   - Usage: Today's Cards layout (`components/today/today-cards.tsx`).
+   - Rules: one `Card` per page, sized to the height between its tabs and the tab bar; the next card peeks at the edge and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each card has one elastic part that takes the height left (a chart, or as many board rows as fit with `+N more`) above a fixed floor, and below the floor the card scrolls rather than clips; a link row closes each card; a control for one page shows beside the tabs only while that page does.
+
 ## Default appearance baseline (MVP)
 
 1. Layout

@@ -58,6 +58,7 @@ import {
 } from '@/src/groups';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { competitionEvent } from './helpers/competition-fixtures';
 
@@ -362,5 +363,93 @@ describe('Today: the group card offline and on errors', () => {
     await waitFor(() => expect(byId('today-group-board-row-lena')).toBeTruthy());
     expect(screen.queryByTestId('today-group-switch')).toBeNull();
     expect(byId('today-group-title')).toHaveTextContent('Lunch Club');
+  });
+});
+
+describe("Today: the group card in the cards layout (Settings' Today layout: Cards)", () => {
+  beforeEach(() => {
+    act(() => updatePreferences({ todayLayout: 'cards' }));
+  });
+  afterEach(() => {
+    act(() => updatePreferences({ todayLayout: 'list' }));
+  });
+
+  // Nine ranked members, me seventh.
+  const nine = ['dave', 'maria', 'sam', 'kit', 'jo', 'marco', ME, 'dee', 'tom'].map((userId, index) => ({
+    rank: index + 1,
+    member: member(userId),
+    working_sets: 60 - index * 5,
+    group_records: 0,
+  }));
+
+  const boardBox = (height: number) =>
+    fireEvent(byId('today-group-board-box'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 345, height } } });
+  const boardRows = () => screen.queryAllByTestId(/^today-group-board-row-[^-]+$/).map((row) => row.props.testID);
+
+  it("names the group's card after it, and offers its switch only while that card shows", async () => {
+    setLastViewedGroupId('g2');
+    api.listMyGroups.mockResolvedValue({ groups: [IRON, LUNCH] });
+    api.getCompetitionWeek.mockResolvedValue(summary({ group_id: 'g2' }));
+    await renderToday();
+
+    await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
+    expect(byId('today-group-section-tab')).toHaveTextContent('Lunch Club');
+    expect(screen.queryByTestId('today-group-switch')).toBeNull();
+
+    fireEvent.press(byId('today-group-section-tab'));
+    fireEvent.press(byId('today-group-switch'));
+    fireEvent.press(byId('today-group-switch-g1'));
+    await waitFor(() => expect(byId('today-group-section-tab')).toHaveTextContent('Iron Wednesdays'));
+    expect(getLastViewedGroupId()).toBe('g1');
+
+    // The card's link opens the group At a glance, as the list layout's heading does.
+    fireEvent.press(byId('today-view-group-button'));
+    expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
+  });
+
+  it('shows as many board rows as the card has room for, counting the rest', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary({ members: nine }));
+    await renderToday();
+    await waitFor(() => expect(byId('today-group-board-box')).toBeTruthy());
+
+    // Before the box is measured: the list layout's three, then my own line.
+    expect(boardRows()).toHaveLength(3);
+    expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 7th');
+    expect(byId('today-group-board-more')).toHaveTextContent('+5 more');
+
+    // 400pt: 34 of heading, 36 for my line and 22 for `+N more` leave 308, seven 40pt rows — me among them.
+    boardBox(400);
+    expect(boardRows()).toEqual(['dave', 'maria', 'sam', 'kit', 'jo', 'marco', ME].map((id) => `today-group-board-row-${id}`));
+    expect(screen.queryByTestId('today-group-board-me')).toBeNull();
+    expect(byId('today-group-board-more')).toHaveTextContent('+2 more');
+    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/7, You, 30 sets, 0 PRs; 2 more$/);
+
+    // Room for everyone: no `+N more`.
+    boardBox(600);
+    expect(boardRows()).toHaveLength(9);
+    expect(screen.queryByTestId('today-group-board-more')).toBeNull();
+
+    // Never fewer than three.
+    boardBox(120);
+    expect(boardRows()).toHaveLength(3);
+  });
+
+  it('centres the loading state in the card while My groups is read (a pending read)', async () => {
+    api.listMyGroups.mockReturnValue(new Promise(() => {}));
+    await renderToday();
+
+    await waitFor(() => expect(within(byId('today-group-missing')).getByTestId('today-group-loading')).toBeTruthy());
+    expect(byId('today-group-missing')).toHaveStyle({ flex: 1, justifyContent: 'center' });
+  });
+
+  it('fills the card with the signed-out panel, its link opening Groups', async () => {
+    mockUseAuth.mockReturnValue({ isConfigured: true, user: null });
+    await renderToday();
+
+    expect(within(byId('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
+    expect(byId('today-group-section-tab')).toHaveTextContent('Group activity');
+    fireEvent.press(byId('today-view-groups-button'));
+    expect(mockPush).toHaveBeenLastCalledWith('/groups');
   });
 });

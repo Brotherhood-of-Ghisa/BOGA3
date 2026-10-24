@@ -33,6 +33,7 @@ import {
 } from '@/src/sync/dev-affordances';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
+import type { TodayLayout } from '@/src/preferences/model';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
@@ -262,6 +263,7 @@ export default function SettingsScreen() {
               value={listPreferences.pastRecordsGymScope}
             />
           </View>
+          <TodayLayoutSetting value={listPreferences.todayLayout} />
           <RestTimerSettings state={preferences} />
         </Card>
       </View>
@@ -412,6 +414,28 @@ const PAST_RECORDS_GYM_SCOPE_OPTIONS = [
     accessibilityLabel: 'Set past records gym filter to Current gym only',
   },
 ];
+
+const TODAY_LAYOUT_OPTIONS = [
+  { value: 'list' as const, label: 'List', accessibilityLabel: 'Show Today as a list' },
+  { value: 'cards' as const, label: 'Cards', accessibilityLabel: 'Show Today as cards' },
+];
+
+// List keeps Today one scrolling page; Cards gives Progress and the group a
+// full-height card each, swiped between.
+function TodayLayoutSetting({ value }: { value: TodayLayout }) {
+  return (
+    <View style={styles.preference}>
+      <Text allowFontScaling={false} style={styles.fieldLabel}>Today layout</Text>
+      <SegmentedControl
+        accessibilityLabel="Today layout"
+        onChange={(todayLayout) => updatePreferences({ todayLayout })}
+        options={TODAY_LAYOUT_OPTIONS}
+        testIDPrefix="settings-today-layout"
+        value={value}
+      />
+    </View>
+  );
+}
 
 // A section's name: a micro-label over its card, as on More.
 function SectionLabel({ title }: { title: string }) {

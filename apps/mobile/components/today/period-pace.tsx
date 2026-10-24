@@ -26,7 +26,10 @@ import { todayText } from './text-styles';
 // Until the first layout pass reports the card's width (and in Jest, where
 // none runs): roughly a 390pt phone's card.
 const FALLBACK_CHART_WIDTH = 326;
-const AXIS_LABEL_Y = 101;
+// The `TODAY` label's baseline, under the plot.
+const AXIS_LABEL_OFFSET = 15;
+// A filling chart never draws shorter than this; the card scrolls instead.
+export const MIN_FILL_CHART_HEIGHT = 72;
 const WEEK_TICK = 4;
 
 const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
@@ -81,7 +84,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
           LAST
         </SvgText>
       ) : null}
-      <SvgText {...axisLabel} fill={uiRoles.ink} letterSpacing={1} textAnchor={todayAnchor} x={today.current.x} y={AXIS_LABEL_Y}>
+      <SvgText {...axisLabel} fill={uiRoles.ink} letterSpacing={1} textAnchor={todayAnchor} x={today.current.x} y={plot.bottom + AXIS_LABEL_OFFSET}>
         TODAY
       </SvgText>
     </>
@@ -91,18 +94,21 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // The fixed period ([[comparison.window]]): its range against the previous
 // period's; its working sets so far against the previous period at the same
 // day ([[comparison.change-display]]) beside the previous period's whole
-// total; and the cumulative lines by day.
-export function PeriodPace({ period }: { period: TodayProgressPeriod }) {
+// total; and the cumulative lines by day. `fill` lets the chart take the
+// height the block is given (Today's cards layout) instead of its own.
+export function PeriodPace({ period, fill = false }: { period: TodayProgressPeriod; fill?: boolean }) {
   const dateFormat = useDateFormat();
-  const [width, setWidth] = useState(FALLBACK_CHART_WIDTH);
+  const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   const onLayout = (event: LayoutChangeEvent) => {
-    const measured = Math.round(event.nativeEvent.layout.width);
-    if (measured > 0 && measured !== width) setWidth(measured);
+    const width = Math.round(event.nativeEvent.layout.width);
+    const height = fill ? Math.round(event.nativeEvent.layout.height) : CHART_HEIGHT;
+    if (width > 0 && height > 0 && (width !== size.width || height !== size.height)) setSize({ width, height });
   };
+  const { width, height } = size;
   const difference = paceDifference(period);
 
   return (
-    <View style={styles.block} testID="today-progress-period">
+    <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
       <View accessible accessibilityLabel={periodRangesAccessibilityLabel(period, dateFormat)} style={styles.ranges}>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
           {formatWeekRange(period.window, dateFormat)}
@@ -144,9 +150,10 @@ export function PeriodPace({ period }: { period: TodayProgressPeriod }) {
         accessibilityLabel={periodChartAccessibilityLabel(period)}
         accessibilityRole="image"
         onLayout={onLayout}
+        style={fill ? styles.fillChart : null}
         testID="today-progress-chart">
-        <Svg height={CHART_HEIGHT} style={styles.chart} width={width}>
-          <PeriodChart geometry={periodChartGeometry(period, width)} />
+        <Svg height={height} style={styles.chart} width={width}>
+          <PeriodChart geometry={periodChartGeometry(period, width, height)} />
         </Svg>
       </View>
     </View>
@@ -182,5 +189,13 @@ const styles = StyleSheet.create({
   },
   chart: {
     overflow: 'visible',
+  },
+  fill: {
+    flex: 1,
+    minHeight: 0,
+  },
+  fillChart: {
+    flex: 1,
+    minHeight: MIN_FILL_CHART_HEIGHT,
   },
 });

@@ -113,6 +113,16 @@ describe('buildWeekBoard', () => {
   it('shows no line for a caller missing from the board', () => {
     expect(buildWeekBoard([row('dave', 1, 5)], ME).me).toBeNull();
   });
+
+  it('keeps as many rows as asked, counting the members past them besides my own line', () => {
+    const members = [row('dave', 1, 58), row('maria', 2, 39), row('sam', 3, 35), row('kit', 4, 30), row(ME, 5, 21), row('tom', 6, 3), row('ana', 7, 1)];
+
+    expect(buildWeekBoard(members, ME)).toMatchObject({ me: { rankLabel: '5th' }, hiddenCount: 3 });
+    const five = buildWeekBoard(members, ME, 5);
+    expect(five.rows.map((entry) => entry.userId)).toEqual(['dave', 'maria', 'sam', 'kit', ME]);
+    expect(five).toMatchObject({ me: null, hiddenCount: 2 });
+    expect(buildWeekBoard(members, ME, 20)).toMatchObject({ me: null, hiddenCount: 0 });
+  });
 });
 
 describe('buildLatestActivity', () => {

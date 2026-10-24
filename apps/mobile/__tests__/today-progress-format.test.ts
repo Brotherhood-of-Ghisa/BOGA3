@@ -182,6 +182,16 @@ describe('the period chart geometry', () => {
     expect(geometry.previous[6].x).toBeCloseTo(plotWidth);
   });
 
+  it('fits the plot to a given height, keeping the axis room under it (the cards layout)', () => {
+    const input = period({ now, cumulative: [0, 10], previousCumulative: days(28, (index) => index), projected: 20 });
+    expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 86 });
+    const tall = periodChartGeometry(input, width, 240);
+    expect(tall.plot.bottom).toBe(222);
+    expect(tall.current[0].y).toBe(222);
+    // Never a plot upside down, however short the space.
+    expect(periodChartGeometry(input, width, 10).plot.bottom).toBe(6);
+  });
+
   it('centres TODAY under today, flush with an edge it would overrun', () => {
     expect(todayLabelAnchor(0, plotWidth)).toBe('start');
     expect(todayLabelAnchor(17.9, plotWidth)).toBe('start');
