@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { aggregateProgressMuscleTickers, muscleTickerBounds, type MuscleTickerSeries } from '@/src/data/progress-muscle-tickers';
 import { aggregateStats } from '@/src/data/stats';
 import { shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
@@ -157,7 +158,7 @@ it('keeps history beside two-line names, caps the plot and preserves independent
   layout('stats-muscle-history-back', 400);
   expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(100);
   layout('stats-muscle-history-back', 72);
-  expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(10);
+  expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(14);
   expect(screen.getByTestId('stats-muscle-history-back')).toHaveStyle({ flexDirection: 'row', minHeight: 44 });
   expect(within(screen.getByTestId('stats-muscle-history-back')).getByText('Back')).toHaveProp('numberOfLines', 2);
   expect(within(screen.getByTestId('stats-muscle-row-back-periods')).getByTestId('stats-muscle-row-back-previous')).toHaveTextContent('1');
@@ -169,6 +170,30 @@ it('keeps history beside two-line names, caps the plot and preserves independent
   expect(rowProps.onSelect).toHaveBeenCalledWith('back');
   fireEvent.press(screen.getByTestId('stats-muscle-history-back'));
   expect(rowProps.onMuscleHistory).toHaveBeenCalled();
+});
+
+it.each([[[0, 40, 20]], [[20]]])('keeps valid Volume history %j drawable in the actual 320pt row allocation', values => {
+  const muscle = { ...muscleRow, current: { ...muscleRow.current, totalVolume: 1234567 } };
+  render(<ProgressTables {...rowProps} muscles={[muscle]} metric="totalVolume"
+    tickers={{ ...tickerData, muscles: { back: { ...tickerData.muscles.back, totalVolume: series(values, null) } } }} />);
+  const tableWidth = 288;
+  layout('stats-muscle-table-container', tableWidth);
+  const row = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back').props.style);
+  const card = StyleSheet.flatten(screen.getByTestId('stats-muscle-table').props.style);
+  const periods = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-periods').props.style);
+  const change = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-change').props.style);
+  const figures = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-values').props.style);
+  const disclosure = StyleSheet.flatten(screen.getByTestId('stats-muscle-select-back').props.style);
+  const historyWidth = tableWidth - card.borderWidth * 2 - row.paddingHorizontal * 2 - row.gap * 2
+    - periods.width - change.width - figures.gap - disclosure.width;
+  expect(historyWidth).toBeCloseTo(63.1567, 2);
+  layout('stats-muscle-history-back', historyWidth);
+  const ticker = screen.getByTestId('stats-muscle-ticker-back');
+  expect(ticker.props.width).toBeGreaterThanOrEqual(8);
+  expect(ticker.props.width).toBeLessThanOrEqual(tableWidth / 3);
+  expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(44);
+  expect(screen.getAllByTestId('stats-muscle-ticker-back-endpoint')).toHaveLength(1);
+  expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent('1234567');
 });
 
 it.each(['pending', 'error', 'loaded'] as const)('keeps comparisons and both actions reachable when ticker data is %s', tickerStatus => {

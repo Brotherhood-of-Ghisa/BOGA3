@@ -159,6 +159,9 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory, ticker,
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
+  // Reserve a drawable plot before sharing the remaining room with the name.
+  const tickerWidth = Math.min(tickerWidthCap, uiSpace.sm
+    + Math.max(0, nameWidth - uiGeometry.tapTarget - uiSpace.sm * 2) * 0.5);
   return <View style={styles.compactRow} testID={prefix}>
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       accessibilityHint={muscleTickerDescription(ticker, tickerWeeks, metric, dateFormat, tickerStatus)}
@@ -166,7 +169,7 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory, ticker,
       onPress={() => onHistory(row, name.current)} style={[styles.nameLink, styles.inlineHistory]} testID={`stats-muscle-history-${row.muscleGroupId}`}>
       <Text allowFontScaling={false} numberOfLines={2} style={[statsTableStyles.name, styles.compactName]}>{row.displayName}</Text>
       {ticker && tickerWindow ? <MuscleTicker series={ticker} start={tickerWindow.start} end={tickerWindow.end}
-        width={Math.min(tickerWidthCap, Math.max(0, nameWidth - uiGeometry.tapTarget - uiSpace.sm) * 0.5)} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
+        width={tickerWidth} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
     </Pressable>
     {values}
     <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
