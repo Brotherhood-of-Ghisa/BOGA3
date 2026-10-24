@@ -251,14 +251,17 @@ export type StatsScreenShellProps = {
   /** Whether muscle figures count secondary work ([[muscle.secondary-filter]]); this visit's choice. */
   countSecondary?: boolean;
   onChangeCountSecondary?: (countSecondary: boolean) => void;
+  /** What Settings says each visit opens on for secondary work and family grouping. */
+  defaultCountSecondary?: boolean;
+  defaultGrouped?: boolean;
 };
 
 // The pinned search row keeps its controls reachable above either table; the
 // view's choices sit behind its Filters button. Muscle 3D has no table to
 // search, so its row holds the button alone.
 function ProgressSearchControls({ viewMode, tableVisible, exerciseSpatial, grouped, onToggleGroup, query, onChangeQuery,
-  gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary }: Pick<StatsScreenShellProps,
-  'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary'> & {
+  gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary, defaultCountSecondary = true, defaultGrouped = true }: Pick<StatsScreenShellProps,
+  'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary' | 'defaultCountSecondary' | 'defaultGrouped'> & {
   tableVisible: boolean; exerciseSpatial: boolean; grouped: boolean; onToggleGroup: () => void; query: string; onChangeQuery: (query: string) => void;
 }) {
   const exercise = viewMode === 'exercise';
@@ -273,8 +276,9 @@ function ProgressSearchControls({ viewMode, tableVisible, exerciseSpatial, group
         testID={exercise ? 'stats-search-input' : 'stats-muscle-search-input'} value={query} />
     </View> : null}
     <ProgressFilters testID="stats-filters"
-      grouping={tableVisible ? { value: grouped, onChange: onToggleGroup } : undefined}
-      secondary={secondaryApplies && onChangeCountSecondary ? { value: countSecondary, onChange: onChangeCountSecondary } : undefined}
+      grouping={tableVisible ? { value: grouped, onChange: onToggleGroup, opening: defaultGrouped } : undefined}
+      secondary={secondaryApplies && onChangeCountSecondary
+        ? { value: countSecondary, onChange: onChangeCountSecondary, opening: defaultCountSecondary } : undefined}
       gym={searchable && onSelectGym ? { value: gymId, options: gymOptions ?? [], onChange: onSelectGym } : undefined} />
   </View>;
 }
@@ -315,12 +319,21 @@ export function StatsScreenShell({
   onSelectGym,
   countSecondary = true,
   onChangeCountSecondary,
+  defaultCountSecondary = true,
+  defaultGrouped = true,
 }: StatsScreenShellProps) {
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
   const [muscleSortMode, setMuscleSortMode] = useState<MuscleSortMode>('now-desc');
-  const [grouped, setGrouped] = useState({ exercise: true, muscle: true });
+  // Each breakdown keeps its own grouping for the visit, opening on Settings'
+  // default; a changed default replaces both.
+  const [grouped, setGrouped] = useState({ exercise: defaultGrouped, muscle: defaultGrouped });
+  const [groupedDefault, setGroupedDefault] = useState(defaultGrouped);
+  if (groupedDefault !== defaultGrouped) {
+    setGroupedDefault(defaultGrouped);
+    setGrouped({ exercise: defaultGrouped, muscle: defaultGrouped });
+  }
   const [muscleSearch, setMuscleSearch] = useState('');
   const tableVisible = muscleLayout === 'list' || (viewMode === 'exercise' && muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const exerciseSpatial = muscleLayout !== 'list' && !(muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
@@ -411,7 +424,8 @@ export function StatsScreenShell({
           query={viewMode === 'exercise' ? searchQuery : muscleSearch}
           onChangeQuery={viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch}
           gymId={gymId} gymOptions={gymOptions} onSelectGym={onSelectGym}
-          countSecondary={countSecondary} onChangeCountSecondary={onChangeCountSecondary} />
+          countSecondary={countSecondary} onChangeCountSecondary={onChangeCountSecondary}
+          defaultCountSecondary={defaultCountSecondary} defaultGrouped={defaultGrouped} />
       </View>
       <ScreenScroll key={viewMode === 'exercise' ? `exercise-${exerciseSpatial}` : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {activeError ? <StatePanel fill={false} kind="error" title="Could not load progress"
@@ -637,8 +651,7 @@ function StatsContent() {
   const catalog = useExerciseCatalog();
   // The tables' gym ([[gym.view-filter]]); this visit's choice only.
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
-  // Secondary work in muscle figures ([[muscle.secondary-filter]]); this visit's choice only.
-  const [countSecondary, setCountSecondary] = useState(true);
+  const { countSecondary } = filters;
   const { current: thisPeriod, previous: lastPeriod, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
   const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
@@ -687,7 +700,8 @@ function StatsContent() {
     isFocused={isFocused}
     exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
     gymId={gymId} gymOptions={gymOptions} onSelectGym={setGymId}
-    countSecondary={countSecondary} onChangeCountSecondary={setCountSecondary} />;
+    countSecondary={countSecondary} onChangeCountSecondary={filters.selectCountSecondary}
+    defaultCountSecondary={values.progressCountSecondary} defaultGrouped={values.progressGrouped} />;
 }
 
 // A period the exercise has no aggregate for is a genuine nothing: zero sets,

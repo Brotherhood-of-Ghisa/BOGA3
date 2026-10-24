@@ -5,7 +5,7 @@ import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
   COLUMN_KEYS, COLUMN_NAMES, ComparisonHeaders, ComparisonValues, compareOptionalNumbers, comparisonSortValues,
-  hasComparisonMetric, metricUnit, resolveComparisonLayout, type ComparisonColumnKey,
+  hasComparisonMetric, metricUnit, pairedPeriodColumns, resolveComparisonLayout, type ComparisonColumnKey,
   type ComparisonLayout,
 } from './comparison-columns';
 import { StatsTable, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
@@ -87,7 +87,7 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 };
 
 // Family headers carry no totals: overlapping muscle rows cannot be summed.
-// List rows pair Now over Previous, with history beside the name. Only Now
+// List rows pair Now with Previous under one `Now` header, with history beside the name. Only Now
 // sorts the paired periods; history and disclosure keep separate 44pt targets.
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
@@ -101,8 +101,9 @@ export function ProgressTables(props: ProgressTablesProps) {
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
+  const resolved = resolveComparisonLayout(tableWidth ? tableWidth + uiSpace.lg * 2 : width, [...rows, ...exercises], metric, true, true);
   const layout: ComparisonLayout = {
-    ...resolveComparisonLayout(tableWidth ? tableWidth + uiSpace.lg * 2 : width, [...rows, ...exercises], metric, true, true),
+    ...resolved, columns: pairedPeriodColumns(resolved.columns, [...rows, ...exercises], metric),
     stacked: false, pairedPeriods: true,
   };
   return <View onLayout={event => setTableWidth(event.nativeEvent.layout.width)} testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">

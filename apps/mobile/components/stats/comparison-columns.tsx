@@ -20,7 +20,8 @@ import {
 // they still fit beside the row's name. Both tables put spoken header
 // labels or shared sort controls over them; neither owns the
 // columns, and a figure means the same thing in both. Muscle List pairs the
-// periods vertically; Exercise and 3D keep three separate columns.
+// periods in one column under `Now` — Sets on one line as `12 (10)`, the wider
+// Volume figures one over the other; Exercise and 3D keep three separate columns.
 
 /** The figure the columns show. 1RM is a metric only an exercise has. */
 export type ComparisonMetric = ProgressExerciseMetric;
@@ -77,6 +78,21 @@ export const comparisonFigures = (row: ComparisonRow, metric: ComparisonMetric):
   previous: metricFigure(row.previous, metric),
   change: metricChange(row, metric),
 });
+
+/** Paired periods share one line where the figures are short enough: Sets. */
+const inlinePeriods = (metric: ComparisonMetric): boolean => metric === 'workingSetCount';
+const inlinePeriodsText = (figures: { now: string; previous: string }): string => `${figures.now} (${figures.previous})`;
+
+/**
+ * The columns of a table pairing its periods: with Sets on one line, the
+ * first column is as wide as its widest `now (previous)` and its sort arrow.
+ * Uncapped: a count pair (`123 (100)`) still leaves the name its room.
+ */
+export const pairedPeriodColumns = (columns: number[], rows: ComparisonRow[], metric: ComparisonMetric): number[] =>
+  inlinePeriods(metric)
+    ? [statsTableColumnWidth(COLUMN_LABELS[0], rows.map(row => inlinePeriodsText(comparisonFigures(row, metric))),
+      uiIconSize.xs + uiSpace.xs), ...columns.slice(1)]
+    : columns;
 
 /** The same three figures as text, in column order — what a column reserves room for. */
 export const comparisonColumnTexts = (row: ComparisonRow, metric: ComparisonMetric): string[] => {
@@ -182,11 +198,7 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
           style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width }]}>
           <StatsTableHeaderLabel label={label} />
         </View>;
-      return <Fragment key={label}>{paired ? <View style={{ width }}>
-        {header}
-        <View accessible accessibilityRole="header" accessibilityLabel={`Previous, ${metricUnit(metric)}`}
-          style={styles.previousHeader}><StatsTableHeaderLabel label="Prev" /></View>
-      </View> : header}</Fragment>;
+      return <Fragment key={label}>{header}</Fragment>;
     })}
   </StatsTableFigures>;
   return <StatsTableHeader testID={testID}>
@@ -218,10 +230,15 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
     style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
     <StatsTableFigures testID={`${prefix}-values`}>
       {layout.pairedPeriods ? <>
-        <View style={{ width: periodWidth }} testID={`${prefix}-periods`}>
+        {inlinePeriods(metric) ? <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: periodWidth }]}
+          testID={`${prefix}-periods`}>
+          <Text allowFontScaling={false} testID={`${prefix}-now`}>{figures.now}</Text>
+          <Text allowFontScaling={false} style={styles.previous}> (<Text allowFontScaling={false}
+            testID={`${prefix}-previous`}>{figures.previous}</Text>)</Text>
+        </Text> : <View style={{ width: periodWidth }} testID={`${prefix}-periods`}>
           <Text allowFontScaling={false} style={statsTableStyles.figure} testID={`${prefix}-now`}>{figures.now}</Text>
           <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.previous]} testID={`${prefix}-previous`}>{figures.previous}</Text>
-        </View>
+        </View>}
         <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: layout.columns[2] }, changeColour]}
           testID={`${prefix}-change`}>{figures.change.text}</Text>
       </> : texts.map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
@@ -233,7 +250,6 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
 
 const styles = StyleSheet.create({
   previous: { color: uiRoles.inkMuted },
-  previousHeader: { alignItems: 'flex-end', paddingBottom: uiSpace.xs },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { alignItems: 'stretch' },
   stackedFigures: { alignSelf: 'stretch', width: '100%', justifyContent: 'flex-end', paddingBottom: uiSpace.xs },

@@ -265,7 +265,7 @@ it('leaves the period chip inert when the Progress period is one week', () => {
 
 describe('formatCountDelta', () => {
   it('renders an absolute neutral delta when both periods are equal', () => {
-    expect(formatCountDelta(0, 0)).toEqual({ text: '±0', tone: 'neutral' });
+    expect(formatCountDelta(0, 0)).toEqual({ text: '0', tone: 'neutral' });
   });
 
   it('renders only the absolute increase when the previous count was zero', () => {
@@ -298,7 +298,7 @@ describe('stats row metric formatters', () => {
     expect(formatVolumeDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
     expect(formatVolumeDelta(100, 0)).toEqual({ text: 'new', tone: 'new' });
     expect(formatVolumeDelta(0, 100)).toEqual({ text: '−100%', tone: 'negative' });
-    expect(formatVolumeDelta(100, 100)).toEqual({ text: '±0%', tone: 'neutral' });
+    expect(formatVolumeDelta(100, 100)).toEqual({ text: '0%', tone: 'neutral' });
     expect(formatVolumeDelta(117, 100)).toEqual({ text: '+17%', tone: 'positive' });
   });
 
@@ -307,15 +307,15 @@ describe('stats row metric formatters', () => {
   it('formats a 1RM change in kg, telling a first estimate from an absent one', () => {
     expect(formatOneRepMaxDelta(104.7, 100)).toEqual({ text: '+4.7', tone: 'positive' });
     expect(formatOneRepMaxDelta(95, 100)).toEqual({ text: '−5.0', tone: 'negative' });
-    expect(formatOneRepMaxDelta(100, 100)).toEqual({ text: '±0', tone: 'neutral' });
+    expect(formatOneRepMaxDelta(100, 100)).toEqual({ text: '0', tone: 'neutral' });
     expect(formatOneRepMaxDelta(100, null)).toEqual({ text: 'new', tone: 'new' });
     expect(formatOneRepMaxDelta(null, 100)).toEqual({ text: '—', tone: 'neutral' });
     expect(formatOneRepMaxDelta(null, null)).toEqual({ text: '—', tone: 'neutral' });
     expect(formatOneRepMaxDelta(Number.POSITIVE_INFINITY, 100)).toEqual({ text: '—', tone: 'neutral' });
     // The sign follows the figure drawn: both periods show `100.0`, so the
     // change is level rather than a `+0.0` in the improvement's colour.
-    expect(formatOneRepMaxDelta(100.04, 100)).toEqual({ text: '±0', tone: 'neutral' });
-    expect(formatOneRepMaxDelta(99.96, 100)).toEqual({ text: '±0', tone: 'neutral' });
+    expect(formatOneRepMaxDelta(100.04, 100)).toEqual({ text: '0', tone: 'neutral' });
+    expect(formatOneRepMaxDelta(99.96, 100)).toEqual({ text: '0', tone: 'neutral' });
     expect(formatOneRepMaxDelta(100.06, 100)).toEqual({ text: '+0.1', tone: 'positive' });
   });
 });

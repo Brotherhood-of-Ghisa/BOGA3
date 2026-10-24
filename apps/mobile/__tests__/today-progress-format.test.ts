@@ -108,7 +108,7 @@ describe('the period against the previous period', () => {
   it('says the difference as a signed absolute count, never a percentage', () => {
     expect(formatSignedCount(4)).toBe('+4');
     expect(formatSignedCount(-3)).toBe('−3');
-    expect(formatSignedCount(0)).toBe('±0');
+    expect(formatSignedCount(0)).toBe('0');
   });
 
   it('compares to the previous period at the same day', () => {

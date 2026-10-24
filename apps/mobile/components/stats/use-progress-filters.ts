@@ -1,12 +1,9 @@
 import { useState } from 'react';
 
-import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { ProgressBreakdown, ProgressExerciseMetric, ProgressMetric } from '@/src/preferences/model';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import type { ProgressBreakdown, ProgressExerciseMetric, ProgressMetric, ProgressPeriod } from '@/src/preferences/model';
 
-// Settings' Progress period, or its one-week alternative. Not a preference:
-// every visit opens on the configured window ([[comparison.window]]) unless
-// its deep link asks for the week.
-export type ProgressPeriod = 'window' | 'this-week';
+export type { ProgressPeriod } from '@/src/preferences/model';
 
 export type ProgressFilterParams = {
   breakdown?: string | string[];
@@ -19,11 +16,20 @@ export type ProgressFilters = {
   metric: ProgressMetric;
   /** The Exercise table's metric, which may be one the Muscle table cannot show. */
   exerciseMetric: ProgressExerciseMetric;
+  /** Secondary work in muscle figures ([[muscle.secondary-filter]]). */
+  countSecondary: boolean;
   selectBreakdown: (next: ProgressBreakdown) => void;
   selectPeriod: (next: ProgressPeriod) => void;
   selectMetric: (next: ProgressMetric) => void;
   selectExerciseMetric: (next: ProgressExerciseMetric) => void;
+  selectCountSecondary: (next: boolean) => void;
 };
+
+type Choices = {
+  breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
+  exerciseMetric?: ProgressExerciseMetric; countSecondary?: boolean;
+};
+type Defaults = Required<Choices>;
 
 const firstParam = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
@@ -38,24 +44,32 @@ export const periodParam = (value: string | string[] | undefined): ProgressPerio
   return param === undefined ? null : param === '7' ? 'this-week' : 'window';
 };
 
-// Progress's filter row: what this visit has chosen wins, then the deep link it
-// was entered by, then — for the breakdown and each table's metric — what the
-// last visit stored. The period has no stored value and falls back to Settings' window.
-// A choice is held here as well as written to the store, so a chip still
-// answers its tap where no preference profile is writable (signed out of a
-// configured build).
+/** This visit's choices, less every one whose Settings default has since changed. */
+const keepUnchangedDefaults = (chosen: Choices, before: Defaults, after: Defaults): Choices =>
+  Object.fromEntries(Object.entries(chosen).filter(([field]) =>
+    before[field as keyof Defaults] === after[field as keyof Defaults])) as Choices;
+
+// Progress's view choices (family grouping is the screen's, per breakdown):
+// what this visit has chosen wins, then the deep link
+// it was entered by, then what Settings says Progress opens on. A choice lasts
+// for the visit and never changes Settings, so it also answers its tap where no
+// preference profile is writable (signed out of a configured build).
 // A tab stays mounted, so a deep link can reach it with new params: a param
 // whose value changed is a new entry for its field, dropping this visit's
 // choice there. A link repeating the params the route already holds is not.
+// A Settings default that changes drops this visit's choice for its field too,
+// so Progress shows the default just set.
 export function useProgressFilters(params: ProgressFilterParams): ProgressFilters {
   const { values } = useAccountLocalPreferenceState();
+  const defaults: Defaults = {
+    breakdown: values.progressBreakdown, period: values.progressPeriod, metric: values.progressMetric,
+    exerciseMetric: values.progressExerciseMetric, countSecondary: values.progressCountSecondary,
+  };
   const link = { breakdown: firstParam(params.breakdown), period: firstParam(params.period) };
   const [entered, setEntered] = useState(link);
-  const [chosen, setChosen] = useState<{
-    breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
-    exerciseMetric?: ProgressExerciseMetric;
-  }>({});
-  const choose = (patch: typeof chosen) => setChosen(current => ({ ...current, ...patch }));
+  const [seenDefaults, setSeenDefaults] = useState(defaults);
+  const [chosen, setChosen] = useState<Choices>({});
+  const choose = (patch: Choices) => setChosen(current => ({ ...current, ...patch }));
   if (link.breakdown !== entered.breakdown || link.period !== entered.period) {
     setEntered(link);
     setChosen(({ breakdown, period, ...current }) => ({
@@ -64,25 +78,22 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
       ...(link.period === entered.period ? { period } : {}),
     }));
   }
+  if ((Object.keys(defaults) as (keyof Defaults)[]).some(field => defaults[field] !== seenDefaults[field])) {
+    setSeenDefaults(defaults);
+    setChosen(current => keepUnchangedDefaults(current, seenDefaults, defaults));
+  }
   const entry = { breakdown: breakdownParam(entered.breakdown), period: periodParam(entered.period) };
 
   return {
-    breakdown: chosen.breakdown ?? entry.breakdown ?? values.progressBreakdown,
-    period: chosen.period ?? entry.period ?? 'window',
-    metric: chosen.metric ?? values.progressMetric,
-    exerciseMetric: chosen.exerciseMetric ?? values.progressExerciseMetric,
-    selectBreakdown: breakdown => {
-      choose({ breakdown });
-      updatePreferences({ progressBreakdown: breakdown });
-    },
+    breakdown: chosen.breakdown ?? entry.breakdown ?? defaults.breakdown,
+    period: chosen.period ?? entry.period ?? defaults.period,
+    metric: chosen.metric ?? defaults.metric,
+    exerciseMetric: chosen.exerciseMetric ?? defaults.exerciseMetric,
+    countSecondary: chosen.countSecondary ?? defaults.countSecondary,
+    selectBreakdown: breakdown => choose({ breakdown }),
     selectPeriod: period => choose({ period }),
-    selectMetric: metric => {
-      choose({ metric });
-      updatePreferences({ progressMetric: metric });
-    },
-    selectExerciseMetric: exerciseMetric => {
-      choose({ exerciseMetric });
-      updatePreferences({ progressExerciseMetric: exerciseMetric });
-    },
+    selectMetric: metric => choose({ metric }),
+    selectExerciseMetric: exerciseMetric => choose({ exerciseMetric }),
+    selectCountSecondary: countSecondary => choose({ countSecondary }),
   };
 }

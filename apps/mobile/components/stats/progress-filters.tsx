@@ -9,7 +9,11 @@ import { SwitchRow } from '@/components/ui/switch-row';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { gymScopeLabel, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
-type Toggle = { value: boolean; onChange: (value: boolean) => void };
+/** `opening` is the value the view opened on (Settings' default); on when absent. */
+type Toggle = { value: boolean; onChange: (value: boolean) => void; opening?: boolean };
+
+const changedToggle = (toggle: Toggle | undefined): toggle is Toggle =>
+  toggle !== undefined && toggle.value !== (toggle.opening ?? true);
 
 export type ProgressFiltersProps = {
   /** Family grouping of the table in view; absent where no table shows. */
@@ -29,8 +33,8 @@ export type ProgressFiltersProps = {
 /** The offered choices off their opening value, as the button's label names them. */
 export const changedFilters = ({ grouping, secondary, gym }: Omit<ProgressFiltersProps, 'testID'>): string[] => [
   ...(gym && gym.value !== undefined ? [gymScopeLabel(gym.value, gym.options)] : []),
-  ...(grouping && !grouping.value ? ['not grouped'] : []),
-  ...(secondary && !secondary.value ? ['secondary sets not counted'] : []),
+  ...(changedToggle(grouping) ? [grouping.value ? 'grouped' : 'not grouped'] : []),
+  ...(changedToggle(secondary) ? [secondary.value ? 'secondary sets counted' : 'secondary sets not counted'] : []),
 ];
 
 /**

@@ -57,6 +57,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: mockUserId ? { id: mock
 import {
   __resetAccountLocalPreferencesForTests,
   ensureAccountLocalPreferencesLoaded,
+  getAccountLocalPreferenceState,
   setAccountLocalPreferenceAccount,
 } from '@/src/preferences/account-local';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
@@ -277,19 +278,24 @@ describe('Stats over real data', () => {
     expect(groupChecked()).toBe(false);
   });
 
-  it('pairs periods with display-only Prev and toggles Now, Muscle and Change sorts over real data', async () => {
+  it('pairs Sets periods on one line under Now alone and toggles Now, Muscle and Change sorts over real data', async () => {
     await renderSeededStats();
     chooseFilter('view-mode', 'Muscle');
     toggleGroup();
     const values = (column: string) => screen.getAllByTestId(new RegExp(`^stats-muscle-row-.*-${column}$`))
-      .map(row => Number(String(row.props.children).replace('−', '-').replace('±', '')));
+      .map(row => Number(String(row.props.children).replace('−', '-')));
     const expectSorted = (column: string, descending: boolean) => {
       const numbers = values(column);
       expect(numbers).toEqual([...numbers].sort((left, right) => descending ? right - left : left - right));
     };
     expectSorted('now', true);
     expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
-    expect(screen.getByRole('header', { name: 'Previous, working sets' })).toBeTruthy();
+    // No `Prev` header: each row reads `now (previous)` on one line.
+    expect(screen.queryByRole('header', { name: 'Previous, working sets' })).toBeNull();
+    expect(screen.queryByText('Prev')).toBeNull();
+    for (const periods of screen.getAllByTestId(/^stats-muscle-row-.*-periods$/)) {
+      expect(periods).toHaveTextContent(/^[\d.]+ \([\d.]+\)$/);
+    }
     expect(screen.getByTestId('stats-muscle-sort-now')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
     fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
     expectSorted('now', false);
@@ -483,7 +489,8 @@ describe('Stats over real data', () => {
     await renderStats();
     await screen.findByTestId('stats-muscle-body-card');
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
+    // The layout is a saved setting; the metric chosen on the page was only for that visit.
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
   });
 
   it.each(['Sets', 'Volume'] as const)('keeps list history and inline contributors on the selected %s metric', async metric => {
@@ -794,38 +801,69 @@ describe('Stats over real data', () => {
     expect(mockPush).toHaveBeenCalledWith('/sessions');
   });
 
-  it('reopens on the last visit\u2019s breakdown and metric, on the configured period, and lets a deep link override', async () => {
+  it('opens each visit on Settings\u2019 defaults, never on the last visit\u2019s choices, and lets a deep link override', async () => {
     mockSearchParams = {};
     await loadMaestroFixture('exercise-block-history');
     await renderStats();
     await screen.findByTestId('stats-muscle-row-quads-now');
-    await showBody();
     chooseFilter('metric', 'Volume');
     chooseFilter('period', 'This week');
     chooseFilter('view-mode', 'Exercise');
+    expect(getAccountLocalPreferenceState().values).toMatchObject(
+      { progressBreakdown: 'muscle', progressMetric: 'workingSetCount', progressPeriod: 'window' });
 
     // Relaunch: a cold store, re-read from the device's key-value storage.
     screen.unmount();
     __resetAccountLocalPreferencesForTests();
     await renderStats();
-    await screen.findByTestId('stats-muscle-body-card');
-    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
-    // The period is not remembered: every visit opens on Settings' Progress
-    // period, so the week chosen above is gone.
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Muscle');
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+
+    // Settings' defaults are what the next visit opens on.
+    await act(async () => updatePreferences({ progressBreakdown: 'exercise', progressPeriod: 'this-week',
+      progressMetric: 'totalVolume', progressExerciseMetric: 'estimatedOneRepMax' }));
+    screen.unmount();
+    __resetAccountLocalPreferencesForTests();
+    await renderStats();
+    await screen.findByTestId('stats-exercise-list-scroll');
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
     chooseFilter('view-mode', 'Muscle');
     expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
 
     // The deep link wins on entry only: the next choice is the user's again.
     screen.unmount();
     __resetAccountLocalPreferencesForTests();
-    mockSearchParams = { breakdown: 'exercise', period: '7' };
+    mockSearchParams = { breakdown: 'muscle', period: '28' };
     await renderStats();
-    await screen.findByTestId('stats-muscle-body-card');
-    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Exercise');
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('Muscle');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
+    chooseFilter('period', 'This week');
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
-    chooseFilter('view-mode', 'Muscle');
-    chooseFilter('period', '4 weeks');
+  });
+
+  it('replaces this visit\u2019s choice with a Settings default changed while Progress stays mounted', async () => {
+    mockSearchParams = {};
+    await loadMaestroFixture('exercise-block-history');
+    await renderStats();
+    await screen.findByTestId('stats-muscle-row-quads-now');
+    chooseFilter('metric', 'Volume');
+    chooseFilter('period', 'This week');
+    // An unrelated default leaves the visit's choices alone.
+    await act(async () => updatePreferences({ progressExerciseMetric: 'totalVolume' }));
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    // A changed default drops that field's choice, so the default just set shows.
+    await act(async () => updatePreferences({ progressMetric: 'totalVolume' }));
+    await act(async () => updatePreferences({ progressMetric: 'workingSetCount' }));
+    expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+    expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+    await act(async () => updatePreferences({ progressPeriod: 'this-week' }));
+    await act(async () => updatePreferences({ progressPeriod: 'window' }));
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('4 weeks');
   });
 

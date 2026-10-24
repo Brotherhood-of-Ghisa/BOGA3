@@ -92,8 +92,51 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   await screen.findByTestId('stats-muscle-body-card');
   expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
   fireEvent.press(screen.getByTestId('settings-muscle-view-list'));
-  await screen.findByTestId('stats-exercise-list');
+  // The breakdown chosen on the page was for that visit: this one opens on Muscle.
+  await screen.findByTestId('stats-muscle-table');
   expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+});
+
+it('sets what Progress opens on: view, period, each metric, grouping and secondary sets', async () => {
+  const page = await openSettingsAndProgress();
+  const defaults = within(screen.getByTestId('settings-progress-defaults'));
+  expect(defaults.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(
+    ['Muscle', 'Exercise', '4 weeks', 'This week', 'Sets', 'Volume', 'Sets', 'Volume', '1RM']);
+  fireEvent.press(screen.getByTestId('settings-progress-breakdown-exercise'));
+  fireEvent.press(screen.getByTestId('settings-progress-period-this-week'));
+  fireEvent.press(screen.getByTestId('settings-progress-metric-totalVolume'));
+  fireEvent.press(screen.getByTestId('settings-progress-exercise-metric-estimatedOneRepMax'));
+  fireEvent.press(screen.getByTestId('settings-progress-grouped'));
+  fireEvent.press(screen.getByTestId('settings-progress-count-secondary'));
+  expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressPeriod: 'this-week', progressMetric: 'totalVolume',
+    progressExerciseMetric: 'estimatedOneRepMax', progressGrouped: false, progressCountSecondary: false });
+  expect(screen.getByTestId('settings-progress-grouped')).toHaveProp('accessibilityState', { checked: false });
+
+  // The mounted page follows each default as it changes.
+  await screen.findByTestId('stats-exercise-list');
+  expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+  await screen.findByTestId('stats-muscle-table');
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
+  // Off is the default now, so the Filters button reads unchanged.
+  expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters');
+  expect(screen.queryAllByTestId(/^stats-family-header-/)).toHaveLength(0);
+  fireEvent.press(screen.getByTestId('stats-filters'));
+  expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+  expect(screen.getByTestId('stats-secondary-toggle')).toHaveProp('accessibilityState', { checked: false });
+  fireEvent.press(screen.getByTestId('stats-group-toggle'));
+  expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: grouped');
+  // A choice on Progress lasts for the visit and leaves Settings alone.
+  expect(values().progressGrouped).toBe(false);
+  page.unmount();
+});
+
+it('offers no period default when the Progress period is one week', async () => {
+  await openSettings();
+  expect(screen.getByTestId('settings-progress-period-window')).toBeTruthy();
+  editNumber('settings-target-window', '1');
+  expect(screen.queryByTestId('settings-progress-period-window')).toBeNull();
 });
 
 it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise after Refresh', async () => {

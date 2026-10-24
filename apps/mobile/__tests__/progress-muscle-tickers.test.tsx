@@ -195,7 +195,9 @@ it('keeps history beside two-line names, caps the plot and preserves independent
   expect(within(screen.getByTestId('stats-muscle-row-back-periods')).getByTestId('stats-muscle-row-back-previous')).toHaveTextContent('1');
   expect(screen.getByTestId('stats-contribution-lift-periods')).toBeTruthy();
   expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
-  expect(screen.getAllByRole('header', { name: 'Previous, working sets' })).toHaveLength(2);
+  // One `Now` header over both periods; Sets read `now (previous)` on one line.
+  expect(screen.queryByRole('header', { name: 'Previous, working sets' })).toBeNull();
+  expect(screen.getByTestId('stats-muscle-row-back-periods')).toHaveTextContent(/^\S+ \(1\)$/);
   expect(screen.queryByTestId('stats-muscle-ticker-lift')).toBeNull();
   fireEvent.press(screen.getByTestId('stats-muscle-select-back'));
   expect(rowProps.onSelect).toHaveBeenCalledWith('back');
@@ -252,6 +254,17 @@ it.each(['pending', 'error', 'loaded'] as const)('keeps comparisons and both act
   expect(rowProps.onMuscleHistory).toHaveBeenLastCalledWith(muscleRow, expect.anything());
   fireEvent.press(screen.getByRole('button', { name: 'Hide Back contributions' }));
   expect(rowProps.onSelect).toHaveBeenLastCalledWith('back');
+});
+
+it('keeps Volume periods one over the other, and shows no change as a plain 0', () => {
+  render(<ProgressTables {...rowProps} metric="totalVolume" />);
+  const periods = screen.getByTestId('stats-muscle-row-back-periods');
+  expect(within(periods).getByTestId('stats-muscle-row-back-now')).toHaveTextContent('50');
+  expect(within(periods).getByTestId('stats-muscle-row-back-previous')).toHaveTextContent(/^50$/);
+  expect(periods).not.toHaveTextContent(/\(/);
+  expect(screen.getByTestId('stats-muscle-row-back-change')).toHaveTextContent(/^0%$/);
+  render(<ProgressTables {...rowProps} />);
+  expect(screen.getByTestId('stats-muscle-row-back-change')).toHaveTextContent(/^0$/);
 });
 
 it('draws no chart for incomplete observations and keeps full accessible names', () => {

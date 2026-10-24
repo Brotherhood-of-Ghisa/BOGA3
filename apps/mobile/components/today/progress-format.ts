@@ -22,11 +22,11 @@ export const formatWeekRange = (window: LocalWindow, dateFormat: ExerciseDateFor
   return formatDateRange(window.start, sunday, dateFormat);
 };
 
-/** A count's signed absolute difference: `+4`, `−3`, `±0`. */
+/** A count's signed absolute difference: `+4`, `−3`, `0`. */
 export const formatSignedCount = (difference: number): string => {
   if (difference > 0) return `+${difference}`;
   if (difference < 0) return `−${Math.abs(difference)}`;
-  return '±0';
+  return '0';
 };
 
 /** Which way the pace went, for the colour every change figure takes. */
