@@ -160,12 +160,15 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
           <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
             {formatPeriodRange(period.window, dateFormat)}
           </Text>
-          {/* One line whatever the day's label: shrinking, never wrapping, so the card keeps its height while the selection moves. */}
-          <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={todayText.headlineFigure} testID="today-progress-period-working-sets">
+          {/* One line whatever the day's label: the figure shrinks rather
+              than wraps, so the card keeps its height as the selection moves. */}
+          <View style={styles.currentRow} testID="today-progress-period-working-sets">
             <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-progress-period-day">{label} </Text>
-            {figures.workingSets}
-            <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
-          </Text>
+            <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[todayText.headlineFigure, styles.currentFigure]}>
+              {figures.workingSets}
+              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+            </Text>
+          </View>
         </View>
         <View style={styles.column}>
           <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
@@ -225,6 +228,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   currentColumn: {
+    flexShrink: 1,
+  },
+  currentRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  currentFigure: {
     flexShrink: 1,
   },
   // The previous period's figure under its `vs`, the difference at the edge.
