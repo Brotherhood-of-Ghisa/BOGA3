@@ -70,6 +70,7 @@ Why: a secondary mapping is real work but not the muscle the lift is for, so
 comparing it against sessions that targeted it misleads.
 Code: `deriveSessionMuscleVolumeComparisons` in
 `apps/mobile/src/session-insights/calculations.ts`.
+Pending: compares entries.
 
 
 ### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
@@ -85,7 +86,7 @@ Progress dropped the Map view.
 Settings → Progress → Muscles offers **Detailed** (default: every anatomy entry
 is its own muscle) or **Broad**, per account, synced, with a Track switch per
 muscle. Broad merges entries, the first listed being the anchor, and leaves
-three untracked. Custom muscles stay their own. Decided 2026-10-24.
+three untracked. Each muscle stays inside one family; custom muscles stay their own. Decided 2026-10-24.
 
 | Broad muscle | Entries |
 | --- | --- |
@@ -101,6 +102,7 @@ three untracked. Custom muscles stay their own. Decided 2026-10-24.
 
 Why: fewer, coarser muscles for users who want a simpler view; exercises keep their detailed mappings.
 Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
+Pending: Settings screen.
 
 ### muscle.no-breakdown · presentation · accepted
 
@@ -111,6 +113,7 @@ or removing it rewrites every entry of the muscle. Mappings to untracked muscles
 are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
+Pending: editor, search, screens.
 
 ### muscle.untracked · definition · accepted
 
@@ -118,6 +121,7 @@ An untracked muscle adds nothing to any muscle figure and is not shown. Exercise
 figures (sets, Volume, records, 1RM) do not change. No line reports the dropped work.
 
 Why: the user chose not to follow that muscle.
+Pending: screens.
 
 ### muscle.family-sections · presentation · accepted
 
@@ -125,6 +129,7 @@ In any list of muscles a family header shows only above two or more of the user'
 muscles; catalogue and picker cards stay one per family.
 
 Why: a header over one muscle repeats it.
+Pending: lists.
 
 ### muscle.catalog-names · presentation · accepted
 

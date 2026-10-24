@@ -128,6 +128,10 @@ export type ReportedMuscle = MuscleAnalyticsInput['muscleGroups'][number];
  */
 export type MuscleReportAssignment = ReadonlyMap<string, { muscle: ReportedMuscle; tracked: boolean }>;
 
+const isSameMuscle = (left: ReportedMuscle, right: ReportedMuscle): boolean =>
+  left.id === right.id && left.displayName === right.displayName
+  && left.familyName === right.familyName && left.sortOrder === right.sortOrder;
+
 /**
  * The input a view reads under the user's muscle setup ([[muscle.report-groups]]):
  * mappings are re-keyed from anatomy entry to muscle, a muscle's repeated
@@ -154,7 +158,7 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
   for (const entry of input.muscleGroups) {
     const assigned = assignment.get(entry.id);
     if (assigned?.tracked === false) continue;
-    const muscle = assigned && assigned.muscle.id !== entry.id ? assigned.muscle : entry;
+    const muscle = assigned && !isSameMuscle(assigned.muscle, entry) ? assigned.muscle : entry;
     if (!muscles.has(muscle.id)) muscles.set(muscle.id, muscle);
   }
 

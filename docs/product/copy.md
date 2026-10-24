@@ -14,7 +14,6 @@ that describes it.
   whose view of the session this is, which the screen cannot show otherwise
   (decided 2026-10-08).
 
-
 ### copy.no-inline-explanation · principle · accepted
 
 Screens show data and controls, not sentences about them: no footnotes,
@@ -30,7 +29,6 @@ formula notes, field hints, "how this works" lines, or a rule's provenance
   uncalculable load or kg a group cannot see, shows plain as `Volume`.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
 - **Good:** the label carries it — the ramp reads `Weekly target` `0%`…`100%`.
-
 
 ### copy.blank-history · presentation · accepted
 

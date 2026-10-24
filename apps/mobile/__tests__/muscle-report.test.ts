@@ -10,7 +10,6 @@ import {
 import {
   BROAD_MUSCLE_PRESET,
   buildMuscleReportAssignment,
-  reportGroupMuscleId,
   type MuscleReportRow,
 } from '@/src/data/muscle-report-presets';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
@@ -31,6 +30,13 @@ const broadRows = (): MuscleReportRow[] => {
     reportGroup: groupOf.get(row.id) ?? null,
     tracked: BROAD_MUSCLE_PRESET.untracked.includes(row.id) ? 0 : 1,
   }));
+};
+
+/** The id a Broad muscle takes: its anchor entry's. */
+const broadId = (key: string): string => {
+  const muscle = BROAD_MUSCLE_PRESET.muscles.find((candidate) => candidate.key === key);
+  if (!muscle) throw new Error(`No Broad muscle ${key}`);
+  return muscle.anchor;
 };
 
 const SESSION_AT = new Date('2026-05-20T10:00:00.000Z');
@@ -82,17 +88,17 @@ describe('Broad preset table', () => {
     }
   });
 
-  it('uses keys that are unique and never an entry id', () => {
-    const keys = BROAD_MUSCLE_PRESET.muscles.map((muscle) => muscle.key);
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(reportGroupMuscleId('glutes_hams')).toBe('group:glutes_hams');
-    for (const entryId of SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => seed.id)) expect(entryId).not.toMatch(/:/);
+  it('uses unique keys and anchors', () => {
+    for (const field of ['key', 'anchor'] as const) {
+      const values = BROAD_MUSCLE_PRESET.muscles.map((muscle) => muscle[field]);
+      expect(new Set(values).size).toBe(values.length);
+    }
   });
 });
 
 describe('Broad', () => {
-  const GLUTES_HAMS = reportGroupMuscleId('glutes_hams');
-  const QUADS = reportGroupMuscleId('quads');
+  const GLUTES_HAMS = broadId('glutes_hams');
+  const QUADS = broadId('quads');
 
   it('counts a squat x 3 as Quads 3 and Glutes & Hams 1.5, Volume once per muscle', () => {
     const input = inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS);
@@ -140,6 +146,19 @@ describe('Broad', () => {
     expect(glutes?.sortOrder).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.find((seed) => seed.id === 'glutes_max')?.sortOrder);
     // No entry id survives as a muscle: nothing is broken into its entries.
     expect(muscleGroups.map((muscle) => muscle.id)).not.toContain('serratus_anterior');
+    // A merged muscle keeps its anchor entry's id, so it keeps that id when the preset flips.
+    expect(muscleGroups.map((muscle) => muscle.id)).toEqual(expect.arrayContaining(['back_lats', 'glutes_max', 'chest']));
+  });
+
+  it('does not let a custom row join a group by carrying its key', () => {
+    const rows: MuscleReportRow[] = [
+      ...broadRows(),
+      { id: 'custom-neck', displayName: 'Neck', familyName: 'Neck', sortOrder: 40, reportGroup: 'back', tracked: 1 },
+    ];
+    const output = reported(inputFor([
+      { exerciseDefinitionId: 'squat', muscleGroupId: 'custom-neck', role: 'primary' },
+    ], rows), rows);
+    expect(output.muscleMappings.map((mapping) => mapping.muscleGroupId)).toEqual(['custom-neck']);
   });
 
   it('leaves custom muscles, and a report group this build does not know, as their own muscle', () => {
@@ -180,7 +199,7 @@ describe('untracked muscles', () => {
     const output = reported(inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS), rows);
 
     expect(output.muscleMappings.map((mapping) => mapping.muscleGroupId)).toEqual([
-      reportGroupMuscleId('quads'), reportGroupMuscleId('glutes_hams'),
+      broadId('quads'), broadId('glutes_hams'),
     ]);
     // Sets are the exercise's: the transform changes mappings, never the sets.
     expect(output.exerciseSets).toEqual(inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS).exerciseSets);
@@ -195,31 +214,68 @@ describe('untracked muscles', () => {
 });
 
 describe('Detailed', () => {
-  const FIXTURES: Record<string, MuscleAnalyticsInput> = {
-    squat: inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS),
-    // A doubly mapped entry, a stabilizer, and a mapping to an entry missing from the list.
-    mixed: inputFor([
-      { exerciseDefinitionId: 'squat', muscleGroupId: 'chest', role: 'secondary' },
-      { exerciseDefinitionId: 'squat', muscleGroupId: 'chest', role: 'primary' },
-      { exerciseDefinitionId: 'squat', muscleGroupId: 'abs_rectus', role: 'stabilizer' },
-      { exerciseDefinitionId: 'squat', muscleGroupId: 'removed-entry', role: 'primary' },
-    ], SYSTEM_MUSCLE_GROUP_SEEDS),
+  /** Two sessions, two exercises, several roles and a warm-up: storage never holds a duplicate (exercise, entry) pair. */
+  const rich = (): MuscleAnalyticsInput => ({
+    sessions: [
+      { id: 's1', completedAt: SESSION_AT },
+      { id: 's2', completedAt: new Date('2026-05-13T10:00:00.000Z'), gymId: 'g1', gymName: 'Gym' },
+    ],
+    exerciseDefinitions: [
+      { id: 'bench', loadInputMode: 'per_side_load', bodyweightContribution: 0 },
+      { id: 'curl', loadInputMode: 'total_load', bodyweightContribution: 0 },
+    ],
+    sessionExercises: [
+      { id: 'b1', sessionId: 's1', exerciseDefinitionId: 'bench', exerciseName: 'Bench' },
+      { id: 'c1', sessionId: 's1', exerciseDefinitionId: 'curl', exerciseName: 'Curl' },
+      { id: 'b2', sessionId: 's2', exerciseDefinitionId: 'bench', exerciseName: 'Bench' },
+    ],
+    exerciseSets: [
+      { id: 'w', sessionExerciseId: 'b1', orderIndex: 0, setType: 'warm_up', weightValue: '40', repsValue: '10', performanceStatus: null },
+      { id: 'b1a', sessionExerciseId: 'b1', orderIndex: 1, setType: null, weightValue: '100', repsValue: '5', performanceStatus: null },
+      { id: 'c1a', sessionExerciseId: 'c1', orderIndex: 0, setType: null, weightValue: '20', repsValue: '10', performanceStatus: null },
+      { id: 'b2a', sessionExerciseId: 'b2', orderIndex: 0, setType: 'rir_1', weightValue: '90', repsValue: '8', performanceStatus: null },
+    ],
+    muscleMappings: [
+      { exerciseDefinitionId: 'bench', muscleGroupId: 'chest', role: 'primary' },
+      { exerciseDefinitionId: 'bench', muscleGroupId: 'triceps', role: 'secondary' },
+      { exerciseDefinitionId: 'bench', muscleGroupId: 'delts_front', role: 'secondary' },
+      { exerciseDefinitionId: 'bench', muscleGroupId: 'abs_rectus', role: 'stabilizer' },
+      { exerciseDefinitionId: 'curl', muscleGroupId: 'biceps', role: 'primary' },
+      { exerciseDefinitionId: 'curl', muscleGroupId: 'forearms_grip', role: 'secondary' },
+    ],
+    muscleGroups: SYSTEM_MUSCLE_GROUP_SEEDS,
+  });
+  const FIXTURES: Record<string, () => MuscleAnalyticsInput> = {
+    squat: () => inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS),
+    rich,
   };
 
-  it.each(Object.keys(FIXTURES))('returns the %s input\'s muscle list and figures unchanged', (name) => {
-    const input = FIXTURES[name];
+  it.each(Object.keys(FIXTURES))('returns the %s input unchanged, and so its figures', (name) => {
+    const input = FIXTURES[name]();
     const output = reported(input, detailedRows());
 
-    expect(output.muscleGroups).toEqual(input.muscleGroups);
-    expect(statsByMuscle(output)).toEqual(statsByMuscle(input));
+    expect(output).toEqual(input);
     expect(aggregateStats(output)).toEqual(aggregateStats(input));
     const ids = input.muscleMappings.map((mapping) => mapping.muscleGroupId);
     expect(aggregateSelectedMuscleDailyEffort(output, { muscleGroupIds: ids, timeZone: 'UTC' }))
       .toEqual(aggregateSelectedMuscleDailyEffort(input, { muscleGroupIds: ids, timeZone: 'UTC' }));
   });
 
+  it('keeps the figures when the input repeats a pair or maps an entry missing from the list', () => {
+    const input = inputFor([
+      { exerciseDefinitionId: 'squat', muscleGroupId: 'chest', role: 'secondary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: 'chest', role: 'primary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: 'removed-entry', role: 'primary' },
+    ], SYSTEM_MUSCLE_GROUP_SEEDS);
+    const output = reported(input, detailedRows());
+
+    expect(output.muscleGroups).toEqual(input.muscleGroups);
+    expect(aggregateStats(output)).toEqual(aggregateStats(input));
+    expect(output.muscleMappings.map((mapping) => mapping.muscleGroupId)).toEqual(['chest', 'removed-entry']);
+  });
+
   it('is the identity under an empty assignment too', () => {
-    const input = FIXTURES.squat;
+    const input = rich();
     expect(applyMuscleReport(input, new Map() as MuscleReportAssignment)).toEqual(input);
   });
 });
@@ -231,16 +287,14 @@ describe('with the secondary filter', () => {
     const primaryOnly = applyMuscleReport(withoutSecondaryMappings(input), buildMuscleReportAssignment(rows));
 
     expect(primaryOnly.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: reportGroupMuscleId('quads'), role: 'primary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: broadId('quads'), role: 'primary' },
     ]);
     const byMuscle = statsByMuscle(primaryOnly);
-    expect(byMuscle.get(reportGroupMuscleId('quads'))?.workingSetCount).toBe(3);
-    expect(byMuscle.get(reportGroupMuscleId('glutes_hams'))?.workingSetCount).toBe(0);
+    expect(byMuscle.get(broadId('quads'))?.workingSetCount).toBe(3);
+    expect(byMuscle.get(broadId('glutes_hams'))?.workingSetCount).toBe(0);
   });
 
   it('leaves a muscle whose entries are all secondary with nothing once secondaries are hidden', () => {
-    // Grouping first would keep the mapping (a group's role is its strongest entry's);
-    // filtering first removes it, which is what hiding secondary work means.
     const input = inputFor([
       { exerciseDefinitionId: 'squat', muscleGroupId: 'glutes_max', role: 'secondary' },
       { exerciseDefinitionId: 'squat', muscleGroupId: 'hip_abductors', role: 'secondary' },
@@ -270,6 +324,6 @@ describe('buildMuscleReportAssignment', () => {
       { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs', sortOrder: 17, reportGroup: 'quads', tracked: 1 },
     ];
     expect(buildMuscleReportAssignment(rows).get('hip_flexors')?.muscle)
-      .toEqual({ id: 'group:quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 17 });
+      .toEqual({ id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 17 });
   });
 });

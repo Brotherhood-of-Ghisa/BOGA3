@@ -43,30 +43,32 @@ export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[]; untracked: 
 /** A user's `muscle_groups` row as the setup reads it: `tracked` is 0/1 locally, a boolean from the agent API. */
 export type MuscleReportRow = ReportedMuscle & { reportGroup: string | null; tracked: number | boolean };
 
-/** The id of the muscle a report group makes; no anatomy entry id has this shape. */
-export const reportGroupMuscleId = (reportGroup: string): string => `group:${reportGroup}`;
-
 /**
  * Reads the user's rows into a `MuscleReportAssignment`. A row whose
- * `reportGroup` names a Broad muscle reports under it, labelled and placed by
- * the preset (sorted where its anchor sorts, else its first member); any other
- * row, including a group key this build does not know, is its own muscle.
+ * `reportGroup` names the Broad muscle it is a member of reports under it: the
+ * muscle takes the anchor entry's id (so a muscle keeps its id when the preset
+ * flips and an editor writes to it directly), the preset's label and family, and
+ * sorts where its anchor sorts, else its first member. Any other row, including
+ * a custom muscle or a group key this build does not know, is its own muscle.
  */
 export const buildMuscleReportAssignment = (rows: readonly MuscleReportRow[]): MuscleReportAssignment => {
   const broadByKey = new Map(BROAD_MUSCLE_PRESET.muscles.map((muscle) => [muscle.key, muscle]));
+  const broadOf = (row: MuscleReportRow): BroadMuscle | undefined => {
+    const broad = row.reportGroup === null ? undefined : broadByKey.get(row.reportGroup);
+    return broad?.entries.includes(row.id) ? broad : undefined;
+  };
   const sortOrderByKey = new Map<string, number>();
   for (const row of rows) {
-    const broad = row.reportGroup === null ? undefined : broadByKey.get(row.reportGroup);
+    const broad = broadOf(row);
     if (!broad) continue;
-    const known = sortOrderByKey.get(broad.key);
-    if (known === undefined || row.id === broad.anchor) sortOrderByKey.set(broad.key, row.sortOrder);
+    if (!sortOrderByKey.has(broad.key) || row.id === broad.anchor) sortOrderByKey.set(broad.key, row.sortOrder);
   }
 
   return new Map(rows.map((row) => {
-    const broad = row.reportGroup === null ? undefined : broadByKey.get(row.reportGroup);
+    const broad = broadOf(row);
     const muscle: ReportedMuscle = broad
       ? {
-        id: reportGroupMuscleId(broad.key), displayName: broad.label, familyName: broad.family,
+        id: broad.anchor, displayName: broad.label, familyName: broad.family,
         sortOrder: sortOrderByKey.get(broad.key) ?? row.sortOrder,
       }
       : row;

@@ -61,7 +61,7 @@ re-implements the rule: group functions read the evaluator's `working` flag
 (`tech/groups-contract.md`). A change to the shared rule reaches stored group
 facts only as that contract's rules-version section says. Changing personal derivation bumps
 `EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
-policy key, rebuilding all definitions when the choices differ.
+canonical policy key, rebuilding all definitions when the choices differ.
 
 ## 2. Counted session
 
@@ -290,19 +290,19 @@ choices may change which recorded set qualifies.
 **A muscle's set count** is [[muscle.set-count]]. One shared counter derives
 it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
 muscle at its strongest role, weighted by that role, and a stabilizer adds
-nothing. Every muscle surface reads it, so they cannot disagree. Family
+nothing. Every muscle surface reads it. Family
 counts deduplicate physical sets at the strongest role across the family's
 muscles; overlapping individual muscle counts must never be summed into a
 global total. Every figure is an exact half-step, shown unrounded. Nothing is
 stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
 them. The window's own working-set total stays a count of physical sets.
 
-**The user's muscles.** `applyMuscleReport` (`muscle-analytics.ts`) runs after
-`withoutSecondaryMappings` and before any muscle read: it re-keys mappings from
-entry to muscle ([[muscle.report-groups]]), keeps one mapping per exercise and
-muscle at the strongest role (Volume counts once per muscle) and drops untracked
-muscles ([[muscle.untracked]]). Detailed is the identity. Exercise figures never
-read it.
+**The user's muscles.** Muscle reads apply `applyMuscleReport`
+(`muscle-analytics.ts`) after `withoutSecondaryMappings`, as surfaces adopt it.
+It re-keys mappings from entry to muscle ([[muscle.report-groups]]), keeps one
+per exercise and muscle at the strongest role (Volume counts once) and drops
+untracked muscles ([[muscle.untracked]]). A merged muscle takes its anchor's id;
+Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
 durable active effort-policy snapshot in one read transaction for both
