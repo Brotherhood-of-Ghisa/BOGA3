@@ -331,8 +331,8 @@ it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s hist
   expect(screen.queryByTestId(`${prefix}-heatmap-p75`)).toBeNull();
   expect(screen.queryByTestId(`${prefix}-window`)).toBeNull();
   expect(screen.queryByText(/^(Metric|P\d+.*|Median.*)$/)).toBeNull();
-  expect(screen.getByTestId(`${prefix}-metric-chip-workingSetCount`)).toHaveStyle({ backgroundColor: '#000000' });
-  expect(screen.getByText('Sets')).toHaveStyle({ color: '#FFFFFF' });
+  // The metric chip names the figure the bars and median show.
+  expect(screen.getByTestId(`${prefix}-metric-chip-workingSetCount`)).toHaveTextContent('Sets');
 });
 
 it('excludes future observations from reference eligibility', () => {

@@ -10,7 +10,11 @@ export type ProgressMuscleTickers = {
   start: Date; end: Date; rollingWeeks: number;
   muscles: Record<string, { workingSetCount: MuscleTickerSeries; totalVolume: MuscleTickerSeries }>;
 };
-export type MuscleTickerOptions = { historyWeeks: number; rollingWeeks: number; weeklyTarget: number; now?: Date; gymId?: string | null };
+export type MuscleTickerOptions = {
+  historyWeeks: number; rollingWeeks: number; weeklyTarget: number; now?: Date; gymId?: string | null;
+  /** `false` counts primary work only ([[muscle.secondary-filter]]); unset counts it by [[muscle.set-count]]. */
+  countSecondary?: boolean;
+};
 
 export const muscleTickerBounds = (options: MuscleTickerOptions) => {
   const now = options.now ?? new Date();

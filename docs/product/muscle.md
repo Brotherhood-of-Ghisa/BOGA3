@@ -7,7 +7,7 @@ Decided 2026-10-09.
 
 A repeated mapping counts at its strongest role. Totals use half-steps (`1.5`),
 unlike the session's physical `Sets` ([[set.count-display]]). Whether to show
-secondaries is separate.
+secondaries is separate ([[muscle.secondary-filter]]).
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -26,11 +26,11 @@ Signature: `primary + ½ secondary`
 
 ### muscle.map-area · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.progress-layout · presentation · accepted
 
@@ -50,6 +50,15 @@ Why: keep List/3D choice in Settings and shade the 3D body by relative distribut
 Code: `apps/mobile/components/preferences/progress-settings.tsx`,
 `apps/mobile/components/stats/muscle-body-projection.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
 
+### muscle.secondary-filter · presentation · accepted
+
+Progress and muscle history Filters offer `Count secondary sets`, on each visit;
+history opens on Progress's choice. Off, muscle figures count primary work only.
+Approved 2026-10-23.
+
+Why: direct muscle work alone.
+Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
+
 ### muscle.comparison-primary-only · presentation · accepted
 
 A session's by-muscle volume comparison covers only muscles the session worked
@@ -66,11 +75,11 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 
 ### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
 
-The Progress Map view was removed; List and 3D remain.
+Progress dropped the Map view.
 
 ### muscle.catalog-names · presentation · accepted
 

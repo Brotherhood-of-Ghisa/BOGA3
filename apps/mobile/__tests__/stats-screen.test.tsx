@@ -895,7 +895,8 @@ describe('StatsScreenShell — view mode toggle', () => {
     fireEvent.press(screen.getByTestId('stats-exercise-row-ex1'));
     expect(onOpenExerciseHistory).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex1' });
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
-    expect(screen.UNSAFE_queryAllByType(Modal)).toHaveLength(0);
+    // The Filters sheet stays mounted, closed.
+    expect(screen.UNSAFE_queryAllByType(Modal).filter(modal => modal.props.visible)).toHaveLength(0);
   });
 
 });

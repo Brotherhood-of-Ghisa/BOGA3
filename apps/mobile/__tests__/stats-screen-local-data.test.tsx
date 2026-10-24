@@ -133,6 +133,20 @@ const chooseFilter = (filter: 'view-mode' | 'period' | 'metric', label: string) 
   expect(chipValue(filter)).toBe(label);
 };
 
+// Group by, Count secondary sets and the gym sit in the Filters sheet, which
+// stays open across choices; each helper opens it, acts, and dismisses it.
+const inFilters = <T,>(inside: () => T): T => {
+  fireEvent.press(screen.getByTestId('stats-filters'));
+  const result = inside();
+  fireEvent(screen.getByTestId('stats-filters-sheet'), 'accessibilityEscape');
+  return result;
+};
+const toggleGroup = () => inFilters(() => fireEvent.press(screen.getByTestId('stats-group-toggle')));
+const groupChecked = () => inFilters(() => screen.getByTestId('stats-group-toggle').props.accessibilityState.checked);
+const chooseGym = (key: string) => inFilters(() => fireEvent.press(screen.getByTestId(`stats-gym-option-${key}`)));
+const chosenGym = () => inFilters(() => screen.getAllByTestId(/^stats-gym-option-/)
+  .find(row => row.props.accessibilityState?.checked)?.props.testID.replace('stats-gym-option-', ''));
+
 const exerciseOrder = () =>
   screen
     .getAllByTestId(/^stats-exercise-name-/)
@@ -204,25 +218,24 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('matches Group by and Gym compact geometry and label typography while retaining the switch state', async () => {
+  it('holds Group by and Gym in the Filters sheet, whose compact button fills while either is changed', async () => {
     await renderSeededStats();
-    const group = screen.getByTestId('stats-group-toggle');
-    const gym = screen.getByTestId('stats-gym');
-    const geometry = ['minHeight', 'borderRadius', 'paddingHorizontal', 'paddingVertical'] as const;
-    const groupStyle = StyleSheet.flatten(group.props.style);
-    const gymStyle = StyleSheet.flatten(gym.props.style);
-    for (const field of geometry) expect(groupStyle[field]).toBe(gymStyle[field]);
-    expect(groupStyle.minHeight).toBe(uiGeometry.compactControlHeight);
-    expect(group.props.hitSlop).toBe(gym.props.hitSlop);
-    const groupLabel = StyleSheet.flatten(within(group).getByText('Group by').props.style);
-    const gymLabel = StyleSheet.flatten(within(gym).getByText('All gyms').props.style);
-    for (const field of ['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform'] as const) {
-      expect(groupLabel[field]).toBe(gymLabel[field]);
-    }
-    expect(group).toHaveProp('accessibilityState', { checked: true });
-    fireEvent.press(group);
+    const button = () => screen.getByTestId('stats-filters');
+    expect(StyleSheet.flatten(button().props.style).minHeight).toBe(uiGeometry.compactControlHeight);
+    expect(button()).toHaveProp('accessibilityLabel', 'Filters');
+    expect(screen.queryByTestId('stats-group-toggle')).toBeNull();
+    fireEvent.press(button());
+    expect(screen.getByTestId('stats-filters-sheet')).toBeTruthy();
+    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: true });
+    // Exercise List counts no muscle, so it offers no secondary choice.
+    expect(screen.queryByTestId('stats-secondary-toggle')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    // The sheet stays open across choices.
     expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+    fireEvent(screen.getByTestId('stats-filters-sheet'), 'accessibilityEscape');
     expect(screen.queryAllByTestId(/^stats-exercise-family-header-/)).toHaveLength(0);
+    expect(button()).toHaveProp('accessibilityLabel', 'Filters: not grouped');
+    expect(button()).toHaveTextContent('Filters');
   });
 
   it('groups exercises by catalogue primary family, sorts within it and retains each breakdown’s controls', async () => {
@@ -232,20 +245,20 @@ describe('Stats over real data', () => {
     expect(exerciseOrder().indexOf(BENCH)).toBeLessThan(exerciseOrder().indexOf(SQUAT));
     fireEvent.press(screen.getByTestId('stats-exercise-sort-previous'));
     expect(familyHeaders()).toEqual(['Chest', 'Legs', 'Other']);
-    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    toggleGroup();
     expect(familyHeaders()).toEqual([]);
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
     expect(exerciseOrder()).toEqual([SQUAT]);
 
     chooseFilter('view-mode', 'Muscle');
     expect(screen.getByTestId('stats-muscle-search-input')).toHaveProp('value', '');
-    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: true });
+    expect(groupChecked()).toBe(true);
     fireEvent.changeText(screen.getByTestId('stats-muscle-search-input'), ' LEGS ');
     expect(screen.getAllByTestId(/^stats-family-header-/)).toHaveLength(2);
     expect(screen.getByTestId('stats-family-header-legs')).toHaveTextContent('Legs');
     fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
     const order = () => screen.queryAllByTestId(/^stats-muscle-block-/).map(row => row.props.testID);
-    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    toggleGroup();
     expect(screen.queryAllByTestId(/^stats-family-header-/)).toHaveLength(0);
     const values = screen.getAllByTestId(/^stats-muscle-row-.*-now$/).map(row => Number(row.props.children));
     expect(values).toEqual([...values].sort((left, right) => left - right));
@@ -257,11 +270,54 @@ describe('Stats over real data', () => {
 
     chooseFilter('view-mode', 'Exercise');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
-    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+    expect(groupChecked()).toBe(false);
     expect(screen.getByTestId('stats-exercise-sort-previous')).toHaveProp('accessibilityState', { selected: true });
     chooseFilter('view-mode', 'Muscle');
     expect(screen.getByTestId('stats-muscle-sort-now').props.accessibilityLabel).toContain('low to high');
-    expect(screen.getByTestId('stats-group-toggle')).toHaveProp('accessibilityState', { checked: false });
+    expect(groupChecked()).toBe(false);
+  });
+
+  it('counts secondary sets at ½ until Count secondary sets is off, across Muscle, its history links and Exercise 3D', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
+    await act(async () => invalidateExerciseCatalogCache());
+    const tickers = jest.spyOn(statsRepository, 'computeProgressMuscleTickers');
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    chooseFilter('view-mode', 'Muscle');
+    const bicepsNow = () => screen.getByTestId('stats-muscle-row-biceps-now');
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^4.5$/));
+    const secondaryOn = () => inFilters(() => screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked);
+    expect(secondaryOn()).toBe(true);
+    fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets');
+
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^1$/));
+    expect(secondaryOn()).toBe(false);
+    expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
+    // The tickers follow the same choice.
+    expect(tickers).toHaveBeenLastCalledWith(expect.objectContaining({ countSecondary: false }));
+    fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets&secondary=hidden');
+
+    // Exercise 3D follows the same choice: the squat leaves biceps' contributors.
+    await showBody();
+    chooseFilter('view-mode', 'Exercise');
+    fireEvent.press(await screen.findByTestId('stats-muscle-body-target-biceps'));
+    expect(screen.getByTestId('stats-exercise-effort-primary')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-effort-secondary')).toBeNull();
+    expect(screen.queryByTestId(SQUAT_ROW)).toBeNull();
+    // Exercise 3D shades from the exercise rows: the choice reads nothing and
+    // keeps the body mounted.
+    const reads = jest.spyOn(statsRepository, 'computeProgressComparisons');
+    const body = screen.getByTestId('stats-muscle-body-card');
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    expect(reads).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stats-muscle-body-card')).toBe(body);
+    expect(screen.getByTestId('stats-exercise-effort-secondary')).toBeTruthy();
+    expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^3.5$/);
   });
 
   it('splits both 3D contribution tables by effort under one aligned header, without changing List', async () => {
@@ -440,50 +496,45 @@ describe('Stats over real data', () => {
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     const squatNow = () => screen.getByTestId(`stats-exercise-row-${SQUAT}-now`);
-    expect(screen.getByTestId('stats-gym')).toHaveTextContent('All gyms');
+    expect(chosenGym()).toBe('all');
     expect(squatNow()).toHaveTextContent(/^7$/);
 
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    chooseGym(gym);
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
-    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    expect(chosenGym()).toBe(gym);
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(String(mockPush.mock.lastCall?.[0])).toContain(`exerciseDefinitionId=${SQUAT}`);
     expect(String(mockPush.mock.lastCall?.[0])).toContain(`gymId=${gym}`);
 
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    chooseGym('no-gym');
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^2$/));
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(String(mockPush.mock.lastCall?.[0])).toContain('gymId=no-gym');
 
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    chooseGym('all');
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^7$/));
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(String(mockPush.mock.lastCall?.[0])).not.toContain('gymId=');
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    chooseGym(gym);
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
     // The Muscle table shares the gym; the 3D muscle body uses all gyms.
     chooseFilter('view-mode', 'Muscle');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
-    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    expect(chosenGym()).toBe(gym);
     fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=sets&gymId=${gym}`);
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    chooseGym('no-gym');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/));
     fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
     expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=sets&gymId=no-gym');
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    chooseGym('all');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId(`stats-gym-option-${gym}`));
+    chooseGym(gym);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
     await showBody();
-    expect(screen.queryByTestId('stats-gym')).toBeNull();
+    // Muscle 3D counts every gym, so its Filters hold only secondary sets.
+    expect(inFilters(() => [screen.queryAllByTestId(/^stats-gym-option-/).length, screen.queryByTestId('stats-secondary-toggle') !== null]))
+      .toEqual([0, true]);
     await screen.findByTestId('stats-muscle-body-card');
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-quads'));
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^7$/);
@@ -493,7 +544,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-quads'));
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
-    expect(screen.getByTestId('stats-gym')).toHaveTextContent('Maestro Block History Gym');
+    expect(chosenGym()).toBe(gym);
   });
 
   it('hides the previous gym’s Muscle snapshot and ignores its late read', async () => {
@@ -507,12 +558,10 @@ describe('Stats over real data', () => {
     const pending = deferred<typeof old>();
     const read = jest.spyOn(statsRepository, 'computeProgressComparisons').mockImplementation(options =>
       options.gymId === EXERCISE_BLOCK_HISTORY_FIXTURE.gymId ? pending.promise : real(options));
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId(`stats-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    chooseGym(EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
     await waitFor(() => expect(read).toHaveBeenCalledWith(expect.objectContaining({ gymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId })));
     expect(screen.queryByTestId('stats-muscle-row-quads-now')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-gym'));
-    fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
+    chooseGym('no-gym');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/));
     await act(async () => pending.resolve(old));
     expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/);
@@ -567,7 +616,7 @@ describe('Stats over real data', () => {
     chooseFilter('period', '4 weeks');
     await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`);
 
-    fireEvent.press(screen.getByTestId('stats-group-toggle'));
+    toggleGroup();
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
 
     // Carry (0.2 days ago), Squat (0.25), Bench (2), Pulldown (20).

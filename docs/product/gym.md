@@ -64,7 +64,4 @@ Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-a
 
 ### gym.split-label · presentation · superseded-by: gym.split
 
-Replaced by [[gym.split]] with owner approval on 2026-10-18: views show the
-whole exercise until a gym is chosen, so no list mixes per-gym rows to label.
-Its share-image and coaching rules moved there; how a chosen gym is named is
-left to the design.
+Replaced by [[gym.split]] on 2026-10-18: no list mixes per-gym rows to label.

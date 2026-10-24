@@ -111,6 +111,15 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
 };
 
 /**
+ * The input a view that hides secondary work reads ([[muscle.secondary-filter]]):
+ * its secondary mappings are dropped, so a muscle counts only the exercises it
+ * is primary for, in Sets and Volume alike.
+ */
+export const withoutSecondaryMappings = <T extends MuscleAnalyticsInput>(input: T): T => ({
+  ...input, muscleMappings: input.muscleMappings.filter((mapping) => mapping.role !== 'secondary'),
+});
+
+/**
  * The working sets a muscle got, by role and combined ([[muscle.set-count]]).
  * `weightedSetCount` is what an unqualified `Sets` for a muscle shows; the two
  * role figures are there for a surface that names them.

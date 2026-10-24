@@ -13,6 +13,7 @@ import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
 import {
   SegmentedControl,
   StatePanel,
+  ToggleChip,
   uiSpace,
 } from '@/components/ui';
 import type {
@@ -21,8 +22,9 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
-// The body of the history page (`app/progress-history.tsx`): the view and
-// metric selectors in one row, then the chosen Timeline, Grid or Weekly view. The
+// The body of the history page (`app/progress-history.tsx`): the view
+// selector, the metric chip and the page's gym or filters in one row, then the
+// chosen Timeline, Grid or Weekly view. The
 // subject's name is the page's native title, so nothing here repeats it.
 // Pending/error bodies mount only their StatePanel; chart work starts after
 // data. One component for the muscle and the exercise page; `kind` names its
@@ -271,6 +273,8 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   // The Timeline's focused week, for the page's ⋮; `null` while
   // another view shows, or when no chart does.
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
+  // The page's gym button or Filters, closing the selector row.
+  filters?: ReactNode;
 };
 
 export function HistoryView<TMetric extends CalendarHeatmapMetric>({
@@ -293,6 +297,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   todayDateKey,
   timeline,
   onFocusWeek,
+  filters,
 }: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
@@ -327,8 +332,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
 
   return (
     <View style={styles.body} testID={`${prefix}-overlay`}>
-      {/* Both selectors in one row: the view as icons, so the metric names —
-          up to four, `Top weight` the widest — keep the rest of the row. */}
+      {/* One row: the view as icons, the metric as one chip that steps to
+          the next on a tap, then the page's gym or filters. */}
       <View style={styles.controls}>
         <SegmentedControl
           accessibilityLabel="Select history view"
@@ -343,19 +348,14 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
           testIDPrefix={`${prefix}-view-chip`}
           value={view}
         />
-        <SegmentedControl
-          accessibilityLabel="Select effort metric"
-          density="compact"
-          hitSlop={uiSpace.sm}
-          // Four metrics: `Top weight` outgrows an equal quarter.
-          layout="fit"
+        <ToggleChip
+          accessibilityLabel="Effort metric"
           onChange={onSelectMetric}
           options={metricOptions}
-          selectedGround="selection"
-          style={styles.metricControl}
-          testIDPrefix={`${prefix}-metric-chip`}
+          testID={`${prefix}-metric-chip`}
           value={metric}
         />
+        {filters}
       </View>
 
       {!!errorMessage || (isLoading && dailyMetrics.length === 0) ? (
@@ -383,19 +383,15 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
-  // The view and metric selectors share one row and one height, clear of the
-  // native header above them.
+  // The selectors share one row and one height, clear of the native header
+  // above them.
   controls: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'center',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.md,
-  },
-  metricControl: {
-    flex: 1,
-    minWidth: 0,
   },
   scroll: {
     flex: 1,

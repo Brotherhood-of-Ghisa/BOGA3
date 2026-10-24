@@ -13,6 +13,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import * as mockReact from 'react';
+import { View } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 
@@ -149,6 +150,27 @@ const buildViewProps = (
 const renderHistoryView = (overrides: Partial<HistoryViewProps<CalendarHeatmapMetric>> = {}) =>
   render(<HistoryView {...buildViewProps(overrides)} />);
 
+type HistoryKind = HistoryViewProps<CalendarHeatmapMetric>['kind'];
+const metricChip = (kind: HistoryKind) => screen.getByTestId(`stats-${kind}-history-metric-chip`);
+/** The metric in force: the one chip's label carries it as `<chip>-<value>`. */
+const shownMetric = (kind: HistoryKind) => {
+  const prefix = `stats-${kind}-history-metric-chip-`;
+  return (within(metricChip(kind)).getByTestId(new RegExp(`^${prefix}`)).props.testID as string).slice(prefix.length);
+};
+/** Steps the metric chip, which wraps round, until it shows `metric`. */
+const chooseMetric = async (kind: HistoryKind, metric: CalendarHeatmapMetric) => {
+  for (let presses = 0; presses < EXERCISE_HISTORY_METRIC_OPTIONS.length && shownMetric(kind) !== metric; presses += 1) {
+    await act(async () => { fireEvent.press(metricChip(kind)); });
+  }
+  expect(shownMetric(kind)).toBe(metric);
+};
+/** The nearest host view holding `node`: the row a control sits in. */
+const hostRow = (node: ReturnType<typeof screen.getByTestId>) => {
+  let parent = node.parent;
+  while (parent && typeof parent.type !== 'string') parent = parent.parent;
+  return parent;
+};
+
 const captureUiEvidence = (name: string, tree: unknown) => {
   const evidenceDir = process.env.UI_EVIDENCE_DIR;
   if (!evidenceDir) return;
@@ -167,6 +189,14 @@ describe('resolveHistorySubject', () => {
       const [name, value] = query.split('=');
       expect(resolveHistorySubject({ [name]: decodeURIComponent(value) })).toEqual(expected);
     }
+  });
+
+  it('reads a muscle\'s hidden secondary sets back from its href, and ignores them on an exercise', () => {
+    const params = (href: string) => Object.fromEntries(new URLSearchParams(href.split('?')[1]));
+    expect(resolveHistorySubject(params(String(progressHistoryHref({ muscleGroupId: 'quads', countSecondary: false })))))
+      .toEqual({ kind: 'muscle', id: 'quads', countSecondary: false });
+    expect(resolveHistorySubject({ muscleGroupId: 'quads', secondary: 'shown' })).toEqual({ kind: 'muscle', id: 'quads' });
+    expect(resolveHistorySubject({ exerciseDefinitionId: 'lift', secondary: 'hidden' })).toEqual({ kind: 'exercise', id: 'lift' });
   });
 
   it.each(['gym a/b', null, undefined])('round-trips muscle gym scope %s', gymId => {
@@ -234,12 +264,18 @@ describe('HistoryView', () => {
     expect(screen.getAllByTestId('stats-muscle-history-empty')[0]).toHaveTextContent(/No training was found/);
   });
 
-  it('puts the view and metric selectors in one row, and draws no view title', () => {
+  it('puts the view selector, metric chip and the page\'s filters in one row, and draws no view title', () => {
     const onSelectView = jest.fn();
-    renderHistoryView({ view: 'daily', dailyMetrics: DAILY_METRICS, weeklyEffort: [buildWeeklyEffort()] });
-    // Both controls, side by side, above the chart.
-    expect(screen.getByTestId('stats-muscle-history-view-chip-row')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-row')).toBeTruthy();
+    renderHistoryView({
+      view: 'daily', dailyMetrics: DAILY_METRICS, weeklyEffort: [buildWeeklyEffort()],
+      filters: <View testID="page-filters" />,
+    });
+    // The controls, side by side, above the chart: one row holds all three.
+    const row = hostRow(screen.getByTestId('stats-muscle-history-view-chip-row'));
+    expect(row).toBeTruthy();
+    expect(hostRow(metricChip('muscle'))).toBe(row);
+    expect(hostRow(screen.getByTestId('page-filters'))).toBe(row);
+    expect(shownMetric('muscle')).toBe('totalVolume');
     // The removed headings: the selectors say what is shown.
     expect(screen.queryByText('Daily training load')).toBeNull();
     expect(screen.queryByText('Weekly training load')).toBeNull();
@@ -271,7 +307,7 @@ describe('HistoryView', () => {
   });
 
   it.each([['muscle', 'daily'], ['muscle', 'weekly'], ['exercise', 'daily'], ['exercise', 'weekly']] as const)(
-    'uses fixed black and white for the active %s history metric in %s mode', (kind, view) => {
+    'shows the active %s history metric on one ink-on-surface chip in %s mode, the view keeping the fixed black ground', (kind, view) => {
       const onSelectMetric = jest.fn();
       const props = buildViewProps({
         kind,
@@ -281,17 +317,28 @@ describe('HistoryView', () => {
       });
       const { rerender } = render(<HistoryView {...props} />);
       const prefix = `stats-${kind}-history-metric-chip`;
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.selection });
-      expect(within(screen.getByTestId(`${prefix}-totalVolume`)).getByText('Volume')).toHaveStyle({ color: uiRoles.surface });
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.surface });
-      fireEvent.press(screen.getByTestId(`${prefix}-workingSetCount`));
-      expect(onSelectMetric).toHaveBeenCalledWith('workingSetCount');
+      // The view selector still marks its active segment on the fixed black ground.
+      expect(screen.getByTestId(`stats-${kind}-history-view-chip-${view}`)).toHaveStyle({ backgroundColor: uiRoles.selection });
+      // One chip shows only the metric in force, as ink on surface, and names the next.
+      expect(metricChip(kind)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveTextContent('Volume');
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ color: uiRoles.ink });
+      expect(screen.queryByTestId(`${prefix}-workingSetCount`)).toBeNull();
+      expect(metricChip(kind)).toHaveProp('accessibilityLabel', 'Effort metric: Volume. Activate to show Sets.');
+      fireEvent.press(metricChip(kind));
+      expect(onSelectMetric).toHaveBeenLastCalledWith('workingSetCount');
 
+      // Sets steps on to an exercise's 1RM, and wraps a muscle's two back to Volume.
+      const after = kind === 'exercise' ? { value: 'estimatedRM1', label: '1RM' } : { value: 'totalVolume', label: 'Volume' };
       rerender(<HistoryView {...props} metric="workingSetCount" />);
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.selection });
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveProp('accessibilityState', { selected: true });
-      expect(within(screen.getByTestId(`${prefix}-workingSetCount`)).getByText('Sets')).toHaveStyle({ color: uiRoles.surface });
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      expect(shownMetric(kind)).toBe('workingSetCount');
+      expect(metricChip(kind)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveTextContent('Sets');
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ color: uiRoles.ink });
+      expect(screen.queryByTestId(`${prefix}-totalVolume`)).toBeNull();
+      expect(metricChip(kind)).toHaveProp('accessibilityLabel', `Effort metric: Sets. Activate to show ${after.label}.`);
+      fireEvent.press(metricChip(kind));
+      expect(onSelectMetric).toHaveBeenLastCalledWith(after.value);
     });
 
   it('offers every entered-load metric for an exercise and the two muscle metrics for a muscle', () => {
@@ -393,26 +440,22 @@ describe('ProgressHistoryScreen', () => {
   it('opens on the metric Progress carried over, and on Volume without one', async () => {
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
     render(<ProgressHistoryRoute />);
-    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'))
-      .toHaveProp('accessibilityState', { selected: true }));
+    await waitFor(() => expect(shownMetric('muscle')).toBe('workingSetCount'));
 
     screen.unmount();
     mockSearchParams = { exerciseDefinitionId: 'ex1' };
     render(<ProgressHistoryRoute />);
-    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
-      .toHaveProp('accessibilityState', { selected: true }));
+    await waitFor(() => expect(shownMetric('exercise')).toBe('totalVolume'));
   });
 
   it('opens a link that lands on the mounted route as a new page, on its own metric', async () => {
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
     const { rerender } = render(<ProgressHistoryRoute />);
-    await waitFor(() => expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'))
-      .toHaveProp('accessibilityState', { selected: true }));
+    await waitFor(() => expect(shownMetric('muscle')).toBe('workingSetCount'));
 
     mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume' };
     rerender(<ProgressHistoryRoute />);
-    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
-      .toHaveProp('accessibilityState', { selected: true }));
+    await waitFor(() => expect(shownMetric('exercise')).toBe('totalVolume'));
     expect(mockScreenOptions.title).toBe('Bench Press');
   });
 
@@ -459,6 +502,9 @@ describe('ProgressHistoryScreen', () => {
     expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
     // Options are merged across renders, so the key must be named to clear it.
     expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
+    // The page's own choices are no header item: its Filters sits in the body's selector row.
+    expect(within(screen.getByTestId('stats-muscle-history-overlay')).getByTestId('progress-history-filters'))
+      .toHaveProp('accessibilityLabel', 'Filters');
   });
 
   it('drops the ⋮ when the Timeline is left for another view on a muscle page', async () => {
@@ -497,7 +543,7 @@ describe('ProgressHistoryScreen', () => {
     render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2' }} initialMetric={null}
       todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
-    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-estimatedRM1')); });
+    await chooseMetric('exercise', 'estimatedRM1');
 
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     fireEvent.press(screen.getByTestId('progress-history-muscle-front_delts'));
@@ -544,7 +590,7 @@ describe('ProgressHistoryScreen', () => {
     render(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-timeline'))
       .toHaveProp('accessibilityState', { selected: true }));
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+    expect(shownMetric('muscle')).toBe('workingSetCount');
     expect(getAccountLocalPreferenceState().values.heatmapView).toBe(saved);
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-weekly'))
@@ -559,7 +605,7 @@ describe('ProgressHistoryScreen', () => {
     render(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId(`stats-muscle-history-view-chip-${view}`))
       .toHaveProp('accessibilityState', { selected: true }));
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toHaveProp('accessibilityState', { selected: true });
+    expect(shownMetric('muscle')).toBe('totalVolume');
     expect(getAccountLocalPreferenceState().values.heatmapView).toBe(saved);
   });
 
@@ -583,22 +629,18 @@ describe('ProgressHistoryScreen', () => {
       .toHaveProp('accessibilityState', { selected: true }));
     expect(screen.UNSAFE_getByType(HistoryView).props.timeline.weekSetsTarget)
       .toEqual({ exerciseDefinitionId: 'ex1', gymId: 'gym-a' });
-    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
-    expect(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'))
-      .toHaveProp('accessibilityState', { selected: true });
+    await chooseMetric('exercise', 'workingSetCount');
 
     mockSearchParams = { ...mockSearchParams, view: 'daily' };
     page.rerender(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-daily'))
       .toHaveProp('accessibilityState', { selected: true }));
-    expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
-      .toHaveProp('accessibilityState', { selected: true });
-    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
+    expect(shownMetric('exercise')).toBe('totalVolume');
+    await chooseMetric('exercise', 'workingSetCount');
 
     mockSearchParams = { ...mockSearchParams, gymId: 'no-gym' };
     page.rerender(<ProgressHistoryRoute />);
-    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume'))
-      .toHaveProp('accessibilityState', { selected: true }));
+    await waitFor(() => expect(shownMetric('exercise')).toBe('totalVolume'));
     expect(screen.UNSAFE_getByType(HistoryView).props.timeline.weekSetsTarget)
       .toEqual({ exerciseDefinitionId: 'ex1', gymId: null });
     expect(getAccountLocalPreferenceState().values.heatmapView).toBe('weekly');
@@ -642,7 +684,7 @@ describe('ProgressHistoryScreen', () => {
       expect.objectContaining({ muscleGroupIds: ['front_delts'] })
     );
     // Only Sets is target-graded, and the page grades this one muscle alone.
-    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')); });
+    await chooseMetric('muscle', 'workingSetCount');
     expect(screen.getByText('Weekly target')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03'))
       .toHaveProp('accessibilityLabel', expect.stringContaining('50% of weekly muscle target'));

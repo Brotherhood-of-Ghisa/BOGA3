@@ -10,7 +10,7 @@ export type ToggleChipOption<TValue extends string | number> = {
 };
 
 export type ToggleChipProps<TValue extends string | number> = {
-  // Two options, or one when the screen has nothing to offer against it.
+  // Two or a few options, or one when the screen has nothing to offer against it.
   options: readonly ToggleChipOption<TValue>[];
   value: TValue;
   onChange: (next: TValue) => void;
@@ -21,8 +21,8 @@ export type ToggleChipProps<TValue extends string | number> = {
   style?: StyleProp<ViewStyle>;
 };
 
-// One filter of two values, showing the one in force; a tap swaps it for the
-// other. A `SegmentedControl` shows both at once and is the default — this is
+// One filter of a few values, showing the one in force; a tap steps to the
+// next, wrapping round. A `SegmentedControl` shows both at once and is the default — this is
 // for a row of filters that cannot afford six labels at phone width
 // (`design-language.md` §4). The `swap` glyph says the tap replaces the value
 // rather than opening anything. Drawn at `compactControlHeight`, its tap

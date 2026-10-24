@@ -134,6 +134,48 @@ const openHistory = async (params: Record<string, string>) => {
   await screen.findByTestId('progress-history-screen');
 };
 
+type HistoryKind = 'exercise' | 'muscle';
+type HistoryMetric = 'totalVolume' | 'workingSetCount' | 'estimatedRM1' | 'highestWeight';
+const metricChip = (kind: HistoryKind) => screen.getByTestId(`stats-${kind}-history-metric-chip`);
+/** The metric in force: the one chip's label carries it as `<chip>-<value>`. */
+const shownMetric = (kind: HistoryKind) => {
+  const prefix = `stats-${kind}-history-metric-chip-`;
+  return (within(metricChip(kind)).getByTestId(new RegExp(`^${prefix}`)).props.testID as string).slice(prefix.length);
+};
+/** Steps the metric chip, which wraps round, until it shows `metric`. */
+const chooseMetric = async (kind: HistoryKind, metric: HistoryMetric) => {
+  for (let presses = 0; presses < 4 && shownMetric(kind) !== metric; presses += 1) {
+    await act(async () => { fireEvent.press(metricChip(kind)); });
+  }
+  expect(shownMetric(kind)).toBe(metric);
+};
+
+// A muscle page's gym sits in its Filters sheet, which stays open across
+// choices: open it, act, dismiss it. An exercise's gym is its own picker.
+const inFilters = <T,>(inside: () => T): T => {
+  fireEvent.press(screen.getByTestId('progress-history-filters'));
+  const result = inside();
+  fireEvent(screen.getByTestId('progress-history-filters-sheet'), 'accessibilityEscape');
+  return result;
+};
+const GYM_BUTTON = { exercise: 'stats-exercise-history-gym', muscle: 'progress-history-filters' } as const;
+const chooseGym = (kind: HistoryKind, key: string) => {
+  if (kind === 'muscle') {
+    inFilters(() => fireEvent.press(screen.getByTestId(`stats-gym-option-${key}`)));
+  } else {
+    fireEvent.press(screen.getByTestId(GYM_BUTTON.exercise));
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${key}`));
+  }
+};
+/** The gym the page's button names: the picker's own, or the Filters' changed choices. */
+const gymButtonLabel = (kind: HistoryKind, gym: string) =>
+  kind === 'exercise' ? `Gym: ${gym}` : gym === 'All gyms' ? 'Filters' : `Filters: ${gym}`;
+const allGymsLabel = (kind: HistoryKind): string => {
+  if (kind === 'muscle') return inFilters(() => screen.getByTestId('stats-gym-option-all').props.accessibilityLabel);
+  fireEvent.press(screen.getByTestId(GYM_BUTTON.exercise));
+  return screen.getByTestId('stats-exercise-history-gym-option-all').props.accessibilityLabel;
+};
+
 beforeEach(async () => {
   resetLocalData();
   mockScreenOptions = {};
@@ -205,9 +247,13 @@ describe('The history page over real data', () => {
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
-    for (const metric of ['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight']) {
-      expect(screen.getByTestId(`stats-exercise-history-metric-chip-${metric}`)).toBeTruthy();
+    // The one metric chip steps through all four, then wraps back to Volume.
+    const stepped = [shownMetric('exercise')];
+    for (let press = 0; press < 4; press += 1) {
+      await act(async () => { fireEvent.press(metricChip('exercise')); });
+      stepped.push(shownMetric('exercise'));
     }
+    expect(stepped).toEqual(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight', 'totalVolume']);
     // Neither view draws a title of its own, and the window has no caption.
     expect(screen.queryByText('Daily training load')).toBeNull();
     expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
@@ -229,21 +275,19 @@ describe('The history page over real data', () => {
     await waitForGone(() => screen.queryByTestId(`stats-${kind}-history-loading`));
     const trainingDays = () => renderedDailySample(kind).filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
     expect(trainingDays()).toEqual([noGymDay]);
-    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('No gym');
+    // The gym sits in the body's selector row, not the native header.
+    expect(within(screen.getByTestId(`stats-${kind}-history-overlay`)).getByTestId(GYM_BUTTON[kind]))
+      .toHaveProp('accessibilityLabel', gymButtonLabel(kind, 'No gym'));
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
-    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    chooseGym(kind, EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
     await waitFor(() => expect(trainingDays().length).toBeGreaterThan(1));
     expect(trainingDays()).not.toContain(noGymDay);
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
-    fireEvent.press(screen.getByTestId('stats-exercise-history-gym-option-all'));
+    chooseGym(kind, 'all');
     await waitFor(() => expect(trainingDays()).toContain(noGymDay));
-    expect(screen.getByTestId('stats-exercise-history-gym')).toHaveTextContent('All gyms');
-    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
+    expect(screen.getByTestId(GYM_BUTTON[kind])).toHaveProp('accessibilityLabel', gymButtonLabel(kind, 'All gyms'));
     // `All gyms` counts every session of the window, each gym's own beside it.
-    expect(screen.getByTestId('stats-exercise-history-gym-option-all').props.accessibilityLabel)
-      .toMatch(/^All gyms, \d+ sessions$/);
+    expect(allGymsLabel(kind)).toMatch(/^All gyms, \d+ sessions$/);
   });
 
   it('draws no gym filter for an exercise with no gym to choose', async () => {
@@ -267,8 +311,7 @@ describe('The history page over real data', () => {
     openSessionHistory();
     expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${SQUAT}`);
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-gym'));
-    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`));
+    chooseGym('exercise', EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
     openSessionHistory();
     expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${SQUAT}&gymId=${EXERCISE_BLOCK_HISTORY_FIXTURE.gymId}`);
   });
@@ -375,7 +418,7 @@ describe('The history page over real data', () => {
     fireEvent.press(buttons[0]);
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'totalVolume'));
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
+    await chooseMetric('muscle', 'workingSetCount');
     fireEvent.press((await screen.findAllByLabelText(/^Open .*Squat.* progress$/))[0]);
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'workingSetCount'));
 
@@ -503,17 +546,20 @@ describe('The history page over real data', () => {
     await waitFor(() => expect(mockScreenOptions.title).toBe('Quads'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
     expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
-    expect(within(screen.getByTestId('stats-muscle-history-overlay'))
-      .queryByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeNull();
+    expect(shownMetric('muscle')).toBe('totalVolume');
+    expect(metricChip('muscle')).toHaveProp('accessibilityLabel', 'Effort metric: Volume. Activate to show Sets.');
+    // The chip steps Volume → Sets and wraps straight back: no exercise-only metric.
+    const stepped: string[] = [];
+    for (let press = 0; press < 2; press += 1) {
+      await act(async () => { fireEvent.press(metricChip('muscle')); });
+      stepped.push(shownMetric('muscle'));
+    }
+    expect(stepped).toEqual(['workingSetCount', 'totalVolume']);
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+    await chooseMetric('muscle', 'workingSetCount');
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
     expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
+    expect(shownMetric('muscle')).toBe('workingSetCount');
   });
 
   it('shows a secondary muscle\'s day cells its half-steps, unrounded', async () => {
@@ -524,7 +570,7 @@ describe('The history page over real data', () => {
     act(() => updatePreferences({ heatmapView: 'daily' }));
     await openHistory({ muscleGroupId: 'quads' });
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
+    await chooseMetric('muscle', 'workingSetCount');
 
     const trained = renderedDailySample('muscle').filter(tile => tile.day?.hasTraining);
     expect(trained.length).toBeGreaterThan(0);
@@ -535,6 +581,64 @@ describe('The history page over real data', () => {
       expect(screen.getByTestId(`stats-muscle-history-heatmap-cell-${tile.dateKey}-value`))
         .toHaveTextContent(String(tile.day!.value));
     }
+  });
+
+  it('counts only primary work, chart and week list alike, when Progress hid secondary sets, until its Filters count them again', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    // Quads keeps its real sets but only as a secondary mapping ([[muscle.secondary-filter]]).
+    localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    const history = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
+    const week = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort');
+    await openHistory({ muscleGroupId: 'quads', secondary: 'hidden' });
+    await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
+    await waitFor(() => expect(week).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
+    expect(await screen.findByTestId('stats-muscle-history-empty')).toBeTruthy();
+    expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
+    // The page's own Filters open on Progress's choice and change it for this visit.
+    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
+    expect(inFilters(() => screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked)).toBe(false);
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
+    await waitForGone(() => screen.queryByTestId('stats-muscle-history-empty'));
+    expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters');
+  });
+
+  it('combines the linked gym with secondary sets, keeping the gym rows while either choice re-reads', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    const gym = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    const real = statsRepository.computeSelectedMuscleHistoryEffort;
+    let release: () => void = () => undefined;
+    const history = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort').mockImplementation(options =>
+      options.countSecondary === false ? real(options)
+        : new Promise(resolve => { release = () => resolve(real(options)); }));
+    await openHistory({ muscleGroupId: 'quads', gymId: gym, secondary: 'hidden' });
+    await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ gymId: gym, countSecondary: false })));
+    await waitFor(() => expect(screen.getByTestId('progress-history-filters').props.accessibilityLabel)
+      .toBe('Filters: Maestro Block History Gym, secondary sets not counted'));
+
+    fireEvent.press(screen.getByTestId('progress-history-filters'));
+    fireEvent.press(screen.getByTestId('stats-secondary-toggle'));
+    await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
+    // The read is pending: the open sheet keeps its gym rows.
+    expect(screen.getByTestId(`stats-gym-option-${gym}`)).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId(`stats-gym-option-${gym}`)).toHaveTextContent(/Maestro Block History Gym/);
+    await act(async () => release());
+    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
+    fireEvent(screen.getByTestId('progress-history-filters-sheet'), 'accessibilityEscape');
+    await waitFor(() => expect(history.mock.lastCall?.[0]).not.toHaveProperty('gymId'));
+    expect(history.mock.lastCall?.[0]).not.toHaveProperty('countSecondary');
+    await act(async () => release());
+    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters');
+  });
+
+  it('offers secondary sets only on a muscle page: an exercise page keeps a plain gym button', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    expect(await screen.findByTestId('stats-exercise-history-gym')).toBeTruthy();
+    expect(screen.queryByTestId('progress-history-filters')).toBeNull();
+    expect(screen.queryByTestId('stats-secondary-toggle')).toBeNull();
   });
 
   it('retries a failed muscle history read without leaving the page', async () => {
