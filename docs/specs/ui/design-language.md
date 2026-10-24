@@ -197,7 +197,7 @@ additionally render faded ([[set.row-figures]], §6).
   on its median). The two colours are fixed in every theme, like `danger`, so
   "better" never follows the picked accent's hue; they sit at one lightness and
   differ only in hue, so neither shouts. **Colour is never the only channel:**
-  the figure still says `+3`, `−12%`, `±0`, `new` or `—`. One rule, every
+  the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
   change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
   it lives, and no screen picks a delta colour of its own.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex

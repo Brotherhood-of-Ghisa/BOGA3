@@ -102,15 +102,14 @@ it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects inval
   expect(write).not.toHaveBeenCalled();
 });
 
-// Progress's remembered filters. The period is deliberately not one of them:
-// every visit opens on Settings' Progress period ([[comparison.window]]).
-it('restores the remembered Progress filters after relaunch, per account, as plain text', async () => {
+// What Progress opens on, set in Settings.
+it('restores the Progress defaults after relaunch, per account, as plain text', async () => {
   await account();
   expect(values().progressBreakdown).toBe('muscle');
   expect(values().progressMetric).toBe('workingSetCount');
-  // Each table remembers its own metric: only the Exercise table can hold 1RM.
+  // Each table has its own metric: only the Exercise table can hold 1RM.
   expect(values().progressExerciseMetric).toBe('workingSetCount');
-  expect(Object.keys(values())).not.toContain('progressPeriod');
+  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true, progressCountSecondary: true });
 
   setAccountLocalPreferences({ progressExerciseMetric: 'estimatedOneRepMax' });
   expect(Storage.getItemSync(preferenceKey('account:A', 'progressExerciseMetric'))).toBe('estimatedOneRepMax');
@@ -131,6 +130,28 @@ it('restores the remembered Progress filters after relaunch, per account, as pla
     progressExerciseMetric: 'workingSetCount' });
   await account('A');
   expect(values().progressMetric).toBe('totalVolume');
+});
+
+it('stores the period as text and grouping and secondary sets as booleans', async () => {
+  await account();
+  setAccountLocalPreferences({ progressPeriod: 'this-week', progressGrouped: false, progressCountSecondary: false });
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressPeriod'))).toBe('this-week');
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressGrouped'))).toBe('false');
+  expect(Storage.getItemSync(preferenceKey('account:A', 'progressCountSecondary'))).toBe('false');
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values()).toMatchObject({ progressPeriod: 'this-week', progressGrouped: false, progressCountSecondary: false });
+  await account('B');
+  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true, progressCountSecondary: true });
+});
+
+it.each([
+  ['progressPeriod', '"window"'], ['progressPeriod', '7'], ['progressGrouped', 'yes'], ['progressCountSecondary', '1'],
+] as const)('opens on the default for an unreadable stored %s %s', async (field, raw) => {
+  Storage.setItemSync(preferenceKey('account:A', field), raw);
+  await account();
+  expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+  expect(isPreferenceValue(field, raw)).toBe(false);
 });
 
 it.each(['progressBreakdown', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric'] as const)(

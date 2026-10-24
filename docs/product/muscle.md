@@ -52,9 +52,9 @@ Code: `apps/mobile/components/preferences/progress-settings.tsx`,
 
 ### muscle.secondary-filter · presentation · accepted
 
-Progress and muscle history Filters offer `Count secondary sets`, on each visit;
-history opens on Progress's choice. Off, muscle figures count primary work only.
-Approved 2026-10-23.
+Progress and muscle history Filters offer `Count secondary sets` per visit:
+Progress opens on Settings' default, history on Progress's. Off counts primary
+work only. Approved 2026-10-23.
 
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 

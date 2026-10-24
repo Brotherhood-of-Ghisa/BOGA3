@@ -4,15 +4,17 @@ export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
 export type HeatmapView = 'daily' | 'weekly' | 'timeline';
-// The Progress filters remembered across launches: the breakdown, and each
-// breakdown's metric. The period is not one of them: every visit opens on
-// Settings' Progress period ([[comparison.window]]).
+// What Progress opens on, set in Settings: the breakdown, the period, each
+// breakdown's metric, family grouping and secondary sets. A choice on Progress
+// lasts only for the visit; it never changes these defaults.
 export type ProgressBreakdown = 'exercise' | 'muscle';
+// Settings' Progress period ([[comparison.window]]), or its one-week alternative.
+export type ProgressPeriod = 'window' | 'this-week';
 export type ProgressMuscleLayout = 'list' | '3d';
 export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // The Exercise breakdown offers one more: a 1RM estimate is a figure only an
-// exercise has, so the Muscle table never shows it. Each breakdown remembers
-// its own metric, so switching back finds the figure you left on.
+// exercise has, so the Muscle table never shows it. Each breakdown has its own
+// metric, so switching back finds the figure you left on.
 export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
 export const MIN_REST_TIMER_SECONDS = 15;
@@ -34,6 +36,9 @@ export type AccountLocalPreferences = {
   historyLookbackWeeks: number;
   heatmapView: HeatmapView;
   progressBreakdown: ProgressBreakdown;
+  progressPeriod: ProgressPeriod;
+  progressGrouped: boolean;
+  progressCountSecondary: boolean;
   progressMuscleLayout: ProgressMuscleLayout;
   progressMetric: ProgressMetric;
   progressExerciseMetric: ProgressExerciseMetric;
@@ -61,6 +66,9 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   historyLookbackWeeks: 52,
   heatmapView: 'daily',
   progressBreakdown: 'muscle',
+  progressPeriod: 'window',
+  progressGrouped: true,
+  progressCountSecondary: true,
   progressMuscleLayout: 'list',
   progressMetric: 'workingSetCount',
   progressExerciseMetric: 'workingSetCount',
@@ -74,7 +82,11 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 // Stored as their own text, not JSON: every other non-boolean field is written
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
-  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
+  ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressPeriod', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
+];
+// Stored as `true` / `false`.
+export const booleanPreferenceFields: (keyof AccountLocalPreferences)[] = [
+  'showNeverDone', 'restTimerAutoStart', 'developerMode', 'progressGrouped', 'progressCountSecondary',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
 export const isNonNegativeSafeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -93,6 +105,9 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
   heatmapView: 'Choose Grid, Weekly or Timeline for history.',
   progressBreakdown: 'Choose Exercise or Muscle for Progress.',
+  progressPeriod: 'Choose the Progress period or This week for Progress.',
+  progressGrouped: 'Choose whether Progress groups by muscle family.',
+  progressCountSecondary: 'Choose whether Progress counts secondary sets.',
   progressMuscleLayout: 'Choose List or 3D for Progress.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
@@ -109,6 +124,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'sort': return value === 'name' || value === 'favourite';
     case 'showNeverDone':
     case 'restTimerAutoStart':
+    case 'progressGrouped':
+    case 'progressCountSecondary':
     case 'developerMode': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
@@ -120,6 +137,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'historyLookbackWeeks': return isPositiveSafeInteger(value) && value <= MAX_HISTORY_LOOKBACK_WEEKS;
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
+    case 'progressPeriod': return value === 'window' || value === 'this-week';
     case 'progressMuscleLayout': return value === 'list' || value === '3d';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':

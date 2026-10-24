@@ -13,7 +13,7 @@ export type ChangeTone = 'positive' | 'negative' | 'neutral' | 'new';
 
 /**
  * A change's ink. Colour is never the only channel: the figure carries its
- * sign (`+3`, `−12%`, `±0`) whatever this returns, so the direction still
+ * sign (`+3`, `−12%`, or a plain `0`) whatever this returns, so the direction still
  * reads without hue.
  */
 export const changeToneColour = (tone: ChangeTone): string => {

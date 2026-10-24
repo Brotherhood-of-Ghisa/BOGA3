@@ -2,8 +2,9 @@ import type { ChangeTone } from '@/components/ui';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 
 // How a change between two periods is said ([[comparison.change-display]]).
-// The tone is its direction, drawn by `changeToneColour`; the text always
-// carries the sign, so the direction reads without the colour.
+// The tone is its direction, drawn by `changeToneColour`; the text carries the
+// sign of any change, so the direction reads without the colour. No change is
+// a plain `0`, with no sign.
 export type DeltaDisplay = { text: string; tone: ChangeTone };
 
 const signed = (difference: number, magnitude: string): DeltaDisplay => ({
@@ -14,7 +15,7 @@ const signed = (difference: number, magnitude: string): DeltaDisplay => ({
 export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
   const difference = current - previous;
   if (!Number.isFinite(difference)) return { text: '—', tone: 'neutral' };
-  if (difference === 0) return { text: '±0', tone: 'neutral' };
+  if (difference === 0) return { text: '0', tone: 'neutral' };
   return signed(difference, String(Math.abs(difference)));
 };
 
@@ -24,7 +25,7 @@ export const formatVolumeDelta = (current: number | null, previous: number | nul
   if (previous === 0) return { text: 'new', tone: 'new' };
   const percent = Math.round(((current - previous) / previous) * 100);
   if (!Number.isFinite(percent)) return { text: 'Increased', tone: 'positive' };
-  if (percent === 0) return { text: '±0%', tone: 'neutral' };
+  if (percent === 0) return { text: '0%', tone: 'neutral' };
   return signed(percent, `${Math.abs(percent)}%`);
 };
 
@@ -43,6 +44,6 @@ export const formatOneRepMaxDelta = (current: number | null, previous: number | 
   // The sign follows the figure drawn, not the raw difference: 100.04 against
   // 100.00 shows `100.0` twice, so its change is level, not `+0.0`.
   const magnitude = formatOneRepMax(Math.abs(difference));
-  if (Number(magnitude) === 0) return { text: '±0', tone: 'neutral' };
+  if (Number(magnitude) === 0) return { text: '0', tone: 'neutral' };
   return signed(difference, magnitude);
 };

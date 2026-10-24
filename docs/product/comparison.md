@@ -4,11 +4,11 @@
 
 | Figure | Shown as | Examples |
 | --- | --- | --- |
-| Set/session count (Progress, Today pace) | the signed difference, never a percentage | `+4`, `−3`, `±0` |
-| Volume (Progress tables) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `±0%`; `new` when the earlier period is 0; `—` when both are 0 |
-| 1RM (Progress exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `±0`; `new` without an earlier estimate, `—` without a current one |
+| Set/session count (Progress, Today pace) | the signed difference, never a percentage | `+4`, `−3`, `0` |
+| Volume (Progress tables) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `0%`; `new` when the earlier period is 0; `—` when both are 0 |
+| 1RM (Progress exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `0`; `new` without an earlier estimate, `—` without a current one |
 
-More means improvement. Shared direction colours supplement the sign; colour is never the only cue.
+More means improvement; no change is unsigned. Colour supplements the sign, never the only cue.
 
 Today's week figures show none: each fills a bar in laps of last week's total.
 
