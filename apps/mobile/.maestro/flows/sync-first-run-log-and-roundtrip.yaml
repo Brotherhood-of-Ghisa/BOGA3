@@ -7,16 +7,19 @@ appId: com.dinoderek.mobile
 #   1. a new user's first sign-in, on an empty server, runs the real
 #      bootstrapper (seed → push → pull) and lifts the first-sync gate on its
 #      own;
-#   2. a reading entered on the device is pushed: Settings' Pending changes
-#      reaches 0;
+#   2. a reading entered on the device, and the muscle setup chosen in
+#      Settings → Progress → Muscles (Broad, Calves switched off), are pushed:
+#      Settings' Pending changes reaches 0;
 #   3. after a full wipe (clearState) and a fresh sign-in, the bootstrapper
-#      pulls instead of re-seeding, and the reading is back on the device.
+#      pulls instead of re-seeding: the reading is back, and the account still
+#      reads Broad with Calves off ([[muscle.report-groups]]), so the boot
+#      catalogue seed did not reset the pulled rows.
 # Why device:
 #   1. real GoTrue sign-in, the auth → sync trigger, `expo/fetch` and the
 #      on-device expo-sqlite against a real server, and the root stack's
 #      access switch from the gate to the app;
 #   2. a write on the device reaching the server through the scheduler's own
-#      cycle (nothing taps Refresh);
+#      cycle (nothing taps Refresh), from a real sheet and switch;
 #   3. clearState wipes SQLite; clearKeychain drops the SecureStore session
 #      to simulate a fresh device. Reinstall alone preserves iOS Keychain data.
 # Jest counterpart: __tests__/sync/cycle-round-trip.test.ts (live server:
@@ -26,7 +29,10 @@ appId: com.dinoderek.mobile
 #   Refresh), __tests__/bodyweight-screen.test.tsx (the reading editor),
 #   __tests__/completed-session-local-data.test.tsx (a session shows no
 #   body-weight UI when a reading applies), __tests__/sync/** and the
-#   sync-cycle-*.test.ts family (cycle, push/pull, drift).
+#   sync-cycle-*.test.ts family (cycle, push/pull, drift),
+#   __tests__/muscle-report-settings.test.tsx (the preset and Track writes,
+#   dirty flags, derived preset), __tests__/sync/muscle-groups-*.test.ts (the
+#   two columns on the wire; a re-seed keeps them).
 #
 # HERMETIC — the flow signs in as its DEDICATED fixture user (user_b, passed in
 # as MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner; one user per flow,
@@ -135,16 +141,53 @@ appId: com.dinoderek.mobile
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
 
-# The save nudges the scheduler (src/sync/write-nudge.ts), whose cycle pushes
-# the reading. Pending changes reaching 0 is the upload proof AND the barrier
-# for the wipe below: without it clearState can beat the push. The id+text
-# matcher targets the dirty-count field, so an unrelated "0" cannot satisfy it.
-# The card sits below the fold, out of the hierarchy until scrolled to.
+# Settings → Progress → Muscles: Broad, then Calves off. Each write dirties the
+# user's muscle_groups rows and nudges the scheduler, like the reading's save.
+# Back is the Broad muscle on its anchor entry's id, so its label tells the
+# presets apart. The sheet's backdrop is hidden from the modal accessibility
+# tree, so the dismiss taps the exposed region above the panel.
 - openLink: "boga3://settings"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
     timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-muscles-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: { id: "settings-muscles-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-preset-broad" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-preset-broad" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-back_lats", text: "Back" }
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-track-calves"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: { id: "settings-track-calves" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-calves", checked: false }
+    timeout: 15000
+- takeScreenshot: "18a-first-run-roundtrip-muscles-broad"
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "settings-muscles-sheet" }
+    timeout: 15000
+- assertVisible: { id: "settings-muscles-row", text: "Muscles, Broad" }
+
+# The saves nudge the scheduler (src/sync/write-nudge.ts), whose cycle pushes
+# the reading and the muscle rows. Pending changes reaching 0 is the upload
+# proof AND the barrier for the wipe below: without it clearState can beat the
+# push. The id+text matcher targets the dirty-count field, so an unrelated "0"
+# cannot satisfy it. The card sits below the fold, out of the hierarchy until
+# scrolled to.
 - scrollUntilVisible:
     element:
       id: "settings-sync-status-dirty-count"
@@ -217,3 +260,28 @@ appId: com.dinoderek.mobile
     visible: { id: "body-weight-reading-.*", text: "Edit 80, .*" }
     timeout: 30000
 - takeScreenshot: "19-first-run-roundtrip-reading-restored"
+# And the account's muscle setup: still Broad, Calves still off.
+- openLink: "boga3://settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-muscles-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: { id: "settings-muscles-row", text: "Muscles, Broad" }
+- tapOn: { id: "settings-muscles-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-back_lats", text: "Back" }
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-track-calves"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: { id: "settings-track-calves", checked: false }
+- takeScreenshot: "20-first-run-roundtrip-muscles-restored"

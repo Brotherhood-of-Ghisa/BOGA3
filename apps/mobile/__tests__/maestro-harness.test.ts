@@ -22,6 +22,7 @@ jest.mock('@/src/maestro/exercise-block-history-fixture', () => ({
 
 jest.mock('@/src/maestro/exercise-browser-fixture', () => ({ seedExerciseBrowserFixture: jest.fn() }));
 jest.mock('@/src/maestro/today-progress-fixture', () => ({ seedTodayProgressFixture: jest.fn() }));
+jest.mock('@/src/maestro/muscle-report-fixture', () => ({ seedMuscleReportFixture: jest.fn() }));
 
 jest.mock('@/src/maestro/exercise-page-fixture', () => ({
   seedExercisePageFixture: jest.fn(),
@@ -46,6 +47,7 @@ import {
 import { seedExerciseBrowserFixture } from '@/src/maestro/exercise-browser-fixture';
 import { seedExercisePageFixture } from '@/src/maestro/exercise-page-fixture';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
+import { seedMuscleReportFixture } from '@/src/maestro/muscle-report-fixture';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -336,4 +338,10 @@ it('routes the Today fixture and teleports to Today', async () => {
   expect(seedTodayProgressFixture).toHaveBeenCalledTimes(1);
   expect(resolveMaestroHarnessTeleportTarget('today')).toBe('today');
   expect(resolveMaestroHarnessTeleportHref({ target: 'today' })).toBe('/today');
+});
+
+it('routes the muscle-report fixture', async () => {
+  expect(resolveMaestroHarnessFixtureName('muscle-report')).toBe('muscle-report');
+  await runMaestroHarnessFixture('muscle-report');
+  expect(seedMuscleReportFixture).toHaveBeenCalledTimes(1);
 });

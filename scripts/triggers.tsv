@@ -67,6 +67,7 @@ apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke,andr
 apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: asserts the iOS share sheet)
 apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/session-plan.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
+apps/mobile/.maestro/flows/muscle-report-broad.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: tap points measured on iOS)
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/rm-curve-regimes.yaml	-frontend,ios-rm-curve	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it

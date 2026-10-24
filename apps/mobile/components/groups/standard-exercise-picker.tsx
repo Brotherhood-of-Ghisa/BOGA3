@@ -14,6 +14,7 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { searchStandardExercises, type StandardExerciseOption } from '@/src/groups';
 
 type StandardExercisePickerProps = {
@@ -28,7 +29,8 @@ type StandardExercisePickerProps = {
  */
 export function StandardExercisePicker({ selectedId, onPick }: StandardExercisePickerProps) {
   const [query, setQuery] = useState('');
-  const { options, total } = useMemo(() => searchStandardExercises(query), [query]);
+  const { muscleSetup } = useExerciseCatalog();
+  const { options, total } = useMemo(() => searchStandardExercises(query, muscleSetup), [query, muscleSetup]);
 
   return (
     <View style={styles.picker} testID="group-standard-exercise-picker">

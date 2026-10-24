@@ -20,6 +20,7 @@ import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
 import { seedTodayProgressFixture } from './today-progress-fixture';
+import { seedMuscleReportFixture } from './muscle-report-fixture';
 import { setBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
@@ -34,7 +35,9 @@ export type MaestroHarnessFixtureName =
   | 'session-view'
   | 'exercise-browser'
   // A completed history dated relative to now: Today's Progress card, populated.
-  | 'today-progress';
+  | 'today-progress'
+  // One session today reaching the entries Broad merges or a user switches off.
+  | 'muscle-report';
 /**
  * Drives the first-sync gate deterministically in tests without a live cycle:
  * 'reset' clears the bootstrap flag so the gate's full-screen block shows;
@@ -95,7 +98,8 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'exercise-page' ||
   value === 'session-view' ||
   value === 'exercise-browser' ||
-  value === 'today-progress'
+  value === 'today-progress' ||
+  value === 'muscle-report'
     ? value
     : 'none';
 
@@ -218,6 +222,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
     await seedSessionViewFixture();
   }
   if (fixtureName === 'today-progress') await seedTodayProgressFixture();
+  if (fixtureName === 'muscle-report') await seedMuscleReportFixture();
 };
 
 export const runMaestroHarnessBodyweightPreference = (value: string | null | undefined) => {

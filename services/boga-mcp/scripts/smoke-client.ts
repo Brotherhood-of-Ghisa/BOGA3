@@ -15,6 +15,8 @@ const exerciseQuery = required('BOGA_MCP_SMOKE_EXERCISE_QUERY');
 // Set only for the seeded local fixture: exercise writes never run against a
 // supplied (possibly hosted) token.
 const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
+// Seeded beside it with report_group `mcp_smoke_group` and tracked 0.
+const smokeGroupedMuscleId = process.env.BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -356,6 +358,16 @@ try {
       }
       if (!muscleList.every((m) => isObject(m) && 'report_group' in m && typeof m.tracked === 'boolean')) {
         throw new Error('list_muscles did not return each muscle’s report_group and tracked state.');
+      }
+      const own = muscleList.find((m) => isObject(m) && m.id === smokeMuscleId);
+      if (!isObject(own) || own.report_group !== null || own.tracked !== true) {
+        throw new Error('list_muscles did not report the seeded muscle as its own, tracked muscle.');
+      }
+      if (smokeGroupedMuscleId) {
+        const grouped = muscleList.find((m) => isObject(m) && m.id === smokeGroupedMuscleId);
+        if (!isObject(grouped) || grouped.report_group !== 'mcp_smoke_group' || grouped.tracked !== false) {
+          throw new Error('list_muscles did not return the stored report_group and tracked = false of the grouped muscle.');
+        }
       }
 
       const created = structured(

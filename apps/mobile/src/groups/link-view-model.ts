@@ -10,10 +10,11 @@ import {
   buildExerciseCatalogSearchText,
   exerciseSearchTextMatches,
   normalizeExerciseSearchWords,
-  seedMuscleSearchTermsById,
+  seedMuscleSearchTerms,
 } from '@/src/exercise-catalog/search';
+import type { MuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
-import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
+import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import type { GroupExercise } from './types';
 
 /** A personal exercise as the linking UI needs it (a subset of the catalogue row). */
@@ -64,10 +65,14 @@ const byName = (left: { name: string }, right: { name: string }): number =>
 
 /**
  * What a group-exercise search matches: its (possibly renamed) name, its origin
- * exercise's muscle groups, and the group's name.
+ * exercise's primary muscles as the user sees them, and the group's name.
  */
-const groupExerciseSearchText = (groupExercise: GroupExercise, groupName: string): string =>
-  [groupExercise.name, seedMuscleSearchTermsById.get(groupExercise.source_exercise_id ?? '') ?? '', groupName]
+const groupExerciseSearchText = (
+  groupExercise: GroupExercise,
+  groupName: string,
+  muscleSetup: Pick<MuscleSetup, 'assignment'>,
+): string =>
+  [groupExercise.name, seedMuscleSearchTerms(groupExercise.source_exercise_id ?? '', muscleSetup), groupName]
     .join(' ')
     .toLowerCase();
 
@@ -210,12 +215,15 @@ export const buildPickerGroupSections = ({
   exercises,
   query,
   groupsOnly,
+  muscleSetup,
 }: {
   catalogs: readonly GroupExerciseCatalog[] | null;
   links: readonly LinkRef[];
   exercises: readonly LinkableExercise[];
   query: string;
   groupsOnly: boolean;
+  /** The user's muscles, which a search matches ([[muscle.no-breakdown]]). */
+  muscleSetup: Pick<MuscleSetup, 'assignment'>;
 }): PickerGroupSection[] => {
   const words = normalizeExerciseSearchWords(query);
   if (!catalogs || (!groupsOnly && words.length === 0)) {
@@ -230,7 +238,7 @@ export const buildPickerGroupSections = ({
     }
     const rows = catalog.exercises
       .filter((groupExercise) => groupExercise.archived_at_ms === null)
-      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName)))
+      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName, muscleSetup)))
       .map((groupExercise): PickerGroupRow => {
         const linkedExercises = links
           .filter(
@@ -312,16 +320,16 @@ export const buildPickSheetModel = ({
   return { suggestion, choices, defaultOption: suggestion ? 'suggested' : 'add-new' };
 };
 
-/** Pick-sheet "Choose another" search over my live exercises (name + muscle groups). */
+/** Pick-sheet "Choose another" search over my live exercises (name + the user's primary muscles). */
 export const filterPickSheetChoices = (
   choices: readonly PickSheetChoice[],
   query: string,
-  muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>,
+  muscleSetup: Pick<MuscleSetup, 'assignment' | 'musclesById'>,
 ): PickSheetChoice[] =>
   choices.filter((choice) =>
     exerciseSearchTextMatches(
       normalizeExerciseSearchWords(query),
-      buildExerciseCatalogSearchText(choice.exercise, muscleGroupsById),
+      buildExerciseCatalogSearchText(choice.exercise, muscleSetup.musclesById, muscleSetup.assignment),
     )
   );
 
@@ -376,12 +384,15 @@ export const buildLinkScreenModel = ({
   linkedCatalogs = [],
   links,
   query,
+  muscleSetup,
 }: {
   exercise: LinkableExercise;
   catalogs: readonly GroupExerciseCatalog[] | null;
   linkedCatalogs?: readonly GroupExerciseCatalog[];
   links: readonly LinkRef[];
   query: string;
+  /** The user's muscles, which a search matches ([[muscle.no-breakdown]]). */
+  muscleSetup: Pick<MuscleSetup, 'assignment'>;
 }): LinkScreenModel => {
   const catalogById = new Map((catalogs ?? []).map((catalog) => [catalog.groupId, catalog]));
   const myLinks = links.filter((link) => link.exerciseDefinitionId === exercise.id);
@@ -423,7 +434,7 @@ export const buildLinkScreenModel = ({
     const rows = (catalog.exercises ?? [])
       .filter((groupExercise) => groupExercise.archived_at_ms === null)
       .filter((groupExercise) => !linkedTargets.has(`${catalog.groupId}:${groupExercise.group_exercise_id}`))
-      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName)))
+      .filter((groupExercise) => exerciseSearchTextMatches(words, groupExerciseSearchText(groupExercise, catalog.groupName, muscleSetup)))
       .map(
         (groupExercise): LinkScreenAvailableRow => ({
           key: `${catalog.groupId}:${groupExercise.group_exercise_id}`,
