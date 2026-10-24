@@ -88,8 +88,7 @@ anatomy entry) or **Broad**, per account, synced, with a Track switch per
 muscle. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle's switch is on while any entry is tracked; an untracked entry's
-work still drops. Each muscle stays in one family. Decided 2026-10-24.
+A merged muscle's switch is on while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family. Decided 2026-10-24.
 
 | Broad muscle | Entries |
 | --- | --- |
@@ -102,7 +101,7 @@ work still drops. Each muscle stays in one family. Decided 2026-10-24.
 | Calves | Calves, Tibialis Anterior |
 | Front, Lateral, Rear Delts; Triceps | one entry each |
 
-Why: a simpler view; exercises keep their detailed mappings.
+Why: a simpler view.
 Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
 
 ### muscle.no-breakdown · presentation · accepted
