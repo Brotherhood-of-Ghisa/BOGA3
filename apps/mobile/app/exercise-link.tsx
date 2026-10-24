@@ -84,8 +84,13 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   );
   const model = useMemo(
     () =>
-      exercise ? buildLinkScreenModel({ exercise, catalogs: linking.catalogs, linkedCatalogs: linking.linkedCatalogs, links: linking.links, query }) : null,
-    [exercise, linking.catalogs, linking.linkedCatalogs, linking.links, query],
+      exercise
+        ? buildLinkScreenModel({
+          exercise, catalogs: linking.catalogs, linkedCatalogs: linking.linkedCatalogs, links: linking.links, query,
+          muscleSetup: catalog.muscleSetup,
+        })
+        : null,
+    [exercise, linking.catalogs, linking.linkedCatalogs, linking.links, query, catalog.muscleSetup],
   );
 
   const catalogLoading = catalog.status === 'idle' || catalog.status === 'loading';

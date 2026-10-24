@@ -5,7 +5,7 @@ import {
 } from '@/src/data/exercise-catalog-seeds';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 
-import { reportedMappings } from './muscle-setup';
+import { reportedMappings, type MuscleSetup } from './muscle-setup';
 
 export const normalizeExerciseSearchWords = (value: string): string[] =>
   value
@@ -61,28 +61,36 @@ export const exerciseSearchTextMatches = (words: string[], searchText: string): 
   return words.every((word) => searchText.includes(word));
 };
 
+const SEED_MUSCLE_GROUPS_BY_ID = new Map(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => [seed.id, seed]));
+
+/** The anatomy entries each bundled-catalogue exercise maps as primary, by its seed id. */
+const SEED_PRIMARY_ENTRY_IDS_BY_ID: ReadonlyMap<string, readonly string[]> = (() => {
+  const entryIdsById = new Map<string, string[]>();
+  for (const mapping of SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS) {
+    if (mapping.role !== 'primary') continue;
+    entryIdsById.set(mapping.exerciseDefinitionId, [...(entryIdsById.get(mapping.exerciseDefinitionId) ?? []), mapping.muscleGroupId]);
+  }
+  return entryIdsById;
+})();
+
 /**
  * Muscle search terms of a bundled-catalogue exercise, by its seed id. Group
  * exercises and catalogue seeds carry only a source id, so their searches
- * match on the origin exercise's muscle groups.
+ * match on the origin exercise's primary muscles, read through the user's
+ * muscle setup as every other search is ([[muscle.no-breakdown]]): an entry
+ * matches by its muscle's name and family, an untracked one not at all. An
+ * entry the user has no row for keeps the catalogue's name.
  */
-export const seedMuscleSearchTermsById: ReadonlyMap<string, string> = (() => {
-  const seedMuscleGroupsById = new Map(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => [seed.id, seed]));
-  const termsById = new Map<string, string[]>();
-  for (const mapping of SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS) {
-    if (mapping.role !== 'primary') {
-      continue;
-    }
-    const muscleGroup = seedMuscleGroupsById.get(mapping.muscleGroupId);
-    if (!muscleGroup) {
-      continue;
-    }
-    const terms = termsById.get(mapping.exerciseDefinitionId) ?? [];
-    terms.push(muscleGroup.displayName, muscleGroup.familyName);
-    termsById.set(mapping.exerciseDefinitionId, terms);
-  }
-  return new Map([...termsById].map(([id, terms]) => [id, terms.join(' ').toLowerCase()]));
-})();
+export const seedMuscleSearchTerms = (seedId: string, muscleSetup: Pick<MuscleSetup, 'assignment'>): string =>
+  (SEED_PRIMARY_ENTRY_IDS_BY_ID.get(seedId) ?? [])
+    .flatMap((entryId) => {
+      const assigned = muscleSetup.assignment.get(entryId);
+      if (assigned) return assigned.tracked ? [assigned.muscle.displayName, assigned.muscle.familyName] : [];
+      const seed = SEED_MUSCLE_GROUPS_BY_ID.get(entryId);
+      return seed ? [seed.displayName, seed.familyName] : [];
+    })
+    .join(' ')
+    .toLowerCase();
 
 export const filterExerciseCatalogExercises = (
   exercises: ExerciseCatalogExercise[],

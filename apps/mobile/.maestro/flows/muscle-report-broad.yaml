@@ -1,0 +1,255 @@
+appId: com.dinoderek.mobile
+---
+# Muscle setup across screens (ios-data-smoke lane, infra-free).
+#
+# Proves, over one fixture session (Lat Pulldown, Barbell Back Squat, Standing
+# Calf Raise) and the device's own muscle rows ([[muscle.report-groups]]):
+#   1. Settings → Progress → Muscles writes Broad and a Track switch (Calves
+#      off) from its sheet, and Progress, already mounted, shows the user's
+#      muscles on return: Chest and Back; no Serratus, Lats, Upper back or
+#      Calves row; Chest, now one muscle, loses its family header
+#      ([[muscle.no-breakdown]], [[muscle.untracked]],
+#      [[muscle.family-sections]]);
+#   2. the completed session's muscle breakdown reports the same muscles;
+#   3. the catalogue's keyboard search matches muscle names only ("lats" finds
+#      nothing, "back pulldown" finds Lat Pulldown), and its editor shows Back
+#      once, with Biceps and no Upper back among the secondaries;
+#   4. the 3D body: a tap on the abdomen selects Core, the muscle Abs and
+#      Obliques merge into;
+#   5. Detailed with Calves back on restores every entry's row and header
+#      ([[muscle.report-groups]]: Detailed is today's figures).
+# Why device:
+#   1. a real sheet, segmented control and switch writing the on-device
+#      expo-sqlite, read back by a screen already mounted in the stack
+#      (focus refresh and the catalogue invalidation on the native runtime),
+#      and the keyboard for the muscle search;
+#   2. the completed-session route pushed over the stack on the same rows;
+#   3. the keyboard, and the editor sheet's panels;
+#   4. the model's gesture-handler tap on the native SVG (Jest has no layout
+#      and mocks the gesture);
+#   5. the same sheet and screen return, the other way.
+# Jest counterpart: __tests__/muscle-report-settings.test.tsx (writes, dirty
+#   flags, derived preset, Track), __tests__/muscle-report.test.ts (the
+#   transform), __tests__/progress-muscle-report-local-data.test.tsx (Progress,
+#   history, Filters, figures), __tests__/muscle-body-3d.test.tsx (shading, hit
+#   test, merged selection), __tests__/completed-session-local-data.test.tsx and
+#   __tests__/session-muscle-report.test.ts (session summary, comparisons, live
+#   insights), __tests__/exercise-editor-modal.test.tsx and
+#   __tests__/exercise-catalog-search.test.ts (editor, search),
+#   __tests__/groups-link-view-model.test.ts (group searches).
+#
+# `reset=data` re-seeds the catalogue, so every run starts on Detailed with
+# every muscle tracked; the Progress view (List / 3D) is a preference that
+# survives the reset, so it is set explicitly.
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: "boga3://maestro-harness?reset=data&fixture=muscle-report&teleport=today"
+      - extendedWaitUntil:
+          visible:
+            id: "today-screen"
+          timeout: 30000
+
+# --- Setup: the List view; the catalogue's rows are Detailed after the reset ---
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-muscle-view-list"
+    direction: DOWN
+- tapOn:
+    id: "settings-muscle-view-list"
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-table"
+    timeout: 15000
+- repeat:
+    while:
+      notVisible:
+        id: "stats-metric-chip-workingSetCount"
+    times: 4
+    commands:
+      - tapOn:
+          id: "stats-metric-chip"
+- assertVisible: { id: "stats-muscle-block-serratus_anterior" }
+
+# --- 1. Broad, Calves off, from the sheet; Progress re-reads on return -----
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-muscles-row"
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-muscles-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-preset-broad" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-preset-broad" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-back_lats", text: "Back" }
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-track-calves"
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-track-calves" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-calves", checked: false }
+    timeout: 15000
+- takeScreenshot: "muscle-report-02-broad-sheet"
+# The backdrop is hidden from the modal accessibility tree: tap the exposed
+# region above the panel.
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "settings-muscles-sheet" }
+    timeout: 15000
+- openLink: "boga3://progress?breakdown=muscle"
+# Chest merges Serratus, so it is one muscle and its family has no header.
+- extendedWaitUntil:
+    notVisible: { id: "stats-muscle-block-serratus_anterior" }
+    timeout: 15000
+- assertVisible: { id: "stats-muscle-block-chest" }
+- assertNotVisible: { id: "stats-family-header-chest" }
+- takeScreenshot: "muscle-report-03-broad-progress"
+# Rows below the fold are not in the hierarchy, so the keyboard search brings
+# each claim on screen: Back by its merged name, no Lats, no untracked Calves.
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- inputText: "back"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-history-back_lats", text: ".*Back.*" }
+    timeout: 10000
+- assertNotVisible: { id: "stats-muscle-block-back_upper" }
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- inputText: "lats"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-list-empty" }
+    timeout: 10000
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- inputText: "calves"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-list-empty" }
+    timeout: 10000
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- hideKeyboard
+
+# --- 2. The completed session reports the same muscles ---------------------
+- openLink: "boga3://completed-session/maestro_muscle_report_session"
+- extendedWaitUntil:
+    visible: { id: "session-completion-muscle-table" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "session-completion-muscle-back_lats", text: "Back, .*" }
+    direction: DOWN
+- scrollUntilVisible:
+    element: { id: "session-completion-muscle-quads" }
+    direction: DOWN
+- assertNotVisible: { id: "session-completion-muscle-back_upper" }
+- assertNotVisible: { id: "session-completion-muscle-adductors" }
+- assertNotVisible: { id: "session-completion-muscle-calves" }
+- takeScreenshot: "muscle-report-04-broad-session"
+
+# --- 3. Catalogue search and editor ---------------------------------------
+- openLink: "boga3://exercise-catalog"
+- extendedWaitUntil:
+    visible: { id: "exercise-catalog-screen" }
+    timeout: 15000
+- tapOn: "Exercise filter input"
+- inputText: "lats"
+- extendedWaitUntil:
+    notVisible: "Exercise actions Lat Pulldown"
+    timeout: 10000
+- takeScreenshot: "muscle-report-05-broad-search-lats"
+- eraseText
+- inputText: "back pulldown"
+- extendedWaitUntil:
+    visible: "Exercise actions Lat Pulldown"
+    timeout: 10000
+- hideKeyboard
+- tapOn: "Exercise actions Lat Pulldown"
+- tapOn: { id: "exercise-action-edit" }
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-primary-muscle-trigger" }
+    timeout: 10000
+- assertVisible: "Remove secondary muscle Biceps"
+- assertNotVisible: "Remove secondary muscle Upper back"
+- takeScreenshot: "muscle-report-06-broad-editor"
+- tapOn: "Close exercise editor"
+
+# --- 4. The 3D body --------------------------------------------------------
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-muscle-view-3d"
+    direction: DOWN
+- tapOn: { id: "settings-muscle-view-3d" }
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-body-viewport" }
+    timeout: 15000
+# The model's centre is the abdomen at the front view; Abs and Obliques both
+# report as Core, so the tap selects it by that name.
+- tapOn: { id: "stats-muscle-body-viewport" }
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-body-selected", text: "Core" }
+    timeout: 10000
+- takeScreenshot: "muscle-report-07-broad-3d"
+
+# --- 5. Detailed, Calves on: every entry's row is back ---------------------
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-muscle-view-list"
+    direction: DOWN
+- tapOn: { id: "settings-muscle-view-list" }
+- scrollUntilVisible:
+    element:
+      id: "settings-muscles-row"
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-muscles-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-preset-detailed" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-preset-detailed" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-back_upper" }
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-track-calves"
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-track-calves" }
+- extendedWaitUntil:
+    visible: { id: "settings-track-calves", checked: true }
+    timeout: 15000
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "settings-muscles-sheet" }
+    timeout: 15000
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-block-serratus_anterior" }
+    timeout: 15000
+- assertVisible: { id: "stats-family-header-chest" }
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- inputText: "lats"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-history-back_lats", text: ".*Lats.*" }
+    timeout: 10000
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- inputText: "calves"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-block-calves" }
+    timeout: 10000
+- takeScreenshot: "muscle-report-08-detailed-restored"
+- tapOn: { id: "stats-muscle-search-input" }
+- eraseText
+- hideKeyboard

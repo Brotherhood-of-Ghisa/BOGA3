@@ -10,8 +10,9 @@ import { LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core'
 import {
   exerciseSearchTextMatches,
   normalizeExerciseSearchWords,
-  seedMuscleSearchTermsById,
+  seedMuscleSearchTerms,
 } from '@/src/exercise-catalog/search';
+import type { MuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 import type { GroupApiError } from './api';
 import type { GroupExercise, GroupRole } from './types';
@@ -178,26 +179,19 @@ const STANDARD_EXERCISES: StandardExerciseOption[] = SYSTEM_EXERCISE_DEFINITION_
   loadInputMode: seed.loadInputMode,
 })).sort((left, right) => left.name.localeCompare(right.name));
 
-/** Search haystacks by seed id: name plus the origin's muscle-group terms. */
-const STANDARD_EXERCISE_SEARCH_TEXTS: ReadonlyMap<string, string> = new Map(
-  STANDARD_EXERCISES.map((option) => {
-    const muscleTerms = seedMuscleSearchTermsById.get(option.sourceExerciseId) ?? '';
-    return [option.sourceExerciseId, `${option.name} ${muscleTerms}`.toLowerCase()];
-  }),
-);
-
 /**
- * The bundled standard exercises whose name or primary muscle groups contain
- * every typed word (case-insensitive), by name, capped at `limit`. `total`
- * counts every match.
+ * The bundled standard exercises whose name or primary muscles contain every
+ * typed word (case-insensitive), by name, capped at `limit`. `total` counts
+ * every match. Muscles are the user's ([[muscle.no-breakdown]]).
  */
 export const searchStandardExercises = (
   query: string,
+  muscleSetup: Pick<MuscleSetup, 'assignment'>,
   limit: number = STANDARD_EXERCISE_RESULT_LIMIT,
 ): { options: StandardExerciseOption[]; total: number } => {
   const words = normalizeExerciseSearchWords(query);
   const matches = STANDARD_EXERCISES.filter((option) =>
-    exerciseSearchTextMatches(words, STANDARD_EXERCISE_SEARCH_TEXTS.get(option.sourceExerciseId) ?? option.name),
+    exerciseSearchTextMatches(words, `${option.name} ${seedMuscleSearchTerms(option.sourceExerciseId, muscleSetup)}`.toLowerCase()),
   );
   return { options: matches.slice(0, limit), total: matches.length };
 };

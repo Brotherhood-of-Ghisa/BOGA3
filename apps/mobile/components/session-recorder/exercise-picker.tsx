@@ -146,8 +146,9 @@ export function ExercisePicker({
         exercises: exerciseOptions,
         query: searchValue,
         groupsOnly,
+        muscleSetup: exerciseCatalog.muscleSetup,
       }),
-    [groupLinking.catalogs, groupLinking.links, exerciseOptions, searchValue, groupsOnly]
+    [groupLinking.catalogs, groupLinking.links, exerciseOptions, searchValue, groupsOnly, exerciseCatalog.muscleSetup]
   );
   const groupEmptyText = !groupExercisesLoaded(groupLinking.catalogs)
     ? groupLinking.offline

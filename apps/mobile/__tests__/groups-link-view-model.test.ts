@@ -31,6 +31,9 @@ import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
 import { competitionLinkExercise } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseWire } from '@/src/groups/competition-wire';
 import type { GroupExercise } from '@/src/groups/types';
+import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { presetRowSetup } from '@/src/data/muscle-report-settings';
+import { EMPTY_MUSCLE_SETUP, buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
   load_input_mode: 'total_load',
@@ -165,7 +168,7 @@ describe('pick sheet', () => {
     expect(model.choices.find((choice) => choice.exercise.id === 'ex-squat')?.unavailableReason).toBe(
       'already linked in Tuesday Crew',
     );
-    expect(filterPickSheetChoices(model.choices, 'hotel', {}).map((choice) => choice.exercise.id)).toEqual(['ex-hotel']);
+    expect(filterPickSheetChoices(model.choices, 'hotel', EMPTY_MUSCLE_SETUP).map((choice) => choice.exercise.id)).toEqual(['ex-hotel']);
   });
 
   it('matches choices on their primary muscle groups', () => {
@@ -176,16 +179,16 @@ describe('pick sheet', () => {
       exercises: [exercise({ id: 'ex-press', name: 'Heavy Push Thing', mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }] })],
       links: [],
     });
-    const muscleGroupsById = { chest: { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 } };
-    expect(filterPickSheetChoices(model.choices, 'chest', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
-    expect(filterPickSheetChoices(model.choices, 'Heavy Push Thing', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
+    const muscleSetup = buildMuscleSetup([{ id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 }]);
+    expect(filterPickSheetChoices(model.choices, 'chest', muscleSetup).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
+    expect(filterPickSheetChoices(model.choices, 'Heavy Push Thing', muscleSetup).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
   });
 });
 
 describe('picker group section (E0.1, D9, D13)', () => {
   it('is empty with no search text and the toggle off — the default list is unchanged', () => {
     expect(
-      buildPickerGroupSections({ catalogs: [IRON, TUESDAY], links: [], exercises: EXERCISES, query: '  ', groupsOnly: false }),
+      buildPickerGroupSections({ catalogs: [IRON, TUESDAY], links: [], exercises: EXERCISES, query: '  ', groupsOnly: false, muscleSetup: EMPTY_MUSCLE_SETUP }),
     ).toEqual([]);
   });
 
@@ -196,6 +199,7 @@ describe('picker group section (E0.1, D9, D13)', () => {
       exercises: EXERCISES,
       query: 'bench',
       groupsOnly: false,
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
 
     expect(sections.map((section) => section.groupName)).toEqual(['Iron Brotherhood', 'Tuesday Crew']);
@@ -213,10 +217,11 @@ describe('picker group section (E0.1, D9, D13)', () => {
       exercises: EXERCISES,
       query: 'tuesday',
       groupsOnly: false,
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(byGroupName.map((section) => section.groupId)).toEqual(['g-tue']);
 
-    const all = buildPickerGroupSections({ catalogs: [IRON, TUESDAY], links: [], exercises: EXERCISES, query: '', groupsOnly: true });
+    const all = buildPickerGroupSections({ catalogs: [IRON, TUESDAY], links: [], exercises: EXERCISES, query: '', groupsOnly: true, muscleSetup: EMPTY_MUSCLE_SETUP });
     expect(all.flatMap((section) => section.rows.map((row) => row.groupExercise.group_exercise_id))).toEqual([
       'gx-bench-iron',
       'gx-deadlift-iron',
@@ -225,7 +230,7 @@ describe('picker group section (E0.1, D9, D13)', () => {
   });
 
   it('shows nothing while my groups are unknown and skips groups whose list is not cached', () => {
-    expect(buildPickerGroupSections({ catalogs: null, links: [], exercises: EXERCISES, query: '', groupsOnly: true })).toEqual([]);
+    expect(buildPickerGroupSections({ catalogs: null, links: [], exercises: EXERCISES, query: '', groupsOnly: true, muscleSetup: EMPTY_MUSCLE_SETUP })).toEqual([]);
     expect(
       buildPickerGroupSections({
         catalogs: [{ ...IRON, exercises: null }, TUESDAY],
@@ -233,6 +238,7 @@ describe('picker group section (E0.1, D9, D13)', () => {
         exercises: EXERCISES,
         query: '',
         groupsOnly: true,
+        muscleSetup: EMPTY_MUSCLE_SETUP,
       }).map((section) => section.groupId),
     ).toEqual(['g-tue']);
   });
@@ -244,6 +250,7 @@ describe('picker group section (E0.1, D9, D13)', () => {
       exercises: EXERCISES,
       query: '',
       groupsOnly: true,
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     const [bench, deadlift] = section.rows;
 
@@ -261,6 +268,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: [IRON, TUESDAY],
       links: [link('ex-comp', 'g-iron', 'gx-bench-iron')],
       query: '',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
 
     expect(model.canLink).toBe(true);
@@ -281,7 +289,7 @@ describe('Link screen (E0.3)', () => {
   });
 
   it('a source match outranks a name match', () => {
-    const model = buildLinkScreenModel({ exercise: SEED_BENCH, catalogs: [IRON, TUESDAY], links: [], query: '' });
+    const model = buildLinkScreenModel({ exercise: SEED_BENCH, catalogs: [IRON, TUESDAY], links: [], query: '', muscleSetup: EMPTY_MUSCLE_SETUP });
     expect(model.suggested.map((row) => row.key)).toEqual(['g-iron:gx-bench-iron', 'g-tue:gx-bench-tue']);
   });
 
@@ -291,6 +299,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: [IRON, TUESDAY],
       links: [link('ex-comp', 'g-iron', 'gx-bench-iron')],
       query: 'dead',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(model.linked).toHaveLength(1);
     expect(model.suggested).toEqual([]);
@@ -303,6 +312,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: [IRON, TUESDAY],
       links: [link('ex-deleted', 'g-tue', 'gx-bench-tue')],
       query: '',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(model.canLink).toBe(false);
     expect(model.linked.map((row) => row.key)).toEqual(['g-tue:gx-bench-tue']);
@@ -316,6 +326,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: [IRON],
       links: [link('ex-comp', 'g-iron', 'gx-old-iron'), link('ex-comp', 'g-left', 'gx-gone')],
       query: '',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(model.linked.map((row) => [row.groupName, row.groupExerciseName, row.statusLabel])).toEqual([
       [PLACEHOLDER_GROUP_NAME, PLACEHOLDER_GROUP_EXERCISE_NAME, INACTIVE_LINK_LABEL],
@@ -329,6 +340,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: null,
       links: [link('ex-comp', 'g-iron', 'gx-bench-iron')],
       query: '',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(model.linked).toEqual([
       expect.objectContaining({
@@ -347,6 +359,7 @@ describe('Link screen (E0.3)', () => {
       catalogs: [{ ...IRON, exercises: null }],
       links: [link('ex-comp', 'g-iron', 'gx-bench-iron')],
       query: '',
+      muscleSetup: EMPTY_MUSCLE_SETUP,
     });
     expect(model.linked[0]).toMatchObject({ groupName: 'Iron Brotherhood', groupExerciseName: PLACEHOLDER_GROUP_EXERCISE_NAME });
     expect(model.groups).toEqual([]);
@@ -392,5 +405,56 @@ describe('competition exercise linking', () => {
 
   it('prefills the shared exercise core for a linked creation', () => {
     expect(buildAddAsNewPrefill(target)).toMatchObject({ name: 'Pull-up', loadInputMode: 'per_side_load' });
+  });
+});
+
+describe('group searches match the user\'s muscles ([[muscle.no-breakdown]])', () => {
+  // The user's catalogue rows under a preset, with some entries switched off.
+  const setupFor = (preset: 'detailed' | 'broad', untracked: readonly string[] = []) =>
+    buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => ({
+      id: seed.id, displayName: seed.displayName, familyName: seed.familyName, sortOrder: seed.sortOrder,
+      reportGroup: presetRowSetup(preset, seed.id).reportGroup ?? null, tracked: untracked.includes(seed.id) ? 0 : 1,
+    })));
+  const DETAILED = setupFor('detailed');
+  const BROAD = setupFor('broad', ['calves', 'tibialis_anterior']);
+  // Names that carry no muscle word, so only the muscle terms can match.
+  const GX_PULLDOWN = groupExercise({ group_exercise_id: 'gx-pulldown', name: 'Pulldown', source_exercise_id: 'seed_lat_pulldown' });
+  const GX_RAISE = groupExercise({ group_exercise_id: 'gx-raise', name: 'Raise', source_exercise_id: 'seed_standing_calf_raise' });
+  const GYM: GroupExerciseCatalog = { groupId: 'g-gym', groupName: 'Gym', exercises: [GX_PULLDOWN, GX_RAISE] };
+  const pickerMatches = (query: string, muscleSetup: typeof DETAILED) =>
+    buildPickerGroupSections({ catalogs: [GYM], links: [], exercises: [], query, groupsOnly: false, muscleSetup })
+      .flatMap((section) => section.rows.map((row) => row.groupExercise.group_exercise_id));
+  const linkMatches = (query: string, muscleSetup: typeof DETAILED) =>
+    buildLinkScreenModel({ exercise: exercise({ id: 'ex-x', name: 'X' }), catalogs: [GYM], links: [], query, muscleSetup })
+      .groups.flatMap((group) => group.rows.map((row) => row.groupExercise.group_exercise_id));
+
+  it('the picker\'s "From your groups" matches an entry by its muscle under Broad, never by the entry', () => {
+    expect(pickerMatches('lats', DETAILED)).toEqual(['gx-pulldown']);
+    expect(pickerMatches('lats', BROAD)).toEqual([]);
+    expect(pickerMatches('back', BROAD)).toEqual(['gx-pulldown']);
+  });
+
+  it('an untracked muscle matches nothing', () => {
+    expect(pickerMatches('calves', DETAILED)).toEqual(['gx-raise']);
+    expect(pickerMatches('calves', BROAD)).toEqual([]);
+    expect(linkMatches('calves', BROAD)).toEqual([]);
+  });
+
+  it('the link screen\'s search reads the same muscles', () => {
+    expect(linkMatches('lats', DETAILED)).toEqual(['gx-pulldown']);
+    expect(linkMatches('lats', BROAD)).toEqual([]);
+    expect(linkMatches('back', BROAD)).toEqual(['gx-pulldown']);
+  });
+
+  it('the pick sheet\'s "Choose another" matches my exercise by its muscle', () => {
+    const model = buildPickSheetModel({
+      groupId: 'g-gym', groupName: 'Gym', groupExercise: GX_PULLDOWN, links: [],
+      exercises: [exercise({ id: 'ex-pull', name: 'Pull Thing', mappings: [{ id: 'm1', muscleGroupId: 'back_lats', weight: 1, role: 'primary' }] })],
+    });
+    const ids = (query: string, muscleSetup: typeof DETAILED) =>
+      filterPickSheetChoices(model.choices, query, muscleSetup).map((choice) => choice.exercise.id);
+    expect(ids('lats', DETAILED)).toEqual(['ex-pull']);
+    expect(ids('lats', BROAD)).toEqual([]);
+    expect(ids('back', BROAD)).toEqual(['ex-pull']);
   });
 });

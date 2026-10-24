@@ -98,8 +98,10 @@ case "$lane" in
   # Infra-free, no Supabase. data-runtime-smoke: real expo-sqlite migration +
   # smoke write/read, and the backend-less build seeds its own starter catalog
   # at boot. Then the two screen flows whose device claims need no backend:
-  # the completion screen's native share sheet, and an exercise created through
-  # the catalogue's editor sheet. They share ONE provisioned simulator + Metro
+  # the completion screen's native share sheet, an exercise created through
+  # the catalogue's editor sheet, the session plan, and the user's muscle setup
+  # (Broad, a Track switch) read across Progress, the 3D body, a completed
+  # session and the catalogue. They share ONE provisioned simulator + Metro
   # (maestro-ios-run-flows.sh), because a lane of their own would pay the
   # provision/launch/teardown overhead again; each resets its own data in-flow
   # through the maestro-harness deep link, so a `data` reset is enough.
@@ -110,13 +112,16 @@ case "$lane" in
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
       --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
-      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml"
+      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
+      --scenario "Muscle report" --flow "$APP_DIR/.maestro/flows/muscle-report-broad.yaml"
     ;;
 
   # The Android data smoke shares the data-runtime-smoke, exercise-catalogue
   # and session-plan flows but omits session-completion-states-fixture.yaml: its assertions are
   # the iOS native share sheet (a "Copy" destination and a page-sheet drag),
-  # which the Android Sharesheet does not reproduce. The other three flows are
+  # which the Android Sharesheet does not reproduce. It also omits
+  # muscle-report-broad.yaml, which has only run on iOS (its sheet-dismiss tap
+  # and 3D tap point are iOS-measured). The other three flows are
   # platform-neutral. One provisioned emulator + Metro for all three.
   android-data-smoke)
     use_android
@@ -163,8 +168,9 @@ case "$lane" in
 
   # The UI <-> server sync e2e lane: real sign-in + real sync cycle + real
   # local Supabase. Proves (A) a new user's first sign-in seeds, pushes and
-  # lifts the first-sync gate, and (B) a reading entered on the device comes
-  # back from the server after a full device wipe and a fresh sign-in.
+  # lifts the first-sync gate, and (B) a reading and the muscle setup entered on
+  # the device come back from the server after a full device wipe and a fresh
+  # sign-in.
   #
   # Signs in as user_b — its own dedicated fixture, per the one-user-per-flow rule
   # (docs/specs/11), enforced by scripts/tests/maestro-fixture-users.test.sh.

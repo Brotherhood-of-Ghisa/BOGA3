@@ -143,12 +143,12 @@ cleanup() {
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.exercise_muscle_mappings
           where owner_user_id = '${USER_UUID}'::uuid
-            and muscle_group_id = 'mcp-smoke-${RUN_TAG}-muscle';
+            and muscle_group_id like 'mcp-smoke-${RUN_TAG}-muscle%';
         delete from app_public.exercise_definitions
           where owner_user_id = '${USER_UUID}'::uuid
             and (id like 'mcp-smoke-${RUN_TAG}-%' or name like 'MCP Smoke ${RUN_TAG} %');
         delete from app_public.muscle_groups
-          where owner_user_id = '${USER_UUID}'::uuid and id = 'mcp-smoke-${RUN_TAG}-muscle';
+          where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-muscle%';
         delete from app_public.gyms
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_plans
@@ -205,6 +205,9 @@ else
   SESSION_ID="mcp-smoke-${RUN_TAG}-session"
   BLOCK_ID="mcp-smoke-${RUN_TAG}-block"
   MUSCLE_ID="mcp-smoke-${RUN_TAG}-muscle"
+  # An entry merged into a muscle and switched off: list_muscles must return
+  # the stored report_group and tracked = false, not just the keys.
+  GROUPED_MUSCLE_ID="mcp-smoke-${RUN_TAG}-muscle-grouped"
   SET_ID="mcp-smoke-${RUN_TAG}-set"
   EXPECT_BODYWEIGHT=1
   EXERCISE_QUERY="MCP Smoke ${RUN_TAG}"
@@ -223,6 +226,12 @@ else
         (owner_user_id,id,display_name,family_name,sort_order,is_editable,created_at,updated_at,client_updated_at_ms)
       values
         ('${USER_UUID}'::uuid,'${MUSCLE_ID}','MCP Smoke Muscle','chest',0,0,${NOW_MS},${NOW_MS},${NOW_MS});
+      insert into app_public.muscle_groups
+        (owner_user_id,id,display_name,family_name,sort_order,is_editable,report_group,tracked,
+         created_at,updated_at,client_updated_at_ms)
+      values
+        ('${USER_UUID}'::uuid,'${GROUPED_MUSCLE_ID}','MCP Smoke Grouped Muscle','chest',0,0,'mcp_smoke_group',0,
+         ${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_definitions
         (owner_user_id,id,name,load_input_mode,bodyweight_contribution,created_at,updated_at,client_updated_at_ms)
       values
@@ -323,6 +332,7 @@ BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
 BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
 BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
 BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
 
@@ -353,6 +363,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="1" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
 
@@ -396,6 +407,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
 

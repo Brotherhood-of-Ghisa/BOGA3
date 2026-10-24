@@ -19,6 +19,9 @@ import {
   type GroupExercise,
   type GroupRole,
 } from '@/src/groups';
+import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { presetRowSetup } from '@/src/data/muscle-report-settings';
+import { EMPTY_MUSCLE_SETUP, buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 const exercise = (id: string, name: string, overrides: Partial<GroupExercise> = {}): GroupExercise => ({
   group_exercise_id: id,
@@ -141,7 +144,7 @@ describe('exercise write wording', () => {
 
 describe('searchStandardExercises', () => {
   it('matches every typed word case-insensitively, sorted by name', () => {
-    const { options } = searchStandardExercises('BENCH barbell');
+    const { options } = searchStandardExercises('BENCH barbell', EMPTY_MUSCLE_SETUP);
     expect(options.length).toBeGreaterThan(0);
     for (const option of options) {
       expect(option.name.toLowerCase()).toContain('bench');
@@ -154,26 +157,41 @@ describe('searchStandardExercises', () => {
   it('carries the seed id and load mode the create RPC needs', () => {
     const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press');
     expect(seed).toBeDefined();
-    const match = searchStandardExercises(seed!.name).options.find((option) => option.sourceExerciseId === seed!.id);
+    const match = searchStandardExercises(seed!.name, EMPTY_MUSCLE_SETUP).options.find((option) => option.sourceExerciseId === seed!.id);
     expect(match).toEqual({ sourceExerciseId: seed!.id, name: seed!.name, loadInputMode: seed!.loadInputMode });
   });
 
   it('caps the results but counts every match', () => {
-    const all = searchStandardExercises('');
+    const all = searchStandardExercises('', EMPTY_MUSCLE_SETUP);
     expect(all.total).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(all.options).toHaveLength(Math.min(STANDARD_EXERCISE_RESULT_LIMIT, all.total));
   });
 
   it('matches primary muscle groups, as every exercise search does', () => {
-    const bench = searchStandardExercises('chest').options.find((option) => option.name.toLowerCase().includes('bench'));
+    const bench = searchStandardExercises('chest', EMPTY_MUSCLE_SETUP).options.find((option) => option.name.toLowerCase().includes('bench'));
     expect(bench).toBeTruthy();
-    const { options, total } = searchStandardExercises('pectoralis');
+    const { options, total } = searchStandardExercises('pectoralis', EMPTY_MUSCLE_SETUP);
     expect(options.length).toBeGreaterThan(0);
     expect(total).toBeGreaterThanOrEqual(options.length);
   });
 
   it('returns nothing for an unmatched query', () => {
-    expect(searchStandardExercises('zzz-no-such-lift')).toEqual({ options: [], total: 0 });
+    expect(searchStandardExercises('zzz-no-such-lift', EMPTY_MUSCLE_SETUP)).toEqual({ options: [], total: 0 });
+  });
+
+  it('matches the user\'s muscles: under Broad a merged entry matches by its muscle, an untracked one not at all', () => {
+    const broad = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => ({
+      id: seed.id, displayName: seed.displayName, familyName: seed.familyName, sortOrder: seed.sortOrder,
+      reportGroup: presetRowSetup('broad', seed.id).reportGroup ?? null, tracked: seed.id === 'calves' ? 0 : 1,
+    })));
+    const ids = (query: string, muscleSetup: typeof broad) =>
+      searchStandardExercises(query, muscleSetup, Infinity).options.map((option) => option.sourceExerciseId);
+
+    expect(ids('lats', EMPTY_MUSCLE_SETUP)).toContain('seed_lat_pulldown');
+    expect(ids('lats', broad)).not.toContain('seed_lat_pulldown');
+    expect(ids('back', broad)).toContain('seed_lat_pulldown');
+    expect(ids('calves', EMPTY_MUSCLE_SETUP)).toContain('seed_standing_calf_raise');
+    expect(ids('calves', broad)).not.toContain('seed_standing_calf_raise');
   });
 });
 
