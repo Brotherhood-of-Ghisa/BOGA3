@@ -236,6 +236,8 @@ export type StatsScreenShellProps = {
   exerciseMappings?: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
   /** The user's muscle setup ([[muscle.report-groups]]); unset shows every anatomy entry as its own muscle. */
   muscleReport?: MuscleReportAssignment;
+  /** The user's muscles per family, from their setup; read from `summary` when unset. */
+  muscleFamilyCounts?: ReadonlyMap<string, number>;
   exerciseDataReady?: boolean;
   exerciseDataError?: string | null;
   // False while the history page is on top: returning restores reader focus.
@@ -302,6 +304,7 @@ export function StatsScreenShell({
   exerciseFamilies,
   exerciseMappings = [],
   muscleReport = NO_MUSCLE_REPORT,
+  muscleFamilyCounts,
   exerciseDataReady = true,
   exerciseDataError = null,
   isFocused = true,
@@ -378,7 +381,8 @@ export function StatsScreenShell({
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
   // Family headers follow the user's muscles ([[muscle.family-sections]]); unknown until they load.
   const familyMuscleCounts = useMemo(
-    () => summary ? countFamilyMuscles(summary.muscles.map(muscle => muscle.familyName)) : undefined, [summary]);
+    () => muscleFamilyCounts ?? (summary ? countFamilyMuscles(summary.muscles.map(muscle => muscle.familyName)) : undefined),
+    [muscleFamilyCounts, summary]);
   const exerciseList = (items: ExerciseListItem[], splitByEffort = false, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => <ExerciseListView items={items} metric={exerciseMetric}
     secondary={secondary} splitByEffort={splitByEffort}
     grouped={tableVisible && grouped.exercise} families={exerciseFamilies} familyMuscleCounts={familyMuscleCounts}
@@ -656,6 +660,9 @@ function StatsContent() {
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
+  const muscleFamilyCounts = useMemo(
+    () => catalog.muscleSetup ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,
+    [catalog.muscleSetup]);
   const exerciseFamilies = useMemo(() => {
     const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
     return new Map(catalog.exercises.map(exercise => [exercise.id, reportedPrimaryFamilyName(exercise, muscleReport, byId)]));
@@ -664,7 +671,7 @@ function StatsContent() {
   const exerciseSearchIndex = useMemo(
     () => new Map(catalog.exercises.map(item => [item.id, item.searchText])), [catalog.exercises]);
   return <StatsScreenShell {...summary} muscleTickers={tickers.data} muscleTickerStatus={tickers.status} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
-    exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} muscleReport={muscleReport} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
+    exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} muscleReport={muscleReport} muscleFamilyCounts={muscleFamilyCounts} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
     onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId, countSecondary }, filters.metric, view))}

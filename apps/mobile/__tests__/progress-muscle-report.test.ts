@@ -17,14 +17,15 @@ import { createStatsRepository, type StatsAggregationInput, type StatsStore } fr
 import {
   NO_MUSCLE_REPORT, reportedExerciseMuscles, reportedMuscleName, reportedPrimaryFamilyName,
 } from '@/src/exercise-catalog/reported-muscles';
-import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
-import { broadMuscleReport, broadMuscleRows } from './helpers/broad-muscle-report';
+import { EMPTY_MUSCLE_SETUP, buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
+import { broadMuscleSetup, broadMuscleReport, broadMuscleRows } from './helpers/broad-muscle-report';
 
 const MERGED_BACK = ['back_upper', 'traps_upper', 'traps_lower'];
 const UNTRACKED_ENTRIES = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
 const UNTRACKED = [...UNTRACKED_ENTRIES, 'calves'];
 // Broad with Calves and the three entries it leaves unmerged switched off by the user.
 const BROAD = broadMuscleReport(UNTRACKED);
+const BROAD_SETUP = broadMuscleSetup(UNTRACKED);
 
 const catalogById = Object.fromEntries(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => [seed.id, seed])) as
   unknown as Record<string, ExerciseCatalogMuscleGroup>;
@@ -129,7 +130,7 @@ describe('the user’s muscles in catalogue helpers', () => {
     const detailed = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => ({ ...seed, reportGroup: null, tracked: 1 }))).assignment;
     expect(reportedExerciseMuscles(exercise([['quads', 'primary'], ['adductors', 'secondary']]), detailed)).toEqual([
       { muscleGroupId: 'quads', role: 'primary' }, { muscleGroupId: 'adductors', role: 'secondary' }]);
-    expect(reportedMuscleName(NO_MUSCLE_REPORT, catalogById, 'adductors')).toBe(catalogById.adductors.displayName);
+    expect(reportedMuscleName(EMPTY_MUSCLE_SETUP, catalogById, 'adductors')).toBe(catalogById.adductors.displayName);
   });
 
   it('shows Quads once at the strongest role and hides untracked mappings', () => {
@@ -140,12 +141,21 @@ describe('the user’s muscles in catalogue helpers', () => {
   });
 
   it('names only a muscle the user has', () => {
-    expect(reportedMuscleName(BROAD, catalogById, 'back_lats')).toBe('Back');
-    expect(reportedMuscleName(BROAD, catalogById, 'back_upper')).toBeNull();
-    expect(reportedMuscleName(BROAD, catalogById, 'forearms_grip')).toBeNull();
-    expect(reportedMuscleName(BROAD, catalogById, 'calves')).toBeNull();
-    expect(reportedMuscleName(BROAD, catalogById, 'glutes_max')).toBe('Glutes & Hams');
-    expect(reportedMuscleName(BROAD, catalogById, 'unknown')).toBeNull();
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'back_lats')).toBe('Back');
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'back_upper')).toBeNull();
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'forearms_grip')).toBeNull();
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'calves')).toBeNull();
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'glutes_max')).toBe('Glutes & Hams');
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'unknown')).toBeNull();
+  });
+
+  it('keeps a merged muscle while any entry is tracked, even with its anchor entry switched off', () => {
+    const lonelyAnchor = broadMuscleSetup([], ['back_lats']);
+    expect(reportedMuscleName(lonelyAnchor, catalogById, 'back_lats')).toBe('Back');
+    expect(reportedMuscleName(lonelyAnchor, catalogById, 'back_upper')).toBeNull();
+    expect(reportedMuscleName(broadMuscleSetup(['back_lats']), catalogById, 'back_lats')).toBeNull();
+    const pullup = exercise([['back_upper', 'primary']]);
+    expect(reportedExerciseMuscles(pullup, lonelyAnchor.assignment)).toEqual([{ muscleGroupId: 'back_lats', role: 'primary' }]);
   });
 
   it('places an exercise under its primary tracked muscle’s family, else Other', () => {

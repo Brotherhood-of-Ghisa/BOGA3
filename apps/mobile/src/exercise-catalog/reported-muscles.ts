@@ -2,7 +2,7 @@ import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import { exerciseCountedMuscles, type ExerciseMuscle } from './exercise-muscles';
 import { OTHER_EXERCISE_FAMILY, pickPrimaryExerciseMapping } from './list-model';
-import { EMPTY_MUSCLE_SETUP } from './muscle-setup';
+import { EMPTY_MUSCLE_SETUP, type MuscleSetup } from './muscle-setup';
 
 /** Every anatomy entry is its own tracked muscle: today's Detailed view. */
 export const NO_MUSCLE_REPORT: MuscleReportAssignment = EMPTY_MUSCLE_SETUP.assignment;
@@ -29,16 +29,18 @@ export const reportedExerciseMuscles = (
 };
 
 /**
- * The name of the muscle whose history `id` opens, or null when the user has
- * no such muscle: an entry merged into another, or an untracked one. An id
- * the setup does not know is named by the catalogue.
+ * The name of the muscle whose history `id` opens, or null when the user has no
+ * such muscle: an entry merged into another's id, or one nothing tracked
+ * backs. A merged muscle lives while any of its entries is tracked, so it is
+ * read from the setup's muscles, not from its anchor entry. An id the setup
+ * does not know is named by the catalogue.
  */
 export const reportedMuscleName = (
-  report: MuscleReportAssignment, catalogById: Readonly<Record<string, ExerciseCatalogMuscleGroup>>, id: string,
+  setup: MuscleSetup, catalogById: Readonly<Record<string, ExerciseCatalogMuscleGroup>>, id: string,
 ): string | null => {
-  const assigned = report.get(id);
-  if (!assigned) return catalogById[id]?.displayName ?? null;
-  return assigned.tracked && assigned.muscle.id === id ? assigned.muscle.displayName : null;
+  const muscle = setup.musclesById[id];
+  if (muscle) return muscle.displayName;
+  return setup.assignment.has(id) ? null : catalogById[id]?.displayName ?? null;
 };
 
 /**

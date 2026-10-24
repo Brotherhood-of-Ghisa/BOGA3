@@ -260,6 +260,15 @@ describe('Muscle history under Broad', () => {
     expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBe(squatSets / 2);
   });
 
+  it('opens a merged muscle whose anchor entry alone is switched off, as the Progress list shows it', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    chooseBroadLocally(localDataClient(), [], ['back_lats']);
+    await act(async () => invalidateExerciseCatalogCache());
+    await open({ muscleGroupId: 'back_lats' });
+    await waitFor(() => expect(mockScreenOptions.title).toBe('Back'));
+    expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
+  });
+
   it('reads the same days as Detailed for a single-entry muscle', async () => {
     await choose('broad');
     const broad = await history(['quads']);

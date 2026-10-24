@@ -127,8 +127,8 @@ Pending: sessions.
 ### muscle.family-sections · presentation · accepted
 
 In any list of muscles a family header shows only above two or more of the user's
-muscles; catalogue and picker cards stay one per family. A family without a
-header lists first.
+muscles; catalogue and picker cards stay one per family. In Progress, a
+headerless family lists first.
 
 Why: a header over one muscle repeats it.
 Code: `apps/mobile/components/stats/progress-tables.tsx`.
