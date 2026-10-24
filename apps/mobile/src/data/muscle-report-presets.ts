@@ -13,11 +13,12 @@ export type BroadMuscle = {
 
 /**
  * The Broad preset ([[muscle.report-groups]]): 11 muscles over catalogue entry
- * ids, each in its family, and the entries Broad leaves untracked. Detailed is
- * every entry its own muscle and needs no table. Choosing a preset writes this
- * table onto the user's rows; custom muscles are never in it.
+ * ids, each in its family. Detailed is every entry its own muscle and needs no
+ * table. Choosing a preset writes only `report_group` on the user's rows; entries
+ * in no muscle (Rotator Cuff, Forearms, Spinal Erectors, custom muscles) stay
+ * their own.
  */
-export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[]; untracked: readonly string[] } = {
+export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[] } = {
   muscles: [
     { key: 'chest', label: 'Chest', family: 'Chest', anchor: 'chest', entries: ['chest', 'serratus_anterior'] },
     { key: 'front_delts', label: 'Front Delts', family: 'Shoulders', anchor: 'delts_front', entries: ['delts_front'] },
@@ -37,7 +38,6 @@ export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[]; untracked: 
     },
     { key: 'calves', label: 'Calves', family: 'Lower Legs', anchor: 'calves', entries: ['calves', 'tibialis_anterior'] },
   ],
-  untracked: ['rotator_cuff', 'forearms_grip', 'spinal_erectors'],
 };
 
 /** A user's `muscle_groups` row as the setup reads it: `tracked` is 0/1 locally, a boolean from the agent API. */

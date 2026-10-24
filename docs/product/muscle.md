@@ -83,10 +83,12 @@ Progress dropped the Map view.
 
 ### muscle.report-groups · definition · accepted
 
-Settings → Progress → Muscles offers **Detailed** (default: every anatomy entry
-is its own muscle) or **Broad**, per account, synced, with a Track switch per
-muscle. Broad merges entries, the first listed being the anchor, and leaves
-three untracked. Each muscle stays inside one family; custom muscles stay their own. Decided 2026-10-24.
+Settings → Progress → Muscles offers **Detailed** (default: one muscle per
+anatomy entry) or **Broad**, per account, synced, with a Track switch per
+muscle. A preset changes merging, never a switch; merges
+matching neither read `Custom`. Broad merges entries (first listed is the anchor);
+Other entries and custom muscles stay their own.
+A merged muscle's switch is on while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family. Decided 2026-10-24.
 
 | Broad muscle | Entries |
 | --- | --- |
@@ -98,11 +100,9 @@ three untracked. Each muscle stays inside one family; custom muscles stay their 
 | Glutes & Hams | Glute Max, Hamstrings, Hip Abductors |
 | Calves | Calves, Tibialis Anterior |
 | Front, Lateral, Rear Delts; Triceps | one entry each |
-| Untracked | Rotator Cuff, Forearms, Spinal Erectors |
 
-Why: fewer, coarser muscles for users who want a simpler view; exercises keep their detailed mappings.
-Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
-Pending: Settings screen.
+Why: a simpler view.
+Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
 
 ### muscle.no-breakdown · presentation · accepted
 
