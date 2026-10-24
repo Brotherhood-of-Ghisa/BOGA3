@@ -26,6 +26,8 @@ export type TodayProgressCardProps = {
   onOpenSessions: () => void;
   onOpenSession: (sessionId: string) => void;
   dateFormat?: ExerciseDateFormat;
+  /** The cards layout: no card of its own (the page is one), the chart taking the height left. */
+  fill?: boolean;
 };
 
 // The most recent completed session as one link row. No in-progress state:
@@ -56,14 +58,14 @@ function LatestSessionRow({
 
 // Today's Progress card: this week against last week, the period against the
 // previous period's pace, the latest session.
-export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat }: TodayProgressCardProps) {
+export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat, fill = false }: TodayProgressCardProps) {
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
-  return (
-    <Card style={styles.card} testID="today-progress-card">
+  const body = (
+    <>
       <WeekFigures week={progress.week} />
       <View style={styles.divider} />
-      <PeriodPace period={progress.period} />
+      <PeriodPace fill={fill} period={progress.period} />
       <View style={styles.divider} />
       <View style={styles.latestHeading}>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
@@ -76,6 +78,18 @@ export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dat
         latest={progress.latest}
         onPress={() => onOpenSession(progress.latest.id)}
       />
+    </>
+  );
+  if (fill) {
+    return (
+      <View style={[styles.card, styles.fill]} testID="today-progress-card">
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Card style={styles.card} testID="today-progress-card">
+      {body}
     </Card>
   );
 }
@@ -84,6 +98,9 @@ const styles = StyleSheet.create({
   card: {
     padding: uiSpace.md,
     gap: uiSpace.md,
+  },
+  fill: {
+    flex: 1,
   },
   // A `rule-soft` hairline across the card, edge to edge.
   divider: {

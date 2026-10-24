@@ -23,8 +23,6 @@ export type TodayGroupHeaderProps = {
  * primary. One group needs no switch.
  */
 export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupId, onSelectGroup }: TodayGroupHeaderProps) {
-  const [switching, setSwitching] = useState(false);
-  const canSwitch = groups.length > 1;
   return (
     <View style={styles.header}>
       <Pressable
@@ -39,17 +37,28 @@ export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupI
         </Text>
         <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
       </Pressable>
-      {canSwitch ? (
-        <IconButton
-          accessibilityHint="Chooses which group Today shows"
-          accessibilityLabel="Switch group"
-          name="swap"
-          onPress={() => setSwitching(true)}
-          size="sm"
-          testID="today-group-switch"
-          tone="muted"
-        />
-      ) : null}
+      <TodayGroupSwitch groups={groups} onSelectGroup={onSelectGroup} selectedGroupId={selectedGroupId} />
+    </View>
+  );
+}
+
+export type TodayGroupSwitchProps = Pick<TodayGroupHeaderProps, 'groups' | 'selectedGroupId' | 'onSelectGroup'>;
+
+/** The switch that changes which group Today shows, and its sheet. One group needs none. */
+export function TodayGroupSwitch({ groups, selectedGroupId, onSelectGroup }: TodayGroupSwitchProps) {
+  const [switching, setSwitching] = useState(false);
+  if (groups.length <= 1) return null;
+  return (
+    <>
+      <IconButton
+        accessibilityHint="Chooses which group Today shows"
+        accessibilityLabel="Switch group"
+        name="swap"
+        onPress={() => setSwitching(true)}
+        size="sm"
+        testID="today-group-switch"
+        tone="muted"
+      />
       <GroupSwitchSheet
         groups={groups}
         onDismiss={() => setSwitching(false)}
@@ -59,7 +68,7 @@ export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupI
         title="Show on Today"
         visible={switching}
       />
-    </View>
+    </>
   );
 }
 

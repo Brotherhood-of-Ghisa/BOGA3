@@ -14,6 +14,9 @@ export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // exercise has, so the Muscle table never shows it. Each breakdown remembers
 // its own metric, so switching back finds the figure you left on.
 export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
+// Today as one scrolling page (`list`), or as two full-height cards, Progress
+// and the group, swiped between (`cards`).
+export type TodayLayout = 'list' | 'cards';
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
 export const MIN_REST_TIMER_SECONDS = 15;
 export const MAX_REST_TIMER_SECONDS = 600;
@@ -40,6 +43,7 @@ export type AccountLocalPreferences = {
   restTimerAutoStart: boolean;
   restTimerDurationSec: number;
   repeatingTimerIntervalSec: number;
+  todayLayout: TodayLayout;
   developerMode: boolean;
 };
 export type ExerciseListPreferences = Pick<AccountLocalPreferences, 'sort' | 'showNeverDone' | 'dateFormat' | 'pastRecordsGymScope'>;
@@ -67,6 +71,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   restTimerAutoStart: true,
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
   repeatingTimerIntervalSec: DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
+  todayLayout: 'list',
   developerMode: false,
 };
 
@@ -75,6 +80,7 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
   ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
+  'todayLayout',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
 export const isNonNegativeSafeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -98,6 +104,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: `Rest timer must be a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`,
+  todayLayout: 'Choose List or Cards for Today.',
   developerMode: 'Choose whether to show developer tools.',
   repeatingTimerIntervalSec: `Repeating interval must be a whole number of seconds from ${MIN_REPEATING_TIMER_INTERVAL_SECONDS} to ${MAX_REPEATING_TIMER_INTERVAL_SECONDS}.`,
 };
@@ -121,6 +128,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressMuscleLayout': return value === 'list' || value === '3d';
+    case 'todayLayout': return value === 'list' || value === 'cards';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';

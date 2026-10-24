@@ -14,6 +14,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
+import Svg from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -434,5 +435,88 @@ describe('Today: the share bar', () => {
 
     expect(track).toHaveStyle({ backgroundColor: uiRoles.viz3 });
     expect(fill).toHaveStyle({ width: '100%', backgroundColor: uiRoles.viz4 });
+  });
+});
+
+describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
+  const layout = (testID: string, size: { width: number; height: number }) =>
+    fireEvent(text(testID), 'layout', { nativeEvent: { layout: { x: 0, y: 0, ...size } } });
+
+  const renderCards = async (props: Partial<TodayScreenProps> = {}) => {
+    const view = await renderToday({ layout: 'cards', ...props });
+    // A 393pt-wide phone; the pager between the tabs and the tab bar is 700pt tall.
+    layout('today-screen', { width: 393, height: 760 });
+    layout('today-screen-pager', { width: 393, height: 700 });
+    return view;
+  };
+
+  const selected = (testID: string) => text(testID).props.accessibilityState?.selected;
+
+  it('gives Progress and the group a full-height card each, the next one peeking', async () => {
+    await bootLocalApp();
+    await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
+    await renderCards();
+
+    // 393 less both 16pt gutters and the 16pt peek; 700 less the track's 12 + 16.
+    expect(text('today-progress-section')).toHaveStyle({ width: 345, height: 672 });
+    expect(text('today-group-section')).toHaveStyle({ width: 345, height: 672 });
+    expect(within(text('today-progress-section')).getByTestId('today-progress-card')).toBeTruthy();
+    expect(within(text('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
+    // The list layout's section headings and their actions give way to the tabs.
+    expect(screen.getAllByText('Progress')).toHaveLength(1);
+    expect(screen.getAllByText('Group activity')).toHaveLength(1);
+    expect(within(text('today-group-section-tab')).getByText('Group activity')).toBeTruthy();
+    expect(screen.getAllByRole('tab').map((tab) => tab.props.testID)).toEqual([
+      'today-progress-section-tab',
+      'today-group-section-tab',
+    ]);
+    expect(selected('today-progress-section-tab')).toBe(true);
+  });
+
+  it('draws the period chart to the height the card leaves it', async () => {
+    await bootLocalApp();
+    await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
+    await renderCards();
+
+    const chart = () => within(text('today-progress-chart')).UNSAFE_getByType(Svg);
+    expect(chart().props).toMatchObject({ width: 326, height: 104 });
+    layout('today-progress-chart', { width: 313, height: 240 });
+    expect(chart().props).toMatchObject({ width: 313, height: 240 });
+  });
+
+  it('moves between the cards by tab or by swipe, and each card closes on its link', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderCards();
+
+    fireEvent.press(text('today-group-section-tab'));
+    expect(selected('today-group-section-tab')).toBe(true);
+    expect(selected('today-progress-section-tab')).toBe(false);
+
+    // A swipe back settles on the first card's offset.
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
+    expect(selected('today-progress-section-tab')).toBe(true);
+    // One card's step (345 + the 8pt gap) on.
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 353, y: 0 } } });
+    expect(selected('today-group-section-tab')).toBe(true);
+
+    fireEvent.press(text('today-view-progress-button'));
+    fireEvent.press(text('today-view-groups-button'));
+    fireEvent.press(text('today-all-sessions-button'));
+    expect(mockPush.mock.calls).toEqual([['/progress'], ['/groups'], ['/sessions']]);
+  });
+
+  it.each([
+    ['a pending read', () => new Promise<TodayProgress>(() => {}), 'today-progress-loading'],
+    ['a failed read', () => Promise.reject(new Error('database is locked')), 'today-progress-error'],
+    ['no completed session', () => Promise.resolve({ status: 'empty' } as const), 'today-progress-empty'],
+  ])('fills the Progress card with its panel for %s', async (_state, loadProgress, panel) => {
+    await bootLocalApp();
+    render(<TodayScreen groupState={signedOut} layout="cards" loadProgress={loadProgress} now={clock} />);
+
+    await waitFor(() => expect(within(text('today-progress-section')).getByTestId(panel)).toBeTruthy());
+    // Centred in the card's whole body rather than drawn in a card of its own.
+    expect(text(panel)).toHaveStyle({ flex: 1, justifyContent: 'center' });
+    expect(within(text('today-progress-section')).getByTestId('today-view-progress-button')).toBeTruthy();
   });
 });

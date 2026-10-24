@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
+  WEEK_BOARD_SIZE,
   buildLatestActivity,
   buildWeekBoard,
   type LatestActivityViewModel,
@@ -26,6 +28,8 @@ export type TodayGroupCardProps = {
   onOpenGroup: (groupId: string) => void;
   onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
   dateFormat?: ExerciseDateFormat;
+  /** The cards layout: no card of its own, and the board shows as many rows as fit. */
+  fill?: boolean;
 };
 
 // A board figure: Plex Mono 500 at `sm`, right-aligned in its column.
@@ -40,10 +44,10 @@ function BoardFigure({ value, record = false, testID }: { value: number; record?
   );
 }
 
-function BoardRow({ row }: { row: WeekBoardRowViewModel }) {
+function BoardRow({ row, fill }: { row: WeekBoardRowViewModel; fill: boolean }) {
   const testID = `today-group-board-row-${row.userId}`;
   return (
-    <View style={[styles.boardRow, row.isMe ? styles.boardRowMine : null]} testID={testID}>
+    <View style={[styles.boardRow, fill ? styles.boardRowFill : null, row.isMe ? styles.boardRowMine : null]} testID={testID}>
       <Text allowFontScaling={false} style={styles.rank} testID={`${testID}-rank`}>
         {row.rank}
       </Text>
@@ -67,22 +71,24 @@ function BoardRow({ row }: { row: WeekBoardRowViewModel }) {
   );
 }
 
-const boardAccessibilityLabel = (title: string, board: WeekBoardViewModel): string =>
+const boardAccessibilityLabel = (title: string, board: WeekBoardViewModel, fill: boolean): string =>
   [
     title,
     ...board.rows.map((row) => `${row.rank}, ${row.name}, ${row.workingSets} sets, ${row.groupRecords} PRs`),
     board.me ? `You, ${board.me.rankLabel}, ${board.me.workingSets} sets, ${board.me.groupRecords} PRs` : null,
+    fill && board.hiddenCount > 0 ? `${board.hiddenCount} more` : null,
   ]
     .filter(Boolean)
     .join('; ');
 
-// This week's top three by working sets, `PRs` being group records; the
-// caller's own line closes it when they are outside the three.
-function WeekBoard({ board, title, onPress }: { board: WeekBoardViewModel; title: string; onPress: () => void }) {
+// This week's leaders by working sets, `PRs` being group records: the top
+// three, or in the cards layout as many as fit and `+N more`. The caller's own
+// line closes it when they are outside the rows shown.
+function WeekBoard({ board, title, onPress, fill }: { board: WeekBoardViewModel; title: string; onPress: () => void; fill: boolean }) {
   return (
     <Pressable
       accessibilityHint="Opens the group"
-      accessibilityLabel={boardAccessibilityLabel(title, board)}
+      accessibilityLabel={boardAccessibilityLabel(title, board, fill)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.board, pressed ? styles.pressed : null]}
@@ -104,7 +110,7 @@ function WeekBoard({ board, title, onPress }: { board: WeekBoardViewModel; title
         </Text>
       </View>
       {board.rows.map((row) => (
-        <BoardRow key={row.userId} row={row} />
+        <BoardRow fill={fill} key={row.userId} row={row} />
       ))}
       {board.me ? (
         <View style={styles.meLine} testID="today-group-board-me">
@@ -115,6 +121,11 @@ function WeekBoard({ board, title, onPress }: { board: WeekBoardViewModel; title
           <BoardFigure testID="today-group-board-me-working-sets" value={board.me.workingSets} />
           <BoardFigure record testID="today-group-board-me-records" value={board.me.groupRecords} />
         </View>
+      ) : null}
+      {fill && board.hiddenCount > 0 ? (
+        <Text allowFontScaling={false} style={[todayText.microLabel, styles.more]} testID="today-group-board-more">
+          {`+${board.hiddenCount} more`}
+        </Text>
       ) : null}
     </Pressable>
   );
@@ -206,30 +217,65 @@ export function TodayGroupCard({
   onOpenGroup,
   onOpenSession,
   dateFormat,
+  fill = false,
 }: TodayGroupCardProps) {
   const [listPreferences] = useExerciseListPreferences();
+  const [boardHeight, setBoardHeight] = useState<number | null>(null);
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
-  const board = buildWeekBoard(summary.members, myUserId);
+  const size = fill && boardHeight !== null ? boardRowsThatFit(boardHeight) : WEEK_BOARD_SIZE;
+  const board = buildWeekBoard(summary.members, myUserId, size);
   const activity = buildLatestActivity(summary, myUserId, nowMs, resolvedDateFormat);
   const openGroup = () => onOpenGroup(selectedGroupId);
 
+  const onBoardLayout = (event: LayoutChangeEvent) => {
+    const measured = Math.round(event.nativeEvent.layout.height);
+    if (measured > 0 && measured !== boardHeight) setBoardHeight(measured);
+  };
+  const weekBoard = <WeekBoard board={board} fill={fill} onPress={openGroup} title="This week" />;
+  const latest = (
+    <View style={styles.latest}>
+      <View style={styles.divider} />
+      <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        Latest activity
+      </Text>
+      <LatestActivity
+        activity={activity}
+        onOpenGroup={openGroup}
+        onOpenSession={(memberId, sessionId) => onOpenSession(memberId, sessionId, selectedGroupId)}
+      />
+    </View>
+  );
+  if (fill) {
+    // The board's box takes the height the latest activity leaves, whatever
+    // its rows; the rows that fit it are chosen from that height.
+    return (
+      <View style={styles.fillCard} testID="today-group-card">
+        <View onLayout={onBoardLayout} style={styles.fillBoard} testID="today-group-board-box">
+          {weekBoard}
+        </View>
+        {latest}
+      </View>
+    );
+  }
   return (
     <Card testID="today-group-card">
-      <WeekBoard board={board} onPress={openGroup} title="This week" />
-      <View style={styles.latest}>
-        <View style={styles.divider} />
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
-          Latest activity
-        </Text>
-        <LatestActivity
-          activity={activity}
-          onOpenGroup={openGroup}
-          onOpenSession={(memberId, sessionId) => onOpenSession(memberId, sessionId, selectedGroupId)}
-        />
-      </View>
+      {weekBoard}
+      {latest}
     </Card>
   );
 }
+
+// The cards layout's board: its rows are a fixed height, so the rows that fit
+// follow from the box's height, after its heading, the caller's own line and
+// the `+N more` line. Never fewer than the list layout's three.
+const FILL_ROW_HEIGHT = 36;
+const FILL_ROW_PITCH = FILL_ROW_HEIGHT + uiSpace.xs;
+const FILL_BOARD_CHROME = uiSpace.md + 14 + uiSpace.sm;
+const FILL_ME_LINE = 36;
+const FILL_MORE_LINE = 22;
+
+export const boardRowsThatFit = (height: number): number =>
+  Math.max(WEEK_BOARD_SIZE, Math.floor((height - FILL_BOARD_CHROME - FILL_ME_LINE - FILL_MORE_LINE) / FILL_ROW_PITCH));
 
 const BAR_HEIGHT = 12;
 const RANK_WIDTH = 14;
@@ -263,6 +309,23 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs + 2,
+  },
+  boardRowFill: {
+    height: FILL_ROW_HEIGHT,
+  },
+  more: {
+    paddingHorizontal: uiSpace.md,
+    paddingTop: uiSpace.xs,
+  },
+  fillCard: {
+    flex: 1,
+  },
+  // Its basis is 0 and its floor fixed, so the rows inside never size it.
+  fillBoard: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minHeight: FILL_BOARD_CHROME + FILL_ME_LINE + FILL_MORE_LINE + WEEK_BOARD_SIZE * FILL_ROW_PITCH,
+    overflow: 'hidden',
   },
   // `You` sits on `paper`, as the canvas draws it.
   boardRowMine: {
