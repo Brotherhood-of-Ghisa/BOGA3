@@ -13,6 +13,10 @@ export type ExerciseCatalogMuscleGroup = {
   displayName: string;
   familyName: string;
   sortOrder: number;
+  /** The user's muscle setup ([[muscle.report-groups]]): the muscle this entry reports under, null = itself. */
+  reportGroup: string | null;
+  /** 0 when the user does not track this entry ([[muscle.untracked]]). */
+  tracked: number;
 };
 
 export type ExerciseCatalogExerciseMuscleMapping = {
@@ -374,6 +378,8 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         displayName: muscleGroups.displayName,
         familyName: muscleGroups.familyName,
         sortOrder: muscleGroups.sortOrder,
+        reportGroup: muscleGroups.reportGroup,
+        tracked: muscleGroups.tracked,
       })
       .from(muscleGroups)
       .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))

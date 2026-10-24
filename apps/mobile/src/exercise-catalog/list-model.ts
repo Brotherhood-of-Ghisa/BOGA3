@@ -8,6 +8,7 @@ import type {
 
 import { filterIndexedExerciseCatalogExercises, type IndexedExerciseCatalogExercise } from './search';
 import { exerciseCountedMuscles } from './exercise-muscles';
+import { reportedMappings, type MuscleSetup } from './muscle-setup';
 
 import type { ExerciseDateFormat, ExerciseListPreferences } from '@/src/preferences/model';
 export { DEFAULT_EXERCISE_LIST_PREFERENCES } from '@/src/preferences/model';
@@ -44,7 +45,10 @@ export type ExerciseListSection = {
 
 export type BuildExerciseListModelInput = {
   exercises: IndexedExerciseCatalogExercise[];
+  /** Anatomy entries: an exercise's card sits in its primary entry's family. */
   muscleGroups: ExerciseCatalogMuscleGroup[];
+  /** The user's muscles, which each card's muscle summary names. */
+  muscleSetup: MuscleSetup;
   stats: ExerciseCatalogStats;
   preferences: ExerciseListPreferences;
   query: string;
@@ -62,11 +66,6 @@ export const pickPrimaryExerciseMapping = (exercise: ExerciseCatalogExercise) =>
   [...exercise.mappings].sort((left, right) => right.weight - left.weight)[0] ??
   null;
 
-const getMuscleDisplayName = (
-  muscleGroupId: string,
-  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
-) => muscleGroupById.get(muscleGroupId)?.displayName ?? muscleGroupId;
-
 export const getExercisePrimaryFamilyName = (
   exercise: ExerciseCatalogExercise,
   muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
@@ -76,18 +75,24 @@ export const getExercisePrimaryFamilyName = (
   return muscleGroupById.get(primaryMapping.muscleGroupId)?.familyName ?? OTHER_EXERCISE_FAMILY;
 };
 
+/**
+ * A card's muscle lines, naming the user's muscles ([[muscle.no-breakdown]]):
+ * each once, at its strongest role, without untracked ones.
+ */
 export const formatExerciseMuscleSummary = (
   exercise: ExerciseCatalogExercise,
-  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
+  muscleSetup: MuscleSetup
 ) => {
-  const muscles = exerciseCountedMuscles(exercise);
+  const muscles = exerciseCountedMuscles({ mappings: reportedMappings(exercise.mappings, muscleSetup.assignment) });
   const lines = (['primary', 'secondary'] as const).map((role) => {
     const names = muscles
       .filter((muscle) => muscle.role === role)
-      .map((muscle) => getMuscleDisplayName(muscle.muscleGroupId, muscleGroupById));
+      .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId);
     return names.length ? `${role === 'primary' ? 'Primary' : 'Secondary'}: ${names.join(' · ')}` : '';
   });
-  return lines.filter(Boolean).join('\n') || 'No muscle links';
+  const summary = lines.filter(Boolean).join('\n');
+  if (summary) return summary;
+  return exerciseCountedMuscles(exercise).length > 0 ? 'No tracked muscles' : 'No muscle links';
 };
 
 export { formatShortDate } from '@/src/utils/local-time';
@@ -140,6 +145,7 @@ const buildFamilyOrder = (muscleGroups: ExerciseCatalogMuscleGroup[]): string[] 
 export const buildExerciseListModel = ({
   exercises,
   muscleGroups,
+  muscleSetup,
   stats,
   preferences,
   query,
@@ -166,7 +172,7 @@ export const buildExerciseListModel = ({
       hasAllTimeHistory,
       lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
-      muscleSummary: formatExerciseMuscleSummary(exercise, muscleGroupById),
+      muscleSummary: formatExerciseMuscleSummary(exercise, muscleSetup),
       statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
     };
   });

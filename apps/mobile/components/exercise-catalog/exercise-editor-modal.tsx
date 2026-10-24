@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
@@ -13,8 +12,10 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
-import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
+import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import type { ReportedMuscle } from '@/src/data/muscle-analytics';
 import {
   muscleSelectorOptions,
   type EditableSecondaryMuscleRow,
@@ -38,7 +39,8 @@ type ExerciseEditorModalProps = {
   title?: string;
 };
 
-type MuscleGroupLookup = Map<string, ExerciseCatalogMuscleGroup>;
+/** The user's muscles by id ([[muscle.no-breakdown]]): the editor never shows an entry inside a muscle. */
+type MuscleLookup = Record<string, ReportedMuscle>;
 
 export function ExerciseEditorModal({
   visible,
@@ -49,7 +51,17 @@ export function ExerciseEditorModal({
   onSave,
   title,
 }: ExerciseEditorModalProps) {
-  const form = useExerciseEditorForm({ visible, editingExercise, prefill, onRequestClose, onSaved, onSave });
+  const { muscleSetup } = useExerciseCatalog();
+  const form = useExerciseEditorForm({
+    visible,
+    editingExercise,
+    prefill,
+    muscleSetup,
+    muscleSetupLoaded: muscleSetup !== EMPTY_MUSCLE_SETUP,
+    onRequestClose,
+    onSaved,
+    onSave,
+  });
   const isSelectorOpen = form.muscleSelectorMode !== null;
   const selectorTitle = form.muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Add secondary muscle';
   const editorTitle = title ?? (editingExercise ? 'Edit Exercise' : 'Create Exercise');
@@ -86,11 +98,7 @@ type EditorForm = ReturnType<typeof useExerciseEditorForm>;
 function EditorBody({ form }: { form: EditorForm }) {
   const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
   const catalog = useExerciseCatalog();
-  const muscleGroups = catalog.muscleGroups;
-  const muscleGroupById = useMemo(
-    () => new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup])),
-    [muscleGroups]
-  );
+  const { muscles, musclesById } = catalog.muscleSetup;
   if (catalog.status === 'idle' || catalog.status === 'loading') {
     return <StatePanel body="Loading muscle groups…" kind="loading" />;
   }
@@ -126,17 +134,22 @@ function EditorBody({ form }: { form: EditorForm }) {
           <GymSplitField onChange={form.setSplitByGym} value={form.splitByGym} />
           <PrimaryMuscleField
             error={form.validation.primaryMuscleError}
-            muscleGroupById={muscleGroupById}
+            muscleById={musclesById}
             onOpen={() => form.openMuscleSelector('primary')}
             primaryMuscleGroupId={form.primaryMuscleGroupId}
           />
           <SecondaryMusclesField
             error={form.validation.secondaryMusclesError}
-            muscleGroupById={muscleGroupById}
+            muscleById={musclesById}
             onOpen={() => form.openMuscleSelector('secondary')}
             onRemove={form.removeSecondaryMuscle}
             rows={form.secondaryMuscleRows}
           />
+          {form.keepsUntrackedMappings ? (
+            <Text allowFontScaling={false} selectable style={styles.helperText} testID="exercise-editor-untracked-note">
+              Also linked to muscles you don&apos;t track. Saving keeps those links.
+            </Text>
+          ) : null}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -155,7 +168,7 @@ function EditorBody({ form }: { form: EditorForm }) {
         <MuscleSelectorList
           mode={mode}
           onPick={(muscleGroupId) => (mode === 'primary' ? form.selectPrimaryMuscle(muscleGroupId) : form.addSecondaryMuscle(muscleGroupId))}
-          options={muscleSelectorOptions(mode, muscleGroups, form.primaryMuscleGroupId, form.selectedSecondaryMuscleIds)}
+          options={muscleSelectorOptions(mode, muscles, form.primaryMuscleGroupId, form.selectedSecondaryMuscleIds)}
           primaryMuscleGroupId={form.primaryMuscleGroupId}
         />
       ) : null}
@@ -190,13 +203,13 @@ function GymSplitField({ value, onChange }: { value: boolean; onChange: (value: 
   );
 }
 
-function PrimaryMuscleField({ primaryMuscleGroupId, muscleGroupById, error, onOpen }: {
+function PrimaryMuscleField({ primaryMuscleGroupId, muscleById, error, onOpen }: {
   primaryMuscleGroupId: string | null;
-  muscleGroupById: MuscleGroupLookup;
+  muscleById: MuscleLookup;
   error: string | null;
   onOpen: () => void;
 }) {
-  const muscleGroup = primaryMuscleGroupId ? muscleGroupById.get(primaryMuscleGroupId) : undefined;
+  const muscleGroup = primaryMuscleGroupId ? muscleById[primaryMuscleGroupId] : undefined;
   return (
     <View style={styles.group}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
@@ -231,9 +244,9 @@ function PrimaryMuscleField({ primaryMuscleGroupId, muscleGroupById, error, onOp
   );
 }
 
-function SecondaryMusclesField({ rows, muscleGroupById, error, onOpen, onRemove }: {
+function SecondaryMusclesField({ rows, muscleById, error, onOpen, onRemove }: {
   rows: EditableSecondaryMuscleRow[];
-  muscleGroupById: MuscleGroupLookup;
+  muscleById: MuscleLookup;
   error: string | null;
   onOpen: () => void;
   onRemove: (rowId: string) => void;
@@ -246,7 +259,7 @@ function SecondaryMusclesField({ rows, muscleGroupById, error, onOpen, onRemove 
       {rows.length > 0 ? (
         <Card>
           {rows.map((row, index) => {
-            const muscleGroup = muscleGroupById.get(row.muscleGroupId);
+            const muscleGroup = muscleById[row.muscleGroupId];
             const displayName = muscleGroup?.displayName ?? row.muscleGroupId;
             return (
               <ListRow
@@ -293,7 +306,7 @@ function SecondaryMusclesField({ rows, muscleGroupById, error, onOpen, onRemove 
 
 function MuscleSelectorList({ mode, options, primaryMuscleGroupId, onPick }: {
   mode: 'primary' | 'secondary';
-  options: ExerciseCatalogMuscleGroup[];
+  options: ReportedMuscle[];
   primaryMuscleGroupId: string | null;
   onPick: (muscleGroupId: string) => void;
 }) {

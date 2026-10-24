@@ -67,12 +67,7 @@ import type { ProgressMuscleTickers } from '@/src/data/progress-muscle-tickers';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import {
-  buildExerciseCatalogSearchText,
-  exerciseSearchTextMatches,
-  indexExerciseCatalogMuscleGroupsById,
-  normalizeExerciseSearchWords,
-} from '@/src/exercise-catalog/search';
+import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 import { ProgressFilters } from '@/components/stats/progress-filters';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
@@ -651,11 +646,9 @@ function StatsContent() {
     const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
     return new Map(catalog.exercises.map(exercise => [exercise.id, getExercisePrimaryFamilyName(exercise, byId)]));
   }, [catalog.exercises, catalog.muscleGroups]);
-  // Search and family placement read the same current catalogue metadata.
-  const exerciseSearchIndex = useMemo(() => {
-    const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(catalog.muscleGroups);
-    return new Map(catalog.exercises.map(item => [item.id, buildExerciseCatalogSearchText(item, muscleGroupsById)]));
-  }, [catalog.exercises, catalog.muscleGroups]);
+  // Search matches the user's muscles, as every exercise search does.
+  const exerciseSearchIndex = useMemo(
+    () => new Map(catalog.exercises.map(item => [item.id, item.searchText])), [catalog.exercises]);
   return <StatsScreenShell {...summary} muscleTickers={tickers.data} muscleTickerStatus={tickers.status} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
     exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
