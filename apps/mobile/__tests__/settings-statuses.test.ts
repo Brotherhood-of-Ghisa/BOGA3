@@ -67,8 +67,8 @@ describe('effortStatus', () => {
 
 describe('bodyweightStatus', () => {
   it('names the switch and, when there is one, the current reading', () => {
-    expect(bodyweightStatus(true, 82.5)).toBe('On · 82.5 kg');
-    expect(bodyweightStatus(false, 80.123456)).toBe('Off · 80.12 kg');
+    expect(bodyweightStatus(true, 82.5)).toBe('On · 82.5');
+    expect(bodyweightStatus(false, 80.123456)).toBe('Off · 80.12');
     expect(bodyweightStatus(true, null)).toBe('On');
     expect(bodyweightStatus(false, null)).toBe('Off');
   });

@@ -5,8 +5,7 @@ import { SettingsCard } from '@/components/settings/settings-card';
 import { bodyweightStatus } from '@/components/settings/statuses';
 import { ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
-import { listBodyWeightReadings } from '@/src/data/bodyweight';
+import { readCurrentBodyWeight } from '@/src/data/bodyweight';
 import {
   setBodyweightCalculationsEnabled,
   useBodyweightCalculationPreferenceError,
@@ -32,16 +31,14 @@ export function BodyWeightSettingsRow() {
   );
 }
 
-// The latest valid reading on or before now, re-read whenever Settings is in view.
+// The reading sessions would use now, re-read whenever Settings is in view.
 function useCurrentBodyWeightKg(): number | null {
   const [currentKg, setCurrentKg] = useState<number | null>(null);
   const revision = useBodyWeightContextRevision();
   useFocusEffect(useCallback(() => {
     let live = true;
-    listBodyWeightReadings().then((rows) => {
-      const now = Date.now();
-      const current = rows.find((row) => row.measuredAt.getTime() <= now);
-      if (live) setCurrentKg(current && isValidBodyWeightReading(current) ? current.weightKg : null);
+    readCurrentBodyWeight().then((current) => {
+      if (live) setCurrentKg(current?.weightKg ?? null);
     }, () => {
       if (live) setCurrentKg(null);
     });

@@ -198,7 +198,17 @@ describe('bodyweight calculations and the Settings card', () => {
 
     await seedReading('82.5');
     render(<BodyWeightSettingsRow />);
-    await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 82.5 kg'));
+    await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 82.5'));
+  });
+
+  it('shows the reading sessions use, skipping a newer reading that needs review', async () => {
+    await bootLocalApp();
+    // The shared resolver (src/data/bodyweight.ts) owns which reading counts.
+    const read = jest.spyOn(bodyweightRepository, 'readCurrentBodyWeight')
+      .mockResolvedValue({ weightKg: 77 } as Awaited<ReturnType<typeof bodyweightRepository.readCurrentBodyWeight>>);
+    render(<BodyWeightSettingsRow />);
+    await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 77'));
+    expect(read).toHaveBeenCalled();
   });
 
   it('keeps the body weight log available while the private preference turns off and on', async () => {

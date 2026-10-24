@@ -26,7 +26,7 @@ export const effortStatus = (values: AccountLocalPreferences): string =>
     : 'Custom';
 
 export const bodyweightStatus = (enabled: boolean, currentKg: number | null): string =>
-  [enabled ? 'On' : 'Off', currentKg === null ? null : `${Math.round(currentKg * 100) / 100} kg`]
+  [enabled ? 'On' : 'Off', currentKg === null ? null : String(Math.round(currentKg * 100) / 100)]
     .filter(Boolean)
     .join(' · ');
 
