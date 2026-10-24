@@ -21,14 +21,17 @@ const detailedRows = (): MuscleReportRow[] =>
   SYSTEM_MUSCLE_GROUP_SEEDS.map(({ id, displayName, familyName, sortOrder }) =>
     ({ id, displayName, familyName, sortOrder, reportGroup: null, tracked: 1 }));
 
-/** The rows after choosing Broad: its table written onto the catalogue entries. */
+/** Entries a user who chose Broad has also switched off; the preset itself never writes `tracked`. */
+const SWITCHED_OFF = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
+
+/** The rows after choosing Broad and switching off `SWITCHED_OFF`. */
 const broadRows = (): MuscleReportRow[] => {
   const groupOf = new Map(BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) =>
     muscle.entries.map((entry) => [entry, muscle.key] as const)));
   return detailedRows().map((row) => ({
     ...row,
     reportGroup: groupOf.get(row.id) ?? null,
-    tracked: BROAD_MUSCLE_PRESET.untracked.includes(row.id) ? 0 : 1,
+    tracked: SWITCHED_OFF.includes(row.id) ? 0 : 1,
   }));
 };
 
@@ -73,9 +76,10 @@ const statsByMuscle = (input: MuscleAnalyticsInput) =>
 describe('Broad preset table', () => {
   const entryIds = SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => seed.id);
 
-  it('places every catalogue entry exactly once, as a member or as untracked', () => {
-    const placed = [...BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries), ...BROAD_MUSCLE_PRESET.untracked];
-    expect([...placed].sort()).toEqual([...entryIds].sort());
+  it('places every catalogue entry at most once, leaving only Rotator Cuff, Forearms and Spinal Erectors in no muscle', () => {
+    const placed = BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries);
+    expect(new Set(placed).size).toBe(placed.length);
+    expect(entryIds.filter((id) => !placed.includes(id)).sort()).toEqual([...SWITCHED_OFF].sort());
   });
 
   it('has 11 muscles, each anchored on one of its own entries inside one family', () => {

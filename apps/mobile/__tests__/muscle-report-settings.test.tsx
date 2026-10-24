@@ -44,7 +44,7 @@ beforeEach(() => { resetLocalData(); __resetAccountLocalPreferencesForTests(); }
 afterEach(() => closeLocalData());
 
 describe('muscle setup writes', () => {
-  it('writes Broad\'s table onto every row, marking each changed row dirty', async () => {
+  it('writes Broad\'s merge table onto every row\'s reportGroup, marking each changed row dirty', async () => {
     await listMuscleReportRows();
     cleanAll();
     await setMuscleReportPreset('broad');
@@ -52,15 +52,14 @@ describe('muscle setup writes', () => {
     expect(rows.size).toBeGreaterThanOrEqual(25);
     for (const [id, row] of rows) {
       expect(row.reportGroup).toBe(broadGroups().get(id) ?? null);
-      expect(row.tracked).toBe(BROAD_MUSCLE_PRESET.untracked.includes(id) ? 0 : 1);
-      const changed = row.reportGroup !== null || row.tracked === 0;
-      expect(row.localDirty).toBe(changed);
+      expect(row.tracked).toBe(1);
+      expect(row.localDirty).toBe(row.reportGroup !== null);
     }
-    expect(rows.get('spinal_erectors')).toMatchObject({ reportGroup: null, tracked: 0, localDirty: true });
+    expect(rows.get('spinal_erectors')).toMatchObject({ reportGroup: null, tracked: 1, localDirty: false });
     expect(rows.get('serratus_anterior')).toMatchObject({ reportGroup: 'chest', tracked: 1, localDirty: true });
   });
 
-  it('clears the setup when Detailed is chosen', async () => {
+  it('clears reportGroup when Detailed is chosen', async () => {
     await listMuscleReportRows();
     await setMuscleReportPreset('broad');
     cleanAll();
@@ -69,6 +68,18 @@ describe('muscle setup writes', () => {
       expect(row).toMatchObject({ reportGroup: null, tracked: 1 });
     }
     expect(stored().get('chest')?.localDirty).toBe(true);
+  });
+
+  it('never changes a row\'s tracked value when a preset is chosen', async () => {
+    await listMuscleReportRows();
+    await setMuscleTracked(['calves', 'forearms_grip'], false);
+    await setMuscleReportPreset('broad');
+    expect(stored().get('calves')).toMatchObject({ reportGroup: 'calves', tracked: 0 });
+    expect(stored().get('forearms_grip')).toMatchObject({ reportGroup: null, tracked: 0 });
+    expect(stored().get('quads')).toMatchObject({ reportGroup: 'quads', tracked: 1 });
+    await setMuscleReportPreset('detailed');
+    expect(stored().get('calves')).toMatchObject({ reportGroup: null, tracked: 0 });
+    expect(stored().get('forearms_grip')).toMatchObject({ reportGroup: null, tracked: 0 });
   });
 
   it('writes nothing when the rows already hold the choice', async () => {
@@ -123,7 +134,7 @@ describe('muscle setup derived from rows', () => {
 
   it('keeps the preset when a Track switch changes', async () => {
     await setMuscleReportPreset('broad');
-    await setMuscleTracked(['forearms_grip'], true);
+    await setMuscleTracked(['forearms_grip'], false);
     await setMuscleTracked(['calves', 'tibialis_anterior'], false);
     expect(deriveMuscleReportPreset(await listMuscleReportRows())).toBe('broad');
   });
@@ -137,8 +148,8 @@ describe('muscle setup derived from rows', () => {
     expect(shape.Legs).toEqual([true, ['Quads', 'Glutes & Hams']]);
     const quads = sections.flatMap(section => section.muscles).find(muscle => muscle.id === 'quads');
     expect(quads?.entryIds.sort()).toEqual(['adductors', 'hip_flexors', 'quads']);
-    const hidden = sections.flatMap(section => section.muscles).find(muscle => muscle.id === 'spinal_erectors');
-    expect(hidden).toMatchObject({ tracked: false });
+    const own = sections.flatMap(section => section.muscles).find(muscle => muscle.id === 'spinal_erectors');
+    expect(own).toMatchObject({ tracked: true, entryIds: ['spinal_erectors'] });
   });
 
   it('counts a muscle as tracked while any of its entries is', async () => {

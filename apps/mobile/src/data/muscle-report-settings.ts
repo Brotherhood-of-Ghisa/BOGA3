@@ -15,19 +15,16 @@ export type SettingsMuscle = { id: string; label: string; family: string; entryI
 /** Muscles of one family; the header shows only above two or more ([[muscle.family-sections]]). */
 export type SettingsMuscleSection = { family: string; showHeader: boolean; muscles: SettingsMuscle[] };
 
-type RowSetup = { reportGroup: string | null; tracked: number };
+/** The columns a write sets on a row; an omitted column keeps what the user chose. */
+type RowSetup = { reportGroup?: string | null; tracked?: number };
 
 const broadGroupOf = (): Map<string, string> =>
   new Map(BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries.map((entry) => [entry, muscle.key] as const)));
 
-/** What choosing `preset` writes onto the entry `id`: Detailed clears both columns, Broad writes its table. */
-export const presetRowSetup = (preset: MuscleReportPreset, id: string): RowSetup =>
-  preset === 'detailed'
-    ? { reportGroup: null, tracked: 1 }
-    : {
-      reportGroup: broadGroupOf().get(id) ?? null,
-      tracked: BROAD_MUSCLE_PRESET.untracked.includes(id) ? 0 : 1,
-    };
+/** What choosing `preset` writes onto the entry `id`: only `reportGroup` (Detailed clears it, Broad writes its table), never `tracked`. */
+export const presetRowSetup = (preset: MuscleReportPreset, id: string): RowSetup => ({
+  reportGroup: preset === 'detailed' ? null : broadGroupOf().get(id) ?? null,
+});
 
 /**
  * The preset the rows' `reportGroup` columns spell out, else `custom` (another
@@ -94,7 +91,10 @@ const writeRowSetups = async (setup: (row: MuscleReportRow) => RowSetup | null):
     let count = 0;
     for (const row of selectRows(tx)) {
       const next = setup(row);
-      if (!next || (next.reportGroup === row.reportGroup && next.tracked === row.tracked)) continue;
+      if (!next) continue;
+      const changes = (next.reportGroup !== undefined && next.reportGroup !== row.reportGroup)
+        || (next.tracked !== undefined && next.tracked !== row.tracked);
+      if (!changes) continue;
       tx.update(muscleGroups)
         .set({ ...next, updatedAt: now, localDirty: true, localUpdatedAtMs: nowMonotonic(tx) })
         .where(eq(muscleGroups.id, row.id))
@@ -109,10 +109,10 @@ const writeRowSetups = async (setup: (row: MuscleReportRow) => RowSetup | null):
   invalidateExerciseCatalogCache();
 };
 
-/** Choosing a preset writes its table onto every row; custom muscles stay their own. */
+/** Choosing a preset writes its merge table onto every row's `reportGroup`; tracking and custom muscles stay as they are. */
 export const setMuscleReportPreset = (preset: MuscleReportPreset): Promise<void> =>
   writeRowSetups((row) => presetRowSetup(preset, row.id));
 
 /** A muscle's Track switch: every entry it covers takes the same value. */
 export const setMuscleTracked = (entryIds: readonly string[], tracked: boolean): Promise<void> =>
-  writeRowSetups((row) => (entryIds.includes(row.id) ? { reportGroup: row.reportGroup, tracked: tracked ? 1 : 0 } : null));
+  writeRowSetups((row) => (entryIds.includes(row.id) ? { tracked: tracked ? 1 : 0 } : null));
