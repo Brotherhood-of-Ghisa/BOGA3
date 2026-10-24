@@ -114,7 +114,8 @@ or removing it rewrites every entry of the muscle. Mappings to untracked muscles
 are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
-Pending: editor, search, screens.
+Code: `resolveEditorMappings` in `apps/mobile/src/exercise-catalog/editor-model.ts`; `buildMuscleSetup` in `apps/mobile/src/exercise-catalog/muscle-setup.ts`.
+Pending: screens.
 
 ### muscle.untracked · definition · accepted
 

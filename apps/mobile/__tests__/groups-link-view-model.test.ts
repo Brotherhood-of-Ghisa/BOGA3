@@ -176,7 +176,7 @@ describe('pick sheet', () => {
       exercises: [exercise({ id: 'ex-press', name: 'Heavy Push Thing', mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }] })],
       links: [],
     });
-    const muscleGroupsById = { chest: { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0 } };
+    const muscleGroupsById = { chest: { id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 } };
     expect(filterPickSheetChoices(model.choices, 'chest', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
     expect(filterPickSheetChoices(model.choices, 'Heavy Push Thing', muscleGroupsById).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
   });

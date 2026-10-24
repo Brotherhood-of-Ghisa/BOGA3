@@ -134,6 +134,7 @@ export default function ExerciseCatalogScreen() {
   const loadError = catalog.status === 'error' ? catalog.lastError ?? 'Unable to load exercise catalog. Try again.' : null;
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
+  const muscleSetup = catalog.muscleSetup;
 
   // The row stats' gym ([[gym.view-filter]]).
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
@@ -153,6 +154,7 @@ export default function ExerciseCatalogScreen() {
       buildExerciseListModel({
         exercises,
         muscleGroups,
+        muscleSetup,
         stats,
         preferences: listPreferences,
         query: debouncedExerciseSearchValue,
@@ -161,6 +163,7 @@ export default function ExerciseCatalogScreen() {
     [
       exercises,
       muscleGroups,
+      muscleSetup,
       stats,
       listPreferences,
       debouncedExerciseSearchValue,

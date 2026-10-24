@@ -15,6 +15,7 @@ import {
   type ExerciseEditorPrefill,
   type MuscleSelectorMode,
 } from '@/src/exercise-catalog/editor-model';
+import type { MuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 
 export type ExerciseEditorSaveInput = {
@@ -30,12 +31,15 @@ const createRowId = () => `muscle-link-row-${Date.now()}-${Math.random().toStrin
 /**
  * The exercise editor's form state. Opening, or a different exercise or
  * prefill, fills the form in the render that shows it — not in an effect, so
- * the autofocused name field never shows stale values.
+ * the autofocused name field never shows stale values. The form holds the
+ * user's muscles, so it fills again once the muscle setup first loads.
  */
-export function useExerciseEditorForm({ visible, editingExercise, prefill, onRequestClose, onSaved, onSave }: {
+export function useExerciseEditorForm({ visible, editingExercise, prefill, muscleSetup, muscleSetupLoaded, onRequestClose, onSaved, onSave }: {
   visible: boolean;
   editingExercise: ExerciseCatalogExercise | null;
   prefill: ExerciseEditorPrefill | null;
+  muscleSetup: MuscleSetup;
+  muscleSetupLoaded: boolean;
   onRequestClose: () => void;
   onSaved: (exercise: ExerciseCatalogExercise) => void;
   onSave?: (input: ExerciseEditorSaveInput) => Promise<ExerciseCatalogExercise>;
@@ -56,16 +60,20 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
     visible: boolean;
     editingExercise: typeof editingExercise;
     prefill: typeof prefill;
+    muscleSetupLoaded: boolean;
+    /** The assignment the form's muscles were read with; Save resolves against the same one. */
+    assignment: MuscleSetup['assignment'];
   } | null>(null);
   if (
     !shownFor ||
     shownFor.visible !== visible ||
     shownFor.editingExercise !== editingExercise ||
-    shownFor.prefill !== prefill
+    shownFor.prefill !== prefill ||
+    shownFor.muscleSetupLoaded !== muscleSetupLoaded
   ) {
-    setShownFor({ visible, editingExercise, prefill });
+    setShownFor({ visible, editingExercise, prefill, muscleSetupLoaded, assignment: muscleSetup.assignment });
     if (visible) {
-      const open = editorOpenState(editingExercise, prefill);
+      const open = editorOpenState(editingExercise, prefill, muscleSetup.assignment);
       setExerciseName(open.name);
       setLoadInputMode(open.loadInputMode);
       setSplitByGym(open.splitByGym);
@@ -80,6 +88,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
   }
 
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
+  // The mappings the form opened with; Save keeps what the user cannot see.
+  const openedMappings = editingExercise?.mappings ?? prefill?.mappings ?? [];
 
   const openMuscleSelector = (mode: Exclude<MuscleSelectorMode, null>) => {
     Keyboard.dismiss();
@@ -135,7 +145,14 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, onReq
   const save = async () => {
     setValidation(createBlankValidationState());
     setSaveError(null);
-    const checked = validateEditorInput({ name: exerciseName, loadInputMode, primaryMuscleGroupId, secondaryMuscleRows });
+    const checked = validateEditorInput({
+      name: exerciseName,
+      loadInputMode,
+      primaryMuscleGroupId,
+      secondaryMuscleRows,
+      openedMappings,
+      assignment: shownFor?.assignment ?? muscleSetup.assignment,
+    });
     setValidation(checked.validation);
     if (!checked.mappings) {
       return;

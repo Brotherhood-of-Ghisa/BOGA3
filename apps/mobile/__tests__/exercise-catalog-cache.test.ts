@@ -20,8 +20,8 @@ const mockListMuscleGroups = jest.mocked(listExerciseCatalogMuscleGroups);
 const mockListExercises = jest.mocked(listExerciseCatalogExercises);
 
 const muscleGroupsFixture = [
-  { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
-  { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
+  { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 },
+  { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1, reportGroup: null, tracked: 1 },
 ];
 
 const exerciseFixture = (overrides: Partial<ExerciseCatalogExercise> = {}): ExerciseCatalogExercise => ({

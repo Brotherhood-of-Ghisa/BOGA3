@@ -29,9 +29,9 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
   useEffect(() => { if (visible) reload(); }, [visible, reload]);
   const options = useMemo(() => catalog.exercises.filter((exercise) => !exercise.deletedAt && exercise.id !== currentExerciseDefinitionId), [catalog.exercises, currentExerciseDefinitionId]);
   const model = useMemo(() => visible ? buildExerciseListModel({
-    exercises: options, muscleGroups: catalog.muscleGroups, stats: history.stats,
+    exercises: options, muscleGroups: catalog.muscleGroups, muscleSetup: catalog.muscleSetup, stats: history.stats,
     preferences, query, includeDeleted: false,
-  }) : null, [catalog.muscleGroups, options, preferences, query, history.stats, visible]);
+  }) : null, [catalog.muscleGroups, catalog.muscleSetup, options, preferences, query, history.stats, visible]);
   const familyExpansion = useFamilyExpansion(model?.isSearching ?? false);
   const dismiss = () => { setQuery(''); onDismiss(); };
 

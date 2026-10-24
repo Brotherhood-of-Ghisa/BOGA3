@@ -84,12 +84,13 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss, gymId = null
       buildExerciseListModel({
         exercises: options,
         muscleGroups: catalog.muscleGroups,
+        muscleSetup: catalog.muscleSetup,
         stats: history.stats,
         preferences,
         query: search,
         includeDeleted: false,
       }),
-    [options, catalog.muscleGroups, history.stats, preferences, search],
+    [options, catalog.muscleGroups, catalog.muscleSetup, history.stats, preferences, search],
   );
 
   const selectListItem = (exercise: ExerciseListItem) => {
