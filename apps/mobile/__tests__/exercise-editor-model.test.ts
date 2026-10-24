@@ -185,6 +185,11 @@ describe('exercise-editor-model', () => {
         secondary('back_lats'), primary('biceps'), secondary('forearms_grip'),
       ]);
 
+      const agentWeighted = exerciseMapped([primary('biceps'), { muscleGroupId: 'forearms_grip', weight: 0.3, role: 'secondary' }]);
+      expect(saveUnderBroad(agentWeighted, 'biceps', []).mappings).toEqual([
+        primary('biceps'), { muscleGroupId: 'forearms_grip', weight: 0.3, role: 'secondary' },
+      ]);
+
       const wristCurl = exerciseMapped([primary('forearms_grip')]);
       expect(editorOpenState(wristCurl, null, broad).primaryMuscleGroupId).toBeNull();
       expect(saveUnderBroad(wristCurl, null, []).mappings).toEqual([primary('forearms_grip')]);

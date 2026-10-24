@@ -76,8 +76,8 @@ const pickPrimaryMapping = (mappings: ExerciseCatalogExercise['mappings']) =>
  * The form's muscles, in the user's muscles: the primary is the muscle a
  * mapping marks primary, else the heaviest; each other muscle appears once as
  * a secondary. Mappings to untracked entries are left out, and when one of
- * them is the primary the form opens with none, so an untouched Save keeps
- * every role.
+ * them is the primary the form opens with none, so an untouched Save promotes
+ * no visible muscle.
  */
 export const buildEditorMuscleSelectionsFromExercise = (
   exercise: ExerciseCatalogExercise,
@@ -180,7 +180,7 @@ export const untrackedMappings = <M extends { muscleGroupId: string }>(
 const strongestRoleWeight = (mappings: readonly SavedMapping[]): number =>
   Math.max(...mappings.map((mapping) => getMuscleContributionRoleWeight(mapping.role)));
 
-/** A kept mapping, with the weight the editor writes for its role (as every editor save does). */
+/** A kept visible mapping, with the weight the editor writes for its role (as every editor save does). */
 const keptMapping = ({ muscleGroupId, weight, role }: SavedMapping): EditorMapping => {
   if (role === 'primary') return { muscleGroupId, weight: PRIMARY_MUSCLE_WEIGHT, role };
   if (role === 'secondary') return { muscleGroupId, weight: SECONDARY_MUSCLE_WEIGHT, role };
@@ -219,8 +219,8 @@ export const resolveEditorMappings = (
       byEntry.set(entry.muscleGroupId, keepsRole ? keptMapping(entry) : { ...muscle, muscleGroupId: entry.muscleGroupId });
     }
   }
-  for (const mapping of untrackedMappings(opened, assignment)) {
-    if (!byEntry.has(mapping.muscleGroupId)) byEntry.set(mapping.muscleGroupId, keptMapping(mapping));
+  for (const { muscleGroupId, weight, role } of untrackedMappings(opened, assignment)) {
+    if (!byEntry.has(muscleGroupId)) byEntry.set(muscleGroupId, { muscleGroupId, weight, role });
   }
   return [...byEntry.values()];
 };

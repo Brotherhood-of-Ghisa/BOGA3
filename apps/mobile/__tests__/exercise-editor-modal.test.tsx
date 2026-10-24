@@ -15,7 +15,7 @@ import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/
 import type { ExerciseCatalogCacheSnapshot } from '@/src/exercise-catalog/cache';
 import { buildMuscleSetup, EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 
-import { broadMuscleRows } from './helpers/muscle-setup';
+import { broadMuscleRows, detailedMuscleRows } from './helpers/muscle-setup';
 
 const MUSCLES: ExerciseCatalogMuscleGroup[] = [
   { id: 'chest', displayName: 'Chest', familyName: 'Push', sortOrder: 0, reportGroup: null, tracked: 1 },
@@ -416,5 +416,28 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
     );
     expect(primaryLabel()).toHaveTextContent('Quads', { exact: false });
     expect(screen.getByText('No secondary muscles selected.')).toBeOnTheScreen();
+  });
+
+  it('saves against the setup the form opened with when the setup changes while it is open', async () => {
+    const detailedRows = detailedMuscleRows();
+    mockCatalog = catalog({ muscleGroups: detailedRows, muscleSetup: buildMuscleSetup(detailedRows) });
+    const editing = exercise({
+      mappings: [
+        { id: 'q', muscleGroupId: 'quads', weight: 1, role: 'primary' },
+        { id: 'g', muscleGroupId: 'glutes_max', weight: 0.5, role: 'secondary' },
+        { id: 'h', muscleGroupId: 'hamstrings', weight: 0.5, role: 'secondary' },
+      ],
+    });
+    const view = renderEditor({ editingExercise: editing });
+    fireEvent.press(screen.getByLabelText('Remove secondary muscle Hamstrings'));
+    mockCatalog = broadCatalog();
+    view.rerender(
+      <ExerciseEditorModal editingExercise={editing} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible />,
+    );
+    await save();
+    expect(onSave.mock.calls[0][0].mappings).toEqual([
+      { muscleGroupId: 'quads', weight: 1, role: 'primary' },
+      { muscleGroupId: 'glutes_max', weight: 0.5, role: 'secondary' },
+    ]);
   });
 });

@@ -61,6 +61,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     editingExercise: typeof editingExercise;
     prefill: typeof prefill;
     muscleSetupLoaded: boolean;
+    /** The assignment the form's muscles were read with; Save resolves against the same one. */
+    assignment: MuscleSetup['assignment'];
   } | null>(null);
   if (
     !shownFor ||
@@ -69,7 +71,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     shownFor.prefill !== prefill ||
     shownFor.muscleSetupLoaded !== muscleSetupLoaded
   ) {
-    setShownFor({ visible, editingExercise, prefill, muscleSetupLoaded });
+    setShownFor({ visible, editingExercise, prefill, muscleSetupLoaded, assignment: muscleSetup.assignment });
     if (visible) {
       const open = editorOpenState(editingExercise, prefill, muscleSetup.assignment);
       setExerciseName(open.name);
@@ -149,7 +151,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
       primaryMuscleGroupId,
       secondaryMuscleRows,
       openedMappings,
-      assignment: muscleSetup.assignment,
+      assignment: shownFor?.assignment ?? muscleSetup.assignment,
     });
     setValidation(checked.validation);
     if (!checked.mappings) {
