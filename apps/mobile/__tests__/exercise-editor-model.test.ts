@@ -190,5 +190,18 @@ describe('exercise-editor-model', () => {
       expect(saveUnderBroad(wristCurl, null, []).mappings).toEqual([primary('forearms_grip')]);
       expect(saveUnderBroad(curl, null, []).validation.primaryMuscleError).toBe('Select a primary muscle before saving.');
     });
+
+    it('opens with no primary when the primary is hidden, so an untouched Save keeps every role', () => {
+      const backExtension = exerciseMapped([primary('spinal_erectors'), secondary('glutes_max'), secondary('hamstrings')]);
+      expect(editorOpenState(backExtension, null, broad)).toMatchObject({
+        primaryMuscleGroupId: null,
+        secondaryMuscleRows: [{ muscleGroupId: 'glutes_max' }],
+      });
+      expect(saveUnderBroad(backExtension, null, ['glutes_max']).mappings).toEqual([
+        secondary('glutes_max'), secondary('hamstrings'), primary('spinal_erectors'),
+      ]);
+      const unmarked = exerciseMapped([{ muscleGroupId: 'quads', weight: 0.75, role: 'secondary' }, secondary('adductors')]);
+      expect(editorOpenState(unmarked, null, broad).primaryMuscleGroupId).toBe('quads');
+    });
   });
 });

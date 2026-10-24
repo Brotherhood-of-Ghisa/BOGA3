@@ -75,14 +75,18 @@ const pickPrimaryMapping = (mappings: ExerciseCatalogExercise['mappings']) =>
 /**
  * The form's muscles, in the user's muscles: the primary is the muscle a
  * mapping marks primary, else the heaviest; each other muscle appears once as
- * a secondary. Mappings to untracked entries are left out.
+ * a secondary. Mappings to untracked entries are left out, and when one of
+ * them is the primary the form opens with none, so an untouched Save keeps
+ * every role.
  */
 export const buildEditorMuscleSelectionsFromExercise = (
   exercise: ExerciseCatalogExercise,
   assignment: MuscleReportAssignment = NO_ASSIGNMENT
 ): { primaryMuscleGroupId: string | null; secondaryMuscleRows: EditableSecondaryMuscleRow[] } => {
   const mappings = reportedMappings(exercise.mappings, assignment);
-  const primaryMuscleGroupId = pickPrimaryMapping(mappings)?.muscleGroupId ?? null;
+  const primaryIsHidden = !mappings.some((mapping) => mapping.role === 'primary')
+    && exercise.mappings.some((mapping) => mapping.role === 'primary');
+  const primaryMuscleGroupId = primaryIsHidden ? null : pickPrimaryMapping(mappings)?.muscleGroupId ?? null;
   const seenSecondaryMuscleIds = new Set<string>();
   const secondaryMuscleRows = mappings
     .filter((mapping) => mapping.muscleGroupId !== primaryMuscleGroupId)

@@ -145,11 +145,6 @@ function EditorBody({ form }: { form: EditorForm }) {
             onRemove={form.removeSecondaryMuscle}
             rows={form.secondaryMuscleRows}
           />
-          {form.keepsUntrackedMappings ? (
-            <Text allowFontScaling={false} selectable style={styles.helperText} testID="exercise-editor-untracked-note">
-              Also linked to muscles you don&apos;t track. Saving keeps those links.
-            </Text>
-          ) : null}
         </ScrollView>
 
         <View style={styles.footer}>

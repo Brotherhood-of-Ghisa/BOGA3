@@ -382,11 +382,10 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
     ].map((name) => `Select primary muscle ${name}`));
   });
 
-  it('shows Quads once, primary, says untracked links stay, and Save keeps them', async () => {
+  it('shows Quads once, primary, and Save keeps the links it hides', async () => {
     renderEditor({ editingExercise: squat() });
     expect(primaryLabel()).toHaveTextContent('Quads', { exact: false });
     expect(screen.getByText('No secondary muscles selected.')).toBeOnTheScreen();
-    expect(screen.getByTestId('exercise-editor-untracked-note')).toBeOnTheScreen();
     await save();
     expect(onSave.mock.calls[0][0].mappings).toEqual([
       { muscleGroupId: 'quads', weight: 1, role: 'primary' },
@@ -417,11 +416,5 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
     );
     expect(primaryLabel()).toHaveTextContent('Quads', { exact: false });
     expect(screen.getByText('No secondary muscles selected.')).toBeOnTheScreen();
-  });
-
-  it('shows no untracked note under Detailed', () => {
-    mockCatalog = catalog();
-    renderEditor({ editingExercise: exercise() });
-    expect(screen.queryByTestId('exercise-editor-untracked-note')).toBeNull();
   });
 });

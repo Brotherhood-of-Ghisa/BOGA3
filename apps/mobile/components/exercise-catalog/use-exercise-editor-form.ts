@@ -7,7 +7,6 @@ import {
   createBlankValidationState,
   editorOpenState,
   parseBodyweightPercentage,
-  untrackedMappings,
   validateEditorInput,
   type EditableSecondaryMuscleRow,
   type EditorLoadInputMode,
@@ -89,7 +88,6 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   // The mappings the form opened with; Save keeps what the user cannot see.
   const openedMappings = editingExercise?.mappings ?? prefill?.mappings ?? [];
-  const keepsUntrackedMappings = untrackedMappings(openedMappings, muscleSetup.assignment).length > 0;
 
   const openMuscleSelector = (mode: Exclude<MuscleSelectorMode, null>) => {
     Keyboard.dismiss();
@@ -189,7 +187,6 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     primaryMuscleGroupId,
     secondaryMuscleRows,
     selectedSecondaryMuscleIds,
-    keepsUntrackedMappings,
     validation,
     saveError,
     setLoadInputMode,

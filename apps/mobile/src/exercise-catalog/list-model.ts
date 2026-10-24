@@ -90,9 +90,7 @@ export const formatExerciseMuscleSummary = (
       .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId);
     return names.length ? `${role === 'primary' ? 'Primary' : 'Secondary'}: ${names.join(' · ')}` : '';
   });
-  const summary = lines.filter(Boolean).join('\n');
-  if (summary) return summary;
-  return exerciseCountedMuscles(exercise).length > 0 ? 'No tracked muscles' : 'No muscle links';
+  return lines.filter(Boolean).join('\n') || 'No muscle links';
 };
 
 export { formatShortDate } from '@/src/utils/local-time';

@@ -78,9 +78,6 @@ describe('exercise browser model', () => {
     ]), broad)).toBe('Primary: Quads\nSecondary: Glutes & Hams');
     expect(formatExerciseMuscleSummary(mapped([
       { id: 'f', muscleGroupId: 'forearms_grip', role: 'primary', weight: 1 },
-    ]), broad)).toBe('No tracked muscles');
-    expect(formatExerciseMuscleSummary(mapped([
-      { id: 'f', muscleGroupId: 'forearms_grip', role: 'stabilizer', weight: 0.25 },
     ]), broad)).toBe('No muscle links');
   });
 

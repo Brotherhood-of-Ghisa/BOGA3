@@ -552,7 +552,6 @@ describe('ExerciseCatalogScreen', () => {
       fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
       fireEvent.press(await screen.findByLabelText('Edit exercise definition Barbell Back Squat'));
       await screen.findByText('Edit Exercise');
-      expect(screen.getByTestId('exercise-editor-untracked-note')).toBeTruthy();
       fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Back Squat');
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
 
