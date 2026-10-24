@@ -29,7 +29,7 @@ export const todayText = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxl,
     color: uiRoles.ink,
   },
-  // The period's difference, beside its headline, and the last period's total.
+  // The previous period's figure on the selected day, and the difference beside it.
   differenceFigure: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '700',

@@ -14,7 +14,7 @@ import {
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
-import { formatMonthDayTime, formatDateRange } from '@/src/utils/local-time';
+import { formatDayMonth, formatMonthDayTime, formatDateRange } from '@/src/utils/local-time';
 
 /** A window of whole weeks (a week, a period) as its Monday–Sunday range, in the selected date format. */
 export const formatWeekRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
@@ -33,15 +33,63 @@ export const formatSignedCount = (difference: number): string => {
 export const paceTone = (difference: number): ChangeTone =>
   difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
-/** This period so far against the previous one through the same day of the period. */
-export const paceDifference = (period: TodayProgressPeriod): number =>
-  period.toDate.workingSets - period.previous.toSameDay.workingSets;
+/** A period by its Monday and Sunday: `Oct 5 to Nov 1`. */
+export const formatPeriodRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
+  const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
+  return `${formatDayMonth(window.start, dateFormat)} to ${formatDayMonth(sunday, dateFormat)}`;
+};
 
-/** `ahead of last period's pace` / `behind last period's pace` / `level with last period's pace`. */
-export const formatPacePhrase = (period: TodayProgressPeriod): string => {
-  const difference = paceDifference(period);
-  const relation = difference > 0 ? 'ahead of' : difference < 0 ? 'behind' : 'level with';
-  return `${relation} last period's pace`;
+const dayOf = (window: LocalWindow, dayIndex: number) =>
+  new Date(window.start.getFullYear(), window.start.getMonth(), window.start.getDate() + dayIndex);
+
+/** One day of the period against the same day of the previous period. */
+export type PeriodDayFigures = {
+  /** 0 is the period's first day. */
+  dayIndex: number;
+  date: Date;
+  previousDate: Date;
+  /** After today the figure is the projection's. */
+  when: 'past' | 'today' | 'projected';
+  workingSets: number;
+  previousWorkingSets: number;
+  difference: number;
+};
+
+/** The day the chart selects, clamped into the period; null is today. */
+export const clampPeriodDay = (period: TodayProgressPeriod, dayIndex: number | null): number =>
+  dayIndex === null ? period.dayOfPeriod - 1 : Math.min(Math.max(dayIndex, 0), period.daysInPeriod - 1);
+
+/**
+ * A day's cumulative working sets: counted through today, and after it the
+ * projection's linear rate (the sets so far per elapsed day), which reaches
+ * `projectedWorkingSets` on the last day.
+ */
+export const periodDayFigures = (period: TodayProgressPeriod, dayIndex: number | null): PeriodDayFigures => {
+  const day = clampPeriodDay(period, dayIndex);
+  const todayIndex = period.dayOfPeriod - 1;
+  const when = day < todayIndex ? 'past' : day === todayIndex ? 'today' : 'projected';
+  const workingSets =
+    when === 'projected'
+      ? Math.round((period.toDate.workingSets / period.dayOfPeriod) * (day + 1))
+      : (period.cumulativeWorkingSets[day] ?? period.toDate.workingSets);
+  const previousWorkingSets =
+    when === 'today' ? period.previous.toSameDay.workingSets : (period.previous.cumulativeWorkingSets[day] ?? 0);
+  return {
+    dayIndex: day,
+    date: dayOf(period.window, day),
+    previousDate: dayOf(period.previous.window, day),
+    when,
+    workingSets,
+    previousWorkingSets,
+    difference: workingSets - previousWorkingSets,
+  };
+};
+
+/** `Today`, `Oct 9`, `Oct 27 (projected)`. */
+export const formatPeriodDayLabel = (figures: PeriodDayFigures, dateFormat: ExerciseDateFormat): string => {
+  if (figures.when === 'today') return 'Today';
+  const date = formatDayMonth(figures.date, dateFormat);
+  return figures.when === 'projected' ? `${date} (projected)` : date;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -63,11 +111,23 @@ export const weekShare = (counts: { current: number; previous: number }): { lap:
   return { lap, fraction: Math.min(ratio - lap, 1) };
 };
 
-/** The two periods' ranges, spoken as one heading. */
-export const periodRangesAccessibilityLabel = (period: TodayProgressPeriod, dateFormat: ExerciseDateFormat): string =>
-  `${period.weeks}-week period, ${formatWeekRange(period.window, dateFormat)}, against the last period, ${formatWeekRange(period.previous.window, dateFormat)}`;
+const setCount = (count: number) => plural(count, 'set', 'sets');
 
-/** The period chart's spoken summary; the chart itself is one image. */
+/** Both periods and the selected day's figures, spoken as one heading. */
+export const periodFiguresAccessibilityLabel = (
+  period: TodayProgressPeriod,
+  figures: PeriodDayFigures,
+  dateFormat: ExerciseDateFormat
+): string =>
+  [
+    `${period.weeks}-week period, ${formatPeriodRange(period.window, dateFormat)}:`,
+    `${formatPeriodDayLabel(figures, dateFormat)} ${setCount(figures.workingSets)},`,
+    `against the last period, ${formatPeriodRange(period.previous.window, dateFormat)}:`,
+    `${setCount(figures.previousWorkingSets)} by ${formatDayMonth(figures.previousDate, dateFormat)},`,
+    formatSignedCount(figures.difference),
+  ].join(' ');
+
+/** The period chart's spoken summary; the chart itself is one adjustable image. */
 export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): string =>
   [
     `Cumulative sets: this period ${period.toDate.workingSets} by day ${period.dayOfPeriod} of ${period.daysInPeriod}`,
@@ -75,6 +135,10 @@ export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): stri
     `the last period finished at ${period.previous.total.workingSets}.`,
     `On course for ${period.projectedWorkingSets}.`,
   ].join(' ');
+
+/** The selected day, as the adjustable chart's value. */
+export const periodChartAccessibilityValue = (figures: PeriodDayFigures, dateFormat: ExerciseDateFormat): string =>
+  `${formatPeriodDayLabel(figures, dateFormat)}: ${setCount(figures.workingSets)}, last period ${figures.previousWorkingSets}`;
 
 const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
 
@@ -135,13 +199,15 @@ export type PeriodChartGeometry = {
   previous: ChartPoint[];
   projection: { from: ChartPoint; to: ChartPoint };
   today: { current: ChartPoint; previous: ChartPoint };
+  /** The selected day: on the current line through today, on the projection after it. */
+  selected: { current: ChartPoint; previous: ChartPoint; projected: boolean };
   /** Where each week after the first starts. */
   weekStartsX: number[];
 };
 
 // Room on the right for the previous period's label at the end of its line.
 export const CHART_RIGHT_GUTTER = 34;
-export const CHART_HEIGHT = 104;
+export const CHART_HEIGHT = 126;
 const PLOT_TOP = 6;
 // Below the plot: the week ticks and the `TODAY` axis label.
 export const CHART_AXIS_ROOM = 18;
@@ -155,6 +221,7 @@ export const periodChartGeometry = (
   period: TodayProgressPeriod,
   width: number,
   height: number = CHART_HEIGHT,
+  selected: PeriodDayFigures = periodDayFigures(period, null)
 ): PeriodChartGeometry => {
   const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
   const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
@@ -176,6 +243,11 @@ export const periodChartGeometry = (
     previous,
     projection: { from: todayCurrent, to: { x: x(days - 1), y: y(period.projectedWorkingSets) } },
     today: { current: todayCurrent, previous: todayPrevious },
+    selected: {
+      current: { x: x(selected.dayIndex), y: y(selected.workingSets) },
+      previous: { x: x(selected.dayIndex), y: y(selected.previousWorkingSets) },
+      projected: selected.when === 'projected',
+    },
     weekStartsX: Array.from({ length: period.weeks - 1 }, (_, week) => x((week + 1) * 7)),
   };
 };
@@ -187,6 +259,12 @@ const AXIS_LABEL_CLEARANCE = 18;
 export const todayLabelAnchor = (x: number, plotWidth: number): 'start' | 'middle' | 'end' => {
   if (x < AXIS_LABEL_CLEARANCE) return 'start';
   return plotWidth - x < AXIS_LABEL_CLEARANCE ? 'end' : 'middle';
+};
+
+/** The day under a touch at `x` across the plot: the nearest, within the period. */
+export const periodDayAtX = (x: number, plotWidth: number, daysInPeriod: number): number => {
+  if (plotWidth <= 0 || daysInPeriod <= 1) return 0;
+  return Math.min(Math.max(Math.round((x / plotWidth) * (daysInPeriod - 1)), 0), daysInPeriod - 1);
 };
 
 export const toPolyline = (points: ChartPoint[]): string =>
