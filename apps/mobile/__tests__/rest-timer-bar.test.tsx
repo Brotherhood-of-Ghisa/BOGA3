@@ -104,7 +104,7 @@ describe('RestTimerBar', () => {
     expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('0:00');
   });
 
-  it('renders repeating mode with round number, countdown, Stop/Start, and Reset controls', () => {
+  it('renders repeating mode with round number, countdown, Pause/Resume, and Reset controls', () => {
     const onAdjust = jest.fn();
     const onRestart = jest.fn();
     const onDismiss = jest.fn();
@@ -138,9 +138,9 @@ describe('RestTimerBar', () => {
     expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent('Round 3');
     expect(screen.getByTestId('repeating-timer-countdown')).toHaveTextContent('0:42');
 
-    // Running shows "Stop"
+    // Running shows "Pause"
     const toggleButton = screen.getByTestId('repeating-timer-toggle');
-    expect(toggleButton).toHaveTextContent('Stop');
+    expect(toggleButton).toHaveTextContent('Pause');
     fireEvent.press(toggleButton);
     expect(onToggleRepeating).toHaveBeenCalledTimes(1);
 
@@ -162,7 +162,7 @@ describe('RestTimerBar', () => {
     fireEvent.press(screen.getByTestId('timer-mode-selector-rest'));
     expect(onSwitchMode).toHaveBeenCalledWith('rest');
 
-    // Paused state shows "Round 3 · PAUSED" and "Start" button
+    // Paused state shows "Round 3 · PAUSED" and "Resume" button
     const pausedRepeatingView: RestTimerView = {
       ...runningRepeatingView,
       status: 'paused',
@@ -180,6 +180,6 @@ describe('RestTimerBar', () => {
       />,
     );
     expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent('Round 3 · PAUSED');
-    expect(screen.getByTestId('repeating-timer-toggle')).toHaveTextContent('Start');
+    expect(screen.getByTestId('repeating-timer-toggle')).toHaveTextContent('Resume');
   });
 });

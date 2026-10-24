@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { Vibration } from 'react-native';
+import { AppState, Vibration } from 'react-native';
 
 import {
   DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
@@ -7,6 +7,7 @@ import {
   MAX_REPEATING_TIMER_INTERVAL_SECONDS,
   MIN_REPEATING_TIMER_INTERVAL_SECONDS,
 } from '../preferences/model';
+import { playRepeatingTimerCue, prepareRepeatingTimerAudio, setRepeatingTimerAwake, stopRepeatingTimerAudio } from './repeating-timer-native';
 
 export const REST_TIMER_STEP_SEC = 15;
 export const REPEATING_TIMER_STEP_SEC = 15;
@@ -64,6 +65,9 @@ let activeEntry: WorkoutTimerEntry | null = null;
 let lastSignaledRound: number | null = null;
 let lastSignaledRestEndsAtMs: number | null = null;
 let roundBoundaryTimeout: ReturnType<typeof setTimeout> | null = null;
+let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
+let isForeground = false;
+let cueGeneration = 0;
 let restCompletionTimeout: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 const suppressedAutoStartSessionIds = new Set<string>();
@@ -81,6 +85,7 @@ export const clearRestTimerAutoStartSuppression = (sessionId?: string): void => 
 };
 
 const emit = () => {
+  updateRepeatingTimerResources();
   scheduleRoundBoundaryCue();
   scheduleRestCompletionCue();
   for (const listener of listeners) {
@@ -165,22 +170,57 @@ export const deriveRepeatingTimerView = (
   };
 };
 
-// The store owns cues so navigating away from a timer view cannot silence them.
+// The store owns native resources across both hosts, including after a view unmounts.
+function updateRepeatingTimerResources(): void {
+  if (activeEntry?.mode !== 'repeating' && !appStateSubscription) return;
+  stopRepeatingTimerAudio();
+  if (activeEntry?.mode === 'repeating') {
+    if (!appStateSubscription) {
+      // Unknown initial state waits for an active event rather than retaining foreground resources.
+      isForeground = AppState.currentState === 'active';
+      appStateSubscription = AppState.addEventListener('change', (state) => {
+        isForeground = state === 'active';
+        stopRepeatingTimerAudio();
+        setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
+        scheduleRoundBoundaryCue();
+        for (const listener of listeners) listener();
+      });
+    }
+    prepareRepeatingTimerAudio();
+  } else {
+    appStateSubscription?.remove();
+    appStateSubscription = null;
+  }
+  setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
+}
+
 function scheduleRoundBoundaryCue(): void {
+  const token = ++cueGeneration;
   if (roundBoundaryTimeout !== null) clearTimeout(roundBoundaryTimeout);
   roundBoundaryTimeout = null;
-  if (!activeEntry || activeEntry.mode !== 'repeating' || activeEntry.pausedAtMs !== null) return;
+  if (!isForeground || !activeEntry || activeEntry.mode !== 'repeating' || activeEntry.pausedAtMs !== null) return;
 
-  const elapsedMs = Math.max(0, Date.now() - activeEntry.startedAtMs + activeEntry.accumulatedMs)
-    - REPEATING_TIMER_PREPARATION_SEC * 1000;
+  const nowMs = Date.now();
+  const totalElapsedMs = Math.max(0, nowMs - activeEntry.startedAtMs + activeEntry.accumulatedMs);
+  const preparationMs = REPEATING_TIMER_PREPARATION_SEC * 1000;
   const intervalMs = activeEntry.intervalSec * 1000;
-  const remainingMs = elapsedMs < 0 ? -elapsedMs : intervalMs - elapsedMs % intervalMs;
+  const boundaryMs = totalElapsedMs < preparationMs ? preparationMs
+    : preparationMs + (Math.floor((totalElapsedMs - preparationMs) / intervalMs) + 1) * intervalMs;
+  const warningMs = boundaryMs - 5_000;
+  const nextCueMs = totalElapsedMs < warningMs ? warningMs
+    : Math.min(boundaryMs, warningMs + (Math.floor((totalElapsedMs - warningMs) / 1_000) + 1) * 1_000);
+  const targetMs = nowMs + nextCueMs - totalElapsedMs;
+  const kind = nextCueMs === boundaryMs ? 'long' : 'short';
   roundBoundaryTimeout = setTimeout(() => {
-    if (activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null) {
-      checkAndTriggerRoundBoundary(deriveRepeatingTimerView(activeEntry, activeEntry.sessionId).round);
+    if (token !== cueGeneration) return;
+    if (Date.now() - targetMs <= 250) {
+      playRepeatingTimerCue(kind, targetMs);
+      if (kind === 'long' && activeEntry?.mode === 'repeating') {
+        checkAndTriggerRoundBoundary(deriveRepeatingTimerView(activeEntry, activeEntry.sessionId).round);
+      }
     }
     scheduleRoundBoundaryCue();
-  }, remainingMs);
+  }, targetMs - nowMs);
 }
 
 function scheduleRestCompletionCue(): void {
@@ -470,6 +510,7 @@ export const __resetRestTimerForTests = (): void => {
   lastSignaledRound = null;
   lastSignaledRestEndsAtMs = null;
   suppressedAutoStartSessionIds.clear();
+  updateRepeatingTimerResources();
   scheduleRoundBoundaryCue();
   scheduleRestCompletionCue();
   listeners.clear();

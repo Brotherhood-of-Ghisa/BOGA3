@@ -40,6 +40,11 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
   expand();
   expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent('Get ready');
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:15');
+  expect(screen.getByTestId('repeating-timer-focus-toggle').props.accessibilityLabel).toBe('Pause repeating timer');
+  const meter = screen.getByTestId('repeating-timer-focus-meter');
+  expect(meter.findAll((node) => node.props.testID === 'repeating-timer-focus-round')).toHaveLength(0);
+  expect(meter.findAll((node) => node.props.testID === 'repeating-timer-focus-toggle')).toHaveLength(0);
+  expect(meter.findAll((node) => node.props.testID === 'repeating-timer-focus-reset')).toHaveLength(0);
   expectProgress(1);
   advance(5_000);
   expectProgress(10 / 15);
@@ -51,7 +56,8 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
   fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
   const paused = getRestTimerEntry();
   expect(paused).toMatchObject({ accumulatedMs: 33_500, pausedAtMs: 33_500 });
-  expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Start');
+  expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Resume');
+  expect(screen.getByTestId('repeating-timer-focus-toggle').props.accessibilityLabel).toBe('Resume repeating timer');
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:42');
   expectProgress(42 / 60);
   fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
@@ -84,7 +90,7 @@ it.each([false, true])('adjusts within bounds and resets to preparation, preserv
   fireEvent.press(screen.getByTestId('repeating-timer-focus-plus'));
   expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('0:30');
   expect(screen.getByTestId('repeating-timer-focus-minus')).toBeEnabled();
-  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent('Get ready');
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(paused ? 'Get ready · Paused' : 'Get ready');
   fireEvent.press(screen.getByTestId('repeating-timer-focus-reset'));
   expect(getRestTimerEntry()).toMatchObject({ accumulatedMs: 0, pausedAtMs: paused ? 0 : null });
   act(() => adjustRepeatingTimer('session-1', 570));
@@ -94,6 +100,27 @@ it.each([false, true])('adjusts within bounds and resets to preparation, preserv
   expect(getRestTimerEntry()).toMatchObject({ intervalSec: 600 });
   fireEvent.press(screen.getByTestId('repeating-timer-focus-minus'));
   expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('9:45');
+});
+
+it('updates the persistent accessibility readout when phase/pause change at the same visible countdown', () => {
+  startRepeatingTimer('session-1', 15);
+  render(<TimerHost />);
+  expand();
+  advance(3_000);
+  const readout = screen.getByTestId('repeating-timer-focus-readout');
+  const compact = screen.getByTestId('repeating-timer-readout');
+  expect(readout.props.accessibilityLabel).toBe('Get ready, 0:12 remaining');
+  expect(compact.props.accessibilityLabel).toBe('Repeating timer preparation, 0:12 remaining');
+  advance(15_000);
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
+  expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:12');
+  expect(screen.getByTestId('repeating-timer-focus-readout')).toBe(readout);
+  expect(readout.props).toMatchObject({ accessible: true, accessibilityLabel: 'Round 1, 0:12 remaining, paused', accessibilityLiveRegion: 'none' });
+  expect(compact.props.accessibilityLabel).toBe('Repeating timer round 1, 0:12 remaining, paused');
+  expect(screen.getByTestId('repeating-timer-focus-countdown').props.accessible).toBe(false);
+  expect(screen.getByTestId('repeating-timer-countdown').props.accessible).toBe(false);
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
+  expect(readout.props.accessibilityLabel).toBe('Round 1, 0:12 remaining');
 });
 
 it.each(['requestClose', 'accessibilityEscape'] as const)('%s collapses without dismissing or pausing', (event) => {

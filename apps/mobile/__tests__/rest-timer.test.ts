@@ -1,5 +1,7 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { Vibration } from 'react-native';
+import { AppState, Vibration, type AppStateStatus } from 'react-native';
+
+import { playRepeatingTimerCue, setRepeatingTimerAwake, stopRepeatingTimerAudio } from '@/src/session-recorder/repeating-timer-native';
 
 import {
   __resetRestTimerForTests,
@@ -283,16 +285,105 @@ describe('rest-timer store and pure rules', () => {
     expect(Vibration.vibrate).toHaveBeenCalledTimes(action === 'replace' ? 1 : 0);
   });
 
-  it('signals once after a delayed callback skips rounds, then realigns to the wall clock', () => {
+  it('skips delayed cues and realigns to the wall clock without a catch-up burst', () => {
     startRepeatingTimer('session-1');
     jest.setSystemTime(190_000);
     jest.advanceTimersByTime(15_000);
-    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+    expect(playRepeatingTimerCue).not.toHaveBeenCalled();
     expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({ round: 4, remainingSec: 50 });
     jest.advanceTimersByTime(49_999);
-    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
     jest.advanceTimersByTime(1);
-    expect(Vibration.vibrate).toHaveBeenCalledTimes(2);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays exactly five short cues and a long cue before every round across both hosts', () => {
+    const first = renderHook(() => useSessionRestTimer('session-1'));
+    const second = renderHook(() => useSessionRestTimer('session-1'));
+    act(() => startRepeatingTimer('session-1', 60));
+    act(() => jest.advanceTimersByTime(9_999));
+    expect(playRepeatingTimerCue).not.toHaveBeenCalled();
+    for (const time of [10_000, 11_000, 12_000, 13_000, 14_000, 15_000]) {
+      act(() => jest.advanceTimersByTime(time - Date.now()));
+      expect(playRepeatingTimerCue).toHaveBeenLastCalledWith(time === 15_000 ? 'long' : 'short', time);
+    }
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(6);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(true);
+    first.unmount(); second.unmount();
+    jest.advanceTimersByTime(54_999);
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(6);
+    jest.advanceTimersByTime(5_001);
+    expect(jest.mocked(playRepeatingTimerCue).mock.calls.slice(6)).toEqual([
+      ['short', 70_000], ['short', 71_000], ['short', 72_000], ['short', 73_000], ['short', 74_000], ['long', 75_000],
+    ]);
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({ round: 2, remainingSec: 60 });
+  });
+
+  it('preserves fractional warning progress on Pause/Resume without replaying emitted seconds', () => {
+    startRepeatingTimer('session-1');
+    jest.advanceTimersByTime(11_125);
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(2);
+    stopRepeatingTimer('session-1');
+    expect(stopRepeatingTimerAudio).toHaveBeenCalled();
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(false);
+    jest.advanceTimersByTime(20_000);
+    startRepeatingTimer('session-1');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(true);
+    jest.advanceTimersByTime(874);
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(2);
+    jest.advanceTimersByTime(1);
+    expect(playRepeatingTimerCue).toHaveBeenLastCalledWith('short', 32_000);
+    jest.advanceTimersByTime(3_000);
+    expect(playRepeatingTimerCue).toHaveBeenLastCalledWith('long', 35_000);
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(6);
+  });
+
+  it.each(['pause', 'reset', 'adjust', 'dismiss', 'mode', 'replace'] as const)('cancels obsolete cue callbacks and audio on %s', (action) => {
+    const timer = jest.spyOn(global, 'setTimeout');
+    startRepeatingTimer('session-1');
+    const obsolete = timer.mock.calls.find(([, delay]) => delay === 10_000)![0] as () => void;
+    jest.advanceTimersByTime(10_000);
+    const before = jest.mocked(stopRepeatingTimerAudio).mock.calls.length;
+    if (action === 'pause') stopRepeatingTimer('session-1');
+    if (action === 'reset') resetRepeatingTimer('session-1');
+    if (action === 'adjust') adjustRepeatingTimer('session-1', 15);
+    if (action === 'dismiss') dismissRestTimer('session-1');
+    if (action === 'mode') switchTimerMode('session-1', 'rest');
+    if (action === 'replace') startRepeatingTimer('session-2');
+    expect(jest.mocked(stopRepeatingTimerAudio).mock.calls.length).toBeGreaterThan(before);
+    const cueCount = jest.mocked(playRepeatingTimerCue).mock.calls.length;
+    obsolete();
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(cueCount);
+    timer.mockRestore();
+  });
+
+  it.each([null, 'background'] as const)('waits for foreground from initial state %s and skips missed cues after backgrounding', (initial) => {
+    AppState.currentState = initial as AppStateStatus;
+    let change!: (state: AppStateStatus) => void;
+    const remove = jest.fn();
+    const subscription = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, callback) => {
+      change = callback;
+      return { remove };
+    });
+    startRepeatingTimer('session-1');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(false);
+    jest.advanceTimersByTime(12_500);
+    expect(playRepeatingTimerCue).not.toHaveBeenCalled();
+    change('active');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(true);
+    jest.advanceTimersByTime(500);
+    expect(playRepeatingTimerCue).toHaveBeenLastCalledWith('short', 13_000);
+    change('background');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(false);
+    jest.advanceTimersByTime(62_500);
+    change('active');
+    expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({ round: 2, remainingSec: 60 });
+    expect(playRepeatingTimerCue).toHaveBeenCalledTimes(1);
+    dismissRestTimer('session-1');
+    expect(remove).toHaveBeenCalledTimes(1);
+    subscription.mockRestore();
   });
 
   it('switches timer modes smoothly between rest and repeating', () => {

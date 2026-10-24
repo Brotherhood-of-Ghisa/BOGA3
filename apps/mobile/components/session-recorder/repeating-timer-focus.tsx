@@ -21,7 +21,8 @@ type Props = {
 /**
  * A fullscreen presentation of the host's repeating timer, never another clock.
  * Close, Back and accessibility escape only collapse it. The store owns cues;
- * countdown changes are read on demand, never announced every second.
+ * phase sits above a countdown-only ring, then interval, Pause/Resume and bottom
+ * Reset. Countdown changes are read on demand, never announced every second.
  */
 export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, children }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -29,12 +30,18 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
   const title = useRef<TextInstance>(null);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const controlsHeight = uiGeometry.tapTarget + uiSpace.sm * 2 + uiBorder.width
+    + uiTypography.lineHeight.xxl * 2
+    + uiTypography.lineHeight.xxs + uiSpace.xs + uiTypography.lineHeight.xxl + uiSpace.lg + uiBorder.width
+    + uiGeometry.tapTarget + uiSpace.xl + uiGeometry.tapTarget + uiSpace.lg
+    + uiSpace.lg * 6;
   const diameter = Math.min(
     width - uiSpace.xxl,
-    Math.max(uiGeometry.tapTarget * 6, height - insets.top - insets.bottom - uiGeometry.tapTarget * 4 - uiSpace.xxl * 2),
+    Math.max(uiGeometry.tapTarget * 4, height - insets.top - insets.bottom - controlsHeight),
     uiGeometry.tapTarget * 10,
   );
   const phase = view.round === 0 ? 'Get ready' : `Round ${view.round}`;
+  // iOS Text caches spoken labels when visible digits repeat; the existing View owns the label.
   const countdownLabel = `${phase}, ${view.formatted} remaining${view.isPaused ? ', paused' : ''}`;
   const close = () => setExpanded(false);
 
@@ -70,12 +77,17 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
               <IconButton accessibilityLabel="Collapse repeating timer" name="x" onPress={close} testID="repeating-timer-focus-close" />
             </View>
             <ScrollView contentContainerStyle={styles.body}>
-              <View style={[styles.meter, { width: diameter, height: diameter }]}>
+              <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.5} numberOfLines={1} style={styles.phase} testID="repeating-timer-focus-round">{phase}{view.isPaused ? ' · Paused' : ''}</Text>
+              <View style={[styles.meter, { width: diameter, height: diameter }]} testID="repeating-timer-focus-meter">
                 <TimerRing diameter={diameter} view={view} />
-                <View style={styles.readout}>
-                  <Text allowFontScaling={false} style={styles.phase} testID="repeating-timer-focus-round">{phase}</Text>
+                <View
+                  accessible
+                  accessibilityLabel={countdownLabel}
+                  accessibilityLiveRegion="none"
+                  style={styles.readout}
+                  testID="repeating-timer-focus-readout">
                   <Text
-                    accessibilityLabel={countdownLabel}
+                    accessible={false}
                     accessibilityLiveRegion="none"
                     adjustsFontSizeToFit
                     allowFontScaling={false}
@@ -85,10 +97,6 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
                     testID="repeating-timer-focus-countdown">
                     {view.formatted}
                   </Text>
-                  <View style={styles.primary}>
-                    <ActionButton accessibilityLabel={view.isPaused ? 'Start repeating timer' : 'Stop repeating timer'} label={view.isPaused ? 'Start' : 'Stop'} onPress={onToggle} testID="repeating-timer-focus-toggle" variant="primary" />
-                  </View>
-                  <ActionButton accessibilityLabel="Reset repeating timer" label="Reset" onPress={onReset} testID="repeating-timer-focus-reset" variant="text" />
                 </View>
               </View>
               <View style={[styles.intervalRow, { width: diameter }]}>
@@ -96,12 +104,18 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
                   <ActionButton accessibilityLabel="Subtract 15 seconds" disabled={view.intervalSec <= MIN_REPEATING_TIMER_INTERVAL_SECONDS} label="−15s" onPress={() => onAdjust(-REPEATING_TIMER_STEP_SEC)} testID="repeating-timer-focus-minus" variant="outline" />
                 </View>
                 <View style={styles.interval}>
-                  <Text allowFontScaling={false} style={styles.phase}>Interval</Text>
+                  <Text allowFontScaling={false} style={styles.intervalLabel}>Interval</Text>
                   <Text accessibilityLabel={`Interval ${formatRestTimerSeconds(view.intervalSec)}`} allowFontScaling={false} style={styles.intervalValue} testID="repeating-timer-focus-interval">{formatRestTimerSeconds(view.intervalSec)}</Text>
                 </View>
                 <View style={styles.intervalControl}>
                   <ActionButton accessibilityLabel="Add 15 seconds" disabled={view.intervalSec >= MAX_REPEATING_TIMER_INTERVAL_SECONDS} label="+15s" onPress={() => onAdjust(REPEATING_TIMER_STEP_SEC)} testID="repeating-timer-focus-plus" variant="outline" />
                 </View>
+              </View>
+              <View style={styles.primary}>
+                <ActionButton accessibilityLabel={view.isPaused ? 'Resume repeating timer' : 'Pause repeating timer'} label={view.isPaused ? 'Resume' : 'Pause'} onPress={onToggle} size="large" testID="repeating-timer-focus-toggle" variant="primary" />
+              </View>
+              <View style={styles.reset}>
+                <ActionButton accessibilityLabel="Reset repeating timer" label="Reset" onPress={onReset} testID="repeating-timer-focus-reset" variant="text" />
               </View>
             </ScrollView>
           </View>
@@ -135,13 +149,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.rule },
   title: { fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },
-  body: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: uiSpace.lg, gap: uiSpace.xxl },
+  body: { flexGrow: 1, alignItems: 'center', padding: uiSpace.lg, gap: uiSpace.lg },
   meter: { alignItems: 'center', justifyContent: 'center' },
   readout: { width: '80%', alignItems: 'center', gap: uiSpace.sm },
-  phase: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking, textTransform: 'uppercase', color: uiRoles.inkMuted },
+  phase: { alignSelf: 'stretch', fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xxl * 2, lineHeight: uiTypography.lineHeight.xxl * 2, color: uiRoles.ink },
+  intervalLabel: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking, textTransform: 'uppercase', color: uiRoles.inkMuted },
   countdown: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.figure.family, fontWeight: '700', fontVariant: ['tabular-nums'], color: uiRoles.ink },
-  primary: { width: '72%' },
-  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm },
+  primary: { alignSelf: 'stretch' },
+  reset: { marginTop: 'auto', paddingTop: uiSpace.lg, alignSelf: 'stretch' },
+  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: uiRoles.rule, paddingTop: uiSpace.lg },
   intervalControl: { width: '29%' },
   interval: { alignItems: 'center', gap: uiSpace.xs },
   intervalValue: { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl, color: uiRoles.ink },

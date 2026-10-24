@@ -6,7 +6,7 @@ export type ActionButtonVariant = 'primary' | 'outline' | 'text';
 export type ActionButtonTone = 'default' | 'danger';
 // `compact`: a 28-tall outline inside a list row (a group record's Certify),
 // its tap target kept at 44 by hit slop.
-export type ActionButtonSize = 'regular' | 'compact';
+export type ActionButtonSize = 'regular' | 'compact' | 'large';
 
 export type ActionButtonProps = {
   label: string;
@@ -55,6 +55,7 @@ export function ActionButton({
       style={({ pressed }) => [
         styles.base,
         size === 'compact' ? styles.compact : null,
+        size === 'large' ? styles.large : null,
         variant === 'primary' ? styles.primary : null,
         variant === 'outline' ? [styles.outline, danger ? styles.outlineDanger : null] : null,
         disabled && variant === 'primary' ? styles.primaryDisabled : null,
@@ -67,6 +68,7 @@ export function ActionButton({
         style={[
           styles.label,
           size === 'compact' ? styles.labelCompact : null,
+          size === 'large' ? styles.labelLarge : null,
           variant === 'primary' ? styles.labelPrimary : null,
           danger ? styles.labelDanger : null,
           disabled && variant !== 'primary' ? styles.labelDisabled : null,
@@ -91,6 +93,7 @@ const styles = StyleSheet.create({
     minHeight: uiGeometry.compactControlHeight,
     paddingHorizontal: uiSpace.sm,
   },
+  large: { minHeight: uiGeometry.tapTarget + uiSpace.xl },
   primary: {
     backgroundColor: uiRoles.accent,
   },
@@ -131,6 +134,7 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxs,
     letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
   },
+  labelLarge: { fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl },
   labelPrimary: {
     color: uiRoles.surface,
   },

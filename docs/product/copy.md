@@ -2,65 +2,57 @@
 
 ### copy.no-subtitles · principle · accepted
 
-A title stands alone: no line under a screen, sheet, card or section title
-that describes it.
+Screen, sheet, card and section titles stand alone: no descriptive line beneath.
 
-- **Test:** delete the line. If the user loses only words about the thing, it
-  was a subtitle: remove it. If they lose a value (a date, a duration, a
-  count, `3 sets · 1RM 102.5`), it is data and stays.
-- **Bad:** a line like "Your training at a glance" under `Today`.
+- **Test:** remove lines describing the thing; retain data: dates, durations,
+  counts, `3 sets · 1RM 102.5`.
+- **Bad:** "Your training at a glance" under `Today`.
 - **Good:** `06-10-2026 · 52 min` under a session title.
-- **Kept:** `<group> · group view` above a group session's title: it says
-  whose view of the session this is, which the screen cannot show otherwise
-  (decided 2026-10-08).
+- **Kept:** `<group> · group view` identifies otherwise-unknown ownership
+  above group session titles (decided 2026-10-08).
 
 ### copy.no-inline-explanation · principle · accepted
 
-Screens show data and controls, not sentences about them: no footnotes,
-formula notes, field hints, "how this works" lines, or a rule's provenance
-(`Rules N · …`).
+Screens show data and controls: no explanatory footnotes, formulas, hints,
+tutorials or rule provenance (`Rules N · …`).
 
-- **Test:** explanations of figures or controls go; fix the label or design
-  instead.
+- **Test:** replace explanations with clearer labels/design.
 - **Exceptions:** an error line with its action; an empty state's one line,
   never a tutorial; a destructive alert naming what goes (`its N sets`); the
   agent-consent page's grant; the explicitly opened RM curve explainer.
-- **An incomplete figure takes no note:** one that left sets out, for an
-  uncalculable load or kg a group cannot see, shows plain as `Volume`.
+- **Incomplete figures:** plain `Volume`, even when excluding uncalculable
+  loads or kg a group cannot see.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
-- **Good:** the label carries it — the ramp reads `Weekly target` `0%`…`100%`.
+- **Good:** `Weekly target` ramp: `0%`…`100%`.
 
 ### copy.blank-history · presentation · accepted
 
-A figure with no training behind it — a rest period, or one outside the data —
-is left visibly blank: no `Rest`, `?`, substitute dash or zero. Known zero
-training stays numeric. Accessibility preserves the difference between rest,
+Figures without training (rest or outside the data) stay blank: no `Rest`,
+`?`, dash or zero. Known zero stays numeric. Accessibility distinguishes rest,
 unavailable and known zero.
 
-Why: missing data must not resemble a measurement.
+Why: distinguish missing data from measurements.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
 
 ### copy.set-entry · presentation · accepted
 
-Workout, session-plan and programme set entry follow the recorder's copy:
-`Effort`, `Weight`, `Reps`. Weight entry uses the same label for total-load
-and per-side exercises; its accessible name is `Set N weight`.
+Workout, session-plan and programme set entry use `Effort`, `Weight`, `Reps`.
+Total-load and per-side exercises share `Weight`, accessible as `Set N weight`.
 
 Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`.
 
 ### copy.no-weight-unit · presentation · accepted
 
-While kg is the only supported weight unit, visible and spoken labels omit
-kg and kilograms, including compound volume units. Keep `per side`, `%BW` and
-`%BW·reps`. Stored values, wire units and coaching/import payloads stay unchanged.
+While kg is the sole weight unit, visible/spoken labels omit kg/kilograms,
+including compound volume units. Retain `per side`, `%BW`, `%BW·reps`. Stored
+values, wire units and coaching/import payloads stay unchanged.
 
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
 
 ### copy.calendar-dates · presentation · accepted
 
-Every complete calendar date displayed, spoken or edited uses Date format,
-including ranges and shared images. Formatting preserves the device-local day
-and stored instant. Month/day calendar headings, relative and time-only labels
-keep their roles.
+Complete dates displayed, spoken or edited use Date format, including ranges
+and shared images, preserving device-local days and stored instants. Month/day
+headings, relative and time-only labels keep their roles.
 
 Code: `apps/mobile/src/utils/local-time.ts`.

@@ -105,8 +105,8 @@ export function RestTimerBar({
           {isRepeating ? (
             <>
               <ActionButton
-                accessibilityLabel={isPaused ? 'Start repeating timer' : 'Stop repeating timer'}
-                label={isPaused ? 'Start' : 'Stop'}
+                accessibilityLabel={isPaused ? 'Resume repeating timer' : 'Pause repeating timer'}
+                label={isPaused ? 'Resume' : 'Pause'}
                 onPress={onToggleRepeating ?? onRestart}
                 size="compact"
                 testID="repeating-timer-toggle"
@@ -145,12 +145,18 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
   const phase = isRepeating ? (isPreparing ? 'Get ready' : `Round ${view.round}`) : 'Rest';
   const statusLabel = isCompleted ? 'Rest complete' : `${phase}${isPaused ? ' · PAUSED' : ''}`;
   const accessiblePhase = isPreparing ? 'preparation' : phase.toLowerCase();
+  // Repeating's View owns its changing label because iOS Text caches labels for repeated digits.
   const countdownLabel = isRepeating
     ? `Repeating timer ${accessiblePhase}, ${view.formatted} remaining${isPaused ? ', paused' : ''}`
     : `Rest timer ${view.formatted}`;
 
   return (
-    <View style={styles.readout}>
+    <View
+      accessible={isRepeating || undefined}
+      accessibilityLabel={isRepeating ? countdownLabel : undefined}
+      accessibilityLiveRegion={isRepeating ? 'none' : undefined}
+      style={styles.readout}
+      testID={isRepeating ? 'repeating-timer-readout' : undefined}>
       <Icon
         color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
         name={isCompleted ? 'success' : 'timer'}
@@ -163,8 +169,9 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
         {statusLabel}
       </Text>
       <Text
+        accessible={isRepeating ? false : undefined}
         allowFontScaling={false}
-        accessibilityLabel={countdownLabel}
+        accessibilityLabel={isRepeating ? undefined : countdownLabel}
         accessibilityLiveRegion={isRepeating ? 'none' : 'polite'}
         style={styles.countdown}
         testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
