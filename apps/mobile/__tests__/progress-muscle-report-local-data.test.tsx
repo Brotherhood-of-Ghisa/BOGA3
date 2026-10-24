@@ -46,6 +46,7 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
+import { projectMuscleBody } from '@/components/stats/muscle-body-projection';
 import { chooseBroadLocally } from './helpers/broad-muscle-report';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -140,6 +141,59 @@ describe('Progress muscle list under Broad', () => {
     await screen.findByTestId('stats-muscle-body-card');
     const targets = screen.getAllByTestId(/^stats-muscle-body-target-/).map(row => String(row.props.testID).replace('stats-muscle-body-target-', ''));
     expect([...targets].sort()).toEqual([...TRACKED_BROAD].sort());
+  });
+});
+
+// A tap on the rendered 3D body, on the facet of one anatomy entry seen from behind.
+const tapEntryOnBody = async (entry: string) => {
+  const viewport = screen.getByTestId('stats-muscle-body-viewport');
+  fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
+  fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
+  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, buckets: new Map() });
+  const facet = detailed.triangles.filter(tri => tri.muscleGroupId === entry).at(-1)!;
+  const tap = viewport.props.gesture.gestures.find((gesture: { type: string }) => gesture.type === 'tap');
+  await act(async () => {
+    tap.handlers.onEnd({ x: (facet.x0 + facet.x1 + facet.x2) / 3, y: (facet.y0 + facet.y1 + facet.y2) / 3 });
+  });
+};
+
+describe('The 3D body on the Progress screens under Broad', () => {
+  it.each(['back_upper', 'traps_lower'])('selects Back when its %s facet is tapped in Muscle 3D', async entry => {
+    await choose('broad');
+    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
+    await renderProgress('muscle');
+    await screen.findByTestId('stats-muscle-body-card');
+    await tapEntryOnBody(entry);
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Back');
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+  });
+
+  it('selects nothing when an untracked facet is tapped in Muscle 3D', async () => {
+    await choose('broad');
+    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
+    await renderProgress('muscle');
+    await screen.findByTestId('stats-muscle-body-card');
+    await tapEntryOnBody('spinal_erectors');
+    expect(screen.queryByTestId('stats-muscle-body-selected')).toBeNull();
+  });
+
+  it('selects Back when a member facet is tapped in Exercise 3D', async () => {
+    await choose('broad');
+    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
+    await renderProgress('exercise');
+    await screen.findByTestId('stats-muscle-body-card');
+    await tapEntryOnBody('back_upper');
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Back');
+    expect(screen.getByTestId('stats-exercise-body-detail')).toBeTruthy();
+  });
+
+  it('selects the entry itself under Detailed', async () => {
+    await choose('detailed');
+    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
+    await renderProgress('muscle');
+    await screen.findByTestId('stats-muscle-body-card');
+    await tapEntryOnBody('back_upper');
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Upper back');
   });
 });
 
