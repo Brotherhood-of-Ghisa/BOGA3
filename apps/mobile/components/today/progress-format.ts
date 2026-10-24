@@ -143,19 +143,25 @@ export type PeriodChartGeometry = {
 export const CHART_RIGHT_GUTTER = 34;
 export const CHART_HEIGHT = 104;
 const PLOT_TOP = 6;
-const PLOT_BOTTOM = 86;
+// Below the plot: the week ticks and the `TODAY` axis label.
+export const CHART_AXIS_ROOM = 18;
 
 /**
  * Day of the period on x (the first day at 0, the last at the plot's edge)
  * and cumulative working sets on y, scaled to the highest of the projection,
  * the previous period's total and today's figure.
  */
-export const periodChartGeometry = (period: TodayProgressPeriod, width: number): PeriodChartGeometry => {
+export const periodChartGeometry = (
+  period: TodayProgressPeriod,
+  width: number,
+  height: number = CHART_HEIGHT,
+): PeriodChartGeometry => {
   const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
+  const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
   const days = period.daysInPeriod;
   const yMax = Math.max(1, period.projectedWorkingSets, period.previous.total.workingSets, period.toDate.workingSets);
   const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
-  const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (PLOT_BOTTOM - PLOT_TOP);
+  const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (plotBottom - PLOT_TOP);
   const toPoints = (values: number[]) => values.map((value, index) => ({ x: x(index), y: y(value) }));
 
   const current = toPoints(period.cumulativeWorkingSets);
@@ -165,7 +171,7 @@ export const periodChartGeometry = (period: TodayProgressPeriod, width: number):
   const todayPrevious = previous[todayIndex] ?? { x: x(todayIndex), y: y(period.previous.toSameDay.workingSets) };
 
   return {
-    plot: { width: plotWidth, top: PLOT_TOP, bottom: PLOT_BOTTOM },
+    plot: { width: plotWidth, top: PLOT_TOP, bottom: plotBottom },
     current,
     previous,
     projection: { from: todayCurrent, to: { x: x(days - 1), y: y(period.projectedWorkingSets) } },

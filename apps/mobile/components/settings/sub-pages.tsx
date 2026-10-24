@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
 
 // Settings' sub pages, each pushed over the tabs with a native header that
 // carries its title. Each holds what its Settings card summarises.
@@ -78,6 +78,18 @@ export function OtherSettingsScreen() {
             value={values.pastRecordsGymScope}
           />
         </View>
+        {/* List keeps Today one scrolling page; Cards gives Progress and the
+            group a full-height card each, swiped between. */}
+        <View style={styles.preference}>
+          <Text allowFontScaling={false} style={styles.fieldLabel}>Today layout</Text>
+          <SegmentedControl
+            accessibilityLabel="Today layout"
+            onChange={(todayLayout) => updatePreferences({ todayLayout })}
+            options={TODAY_LAYOUT_OPTIONS}
+            testIDPrefix="settings-today-layout"
+            value={values.todayLayout}
+          />
+        </View>
       </Card>
     </SubPage>
   );
@@ -116,6 +128,11 @@ const DATE_FORMAT_OPTIONS = (['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const
   label: format,
   accessibilityLabel: `Set date format to ${format}`,
 }));
+
+const TODAY_LAYOUT_OPTIONS = [
+  { value: 'list' as const, label: 'List', accessibilityLabel: 'Show Today as a list' },
+  { value: 'cards' as const, label: 'Cards', accessibilityLabel: 'Show Today as cards' },
+];
 
 const PAST_RECORDS_GYM_SCOPE_OPTIONS = [
   {
