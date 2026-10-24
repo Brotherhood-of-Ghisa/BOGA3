@@ -10,9 +10,10 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
 }));
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import SettingsRoute from '../app/(tabs)/settings';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { muscleGroups } from '@/src/data/schema';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import {
@@ -222,5 +223,17 @@ describe('Settings → Progress → Muscles', () => {
     fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
     await waitFor(() => expect(selected('broad')).toBe(true));
     expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
+  });
+
+  it('re-reads the rows when the catalog is invalidated, and clears a stale error', async () => {
+    await openMuscles();
+    jest.spyOn(localDatabase(), 'transaction').mockImplementationOnce(() => { throw new Error('disk full'); });
+    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
+    await screen.findByTestId('settings-muscles-error');
+    localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
+    act(() => invalidateExerciseCatalogCache());
+    await screen.findByTestId('settings-muscle-custom');
+    expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
+    expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Custom/);
   });
 });

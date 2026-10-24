@@ -37,7 +37,7 @@ const useMuscleSetup = () => {
     void listMuscleReportRows().then((next) => { if (live) setRows(next); },
       () => { if (live) setError(LOAD_ERROR); });
     const stop = subscribeToExerciseCatalogInvalidation(() => {
-      void listMuscleReportRows().then((next) => { if (live) setRows(next); }, () => {});
+      void listMuscleReportRows().then((next) => { if (live) { setRows(next); setError(null); } }, () => {});
     });
     return () => { live = false; stop(); };
   }, []);
