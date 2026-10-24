@@ -5,8 +5,7 @@ appId: com.dinoderek.mobile
 # Proves:
 #   1. a wiped, signed-out launch lands on the sign-in gate (login-on-start);
 #   2. the fixture user signs in through real GoTrue;
-#   3. Settings → Connected agents loads the real grant list (empty for this
-#      user), and the native back returns;
+#   3. Connected agents loads the real grant list (empty for this user);
 #   4. Profile loads the user's real row, and a username update is written to
 #      Supabase (`Profile updated.`);
 #   5. sign-out drops the session, and the route guard returns to the gate.
@@ -114,17 +113,11 @@ appId: com.dinoderek.mobile
       id: "settings-screen"
     timeout: 15000
 - takeScreenshot: "06-settings-sections-top"
-# Connected agents is a signed-in-only Settings destination. Opening it against
-# real local Supabase proves the SDK grant-list path renders on-device. This
-# flow's fixture user never authorizes an agent, so the list loads empty.
-- scrollUntilVisible:
-    element:
-      id: "settings-connected-agents-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- tapOn:
-    id: "settings-connected-agents-row"
+# Connected agents is signed-in only, reached from More's Connect an AI once an
+# agent is connected (Jest: more-screen.test.tsx). This flow's fixture user
+# never authorizes an agent, so open it by link: against real local Supabase it
+# proves the SDK grant-list path renders on-device, and the list loads empty.
+- openLink: "boga3://connected-agents"
 - extendedWaitUntil:
     visible:
       id: "connected-agents-screen"
@@ -134,10 +127,7 @@ appId: com.dinoderek.mobile
       id: "connected-agents-empty"
     timeout: 15000
 - takeScreenshot: "connected-agents-empty"
-# The native back item is arrow-only; its accessibility label is the previous
-# route's title. Settings is a tab, and the root stack titles the `(tabs)`
-# group "Back" (components/navigation/root-stack.tsx), so the label is "Back".
-- tapOn: "Back"
+- openLink: "boga3://settings"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"

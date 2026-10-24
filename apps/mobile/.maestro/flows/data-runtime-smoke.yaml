@@ -155,10 +155,10 @@ appId: com.dinoderek.mobile
 # chip rather than either layout before switching to Exercise.
 # The existing table/history scenario explicitly selects List; a previous visit
 # may have saved Map. Map disclosure and browsing state remain Jest/native visual QA.
-# Reuse this Settings visit to establish the scrolling window too: data reset
-# preserves preferences. This is setup, not a new Settings claim
+# Reuse this Settings → Progress visit to establish the scrolling window too:
+# data reset preserves preferences. This is setup, not a new Settings claim
 # (settings-progress.test.tsx).
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"

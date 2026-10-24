@@ -8,6 +8,7 @@ import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading 
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
 import { formatLocalDateTime } from '@/src/utils/local-time';
+import { BodyweightCalculationsRow } from './settings-row';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 
@@ -42,6 +43,7 @@ export function BodyWeightScreen() {
   const displayKg = (weightKg: number) => String(Number(weightKg.toFixed(6)));
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
+      <Card><BodyweightCalculationsRow /></Card>
       <Text allowFontScaling={false} style={styles.body}>
         Each session uses the latest reading on or before its start.
       </Text>

@@ -12,7 +12,7 @@ jest.mock('expo-router', () => ({
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
-import SettingsRoute from '../app/(tabs)/settings';
+import ProgressSettingsRoute from '../app/settings-progress';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { muscleGroups } from '@/src/data/schema';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -164,7 +164,7 @@ describe('Settings → Progress → Muscles', () => {
   const openMuscles = async () => {
     setAccountLocalPreferenceAccount('A', true);
     await ensureAccountLocalPreferencesLoaded();
-    render(<SettingsRoute />);
+    render(<ProgressSettingsRoute />);
     await waitFor(() => expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Detailed/));
     fireEvent.press(screen.getByTestId('settings-muscles-row'));
     await screen.findByTestId('settings-muscle-preset-row');
@@ -211,7 +211,7 @@ describe('Settings → Progress → Muscles', () => {
     localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
     setAccountLocalPreferenceAccount('A', true);
     await ensureAccountLocalPreferencesLoaded();
-    render(<SettingsRoute />);
+    render(<ProgressSettingsRoute />);
     await waitFor(() => expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Custom/));
     fireEvent.press(screen.getByTestId('settings-muscles-row'));
     await screen.findByTestId('settings-muscle-preset-row');

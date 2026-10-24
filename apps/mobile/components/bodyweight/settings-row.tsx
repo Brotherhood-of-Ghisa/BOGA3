@@ -1,6 +1,12 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Icon, ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { SettingsCard } from '@/components/settings/settings-card';
+import { bodyweightStatus } from '@/components/settings/statuses';
+import { ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
+import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
+import { listBodyWeightReadings } from '@/src/data/bodyweight';
 import {
   setBodyweightCalculationsEnabled,
   useBodyweightCalculationPreferenceError,
@@ -8,8 +14,45 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import { BODY_WEIGHT_ROUTE } from '@/src/navigation/routes';
 
+// Settings' Bodyweight card: the calculation switch's state and the current
+// reading. The sub page (`/body-weight`) holds the switch and the log.
 export function BodyWeightSettingsRow() {
   const router = useRouter();
+  const enabled = useBodyweightCalculationsEnabled();
+  const currentKg = useCurrentBodyWeightKg();
+  return (
+    <SettingsCard
+      accessibilityHint="Opens bodyweight calculations and the body weight log"
+      icon="weight"
+      label="Bodyweight"
+      onPress={() => router.push(BODY_WEIGHT_ROUTE)}
+      status={bodyweightStatus(enabled, currentKg)}
+      testID="settings-body-weight-row"
+    />
+  );
+}
+
+// The latest valid reading on or before now, re-read whenever Settings is in view.
+function useCurrentBodyWeightKg(): number | null {
+  const [currentKg, setCurrentKg] = useState<number | null>(null);
+  const revision = useBodyWeightContextRevision();
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    listBodyWeightReadings().then((rows) => {
+      const now = Date.now();
+      const current = rows.find((row) => row.measuredAt.getTime() <= now);
+      if (live) setCurrentKg(current && isValidBodyWeightReading(current) ? current.weightKg : null);
+    }, () => {
+      if (live) setCurrentKg(null);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the reading.
+  }, [revision]));
+  return currentKg;
+}
+
+// The calculation switch, at the top of the body weight page.
+export function BodyweightCalculationsRow() {
   const enabled = useBodyweightCalculationsEnabled();
   const preferenceError = useBodyweightCalculationPreferenceError();
   return (
@@ -48,31 +91,11 @@ export function BodyWeightSettingsRow() {
           {preferenceError}
         </Text>
       ) : null}
-      <ListRow
-        accessibilityHint="Opens dated body weight readings"
-        accessibilityLabel="Open body weight log"
-        density="list"
-        divider
-        leading={<Icon name="user" size="md" color={uiRoles.inkMuted} />}
-        onPress={() => router.push(BODY_WEIGHT_ROUTE)}
-        testID="settings-body-weight-row"
-        trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.bodyWeightLogLabel}>
-          Body weight log
-        </Text>
-      </ListRow>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  bodyWeightLogLabel: {
-    color: uiRoles.ink,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.lg,
-    fontWeight: '400',
-    lineHeight: uiTypography.lineHeight.lg,
-  },
   preferenceError: {
     color: uiRoles.danger,
     fontFamily: uiFonts.body.family,

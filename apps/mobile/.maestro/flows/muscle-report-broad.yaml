@@ -51,7 +51,7 @@ appId: com.dinoderek.mobile
           timeout: 30000
 
 # --- Setup: the List view; the catalogue's rows are Detailed after the reset ---
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"
@@ -74,7 +74,7 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-block-serratus_anterior" }
 
 # --- 1. Broad, Calves off, from the sheet; Progress re-reads on return -----
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscles-row"
@@ -181,7 +181,7 @@ appId: com.dinoderek.mobile
 - tapOn: "Close exercise editor"
 
 # --- 4. The 3D body --------------------------------------------------------
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-3d"
@@ -200,7 +200,7 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "muscle-report-07-broad-3d"
 
 # --- 5. Detailed, Calves on: every entry's row is back ---------------------
-- openLink: "boga3://settings"
+- openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"

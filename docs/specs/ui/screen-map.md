@@ -27,7 +27,7 @@ draws the same fixed bar on every screen that shows tabs.
 | `/today` | Landing page: how this week and the current fixed period ([[comparison.window]]) are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
 | `/progress` | One frozen row of breakdown / period / metric chips over table search and a compact Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it, all reset each visit; both breakdowns use Settings' saved layout ([[muscle.progress-layout]]) and [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle sorts name / Now / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families, preserving row figures. Each breakdown retains its own search, grouping and sort for the visit. Exercise 3D scopes the list to the tapped muscle, with aligned Primary effort / Secondary effort sections; 1RM uses List. Muscle List places compact Sets/Volume tickers beside names ([[comparison.muscle-ticker-extent]]); names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Breakdown and each metric persist; period opens on Settings' ([[comparison.window]]), with `breakdown` / `period` overrides on entry or changed links. Sessions remains last | `(tabs)/progress.tsx` |
-| `/more` | Hub for secondary capabilities, so the tab bar stays at four: Community, Tools, Library & account | `(tabs)/more.tsx` |
+| `/more` | Hub for secondary capabilities, so the tab bar stays at four. Two untitled cards: Groups, Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
 
 ### Preserved tab roots
 
@@ -37,9 +37,9 @@ addressable, each resolving to a canonical owner for tab selection.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
-| `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings in the user's muscles ([[muscle.no-breakdown]]); a gym pill scopes the row stats. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
+| `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings in the user's muscles ([[muscle.no-breakdown]]); a gym pill scopes the row stats. A one-line title bar (back, `Exercises`, ⋮ for Manage), then search beside a labelled `Add`. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
 | `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
-| `/settings` | Account, AI coaching, preferences and Progress options including [[muscle.progress-layout]] and a Muscles row opening a sheet ([[muscle.report-groups]]), Notifications opening a scrollable sheet, sync status, About, and dev-only tools | `(tabs)/settings.tsx` |
+| `/settings` | One card per destination (icon, label, current value): Account, Appearance (sheet), Bodyweight, Rest timer, Notifications (scrollable sheet), Progress, Effort, Developer tools, Data & sync, Other; About last, not pressable. The rest live on sub pages | `(tabs)/settings.tsx`, `components/settings/` |
 
 ## Sessions
 
@@ -66,7 +66,8 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/profile` | Auth-aware account route: signed-out credentials, signed-in username / email / password management, sign-out | `profile.tsx` |
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
-| `/body-weight` | Private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
+| `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format and past-records gym filter; the sync status panel; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 
@@ -91,7 +92,7 @@ addressable, each resolving to a canonical owner for tab selection.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/dev-logs` | In-app recent-log viewer, reached from More only under `isDevMode()` | `dev-logs.tsx` |
+| `/dev-logs` | In-app recent-log viewer, reached from Settings → Developer tools only under `isDevMode()` | `dev-logs.tsx` |
 | `/maestro-harness` | Test harness: fixtures, resets, gate actions, teleports. Self-gated | `maestro-harness.tsx` |
 
 ## Shells (not user-facing screens)
@@ -125,7 +126,8 @@ addressable, each resolving to a canonical owner for tab selection.
   `exercise-link`, `progress-history`, `group/[groupId]`, a leaderboard) set
   that title inside the route file once the entity resolves; session-view, exercise-page, the
   exercise picker and every `completed-session` presentation hide the native
-  header and draw their own top bar.
+  header and draw their own top bar; `/settings` and `/exercise-catalog` keep
+  the tab bar, so draw `TitleBar` (back, title, ⋮).
 
 ## Screen rules a route file will not tell you
 
@@ -174,8 +176,8 @@ addressable, each resolving to a canonical owner for tab selection.
   (`design-language.md`, "Choosing one"); meanwhile its checked sheet row reads
   `Next launch`, and a saved custom colour's button `Saved · next launch`. No
   sentence explains the restart ([[copy.no-inline-explanation]]).
-- `Body weight log` sits on Settings regardless of the bodyweight-calculation
-  preference, and no session, detail or logger surface shows or links to a
+- The body weight log is reachable from Settings' Bodyweight card regardless
+  of the bodyweight-calculation preference, and no session, detail or logger surface shows or links to a
   reading.
 
 ## Overlays on existing routes (not destinations)

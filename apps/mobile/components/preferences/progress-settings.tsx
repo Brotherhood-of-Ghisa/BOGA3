@@ -2,14 +2,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card, SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
-import { EffortSettings } from './effort-settings';
 import { MuscleSettingsRow } from './muscle-settings';
 import { PreferenceNumberField } from './number-field';
 
 export function ProgressSettings({ state }: { state: AccountLocalPreferenceState }) {
   const { values, pending } = state;
   return <View style={styles.section} testID="settings-section-progress">
-    <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>Progress</Text>
     <Card style={styles.card}>
       <View style={styles.preference}>
         <Text allowFontScaling={false} style={styles.label}>Progress view</Text>
@@ -29,15 +27,13 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
         value={pending.historyLookbackWeeks ?? values.historyLookbackWeeks}
         onCommit={historyLookbackWeeks => updatePreferences({ historyLookbackWeeks })} />
     </Card>
-    <Card style={styles.card}><MuscleSettingsRow /></Card>
-    <Card style={styles.card}><EffortSettings values={{ ...values, ...pending }} /></Card>
+    <Card><MuscleSettingsRow /></Card>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  section: { gap: uiSpace.sm },
+  section: { gap: uiSpace.md },
   preference: { gap: uiSpace.sm },
   card: { padding: uiSpace.md, gap: uiSpace.md },
-  heading: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted, textTransform: 'uppercase' },
   label: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
 });

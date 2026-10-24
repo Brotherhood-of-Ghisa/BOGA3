@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * The body weight log and its Settings rows over real data: the production
+ * The body weight log, its calculation switch and the Settings card over real data: the production
  * screen, weight editor, reading repository and private calculation
  * preference over the migrated in-memory SQLite database
  * (helpers/local-data.ts). Only the native database open and the router are
@@ -171,7 +171,7 @@ describe('body weight log', () => {
   });
 });
 
-describe('Settings bodyweight rows', () => {
+describe('bodyweight calculations and the Settings card', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetLocalData();
@@ -183,27 +183,44 @@ describe('Settings bodyweight rows', () => {
   });
 
   const toggle = () => screen.getByTestId('settings-bodyweight-calculations-toggle');
+  const cardStatus = () => screen.getByTestId('settings-body-weight-row').props.accessibilityLabel;
 
-  it('keeps the body weight log available while the private preference turns off and on', async () => {
+  it('summarises the switch and the current reading on the card, which opens the body weight page', async () => {
     await bootLocalApp();
     render(<BodyWeightSettingsRow />);
-    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
-    expect(screen.getByText('Body weight log')).toBeTruthy();
+    await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off'));
+    // The switch lives on the page, not the card.
+    expect(screen.queryByTestId('settings-bodyweight-calculations-toggle')).toBeNull();
 
     fireEvent.press(screen.getByTestId('settings-body-weight-row'));
     expect(mockPush).toHaveBeenCalledWith('/body-weight');
+    screen.unmount();
+
+    await seedReading('82.5');
+    render(<BodyWeightSettingsRow />);
+    await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 82.5 kg'));
+  });
+
+  it('keeps the body weight log available while the private preference turns off and on', async () => {
+    await bootLocalApp();
+    render(<><BodyWeightSettingsRow /><BodyWeightScreen /></>);
+    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
+    // The switch sits at the top of the log, above the current reading.
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('settings-bodyweight-calculations-toggle')).toBeLessThan(tree.indexOf('body-weight-current'));
 
     for (const [label, enabled] of [['On', true], ['Off', false], ['On', true]] as const) {
       fireEvent.press(toggle());
       expect(toggle()).toHaveTextContent(label);
-      expect(screen.getByTestId('settings-body-weight-row')).toBeTruthy();
+      expect(cardStatus()).toBe(`Bodyweight, ${label}`);
+      expect(screen.getByTestId('body-weight-add')).toBeTruthy();
       await waitFor(() => expect(storedPreference()).toBe(enabled), AFTER_WRITE);
     }
   });
 
   it('reverts an optimistic toggle and shows a retryable error when the write fails', async () => {
     await bootLocalApp();
-    render(<BodyWeightSettingsRow />);
+    render(<BodyWeightScreen />);
     await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
 
     // A failed preference write.

@@ -3,35 +3,38 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useConnectedAgentNames } from '@/components/more/use-connected-agent-names';
 import {
   Card,
   Icon,
   ListRow,
-  PageHeader,
   ScreenScroll,
   uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import {
-  getMoreSections,
-  type MoreDestination,
-} from '@/src/navigation/more-destinations';
+import { MORE_GROUPS, type MoreDestination } from '@/src/navigation/more-destinations';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
-import { isDevMode } from '@/src/utils/isDevMode';
 
+// Like the other tabs, More has no title: two untitled cards of destinations.
 export default function MoreScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const agentNames = useConnectedAgentNames(user?.id ?? null);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const sections = getMoreSections({ hasUser: user !== null, isDeveloper: isDevMode() });
+  // Connect an AI leaves the app for the setup instructions only when there is
+  // no agent to show: signed out, or signed in with none connected.
+  const connectsExternally = !user || agentNames?.length === 0;
 
   const openDestination = async (destination: MoreDestination) => {
     if (destination.action.type === 'route') {
       router.push(destination.action.href);
+      return;
+    }
+    if (!connectsExternally) {
+      router.push('/connected-agents');
       return;
     }
 
@@ -48,73 +51,55 @@ export default function MoreScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="more-screen">
-      <PageHeader title="More" />
-
-      {sections.map((section) => (
-        <View key={section.key} style={styles.section} testID={`more-section-${section.key}`}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
-            {section.title}
-          </Text>
-          <Card>
-            {section.destinations.map((destination, index) => {
-              const external = destination.action.type === 'connect-agent';
-              return (
-                <View key={destination.key}>
-                  <ListRow
-                    accessibilityHint={destination.accessibilityHint}
-                    accessibilityLabel={destination.label}
-                    accessibilityRole={external ? 'link' : 'button'}
-                    density="list"
-                    divider={index > 0}
-                    label={destination.label}
-                    leading={<Icon color={uiRoles.inkMuted} name={destination.icon} />}
-                    onPress={() => {
-                      void openDestination(destination);
-                    }}
-                    testID={destination.testID}
-                    trailing={
-                      <Icon
-                        color={uiRoles.inkFaint}
-                        name={external ? 'arrow-up-right' : 'chevron-right'}
-                        size="sm"
-                      />
-                    }
-                  />
-                  {destination.key === 'connect-agent' && connectError ? (
-                    <Text
-                      allowFontScaling={false}
-                      accessibilityLiveRegion="polite"
-                      style={styles.inlineError}
-                      testID="more-connect-agent-error">
-                      {connectError}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-          </Card>
-        </View>
+      {MORE_GROUPS.map((destinations, groupIndex) => (
+        <Card key={groupIndex} testID={`more-group-${groupIndex + 1}`}>
+          {destinations.map((destination, index) => {
+            const isConnect = destination.action.type === 'connect-ai';
+            const external = isConnect && connectsExternally;
+            const description = isConnect && agentNames?.length ? agentNames.join(', ') : undefined;
+            return (
+              <View key={destination.key}>
+                <ListRow
+                  accessibilityLabel={description ? `${destination.label}, ${description}` : destination.label}
+                  accessibilityRole={external ? 'link' : 'button'}
+                  density="list"
+                  description={description}
+                  divider={index > 0}
+                  label={destination.label}
+                  leading={<Icon color={uiRoles.inkMuted} name={destination.icon} />}
+                  onPress={() => {
+                    void openDestination(destination);
+                  }}
+                  testID={destination.testID}
+                  trailing={
+                    <Icon
+                      color={uiRoles.inkFaint}
+                      name={external ? 'arrow-up-right' : 'chevron-right'}
+                      size="sm"
+                    />
+                  }
+                />
+                {isConnect && connectError ? (
+                  <Text
+                    allowFontScaling={false}
+                    accessibilityLiveRegion="polite"
+                    style={styles.inlineError}
+                    testID="more-connect-ai-error">
+                    {connectError}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
       ))}
     </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  // Sections sit a step further apart than a label and its card.
   content: {
     gap: uiSpace.xl,
-  },
-  section: {
-    gap: uiSpace.sm,
-  },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   // Under the row it belongs to, inset to the row's text.
   inlineError: {

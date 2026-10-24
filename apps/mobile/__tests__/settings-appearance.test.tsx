@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * Settings → Preferences → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
+ * Settings → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
  * theme presets in a sheet, a choice saved per device at once and applied on
  * the next launch, and the failures that must be logged rather than silent.
  *
@@ -20,6 +20,8 @@ jest.mock('@/components/sync-status/sync-status-panel', () => ({ SyncStatusPanel
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
