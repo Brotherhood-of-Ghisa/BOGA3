@@ -493,7 +493,7 @@ describe('StatsScreenShell', () => {
     renderStatsScreenShell({ muscleLayout: 'list', summary, tableMetric: 'totalVolume' });
     expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('100000000000');
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+9999999999900%');
-    expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ width: '100%' });
+    expect(screen.getByTestId('stats-muscle-row-chest-periods')).toBeTruthy();
     act(() => ReactNative.Dimensions.set({ window: dimensions }));
   });
 
@@ -1100,6 +1100,10 @@ it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt'
   expect(StyleSheet.flatten(tile.props.style)).toEqual(bounds);
   expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
   expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
+  expect(screen.getByTestId('stats-contribution-bench-periods')).toHaveStyle(
+    StyleSheet.flatten(screen.getByTestId('stats-muscle-row-chest-periods').props.style));
+  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: uiRoles.inkMuted });
+  expect(screen.getByRole('link', { name: 'Open Long exercise name history' })).toBeTruthy();
   expect(within(screen.getByTestId('stats-contributions-header')).getByText('Change')).toBeTruthy();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });

@@ -277,6 +277,39 @@ describe('Stats over real data', () => {
     expect(groupChecked()).toBe(false);
   });
 
+  it('pairs periods with display-only Prev and toggles Now, Muscle and Change sorts over real data', async () => {
+    await renderSeededStats();
+    chooseFilter('view-mode', 'Muscle');
+    toggleGroup();
+    const values = (column: string) => screen.getAllByTestId(new RegExp(`^stats-muscle-row-.*-${column}$`))
+      .map(row => Number(String(row.props.children).replace('−', '-').replace('±', '')));
+    const expectSorted = (column: string, descending: boolean) => {
+      const numbers = values(column);
+      expect(numbers).toEqual([...numbers].sort((left, right) => descending ? right - left : left - right));
+    };
+    expectSorted('now', true);
+    expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
+    expect(screen.getByRole('header', { name: 'Previous, working sets' })).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-sort-now')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
+    expectSorted('now', false);
+    expect(screen.getByTestId('stats-muscle-sort-now-indicator-up', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
+    expectSorted('now', true);
+    expect(screen.getByTestId('stats-muscle-sort-now-indicator-down', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-muscle'));
+    const names = () => screen.getAllByRole('link').map(row => row.props.accessibilityLabel);
+    expect(names()).toEqual([...names()].sort((left, right) => left.localeCompare(right)));
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-muscle'));
+    expect(names()).toEqual([...names()].sort((left, right) => right.localeCompare(left)));
+    expect(screen.getByTestId('stats-muscle-sort-now-indicator')).toHaveStyle({ opacity: 0 });
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-change'));
+    expectSorted('change', true);
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-change'));
+    expectSorted('change', false);
+    expect(screen.getByTestId('stats-muscle-sort-change-indicator-up', { includeHiddenElements: true })).toBeTruthy();
+  });
+
   it('counts secondary sets at ½ until Count secondary sets is off, across Muscle, its history links and Exercise 3D', async () => {
     await loadMaestroFixture('exercise-block-history');
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);

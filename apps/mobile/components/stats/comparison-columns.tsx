@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { changeToneColour, uiBorder, uiGeometry, uiIconSize, uiSpace } from '@/components/ui';
+import { changeToneColour, uiBorder, uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ProgressExerciseMetric } from '@/src/preferences/model';
@@ -19,7 +19,8 @@ import {
 // them ([[comparison.change-display]]) — and the layout that decides whether
 // they still fit beside the row's name. Both tables put spoken header
 // labels or shared sort controls over them; neither owns the
-// columns, and a figure means the same thing in both.
+// columns, and a figure means the same thing in both. Muscle List pairs the
+// periods vertically; Exercise and 3D keep three separate columns.
 
 /** The figure the columns show. 1RM is a metric only an exercise has. */
 export type ComparisonMetric = ProgressExerciseMetric;
@@ -128,7 +129,7 @@ export const compareOptionalNumbers = (
   return validLeft < validRight ? -1 : 1;
 };
 
-export type ComparisonLayout = { columns: number[]; stacked: boolean };
+export type ComparisonLayout = { columns: number[]; stacked: boolean; pairedPeriods?: boolean };
 
 /**
  * The figure columns, and whether they still fit beside the name. A column is
@@ -170,15 +171,23 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
   column?: (position: ComparisonColumnPosition, width: number) => ReactNode;
 }) {
   const columns = <StatsTableFigures style={layout.stacked && styles.stackedFigures}>
-    {COLUMN_LABELS.map((label, index) => <Fragment key={label}>
-      {column
-        ? column({ key: COLUMN_KEYS[index], label, name: COLUMN_NAMES[index], index }, layout.columns[index])
+    {COLUMN_LABELS.map((label, index) => {
+      if (layout.pairedPeriods && index === 1) return null;
+      const paired = layout.pairedPeriods && index === 0;
+      const width = paired ? Math.max(layout.columns[0], layout.columns[1]) : layout.columns[index];
+      const header = column
+        ? column({ key: COLUMN_KEYS[index], label, name: COLUMN_NAMES[index], index }, width)
         : <View accessible accessibilityRole="header"
           accessibilityLabel={`${COLUMN_NAMES[index]}, ${metricUnit(metric)}`}
-          style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width: layout.columns[index] }]}>
+          style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width }]}>
           <StatsTableHeaderLabel label={label} />
-        </View>}
-    </Fragment>)}
+        </View>;
+      return <Fragment key={label}>{paired ? <View style={{ width }}>
+        {header}
+        <View accessible accessibilityRole="header" accessibilityLabel={`Previous, ${metricUnit(metric)}`}
+          style={styles.previousHeader}><StatsTableHeaderLabel label="Prev" /></View>
+      </View> : header}</Fragment>;
+    })}
   </StatsTableFigures>;
   return <StatsTableHeader testID={testID}>
     <View style={[statsTableStyles.headerCell, statsTableStyles.nameCell, layout.stacked && styles.stackedName]}>
@@ -203,11 +212,19 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
   const figures = comparisonFigures(row, metric);
   const texts = [figures.now, figures.previous, figures.change.text];
   const changeColour = { color: changeToneColour(figures.change.tone) };
+  const periodWidth = Math.max(layout.columns[0], layout.columns[1]);
   return <View accessible={speak || undefined}
     accessibilityLabel={speak ? `Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.` : undefined}
     style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
     <StatsTableFigures testID={`${prefix}-values`}>
-      {texts.map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
+      {layout.pairedPeriods ? <>
+        <View style={{ width: periodWidth }} testID={`${prefix}-periods`}>
+          <Text allowFontScaling={false} style={statsTableStyles.figure} testID={`${prefix}-now`}>{figures.now}</Text>
+          <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.previous]} testID={`${prefix}-previous`}>{figures.previous}</Text>
+        </View>
+        <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: layout.columns[2] }, changeColour]}
+          testID={`${prefix}-change`}>{figures.change.text}</Text>
+      </> : texts.map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
         style={[statsTableStyles.figure, { width: layout.columns[index] }, COLUMN_KEYS[index] === 'change' && changeColour]}
         testID={`${prefix}-${COLUMN_KEYS[index]}`}>{value}</Text>)}
     </StatsTableFigures>
@@ -215,6 +232,8 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
 }
 
 const styles = StyleSheet.create({
+  previous: { color: uiRoles.inkMuted },
+  previousHeader: { alignItems: 'flex-end', paddingBottom: uiSpace.xs },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { alignItems: 'stretch' },
   stackedFigures: { alignSelf: 'stretch', width: '100%', justifyContent: 'flex-end', paddingBottom: uiSpace.xs },
