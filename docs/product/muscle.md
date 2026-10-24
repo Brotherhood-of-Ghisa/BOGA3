@@ -113,8 +113,8 @@ or removing it rewrites every entry of the muscle. Mappings to untracked muscles
 are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
-Code: `apps/mobile/src/exercise-catalog/reported-muscles.ts`.
-Pending: editor, search, session screens.
+Code: `resolveEditorMappings`: `apps/mobile/src/exercise-catalog/editor-model.ts`; `buildMuscleSetup`: `apps/mobile/src/exercise-catalog/muscle-setup.ts`; `apps/mobile/src/exercise-catalog/reported-muscles.ts`.
+Pending: session screens.
 
 ### muscle.untracked · definition · accepted
 
@@ -132,7 +132,7 @@ header lists first.
 
 Why: a header over one muscle repeats it.
 Code: `apps/mobile/components/stats/progress-tables.tsx`.
-Pending: catalogue and picker lists.
+Pending: catalogue lists.
 
 ### muscle.catalog-names · presentation · accepted
 

@@ -15,9 +15,9 @@ import type { ProgressMuscleComparison } from '@/src/data/progress-comparisons';
 import { reportMuscleTrainingStarts } from '@/src/data/progress-muscle-tickers';
 import { createStatsRepository, type StatsAggregationInput, type StatsStore } from '@/src/data/stats';
 import {
-  NO_MUSCLE_REPORT, muscleReportOfGroups, reportedExerciseMuscles, reportedExerciseSearchText,
-  reportedMuscleName, reportedPrimaryFamilyName,
+  NO_MUSCLE_REPORT, reportedExerciseMuscles, reportedMuscleName, reportedPrimaryFamilyName,
 } from '@/src/exercise-catalog/reported-muscles';
+import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import { broadMuscleReport, broadMuscleRows } from './helpers/broad-muscle-report';
 
 const BROAD = broadMuscleReport(['calves']);
@@ -125,7 +125,7 @@ describe('Exercise 3D shading under the user’s muscles', () => {
 
 describe('the user’s muscles in catalogue helpers', () => {
   it('reads Detailed rows as every entry its own tracked muscle', () => {
-    const detailed = muscleReportOfGroups(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => ({ ...seed })));
+    const detailed = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => ({ ...seed, reportGroup: null, tracked: 1 }))).assignment;
     expect(reportedExerciseMuscles(exercise([['quads', 'primary'], ['adductors', 'secondary']]), detailed)).toEqual([
       { muscleGroupId: 'quads', role: 'primary' }, { muscleGroupId: 'adductors', role: 'secondary' }]);
     expect(reportedMuscleName(NO_MUSCLE_REPORT, catalogById, 'adductors')).toBe(catalogById.adductors.displayName);
@@ -156,12 +156,6 @@ describe('the user’s muscles in catalogue helpers', () => {
     expect(reportedPrimaryFamilyName(exercise([]), BROAD, byId)).toBe('Other');
   });
 
-  it('searches an exercise by its muscles’ names, never a merged entry’s', () => {
-    const row = exercise([['back_upper', 'primary'], ['spinal_erectors', 'primary']]);
-    expect(reportedExerciseSearchText(row, BROAD, catalogById)).toBe('squat back back');
-    expect(reportedExerciseSearchText(row, NO_MUSCLE_REPORT, catalogById)).toContain('upper back');
-    expect(reportedExerciseSearchText(exercise([['quads', 'secondary']]), BROAD, catalogById)).toBe('squat');
-  });
 });
 
 describe('family headers follow the user’s muscles', () => {

@@ -1,18 +1,11 @@
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
-import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
 import { exerciseCountedMuscles, type ExerciseMuscle } from './exercise-muscles';
 import { OTHER_EXERCISE_FAMILY, pickPrimaryExerciseMapping } from './list-model';
+import { EMPTY_MUSCLE_SETUP } from './muscle-setup';
 
 /** Every anatomy entry is its own tracked muscle: today's Detailed view. */
-export const NO_MUSCLE_REPORT: MuscleReportAssignment = new Map();
-
-/** The user's muscle setup, read from their `muscle_groups` rows ([[muscle.report-groups]]). */
-export const muscleReportOfGroups = (groups: readonly ExerciseCatalogMuscleGroup[]): MuscleReportAssignment =>
-  buildMuscleReportAssignment(groups.map(group => ({
-    id: group.id, displayName: group.displayName, familyName: group.familyName, sortOrder: group.sortOrder,
-    reportGroup: group.reportGroup ?? null, tracked: group.tracked ?? 1,
-  })));
+export const NO_MUSCLE_REPORT: MuscleReportAssignment = EMPTY_MUSCLE_SETUP.assignment;
 
 /**
  * An exercise's counted muscles as the user sees them ([[muscle.no-breakdown]]):
@@ -62,20 +55,4 @@ export const reportedPrimaryFamilyName = (
   if (!mapping) return OTHER_EXERCISE_FAMILY;
   return report.get(mapping.muscleGroupId)?.muscle.familyName
     ?? catalogById.get(mapping.muscleGroupId)?.familyName ?? OTHER_EXERCISE_FAMILY;
-};
-
-/**
- * The text a Progress exercise search matches: the exercise's name and its
- * primary muscles' names and families, as the user's muscles. An entry merged
- * into another matches by its muscle, never its own name ([[muscle.no-breakdown]]).
- */
-export const reportedExerciseSearchText = (
-  exercise: Pick<ExerciseCatalogExercise, 'name' | 'mappings'>, report: MuscleReportAssignment,
-  catalogById: Readonly<Record<string, ExerciseCatalogMuscleGroup>>,
-): string => {
-  const terms = reportedExerciseMuscles(exercise, report).flatMap(({ muscleGroupId, role }) => {
-    const muscle = report.get(muscleGroupId)?.muscle ?? catalogById[muscleGroupId];
-    return role === 'primary' && muscle ? [muscle.displayName, muscle.familyName] : [];
-  });
-  return [exercise.name, ...terms].join(' ').toLowerCase();
 };

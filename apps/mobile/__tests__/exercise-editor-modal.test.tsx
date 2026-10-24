@@ -13,11 +13,14 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import type { ExerciseCatalogCacheSnapshot } from '@/src/exercise-catalog/cache';
+import { buildMuscleSetup, EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
+
+import { broadMuscleRows, detailedMuscleRows } from './helpers/muscle-setup';
 
 const MUSCLES: ExerciseCatalogMuscleGroup[] = [
-  { id: 'chest', displayName: 'Chest', familyName: 'Push', sortOrder: 0 },
-  { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
-  { id: 'delts', displayName: 'Front delts', familyName: 'Shoulders', sortOrder: 2 },
+  { id: 'chest', displayName: 'Chest', familyName: 'Push', sortOrder: 0, reportGroup: null, tracked: 1 },
+  { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1, reportGroup: null, tracked: 1 },
+  { id: 'delts', displayName: 'Front delts', familyName: 'Shoulders', sortOrder: 2, reportGroup: null, tracked: 1 },
 ];
 
 let mockCatalog: ExerciseCatalogCacheSnapshot;
@@ -36,6 +39,7 @@ const catalog = (over: Partial<ExerciseCatalogCacheSnapshot> = {}): ExerciseCata
   exercises: [],
   muscleGroups: MUSCLES,
   muscleGroupsById: Object.fromEntries(MUSCLES.map((muscle) => [muscle.id, muscle])),
+  muscleSetup: buildMuscleSetup(MUSCLES),
   lastError: null,
   ...over,
 });
@@ -310,7 +314,7 @@ describe('muscle selector', () => {
   });
 
   it('says when there is no muscle group to pick as primary', () => {
-    mockCatalog = catalog({ muscleGroups: [], muscleGroupsById: {} });
+    mockCatalog = catalog({ muscleGroups: [], muscleGroupsById: {}, muscleSetup: buildMuscleSetup([]) });
     renderEditor();
     fireEvent.press(primaryLabel());
     expect(screen.getByText('No primary muscle options available.')).toBeOnTheScreen();
@@ -345,5 +349,95 @@ describe('closing', () => {
       <ExerciseEditorModal editingExercise={exercise()} onRequestClose={onRequestClose} onSaved={onSaved} title="Add as new" visible />,
     );
     expect(screen.getByText('Add as new')).toBeOnTheScreen();
+  });
+});
+
+describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
+  const BROAD_ROWS = broadMuscleRows();
+  const broadCatalog = () => catalog({
+    muscleGroups: BROAD_ROWS,
+    muscleGroupsById: Object.fromEntries(BROAD_ROWS.map((muscle) => [muscle.id, muscle])),
+    muscleSetup: buildMuscleSetup(BROAD_ROWS),
+  });
+  const squat = () => exercise({
+    name: 'Back Squat',
+    mappings: [
+      { id: 'q', muscleGroupId: 'quads', weight: 1, role: 'primary' },
+      { id: 'a', muscleGroupId: 'adductors', weight: 0.5, role: 'secondary' },
+      { id: 's', muscleGroupId: 'spinal_erectors', weight: 0.5, role: 'secondary' },
+    ],
+  });
+
+  beforeEach(() => {
+    mockCatalog = broadCatalog();
+  });
+
+  it('offers the 11 muscles in the selector, no entry inside one and no untracked one', () => {
+    renderEditor();
+    fireEvent.press(primaryLabel());
+    const offered = screen.getAllByLabelText(/^Select primary muscle /).map((option) => option.props.accessibilityLabel);
+    expect(offered).toEqual([
+      'Chest', 'Front Delts', 'Lateral Delts', 'Rear Delts', 'Back', 'Biceps', 'Triceps', 'Core', 'Quads',
+      'Glutes & Hams', 'Calves',
+    ].map((name) => `Select primary muscle ${name}`));
+  });
+
+  it('shows Quads once, primary, and Save keeps the links it hides', async () => {
+    renderEditor({ editingExercise: squat() });
+    expect(primaryLabel()).toHaveTextContent('Quads', { exact: false });
+    expect(screen.getByText('No secondary muscles selected.')).toBeOnTheScreen();
+    await save();
+    expect(onSave.mock.calls[0][0].mappings).toEqual([
+      { muscleGroupId: 'quads', weight: 1, role: 'primary' },
+      { muscleGroupId: 'adductors', weight: 0.5, role: 'secondary' },
+      { muscleGroupId: 'spinal_erectors', weight: 0.5, role: 'secondary' },
+    ]);
+  });
+
+  it('adds Back as one Lats mapping', async () => {
+    renderEditor({ editingExercise: squat() });
+    fireEvent.press(screen.getByTestId('exercise-editor-secondary-muscle-trigger'));
+    fireEvent.press(screen.getByLabelText('Select secondary muscle Back'));
+    await save();
+    expect(onSave.mock.calls[0][0].mappings.filter((mapping) => mapping.role === 'secondary')).toEqual([
+      { muscleGroupId: 'adductors', weight: 0.5, role: 'secondary' },
+      { muscleGroupId: 'back_lats', weight: 0.5, role: 'secondary' },
+      { muscleGroupId: 'spinal_erectors', weight: 0.5, role: 'secondary' },
+    ]);
+  });
+
+  it('fills the form in the user\'s muscles once the setup loads after the sheet opened', () => {
+    mockCatalog = catalog({ status: 'loading', muscleGroups: [], muscleGroupsById: {}, muscleSetup: EMPTY_MUSCLE_SETUP });
+    const editing = squat();
+    const view = renderEditor({ editingExercise: editing });
+    mockCatalog = broadCatalog();
+    view.rerender(
+      <ExerciseEditorModal editingExercise={editing} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible />,
+    );
+    expect(primaryLabel()).toHaveTextContent('Quads', { exact: false });
+    expect(screen.getByText('No secondary muscles selected.')).toBeOnTheScreen();
+  });
+
+  it('saves against the setup the form opened with when the setup changes while it is open', async () => {
+    const detailedRows = detailedMuscleRows();
+    mockCatalog = catalog({ muscleGroups: detailedRows, muscleSetup: buildMuscleSetup(detailedRows) });
+    const editing = exercise({
+      mappings: [
+        { id: 'q', muscleGroupId: 'quads', weight: 1, role: 'primary' },
+        { id: 'g', muscleGroupId: 'glutes_max', weight: 0.5, role: 'secondary' },
+        { id: 'h', muscleGroupId: 'hamstrings', weight: 0.5, role: 'secondary' },
+      ],
+    });
+    const view = renderEditor({ editingExercise: editing });
+    fireEvent.press(screen.getByLabelText('Remove secondary muscle Hamstrings'));
+    mockCatalog = broadCatalog();
+    view.rerender(
+      <ExerciseEditorModal editingExercise={editing} onRequestClose={onRequestClose} onSave={onSave} onSaved={onSaved} visible />,
+    );
+    await save();
+    expect(onSave.mock.calls[0][0].mappings).toEqual([
+      { muscleGroupId: 'quads', weight: 1, role: 'primary' },
+      { muscleGroupId: 'glutes_max', weight: 0.5, role: 'secondary' },
+    ]);
   });
 });

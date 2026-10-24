@@ -17,8 +17,8 @@ describe('exercise catalog repository', () => {
     const now = new Date('2026-02-25T10:00:00.000Z');
 
     store.listMuscleGroups.mockResolvedValue([
-      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
-      { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
+      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 },
+      { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1, reportGroup: null, tracked: 1 },
     ]);
     store.saveExercise.mockResolvedValue({
       bodyweightContribution: 0,
@@ -61,7 +61,7 @@ describe('exercise catalog repository', () => {
   it('validates name and load mode through the shared ExerciseCore rules', async () => {
     const store = createMockStore();
     const repository = createExerciseCatalogRepository(store);
-    store.listMuscleGroups.mockResolvedValue([{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 }]);
+    store.listMuscleGroups.mockResolvedValue([{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 }]);
     store.saveExercise.mockResolvedValue({ bodyweightContribution: 0, splitByGym: false, id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
     const mappings = [{ muscleGroupId: 'chest', weight: 1 }];
 
@@ -94,7 +94,7 @@ describe('exercise catalog repository', () => {
     const repository = createExerciseCatalogRepository(store);
 
     store.listMuscleGroups.mockResolvedValue([
-      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
+      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 },
     ]);
 
     await expect(

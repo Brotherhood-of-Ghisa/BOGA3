@@ -40,7 +40,7 @@ import {
   compareFamilySections, countFamilyMuscles, familyHasHeader, nextMuscleSortMode, type MuscleSortMode,
 } from '@/components/stats/progress-tables';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
-import { NO_MUSCLE_REPORT, reportedExerciseSearchText, reportedPrimaryFamilyName } from '@/src/exercise-catalog/reported-muscles';
+import { NO_MUSCLE_REPORT, reportedPrimaryFamilyName } from '@/src/exercise-catalog/reported-muscles';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import {
   COLUMN_KEYS,
@@ -655,15 +655,14 @@ function StatsContent() {
       previous: periodFigures(lastPeriod.aggregatesById.get(item.id)),
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
-  const muscleReport = catalog.muscleReport ?? NO_MUSCLE_REPORT;
+  const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
   const exerciseFamilies = useMemo(() => {
     const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
     return new Map(catalog.exercises.map(exercise => [exercise.id, reportedPrimaryFamilyName(exercise, muscleReport, byId)]));
   }, [catalog.exercises, catalog.muscleGroups, muscleReport]);
-  // Search and family placement read the same current catalogue metadata, as the user's muscles.
+  // Search matches the user's muscles, as every exercise search does.
   const exerciseSearchIndex = useMemo(
-    () => new Map(catalog.exercises.map(item => [item.id, reportedExerciseSearchText(item, muscleReport, catalog.muscleGroupsById)])),
-    [catalog.exercises, catalog.muscleGroupsById, muscleReport]);
+    () => new Map(catalog.exercises.map(item => [item.id, item.searchText])), [catalog.exercises]);
   return <StatsScreenShell {...summary} muscleTickers={tickers.data} muscleTickerStatus={tickers.status} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
     exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} muscleReport={muscleReport} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}

@@ -44,7 +44,8 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import * as catalogRepository from '@/src/data/exercise-catalog';
 import * as catalogStats from '@/src/data/exercise-catalog-stats';
-import { exerciseDefinitions, exerciseMuscleMappings } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from '@/src/data/schema';
+import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import {
   bootLocalApp,
@@ -53,6 +54,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { broadSetupOf } from './helpers/muscle-setup';
 import { waitForGone } from './helpers/wait-for-gone';
 
 type TestNode = typeof screen.UNSAFE_root;
@@ -123,6 +125,13 @@ const deleteEveryExercise = () => {
 const emptyCatalog = () => {
   localDatabase().delete(exerciseMuscleMappings).run();
   localDatabase().delete(exerciseDefinitions).run();
+};
+
+// Broad chosen on this account ([[muscle.report-groups]]), as its rows hold it.
+const chooseBroad = () => {
+  for (const { id } of SYSTEM_MUSCLE_GROUP_SEEDS) {
+    localDatabase().update(muscleGroups).set(broadSetupOf(id)).where(eq(muscleGroups.id, id)).run();
+  }
 };
 
 const createExercise = async (name: string) => {
@@ -520,6 +529,34 @@ describe('ExerciseCatalogScreen', () => {
       fireEvent.press(screen.getByRole('radio', { name: 'No gym' }));
       await waitForGone(() => screen.queryByLabelText('Exercise actions Barbell Bench Press'));
       expect(screen.getByLabelText('Exercise actions Cable Bench Press')).toBeTruthy();
+    });
+  });
+
+  describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
+    it('searches and names muscles, never an entry inside one', async () => {
+      await openCatalog({ prepare: chooseBroad });
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'lats');
+      expect(await screen.findByText('No exercises match the current filters.')).toBeTruthy();
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back');
+      expect(await screen.findByLabelText('Edit exercise definition Lat Pulldown')).toHaveTextContent(/Primary: Back/);
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
+      expect(await screen.findByLabelText('Edit exercise definition Barbell Back Squat')).toHaveTextContent(
+        /Primary: Quads\s+Secondary: Glutes & HamsNever done/
+      );
+    });
+
+    it('saves an edit without touching the mappings it hides or merges', async () => {
+      await openCatalog({ prepare: chooseBroad });
+      const before = activeMappingsOf('seed_barbell_back_squat');
+      expect(before.map((mapping) => mapping.muscleGroupId)).toEqual(['adductors', 'glutes_max', 'quads', 'spinal_erectors']);
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
+      fireEvent.press(await screen.findByLabelText('Edit exercise definition Barbell Back Squat'));
+      await screen.findByText('Edit Exercise');
+      fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Back Squat');
+      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+
+      expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+      expect(activeMappingsOf('seed_barbell_back_squat')).toEqual(before);
     });
   });
 

@@ -225,7 +225,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   );
   // A muscle is the user's muscle ([[muscle.report-groups]]): an entry merged
   // into another, or one they do not track, has no history page of its own.
-  const muscleReport = catalog.muscleReport ?? NO_MUSCLE_REPORT;
+  const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
   const name = subject?.kind === 'muscle'
     ? reportedMuscleName(muscleReport, catalog.muscleGroupsById, subject.id)
     : exercise?.name ?? null;

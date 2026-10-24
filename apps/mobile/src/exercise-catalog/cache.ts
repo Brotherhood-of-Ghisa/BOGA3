@@ -7,9 +7,8 @@ import {
   type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
 
-import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import { subscribeToExerciseCatalogInvalidation } from './invalidation';
-import { muscleReportOfGroups, NO_MUSCLE_REPORT } from './reported-muscles';
+import { buildMuscleSetup, EMPTY_MUSCLE_SETUP, type MuscleSetup } from './muscle-setup';
 import {
   buildExerciseCatalogSearchText,
   indexExerciseCatalogMuscleGroupsById,
@@ -21,10 +20,11 @@ export type ExerciseCatalogCacheStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type ExerciseCatalogCacheSnapshot = {
   status: ExerciseCatalogCacheStatus;
   exercises: IndexedExerciseCatalogExercise[];
+  /** Anatomy entries: what mappings, sharing and saves use. */
   muscleGroups: ExerciseCatalogMuscleGroup[];
   muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>;
-  /** The muscles the user sees: anatomy entries merged or hidden by their setup ([[muscle.report-groups]]); unset reads as Detailed. */
-  muscleReport?: MuscleReportAssignment;
+  /** The muscles the user sees; `exercises[].searchText` matches on these. */
+  muscleSetup: MuscleSetup;
   lastError: string | null;
 };
 
@@ -35,7 +35,7 @@ const EMPTY_SNAPSHOT: ExerciseCatalogCacheSnapshot = {
   exercises: [],
   muscleGroups: [],
   muscleGroupsById: {},
-  muscleReport: NO_MUSCLE_REPORT,
+  muscleSetup: EMPTY_MUSCLE_SETUP,
   lastError: null,
 };
 
@@ -59,11 +59,11 @@ const setSnapshot = (next: ExerciseCatalogCacheSnapshot) => {
 
 const buildIndexedExercises = (
   exercises: ExerciseCatalogExercise[],
-  muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>
+  muscleSetup: MuscleSetup
 ): IndexedExerciseCatalogExercise[] =>
   exercises.map((exercise) => ({
     ...exercise,
-    searchText: buildExerciseCatalogSearchText(exercise, muscleGroupsById),
+    searchText: buildExerciseCatalogSearchText(exercise, muscleSetup.musclesById, muscleSetup.assignment),
   }));
 
 const reload = async (): Promise<void> => {
@@ -79,12 +79,13 @@ const reload = async (): Promise<void> => {
       listExerciseCatalogMuscleGroups(),
     ]);
     const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(loadedMuscleGroups);
+    const muscleSetup = buildMuscleSetup(loadedMuscleGroups);
     setSnapshot({
       status: 'ready',
-      exercises: buildIndexedExercises(loadedExercises, muscleGroupsById),
+      exercises: buildIndexedExercises(loadedExercises, muscleSetup),
       muscleGroups: loadedMuscleGroups,
       muscleGroupsById,
-      muscleReport: muscleReportOfGroups(loadedMuscleGroups),
+      muscleSetup,
       lastError: null,
     });
   } catch (error) {

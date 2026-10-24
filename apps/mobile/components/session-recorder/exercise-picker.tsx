@@ -128,12 +128,13 @@ export function ExercisePicker({
       buildExerciseListModel({
         exercises: exerciseOptions,
         muscleGroups: exerciseCatalog.muscleGroups,
+        muscleSetup: exerciseCatalog.muscleSetup,
         stats: exerciseCatalogStats,
         preferences: listPreferences,
         query: searchValue,
         includeDeleted: false,
       }),
-    [exerciseOptions, exerciseCatalog.muscleGroups, exerciseCatalogStats, listPreferences, searchValue]
+    [exerciseOptions, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalogStats, listPreferences, searchValue]
   );
   const familyExpansion = useFamilyExpansion(listModel.isSearching);
   // "From your groups" (E0.1): only with search text or the Groups toggle on.

@@ -6,7 +6,10 @@ import {
   formatExerciseMuscleSummary,
   type ExerciseListPreferences,
 } from '@/src/exercise-catalog/list-model';
+import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import type { IndexedExerciseCatalogExercise } from '@/src/exercise-catalog/search';
+
+import { broadMuscleRows } from './helpers/muscle-setup';
 
 const NOW = new Date(2026, 8, 25, 12);
 const DAY_MS = 86_400_000;
@@ -22,7 +25,8 @@ const rawHistory = (): ExerciseCatalogStatsRawHistory => ({
     sessionExerciseId, weightValue: '20', repsValue: '10', setType: 'rir_2',
   })),
 });
-const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10 }];
+const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10, reportGroup: null, tracked: 1 }];
+const muscleSetup = buildMuscleSetup(muscleGroups);
 const exercises: IndexedExerciseCatalogExercise[] = [
   { id: 'bench', name: 'Bench Press', bodyweightContribution: 0, splitByGym: false, deletedAt: null, mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'bench press chest' },
   { id: 'old', name: 'Ancient Press', bodyweightContribution: 0, splitByGym: false, deletedAt: null, mappings: [{ id: 'm2', muscleGroupId: 'chest', weight: 1, role: 'secondary' }], searchText: 'ancient press' },
@@ -31,7 +35,7 @@ const exercises: IndexedExerciseCatalogExercise[] = [
   { id: 'deleted', name: 'Deleted Fly', bodyweightContribution: 0, splitByGym: false, deletedAt: NOW, mappings: [], searchText: 'deleted fly' },
 ];
 const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = '') => buildExerciseListModel({
-  exercises, muscleGroups,
+  exercises, muscleGroups, muscleSetup,
   stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) }),
   preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, ...preferences },
   query, includeDeleted: false,
@@ -39,10 +43,10 @@ const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = 
 
 describe('exercise browser model', () => {
   it('shows every muscle by role, primaries first and duplicates at their strongest role', () => {
-    const groups = new Map([
-      ...muscleGroups.map((group) => [group.id, group] as const),
-      ['triceps', { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 20 }],
-      ['delts', { id: 'delts', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 30 }],
+    const groups = buildMuscleSetup([
+      ...muscleGroups,
+      { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 20, reportGroup: null, tracked: 1 },
+      { id: 'delts', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 30, reportGroup: null, tracked: 1 },
     ]);
     const exercise: IndexedExerciseCatalogExercise = { ...exercises[0], mappings: [
       { id: 's1', muscleGroupId: 'delts', role: 'secondary', weight: 0.5 },
@@ -56,11 +60,25 @@ describe('exercise browser model', () => {
   });
 
   it('omits absent role lines and keeps unmapped or unknown muscles readable', () => {
-    const groups = new Map(muscleGroups.map((group) => [group.id, group]));
-    expect(formatExerciseMuscleSummary(exercises[0], groups)).toBe('Primary: Chest');
-    expect(formatExerciseMuscleSummary(exercises[1], groups)).toBe('Secondary: Chest');
-    expect(formatExerciseMuscleSummary(exercises[3], groups)).toBe('No muscle links');
-    expect(formatExerciseMuscleSummary(exercises[0], new Map())).toBe('Primary: chest');
+    expect(formatExerciseMuscleSummary(exercises[0], muscleSetup)).toBe('Primary: Chest');
+    expect(formatExerciseMuscleSummary(exercises[1], muscleSetup)).toBe('Secondary: Chest');
+    expect(formatExerciseMuscleSummary(exercises[3], muscleSetup)).toBe('No muscle links');
+    expect(formatExerciseMuscleSummary(exercises[0], buildMuscleSetup([]))).toBe('Primary: chest');
+  });
+
+  it("names the user's muscles: a merged muscle once at its strongest role, untracked ones left out", () => {
+    const broad = buildMuscleSetup(broadMuscleRows());
+    const mapped = (mappings: IndexedExerciseCatalogExercise['mappings']) => ({ ...exercises[0], mappings });
+    expect(formatExerciseMuscleSummary(mapped([
+      { id: 'q', muscleGroupId: 'quads', role: 'primary', weight: 1 },
+      { id: 'a', muscleGroupId: 'adductors', role: 'secondary', weight: 0.5 },
+      { id: 'g', muscleGroupId: 'glutes_max', role: 'secondary', weight: 0.5 },
+      { id: 'h', muscleGroupId: 'hamstrings', role: 'secondary', weight: 0.5 },
+      { id: 's', muscleGroupId: 'spinal_erectors', role: 'secondary', weight: 0.5 },
+    ]), broad)).toBe('Primary: Quads\nSecondary: Glutes & Hams');
+    expect(formatExerciseMuscleSummary(mapped([
+      { id: 'f', muscleGroupId: 'forearms_grip', role: 'primary', weight: 1 },
+    ]), broad)).toBe('No muscle links');
   });
 
   it('always keeps taxonomy order and the existing fallback mapping, with Other last', () => {
@@ -80,7 +98,7 @@ describe('exercise browser model', () => {
       exerciseDefinitionId: id, score: 1, completedSetCount: 2,
       lastCompletedAt: daysBefore(id === 'old' ? 10 : 2),
     });
-    const model = buildExerciseListModel({ exercises, muscleGroups, stats, preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: false });
+    const model = buildExerciseListModel({ exercises, muscleGroups, muscleSetup, stats, preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: false });
     expect(model.sections[0].exercises.map((item) => item.id)).toEqual(['bench', 'never', 'old']);
   });
 
@@ -103,7 +121,7 @@ describe('exercise browser model', () => {
   });
 
   it('includes deleted rows only for the management view', () => {
-    const model = buildExerciseListModel({ exercises, muscleGroups, stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) }), preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: true });
+    const model = buildExerciseListModel({ exercises, muscleGroups, muscleSetup, stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW, { historyStart: new Date(2025, 8, 22) }), preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: true });
     expect(model.items.some((item) => item.id === 'deleted')).toBe(true);
   });
 });
