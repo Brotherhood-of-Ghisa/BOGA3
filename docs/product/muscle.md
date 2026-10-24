@@ -69,8 +69,8 @@ primary muscle's Volume still includes its secondary work at ½
 Why: a secondary mapping is real work but not the muscle the lift is for, so
 comparing it against sessions that targeted it misleads.
 Code: `deriveSessionMuscleVolumeComparisons` in
-`apps/mobile/src/session-insights/calculations.ts`.
-Pending: compares entries.
+`apps/mobile/src/session-insights/calculations.ts`, over
+`reportSessionMuscles` in `apps/mobile/src/session-insights/catalog-muscles.ts`.
 
 
 ### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout

@@ -4,6 +4,7 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   deriveSessionExerciseVolumeComparisons,
   deriveSessionMuscleVolumeComparisons,
+  sessionMuscleCatalogOfExercises,
   type ExerciseVolumeComparison,
 } from '@/src/session-insights';
 import { toSessionInsightExercises } from '@/src/session-recorder/session-model';
@@ -39,24 +40,13 @@ export function useSessionLiveInsights(sessionId: string | null, state: SessionV
         exerciseCatalog.status === 'ready'
           ? deriveSessionMuscleVolumeComparisons({
               ...base,
-              exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
-                id: exercise.id,
-                loadInputMode: exercise.loadInputMode ?? 'total_load',
-                bodyweightContribution: exercise.bodyweightContribution,
-              })),
-              muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
-                exercise.mappings.map((mapping) => ({
-                  exerciseDefinitionId: exercise.id,
-                  muscleGroupId: mapping.muscleGroupId,
-                  role: mapping.role,
-                  weight: mapping.weight,
-                }))
+              ...sessionMuscleCatalogOfExercises(
+                exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup.assignment,
               ),
-              muscleGroups: exerciseCatalog.muscleGroups,
             })
           : [],
     };
-  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, sessionId, state]);
+  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status, sessionId, state]);
 
   const muscleCatalogState = exerciseCatalog.status === 'idle' ? 'loading' : exerciseCatalog.status;
   return { insights, muscleCatalogState };

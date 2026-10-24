@@ -6,6 +6,7 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-o
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
+import { buildMuscleReportAssignment } from "@/src/data/muscle-report-presets";
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from "@/src/data/exercise-session-facts";
 import {
   exerciseDefinitions,
@@ -19,6 +20,7 @@ import {
 import type { RecordBaseline } from "@/src/exercise-calculations/records";
 import { normalizeSessionSetPerformanceStatus } from "@/src/exercise-calculations/set-semantics";
 
+import { reportSessionMuscles } from "./catalog-muscles";
 import {
   deriveCompletedSessionInsights,
   type CompletedSessionInsights,
@@ -78,6 +80,9 @@ export type SessionInsightsStore = {
       displayName: string;
       familyName: string;
       sortOrder: number;
+      /** The user's muscle setup ([[muscle.report-groups]]); absent reads as Detailed. */
+      reportGroup?: string | null;
+      tracked?: number | boolean;
     }[];
   }>;
 };
@@ -131,6 +136,8 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
           displayName: muscleGroups.displayName,
           familyName: muscleGroups.familyName,
           sortOrder: muscleGroups.sortOrder,
+          reportGroup: muscleGroups.reportGroup,
+          tracked: muscleGroups.tracked,
         })
         .from(muscleGroups)
         .all(),
@@ -331,6 +338,14 @@ export const createCompletedSessionInsightsRepository = (
         exercise.exerciseDefinitionId === null ? [] : [exercise.exerciseDefinitionId]))],
     });
 
+    // The comparison reports the user's muscles, not anatomy entries.
+    const reported = catalog && reportSessionMuscles(
+      { muscleMappings: catalog.mappings, muscleGroups: catalog.groups },
+      buildMuscleReportAssignment(catalog.groups.map((group) => ({
+        ...group, reportGroup: group.reportGroup ?? null, tracked: group.tracked ?? 1,
+      }))),
+    );
+
     return deriveCompletedSessionInsights({
       recordBaselineByDefinitionId,
       targetSession: targetGraph,
@@ -338,8 +353,8 @@ export const createCompletedSessionInsightsRepository = (
         (session) => session.sessionId !== target.sessionId,
       ),
       exerciseDefinitions: catalog?.definitions,
-      muscleMappings: catalog?.mappings,
-      muscleGroups: catalog?.groups,
+      muscleMappings: reported?.muscleMappings,
+      muscleGroups: reported?.muscleGroups,
     });
   },
 });
