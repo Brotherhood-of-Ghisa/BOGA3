@@ -113,10 +113,10 @@ Two traps:
 
 ## Choosing lanes
 
-Lane choice is **judgement, agreed with the operator** — paths give a default,
-not a requirement, because a path match says little about risk (a restyle of a
-screen matches the same rows as a rewrite of its logic) and the simulator and
-Docker lanes are the expensive part of the ladder.
+Lane choice is **judgement, agreed with your reviewer agent** — paths give a
+default, not a requirement, because a path match says little about risk (a
+restyle of a screen matches the same rows as a rewrite of its logic) and the
+simulator and Docker lanes are the expensive part of the ladder.
 
 1. **Jest is always required**, and is the one gate that is never negotiable:
    every code change adds or updates the Jest coverage for the behaviour it
@@ -125,9 +125,8 @@ Docker lanes are the expensive part of the ladder.
    your diff and the rule that selected each, out of the path-trigger registry
    `scripts/triggers.tsv` (`AGENTS.md` carries the short human summary).
 3. **Propose, then agree.** Before running any lane beyond `./boga test fast`,
-   propose a lane set to the operator: the default, lowered or raised by
-   judgement, one line of reason per change. Lowering uses one of these
-   categories:
+   propose a lane set to your reviewer agent: the default, lowered or raised by
+   judgement, one line of reason per change. Lowering uses these categories:
    - `cosmetic` — colours, fonts, spacing, icons, styling that do not change what
      renders, when it renders, or where an interactive element sits. Not
      cosmetic: conditional rendering, `testID`s, layout that can push a control
@@ -141,16 +140,18 @@ Docker lanes are the expensive part of the ladder.
      `06`, "Maestro scope policy") and the Jest tests in the diff prove it.
 
    Raise the default when the change carries risk its paths do not show (a
-   shared hook, a boot-time effect, a native call). The operator's answer is
-   final; the dev-client rebuild below is not a lane choice and is never lowered.
+   shared hook, a boot-time effect, a native call). The operator, when present,
+   may override; the dev-client rebuild below is not a lane choice and is never
+   lowered.
 4. **Run the smallest Maestro set** for your platform (iOS on macOS, Android on
    Linux; required only on their relevant platform) — lanes whose flows exercise
    the change. Some areas have no Maestro lane at all (bodyweight: Jest over
-   real data plus `ios-sync-e2e` covers it); adding a flow needs the operator's
-   approval first (spec `06`, "Maestro scope policy").
+   real data plus `ios-sync-e2e` covers it); adding a flow needs a written
+   justification first (spec `06`, "Maestro scope policy").
 5. **Run the agreed lanes to green before opening the PR**, and record each one
    there with its result, its evidence (command output or Maestro artifact path)
-   and that the set was agreed. No checker validates this; reviewers read it.
+   and the reviewer agent's agreement. No checker validates this; reviewers
+   read it.
 
 **Why the UI default is `frontend-ui`, not `frontend`:** the three
 Supabase-backed e2e lanes (`ios-auth-profile`, `ios-sync-e2e`, `ios-groups-e2e`)
