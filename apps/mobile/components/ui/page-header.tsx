@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
@@ -15,6 +16,35 @@ export function PageHeader({ title }: PageHeaderProps) {
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.pageTitle}>
         {title}
       </Text>
+    </View>
+  );
+}
+
+type TitleBarProps = {
+  title: string;
+  // Before the title: the screen's way back (`MoreHubBackButton`), if any.
+  back?: ReactNode;
+  // After the title, at the right edge: the screen's header actions (⋮).
+  actions?: ReactNode;
+  testID?: string;
+};
+
+// A tab-group screen's top bar, drawn as the native stack header is: one line
+// of back arrow, Archivo 700 `ink` title at `xl`, and actions on the right.
+// For a screen that keeps the tab bar, so cannot take a native header.
+export function TitleBar({ title, back, actions, testID }: TitleBarProps) {
+  return (
+    <View style={styles.bar} testID={testID}>
+      {back}
+      <Text
+        allowFontScaling={false}
+        accessibilityRole="header"
+        ellipsizeMode="tail"
+        numberOfLines={1}
+        style={styles.barTitle}>
+        {title}
+      </Text>
+      {actions ? <View style={styles.barActions}>{actions}</View> : null}
     </View>
   );
 }
@@ -57,6 +87,24 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.xxl,
     lineHeight: uiTypography.lineHeight.xxl,
     color: uiRoles.ink,
+  },
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  barTitle: {
+    flex: 1,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
+  barActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: -uiSpace.xs,
   },
   section: {
     flexDirection: 'row',

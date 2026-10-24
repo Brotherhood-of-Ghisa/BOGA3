@@ -141,8 +141,9 @@ layer 0 and pulls readings in layer 4.
 
 ## 6. Personal UI and consumers
 
-Settings presents `Bodyweight calculations` with an On/Off control and a separate,
-always-visible `Body weight log` row that opens dated kg history. Disabling the
+Settings' always-visible Bodyweight card (status: On/Off and the current
+reading) opens the body weight page: the `Bodyweight calculations` On/Off
+control above dated kg history. Disabling the
 toggle hides the exercise-editor contribution field but never hides reading
 management or deletes anything. The personal exercise editor shows only
 `Bodyweight contribution (%)` while enabled, with no hint under it

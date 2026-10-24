@@ -3,11 +3,15 @@
 const mockPush = jest.fn();
 const mockOpenURL = jest.fn();
 const mockUseAuth = jest.fn();
-const mockIsDevMode = jest.fn();
+const mockListConnectedAgents = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
+jest.mock('expo-router', () => {
+  const { useEffect } = jest.requireActual<typeof import('react')>('react');
+  return {
+    useRouter: () => ({ push: mockPush }),
+    useFocusEffect: (effect: () => void | (() => void)) => useEffect(effect, [effect]),
+  };
+});
 
 jest.mock('expo-linking', () => ({
   openURL: (...args: unknown[]) => mockOpenURL(...args),
@@ -17,8 +21,8 @@ jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-jest.mock('@/src/utils/isDevMode', () => ({
-  isDevMode: () => mockIsDevMode(),
+jest.mock('@/src/auth/connected-agents', () => ({
+  listConnectedAgents: () => mockListConnectedAgents(),
 }));
 
 jest.mock('@/src/utils/agent-connect', () => ({
@@ -29,94 +33,116 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import MoreScreen from '../app/(tabs)/more';
 
+const agent = (name: string) => ({ clientId: name, grantedAt: '', lastAccessAt: null, name, planAccessEnabled: false, scopes: [] });
+
 describe('More screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockOpenURL.mockReset().mockResolvedValue(undefined);
     mockUseAuth.mockReset().mockReturnValue({ user: { id: 'user-1' } });
-    mockIsDevMode.mockReset().mockReturnValue(false);
+    mockListConnectedAgents.mockReset().mockResolvedValue([]);
   });
 
-  it('organizes every production destination under the approved sections', () => {
+  it('shows two untitled cards in order, with no page title', async () => {
     render(<MoreScreen />);
 
-    expect(screen.getByTestId('more-section-community')).toBeTruthy();
-    expect(screen.getByTestId('more-section-tools')).toBeTruthy();
-    expect(screen.getByTestId('more-section-library-account')).toBeTruthy();
-    expect(screen.getByTestId('more-groups-row')).toBeTruthy();
-    expect(screen.getByTestId('more-connect-agent-row')).toBeTruthy();
-    expect(screen.getByTestId('more-connected-agents-row')).toBeTruthy();
-    expect(screen.getByTestId('more-gyms-row')).toBeTruthy();
-    expect(screen.getByTestId('more-exercise-database-row')).toBeTruthy();
-    expect(screen.getByTestId('more-settings-row')).toBeTruthy();
-    expect(screen.queryByTestId('more-developer-logs-row')).toBeNull();
+    const rowsOf = (testID: string) =>
+      screen
+        .getByTestId(testID)
+        .findAll((node) => typeof node.props.testID === 'string' && node.props.testID.endsWith('-row'), { deep: true })
+        .map((node) => node.props.testID)
+        .filter((id, index, ids) => ids.indexOf(id) === index);
+    expect(rowsOf('more-group-1')).toEqual(['more-groups-row', 'more-exercises-row', 'more-gyms-row']);
+    expect(rowsOf('more-group-2')).toEqual(['more-connect-ai-row', 'more-settings-row']);
+    expect(screen.queryByText('More')).toBeNull();
+    expect(screen.queryByRole('header')).toBeNull();
+    await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
   });
 
   it.each([
     ['more-groups-row', '/groups'],
-    ['more-connected-agents-row', '/connected-agents'],
     ['more-gyms-row', '/gyms?source=more'],
-    ['more-exercise-database-row', '/exercise-catalog?source=more'],
+    ['more-exercises-row', '/exercise-catalog?source=more'],
     ['more-settings-row', '/settings?source=more'],
-  ])('opens %s at its existing route', (testID, route) => {
+  ])('opens %s at its route', async (testID, route) => {
     render(<MoreScreen />);
+    await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
 
     fireEvent.press(screen.getByTestId(testID));
 
     expect(mockPush).toHaveBeenCalledWith(route);
   });
 
-  it('opens MCP setup externally and keeps external semantics accessible', async () => {
+  it('names Exercises and Settings by their labels alone', async () => {
+    render(<MoreScreen />);
+    await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
+
+    expect(screen.getByTestId('more-exercises-row').props.accessibilityLabel).toBe('Exercises');
+    expect(screen.getByTestId('more-settings-row').props.accessibilityLabel).toBe('Settings');
+  });
+
+  it('shows the connected agent and opens the agents screen', async () => {
+    mockListConnectedAgents.mockResolvedValue([agent('Claude')]);
     render(<MoreScreen />);
 
-    const row = screen.getByTestId('more-connect-agent-row');
-    expect(row.props.accessibilityRole).toBe('link');
-    expect(row.props.accessibilityLabel).toBe('Connect an AI coach');
-    expect(row.props.accessibilityHint).toContain('system browser');
+    expect(await screen.findByText('Claude')).toBeTruthy();
+    const row = screen.getByTestId('more-connect-ai-row');
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityLabel).toBe('Connect an AI, Claude');
     fireEvent.press(row);
 
-    await waitFor(() => {
-      expect(mockOpenURL).toHaveBeenCalledWith('https://example.test/connect');
-    });
+    expect(mockPush).toHaveBeenCalledWith('/connected-agents');
+    expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
-  it('names each destination by its label alone, with no description line', () => {
+  it('names every connected agent', async () => {
+    mockListConnectedAgents.mockResolvedValue([agent('Claude'), agent('ChatGPT')]);
     render(<MoreScreen />);
 
-    expect(screen.getByTestId('more-exercise-database-row').props.accessibilityLabel).toBe(
-      'Exercise database',
-    );
-    expect(screen.queryByText('Search, create, edit, archive, and restore exercises.')).toBeNull();
-    expect(screen.queryByText(/stay close without crowding/)).toBeNull();
+    expect(await screen.findByText('Claude, ChatGPT')).toBeTruthy();
   });
 
-  it('shows an inline error when the MCP setup page cannot open', async () => {
-    mockOpenURL.mockRejectedValue(new Error('browser unavailable'));
+  it('opens the setup instructions externally when no agent is connected', async () => {
     render(<MoreScreen />);
+    await waitFor(() => expect(screen.getByTestId('more-connect-ai-row').props.accessibilityRole).toBe('link'));
 
-    fireEvent.press(screen.getByTestId('more-connect-agent-row'));
+    fireEvent.press(screen.getByTestId('more-connect-ai-row'));
 
-    expect(await screen.findByTestId('more-connect-agent-error')).toHaveTextContent(
-      'Couldn’t open the setup page. Try again.',
-    );
-    expect(screen.getByTestId('more-settings-row')).toBeTruthy();
+    await waitFor(() => expect(mockOpenURL).toHaveBeenCalledWith('https://example.test/connect'));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('hides account-bound agents when there is no authenticated user', () => {
+  it('opens the setup instructions when signed out, without reading agents', async () => {
     mockUseAuth.mockReturnValue({ user: null });
     render(<MoreScreen />);
 
-    expect(screen.queryByTestId('more-connected-agents-row')).toBeNull();
-    expect(screen.getByTestId('more-groups-row')).toBeTruthy();
-    expect(screen.getByTestId('more-settings-row')).toBeTruthy();
+    const row = screen.getByTestId('more-connect-ai-row');
+    expect(row.props.accessibilityRole).toBe('link');
+    fireEvent.press(row);
+
+    await waitFor(() => expect(mockOpenURL).toHaveBeenCalledWith('https://example.test/connect'));
+    expect(mockListConnectedAgents).not.toHaveBeenCalled();
   });
 
-  it('exposes developer logs only through the shared development-mode gate', () => {
-    mockIsDevMode.mockReturnValue(true);
+  it('opens the agents screen when the agent list cannot be read', async () => {
+    mockListConnectedAgents.mockRejectedValue(new Error('offline'));
+    render(<MoreScreen />);
+    await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByTestId('more-connect-ai-row'));
+
+    expect(mockPush).toHaveBeenCalledWith('/connected-agents');
+  });
+
+  it('shows an inline error when the setup page cannot open', async () => {
+    mockOpenURL.mockRejectedValue(new Error('browser unavailable'));
+    mockUseAuth.mockReturnValue({ user: null });
     render(<MoreScreen />);
 
-    fireEvent.press(screen.getByTestId('more-developer-logs-row'));
+    fireEvent.press(screen.getByTestId('more-connect-ai-row'));
 
-    expect(mockPush).toHaveBeenCalledWith('/dev-logs');
+    expect(await screen.findByTestId('more-connect-ai-error')).toHaveTextContent(
+      'Couldn’t open the setup page. Try again.',
+    );
   });
 });

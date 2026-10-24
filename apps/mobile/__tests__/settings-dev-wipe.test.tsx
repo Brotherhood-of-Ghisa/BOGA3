@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * The developer-only data affordances on the Settings screen, over real data:
+ * The developer-only data affordances on Settings → Developer tools, over real data:
  * the dev-mode visibility gate, the log viewer link, the catalog reset ("Reset
  * local data"), the local wipe, and the two-step "wipe remote then wipe local" flow that keeps
  * the just-deleted server rows from being re-pushed by the next sync cycle.
@@ -9,8 +9,7 @@
  * The local database is the migrated in-memory SQLite fixture
  * (helpers/local-data.ts), seeded with the `session-view` Maestro fixture, so
  * every wipe and reseed is read back from it. Replaced: the dev-mode flag, the
- * auth hook, the router, the sync-status panel (its own spec), and the remote
- * wipe RPC (the server). A failed reset and a failed remote wipe are forced
+ * auth hook, the router, and the remote wipe RPC (the server). A failed reset and a failed remote wipe are forced
  * once with `jest.spyOn`.
  */
 
@@ -18,9 +17,6 @@ const mockPush = jest.fn();
 const mockIsDevMode = jest.fn();
 const mockUseAuth = jest.fn();
 const mockAlert = jest.fn();
-
-// Reading entry/navigation is covered by bodyweight-screen.test.tsx.
-jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -30,10 +26,6 @@ jest.mock('@/src/data/bootstrap', () =>
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
-  // The sync-status panel uses focus to refresh; in tests run the effect once.
-  useFocusEffect: (callback: () => void | (() => void)) => {
-    callback();
-  },
 }));
 
 jest.mock('@/src/utils/isDevMode', () => ({
@@ -44,13 +36,6 @@ jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// The sync-status panel is exercised by its own spec; here it would pull the
-// real scheduler/sync-status modules into the dev-wipe render. Stub it to a
-// marker so this suite stays focused on the dev affordances.
-jest.mock('@/components/sync-status/sync-status-panel', () => ({
-  SyncStatusPanel: () => null,
-}));
-
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
@@ -58,7 +43,7 @@ import {
   getExerciseListPreferencesSnapshot,
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
-import SettingsRoute from '../app/(tabs)/settings';
+import DeveloperToolsRoute from '../app/settings-developer-tools';
 import * as devReset from '@/src/data/dev-reset';
 import * as devAffordances from '@/src/sync/dev-affordances';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
@@ -79,8 +64,8 @@ const openSettings = async () => {
     .prepare("INSERT INTO exercise_definitions (id, name) VALUES ('custom-press', 'Custom Press')")
     .run();
   await bootLocalApp();
-  render(<SettingsRoute />);
-  // The preferences card reads SecureStore after mount; let it land inside act.
+  render(<DeveloperToolsRoute />);
+  // Let any post-mount reads land inside act.
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
@@ -91,7 +76,7 @@ describe('settings developer data affordances', () => {
     resetLocalData();
     mockPush.mockReset();
     mockIsDevMode.mockReset().mockReturnValue(true);
-    // Signed-in user so the screen renders without crashing on `user`.
+    // A signed-in user, as the remote wipe needs.
     mockUseAuth.mockReset().mockReturnValue({ user: { id: 'user-1', email: 'u@test' } });
     mockAlert.mockReset();
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
@@ -102,15 +87,27 @@ describe('settings developer data affordances', () => {
     closeLocalData();
   });
 
-  it('renders no developer tools when not in dev mode', async () => {
+  it('renders only the Developer mode switch when not in dev mode', async () => {
     mockIsDevMode.mockReturnValue(false);
 
     await openSettings();
 
+    expect(screen.getByTestId('settings-developer-tools-screen')).toBeTruthy();
+    expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
     expect(screen.queryByTestId('settings-dev-tools-card')).toBeNull();
     expect(screen.queryByTestId('settings-dev-reset-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
+  });
+
+  it('switches Developer mode on the page in every build', async () => {
+    mockIsDevMode.mockReturnValue(false);
+    await openSettings();
+
+    expect(screen.getByTestId('settings-developer-mode-switch').props.value).toBe(false);
+    fireEvent(screen.getByTestId('settings-developer-mode-switch'), 'valueChange', true);
+
+    await waitFor(() => expect(screen.getByTestId('settings-developer-mode-switch').props.value).toBe(true));
   });
 
   it('opens the in-app log viewer from Developer tools', async () => {

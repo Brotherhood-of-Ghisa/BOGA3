@@ -23,7 +23,7 @@ export {
   type ListRowTone,
 } from '@/components/ui/list-row';
 export { Notice, type NoticeProps, type NoticeTone } from '@/components/ui/notice';
-export { PageHeader, SectionHeader } from '@/components/ui/page-header';
+export { PageHeader, SectionHeader, TitleBar } from '@/components/ui/page-header';
 export {
   PageSheet,
   PageSheetHeader,

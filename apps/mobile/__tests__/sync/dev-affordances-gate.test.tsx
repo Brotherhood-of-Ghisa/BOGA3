@@ -4,18 +4,21 @@
  * Outcome: the developer-only wipe affordances are gated on the cross-build dev
  * signal, not the bare metro-only `__DEV__` global.
  *
- * Two buttons (wipe-local, wipe-remote-for-me) live on the Settings screen
- * behind a dev gate. They must be hidden in a release build and shown in a dev
+ * Two buttons (wipe-local, wipe-remote-for-me) live on Settings → Developer
+ * tools, behind a dev gate on both the Settings card that opens the page and
+ * the page itself. They must be hidden in a release build and shown in a dev
  * build — and the gate must use the helper that stays true in the internally
  * distributed developer build (where `__DEV__` is false), so a bare `__DEV__`
  * guard would wrongly hide the tools on the very build that needs them.
  *
  * This file asserts:
  *
- *   1. With the dev signal false, the Settings screen renders neither wipe
- *      button (nor the dev-tools card).
- *   2. With the dev signal true, it renders both buttons.
- *   3. The Settings screen source and the wipe-helper source contain no bare
+ *   1. With the dev signal false, the Developer tools page (reached in every
+ *      build, for its Developer mode switch) renders neither wipe button (nor
+ *      the dev-tools card).
+ *   2. With the dev signal true, Settings shows the card and the page renders
+ *      both buttons.
+ *   3. The Settings screen, Developer tools page and wipe-helper sources contain no bare
  *      `__DEV__` token used as a runtime guard (only the helper's own
  *      explanatory comments may mention it).
  */
@@ -31,6 +34,8 @@ const mockUseAuth = jest.fn();
 jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
 
 jest.mock('expo-router', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
 }));
@@ -61,10 +66,11 @@ jest.mock('@/src/sync/dev-affordances', () => ({
 
 import { render, screen } from '@testing-library/react-native';
 
-import SettingsRoute from '../../app/(tabs)/settings';
+import DeveloperToolsRoute from '../../app/settings-developer-tools';
 
 const MOBILE_ROOT = join(__dirname, '..', '..');
 const SETTINGS_PATH = join(MOBILE_ROOT, 'app', '(tabs)', 'settings.tsx');
+const DEVELOPER_TOOLS_PATH = join(MOBILE_ROOT, 'components', 'settings', 'developer-tools.tsx');
 const DEV_AFFORDANCES_PATH = join(MOBILE_ROOT, 'src', 'sync', 'dev-affordances.ts');
 
 beforeEach(() => {
@@ -78,8 +84,8 @@ describe('the dev gate on the wipe affordances', () => {
   it('renders neither wipe button when the dev signal is false', () => {
     mockIsDevMode.mockReturnValue(false);
 
-    render(<SettingsRoute />);
-
+    render(<DeveloperToolsRoute />);
+    expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
     expect(screen.queryByTestId('settings-dev-tools-card')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
@@ -88,8 +94,8 @@ describe('the dev gate on the wipe affordances', () => {
   it('renders both wipe buttons when the dev signal is true', () => {
     mockIsDevMode.mockReturnValue(true);
 
-    render(<SettingsRoute />);
-
+    render(<DeveloperToolsRoute />);
+    expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
     expect(screen.getByTestId('settings-dev-wipe-local-button')).toBeTruthy();
     expect(screen.getByTestId('settings-dev-wipe-remote-button')).toBeTruthy();
   });
@@ -103,6 +109,7 @@ describe('the affordances are not gated on the bare metro-only global', () => {
 
   const targets: [string, string][] = [
     ['Settings screen', SETTINGS_PATH],
+    ['Developer tools page', DEVELOPER_TOOLS_PATH],
     ['wipe helper', DEV_AFFORDANCES_PATH],
   ];
 
@@ -111,8 +118,7 @@ describe('the affordances are not gated on the bare metro-only global', () => {
     expect(code.includes('__DEV__')).toBe(false);
   });
 
-  it('the Settings screen gates on the dev-mode helper', () => {
-    const source = readFileSync(SETTINGS_PATH, 'utf8');
-    expect(source).toContain('isDevMode');
+  it('the Developer tools page gates on the dev-mode helper', () => {
+    expect(readFileSync(DEVELOPER_TOOLS_PATH, 'utf8')).toContain('isDevMode');
   });
 });

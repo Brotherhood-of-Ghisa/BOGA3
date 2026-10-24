@@ -10,6 +10,16 @@ export const EXERCISE_LINK_ROUTE = '/exercise-link';
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
+/** Settings' sub pages, one per Settings card; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
+export const SETTINGS_SUB_PAGES = {
+  restTimer: '/settings-rest-timer',
+  progress: '/settings-progress',
+  effort: '/settings-effort',
+  other: '/settings-other',
+  dataSync: '/settings-data-sync',
+  developerTools: '/settings-developer-tools',
+} as const;
+
 /** The Link screen for one of my exercises (E0.3). */
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;

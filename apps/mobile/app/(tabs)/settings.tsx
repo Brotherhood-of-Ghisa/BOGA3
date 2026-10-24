@@ -1,51 +1,105 @@
 import { useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
-import { useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
-import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
-import { ProgressSettings } from '@/components/preferences/progress-settings';
-import { RestTimerSettings } from '@/components/preferences/rest-timer-settings';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
+import { SettingsCard } from '@/components/settings/settings-card';
+import { effortStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
+import { useSyncStatusSnapshot } from '@/components/sync-status/use-sync-status';
 import {
-  ActionButton,
   Card,
   Icon,
   ListRow,
-  Notice,
-  PageHeader,
   ScreenScroll,
-  SegmentedControl,
+  TitleBar,
   uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import {
-  resetAndReseedLocalData,
-  wipeLocalAndReBootstrap,
-  wipeRemoteForCurrentUser,
-} from '@/src/sync/dev-affordances';
-import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
-import type { TodayLayout } from '@/src/preferences/model';
-import { getAgentConnectUrl } from '@/src/utils/agent-connect';
-import { isDevMode } from '@/src/utils/isDevMode';
+import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
-type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
-
+// A list of cards, each an icon, a label and what is set now. Every setting
+// lives on a sub page.
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const preferences = useAccountLocalPreferenceState();
-  const { values: listPreferences, error: preferenceError, retry: refreshPreferences } = preferences;
-  const [connectError, setConnectError] = useState<string | null>(null);
+  const values = { ...preferences.values, ...preferences.pending };
+  const syncSnapshot = useSyncStatusSnapshot(Boolean(user));
+
+  return (
+    <ScreenScroll
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      testID="settings-screen">
+      <TitleBar back={<MoreHubBackButton />} title="Settings" />
+
+      <SettingsCard
+        accessibilityHint="Opens your account screen"
+        icon="user"
+        label="Account"
+        onPress={() => router.push('/profile')}
+        status={user ? user.email?.trim() || undefined : 'Signed out'}
+        testID="settings-profile-row"
+      />
+      <Card><AppearanceSettingsRow /></Card>
+      <BodyWeightSettingsRow />
+      <SettingsCard
+        icon="timer"
+        label="Rest timer"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.restTimer)}
+        status={restTimerStatus(values)}
+        testID="settings-rest-timer-row"
+      />
+      <Card><NotificationSettingsRow key={user?.id ?? 'signed-out'} userId={user?.id ?? null} /></Card>
+      <SettingsCard
+        icon="progress"
+        label="Progress"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.progress)}
+        status={progressStatus(values)}
+        testID="settings-progress-row"
+      />
+      <SettingsCard
+        icon="gauge"
+        label="Effort"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.effort)}
+        status={effortStatus(values)}
+        testID="settings-effort-row"
+      />
+      <SettingsCard
+        icon="code"
+        label="Developer tools"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.developerTools)}
+        status={`Developer mode ${values.developerMode ? 'on' : 'off'}`}
+        testID="settings-developer-tools-row"
+      />
+      <SettingsCard
+        icon="refresh"
+        label="Data & sync"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.dataSync)}
+        status={syncStatus(syncSnapshot, { isSignedIn: Boolean(user), preferenceError: preferences.error })}
+        testID="settings-data-sync-row"
+      />
+      <SettingsCard
+        icon="sliders"
+        label="Other"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.other)}
+        status={values.dateFormat}
+        testID="settings-other-row"
+      />
+      <AboutCard />
+    </ScreenScroll>
+  );
+}
+
+// The build's identity, read and never pressed: the list's last card.
+function AboutCard() {
   const runtimeMetadata = readAppRuntimeMetadata();
   const versionBuild = formatVersionBuild(runtimeMetadata);
   const aboutLines = [
@@ -61,466 +115,51 @@ export default function SettingsScreen() {
       : null,
   ].filter((line): line is { testID: string; text: string } => line !== null);
 
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
-
-  const [isWipingLocal, setIsWipingLocal] = useState(false);
-  const [wipeLocalFeedback, setWipeLocalFeedback] = useState<DevFeedback>(null);
-
-  const [isWipingRemote, setIsWipingRemote] = useState(false);
-  const [wipeRemoteFeedback, setWipeRemoteFeedback] = useState<DevFeedback>(null);
-
-  const handleConnectAgent = async () => {
-    setConnectError(null);
-    try {
-      await Linking.openURL(getAgentConnectUrl());
-    } catch {
-      setConnectError('Couldn’t open the setup page. Try again.');
-    }
-  };
-
-  const handleDevReset = async () => {
-    setIsResetting(true);
-    setResetFeedback(null);
-    try {
-      await resetAndReseedLocalData();
-      setResetFeedback({
-        tone: 'success',
-        message: 'Local data wiped and the exercise catalog re-seeded.',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error during dev reset.';
-      setResetFeedback({ tone: 'error', message });
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const confirmDevReset = () => {
-    Alert.alert(
-      'Reset local data?',
-      'Wipes every local table and re-seeds the exercise catalog; the next sync restores the rest from the server. Server data is untouched. Dev builds only.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            void handleDevReset();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleWipeLocal = async () => {
-    setIsWipingLocal(true);
-    setWipeLocalFeedback(null);
-    try {
-      await wipeLocalAndReBootstrap();
-      setWipeLocalFeedback({
-        tone: 'success',
-        message: 'Local database wiped and re-bootstrapped. Sync will re-pull from the server.',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error during local wipe.';
-      setWipeLocalFeedback({ tone: 'error', message });
-    } finally {
-      setIsWipingLocal(false);
-    }
-  };
-
-  // Delete every server row owned by this account, then wipe local so the
-  // just-deleted rows are not re-pushed by the next sync cycle.
-  const handleWipeRemote = async () => {
-    setIsWipingRemote(true);
-    setWipeRemoteFeedback(null);
-    try {
-      const { rowsDeleted } = await wipeRemoteForCurrentUser();
-      await wipeLocalAndReBootstrap();
-      setWipeRemoteFeedback({
-        tone: 'success',
-        message: `Deleted ${rowsDeleted} server ${
-          rowsDeleted === 1 ? 'row' : 'rows'
-        } and wiped local data.`,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error during remote wipe.';
-      setWipeRemoteFeedback({ tone: 'error', message });
-    } finally {
-      setIsWipingRemote(false);
-    }
-  };
-
-  const confirmWipeRemote = () => {
-    Alert.alert(
-      'Wipe remote data?',
-      'This deletes EVERY row on the server owned by your account. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete server data',
-          style: 'destructive',
-          onPress: () => {
-            void handleWipeRemote();
-          },
-        },
-      ]
-    );
-  };
-
   return (
-    <ScreenScroll
-      contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      testID="settings-screen">
-      <MoreHubBackButton />
-      <PageHeader title="Settings" />
-
-      <View style={styles.section} testID="settings-section-account">
-        <SectionLabel title="Account" />
-        <Card>
-          <ListRow
-            accessibilityHint="Opens your account screen"
-            accessibilityLabel="Open Account"
-            density="list"
-            description={user?.email?.trim() || undefined}
-            divider={false}
-            label="Account"
-            leading={<Icon color={uiRoles.inkMuted} name="user" />}
-            onPress={() => router.push('/profile')}
-            testID="settings-profile-row"
-            trailing={<RowChevron />}
-          />
-        </Card>
-      </View>
-
-      <View style={styles.section} testID="settings-section-ai-coaching">
-        <SectionLabel title="AI coaching" />
-        <Card>
-          <ListRow
-            accessibilityHint="Opens setup instructions in your system browser"
-            accessibilityLabel="Connect an AI coach, opens in browser"
-            accessibilityRole="link"
-            density="list"
-            divider={false}
-            label="Connect an AI coach"
-            leading={<Icon color={uiRoles.inkMuted} name="sparkles" />}
-            onPress={() => {
-              void handleConnectAgent();
-            }}
-            testID="settings-connect-agent-row"
-            trailing={<RowChevron external />}
-          />
-          {connectError ? (
-            <Text
-              allowFontScaling={false}
-              accessibilityLiveRegion="polite"
-              style={styles.inlineError}
-              testID="settings-connect-agent-error">
-              {connectError}
-            </Text>
-          ) : null}
-          {user ? (
-            <ListRow
-              accessibilityHint="Opens the list of authorized coaching agents"
-              accessibilityLabel="Open Connected Agents"
-              density="list"
-              label="Connected agents"
-              leading={<Icon color={uiRoles.inkMuted} name="shield-check" />}
-              onPress={() => router.push('/connected-agents')}
-              testID="settings-connected-agents-row"
-              trailing={<RowChevron />}
-            />
-          ) : null}
-        </Card>
-      </View>
-
-      <View style={styles.section} testID="settings-section-preferences">
-        <SectionLabel title="Preferences" />
-        <Card><AppearanceSettingsRow /></Card>
-        <Card><BodyWeightSettingsRow /></Card>
-        <Card style={styles.cardBody} testID="settings-preferences-card">
-          <View style={styles.preference}>
-            <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
-            <SegmentedControl
-              accessibilityLabel="Date format"
-              onChange={(format) => setExerciseListPreferences({ dateFormat: format })}
-              options={DATE_FORMAT_OPTIONS}
-              testIDPrefix="settings-date-format"
-              value={listPreferences.dateFormat}
-            />
-          </View>
-          <View style={styles.preference}>
-            <Text allowFontScaling={false} style={styles.fieldLabel}>Past records gym filter</Text>
-            <SegmentedControl
-              accessibilityLabel="Past records gym filter"
-              onChange={(scope) => setExerciseListPreferences({ pastRecordsGymScope: scope })}
-              options={PAST_RECORDS_GYM_SCOPE_OPTIONS}
-              testIDPrefix="settings-records-gym"
-              value={listPreferences.pastRecordsGymScope}
-            />
-          </View>
-          <TodayLayoutSetting value={listPreferences.todayLayout} />
-          <RestTimerSettings state={preferences} />
-        </Card>
-      </View>
-
-      <View style={styles.section} testID="settings-section-notifications">
-        <SectionLabel title="Notifications" />
-        <Card><NotificationSettingsRow key={user?.id ?? 'signed-out'} userId={user?.id ?? null} /></Card>
-      </View>
-
-      <ProgressSettings key={user ? `account:${user.id}` : 'local'} state={preferences} />
-
-      <View style={styles.section} testID="settings-section-developer-mode">
-        <SectionLabel title="Developer" />
-        <Card>
-          <View style={styles.preference}>
-            <Text allowFontScaling={false} style={styles.fieldLabel}>Developer mode</Text>
-            <Switch
-              accessibilityLabel="Developer mode"
-              onValueChange={(developerMode) => updatePreferences({ developerMode })}
-              testID="settings-developer-mode-switch"
-              value={listPreferences.developerMode}
-            />
-          </View>
-          <Text allowFontScaling={false} style={styles.bodyMuted} testID="settings-developer-mode-description">
-            Shows a GPS diagnostics panel in the session gym picker.
-          </Text>
-        </Card>
-      </View>
-
-      <View style={styles.section} testID="settings-section-data-sync">
-        <SectionLabel title="Data & sync" />
-        <SyncStatusPanel
-          key={user ? `account:${user.id}` : 'local'}
-          isSignedIn={Boolean(user)}
-          onRefreshPreferences={refreshPreferences}
-          preferenceError={preferenceError}
-        />
-      </View>
-
-      <View style={styles.section} testID="settings-section-about">
-        <SectionLabel title="About" />
-        <Card testID="settings-about-card">
+    <Card testID="settings-about-card">
+      <ListRow
+        accessibilityLabel={['About', ...aboutLines.map((line) => line.text)].join(', ')}
+        accessible
+        density="list"
+        divider={false}
+        leading={<Icon color={uiRoles.inkMuted} name="info" />}>
+        <View style={styles.about}>
+          <Text allowFontScaling={false} style={styles.aboutLabel}>About</Text>
           {aboutLines.length > 0 ? (
-            aboutLines.map((line, index) => (
-              <ListRow density="list" divider={index > 0} key={line.testID}>
-                <Text allowFontScaling={false} style={styles.body} testID={line.testID}>
-                  {line.text}
-                </Text>
-              </ListRow>
+            aboutLines.map((line) => (
+              <Text allowFontScaling={false} key={line.testID} style={styles.aboutLine} testID={line.testID}>
+                {line.text}
+              </Text>
             ))
           ) : (
-            <ListRow density="list" divider={false}>
-              <Text allowFontScaling={false} style={styles.bodyMuted}>Release information unavailable</Text>
-            </ListRow>
+            <Text allowFontScaling={false} style={styles.aboutLine}>Release information unavailable</Text>
           )}
-        </Card>
-      </View>
-
-      {isDevMode() ? (
-        <View style={styles.section} testID="settings-section-developer-tools">
-          {/* Dev-only (plan G8): a mechanical restyle. The warning is the glyph, not a hue. */}
-          <Card style={styles.cardBody} testID="settings-dev-tools-card">
-            <View style={styles.devHeader}>
-              <Icon color={uiRoles.inkMuted} name="warning" size="sm" />
-              <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
-                Developer tools
-              </Text>
-            </View>
-
-            <Text allowFontScaling={false} style={styles.bodyMuted}>
-              View the in-app logs captured this session (all levels). Errors and warnings also
-              sync to the backend once signed in.
-            </Text>
-            <ActionButton
-              accessibilityLabel="Open the in-app log viewer"
-              label="View logs"
-              onPress={() => router.push('/dev-logs')}
-              testID="settings-dev-logs-button"
-              variant="outline"
-            />
-
-            <Text allowFontScaling={false} style={styles.bodyMuted}>
-              Wipe every local table and re-run the exercise catalog seeder. Available only in
-              development builds — does nothing in release.
-            </Text>
-            <ActionButton
-              accessibilityLabel="Reset local data and re-seed exercise catalog"
-              disabled={isResetting}
-              label={isResetting ? 'Resetting…' : 'Reset local data and re-seed'}
-              onPress={confirmDevReset}
-              testID="settings-dev-reset-button"
-              variant="outline"
-            />
-            <DevFeedbackNotice feedback={resetFeedback} testID="settings-dev-reset-feedback" />
-
-            <Text allowFontScaling={false} style={styles.bodyMuted}>
-              Drop the local database and re-bootstrap. Sync re-pulls your server state into a
-              clean local store.
-            </Text>
-            <ActionButton
-              accessibilityLabel="Wipe local database and re-bootstrap"
-              disabled={isWipingLocal}
-              label={isWipingLocal ? 'Wiping…' : 'Wipe local & re-bootstrap'}
-              onPress={() => {
-                void handleWipeLocal();
-              }}
-              testID="settings-dev-wipe-local-button"
-              variant="outline"
-            />
-            <DevFeedbackNotice feedback={wipeLocalFeedback} testID="settings-dev-wipe-local-feedback" />
-
-            <Text allowFontScaling={false} style={styles.bodyMuted}>
-              Delete every row on the server owned by your account, then wipe local. Useful for
-              testing the bootstrap flow against an empty server.
-            </Text>
-            <ActionButton
-              accessibilityLabel="Wipe remote data owned by my account"
-              disabled={isWipingRemote}
-              label={isWipingRemote ? 'Wiping…' : 'Wipe remote (my data)'}
-              onPress={confirmWipeRemote}
-              testID="settings-dev-wipe-remote-button"
-              tone="danger"
-              variant="outline"
-            />
-            <DevFeedbackNotice feedback={wipeRemoteFeedback} testID="settings-dev-wipe-remote-feedback" />
-          </Card>
         </View>
-      ) : null}
-    </ScreenScroll>
-  );
-}
-
-const DATE_FORMAT_OPTIONS = (['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => ({
-  value: format,
-  label: format,
-  accessibilityLabel: `Set date format to ${format}`,
-}));
-
-const PAST_RECORDS_GYM_SCOPE_OPTIONS = [
-  {
-    value: 'all' as const,
-    label: 'All gyms',
-    accessibilityLabel: 'Set past records gym filter to All gyms',
-  },
-  {
-    value: 'current-gym' as const,
-    label: 'Current gym only',
-    accessibilityLabel: 'Set past records gym filter to Current gym only',
-  },
-];
-
-const TODAY_LAYOUT_OPTIONS = [
-  { value: 'list' as const, label: 'List', accessibilityLabel: 'Show Today as a list' },
-  { value: 'cards' as const, label: 'Cards', accessibilityLabel: 'Show Today as cards' },
-];
-
-// List keeps Today one scrolling page; Cards gives Progress and the group a
-// full-height card each, swiped between.
-function TodayLayoutSetting({ value }: { value: TodayLayout }) {
-  return (
-    <View style={styles.preference}>
-      <Text allowFontScaling={false} style={styles.fieldLabel}>Today layout</Text>
-      <SegmentedControl
-        accessibilityLabel="Today layout"
-        onChange={(todayLayout) => updatePreferences({ todayLayout })}
-        options={TODAY_LAYOUT_OPTIONS}
-        testIDPrefix="settings-today-layout"
-        value={value}
-      />
-    </View>
-  );
-}
-
-// A section's name: a micro-label over its card, as on More.
-function SectionLabel({ title }: { title: string }) {
-  return (
-    <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
-      {title}
-    </Text>
-  );
-}
-
-function RowChevron({ external = false }: { external?: boolean }) {
-  return <Icon color={uiRoles.inkFaint} name={external ? 'arrow-up-right' : 'chevron-right'} size="sm" />;
-}
-
-// A dev action's outcome: words plus a glyph, `danger` only when it failed (G3).
-function DevFeedbackNotice({ feedback, testID }: { feedback: DevFeedback; testID: string }) {
-  if (!feedback) {
-    return null;
-  }
-  return feedback.tone === 'success' ? (
-    <Notice icon="success" live message={feedback.message} testID={testID} />
-  ) : (
-    <Notice icon="warning" live message={feedback.message} testID={testID} tone="danger" />
+      </ListRow>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  // Sections sit a step further apart than a label and its card.
   content: {
-    gap: uiSpace.xl,
-  },
-  section: {
     gap: uiSpace.sm,
   },
-  microLabel: {
+  about: {
+    flex: 1,
+    paddingVertical: uiSpace.sm,
+  },
+  aboutLabel: {
     fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  // A card holding prose and controls rather than rows.
-  cardBody: {
-    padding: uiSpace.md,
-    gap: uiSpace.md,
-  },
-  body: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
   },
-  bodyMuted: {
+  aboutLine: {
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
-  },
-  preference: {
-    gap: uiSpace.sm,
-  },
-  fieldLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  // Under the row it belongs to, inset to the row's text.
-  inlineError: {
-    paddingHorizontal: uiSpace.md,
-    paddingBottom: uiSpace.md,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
-  },
-  devHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
   },
 });

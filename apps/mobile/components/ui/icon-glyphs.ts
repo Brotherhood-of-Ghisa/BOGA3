@@ -225,6 +225,32 @@ export const ICON_GLYPHS = {
     circle(6.5, 12.5, 0.5, 'solid'),
     circle(8.5, 7.5, 0.5, 'solid'),
   ],
+  // Lucide `weight`: the Bodyweight row in Settings.
+  weight: [
+    circle(12, 5, 3),
+    path('M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z'),
+  ],
+  // Lucide `gauge`: the Effort row in Settings.
+  gauge: [path('m12 14 4-4'), path('M3.34 19a10 10 0 1 1 17.32 0')],
+  // Lucide `refresh-cw`: the Data & sync row in Settings.
+  refresh: [
+    path('M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'),
+    path('M21 3v5h-5'),
+    path('M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'),
+    path('M8 16H3v5'),
+  ],
+  // Lucide `sliders-horizontal`: the Other row in Settings.
+  sliders: [
+    path('M10 5H3'),
+    path('M12 19H3'),
+    path('M14 3v4'),
+    path('M16 17v4'),
+    path('M21 12h-9'),
+    path('M21 19h-5'),
+    path('M21 5h-7'),
+    path('M8 10v4'),
+    path('M8 12H3'),
+  ],
 } satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof ICON_GLYPHS;

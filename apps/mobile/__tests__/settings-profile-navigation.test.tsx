@@ -61,6 +61,7 @@ import * as syncStatusSource from '@/src/sync/sync-status';
 import ProfileRoute from '../app/profile';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import SettingsRoute from '../app/(tabs)/settings';
+import { DataSyncSettingsScreen, OtherSettingsScreen } from '@/components/settings/sub-pages';
 
 type MockUseAuthValue = {
   clearAuthError: jest.Mock;
@@ -152,29 +153,17 @@ describe('settings and profile routes', () => {
     expect(mockReplace).toHaveBeenCalledWith('/more');
   });
 
-  it('opens Connected agents for a signed-in user', async () => {
-    mockUseAuth.mockReturnValue(
-      createAuthValue({
-        user: { email: 'member@example.test', id: 'user-1' },
-      }),
-    );
-    // The preferences card reads its store on mount; load it first so the read lands in the test.
-    await ensureExerciseListPreferencesLoaded();
-    render(<SettingsRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-connected-agents-row'));
-
-    expect(mockPush).toHaveBeenCalledWith('/connected-agents');
-  });
-
   it('reports a failed date-format save only under Data & Sync and retries it through Refresh', async () => {
     await ensureExerciseListPreferencesLoaded();
-    render(<SettingsRoute />);
+    // Settings' list, the Other page that saves and the Data & sync page that
+    // reports, over the one preferences store.
+    render(<><SettingsRoute /><OtherSettingsScreen /><DataSyncSettingsScreen /></>);
     const save = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
     fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
     const error = /Preferences could not be saved\./;
-    expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+    expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
       .toHaveTextContent(error);
+    expect(screen.getByTestId('settings-data-sync-row').props.accessibilityLabel).toBe('Data & sync, Error');
     expect(within(screen.getByTestId('settings-preferences-card')).queryByText(error)).toBeNull();
     expect(screen.queryByTestId('preferences-error')).toBeNull();
     expect(screen.queryByText('Retry')).toBeNull();
@@ -182,6 +171,8 @@ describe('settings and profile routes', () => {
     fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
     await waitFor(() => expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD'));
     expect(screen.queryByTestId('settings-sync-status-error')).toBeNull();
+    expect(screen.getByTestId('settings-data-sync-row').props.accessibilityLabel).toBe('Data & sync, Signed out');
+    expect(screen.getByTestId('settings-other-row').props.accessibilityLabel).toBe('Other, YYYY-MM-DD');
     save.mockRestore();
   });
 
@@ -195,24 +186,24 @@ describe('settings and profile routes', () => {
       .mockReturnValueOnce(accountBRead).mockResolvedValue({ ...status, dirtyCount: 1, errorMessage: 'Account C error' });
     const switchAccount = (id: string) => mockUseAuth.mockReturnValue(createAuthValue({ user: { id } }));
     switchAccount('account-a');
-    const { rerender } = render(<SettingsRoute />);
+    const { rerender } = render(<DataSyncSettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account A error'));
     switchAccount('account-b');
-    rerender(<SettingsRoute />);
+    rerender(<DataSyncSettingsScreen />);
     expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
     expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('0');
     switchAccount('account-c');
-    rerender(<SettingsRoute />);
+    rerender(<DataSyncSettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account C error'));
     await act(async () => { finishAccountBRead({ ...status, dirtyCount: 8, errorMessage: 'Account B error' }); });
     expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account C error');
     expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('1');
   });
 
-  it('renders the Preferences card and allows changing the date format setting', async () => {
+  it('renders the Preferences card on Other and allows changing the date format setting', async () => {
     await ensureExerciseListPreferencesLoaded();
 
-    render(<SettingsRoute />);
+    render(<OtherSettingsScreen />);
 
     expect(screen.getByTestId('settings-preferences-card')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-DD-MM-YYYY')).toBeTruthy();

@@ -173,9 +173,10 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/groups`, `/connected-agents`, `/dev-logs`, `/gyms?source=more`, `/exercise-catalog?source=more`, `/settings?source=more` | hub rows; connected agents requires a current user and developer logs `isDevMode()` |
-| `/more`, `/settings` | the first-party `/connect` page, system browser | `Connect an AI coach`; launch failure stays inline. OAuth begins later, in the user's own MCP client |
-| `/settings` | `/profile`, `/connected-agents`, `/body-weight`, `/theme-colour` | destination rows (`push`); Connected agents is absent while signed out, and `Body weight log` is always shown, independent of the `Bodyweight calculations` preference. No workout route reaches bodyweight entry or history |
+| `/more` | `/groups`, `/exercise-catalog?source=more`, `/gyms?source=more`, `/connected-agents`, `/settings?source=more` | hub rows; `Connect an AI` only with an agent connected |
+| `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
+| `/settings` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` sub pages | cards (`push`); Bodyweight always shown. No workout route reaches bodyweight entry or history |
+| `/settings-developer-tools` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |
 | `/groups`, `/exercise-link` (signed out, auth configured) | `/sign-in` | the sign-in-required card's `Sign in` |
