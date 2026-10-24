@@ -49,12 +49,35 @@ export const compareProgressFamilies = (left: string, right: string): number => 
   return rank(left) - rank(right) || left.localeCompare(right);
 };
 
+/** How many of the user's muscles sit in each family. */
+export const countFamilyMuscles = (families: Iterable<string>): ReadonlyMap<string, number> => {
+  const counts = new Map<string, number>();
+  for (const family of families) counts.set(family, (counts.get(family) ?? 0) + 1);
+  return counts;
+};
+
+/**
+ * Whether a family gets a header: only above two or more of the user's muscles
+ * ([[muscle.family-sections]]). A header over one muscle repeats it. With no
+ * counts every family has one, as does `Other`, which is not a muscle family.
+ */
+export const familyHasHeader = (family: string, counts?: ReadonlyMap<string, number>): boolean =>
+  counts === undefined || family === 'Other' || (counts.get(family) ?? 0) >= 2;
+
+/**
+ * Families in section order: those with no header first, so a muscle with none
+ * never sits under the previous family's header; then the fixed family order.
+ */
+export const compareFamilySections = (left: string, right: string, counts?: ReadonlyMap<string, number>): number =>
+  Number(familyHasHeader(left, counts)) - Number(familyHasHeader(right, counts)) || compareProgressFamilies(left, right);
+
 export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: MuscleSortMode,
-  metric: ProgressMetric, grouped: boolean): ProgressMuscleComparison[] => {
+  metric: ProgressMetric, grouped: boolean, familyCounts?: ReadonlyMap<string, number>): ProgressMuscleComparison[] => {
   const descending = mode.endsWith('-desc');
   const key = mode.slice(0, mode.lastIndexOf('-')) as 'name' | ComparisonColumnKey;
+  const counts = familyCounts ?? countFamilyMuscles(muscles.map(row => row.familyName));
   return [...muscles].sort((left, right) => {
-    const family = grouped ? compareProgressFamilies(left.familyName, right.familyName) : 0;
+    const family = grouped ? compareFamilySections(left.familyName, right.familyName, counts) : 0;
     if (family) return family;
     const name = left.displayName.localeCompare(right.displayName);
     const value = key === 'name' ? (descending ? -name : name)
@@ -71,8 +94,10 @@ export function ProgressTables(props: ProgressTablesProps) {
     grouped = true, searchQuery = '', sortMode = 'now-desc', onSort, tickers, tickerWeeks = 4, tickerStatus = 'loaded' } = props;
   const [tableWidth, setTableWidth] = useState(0);
   const words = normalizeExerciseSearchWords(searchQuery);
+  // Counted over all the user's muscles, so a search does not take a header away.
+  const familyCounts = countFamilyMuscles(muscles.map(row => row.familyName));
   const rows = sortProgressMuscles(muscles.filter(row => exerciseSearchTextMatches(words,
-    `${row.displayName} ${row.familyName}`.toLowerCase())), sortMode, metric, grouped);
+    `${row.displayName} ${row.familyName}`.toLowerCase())), sortMode, metric, grouped, familyCounts);
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
@@ -87,7 +112,7 @@ export function ProgressTables(props: ProgressTablesProps) {
         metric={metric} mode={sortMode} onSort={onSort} width={columnWidth} />} />
     {rows.length === 0 ? <StatePanel fill={false} body="No muscles match the search query." testID="stats-muscle-list-empty" /> : null}
     {rows.map((row, index) => <Fragment key={row.muscleGroupId}>
-      {grouped && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
+      {grouped && familyHasHeader(row.familyName, familyCounts) && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
         <StatsTableFamily name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
       <View testID={`stats-muscle-block-${row.muscleGroupId}`}>
         <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}

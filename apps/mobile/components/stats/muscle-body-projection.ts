@@ -5,6 +5,7 @@ import {
 import { hexToLch, lchToHex } from '@/components/ui/lch';
 import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import {
   MUSCLE_BODY_MESH,
@@ -197,9 +198,24 @@ const computeLightStep = (nx: number, ny: number, nz: number): number => {
   return Math.round(intensity * (SHADE_STEPS - 1));
 };
 
+/**
+ * The muscle a mesh facet belongs to under the user's setup
+ * ([[muscle.report-groups]]). Meshes stay keyed by anatomy entry: a merged
+ * entry takes its muscle's id (so it shades and selects with it) and an
+ * untracked one is neutral anatomy, neither shaded nor tappable.
+ */
+const reportedMaterial = (
+  entry: MuscleBodyMaterialId, report: MuscleReportAssignment | undefined
+): MuscleBodyMaterialId => {
+  const assigned = entry === 'neutral' ? undefined : report?.get(entry);
+  if (!assigned) return entry;
+  return assigned.tracked ? assigned.muscle.id as MuscleBodyMaterialId : 'neutral';
+};
+
 type ProjectionContext = {
   readonly verts: RotatedVertices;
   readonly materials: readonly MuscleBodyMaterialId[];
+  readonly report?: MuscleReportAssignment;
   readonly buckets: ReadonlyMap<string, CalendarHeatmapBucket>;
   readonly selectedCanonicalId: string | null;
   readonly palette: ThemeShadePalette;
@@ -279,7 +295,7 @@ const projectSingleFace = (
   const unitNz = nz / len;
   if (unitNz < BACKFACE_CULL_NZ) return null;
 
-  const materialId = ctx.materials[matIdx] ?? 'neutral';
+  const materialId = reportedMaterial(ctx.materials[matIdx] ?? 'neutral', ctx.report);
   const selected = materialId !== 'neutral' && materialId === ctx.selectedCanonicalId;
   const step = computeLightStep(nx / len, ny / len, unitNz);
   const fill = resolveFaceFill(materialId, step, selected, ctx);
@@ -343,6 +359,8 @@ export type ProjectMuscleBodyOptions = {
   readonly height: number;
   readonly buckets: ReadonlyMap<string, CalendarHeatmapBucket>;
   readonly selectedId?: string | null;
+  /** The user's muscle setup; unset shows every anatomy entry as its own muscle. */
+  readonly report?: MuscleReportAssignment;
   readonly palette?: ThemeShadePalette;
   readonly mesh?: MuscleBodyMesh;
 };
@@ -357,6 +375,7 @@ export function projectMuscleBody({
   height,
   buckets,
   selectedId = null,
+  report,
   palette = getDefaultPalette(),
   mesh = MUSCLE_BODY_MESH,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
@@ -368,6 +387,7 @@ export function projectMuscleBody({
   const ctx: ProjectionContext = {
     verts,
     materials: mesh.materials,
+    report,
     buckets,
     selectedCanonicalId,
     palette,

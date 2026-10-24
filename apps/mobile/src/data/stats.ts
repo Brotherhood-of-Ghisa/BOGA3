@@ -3,7 +3,10 @@ import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { drainExerciseSessionFacts } from './exercise-session-facts';
-import { aggregateProgressMuscleTickers, muscleTickerBounds, type MuscleTickerOptions, type MuscleTrainingStarts } from './progress-muscle-tickers';
+import {
+  aggregateProgressMuscleTickers, muscleTickerBounds, reportMuscleTrainingStarts,
+  type MuscleTickerOptions, type MuscleTrainingStarts,
+} from './progress-muscle-tickers';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { selectDatedInProgressSession } from './in-progress-session';
@@ -12,6 +15,7 @@ import {
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
+  applyMuscleReport,
   collectMuscleSetContributions,
   countedMuscleAnalyticsSessionIds,
   countMuscleAnalyticsWorkingSets,
@@ -21,6 +25,7 @@ import {
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
   type MuscleAnalyticsInput,
+  type MuscleReportAssignment,
   type MuscleSetCounter,
   type SelectedMuscleDailyEffort,
   type SelectedMuscleWeeklyEffort,
@@ -39,6 +44,7 @@ import {
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 import { aggregateProgressComparisons, type ProgressMuscleComparison } from './progress-comparisons';
+import { buildMuscleReportAssignment } from './muscle-report-presets';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
@@ -81,7 +87,12 @@ export type StatsSummary = {
 
 export type ProgressComparisons = StatsSummary & { muscles: ProgressMuscleComparison[] };
 
-export type StatsAggregationInput = MuscleAnalyticsInput & { muscleTrainingStarts?: MuscleTrainingStarts };
+export type StatsAggregationInput = MuscleAnalyticsInput & {
+  /** By anatomy entry id, as read; `inputInScope` re-keys it to the user's muscles. */
+  muscleTrainingStarts?: MuscleTrainingStarts;
+  /** The user's muscle setup ([[muscle.report-groups]]); unset reports every entry as its own muscle. */
+  muscleReport?: MuscleReportAssignment;
+};
 
 export type StatsStore = {
   /**
@@ -172,8 +183,16 @@ const inputInGym = (input: StatsAggregationInput, gymId: string | null | undefin
 const inputCountingSecondary = (input: StatsAggregationInput, countSecondary: boolean | undefined): StatsAggregationInput =>
   countSecondary === false ? withoutSecondaryMappings(input) : input;
 
+// A read's muscles: the user's, not their anatomy entries ([[muscle.report-groups]]).
+// After the secondary filter, so a merged muscle keeps only the roles that count.
+const inputReportingMuscles = (input: StatsAggregationInput): StatsAggregationInput => {
+  const { muscleReport } = input;
+  if (!muscleReport) return input;
+  return { ...applyMuscleReport(input, muscleReport), muscleTrainingStarts: reportMuscleTrainingStarts(input.muscleTrainingStarts, muscleReport) };
+};
+
 const inputInScope = (input: StatsAggregationInput, options: { gymId?: string | null; countSecondary?: boolean }) =>
-  inputInGym(inputCountingSecondary(input, options.countSecondary), options.gymId);
+  inputInGym(inputReportingMuscles(inputCountingSecondary(input, options.countSecondary)), options.gymId);
 
 type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null };
 
@@ -393,6 +412,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           displayName: muscleGroups.displayName,
           familyName: muscleGroups.familyName,
           sortOrder: muscleGroups.sortOrder,
+          reportGroup: muscleGroups.reportGroup,
+          tracked: muscleGroups.tracked,
         })
         .from(muscleGroups)
         .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))
@@ -424,7 +445,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
         })),
         muscleMappings: muscleMappingRows,
-        muscleGroups: muscleGroupRows,
+        muscleGroups: muscleGroupRows.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
+        muscleReport: buildMuscleReportAssignment(muscleGroupRows),
       };
     });
   },
@@ -462,7 +484,8 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const bounds = muscleTickerBounds(clocked);
     const input = await store.loadAggregationInput({ start: bounds.readStart, end: bounds.end,
       muscleTrainingStarts: { gymId: options.gymId, countSecondary: options.countSecondary } });
-    return aggregateProgressMuscleTickers(inputInScope(input, options), clocked, input.muscleTrainingStarts ?? {});
+    const scoped = inputInScope(input, options);
+    return aggregateProgressMuscleTickers(scoped, clocked, scoped.muscleTrainingStarts ?? {});
   },
   async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
     const periods = comparisonPeriods(options);
@@ -507,8 +530,8 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
   async computeSelectedMuscleHistoryEffort(options: ComputeSelectedMuscleDailyEffortOptions) {
     ensureDate(options.start, 'start');
     ensureDate(options.end, 'end');
-    const input = inputCountingSecondary(await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now }),
-      options.countSecondary);
+    const input = inputReportingMuscles(inputCountingSecondary(
+      await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now }), options.countSecondary));
     const allEffort = aggregateSelectedMuscleDailyEffort(input, options);
     const contributingSessions = new Set(allEffort.flatMap(day => day.contributions.map(row => row.sessionId)));
     const effort = options.gymId === undefined ? allEffort : aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);

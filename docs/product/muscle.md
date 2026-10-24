@@ -27,11 +27,11 @@ Signature: `primary + ½ secondary`
 
 ### muscle.map-area · presentation · superseded-by: muscle.progress-layout
 
-Progress dropped the Map view.
+Map view dropped.
 
 ### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
 
-Progress dropped the Map view.
+Map view dropped.
 
 ### muscle.progress-layout · presentation · accepted
 
@@ -75,11 +75,11 @@ Pending: compares entries.
 
 ### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
 
-Progress dropped the Map view.
+Map view dropped.
 
 ### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
 
-Progress dropped the Map view.
+Map view dropped.
 
 ### muscle.report-groups · definition · accepted
 
@@ -113,7 +113,8 @@ or removing it rewrites every entry of the muscle. Mappings to untracked muscles
 are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
-Pending: editor, search, screens.
+Code: `apps/mobile/src/exercise-catalog/reported-muscles.ts`.
+Pending: editor, search, session screens.
 
 ### muscle.untracked · definition · accepted
 
@@ -121,15 +122,17 @@ An untracked muscle adds nothing to any muscle figure and is not shown. Exercise
 figures (sets, Volume, records, 1RM) do not change. No line reports the dropped work.
 
 Why: the user chose not to follow that muscle.
-Pending: screens.
+Pending: session screens.
 
 ### muscle.family-sections · presentation · accepted
 
 In any list of muscles a family header shows only above two or more of the user's
-muscles; catalogue and picker cards stay one per family.
+muscles; catalogue and picker cards stay one per family. A family without a
+header lists first.
 
 Why: a header over one muscle repeats it.
-Pending: lists.
+Code: `apps/mobile/components/stats/progress-tables.tsx`.
+Pending: catalogue and picker lists.
 
 ### muscle.catalog-names · presentation · accepted
 

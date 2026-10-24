@@ -1238,8 +1238,10 @@ describe('Progress table ordering', () => {
       { ...muscles[0], muscleGroupId: 'null', displayName: 'Absent', familyName: 'Chest', current: { ...muscles[0].current, totalVolume: null } },
       { ...muscles[0], muscleGroupId: 'large', displayName: 'Large', familyName: 'Legs', current: { ...muscles[0].current, totalVolume: 100 } },
     ];
+    // Both families have two muscles among the user's, so both keep the family order.
+    const familyCounts = new Map([['Chest', 2], ['Legs', 2]]);
     const ids = (grouped: boolean, mode: 'now-asc' | 'now-desc' | 'name-asc' | 'name-desc') =>
-      sortProgressMuscles(rows, mode, 'totalVolume', grouped).map(row => row.muscleGroupId);
+      sortProgressMuscles(rows, mode, 'totalVolume', grouped, familyCounts).map(row => row.muscleGroupId);
     expect(ids(true, 'now-desc')).toEqual(['zero', 'null', 'large']);
     expect(ids(false, 'now-desc')).toEqual(['large', 'zero', 'null']);
     expect(ids(false, 'now-asc')).toEqual(['zero', 'large', 'null']);

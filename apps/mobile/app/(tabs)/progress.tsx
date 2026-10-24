@@ -36,8 +36,11 @@ import {
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
-import { compareProgressFamilies, nextMuscleSortMode, type MuscleSortMode } from '@/components/stats/progress-tables';
-import { getExercisePrimaryFamilyName } from '@/src/exercise-catalog/list-model';
+import {
+  compareFamilySections, countFamilyMuscles, familyHasHeader, nextMuscleSortMode, type MuscleSortMode,
+} from '@/components/stats/progress-tables';
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
+import { NO_MUSCLE_REPORT, reportedExerciseSearchText, reportedPrimaryFamilyName } from '@/src/exercise-catalog/reported-muscles';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import {
   COLUMN_KEYS,
@@ -67,12 +70,7 @@ import type { ProgressMuscleTickers } from '@/src/data/progress-muscle-tickers';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import {
-  buildExerciseCatalogSearchText,
-  exerciseSearchTextMatches,
-  indexExerciseCatalogMuscleGroupsById,
-  normalizeExerciseSearchWords,
-} from '@/src/exercise-catalog/search';
+import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 import { ProgressFilters } from '@/components/stats/progress-filters';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
@@ -236,6 +234,8 @@ export type StatsScreenShellProps = {
   exerciseSearchIndex: ReadonlyMap<string, string>;
   exerciseFamilies?: ReadonlyMap<string, string>;
   exerciseMappings?: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
+  /** The user's muscle setup ([[muscle.report-groups]]); unset shows every anatomy entry as its own muscle. */
+  muscleReport?: MuscleReportAssignment;
   exerciseDataReady?: boolean;
   exerciseDataError?: string | null;
   // False while the history page is on top: returning restores reader focus.
@@ -301,6 +301,7 @@ export function StatsScreenShell({
   exerciseSearchIndex,
   exerciseFamilies,
   exerciseMappings = [],
+  muscleReport = NO_MUSCLE_REPORT,
   exerciseDataReady = true,
   exerciseDataError = null,
   isFocused = true,
@@ -375,9 +376,12 @@ export function StatsScreenShell({
   const { activeError, bodyReady, pending } = progressPresentationState({ bodyActive, summary, isLoading,
     errorMessage, exerciseDataReady, exerciseDataError });
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
+  // Family headers follow the user's muscles ([[muscle.family-sections]]); unknown until they load.
+  const familyMuscleCounts = useMemo(
+    () => summary ? countFamilyMuscles(summary.muscles.map(muscle => muscle.familyName)) : undefined, [summary]);
   const exerciseList = (items: ExerciseListItem[], splitByEffort = false, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => <ExerciseListView items={items} metric={exerciseMetric}
     secondary={secondary} splitByEffort={splitByEffort}
-    grouped={tableVisible && grouped.exercise} families={exerciseFamilies}
+    grouped={tableVisible && grouped.exercise} families={exerciseFamilies} familyMuscleCounts={familyMuscleCounts}
     onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
     emptyBody={emptyOverride ?? exerciseEmptyBody(exerciseListItems, exerciseMetric)}
     sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />;
@@ -411,10 +415,10 @@ export function StatsScreenShell({
         {showLoading ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
         {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={bodyReady}
-          exercises={exerciseMappings} muscles={summary?.muscles ?? []} countSecondary={countSecondary}
+          exercises={exerciseMappings} muscles={summary?.muscles ?? []} countSecondary={countSecondary} report={muscleReport}
           items={filteredExerciseListItems}
           selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
-          tickers={muscleTickers} tickerStatus={muscleTickerStatus} tickerWeeks={targetWindowWeeks}
+          tickers={muscleTickers} tickerStatus={muscleTickerStatus} tickerWeeks={targetWindowWeeks} report={muscleReport}
           grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
@@ -440,10 +444,11 @@ function progressPresentationState({ bodyActive, summary, isLoading, errorMessag
 }
 
 function ExerciseBreakdown({
-  metric, muscleLayout, ready, exercises, muscles, items, countSecondary,
+  metric, muscleLayout, ready, exercises, muscles, items, countSecondary, report,
   selectedMuscleId, onSelectMuscle, renderList,
 }: {
   metric: ProgressExerciseMetric; muscleLayout: ProgressMuscleLayout; ready: boolean; countSecondary: boolean;
+  report: MuscleReportAssignment;
   exercises: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
   muscles: readonly ProgressMuscleComparison[];
   items: ExerciseListItem[];
@@ -451,18 +456,18 @@ function ExerciseBreakdown({
   renderList: (items: ExerciseListItem[], splitByEffort?: boolean, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => ReactNode;
 }) {
   const bodyMuscles = useMemo(
-    () => buildExerciseBodyMuscles({ items, exercises, muscles, countSecondary }),
-    [items, exercises, muscles, countSecondary]
+    () => buildExerciseBodyMuscles({ items, exercises, muscles, countSecondary, report }),
+    [items, exercises, muscles, countSecondary, report]
   );
   const selectedMuscle = useMemo(
-    () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, countSecondary }),
-    [selectedMuscleId, items, exercises, muscles, countSecondary]
+    () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, countSecondary, report }),
+    [selectedMuscleId, items, exercises, muscles, countSecondary, report]
   );
   if (muscleLayout === 'list') return renderList(items);
   if (metric === 'estimatedOneRepMax') return renderList(items);
   if (!ready) return null;
   return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
-    selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle}
+    selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle} report={report}
     renderAll={() => renderList(items)}
     renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
       true, secondary, entries.length === 0 ? 'No exercises for this muscle.' : undefined)} />;
@@ -493,12 +498,15 @@ function ExerciseListView({
   secondary,
   grouped,
   families,
+  familyMuscleCounts,
   splitByEffort,
 }: {
   items: ExerciseListItem[];
   grouped: boolean;
   splitByEffort: boolean;
   families?: ReadonlyMap<string, string>;
+  /** The user's muscles per family: a family with fewer than two gets no header. */
+  familyMuscleCounts?: ReadonlyMap<string, number>;
   secondary?: readonly ExerciseContributionEntry[];
   metric: ProgressExerciseMetric;
   onPressExercise: (exercise: ExerciseHeatmapTarget, target: ComponentRef<typeof View> | null) => void;
@@ -521,7 +529,7 @@ function ExerciseListView({
   // headers sort, so each column keeps room for its indicator.
   const layout = resolveComparisonLayout(width, [...items, ...secondaryRows], metric, false, true);
   const familyName = (item: ExerciseListItem) => families?.get(item.id) ?? 'Other';
-  const primaryRows = grouped ? [...items].sort((left, right) => compareProgressFamilies(familyName(left), familyName(right))) : items;
+  const primaryRows = grouped ? [...items].sort((left, right) => compareFamilySections(familyName(left), familyName(right), familyMuscleCounts)) : items;
   const rows = [...primaryRows.map(item => ({ item, isSecondary: false })),
     ...secondaryRows.map(item => ({ item, isSecondary: true }))];
   return (
@@ -568,7 +576,7 @@ function ExerciseListView({
           <Fragment key={item.id}>
           {splitByEffort && sectionStart ? <StatsTableFamily name={isSecondary ? 'Secondary effort' : 'Primary effort'}
             testID={`stats-exercise-effort-${isSecondary ? 'secondary' : 'primary'}`} /> : null}
-          {grouped && (index === 0 || familyName(rows[index - 1].item) !== familyName(item)) ?
+          {grouped && familyHasHeader(familyName(item), familyMuscleCounts) && (index === 0 || familyName(rows[index - 1].item) !== familyName(item)) ?
             <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
@@ -647,17 +655,17 @@ function StatsContent() {
       previous: periodFigures(lastPeriod.aggregatesById.get(item.id)),
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
+  const muscleReport = catalog.muscleReport ?? NO_MUSCLE_REPORT;
   const exerciseFamilies = useMemo(() => {
     const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
-    return new Map(catalog.exercises.map(exercise => [exercise.id, getExercisePrimaryFamilyName(exercise, byId)]));
-  }, [catalog.exercises, catalog.muscleGroups]);
-  // Search and family placement read the same current catalogue metadata.
-  const exerciseSearchIndex = useMemo(() => {
-    const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(catalog.muscleGroups);
-    return new Map(catalog.exercises.map(item => [item.id, buildExerciseCatalogSearchText(item, muscleGroupsById)]));
-  }, [catalog.exercises, catalog.muscleGroups]);
+    return new Map(catalog.exercises.map(exercise => [exercise.id, reportedPrimaryFamilyName(exercise, muscleReport, byId)]));
+  }, [catalog.exercises, catalog.muscleGroups, muscleReport]);
+  // Search and family placement read the same current catalogue metadata, as the user's muscles.
+  const exerciseSearchIndex = useMemo(
+    () => new Map(catalog.exercises.map(item => [item.id, reportedExerciseSearchText(item, muscleReport, catalog.muscleGroupsById)])),
+    [catalog.exercises, catalog.muscleGroupsById, muscleReport]);
   return <StatsScreenShell {...summary} muscleTickers={tickers.data} muscleTickerStatus={tickers.status} onRetry={() => { summary.onRetry(); void ensureExerciseCatalogLoaded(); }}
-    exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
+    exerciseFamilies={exerciseFamilies} exerciseMappings={catalog.exercises} muscleReport={muscleReport} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
     onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId, countSecondary }, filters.metric, view))}

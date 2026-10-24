@@ -7,7 +7,9 @@ import {
   type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
 
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import { subscribeToExerciseCatalogInvalidation } from './invalidation';
+import { muscleReportOfGroups, NO_MUSCLE_REPORT } from './reported-muscles';
 import {
   buildExerciseCatalogSearchText,
   indexExerciseCatalogMuscleGroupsById,
@@ -21,6 +23,8 @@ export type ExerciseCatalogCacheSnapshot = {
   exercises: IndexedExerciseCatalogExercise[];
   muscleGroups: ExerciseCatalogMuscleGroup[];
   muscleGroupsById: Record<string, ExerciseCatalogMuscleGroup>;
+  /** The muscles the user sees: anatomy entries merged or hidden by their setup ([[muscle.report-groups]]); unset reads as Detailed. */
+  muscleReport?: MuscleReportAssignment;
   lastError: string | null;
 };
 
@@ -31,6 +35,7 @@ const EMPTY_SNAPSHOT: ExerciseCatalogCacheSnapshot = {
   exercises: [],
   muscleGroups: [],
   muscleGroupsById: {},
+  muscleReport: NO_MUSCLE_REPORT,
   lastError: null,
 };
 
@@ -79,6 +84,7 @@ const reload = async (): Promise<void> => {
       exercises: buildIndexedExercises(loadedExercises, muscleGroupsById),
       muscleGroups: loadedMuscleGroups,
       muscleGroupsById,
+      muscleReport: muscleReportOfGroups(loadedMuscleGroups),
       lastError: null,
     });
   } catch (error) {
