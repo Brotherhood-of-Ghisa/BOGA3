@@ -107,6 +107,7 @@ let mockExerciseCatalogState = {
   ],
   muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 1 }],
   muscleGroupsById: {},
+  muscleSetup: { assignment: new Map() as ReadonlyMap<string, { muscle: { id: string; displayName: string; familyName: string; sortOrder: number }; tracked: boolean }> },
   lastError: null as Error | null,
 };
 

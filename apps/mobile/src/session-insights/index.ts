@@ -50,6 +50,11 @@ export {
   type SessionInsightSetRow,
 } from "./repository";
 export {
+  reportSessionMuscles,
+  sessionMuscleCatalogOfExercises,
+  type SessionMuscleCatalog,
+} from "./catalog-muscles";
+export {
   hasVolumeReference,
   partitionVolumeComparisons,
   type PartitionedVolumeComparisons,
