@@ -77,9 +77,10 @@ describe('Broad preset table', () => {
   const entryIds = SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => seed.id);
 
   it('places every catalogue entry at most once, leaving only Rotator Cuff, Forearms and Spinal Erectors in no muscle', () => {
+    const inNoMuscle = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
     const placed = BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries);
     expect(new Set(placed).size).toBe(placed.length);
-    expect(entryIds.filter((id) => !placed.includes(id)).sort()).toEqual([...SWITCHED_OFF].sort());
+    expect(entryIds.filter((id) => !placed.includes(id)).sort()).toEqual([...inNoMuscle].sort());
   });
 
   it('has 11 muscles, each anchored on one of its own entries inside one family', () => {

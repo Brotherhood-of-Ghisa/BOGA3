@@ -83,12 +83,13 @@ Progress dropped the Map view.
 
 ### muscle.report-groups · definition · accepted
 
-Settings → Progress → Muscles offers **Detailed** (default: every anatomy entry
-is its own muscle) or **Broad**, per account, synced, with a Track switch per
-muscle. A preset changes only how entries merge, never a switch; merges
+Settings → Progress → Muscles offers **Detailed** (default: one muscle per
+anatomy entry) or **Broad**, per account, synced, with a Track switch per
+muscle. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
-Rotator Cuff, Forearms and Spinal Erectors, and custom muscles, stay their own.
-Each muscle stays in one family. Decided 2026-10-24.
+Other entries and custom muscles stay their own.
+A merged muscle's switch is on while any entry is tracked; an untracked entry's
+work still drops. Each muscle stays in one family. Decided 2026-10-24.
 
 | Broad muscle | Entries |
 | --- | --- |
@@ -102,7 +103,7 @@ Each muscle stays in one family. Decided 2026-10-24.
 | Front, Lateral, Rear Delts; Triceps | one entry each |
 
 Why: a simpler view; exercises keep their detailed mappings.
-Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/src/data/muscle-report-settings.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
+Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
 
 ### muscle.no-breakdown · presentation · accepted
 
