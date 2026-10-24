@@ -36,7 +36,6 @@ Plot and fit within the selected exercise/time/effort/gym scope. All gyms pools
 including No gym; individual gyms remain selectable. Programme Technique/reset
 recorded as RIR4 remains working, not a Technique/warm-up label.
 
-Why: compare efforts; reliability unproven. Approved 2026-10-13.
 Code: `RmCurveContent` in `apps/mobile/components/rm-curve/content.tsx`.
 
 ### 1rm.curve-effort · calculation · accepted
@@ -47,12 +46,11 @@ analytical total RM is `estimateOneRepMax(L, u)`. Never replace logged reps,
 global 1RM or records. X names RIR0-equivalent reps; details retain m, n and
 existing 1RM. A positive-RIR single uses u>1 analytically; its global figure stays unchanged.
 
-Why: effort normalization; test uncertainty. Approved 2026-10-13.
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
 
 ### 1rm.curve-reference · calculation · superseded-by: 1rm.curve-fitting
 
-Replaced by [[1rm.curve-fitting]] with owner approval on 2026-10-15.
+Replaced by [[1rm.curve-fitting]].
 
 ### 1rm.curve-fitting · calculation · accepted
 
@@ -67,7 +65,6 @@ filters. Ties keep the first in session order (block, set, then set ID).
 Omit sessions without qualifying sets. Plot all qualifying sets.
 Unavailable fits retain observations without historical fallback. Keep logged metrics.
 
-Why: approved 2026-10-15; filtered maximum approved 2026-10-17; activation separate.
 Code: `apps/mobile/src/strength-regimes/`.
 
 ### 1rm.curve-uncertainty · calculation · accepted
@@ -81,7 +78,6 @@ estimates. Halos depict model spread. Curve shading shows relative evidence,
 never break/membership probability. Unverified histories stay exploratory
 without calibrated shading/confidence claims.
 
-Why: approved 2026-10-15; halos 2026-10-21.
 Code: `apps/mobile/src/strength-regimes/assessment.ts`.
 
 ### 1rm.curve-periods · presentation · accepted
@@ -92,7 +88,6 @@ label/hue; invalidated fits remove it. Selection follows chart activation and
 Previous/Next, persists while valid, and never automatically chooses a
 representative. No set-list popup.
 
-Why: approved 2026-10-15; set-list removal approved 2026-10-17.
 Code: `apps/mobile/components/rm-curve/`.
 
 ### 1rm.curve-load · presentation · accepted
@@ -104,7 +99,7 @@ exception to hiding calculated load requires an axis distinct from Weight.
 Details retain raw Weight/existing 1RM. Logging, records, reading selection and
 personal missing-reading fallback retain their meaning.
 
-Why: shared curve across bodyweight contexts. Approved 2026-10-13; design 2026-10-14.
+Why: shared curve across bodyweight contexts.
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
 
 ### 1rm.curve-scope · definition · accepted
@@ -118,5 +113,4 @@ recompute points and [[1rm.curve-fitting]].
 All gyms preserves provenance; pooling establishes neither equipment equivalence
 nor reliable strength changes.
 
-Why: owner approved scope/design defaults 2026-10-14; broader initial scope approved 2026-10-21.
 Code: `apps/mobile/components/rm-curve/screen.tsx`; `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.

@@ -91,7 +91,7 @@ visible start for calculation only. This week changes table figures alone.
 Connect real observations across rest days without inventing samples; unavailable
 training observations break the line.
 
-Why: show comparable rolling effort without inventing history. Approved 2026-10-23.
+Why: show comparable rolling effort without inventing history.
 Code: `apps/mobile/src/data/progress-muscle-tickers.ts`.
 
 ### comparison.muscle-ticker-reference · calculation · accepted
@@ -104,7 +104,6 @@ valid. Graph visibility follows [[comparison.muscle-ticker-extent]]. Reference
 colour compares the observation with its reference independently of the table's
 signed Change.
 
-Why: compare like periods, keeping sparse history truthful. Approved 2026-10-23.
 Code: `apps/mobile/src/data/progress-muscle-tickers.ts`.
 
 ### comparison.muscle-ticker-extent · presentation · accepted
@@ -120,5 +119,5 @@ its real dates and internal unavailable gaps. The complete plot fits within
 one-third of its actual table width. Charts mark only the latest valid
 observation, even if earlier than today.
 
-Why: sparse or empty history must not imply a meaningful trend or longer coverage. Approved 2026-10-24.
+Why: sparse history must not imply a trend or longer coverage.
 Code: `apps/mobile/components/stats/muscle-ticker.tsx`.

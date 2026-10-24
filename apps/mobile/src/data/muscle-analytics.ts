@@ -119,6 +119,48 @@ export const withoutSecondaryMappings = <T extends MuscleAnalyticsInput>(input: 
   ...input, muscleMappings: input.muscleMappings.filter((mapping) => mapping.role !== 'secondary'),
 });
 
+/** A muscle as a view reports it: an anatomy entry, or the group several entries report under. */
+export type ReportedMuscle = MuscleAnalyticsInput['muscleGroups'][number];
+
+/**
+ * Which muscle each anatomy entry reports under, and whether the user tracks
+ * it, by entry id. An entry with no assignment is its own tracked muscle.
+ */
+export type MuscleReportAssignment = ReadonlyMap<string, { muscle: ReportedMuscle; tracked: boolean }>;
+
+/**
+ * The input a view reads under the user's muscle setup ([[muscle.report-groups]]):
+ * mappings are re-keyed from anatomy entry to muscle, a muscle's repeated
+ * mappings per exercise collapse to the strongest role, mappings to untracked
+ * entries drop ([[muscle.untracked]]), and `muscleGroups` becomes the tracked
+ * muscles in first-seen order. With every entry its own tracked muscle (Detailed)
+ * the input comes back unchanged. Run it after `withoutSecondaryMappings`.
+ */
+export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
+  input: T, assignment: MuscleReportAssignment,
+): T => {
+  const strongest = new Map<string, MuscleAnalyticsInput['muscleMappings'][number]>();
+  for (const mapping of input.muscleMappings) {
+    const assigned = assignment.get(mapping.muscleGroupId);
+    if (assigned?.tracked === false) continue;
+    const muscleId = assigned?.muscle.id ?? mapping.muscleGroupId;
+    const key = JSON.stringify([mapping.exerciseDefinitionId, muscleId]);
+    const existing = strongest.get(key);
+    if (existing && getMuscleContributionRoleWeight(existing.role) >= getMuscleContributionRoleWeight(mapping.role)) continue;
+    strongest.set(key, muscleId === mapping.muscleGroupId ? mapping : { ...mapping, muscleGroupId: muscleId });
+  }
+
+  const muscles = new Map<string, ReportedMuscle>();
+  for (const entry of input.muscleGroups) {
+    const assigned = assignment.get(entry.id);
+    if (assigned?.tracked === false) continue;
+    const muscle = assigned && assigned.muscle.id !== entry.id ? assigned.muscle : entry;
+    if (!muscles.has(muscle.id)) muscles.set(muscle.id, muscle);
+  }
+
+  return { ...input, muscleMappings: [...strongest.values()], muscleGroups: [...muscles.values()] };
+};
+
 /**
  * The working sets a muscle got, by role and combined ([[muscle.set-count]]).
  * `weightedSetCount` is what an unqualified `Sets` for a muscle shows; the two
