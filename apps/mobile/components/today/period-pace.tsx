@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  type AccessibilityActionEvent,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { changeToneColour } from '@/components/ui/change-tone';
@@ -9,14 +16,16 @@ import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
   CHART_HEIGHT,
-  formatPacePhrase,
+  formatPeriodDayLabel,
+  formatPeriodRange,
   formatSignedCount,
-  formatWeekRange,
-  paceDifference,
   paceTone,
   periodChartAccessibilityLabel,
+  periodChartAccessibilityValue,
   periodChartGeometry,
-  periodRangesAccessibilityLabel,
+  periodDayAtX,
+  periodDayFigures,
+  periodFiguresAccessibilityLabel,
   todayLabelAnchor,
   toPolyline,
   type PeriodChartGeometry,
@@ -35,7 +44,7 @@ const WEEK_TICK = 4;
 const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
 
 function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
-  const { plot, current, previous, projection, today, weekStartsX } = geometry;
+  const { plot, current, previous, projection, today, selected, weekStartsX } = geometry;
   const area = [{ x: 0, y: plot.bottom }, ...current, { x: today.current.x, y: plot.bottom }];
   const previousEnd = previous[previous.length - 1];
   const todayAnchor = todayLabelAnchor(today.current.x, plot.width);
@@ -77,8 +86,30 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
         strokeWidth={2}
         testID="today-progress-chart-current"
       />
-      <Circle cx={today.current.x} cy={today.current.y} fill={uiRoles.ink} r={4.5} stroke={uiRoles.surface} strokeWidth={2} />
-      <Circle cx={today.previous.x} cy={today.previous.y} fill={uiRoles.surface} r={3.5} stroke={uiRoles.inkFaint} strokeWidth={2} />
+      {selected.current.x === today.current.x ? null : (
+        <Circle cx={today.current.x} cy={today.current.y} fill={uiRoles.ink} r={2.5} testID="today-progress-chart-today" />
+      )}
+      {selected.current.x === today.current.x ? null : (
+        <Line
+          stroke={uiRoles.inkFaint}
+          strokeWidth={1}
+          testID="today-progress-chart-selection"
+          x1={selected.current.x}
+          x2={selected.current.x}
+          y1={plot.top}
+          y2={plot.bottom}
+        />
+      )}
+      <Circle cx={selected.previous.x} cy={selected.previous.y} fill={uiRoles.surface} r={3.5} stroke={uiRoles.inkFaint} strokeWidth={2} />
+      {/* A projected day is hollow: the projection's figure, not a count. */}
+      <Circle
+        cx={selected.current.x}
+        cy={selected.current.y}
+        fill={selected.projected ? uiRoles.surface : uiRoles.ink}
+        r={4.5}
+        stroke={selected.projected ? uiRoles.ink : uiRoles.surface}
+        strokeWidth={2}
+      />
       {previousEnd ? (
         <SvgText {...axisLabel} fill={uiRoles.inkMuted} letterSpacing={1} x={previousEnd.x + 6} y={previousEnd.y + 4}>
           LAST
@@ -91,70 +122,90 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
   );
 }
 
-// The fixed period ([[comparison.window]]): its range against the previous
-// period's; its working sets so far against the previous period at the same
-// day ([[comparison.change-display]]) beside the previous period's whole
-// total; and the cumulative lines by day. `fill` lets the chart take the
-// height the block is given (Today's cards layout) instead of its own.
+// The fixed period ([[comparison.window]]) against the previous period: the
+// selected day's working sets (today until the chart is touched; after today,
+// the projection's) against the previous period's at the same day, and their
+// difference ([[comparison.change-display]]); then the cumulative lines by day.
+// `fill` lets the chart take the height the block is given (Today's cards
+// layout) instead of its own.
 export function PeriodPace({ period, fill = false }: { period: TodayProgressPeriod; fill?: boolean }) {
   const dateFormat = useDateFormat();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
-  const onLayout = (event: LayoutChangeEvent) => {
-    const width = Math.round(event.nativeEvent.layout.width);
-    const height = fill ? Math.round(event.nativeEvent.layout.height) : CHART_HEIGHT;
-    if (width > 0 && height > 0 && (width !== size.width || height !== size.height)) setSize({ width, height });
-  };
+  // The selected day belongs to the period it was picked in; another period
+  // (a new day, a changed Progress period) starts again at today.
+  const [selection, setSelection] = useState<{ periodKey: string; dayIndex: number } | null>(null);
+  const periodKey = `${period.window.start.getTime()}:${period.daysInPeriod}:${period.dayOfPeriod}`;
+  const figures = periodDayFigures(period, selection?.periodKey === periodKey ? selection.dayIndex : null);
   const { width, height } = size;
-  const difference = paceDifference(period);
+  const geometry = periodChartGeometry(period, width, height, figures);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const measuredWidth = Math.round(event.nativeEvent.layout.width);
+    const measuredHeight = fill ? Math.round(event.nativeEvent.layout.height) : CHART_HEIGHT;
+    if (measuredWidth > 0 && measuredHeight > 0 && (measuredWidth !== width || measuredHeight !== height)) {
+      setSize({ width: measuredWidth, height: measuredHeight });
+    }
+  };
+  const select = (dayIndex: number) => setSelection({ periodKey, dayIndex });
+  const onTouch = (event: GestureResponderEvent) =>
+    select(periodDayAtX(event.nativeEvent.locationX, geometry.plot.width, period.daysInPeriod));
+  const onAccessibilityAction = (event: AccessibilityActionEvent) =>
+    select(figures.dayIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
+  const label = formatPeriodDayLabel(figures, dateFormat);
 
   return (
     <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
-      <View accessible accessibilityLabel={periodRangesAccessibilityLabel(period, dateFormat)} style={styles.ranges}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
-          {formatWeekRange(period.window, dateFormat)}
-        </Text>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
-          vs {formatWeekRange(period.previous.window, dateFormat)}
-        </Text>
-      </View>
-      <View style={styles.figures}>
-        <View style={styles.column}>
-          <View style={styles.currentRow}>
-            <Text allowFontScaling={false} style={todayText.headlineFigure} testID="today-progress-period-working-sets">
-              {period.toDate.workingSets}
-              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
-            </Text>
-            {/* The pace difference takes its direction's colour, like every
-                other change figure (`design-language.md` §6). */}
-            <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[todayText.differenceFigure, { color: changeToneColour(paceTone(difference)) }]}>
-              {formatSignedCount(difference)}
-            </Text>
-          </View>
-          <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-progress-period-pace">
-            {formatPacePhrase(period)}
+      <View accessible accessibilityLabel={periodFiguresAccessibilityLabel(period, figures, dateFormat)} style={styles.figures}>
+        <View style={[styles.column, styles.currentColumn]}>
+          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
+            {formatPeriodRange(period.window, dateFormat)}
           </Text>
-        </View>
-        <View style={[styles.column, styles.previousTotal]}>
-          <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-total">
-            {period.previous.total.workingSets}
+          {/* One line whatever the day's label: shrinking, never wrapping, so the card keeps its height while the selection moves. */}
+          <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={todayText.headlineFigure} testID="today-progress-period-working-sets">
+            <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-progress-period-day">{label} </Text>
+            {figures.workingSets}
             <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
           </Text>
-          <Text allowFontScaling={false} style={todayText.mutedLine}>
-            last period
+        </View>
+        <View style={styles.column}>
+          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
+            vs {formatPeriodRange(period.previous.window, dateFormat)}
           </Text>
+          <View style={styles.previousRow}>
+            <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-sets">
+              {figures.previousWorkingSets}
+              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+            </Text>
+            {/* The difference takes its direction's colour, like every other
+                change figure (`design-language.md` §6). */}
+            <Text allowFontScaling={false} testID="today-progress-period-difference"
+              style={[todayText.differenceFigure, { color: changeToneColour(paceTone(figures.difference)) }]}>
+              {formatSignedCount(figures.difference)}
+            </Text>
+          </View>
         </View>
       </View>
+      {/* Lifting a finger off the chart, or dragging across it, selects the
+          day under it; a vertical drag goes to the screen's scroll. The Svg
+          takes no touches, so `locationX` is across this view. */}
       <View
         accessible
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         accessibilityLabel={periodChartAccessibilityLabel(period)}
-        accessibilityRole="image"
+        accessibilityRole="adjustable"
+        accessibilityValue={{ text: periodChartAccessibilityValue(figures, dateFormat) }}
+        onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
+        onResponderMove={onTouch}
+        onResponderRelease={onTouch}
+        onStartShouldSetResponder={() => true}
         style={fill ? styles.fillChart : null}
         testID="today-progress-chart">
-        <Svg height={height} style={styles.chart} width={width}>
-          <PeriodChart geometry={periodChartGeometry(period, width, height)} />
-        </Svg>
+        <View pointerEvents="none">
+          <Svg height={height} style={styles.chart} width={width}>
+            <PeriodChart geometry={geometry} />
+          </Svg>
+        </View>
       </View>
     </View>
   );
@@ -164,28 +215,24 @@ const styles = StyleSheet.create({
   block: {
     gap: uiSpace.md,
   },
-  ranges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    columnGap: uiSpace.sm,
-  },
   figures: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
     gap: uiSpace.sm,
   },
   column: {
     gap: uiSpace.xs,
+    justifyContent: 'space-between',
   },
-  currentRow: {
+  currentColumn: {
+    flexShrink: 1,
+  },
+  // The previous period's figure under its `vs`, the difference at the edge.
+  previousRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    justifyContent: 'space-between',
     gap: uiSpace.sm,
-  },
-  previousTotal: {
-    alignItems: 'flex-end',
   },
   chart: {
     overflow: 'visible',

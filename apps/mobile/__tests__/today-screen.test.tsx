@@ -171,22 +171,57 @@ describe('Today: the Progress card over real data', () => {
     await renderToday();
 
     // 4-week periods from Monday 29 Dec 2025: Friday 16 Oct is day 12 of 5 Oct – 1 Nov.
-    expect(text('today-progress-period-range')).toHaveTextContent('05-10-2026 – 01-11-2026');
-    expect(text('today-progress-period-previous-range')).toHaveTextContent('vs 07-09-2026 – 04-10-2026');
+    expect(text('today-progress-period-range')).toHaveTextContent('5 Oct to 1 Nov');
+    expect(text('today-progress-period-previous-range')).toHaveTextContent('vs 7 Sep to 4 Oct');
     // This period: 3 sessions, 18 working sets. The previous one to its 12th day (18 Sep): none; all of it: 20 Sep's 6.
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+18');
-    // Ahead of the pace is an improvement, in the one colour every change
-    // figure uses for one (`design-language.md` §6).
+    // Ahead is an improvement, in the one colour every change figure uses for
+    // one (`design-language.md` §6).
     expect(text('today-progress-period-difference')).toHaveStyle({ color: uiRoles.gain });
-    expect(text('today-progress-period-pace')).toHaveTextContent("ahead of last period's pace");
-    expect(text('today-progress-period-previous-total')).toHaveTextContent('6 sets');
+    expect(screen.queryByText(/pace/)).toBeNull();
     // The spoken label carries the projection the chart draws (18 over 12 days, across 28: 42).
     expect(text('today-progress-chart')).toHaveProp(
       'accessibilityLabel',
       'Cumulative sets: this period 18 by day 12 of 28 against the last period 0 by day 12; the last period finished at 6. On course for 42.',
     );
-    expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'image');
+    expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'adjustable');
+  });
+
+  it('shows the day the chart selects: its counts, or after today the projection', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+    const chart = text('today-progress-chart');
+    // The fallback 326pt chart's plot is 292pt across 28 days.
+    const touchDay = (event: 'responderRelease' | 'responderMove', dayIndex: number) =>
+      fireEvent(chart, event, { nativeEvent: { locationX: (dayIndex / 27) * 292 } });
+
+    // Wed 7 Oct, day 3: 6 Oct's 6 sets against none by 9 Sep.
+    touchDay('responderRelease', 2);
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('7 Oct 6 sets');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+6');
+    expect(text('today-progress-chart-selection')).toBeTruthy();
+    expect(text('today-progress-chart-today')).toBeTruthy();
+
+    // Sunday, day 14: 18 sets over 12 days projects 21; the previous period had 20 Sep's 6, so dragging there.
+    touchDay('responderMove', 13);
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 Oct (projected) 21 sets');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('6 sets');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+15');
+
+    // The adjustable chart steps a day at a time, and back to today.
+    fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('17 Oct (projected) 20 sets');
+    fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(chart).toHaveProp('accessibilityValue', { text: '19 Oct (projected): 23 sets, last period 6' });
+    touchDay('responderRelease', 11);
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
+    expect(screen.queryByTestId('today-progress-chart-selection')).toBeNull();
+    expect(screen.queryByTestId('today-progress-chart-today')).toBeNull();
   });
 
   it("takes the period from Settings' Progress period and reads again when it changes", async () => {
@@ -197,15 +232,20 @@ describe('Today: the Progress card over real data', () => {
     await renderToday({ loadProgress });
 
     // 3 weeks: 28 Sep – 18 Oct against 7 – 27 Sep; 20 Sep falls before day 19.
-    expect(text('today-progress-period-range')).toHaveTextContent('28-09-2026 – 18-10-2026');
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 sets');
+    expect(text('today-progress-period-range')).toHaveTextContent('28 Sep to 18 Oct');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+12');
+
+    // A day picked in one period is not carried into another.
+    fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 0 } });
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('28 Sep 0 sets');
 
     act(() => updatePreferences({ targetWindowWeeks: 1 }));
     // 1 week is the calendar week: 15 Oct's 6 sets against last week's 12 by Friday.
-    await waitFor(() => expect(text('today-progress-period-range')).toHaveTextContent('12-10-2026 – 18-10-2026'));
+    await waitFor(() => expect(text('today-progress-period-range')).toHaveTextContent('12 Oct to 18 Oct'));
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 6 sets');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('12 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('−6');
-    expect(text('today-progress-period-pace')).toHaveTextContent("behind last period's pace");
     expect(loadProgress.mock.calls).toEqual([[NOW, 3], [NOW, 1]]);
   });
 
@@ -479,7 +519,7 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     await renderCards();
 
     const chart = () => within(text('today-progress-chart')).UNSAFE_getByType(Svg);
-    expect(chart().props).toMatchObject({ width: 326, height: 104 });
+    expect(chart().props).toMatchObject({ width: 326, height: 126 });
     layout('today-progress-chart', { width: 313, height: 240 });
     expect(chart().props).toMatchObject({ width: 313, height: 240 });
   });

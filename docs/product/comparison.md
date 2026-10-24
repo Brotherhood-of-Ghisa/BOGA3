@@ -39,7 +39,7 @@ Weeks start Monday, local time.
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
-| Today, period pace | N-week periods from Mon 29 Dec 2025: this one through today | the previous period through the same day; its full total and daily series also appear |
+| Today, period pace | N-week periods from Mon 29 Dec 2025: to today or the chart's selected day, projected past today | the previous period to that day; its daily series |
 
 Why: include the unfinished week; Today's bar targets last week's whole total.
 Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and period windows in `apps/mobile/src/progress-summary/calculations.ts`.

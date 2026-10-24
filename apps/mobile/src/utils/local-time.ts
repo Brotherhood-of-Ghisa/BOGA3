@@ -32,6 +32,13 @@ export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): str
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const formatMonthYear = (date: Date): string => `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 
+/** `Oct 5`, or `5 Oct` when the selected format puts the day first: no year. */
+export const formatDayMonth = (date: Date, dateFormat: ExerciseDateFormat): string => {
+  if (!Number.isFinite(date.getTime())) return '—';
+  const month = MONTH_NAMES[date.getMonth()].slice(0, 3);
+  return dateFormat === 'DD-MM-YYYY' ? `${date.getDate()} ${month}` : `${month} ${date.getDate()}`;
+};
+
 /** A local calendar date and 24-hour clock in the user's selected format. */
 export const formatLocalDateTime = (epochMs: number, dateFormat: ExerciseDateFormat): string => {
   const date = new Date(epochMs);

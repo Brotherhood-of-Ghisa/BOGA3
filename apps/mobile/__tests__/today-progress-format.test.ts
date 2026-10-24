@@ -7,22 +7,26 @@
 import {
   CHART_RIGHT_GUTTER,
   formatSessionSummaryFigures,
-  formatPacePhrase,
+  formatPeriodDayLabel,
+  formatPeriodRange,
   formatPersonalRecordLead,
   formatSignedCount,
   formatWeekRange,
   sessionSummaryRecordLine,
   sessionSummaryAccessibilityLabel,
-  paceDifference,
   periodChartAccessibilityLabel,
+  periodChartAccessibilityValue,
   periodChartGeometry,
-  periodRangesAccessibilityLabel,
+  periodDayAtX,
+  periodDayFigures,
+  periodFiguresAccessibilityLabel,
   todayLabelAnchor,
   toPolyline,
   weekShare,
 } from '@/components/today/progress-format';
 import type { LatestSessionSummary, ProgressCounts, SessionPersonalRecord, TodayProgressPeriod } from '@/src/progress-summary';
 import { localPeriodWindow, localWeekWindow } from '@/src/utils/local-calendar';
+import { formatDayMonth } from '@/src/utils/local-time';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
@@ -111,24 +115,58 @@ describe('the period against the previous period', () => {
     expect(formatSignedCount(0)).toBe('0');
   });
 
-  it('compares to the previous period at the same day', () => {
-    const ahead = period({ now, cumulative: [102], toSameDay: counts(98) });
-    const behind = period({ now, cumulative: [90], toSameDay: counts(98) });
-    const level = period({ now, cumulative: [98], toSameDay: counts(98) });
-
-    expect(paceDifference(ahead)).toBe(4);
-    expect(formatPacePhrase(ahead)).toBe("ahead of last period's pace");
-    expect(formatPacePhrase(behind)).toBe("behind last period's pace");
-    expect(formatPacePhrase(level)).toBe("level with last period's pace");
+  it('compares today with the previous period at the same day', () => {
+    const october = period({ now, cumulative: days(19, (index) => index + 84), toSameDay: counts(98) });
+    expect(periodDayFigures(october, null)).toEqual({
+      dayIndex: 18,
+      date: local(2026, 10, 23),
+      previousDate: local(2026, 9, 25),
+      when: 'today',
+      workingSets: 102,
+      previousWorkingSets: 98,
+      difference: 4,
+    });
+    expect(formatPeriodDayLabel(periodDayFigures(october, null), 'DD-MM-YYYY')).toBe('Today');
   });
 
-  it('names both periods by their Monday–Sunday ranges', () => {
+  it('gives a selected past day its counts, and a later day the projection at the same rate', () => {
+    const october = period({
+      now,
+      cumulative: days(19, (index) => (index + 1) * 2),
+      previousCumulative: days(28, (index) => index * 3),
+      projected: 56,
+    });
+
+    const past = periodDayFigures(october, 4);
+    expect(past).toMatchObject({ when: 'past', workingSets: 10, previousWorkingSets: 12, difference: -2 });
+    expect(formatPeriodDayLabel(past, 'MM-DD-YYYY')).toBe('Oct 9');
+
+    // 38 sets over 19 days: 2 a day, reaching the projection on the last day.
+    const projected = periodDayFigures(october, 21);
+    expect(projected).toMatchObject({ when: 'projected', workingSets: 44, previousWorkingSets: 63, difference: -19 });
+    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY')).toBe('26 Oct (projected)');
+    expect(periodDayFigures(october, 27).workingSets).toBe(october.projectedWorkingSets);
+
+    // A selection outside the period stays on its edge.
+    expect(periodDayFigures(october, -3).dayIndex).toBe(0);
+    expect(periodDayFigures(october, 40).dayIndex).toBe(27);
+  });
+
+  it('names both periods by month and day, Monday to Sunday, without the year', () => {
     const october = period({ now, cumulative: days(19, () => 0) });
+    expect(formatPeriodRange(october.window, 'YYYY-MM-DD')).toBe('Oct 5 to Nov 1');
+    expect(formatPeriodRange(october.previous.window, 'DD-MM-YYYY')).toBe('7 Sep to 4 Oct');
+    expect(formatDayMonth(local(2026, 12, 28), 'MM-DD-YYYY')).toBe('Dec 28');
+    expect(formatDayMonth(new Date(Number.NaN), 'DD-MM-YYYY')).toBe('—');
     expect(formatWeekRange(october.window, 'DD-MM-YYYY')).toBe('05-10-2026 – 01-11-2026');
-    expect(formatWeekRange(october.previous.window, 'DD-MM-YYYY')).toBe('07-09-2026 – 04-10-2026');
-    expect(periodRangesAccessibilityLabel(october, 'YYYY-MM-DD')).toBe(
-      '4-week period, 2026-10-05 – 2026-11-01, against the last period, 2026-09-07 – 2026-10-04',
+  });
+
+  it('speaks both periods with the selected day as one heading', () => {
+    const october = period({ now, cumulative: days(19, () => 18), toSameDay: counts(6) });
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe(
+      '4-week period, Oct 5 to Nov 1: Today 18 sets, against the last period, Sep 7 to Oct 4: 6 sets by Sep 25, +12',
     );
+    expect(periodChartAccessibilityValue(periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, last period 6');
   });
 
   it('speaks the chart as one sentence', () => {
@@ -184,12 +222,33 @@ describe('the period chart geometry', () => {
 
   it('fits the plot to a given height, keeping the axis room under it (the cards layout)', () => {
     const input = period({ now, cumulative: [0, 10], previousCumulative: days(28, (index) => index), projected: 20 });
-    expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 86 });
+    expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 108 });
     const tall = periodChartGeometry(input, width, 240);
     expect(tall.plot.bottom).toBe(222);
     expect(tall.current[0].y).toBe(222);
     // Never a plot upside down, however short the space.
     expect(periodChartGeometry(input, width, 10).plot.bottom).toBe(6);
+  });
+
+  it('marks the selected day, on the projection after today', () => {
+    const october = period({ now, cumulative: days(19, (index) => (index + 1) * 2), previousCumulative: days(28, () => 10), projected: 56, toSameDay: counts(10) });
+    const atToday = periodChartGeometry(october, width);
+    expect(atToday.selected).toEqual({ current: atToday.today.current, previous: atToday.today.previous, projected: false });
+
+    const later = periodChartGeometry(october, width, undefined, periodDayFigures(october, 27));
+    expect(later.selected.projected).toBe(true);
+    expect(later.selected.current).toEqual(later.projection.to);
+    expect(later.selected.previous).toEqual(later.previous[27]);
+  });
+
+  it('picks the day nearest a touch across the plot, within the period', () => {
+    expect(periodDayAtX(0, plotWidth, 28)).toBe(0);
+    expect(periodDayAtX(plotWidth / 2, plotWidth, 28)).toBe(14);
+    expect(periodDayAtX(plotWidth, plotWidth, 28)).toBe(27);
+    expect(periodDayAtX(plotWidth + 30, plotWidth, 28)).toBe(27);
+    expect(periodDayAtX(-5, plotWidth, 28)).toBe(0);
+    expect(periodDayAtX(10, 0, 28)).toBe(0);
+    expect(periodDayAtX(10, plotWidth, 1)).toBe(0);
   });
 
   it('centres TODAY under today, flush with an edge it would overrun', () => {
