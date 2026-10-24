@@ -1407,8 +1407,8 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
  * pull again, repeating until a full round changes nothing locally in either
  * direction. There is no round cap: the loop is bounded by convergence itself
- * (and, per leg, by each RPC's own request timeout), so it keeps draining as
- * long as there is real work — a second device's live edit stream is followed,
+ * (and, per request, by the client's SUPABASE_REQUEST_TIMEOUT_MS), so it keeps
+ * draining as long as there is real work — a second device's live edit stream is followed,
  * not truncated, and a locally re-edited row keeps re-pushing its latest value.
  * The exit test counts rows ACTUALLY changed, not rows the server returned, so a
  * benign no-op re-pull (an echo of an already-local row) reads as quiet instead

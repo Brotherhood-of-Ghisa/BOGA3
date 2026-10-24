@@ -68,7 +68,7 @@
   session chain, readings) is `cycle-round-trip`'s, against the live server.
 - Current frontend baseline suites for this policy (Sync v2) include the
   `apps/mobile/__tests__/sync-cycle-*.test.ts` family
-  (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
+  (`-convergence`, `-pull`, `-push`, `-race`, `-request-timeout`, `-wire`),
   `sync-cycle-push-preflight.test.ts`, `sync-cycle-quarantine.test.ts`,
   `sync-bootstrapper.test.ts`, `sync-account-ownership.test.ts`,
   `local-wipe.test.ts`, `sync-status-composer.test.ts`,

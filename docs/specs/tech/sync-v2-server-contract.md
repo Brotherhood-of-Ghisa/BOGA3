@@ -352,9 +352,9 @@ Guarantees:
   re-running from the same state reaches the same end state.
 - Batch N's ack is applied before batch N+1 is built; otherwise N+1 would
   re-send the same rows.
-- **There is no round cap and no wall-clock deadline.** Convergence and each
-  request's HTTP timeout are the only bounds: a round cap would report a
-  non-converging spin as converged, hiding bugs and truncating legitimate
+- **There is no round cap and no cycle deadline.** Convergence and the
+  client's per-request timeout (`INTERNAL`) are the only bounds: a round cap
+  would report a non-converging spin as converged, hiding bugs and truncating legitimate
   update streams. A cycle resumes from persisted state, so a long one may span
   scheduler ticks.
 
