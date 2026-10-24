@@ -14,8 +14,9 @@ appId: com.dinoderek.mobile
 #      Done replaces it with Stats;
 #   5. Progress → Exercise reads back the session just written: the only
 #      on-device check of the Stats queries (their values over the harness
-#      fixtures are stats-screen-local-data.test.tsx). Its filter row is
-#      remembered on the device, so reopening Progress returns to Exercise.
+#      fixtures are stats-screen-local-data.test.tsx). The tab stays
+#      mounted, so the breakdown chosen holds for the visit: returning to
+#      Progress finds Exercise.
 #   6. an exercise row pushes its history page; its chart scrolls inside the
 #      page, and native back returns to Progress;
 #   7. the history grid opens its sessions ([[session.history-open]]): today's
@@ -148,9 +149,9 @@ appId: com.dinoderek.mobile
       id: "stats-history-screen"
     timeout: 30000
 # 5. The pinned switch opens exercise browsing without leaving Progress. Enter
-# on the breakdown this step starts from rather than on whatever the last run
-# of this lane left stored: Done has already mounted Progress, and a deep link
-# that changes its breakdown re-enters it, overriding the remembered filter.
+# on the breakdown this step starts from rather than on whatever default the
+# device stores: Done has already mounted Progress, and a deep link that
+# changes its breakdown re-enters it, overriding Settings' default breakdown.
 # Settings preserves List / Map across data resets; wait for the breakdown
 # chip rather than either layout before switching to Exercise.
 # The existing table/history scenario explicitly selects List; a previous visit

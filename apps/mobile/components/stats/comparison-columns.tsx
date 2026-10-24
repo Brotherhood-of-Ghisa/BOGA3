@@ -86,6 +86,7 @@ const inlinePeriodsText = (figures: { now: string; previous: string }): string =
 /**
  * The columns of a table pairing its periods: with Sets on one line, the
  * first column is as wide as its widest `now (previous)` and its sort arrow.
+ * Uncapped: a count pair (`123 (100)`) still leaves the name its room.
  */
 export const pairedPeriodColumns = (columns: number[], rows: ComparisonRow[], metric: ComparisonMetric): number[] =>
   inlinePeriods(metric)
