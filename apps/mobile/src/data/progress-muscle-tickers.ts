@@ -1,9 +1,37 @@
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { historyWeekBounds, localDateKey, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
-import { collectMuscleSetContributions, type MuscleAnalyticsInput, type MuscleSetContribution } from './muscle-analytics';
+import {
+  collectMuscleSetContributions, type MuscleAnalyticsInput, type MuscleReportAssignment, type MuscleSetContribution,
+} from './muscle-analytics';
 
 export type MuscleTrainingStarts = Record<string, { workingSetCount?: Date; totalVolume?: Date }>;
+const earlier = (left: Date | undefined, right: Date | undefined): Date | undefined =>
+  left === undefined || (right !== undefined && right < left) ? right : left;
+
+/**
+ * Training starts read by anatomy entry, re-keyed to the user's muscles
+ * ([[muscle.report-groups]]): a muscle starts when its earliest entry did, and
+ * an untracked entry starts nothing.
+ */
+export const reportMuscleTrainingStarts = (
+  starts: MuscleTrainingStarts | undefined, assignment: MuscleReportAssignment,
+): MuscleTrainingStarts | undefined => {
+  if (!starts) return starts;
+  const reported: MuscleTrainingStarts = {};
+  for (const [entryId, entry] of Object.entries(starts)) {
+    const assigned = assignment.get(entryId);
+    if (assigned?.tracked === false) continue;
+    const muscleId = assigned?.muscle.id ?? entryId;
+    const merged = reported[muscleId];
+    reported[muscleId] = merged ? {
+      workingSetCount: earlier(merged.workingSetCount, entry.workingSetCount),
+      totalVolume: earlier(merged.totalVolume, entry.totalVolume),
+    } : entry;
+  }
+  return reported;
+};
+
 export type MuscleTickerObservation = { at: Date; value: number | null };
 export type MuscleTickerSeries = { observations: MuscleTickerObservation[]; reference: number | null };
 export type ProgressMuscleTickers = {

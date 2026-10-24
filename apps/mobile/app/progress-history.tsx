@@ -23,7 +23,8 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
-import { exerciseCountedMuscles } from '@/src/exercise-catalog/exercise-muscles';
+import { reportedExerciseMuscles, reportedMuscleName } from '@/src/exercise-catalog/reported-muscles';
+import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -223,17 +224,20 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     () => subject?.kind === 'exercise' ? catalog.exercises.find(candidate => candidate.id === subject.id) ?? null : null,
     [catalog, subject]
   );
+  // A muscle is the user's muscle ([[muscle.report-groups]]): an entry merged
+  // into another, or one they do not track, has no history page of its own.
+  const muscleSetup = catalog.muscleSetup ?? EMPTY_MUSCLE_SETUP;
   const name = subject?.kind === 'muscle'
-    ? catalog.muscleGroupsById[subject.id]?.displayName ?? null
+    ? reportedMuscleName(muscleSetup, catalog.muscleGroupsById, subject.id)
     : exercise?.name ?? null;
-  // The muscles the ⋮ links to: an exercise's counted muscles the catalogue
-  // can name. A muscle's own page links to none.
+  // The muscles the ⋮ links to: an exercise's counted muscles as the user sees
+  // them, which the catalogue can name. A muscle's own page links to none.
   const muscleLinks = useMemo(
-    () => exercise ? exerciseCountedMuscles(exercise).flatMap(({ muscleGroupId, role }) => {
-      const muscleName = catalog.muscleGroupsById[muscleGroupId]?.displayName;
+    () => exercise ? reportedExerciseMuscles(exercise, muscleSetup.assignment).flatMap(({ muscleGroupId, role }) => {
+      const muscleName = reportedMuscleName(muscleSetup, catalog.muscleGroupsById, muscleGroupId);
       return muscleName ? [{ id: muscleGroupId, name: muscleName, role }] : [];
     }) : [],
-    [catalog, exercise]
+    [catalog, exercise, muscleSetup]
   );
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(

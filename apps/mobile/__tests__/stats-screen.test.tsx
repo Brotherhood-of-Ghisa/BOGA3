@@ -1225,6 +1225,27 @@ it('draws the three filter chips as one equal-width outline row', () => {
 });
 
 
+describe('Exercise list family headers follow the user’s muscles', () => {
+  const sets = { workingSetCount: 3, totalVolume: 900, volumeSetCount: 3 };
+  const items = [listItem('squat', { name: 'Squat', current: sets }), listItem('bench', { name: 'Bench', current: sets }),
+    listItem('mystery', { name: 'Mystery', current: sets })];
+  const families = new Map([['squat', 'Legs'], ['bench', 'Chest'], ['mystery', 'Other']]);
+  const headers = () => screen.queryAllByTestId(/^stats-exercise-family-header-/).map(row => row.props.children);
+  const names = () => screen.getAllByTestId(/^stats-exercise-name-/).map(row => row.props.children);
+
+  it('headers only families with two or more of the user’s muscles, before the summary has loaded', () => {
+    renderStatsScreenShell({ summary: null, viewMode: 'exercise', exerciseListItems: items, exerciseFamilies: families,
+      muscleFamilyCounts: new Map([['Legs', 2], ['Chest', 1]]) });
+    expect(headers()).toEqual(['Legs', 'Other']);
+    expect(names()).toEqual(['Bench', 'Squat', 'Mystery']);
+  });
+
+  it('keeps every header and the family order when the muscle counts are unknown', () => {
+    renderStatsScreenShell({ summary: null, viewMode: 'exercise', exerciseListItems: items, exerciseFamilies: families });
+    expect(headers()).toEqual(['Chest', 'Legs', 'Other']);
+  });
+});
+
 describe('Progress table ordering', () => {
   it('keeps the family order fixed, custom families alphabetical and Other last', () => {
     expect(['Other', 'Custom B', 'Legs', 'Custom A', 'Chest'].sort(compareProgressFamilies))
@@ -1238,8 +1259,10 @@ describe('Progress table ordering', () => {
       { ...muscles[0], muscleGroupId: 'null', displayName: 'Absent', familyName: 'Chest', current: { ...muscles[0].current, totalVolume: null } },
       { ...muscles[0], muscleGroupId: 'large', displayName: 'Large', familyName: 'Legs', current: { ...muscles[0].current, totalVolume: 100 } },
     ];
+    // Both families have two muscles among the user's, so both keep the family order.
+    const familyCounts = new Map([['Chest', 2], ['Legs', 2]]);
     const ids = (grouped: boolean, mode: 'now-asc' | 'now-desc' | 'name-asc' | 'name-desc') =>
-      sortProgressMuscles(rows, mode, 'totalVolume', grouped).map(row => row.muscleGroupId);
+      sortProgressMuscles(rows, mode, 'totalVolume', grouped, familyCounts).map(row => row.muscleGroupId);
     expect(ids(true, 'now-desc')).toEqual(['zero', 'null', 'large']);
     expect(ids(false, 'now-desc')).toEqual(['large', 'zero', 'null']);
     expect(ids(false, 'now-asc')).toEqual(['zero', 'large', 'null']);

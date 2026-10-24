@@ -6,19 +6,20 @@ import { MuscleBodyCard } from './muscle-body-card';
 import { HISTORY_VIEW_OPTIONS } from './history-view';
 import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } from './progress-tables';
 
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMuscleLayout } from '@/src/preferences/model';
-type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout };
+type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; report?: MuscleReportAssignment };
 
 // Settings chooses the layout; both share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
-  const { muscles, metric, selectedId, muscleLayout, onSelect, onMuscleHistory, onExerciseHistory } = props;
+  const { muscles, metric, selectedId, muscleLayout, onSelect, onMuscleHistory, onExerciseHistory, report } = props;
   const { width } = useWindowDimensions();
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, exercises, metric);
   return <View style={styles.body}>
-    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} />
+    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} />
     {selected ? <StatsTable testID="stats-contributions">
       <View style={styles.contributionHeader}>
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selected.displayName}</Text>

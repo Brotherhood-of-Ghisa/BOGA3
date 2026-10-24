@@ -14,6 +14,7 @@ import {
   type SegmentedControlOption,
 } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { comparisonFigures, metricUnit } from './comparison-columns';
 import {
@@ -31,6 +32,8 @@ type Props = {
   readonly metric: ProgressMetric;
   readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
+  /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
+  readonly report?: MuscleReportAssignment;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -97,7 +100,7 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * in CIE LCh, supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects/deselects a muscle group on tap.
  */
-export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props) {
+export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
@@ -121,9 +124,10 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect }: Props)
         height: VIEWPORT_HEIGHT,
         buckets,
         selectedId,
+        report,
         palette,
       }),
-    [angleDeg, buckets, palette, selectedId, viewportWidth]
+    [angleDeg, buckets, palette, report, selectedId, viewportWidth]
   );
 
   const selectedMuscle = useMemo(

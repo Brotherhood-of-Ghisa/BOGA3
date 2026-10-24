@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
+import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import type { ExerciseBodyMuscleDetail, ExerciseContributionEntry } from './exercise-body-data';
 import { MuscleBodyCard } from './muscle-body-card';
@@ -15,6 +16,7 @@ export function ExerciseBodyView({
   onSelectMuscle,
   renderAll,
   renderDetail,
+  report,
 }: {
   muscles: readonly ProgressMuscleComparison[];
   metric: ProgressMetric;
@@ -23,9 +25,10 @@ export function ExerciseBodyView({
   onSelectMuscle: (muscleGroupId: string) => void;
   renderAll: () => ReactNode;
   renderDetail: (entries: ExerciseContributionEntry[], secondary?: readonly ExerciseContributionEntry[]) => ReactNode;
+  report?: MuscleReportAssignment;
 }) {
   return <View style={styles.body}>
-    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} />
+    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} report={report} />
     {selectedMuscle ? <View testID="stats-exercise-body-detail" style={styles.detail}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selectedMuscle.displayName}</Text>
       {renderDetail(selectedMuscle.exercises, selectedMuscle.secondary)}
