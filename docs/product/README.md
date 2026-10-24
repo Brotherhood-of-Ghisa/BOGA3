@@ -6,7 +6,9 @@ below, or when a doc you load cites one of its facts (`[[set.eligibility]]`
 is in `set.md`). When unsure, load it.
 
 - **Status**: `accepted` is decided; `open` is undecided, so a builder who
-  needs it stops and asks; `superseded-by: <id>` names its replacement.
+  needs it decides it; `superseded-by: <id>` names its replacement. No fact
+  change needs sign-off, but each is highlighted (authoring doc, "Changing a
+  fact").
 - `Why:` is the reason, for cases a fact does not list. `Pending:` names where
   the code does not yet match.
 - If you are writing or changing a fact, load

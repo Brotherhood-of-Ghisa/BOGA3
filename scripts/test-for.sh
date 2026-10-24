@@ -16,8 +16,8 @@
 # the rule that selected it. `frontend` subsumes `frontend-ui`.
 #
 # The output is a DEFAULT, not a requirement (spec 02, "Choosing lanes"): the
-# agent proposes a lane set from it plus judgement, the operator agrees it, and
-# the PR lists the lanes that ran. Exit code is 0 unless the registry is
+# agent proposes a lane set from it plus judgement, its reviewer agent agrees
+# it, and the PR lists the lanes that ran. Exit code is 0 unless the registry is
 # unreadable.
 
 set -euo pipefail
@@ -194,7 +194,7 @@ if target_platform == "android":
     plat_suffix = " [Linux/Android host]"
 elif target_platform == "ios":
     plat_suffix = " [macOS/iOS host]"
-print(f"DEFAULT (union){plat_suffix} — propose to the operator; agree the final set before running slow lanes:")
+print(f"DEFAULT (union){plat_suffix} — propose to your reviewer agent; agree the final set before running slow lanes:")
 for r in ordered:
     print(f"  ./boga test {r:<14} — {'; '.join(sorted(required[r]))}")
 if skipped_lanes:

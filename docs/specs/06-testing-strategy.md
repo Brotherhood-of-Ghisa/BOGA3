@@ -95,7 +95,7 @@ the real path only where the path itself is under test.
   otherwise the screen test covers the query.
 - Run a targeted test or lane after each meaningful change, then
   `./boga test fast` before closeout. Simulator and Docker lanes run as agreed
-  with the operator, from the path default (`02`, "Choosing lanes").
+  with your reviewer agent, from the path default (`02`, "Choosing lanes").
 - Fixtures and mechanics — the shared in-memory database, device SQLite parity,
   the pinned time zone, hang safety, Maestro flow rules — are in
   `docs/specs/writing-tests.md`. **Load it when you are writing a test.**
@@ -109,9 +109,9 @@ reach; everything else is Jest.
   reasons in the Device-e2e row above, or two users. Screen state, copy,
   formatting, conditional rendering, calculated values, and local sorting or
   toggles are Jest.
-- **New Maestro coverage needs the operator.** Adding a flow, or a scenario to an
-  existing flow, needs a justification (which device-only reason, and why Jest
-  cannot prove it) and explicit approval *before* it is written. Removing Maestro
+- **New Maestro coverage needs a justification.** Adding a flow, or a scenario
+  to an existing flow, needs a written justification (which device-only reason,
+  and why Jest cannot prove it) *before* it is written. Removing Maestro
   coverage that Jest now owns does not.
 - **Flows state what they prove**, in a header block: `Proves:` (the behaviours
   it asserts), `Why device:` (the reason for each), `Jest counterpart:` (the Jest

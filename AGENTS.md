@@ -20,8 +20,9 @@ place each under `docs/specs/**`, routed from here.
    shared by all worktrees). If a lane has no data, run it; the gate records
    it. Estimating a duration is an error.
 
-3. **Jest always; slower lanes by agreement with the operator** (the human you
-   are working with). Run the agreed lanes to green before opening the PR.
+3. **Jest always; slower lanes agreed with your reviewer agent** (the
+   operator — the human you are working with — may override when present). Run
+   the agreed lanes to green before opening the PR.
    `./boga` is the single entrypoint (runnable from anywhere in the repo;
    lanes defined in `scripts/lanes.tsv`; `./boga test --list` shows everything):
 
@@ -52,14 +53,14 @@ place each under `docs/specs/**`, routed from here.
    - **Jest is never optional:** every code change adds or updates Jest
      coverage for the behaviour it changes and passes `boga test fast`.
    - **The table is a default, not a rule.** Before running any lane beyond
-     `boga test fast`, propose a lane set to the operator — the default lowered or
-     raised by judgement (`cosmetic`, `copy-only`, `test-only`, `docs-only`,
-     `covered-by-jest`; definitions in spec `02`, "Choosing lanes") — and run
-     what they agree.
+     `boga test fast`, propose a lane set to your reviewer agent — the default
+     lowered or raised by judgement (`cosmetic`, `copy-only`, `test-only`,
+     `docs-only`, `covered-by-jest`; definitions in spec `02`, "Choosing
+     lanes") — and run what you agree.
    - **Maestro is minimal.** Run only the lanes whose flows exercise the change.
-     Adding a Maestro flow or scenario needs a justification (why Jest cannot
-     prove it) and the operator's approval first; every flow states what it
-     proves (spec `06`, "Maestro scope policy").
+     Adding a Maestro flow or scenario needs a written justification first (why
+     Jest cannot prove it); every flow states what it proves (spec `06`,
+     "Maestro scope policy").
    - **Quality targets — run once before the PR.** Not in CI and not in
      `boga test fast`, so nothing runs them for you: on the finished change run
      `./boga test jest-coverage`, `./boga test complexity` and
@@ -131,10 +132,9 @@ never a spec of the result: what must outlive the build moves to its owner.
 - `docs/specs/03-technical-architecture.md` — tech choices, decision register.
 - `docs/specs/09-project-structure.md` — repo layout, path ownership.
 - `docs/product/README.md` — which product-decision files (what counts, how
-  figures are computed and shown, screen copy) your task loads. Never decide
-  an `open` fact or change an `accepted` one without the product owner's
-  approval: stop and ask. An approved fact change may ship in the PR that
-  implements it.
+  figures are computed and shown, screen copy) your task loads. Adding a fact,
+  changing an `accepted` one or deciding an `open` one needs no sign-off, but
+  highlight it in the plan and in the PR body's `Product facts:` line.
 
 ## Load on demand (by task area)
 
@@ -220,6 +220,7 @@ manually written content.
 Follow `.github/pull_request_template.md`: **Objective / Tests / Review hard /
 Deviations**, using data and `file:line` pointers, not prose (~25 lines; link,
 don't quote). **Tests** lists each lane run, result and evidence link ("CI green"
-alone is insufficient), operator agreement, and skipped defaults with reasons.
+alone is insufficient), reviewer-agent agreement, and skipped defaults with
+reasons.
 Before opening, run `docs/procedures/product-review.md` on the branch diff
 alongside `/code-review`; put its verdict on **Tests**' `Product facts:` line.

@@ -52,7 +52,7 @@ same PR:
 
 | What the build settled | Owner |
 | --- | --- |
-| A product decision a user can observe (what counts, what is shown, the words) | a fact in `docs/product/` (the product owner approves) |
+| A product decision a user can observe (what counts, what is shown, the words) | a fact in `docs/product/` (highlighted in the PR) |
 | A rule shared by several screens | `ux-rules.md` or `design-language.md` |
 | A screen's layout and behaviour | the component's header comment and its Jest tests; `screen-map.md` for route entry, exit and states |
 | Everything else (pixels, spacing, mock copy, how the design evolved) | nowhere: the shipped app is the record |

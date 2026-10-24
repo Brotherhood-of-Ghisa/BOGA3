@@ -34,8 +34,8 @@ quality (that is `/code-review`).
      only class that takes words out: check every diff touching a screen a
      fact describes.
 
-   When unsure between **changes** and **violates**, choose **changes**: the
-   product owner decides either way.
+   When unsure between **changes** and **violates**, choose **changes**: it
+   is highlighted for humans either way.
 4. Code moving towards a cited fact's `Pending:` line: no finding.
 5. Drop anything you cannot tie to a concrete line of the diff.
 
@@ -45,15 +45,17 @@ One line per finding, most severe first, then a one-line verdict:
 
 ```text
 <class> <fact id or "none"> — <file>:<line> — <what a user would observe, one sentence>
-Verdict: clean | needs decision | needs fix
+Verdict: clean | fact changes | needs fix
 ```
 
 - **violates** → `needs fix`.
-- **changes**, **answers**, **new decision** → `needs decision`: the
-  product owner decides, in a `docs/product/**` change, before merge. For a
-  new decision, propose the fact (ID, kind, statement) in one line.
+- **changes**, **answers**, **new decision** → `fact changes`: no sign-off
+  is needed, provided the diff updates the fact in `docs/product/**` and the
+  PR body's `Product facts:` line highlights its ID. Either missing →
+  `needs fix`; for an unrecorded new decision, propose the fact (ID, kind,
+  statement) in one line.
 - **restates** → `needs fix` (replace with `[[id]]`).
-- **over-specified** → `needs decision`: name the fact's lines to drop.
+- **over-specified** → `fact changes`: name the fact's lines to drop.
 - No findings → `Verdict: clean`. Do not pad with style or code remarks.
 
 ## Audit mode

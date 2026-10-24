@@ -35,7 +35,7 @@ Signature: `<text>`, `<text>`  (optional)
 - **Small**: a statement — the header down to `Why:`, examples excluded — is at
   most 130 words. Longer usually describes a screen: split it into its
   decisions, or leave render detail to its component and tests. Keep a line
-  only if changing it would need the product owner.
+  only if changing it would be a product decision.
 - **Examples** for definitions and calculations are table rows a test can run.
   A principle carries at most three: one bad, one good, one kept exception;
   review verdicts stay in git and PR bodies.
@@ -54,8 +54,10 @@ budgets` prints statement sizes.
 
 ## Changing a fact
 
-1. A fact may change in its own PR or in the PR that implements it. The
-   product owner's approval is the decision; the PR body names each fact ID
-   it changes.
+1. A fact may change in its own PR or in the PR that implements it. No
+   sign-off is needed, but every product change — a new fact, a changed
+   `accepted` fact, a decided `open` fact — is highlighted so humans see it:
+   in the plan while planning, and in the PR body, whose `Product facts:` line
+   names each such ID. `product-review.md` checks none is missed.
 2. Implementation PRs cite the fact IDs they implement and remove its
    `Pending:` line when the code matches.
