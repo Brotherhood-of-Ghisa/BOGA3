@@ -78,3 +78,5 @@ begin
   execute definition;
 end
 $migration$;
+
+drop function pg_temp.replace_once(text, text, text, text);
