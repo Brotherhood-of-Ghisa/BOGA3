@@ -26,11 +26,13 @@ const ENTRIES = [
   { id: 'forearms_grip', displayName: 'Forearms', familyName: 'Arms', sortOrder: 70 },
 ];
 
-/** The user's entry rows after choosing Broad: each member holds its muscle's key; untracked ones are off. */
+/** The user's entry rows after choosing Broad: each member holds its muscle's key. */
 const broadRows = ENTRIES.map((entry) => {
   const muscle = BROAD_MUSCLE_PRESET.muscles.find((candidate) => candidate.entries.includes(entry.id));
-  return { ...entry, reportGroup: muscle?.key ?? null, tracked: BROAD_MUSCLE_PRESET.untracked.includes(entry.id) ? 0 : 1 };
+  return { ...entry, reportGroup: muscle?.key ?? null, tracked: 1 };
 });
+/** Broad, with the user's Track switch off for Forearms. */
+const forearmsOffRows = broadRows.map((entry) => (entry.id === 'forearms_grip' ? { ...entry, tracked: 0 } : entry));
 const detailedRows = ENTRIES.map((entry) => ({ ...entry, reportGroup: null, tracked: 1 }));
 
 const exercise = (
@@ -104,7 +106,7 @@ describe('completed-session muscle breakdown under Broad', () => {
   });
 
   it('drops untracked muscles from the breakdown while the sets stay counted as work', () => {
-    const summary = summarize(broadRows, [row('fly', 2, 0)]);
+    const summary = summarize(forearmsOffRows, [row('fly', 2, 0)]);
     expect(summary.workingSetsByMuscle.map((muscle) => muscle.displayName)).toEqual(['Chest']);
     expect(summary.workingSetCount).toBe(2);
   });

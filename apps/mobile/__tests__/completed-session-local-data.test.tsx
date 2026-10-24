@@ -410,7 +410,7 @@ describe('completed-session detail over real data', () => {
       for (const muscle of BROAD_MUSCLE_PRESET.muscles) {
         localDatabase().update(muscleGroups).set({ reportGroup: muscle.key }).where(inArray(muscleGroups.id, [...muscle.entries])).run();
       }
-      localDatabase().update(muscleGroups).set({ tracked: 0 }).where(inArray(muscleGroups.id, [...BROAD_MUSCLE_PRESET.untracked])).run();
+      localDatabase().update(muscleGroups).set({ tracked: 0 }).where(eq(muscleGroups.id, 'spinal_erectors')).run();
       invalidateExerciseCatalogCache();
     });
 
