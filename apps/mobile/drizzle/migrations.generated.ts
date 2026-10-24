@@ -145,6 +145,12 @@ export const generatedMigrationBundle = {
     tag: "0022_plan_last_modified_by",
     breakpoints: true,
   },
+  {
+    idx: 23,
+    when: 1792847536927,
+    tag: "0023_muscle_groups_report_group_tracked",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -856,6 +862,9 @@ END;
 ALTER TABLE \`session_plans\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));--> statement-breakpoint
 ALTER TABLE \`session_plan_exercises\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));--> statement-breakpoint
 ALTER TABLE \`session_plan_sets\` ADD \`last_modified_by\` text DEFAULT 'human' NOT NULL CHECK (\`last_modified_by\` in ('human', 'agent'));
+`,
+  m0023: `ALTER TABLE \`muscle_groups\` ADD \`report_group\` text;--> statement-breakpoint
+ALTER TABLE \`muscle_groups\` ADD \`tracked\` integer DEFAULT 1 NOT NULL CONSTRAINT "muscle_groups_tracked_boolean_guard" CHECK (\`tracked\` in (0, 1));
 `,
   },
 } as const;

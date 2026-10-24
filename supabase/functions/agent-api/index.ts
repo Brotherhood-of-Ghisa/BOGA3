@@ -750,24 +750,30 @@ const projectCatalogExercises = async (
   }));
 };
 
-/** The owner's muscle taxonomy: the ids an exercise's muscles must name. */
+/**
+ * The owner's muscle taxonomy: the ids an exercise's muscles must name. Each
+ * entry carries the user's setup: the `report_group` key it reports under
+ * (null = the entry is its own muscle) and whether that muscle is `tracked`.
+ */
 const listMuscles = async (client: SupabaseClient, userId: string): Promise<JsonObject> => {
   const { data, error } = await client
     .schema('app_public')
     .from('muscle_groups')
-    .select('id,display_name,family_name,sort_order')
+    .select('id,display_name,family_name,sort_order,report_group,tracked')
     .eq('owner_user_id', userId)
     .is('deleted_at', null)
     .order('sort_order')
     .order('id')
     .limit(500)
-    .returns<Array<MuscleGroupRow & { sort_order: number }>>();
+    .returns<Array<MuscleGroupRow & { sort_order: number; report_group: string | null; tracked: number }>>();
   throwDatabaseError(error);
   return {
     muscles: (data ?? []).map((row) => ({
       id: row.id,
       name: row.display_name,
       family: row.family_name,
+      report_group: row.report_group,
+      tracked: row.tracked !== 0,
     })),
   };
 };

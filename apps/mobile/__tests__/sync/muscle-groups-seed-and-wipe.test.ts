@@ -135,6 +135,32 @@ describe('the starter-catalog seed writes muscle_groups dirty and is marker-gate
   });
 });
 
+describe('the starter-catalog seed never writes the user\'s muscle setup', () => {
+  it('seeds every entry as its own tracked muscle', () => {
+    seedInto(database);
+
+    const rows = database.select().from(muscleGroups).all();
+    expect(rows.every((row) => row.reportGroup === null && row.tracked === 1)).toBe(true);
+  });
+
+  it('keeps report_group and tracked when a re-seed upserts rows the account already holds', () => {
+    // Rows pulled for an account whose user chose a setup; the seed marker is
+    // still 0, so the seeder upserts over them.
+    seedInto(database);
+    database.update(muscleGroups).set({ reportGroup: 'held_group', tracked: 0, displayName: 'Old name' }).run();
+    database.delete(syncRuntimeState).run();
+
+    seedInto(database);
+
+    const rows = database.select().from(muscleGroups).all();
+    expect(rows).toHaveLength(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+    // The seeder did rewrite the rows it owns…
+    expect(rows.every((row) => row.displayName !== 'Old name')).toBe(true);
+    // …and left the user's setup alone.
+    expect(rows.every((row) => row.reportGroup === 'held_group' && row.tracked === 0)).toBe(true);
+  });
+});
+
 describe('there is no standalone muscle-group boot seed', () => {
   it('exposes no standalone muscle-group seed export from the catalog-seeds module', () => {
     const catalogSeeds = jest.requireActual('@/src/data/exercise-catalog-seeds') as Record<

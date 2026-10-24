@@ -354,6 +354,9 @@ try {
       if (!muscleList.some((m) => isObject(m) && m.id === smokeMuscleId)) {
         throw new Error('list_muscles did not return the seeded muscle.');
       }
+      if (!muscleList.every((m) => isObject(m) && 'report_group' in m && typeof m.tracked === 'boolean')) {
+        throw new Error('list_muscles did not return each muscle’s report_group and tracked state.');
+      }
 
       const created = structured(
         await client.callTool({

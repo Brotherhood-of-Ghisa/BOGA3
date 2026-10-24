@@ -231,6 +231,7 @@ GYM_CLAMP_ID="push-gym-clamp-${RUN_TAG}"
 GYM_CROSS_OWNER_ID="push-gym-cross-${RUN_TAG}"
 EXDEF_A_ID="push-exdef-a-${RUN_TAG}"
 EXDEF_PATCH_ID="push-exdef-patch-${RUN_TAG}"
+MUSCLE_SETUP_ID="push-muscle-setup-${RUN_TAG}"
 SESSION_A_ID="push-session-a-${RUN_TAG}"
 SX_A_ID="push-sx-a-${RUN_TAG}"
 SX_ORPHAN_ID="push-sx-orphan-${RUN_TAG}"
@@ -422,6 +423,53 @@ sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
 assert_status "200" "exercise-definition split_by_gym cleared"
 service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=split_by_gym"
 assert_json_expr 'length == 1 and .[0].split_by_gym == false' "an explicit false clears the flag"
+
+# ===========================================================================
+# 3c. The muscle setup columns are additive: an insert without the keys stores
+#     the defaults (the entry is its own, tracked muscle) and a writer that
+#     omits them keeps the stored values, so a build predating the fields
+#     cannot reset a user's muscle setup.
+# ===========================================================================
+
+echo "[sync-push] omitted report_group and tracked keep the stored values"
+muscle_payload() {
+  # $1 client_updated_at_ms, $2 display name, $3 JSON object merged into fields.
+  jq -nc --arg id "${MUSCLE_SETUP_ID}" --argjson cuam "$1" --arg name "$2" --argjson setup "$3" \
+    '{entities: [
+      {type: "muscle_groups", id: $id, client_updated_at_ms: $cuam,
+       fields: ({display_name: $name, family_name: "Back", sort_order: 7, is_editable: 0,
+                 created_at: $cuam, updated_at: $cuam, deleted_at: null} + $setup)}
+    ]}'
+}
+
+T_MUSCLE_INSERT=$((BASE_MS + 170))
+sync_push "${USER_A_TOKEN}" "$(muscle_payload "${T_MUSCLE_INSERT}" "Lats" '{}')"
+assert_status "200" "muscle-group insert without setup keys"
+service_select "muscle_groups" "owner_user_id=eq.${USER_A_UUID}&id=eq.${MUSCLE_SETUP_ID}&select=report_group,tracked"
+assert_json_expr 'length == 1 and .[0].report_group == null and .[0].tracked == 1' \
+  "an insert without the keys stores the defaults"
+
+T_MUSCLE_SET=$((BASE_MS + 180))
+sync_push "${USER_A_TOKEN}" "$(muscle_payload "${T_MUSCLE_SET}" "Lats" '{"report_group":"back","tracked":0}')"
+assert_status "200" "muscle-group setup update"
+service_select "muscle_groups" "owner_user_id=eq.${USER_A_UUID}&id=eq.${MUSCLE_SETUP_ID}&select=report_group,tracked"
+assert_json_expr 'length == 1 and .[0].report_group == "back" and .[0].tracked == 0' \
+  "a payload carrying the keys sets them"
+
+T_MUSCLE_OMITTED=$((BASE_MS + 190))
+sync_push "${USER_A_TOKEN}" "$(muscle_payload "${T_MUSCLE_OMITTED}" "Older Writer" '{}')"
+assert_status "200" "muscle-group update omitting setup keys"
+service_select "muscle_groups" "owner_user_id=eq.${USER_A_UUID}&id=eq.${MUSCLE_SETUP_ID}&select=display_name,report_group,tracked,client_updated_at_ms"
+assert_json_expr --argjson cuam "${T_MUSCLE_OMITTED}" \
+  'length == 1 and .[0].display_name == "Older Writer" and .[0].report_group == "back" and .[0].tracked == 0 and .[0].client_updated_at_ms == $cuam' \
+  "a newer write omitting the keys keeps the stored setup while its other fields land"
+
+T_MUSCLE_CLEAR=$((BASE_MS + 195))
+sync_push "${USER_A_TOKEN}" "$(muscle_payload "${T_MUSCLE_CLEAR}" "Lats" '{"report_group":null,"tracked":1}')"
+assert_status "200" "muscle-group setup cleared"
+service_select "muscle_groups" "owner_user_id=eq.${USER_A_UUID}&id=eq.${MUSCLE_SETUP_ID}&select=report_group,tracked"
+assert_json_expr 'length == 1 and .[0].report_group == null and .[0].tracked == 1' \
+  "an explicit null and 1 clear the setup"
 
 # ===========================================================================
 # 4. LWW newer wins — push T=100, then T=200 with a different name.
@@ -793,6 +841,7 @@ service_delete "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=like.push-set
 service_delete "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=like.push-sx-%-${RUN_TAG}"
 service_delete "sessions" "owner_user_id=eq.${USER_A_UUID}&id=like.push-session-%-${RUN_TAG}"
 service_delete "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=like.push-exdef-%-${RUN_TAG}"
+service_delete "muscle_groups" "owner_user_id=eq.${USER_A_UUID}&id=like.push-muscle-%-${RUN_TAG}"
 service_delete "gyms" "owner_user_id=eq.${USER_A_UUID}&id=like.push-gym-%-${RUN_TAG}"
 service_delete "gyms" "owner_user_id=eq.${USER_A_UUID}&id=like.push-batch-200-${RUN_TAG}-%"
 

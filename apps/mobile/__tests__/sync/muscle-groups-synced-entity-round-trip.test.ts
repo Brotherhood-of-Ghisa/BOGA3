@@ -11,7 +11,7 @@
  * enables at boot via `PRAGMA foreign_keys = ON`):
  *
  *   1. Wire round-trip — a muscle-group row serialises to the shared wire
- *      envelope carrying exactly the seven typed columns, and an incoming
+ *      envelope carrying exactly the nine typed columns, and an incoming
  *      envelope reads back into a local row with `deleted_at`, the local-only
  *      bookkeeping columns, and the generated `id` default all intact.
  *   2. Registry — `muscle_groups` is a member of the entity-table set, sits in
@@ -255,7 +255,7 @@ const markBootstrapDone = (): void => {
 // =============================================================================
 
 describe('muscle_groups serialises onto the shared wire envelope and reads back intact', () => {
-  it('emits exactly the seven typed columns under fields, never the local-only columns', () => {
+  it('emits exactly the nine typed columns under fields, never the local-only columns', () => {
     const deletedAt = new Date(1_717_000_000_000);
     const wire = entityToWire(
       {
@@ -264,6 +264,8 @@ describe('muscle_groups serialises onto the shared wire envelope and reads back 
         familyName: 'chest',
         sortOrder: 1,
         isEditable: 0,
+        reportGroup: 'chest',
+        tracked: 0,
         createdAt: new Date(1_716_000_000_000),
         updatedAt: new Date(1_716_500_000_000),
         deletedAt,
@@ -277,7 +279,7 @@ describe('muscle_groups serialises onto the shared wire envelope and reads back 
     expect(wire.id).toBe('chest_clavicular');
     // The wire LWW key is the row's monotonic local timestamp.
     expect(wire.client_updated_at_ms).toBe(4242);
-    // Exactly the seven typed columns; the two local-only bookkeeping columns
+    // Exactly the nine typed columns; the two local-only bookkeeping columns
     // (the dirty bit and the monotonic stamp) never cross the wire.
     expect(Object.keys(wire.fields).sort()).toEqual([
       'created_at',
@@ -285,13 +287,17 @@ describe('muscle_groups serialises onto the shared wire envelope and reads back 
       'display_name',
       'family_name',
       'is_editable',
+      'report_group',
       'sort_order',
+      'tracked',
       'updated_at',
     ]);
     expect(wire.fields.display_name).toBe('Clavicular Chest');
     expect(wire.fields.family_name).toBe('chest');
     expect(wire.fields.sort_order).toBe(1);
     expect(wire.fields.is_editable).toBe(0);
+    expect(wire.fields.report_group).toBe('chest');
+    expect(wire.fields.tracked).toBe(0);
     // Timestamp columns emit epoch-ms integers.
     expect(wire.fields.deleted_at).toBe(deletedAt.getTime());
     expect(wire.fields.local_dirty).toBeUndefined();
@@ -309,6 +315,8 @@ describe('muscle_groups serialises onto the shared wire envelope and reads back 
         family_name: 'back',
         sort_order: 2,
         is_editable: 0,
+        report_group: 'back',
+        tracked: 0,
         created_at: 1_716_000_000_000,
         updated_at: 1_716_700_000_000,
         deleted_at: 1_717_000_000_000,
@@ -327,6 +335,8 @@ describe('muscle_groups serialises onto the shared wire envelope and reads back 
     database.insert(muscleGroups).values(values as never).run();
     const stored = database.select().from(muscleGroups).where(eq(muscleGroups.id, 'back_lats')).get();
     expect(stored?.displayName).toBe('Lats');
+    expect(stored?.reportGroup).toBe('back');
+    expect(stored?.tracked).toBe(0);
     expect(stored?.deletedAt).toEqual(new Date(1_717_000_000_000));
     expect(stored?.localDirty).toBe(false);
 
@@ -361,7 +371,7 @@ describe('muscle_groups is registered in the sync engine as a Layer 0 entity', (
   it('serialises with the exact wire field set the server projects', () => {
     // Serialising a bare row exposes precisely the typed columns the registry's
     // field map declares — proof that ENTITY_FIELDS[muscle_groups] is the agreed
-    // seven-column set and nothing leaks or is missing.
+    // nine-column set and nothing leaks or is missing.
     const wire = entityToWire(
       {
         id: 'shoulders_front',
@@ -369,6 +379,8 @@ describe('muscle_groups is registered in the sync engine as a Layer 0 entity', (
         familyName: 'shoulders',
         sortOrder: 0,
         isEditable: 1,
+        reportGroup: null,
+        tracked: 1,
         createdAt: new Date(0),
         updatedAt: new Date(0),
         deletedAt: null,
@@ -383,7 +395,9 @@ describe('muscle_groups is registered in the sync engine as a Layer 0 entity', (
       'display_name',
       'family_name',
       'is_editable',
+      'report_group',
       'sort_order',
+      'tracked',
       'updated_at',
     ]);
   });

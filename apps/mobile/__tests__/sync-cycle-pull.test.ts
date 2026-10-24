@@ -17,7 +17,7 @@ import {
   PRIMARY_RUNTIME_STATE_ID,
   type Transaction,
 } from '@/src/data/clock';
-import { gyms, sessions, syncRuntimeState } from '@/src/data/schema';
+import { gyms, muscleGroups, sessions, syncRuntimeState } from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -126,6 +126,64 @@ describe('applyPullPage last-write-wins', () => {
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.deletedAt?.getTime()).toBe(250);
+  });
+});
+
+const muscleWire = (ms: number, setup?: { report_group: string | null; tracked: number }): WireEntity => ({
+  type: 'muscle_groups',
+  id: 'back_lats',
+  client_updated_at_ms: ms,
+  fields: {
+    display_name: 'Lats',
+    family_name: 'Back',
+    sort_order: 7,
+    is_editable: 0,
+    ...setup,
+    created_at: ms,
+    updated_at: ms,
+    deleted_at: null,
+  },
+});
+
+const readMuscleSetup = () =>
+  database
+    .select({ reportGroup: muscleGroups.reportGroup, tracked: muscleGroups.tracked })
+    .from(muscleGroups)
+    .where(eq(muscleGroups.id, 'back_lats'))
+    .get();
+
+describe('applyPullPage carries the muscle report group and tracked flag', () => {
+  beforeEach(() => {
+    fixture = createInMemoryDatabase();
+    database = fixture.database;
+  });
+
+  it('writes both columns on insert and on an incoming-wins update', () => {
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [muscleWire(100, { report_group: 'back', tracked: 0 })], 'muscle_groups'),
+    );
+    expect(readMuscleSetup()).toEqual({ reportGroup: 'back', tracked: 0 });
+
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [muscleWire(200, { report_group: null, tracked: 1 })], 'muscle_groups'),
+    );
+    expect(readMuscleSetup()).toEqual({ reportGroup: null, tracked: 1 });
+  });
+
+  it('keeps the local values when a newer envelope omits both keys', () => {
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [muscleWire(100, { report_group: 'back', tracked: 0 })], 'muscle_groups'),
+    );
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [muscleWire(200)], 'muscle_groups'),
+    );
+    expect(changed).toBe(1);
+    expect(readMuscleSetup()).toEqual({ reportGroup: 'back', tracked: 0 });
+  });
+
+  it('inserts the column defaults when a new row arrives without either key', () => {
+    database.transaction((tx) => applyPullPage(tx as Transaction, [muscleWire(100)], 'muscle_groups'));
+    expect(readMuscleSetup()).toEqual({ reportGroup: null, tracked: 1 });
   });
 });
 

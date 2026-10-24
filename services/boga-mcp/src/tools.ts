@@ -153,7 +153,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'List the authorizing user’s muscles (id, name, family). Exercise muscle mappings must name these ids.',
+        'List the authorizing user’s muscles: id, name, family, report_group (the key of the muscle the entry reports under; null = the entry is its own muscle) and tracked (false = left out of the person’s muscle figures). Exercise muscle mappings must name these ids, never a report_group.',
       inputSchema: z.object({}).strict(),
       title: 'List muscles',
     },

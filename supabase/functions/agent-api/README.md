@@ -108,7 +108,9 @@ Only owner rows are returned, soft-deleted ones only with `include_deleted`.
 Cursor ordering is stable by name then ID. `revision` is the definition's LWW
 stamp, quoted by every exercise edit.
 `GET /v1/agent/muscles` lists the owner's live muscles (`id`, `name`,
-`family`); exercise writes must name these ids.
+`family`, plus the owner's setup: `report_group`, the key of the muscle the
+entry reports under or `null` for its own, and `tracked`, a boolean);
+exercise writes must name these ids, never a `report_group`.
 
 ## Exercise context
 

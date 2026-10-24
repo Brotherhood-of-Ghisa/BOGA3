@@ -93,7 +93,7 @@ const responses: Record<string, Record<string, unknown>> = {
     plan_ids: ['plan-1', 'plan-2'],
   },
   '/functions/v1/agent-api/v1/agent/muscles': {
-    muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest' }],
+    muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest', report_group: null, tracked: true }],
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a': {
     exercise_id: 'exercise-a',
