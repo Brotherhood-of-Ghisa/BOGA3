@@ -188,8 +188,9 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
           </View>
         </View>
       </View>
-      {/* Lifting a finger off the chart, or dragging across it, selects the
-          day under it; a vertical drag goes to the screen's scroll. The Svg
+      {/* Lifting a finger off the chart selects the day under it, and in the
+          list layout so does dragging across it; a drag the scroller takes
+          (the screen's scroll, the cards' swipe) selects nothing. The Svg
           takes no touches, so `locationX` is across this view. */}
       <View
         accessible
@@ -199,7 +200,7 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
         accessibilityValue={{ text: periodChartAccessibilityValue(figures, dateFormat) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
-        onResponderMove={onTouch}
+        onResponderMove={fill ? undefined : onTouch}
         onResponderRelease={onTouch}
         onStartShouldSetResponder={() => true}
         style={fill ? styles.fillChart : null}

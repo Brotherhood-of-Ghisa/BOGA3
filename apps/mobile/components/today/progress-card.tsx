@@ -57,7 +57,7 @@ function LatestSessionRow({
 }
 
 // Today's Progress card: this week against last week, the period against the
-// previous period's pace, the latest session.
+// previous period day by day, the latest session.
 export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat, fill = false }: TodayProgressCardProps) {
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;

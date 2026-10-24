@@ -513,6 +513,18 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(selected('today-progress-section-tab')).toBe(true);
   });
 
+  it("selects a day on a tap, never on a drag, which is the cards' swipe", async () => {
+    await bootLocalApp();
+    await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
+    await renderCards();
+    const chart = text('today-progress-chart');
+
+    fireEvent(chart, 'responderMove', { nativeEvent: { locationX: 0 } });
+    expect(text('today-progress-period-day')).toHaveTextContent('Today');
+    fireEvent(chart, 'responderRelease', { nativeEvent: { locationX: 0 } });
+    expect(text('today-progress-period-day')).toHaveTextContent('5 Oct');
+  });
+
   it('draws the period chart to the height the card leaves it', async () => {
     await bootLocalApp();
     await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
