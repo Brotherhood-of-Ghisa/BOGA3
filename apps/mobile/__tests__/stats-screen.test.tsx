@@ -1225,6 +1225,27 @@ it('draws the three filter chips as one equal-width outline row', () => {
 });
 
 
+describe('Exercise list family headers follow the user’s muscles', () => {
+  const sets = { workingSetCount: 3, totalVolume: 900, volumeSetCount: 3 };
+  const items = [listItem('squat', { name: 'Squat', current: sets }), listItem('bench', { name: 'Bench', current: sets }),
+    listItem('mystery', { name: 'Mystery', current: sets })];
+  const families = new Map([['squat', 'Legs'], ['bench', 'Chest'], ['mystery', 'Other']]);
+  const headers = () => screen.queryAllByTestId(/^stats-exercise-family-header-/).map(row => row.props.children);
+  const names = () => screen.getAllByTestId(/^stats-exercise-name-/).map(row => row.props.children);
+
+  it('headers only families with two or more of the user’s muscles, before the summary has loaded', () => {
+    renderStatsScreenShell({ summary: null, viewMode: 'exercise', exerciseListItems: items, exerciseFamilies: families,
+      muscleFamilyCounts: new Map([['Legs', 2], ['Chest', 1]]) });
+    expect(headers()).toEqual(['Legs', 'Other']);
+    expect(names()).toEqual(['Bench', 'Squat', 'Mystery']);
+  });
+
+  it('keeps every header and the family order when the muscle counts are unknown', () => {
+    renderStatsScreenShell({ summary: null, viewMode: 'exercise', exerciseListItems: items, exerciseFamilies: families });
+    expect(headers()).toEqual(['Chest', 'Legs', 'Other']);
+  });
+});
+
 describe('Progress table ordering', () => {
   it('keeps the family order fixed, custom families alphabetical and Other last', () => {
     expect(['Other', 'Custom B', 'Legs', 'Custom A', 'Chest'].sort(compareProgressFamilies))

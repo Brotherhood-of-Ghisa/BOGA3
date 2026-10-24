@@ -263,10 +263,14 @@ describe('Muscle history under Broad', () => {
   it('opens a merged muscle whose anchor entry alone is switched off, as the Progress list shows it', async () => {
     await loadMaestroFixture('exercise-block-history');
     chooseBroadLocally(localDataClient(), [], ['back_lats']);
+    // The squat also trains Upper back: the muscle's only tracked entry.
+    localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('squat_upper_back', ?, 'back_upper', 1, 'primary')").run(SQUAT);
     await act(async () => invalidateExerciseCatalogCache());
     await open({ muscleGroupId: 'back_lats' });
     await waitFor(() => expect(mockScreenOptions.title).toBe('Back'));
     expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
+    const back = await history(['back_lats']);
+    expect(back.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeGreaterThan(0);
   });
 
   it('reads the same days as Detailed for a single-entry muscle', async () => {

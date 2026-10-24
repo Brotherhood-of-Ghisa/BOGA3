@@ -661,8 +661,9 @@ function StatsContent() {
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
   const muscleFamilyCounts = useMemo(
-    () => catalog.muscleSetup ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,
-    [catalog.muscleSetup]);
+    () => catalog.status === 'ready' && catalog.muscleSetup
+      ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,
+    [catalog.status, catalog.muscleSetup]);
   const exerciseFamilies = useMemo(() => {
     const byId = new Map(catalog.muscleGroups.map(muscle => [muscle.id, muscle]));
     return new Map(catalog.exercises.map(exercise => [exercise.id, reportedPrimaryFamilyName(exercise, muscleReport, byId)]));
