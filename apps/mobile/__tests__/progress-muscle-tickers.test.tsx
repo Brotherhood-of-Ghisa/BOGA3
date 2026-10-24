@@ -68,6 +68,37 @@ const series = (values: (number | null)[], reference: number | null = 10): Muscl
   reference, observations: values.map((value, i) => ({ at: date(9 + i * 3), value })),
 });
 
+// Six complete observations spanning exactly four local weeks, across DST.
+const eligibleSeries = (values: (number | null)[] = [0, 20, 5, 15, 10, 25], reference: number | null = 10): MuscleTickerSeries => ({
+  reference, observations: values.map((value, i) => ({ at: date([1, 6, 11, 16, 22, 29][i]), value })),
+});
+
+it.each([
+  ['fewer than six complete observations', eligibleSeries([1, 1, null, 1, 1, 1]), 4, false],
+  ['six observations without a full period', series([1, 2, 3, 4, 5, 6]), 4, false],
+  ['all-zero history', eligibleSeries([0, 0, 0, 0, 0, 0]), 4, false],
+  ['a longer configured period', eligibleSeries(), 5, false],
+  ['exact local-week boundary across DST', eligibleSeries(), 4, true],
+  ['flat positive history', eligibleSeries([2, 2, 2, 2, 2, 2]), 4, true],
+  ['one positive value among zeros', eligibleSeries([0, 0, 0, 0, 0, 1]), 4, true],
+] as const)('shares graph eligibility for %s', (_name, history, rollingWeeks, visible) => {
+  const props = { series: history, rollingWeeks, start: date(1), end: date(31), width: 100, testID: 'ticker' };
+  expect(Boolean(MuscleTicker(props))).toBe(visible);
+});
+
+it('does not use unavailable endpoint dates to satisfy the span', () => {
+  const history = series([null, 1, 1, 1, 1, 1, 1, null]);
+  history.observations[0].at = date(-7);
+  history.observations[7].at = date(31);
+  expect(MuscleTicker({ series: history, rollingWeeks: 4, start: date(-7), end: date(31), width: 100, testID: 'ticker' })).toBeNull();
+});
+
+it('rejects a span one millisecond short of the local-week boundary', () => {
+  const history = eligibleSeries();
+  history.observations[5].at = new Date(date(29).getTime() - 1);
+  expect(MuscleTicker({ series: history, rollingWeeks: 4, start: date(1), end: date(31), width: 100, testID: 'ticker' })).toBeNull();
+});
+
 it('connects Monday and Thursday real observations, splits exactly at the reference and breaks unavailable training', () => {
   const result = muscleTickerGeometry(series([0, 20, null, 5]), date(1), date(31), 100)!;
   expect(result.segments).toHaveLength(2);
@@ -78,14 +109,14 @@ it('connects Monday and Thursday real observations, splits exactly at the refere
   expect(result.lastX).toBeLessThan(97);
 });
 
-it('keeps the full time scale, one latest dot, neutral below the sample minimum, and no empty plot', () => {
+it('keeps raw geometry on the full time scale with one latest dot and no empty plot', () => {
   const single = muscleTickerGeometry(series([5], null), date(1), date(31), 100)!;
   expect(single.segments).toEqual([]);
   expect(single.endpoint.tone).toBe('neutral');
   expect(single.firstX).toBe(single.lastX);
   expect(single.lastX).toBeGreaterThan(3);
   expect(muscleTickerGeometry(series([null]), date(1), date(31), 100)).toBeNull();
-  render(<MuscleTicker series={series([0, 20, 5])} start={date(1)} end={date(31)} width={100} testID="ticker" />);
+  render(<MuscleTicker series={eligibleSeries()} rollingWeeks={4} start={date(1)} end={date(31)} width={100} testID="ticker" />);
   expect(screen.getAllByTestId('ticker-endpoint')).toHaveLength(1);
   expect(screen.getByTestId('ticker').props.width).toBe(100);
 });
@@ -147,7 +178,7 @@ const muscleRow = {
     volumeChange: { kind: 'percent' as const, percent: 0 } }],
 };
 const tickerData = { start: date(1), end: date(31), rollingWeeks: 4,
-  muscles: { back: { workingSetCount: series([0, 20, 5]), totalVolume: series([0, 40, 20], null) } } };
+  muscles: { back: { workingSetCount: eligibleSeries(), totalVolume: eligibleSeries([0, 40, 20, 30, 10, 20], 20) } } };
 const rowProps = { muscles: [muscleRow], metric: 'workingSetCount' as const, selectedId: 'back',
   onSelect: jest.fn(), onMuscleHistory: jest.fn(), onExerciseHistory: jest.fn(), tickers: tickerData, tickerWeeks: 4 };
 const layout = (id: string, width: number) => act(() => { fireEvent(screen.getByTestId(id), 'layout', { nativeEvent: { layout: { width, height: 100, x: 0, y: 0 } } }); });
@@ -172,10 +203,10 @@ it('keeps history beside two-line names, caps the plot and preserves independent
   expect(rowProps.onMuscleHistory).toHaveBeenCalled();
 });
 
-it.each([[[0, 40, 20]], [[20]]])('keeps valid Volume history %j drawable in the actual 320pt row allocation', values => {
+it.each([[[0, 40, 20, 30, 10, 20]], [[20, 20, 20, 20, 20, 20]]])('keeps valid Volume history %j drawable in the actual 320pt row allocation', values => {
   const muscle = { ...muscleRow, current: { ...muscleRow.current, totalVolume: 1234567 } };
   render(<ProgressTables {...rowProps} muscles={[muscle]} metric="totalVolume"
-    tickers={{ ...tickerData, muscles: { back: { ...tickerData.muscles.back, totalVolume: series(values, null) } } }} />);
+    tickers={{ ...tickerData, muscles: { back: { ...tickerData.muscles.back, totalVolume: eligibleSeries(values, 20) } } }} />);
   const tableWidth = 288;
   layout('stats-muscle-table-container', tableWidth);
   const row = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back').props.style);
@@ -194,6 +225,22 @@ it.each([[[0, 40, 20]], [[20]]])('keeps valid Volume history %j drawable in the 
   expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(44);
   expect(screen.getAllByTestId('stats-muscle-ticker-back-endpoint')).toHaveLength(1);
   expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent('1234567');
+});
+
+it.each(['workingSetCount', 'totalVolume'] as const)('leaves excluded %s plots blank and preserves figures, spoken history and actions', metric => {
+  render(<ProgressTables {...rowProps} metric={metric}
+    tickers={{ ...tickerData, muscles: { back: { workingSetCount: series([5]), totalVolume: series([5]) } } }} />);
+  layout('stats-muscle-table-container', 300);
+  layout('stats-muscle-history-back', 160);
+  expect(screen.queryByTestId('stats-muscle-ticker-back')).toBeNull();
+  expect(screen.queryByText(/building history/i)).toBeNull();
+  expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent(metric === 'workingSetCount' ? '1' : '50');
+  const history = screen.getByRole('link', { name: 'Open Back history' });
+  expect(history.props.accessibilityHint).toContain('Latest 5');
+  fireEvent.press(history);
+  expect(rowProps.onMuscleHistory).toHaveBeenLastCalledWith(muscleRow, expect.anything());
+  fireEvent.press(screen.getByRole('button', { name: 'Hide Back contributions' }));
+  expect(rowProps.onSelect).toHaveBeenLastCalledWith('back');
 });
 
 it.each(['pending', 'error', 'loaded'] as const)('keeps comparisons and both actions reachable when ticker data is %s', tickerStatus => {

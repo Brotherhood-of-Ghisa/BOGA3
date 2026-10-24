@@ -169,7 +169,7 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory, ticker,
       onPress={() => onHistory(row, name.current)} style={[styles.nameLink, styles.inlineHistory]} testID={`stats-muscle-history-${row.muscleGroupId}`}>
       <Text allowFontScaling={false} numberOfLines={2} style={[statsTableStyles.name, styles.compactName]}>{row.displayName}</Text>
       {ticker && tickerWindow ? <MuscleTicker series={ticker} start={tickerWindow.start} end={tickerWindow.end}
-        width={tickerWidth} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
+        width={tickerWidth} rollingWeeks={tickerWeeks} testID={`stats-muscle-ticker-${row.muscleGroupId}`} /> : null}
     </Pressable>
     {values}
     <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}

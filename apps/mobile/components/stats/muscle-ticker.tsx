@@ -5,6 +5,8 @@ import { formatVolume } from '@/src/exercise-calculations/format';
 import { formatShortDate } from '@/src/utils/local-time';
 import type { ExerciseDateFormat, ProgressMetric } from '@/src/preferences/model';
 import type { MuscleTickerSeries } from '@/src/data/progress-muscle-tickers';
+import { shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 import { muscleTickerGeometry, TICKER_HEIGHT } from './muscle-ticker-geometry';
 
 export type MuscleTickerStatus = 'pending' | 'loaded' | 'error';
@@ -19,9 +21,13 @@ export function muscleTickerDescription(series: MuscleTickerSeries | undefined, 
 }
 
 // The parent history link owns the spoken data and interaction; SVG is decorative.
-export function MuscleTicker({ series, start, end, width, testID }: {
-  series: MuscleTickerSeries; start: Date; end: Date; width: number; testID: string;
+export function MuscleTicker({ series, start, end, width, rollingWeeks, testID }: {
+  series: MuscleTickerSeries; start: Date; end: Date; width: number; rollingWeeks: number; testID: string;
 }) {
+  // Both metrics share the visibility rule of [[comparison.muscle-ticker-extent]].
+  const known = series.observations.filter(row => row.value !== null);
+  if (known.length < MIN_HISTORY_OBSERVATIONS || !known.some(row => row.value! > 0)
+    || shiftCalendarWeeks(known[0].at, rollingWeeks) > known[known.length - 1].at) return null;
   const geometry = muscleTickerGeometry(series, start, end, width);
   if (!geometry) return null;
   const { segments, referenceY, firstX, lastX, endpoint } = geometry;

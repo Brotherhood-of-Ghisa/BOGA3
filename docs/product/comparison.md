@@ -100,21 +100,25 @@ Sets reference is configured weekly working-set target × configured N.
 Volume reference is the median of overlapping complete N-week observations
 inside the visible history. Include known numeric zeros; exclude missing, rest
 and unavailable observations. Require six valid observations; a zero median is
-valid. Below six, Volume uses a neutral line and latest dot without reference,
-fill or above/below claims. Reference colour compares the observation with its
-reference independently of the table's signed Change.
+valid. Graph visibility follows [[comparison.muscle-ticker-extent]]. Reference
+colour compares the observation with its reference independently of the table's
+signed Change.
 
 Why: compare like periods, keeping sparse history truthful. Approved 2026-10-23.
 Code: `apps/mobile/src/data/progress-muscle-tickers.ts`.
 
 ### comparison.muscle-ticker-extent · presentation · accepted
 
+Sets and Volume require at least six complete observations spanning the
+configured Progress N weeks in local calendar time, including a positive value.
+Otherwise the graph stays blank; figures and history links remain. Flat positive
+histories qualify.
+
 Muscle List tickers retain the full configured history time scale. Available
 history is right-aligned and shortened in proportion to elapsed time, preserving
 its real dates and internal unavailable gaps. The complete plot fits within
-one-third of its actual table width. No valid observations means no plot; one
-valid observation means only its dot at its actual date. Every chart has only
-one marker, at its latest valid observation, even if earlier than today.
+one-third of its actual table width. Charts mark only the latest valid
+observation, even if earlier than today.
 
-Why: short history must not appear to cover a longer period. Approved 2026-10-23.
+Why: sparse or empty history must not imply a meaningful trend or longer coverage. Approved 2026-10-24.
 Code: `apps/mobile/components/stats/muscle-ticker.tsx`.
