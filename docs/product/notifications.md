@@ -1,13 +1,10 @@
 # Notifications
 
-Accepted 2026-10-07; theme/preview approved 2026-10-14, gym wording 2026-10-16.
-
 ### notifications.platform · definition · accepted
 
 The first release delivers native iOS push notifications; Android is outside
 it.
 
-Why: verify the app's current platform first.
 Code: `apps/mobile/src/notifications/native-adapter.ts` and
 `apps/mobile/modules/boga-notifications/`.
 
@@ -18,7 +15,6 @@ sharing the workout, subject to that recipient's permission and preferences —
 not only the person overtaken on a leaderboard. The lifter never receives their
 own workout alert.
 
-Why: members follow group training and competition.
 Code: live recipients and handoff checks in `supabase/migrations/20261014133141_notification_workout_events.sql`
 and `supabase/migrations/20261014115352_notification_delivery.sql`.
 
@@ -28,10 +24,7 @@ After opt-in, Activity, Group exercise bests and Leaderboard changes are all
 enabled by default. Each category can be disabled and a group muted; app
 preferences never bypass the iOS notification permission.
 
-Why: activity belongs alongside achievements.
-Code: server category/mute RPCs in `supabase/migrations/20261014115352_notification_delivery.sql`.
-Code: `apps/mobile/components/notifications/` and
-`apps/mobile/src/notifications/lifecycle.ts`.
+Code: `apps/mobile/src/notifications/lifecycle.ts`; `supabase/migrations/20261014115352_notification_delivery.sql`.
 
 ### notifications.workout-delivery · definition · accepted
 
@@ -47,8 +40,7 @@ alerts; each summary contains only information from groups they can access.
 Achievements during training are collected for the completion summary, not
 sent as separate alerts.
 
-Why: announce training, then collect achievements. Logical notification limits
-do not promise exactly-once display by external push providers.
+Why: limits are logical; external push providers may still show one twice.
 Code: `supabase/migrations/20261014133141_notification_workout_events.sql`.
 
 ### notifications.achievements · definition · accepted
@@ -62,11 +54,8 @@ before-to-final position change per member × group exercise × metric × board
 scope × group, upward or downward. Intermediate hops do not multiply it;
 returning to the original position counts zero.
 
-Why: group achievements and movement should be visible to the whole group.
-Code: current scoring and disclosure are owned by
-`docs/specs/tech/group-competition-contract.md`; final counting in
-`apps/mobile/src/notifications/workout-events.ts`, evidence in
-`supabase/migrations/20261014133141_notification_workout_events.sql`.
+Code: `apps/mobile/src/notifications/workout-events.ts`; scoring is owned by
+`docs/specs/tech/group-competition-contract.md`.
 
 ### notifications.freshness · definition · accepted
 
@@ -75,8 +64,7 @@ not restart that window. Retries and provider expiry must retain the event's
 original deadline.
 
 Why: avoid bursts from old offline history.
-Code: immutable intent deadline and delivery expiry in `supabase/migrations/20261014115352_notification_delivery.sql`.
-Code: original event-time filtering in `supabase/migrations/20261014133141_notification_workout_events.sql`.
+Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
 
 ### notifications.completion-readiness · definition · accepted
 
@@ -85,8 +73,7 @@ graph and the server to verify matching evaluated results. Older app versions
 without confirmation produce no completion summaries.
 
 Why: completion can arrive before final exercise and set rows.
-Code: authenticated graph confirmation in `supabase/migrations/20261014133141_notification_workout_events.sql`.
-Code: quiet-sync graph submission in `apps/mobile/src/notifications/completion.ts`.
+Code: `apps/mobile/src/notifications/completion.ts`.
 
 ### notifications.non-workout-ranks · definition · accepted
 
@@ -95,7 +82,6 @@ from certification, corrections, links, membership or competition rules are
 deferred to a separately designed board-update notification. This excludes
 those causes, not non-first or downward positions within workout alerts.
 
-Why: standalone board changes need their own batching, expiry and design.
 Pending: [board-update notification proposal #737](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/737).
 
 ### notifications.theme · presentation · accepted
@@ -105,7 +91,6 @@ theme, including custom colours. The abbreviated banner retains the iOS system
 appearance. Warm-theme examples do not fix the notification palette for every
 user.
 
-Why: match the app within iOS presentation constraints.
 Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationContent.swift`.
 
 ### notifications.preview · presentation · accepted
@@ -118,8 +103,6 @@ exercise names or lifting figures. Disabled and zero-count rows are omitted.
 Activity-off previews omit start/completion wording. Only enabled, currently
 authorized groups contribute.
 
-Why: keep previews compact; show details in the authorized app view.
-Code: `supabase/migrations/20261016164705_notification_workout_location.sql`.
 Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationContent.swift`.
 
 ### notifications.foreground · presentation · accepted
@@ -128,5 +111,4 @@ While BOGA is open, an eligible incoming notification shows the normal iOS
 banner without sound. Receiving it never navigates away from the current screen;
 opening its workout requires a tap.
 
-Why: visible alerts preserve the current screen.
 Code: `apps/mobile/src/notifications/native-adapter.ts`.

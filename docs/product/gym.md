@@ -18,10 +18,8 @@ current gym; a session with no gym counts only in the whole exercise.
 
 The setting is synced and retroactive: changing it recomputes history and PRs.
 
-Why: one exercise on different gyms' equipment is not comparable, yet the whole
-exercise stays the default so a split never multiplies rows. A session with no
-gym is usually a gym not worth recording, so it is compared with everything.
-Approved 2026-10-18; Repeat last's fallback and the 1RM curve row the same day.
+Why: equipment differs between gyms, yet the whole exercise stays the default so
+a split never multiplies rows.
 Code: `GymSplitField` in `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`.
 
 ### gym.split-choice · principle · accepted
@@ -31,8 +29,7 @@ and bodyweight exercises stay whole.
 
 - **Good:** `Leg Press` split; `Dumbbell Curl` whole.
 
-Why: machines change a lot between gyms; dumbbells are always the same.
-Approved 2026-10-19.
+Why: machines change between gyms; dumbbells do not.
 Code: `EXERCISE_WRITE_RULES` in `services/boga-mcp/src/tools.ts`.
 
 ### gym.view-filter · definition · accepted
@@ -44,8 +41,7 @@ From the exercise page, history opens on the session's gym, if any, when
 the exercise is split or `Current gym only` is on. Muscle 3D remains all gyms.
 
 Why: gym scope answers where the effort happened; splitting only changes which
-PRs show ([[gym.split-progress-prs]]). Approved 2026-10-18;
-muscle tables and history 2026-10-22; exercise-page entry 2026-10-23.
+PRs show ([[gym.split-progress-prs]]).
 Code: `GymPicker` in `apps/mobile/components/gyms/gym-picker.tsx`;
 `exerciseHistoryOpeningGym` in `apps/mobile/src/session-recorder/exercise-history-view.ts`.
 
@@ -56,9 +52,7 @@ is chosen: a view with a gym chosen marks each session's own PRs — that gym's 
 and a view of every gym marks the whole exercise's. No setting. Showing gym PRs and
 whole-exercise PRs side by side is parked.
 
-Why: choosing the gym is the question "what are my PRs here", so no second
-switch is needed. Approved 2026-10-18 (mock option A); exercise history
-2026-10-23.
+Why: choosing the gym asks "what are my PRs here", so no second switch.
 Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`;
 `withBlockRecords` in `apps/mobile/src/data/exercise-history.ts`.
 

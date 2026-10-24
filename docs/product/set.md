@@ -7,8 +7,7 @@ reps (a positive integer, at most 999), valid Weight (digits with an optional
 decimal point; blank Weight with valid reps is `0`), and no performance status.
 Planned, unperformed and skipped rows never count for any figure.
 
-Why: one validity rule means a value is valid everywhere or nowhere. The reps
-cap keeps counts exact on every device and server; no real set comes near it.
+Why: one validity rule; the reps cap keeps counts exact on every device and server.
 Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser and `MAX_SET_REPS` in `apps/mobile/src/exercise-calculations/parse.ts`.
 
 ### set.eligibility · definition · accepted
@@ -49,8 +48,7 @@ trained. It asks first, naming the count, unless every row going is blank.
 The exercise page's swipe-left also deletes a planned row; the session view's
 Done keeps planned rows.
 
-Why: the alert promised removal; a finished exercise still listing sets nobody
-did misreports the session to its own reader.
+Why: a finished exercise must not list sets nobody did.
 Code: `planCompleteExercise` in `apps/mobile/src/session-recorder/exercise-page-model.ts`.
 
 ### set.count-display · presentation · accepted
@@ -60,8 +58,7 @@ screen and in the share image. All-sets and working-sets counts are never
 shown side by side. Only plain row counts count every row: `n of m sets done`
 and the remove-exercise alert's `its N sets`.
 
-Why: one number per idea, so the reader never has to pick which count
-matters.
+Why: one number per idea.
 Code: the aggregators' `workingSetCount`.
 Signature: `n of m sets done`
 

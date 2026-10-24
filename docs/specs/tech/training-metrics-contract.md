@@ -61,7 +61,7 @@ re-implements the rule: group functions read the evaluator's `working` flag
 (`tech/groups-contract.md`). A change to the shared rule reaches stored group
 facts only as that contract's rules-version section says. Changing personal derivation bumps
 `EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
-canonical policy key, rebuilding all definitions when the active choices differ.
+canonical policy key, rebuilding all definitions when the choices differ.
 
 ## 2. Counted session
 
@@ -99,14 +99,13 @@ the session itself. Those priors are Settings' History look-back over
 active. Set eligibility is unchanged and record baselines stay all-time. Below
 the minimum nothing is drawn: no comparison is ever shown as an empty plot. The
 median delta carries its direction in colour like every other change figure
-(`ui/design-language.md` §6), above the median being the improvement.
+(`ui/design-language.md` §6); above the median is the improvement.
 History and quartiles derive in
 `apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
 the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.
 
-The by-muscle comparison covers only muscles the session worked as primary
-([[muscle.comparison-primary-only]]), and baseline sessions are read the same
-way.
+The by-muscle comparison follows [[muscle.comparison-primary-only]], baselines
+included.
 
 **Counted-session statistics.**
 
@@ -290,15 +289,20 @@ choices may change which recorded set qualifies.
 
 **A muscle's set count** is [[muscle.set-count]]. One shared counter derives
 it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
-muscle at its strongest role (duplicate mappings use the strongest role for
-that exercise/muscle pair), weighted by that role, and a stabilizer adds
-nothing. The session summary, Progress muscle comparisons, the muscle heatmaps
-and the Stats muscle breakdown all read it, so they cannot disagree. Family
+muscle at its strongest role, weighted by that role, and a stabilizer adds
+nothing. Every muscle surface reads it. Family
 counts deduplicate physical sets at the strongest role across the family's
 muscles; overlapping individual muscle counts must never be summed into a
 global total. Every figure is an exact half-step, shown unrounded. Nothing is
 stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
 them. The window's own working-set total stays a count of physical sets.
+
+**The user's muscles.** Surfaces reading the muscle setup apply
+`applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
+It re-keys mappings from entry to muscle ([[muscle.report-groups]]), keeps one
+per exercise and muscle at the strongest role (Volume counts once) and drops
+untracked muscles ([[muscle.untracked]]). A merged muscle takes its anchor's id;
+Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
 durable active effort-policy snapshot in one read transaction for both
@@ -309,16 +313,14 @@ exercise contributions together. It retains the whole taxonomy, joins repeated
 blocks by definition ID, and keeps the union of contributing exercises in
 either period. Current definition names label those IDs; a recorded name is a
 fallback, never an identity join. Current mappings reinterpret both periods.
-Unlinked sets contribute no muscle/exercise row, as in the existing muscle
-analytics. A volume-only exercise remains a contributor even at zero load.
+Unlinked sets contribute no muscle/exercise row. A volume-only exercise remains a contributor even at zero load.
 
 Every period exposes working-set count, Volume (§4 Totals) and the included
 Volume-set count; counts and Volume reconcile with the contribution rows.
 Changes are shown as [[comparison.change-display]]; each row's Volume change
 uses its own baseline, and the code's states are `empty`, `new`, a percentage,
 `unavailable` (`—`) when either sum is not finite, and `increased` if the
-percentage overflows. Row
-percentages are never summed. Calculation-column eligibility is independent
+percentage overflows. Row percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
 
 Muscle List tickers implement [[comparison.muscle-ticker-window]] and

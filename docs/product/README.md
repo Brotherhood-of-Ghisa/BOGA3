@@ -23,7 +23,7 @@ is in `set.md`). When unsure, load it.
 | `copy.md` | any words on screen (every UI change); set entry; blank history cells |
 | `comparison.md` | comparing periods or sessions, change figures (`+4`, `+12%`), history windows, weekly reference lines |
 | `1rm.md` | the 1RM estimate or its display; the RM curve |
-| `muscle.md` | attributing sets or work to muscles |
+| `muscle.md` | attributing sets or work to muscles; muscle setup, lists, family headers |
 | `gym.md` | gyms, or how one exercise's history is grouped |
 | `groups.md` | group competition and certification |
 | `notifications.md` | any notification: group alerts, workout notifications |

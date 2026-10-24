@@ -14,8 +14,6 @@ that describes it.
   whose view of the session this is, which the screen cannot show otherwise
   (decided 2026-10-08).
 
-Why: descriptive subtitles repeat the screen.
-
 ### copy.no-inline-explanation · principle · accepted
 
 Screens show data and controls, not sentences about them: no footnotes,
@@ -31,8 +29,6 @@ formula notes, field hints, "how this works" lines, or a rule's provenance
   uncalculable load or kg a group cannot see, shows plain as `Volume`.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
 - **Good:** the label carries it — the ramp reads `Weekly target` `0%`…`100%`.
-
-Why: labels carry meaning.
 
 ### copy.blank-history · presentation · accepted
 
@@ -50,7 +46,6 @@ Workout, session-plan and programme set entry follow the recorder's copy:
 `Effort`, `Weight`, `Reps`. Weight entry uses the same label for total-load
 and per-side exercises; its accessible name is `Set N weight`.
 
-Why: the recorder is the standard for entering sets, and planning follows it.
 Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`.
 
 ### copy.no-weight-unit · presentation · accepted
@@ -59,7 +54,6 @@ While kg is the only supported weight unit, visible and spoken labels omit
 kg and kilograms, including compound volume units. Keep `per side`, `%BW` and
 `%BW·reps`. Stored values, wire units and coaching/import payloads stay unchanged.
 
-Why: the sole weight unit adds no information. Approved 2026-10-17.
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
 
 ### copy.calendar-dates · presentation · accepted
@@ -69,5 +63,4 @@ including ranges and shared images. Formatting preserves the device-local day
 and stored instant. Month/day calendar headings, relative and time-only labels
 keep their roles.
 
-Why: one setting; issue #777.
 Code: `apps/mobile/src/utils/local-time.ts`.
