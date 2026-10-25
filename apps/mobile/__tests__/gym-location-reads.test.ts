@@ -26,17 +26,14 @@ describe('findNearbyGymSuggestions (the gym sheet suggestion)', () => {
     expect(found[0]).toBe(harbour);
   });
 
-  it('suggests nothing without a fix and with a fix too coarse to trust', () => {
-    const gyms = [gym('a', 51.5, -0.12)];
-
-    expect(findNearbyGymSuggestions(null, gyms)).toEqual([]);
-    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12, 501), gyms)).toEqual([]);
+  it('suggests nothing without a fix', () => {
+    expect(findNearbyGymSuggestions(null, [gym('a', 51.5, -0.12)])).toEqual([]);
   });
 
-  it('trusts a fix the old 1.5-second read refused', () => {
-    const gyms = [gym('a', 51.5, -0.12)];
+  it('suggests every gym within a kilometre whatever the fix accuracy', () => {
+    const gyms = [gym('a', 51.5, -0.12), gym('b', 51.505, -0.12), gym('c', 51.51, -0.12)];
 
-    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12, 140), gyms)).toEqual([gyms[0]]);
+    expect(findNearbyGymSuggestions(positionAt(51.5, -0.12, 2_000), gyms)).toEqual([gyms[0], gyms[1]]);
   });
 
   it.each([

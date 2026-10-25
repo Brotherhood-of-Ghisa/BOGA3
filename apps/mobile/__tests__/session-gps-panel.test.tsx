@@ -55,7 +55,7 @@ describe('session gym sheet GPS panel', () => {
     expect(screen.getByTestId('session-gps-value-fix')).toHaveTextContent('Held · ±30 m');
     expect(screen.getByTestId('session-gps-value-last-read')).toHaveTextContent('read ok · ±30 m');
     expect(screen.getByTestId('session-gps-value-coordinates')).toHaveTextContent('51.50000, -0.12000 · ±30 m');
-    expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('2 of 3 gyms in reach');
+    expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('2 of 3 gyms within 1 km');
   });
 
   it('explains a give-up instead of a fix', () => {
@@ -63,6 +63,12 @@ describe('session gym sheet GPS panel', () => {
 
     expect(screen.getByTestId('session-gps-value-fix')).toHaveTextContent('Given up · Location read failed');
     expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('Location read failed');
+  });
+
+  it('says no gym is within reach of a held fix', () => {
+    renderSheet({ state: availableState, nearbyGymCount: 4, suggestionCount: 0 });
+
+    expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('No gym within 1 km (4 gyms searched)');
   });
 
   it('renders nothing without the developer inputs', () => {

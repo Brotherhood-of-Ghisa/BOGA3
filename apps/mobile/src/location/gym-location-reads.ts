@@ -16,9 +16,9 @@ import {
 export type ReadForegroundPosition = () => Promise<CurrentForegroundPositionResult>;
 
 /**
- * The gyms to suggest for the session's cached fix, nearest first, at most two.
- * `null` position (still acquiring, or the session gave up) and no gym in
- * range both suggest nothing. Gyms come back as the directory's own objects,
+ * The gyms to suggest for the session's cached fix: those within a kilometre,
+ * nearest first. `null` position (still acquiring, or the session gave up)
+ * and no gym in reach both suggest nothing. Gyms come back as the directory's own objects,
  * so the caller maps them straight onto rows.
  */
 export const findNearbyGymSuggestions = <T extends GymLocationCandidate>(
@@ -26,14 +26,7 @@ export const findNearbyGymSuggestions = <T extends GymLocationCandidate>(
   gyms: T[]
 ): T[] => {
   if (!position) return [];
-  return findNearbyGymsForPosition(
-    {
-      latitude: position.latitude,
-      longitude: position.longitude,
-      accuracyM: position.accuracyM,
-    },
-    gyms
-  )
+  return findNearbyGymsForPosition(position, gyms)
     .map((match) => gyms.find((gym) => gym.id === match.gym.id))
     .filter((gym): gym is T => gym !== undefined);
 };

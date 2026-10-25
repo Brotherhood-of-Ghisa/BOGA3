@@ -1,8 +1,8 @@
 /**
  * The session view's position cache (`src/location/session-position.ts`): the
  * recorder starts acquiring when the session opens, the sheet reads the cache
- * and hears about the fix the moment it lands, coarse or failed reads retry
- * after a wait, and only permission denials and services-off end the
+ * and hears about the fix the moment it lands — any fix, however coarse —
+ * timed-out or failed reads retry after a wait, and only permission denials and services-off end the
  * acquisition for good. Injected readers stand in for the native module.
  */
 
@@ -11,7 +11,6 @@ import {
   getSessionPosition,
   getSessionPositionState,
   resetSessionPositions,
-  SESSION_POSITION_MAX_ACCURACY_M,
   SESSION_POSITION_MAX_READS,
   subscribeSessionPosition,
   subscribeSessionPositionState,
@@ -21,6 +20,8 @@ const fixAt = (accuracyM: number | null, latitude = 51.5, longitude = -0.12) => 
   status: 'success' as const,
   position: { latitude, longitude, accuracyM, capturedAt: new Date('2026-09-23T10:00:00Z') },
 });
+
+const TIMEOUT = { status: 'timeout' as const, timeoutMs: 10_000 };
 
 const readerOf = (results: unknown[]): jest.Mock => {
   const read = jest.fn();
@@ -38,7 +39,7 @@ afterEach(() => {
 });
 
 describe('session position', () => {
-  it("caches the session's first usable fix and reads no more", async () => {
+  it("caches the session's first fix and reads no more", async () => {
     const read = readerOf([fixAt(20)]);
     await beginSessionPosition('session-1', {}, read, 0);
 
@@ -69,16 +70,20 @@ describe('session position', () => {
     expect(updates).toHaveLength(0);
   });
 
-  it('retries a fix coarser than the gate and caches the one that tightens', async () => {
-    const read = readerOf([fixAt(SESSION_POSITION_MAX_ACCURACY_M + 1), fixAt(30)]);
-    await beginSessionPosition('session-1', {}, read, 0);
+  it('trusts a coarse fix, or one with unknown accuracy, at once', async () => {
+    const coarse = readerOf([fixAt(3_000)]);
+    await beginSessionPosition('session-1', {}, coarse, 0);
+    const unknown = readerOf([fixAt(null)]);
+    await beginSessionPosition('session-2', {}, unknown, 0);
 
-    expect(read).toHaveBeenCalledTimes(2);
-    expect(getSessionPosition('session-1')?.accuracyM).toBe(30);
+    expect(coarse).toHaveBeenCalledTimes(1);
+    expect(getSessionPosition('session-1')?.accuracyM).toBe(3_000);
+    expect(unknown).toHaveBeenCalledTimes(1);
+    expect(getSessionPosition('session-2')).toMatchObject({ latitude: 51.5, accuracyM: null });
   });
 
-  it('gives up after the read budget of coarse reads and does not read again', async () => {
-    const read = readerOf(Array.from({ length: SESSION_POSITION_MAX_READS }, () => fixAt(600)));
+  it('gives up after the read budget of timed-out reads and does not read again', async () => {
+    const read = readerOf(Array.from({ length: SESSION_POSITION_MAX_READS }, () => TIMEOUT));
     await beginSessionPosition('session-1', {}, read, 0);
 
     expect(read).toHaveBeenCalledTimes(SESSION_POSITION_MAX_READS);
@@ -90,7 +95,7 @@ describe('session position', () => {
   });
 
   it('lets the gym sheet resume a spent acquisition, but not a denial', async () => {
-    const read = readerOf(Array.from({ length: SESSION_POSITION_MAX_READS }, () => fixAt(600)));
+    const read = readerOf(Array.from({ length: SESSION_POSITION_MAX_READS }, () => TIMEOUT));
     await beginSessionPosition('session-1', {}, read, 0);
 
     const resumed = readerOf([fixAt(25)]);
@@ -109,7 +114,7 @@ describe('session position', () => {
     // before the read count (6) does.
     const read = jest.fn(async () => {
       jest.advanceTimersByTime(15_000);
-      return fixAt(600);
+      return TIMEOUT;
     });
     jest.setSystemTime(0);
     const acquisition = beginSessionPosition('session-1', {}, read, 5_000);
@@ -157,7 +162,7 @@ describe('session position', () => {
     expect(states[3]).toMatchObject({ status: 'available', attempts: 2 });
   });
 
-  it('treats a rejected read as no fix rather than a crash, retrying it like a coarse read', async () => {
+  it('treats a rejected read as no fix rather than a crash, retrying it like a timeout', async () => {
     const read = jest.fn().mockRejectedValue(new Error('native'));
     await expect(beginSessionPosition('session-1', {}, read, 0)).resolves.toBeUndefined();
 

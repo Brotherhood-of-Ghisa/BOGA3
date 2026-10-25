@@ -158,8 +158,8 @@ addressable, each resolving to a canonical owner for tab selection.
   hides the cached data.
 - A gym's location is shown as **presence only** (`Location saved` /
   `No location saved`) — never coordinates, anywhere. The session view's gym
-  sheet runs one foreground lookup (1.5 s budget) and offers a single confident
-  match as `Nearby · <gym>`, never preselected.
+  sheet suggests located gyms within 1 km of any fix, nearest first, as
+  `Nearby · <gym>`, never preselected.
 - Network state is **three-valued**: until NetInfo reports a determined
   `isConnected`, the UI says `Checking…` (or stays on its in-progress state)
   and never claims online or offline. `/sync-setup` shows its offline copy only

@@ -8,23 +8,18 @@ import type { CurrentForegroundPositionResult, ForegroundLocationPosition } from
  * it.
  *
  * The gym sheet never selects a gym from a position — it suggests — so the
- * cache trades strictness for availability: a fix at least as accurate as
- * {@link SESSION_POSITION_MAX_ACCURACY_M} is trusted the moment it lands and
- * the sheet updates live. A coarser fix — or a read that times out or fails —
- * is retried after a wait, because a cold GPS pipeline tightens over seconds,
- * and three reads fired back to back only see the same coarse cached fix.
- * Permission denial and services-off give up at once; anything else keeps
- * retrying inside the attempt and wall-clock budgets. A session that ends its
- * acquisition with no usable fix gives up until the gym sheet re-arms it
- * (`resume`), when the person opening the sheet is waiting on exactly that.
+ * cache trades strictness for availability: the first fix that lands is
+ * trusted, whatever its accuracy, and the sheet updates live. A read that
+ * times out or fails is retried after a wait, because a cold GPS pipeline
+ * can take seconds to answer. Permission denial and services-off give up at
+ * once; anything else keeps retrying inside the attempt and wall-clock
+ * budgets. A session that ends its acquisition with no fix gives up until the
+ * gym sheet re-arms it (`resume`), when the person opening the sheet is
+ * waiting on exactly that.
  */
 
-// Gyms usually sit more than a kilometre apart, so a fix this coarse still
-// names the right gym or gyms. The matcher pairs this with its own radius.
-export const SESSION_POSITION_MAX_ACCURACY_M = 500;
-
 // How many reads one acquisition tries before giving up, how long it waits
-// between them — so the GPS pipeline can tighten — and how long the whole
+// between them — so the GPS pipeline can answer — and how long the whole
 // acquisition may run.
 export const SESSION_POSITION_MAX_READS = 6;
 export const SESSION_POSITION_RETRY_DELAY_MS = 2_000;
@@ -39,15 +34,10 @@ const ACQUISITION_BUDGET_MS = SESSION_POSITION_ACQUISITION_BUDGET_MS;
 const isRetryableRead = (status: CurrentForegroundPositionResult['status']): boolean =>
   status !== 'permission_denied' && status !== 'unavailable';
 
-const isUsableFix = (position: ForegroundLocationPosition): boolean => {
-  const { accuracyM } = position;
-  return accuracyM !== null && accuracyM >= 0 && accuracyM <= SESSION_POSITION_MAX_ACCURACY_M;
-};
-
 const gaveUpReasonFor = (result: CurrentForegroundPositionResult): SessionPositionGaveUpReason => {
   if (result.status === 'permission_denied') return 'permission_denied';
   if (result.status === 'unavailable') return 'services_disabled';
-  if (result.status === 'success' || result.status === 'timeout') return 'no_fix';
+  if (result.status === 'timeout') return 'no_fix';
   return 'read_error';
 };
 
@@ -208,7 +198,7 @@ export const beginSessionPosition = async (
       };
       setEntry(sessionId, { ...entry });
 
-      if (result.status === 'success' && isUsableFix(result.position)) {
+      if (result.status === 'success') {
         setEntry(sessionId, { ...entry, status: 'available', position: result.position });
         notifyPosition(sessionId, result.position);
         return;

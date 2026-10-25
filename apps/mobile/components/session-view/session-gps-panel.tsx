@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { DEFAULT_SUGGESTION_MAX_ACCURACY_M } from '@/src/location/gym-location-matcher';
+import { DEFAULT_SUGGESTION_RADIUS_M } from '@/src/location/gym-location-matcher';
 import type { SessionPositionState } from '@/src/location/session-position';
 
 export type SessionGpsPanelProps = {
@@ -16,7 +16,7 @@ export type SessionGpsPanelProps = {
 const GAVE_UP_COPY: Record<NonNullable<SessionPositionState['gaveUpReason']>, string> = {
   permission_denied: 'Location permission denied',
   services_disabled: 'Location services are off',
-  no_fix: 'No accurate enough fix',
+  no_fix: 'No fix',
   read_error: 'Location read failed',
 };
 
@@ -33,20 +33,15 @@ const formatAccuracy = (accuracyM: number | null): string =>
   accuracyM === null ? 'unknown' : `±${Math.round(accuracyM)} m`;
 
 // Why the sheet is or is not suggesting, from the same inputs the suggestion
-// used: no fix, a fix coarser than the suggestion gate, or the fix against the
-// gym directory.
+// used: no fix, or the fix against the gym directory.
 const suggestionOutcome = (state: SessionPositionState | null, nearbyGymCount: number | null, suggestionCount: number): string => {
   if (nearbyGymCount === null) return 'Gyms still loading';
   if (!state) return 'GPS read not started';
   if (state.status === 'reading') return `Waiting for a fix (attempt ${state.attempts})`;
-  const position = state.position;
-  if (!position) return GAVE_UP_COPY[state.gaveUpReason ?? 'no_fix'];
-  const { accuracyM } = position;
-  if (accuracyM === null || accuracyM > DEFAULT_SUGGESTION_MAX_ACCURACY_M) {
-    return `Fix too coarse for the gate (±${accuracyM === null ? '?' : Math.round(accuracyM)} m > ${DEFAULT_SUGGESTION_MAX_ACCURACY_M} m)`;
-  }
-  if (suggestionCount === 0) return `No gym in reach of the fix (${nearbyGymCount} gyms searched)`;
-  return `${suggestionCount} of ${nearbyGymCount} gyms in reach`;
+  if (!state.position) return GAVE_UP_COPY[state.gaveUpReason ?? 'no_fix'];
+  const reach = `${DEFAULT_SUGGESTION_RADIUS_M / 1_000} km`;
+  if (suggestionCount === 0) return `No gym within ${reach} (${nearbyGymCount} gyms searched)`;
+  return `${suggestionCount} of ${nearbyGymCount} gyms within ${reach}`;
 };
 
 /**
