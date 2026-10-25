@@ -176,6 +176,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
         offline={offline}
         onRetry={onRefresh}
         refreshGroup={refreshGroup}
+        userId={userId}
       />
     </ScrollView>
   );

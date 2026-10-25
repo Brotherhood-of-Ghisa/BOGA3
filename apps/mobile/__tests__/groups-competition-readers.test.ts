@@ -39,10 +39,42 @@ const records = { contract_version: 4, group_id: 'g', member_user_id: 'u1', sess
 const previousHolder = { user_id: 'u2', username: 'Rival' };
 const recordDetail = { performance, previous: [{ value: { ...historicalValue, role: 'previous', value: 120, member: previousHolder },
   performance: null }] };
+const sharedExerciseDetails = {
+  group_exercise_id: 'ge',
+  group_exercise_name: 'Pull-up',
+  name: 'Pull-up',
+  load_input_mode: 'total_load',
+  bodyweight_contribution: 1,
+  mappings: [{ muscle_group_id: 'lats', weight: 1, role: 'primary' }],
+  created_at_ms: 100,
+};
+const sharedExercise = {
+  id: 'se1',
+  group_id: 'g',
+  shared_by: member,
+  exercise: sharedExerciseDetails,
+};
+const sharedExercisesList = {
+  contract_version: 4,
+  group_id: 'g',
+  shared_exercises: [sharedExercise],
+};
+const sharedExerciseWrite = {
+  contract_version: 4,
+  group_id: 'g',
+  shared_exercise: sharedExercise,
+};
+const sharedExerciseDelete = {
+  contract_version: 4,
+  group_id: 'g',
+  shared_exercise_id: 'se1',
+  deleted: true,
+};
 const stream = { contract_version: 4, items: [
   { kind: 'competition', key: 'ev', sort_at_ms: 100, event, record: recordDetail },
   { kind: 'session', key: 'u1:s', sort_at_ms: 100, groups: [{ group_id: 'g', name: 'Crew' }], session },
   { kind: 'membership', key: 'm:joined', sort_at_ms: 90, event: 'joined', group: { group_id: 'g', name: 'Crew' }, member },
+  { kind: 'shared_exercise', key: 'shared_exercise:ev_se', sort_at_ms: 85, id: 'se1', group_id: 'g', shared_by: member, exercise: sharedExerciseDetails },
 ], next_cursor: null, has_more: false };
 const latest = { member, session_id: 's', started_at_ms: 100, completed_at_ms: 200, duration_sec: 100,
   gym_name: null, working_sets: 1, exercise_count: 1, group_records: [event] };
@@ -66,6 +98,9 @@ test('every new reader accepts only its exact versioned envelope', () => {
     [guards.isCompetitionSessionRecordsWire,records],
     [guards.isCompetitionStreamWire,stream], [guards.isCompetitionWeekSummaryWire,week],
     [guards.isCompetitionPeriodTotalsWire,periodTotals],
+    [guards.isGroupSharedExercisesListWire,sharedExercisesList],
+    [guards.isGroupSharedExerciseWriteWire,sharedExerciseWrite],
+    [guards.isGroupSharedExerciseDeleteWire,sharedExerciseDelete],
   ] as const;
   for (const [guard,value] of cases) {
     expect(guard(value)).toBe(true); expect(guard(null)).toBe(false); expect(guard({ ...value, private_reading: 80 })).toBe(false);
@@ -240,6 +275,7 @@ describe('request-scoped protocol-4 API', () => {
       const foreign = clone(item) as CompetitionStreamItemWire;
       if ('groups' in foreign) foreign.groups[0].group_id = 'other';
       else if ('group' in foreign) foreign.group.group_id = 'other';
+      else if (foreign.kind === 'shared_exercise') foreign.group_id = 'other';
       else foreign.event.group.group_id = 'other';
       respond({ ...stream,items: [foreign] }); await expect(api.getCompetitionStream('g')).rejects.toMatchObject({ code: 'INTERNAL' });
       respond({ ...stream,items: [foreign] }); await expect(api.getCompetitionStream()).resolves.toEqual({ ...stream,items: [foreign] });
@@ -253,6 +289,20 @@ describe('request-scoped protocol-4 API', () => {
     mockClient.mockImplementation(() => { throw new Error('unconfigured'); }); await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'INTERNAL' });
     mockClient.mockReturnValue({ schema: () => ({ rpc: () => { throw new Error('offline'); } }) });
     await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'NETWORK' });
+  });
+  test('shared exercises RPCs set header and validate', async () => {
+    respond(sharedExerciseWrite);
+    await expect(api.createGroupSharedExercise({ groupId: 'g', name: 'Pull-up', mode: 'total_load' })).resolves.toEqual(sharedExerciseWrite);
+    expect(rpc).toHaveBeenCalledWith('group_shared_exercise_create', expect.any(Object));
+    expect(setHeader).toHaveBeenCalledWith('x-boga-group-contract', '4');
+
+    respond(sharedExercisesList);
+    await expect(api.listGroupSharedExercises('g')).resolves.toEqual(sharedExercisesList);
+    expect(rpc).toHaveBeenCalledWith('group_shared_exercises_list', expect.any(Object));
+
+    respond(sharedExerciseDelete);
+    await expect(api.deleteGroupSharedExercise('g', 'se1')).resolves.toEqual(sharedExerciseDelete);
+    expect(rpc).toHaveBeenCalledWith('group_shared_exercise_delete', expect.any(Object));
   });
   test('server-normalized names on committed creates/updates are accepted', async () => {
     const payload = { contract_version: 4,exercise };

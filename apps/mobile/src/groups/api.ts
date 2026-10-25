@@ -2,10 +2,12 @@ import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
   isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
-  isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
+  isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire,
+  isGroupSharedExerciseDeleteWire, isGroupSharedExercisesListWire, isGroupSharedExerciseWriteWire } from './competition-reader-guards';
 import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire,
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
-  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionPeriodTotalsWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
+  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionPeriodTotalsWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
+  GroupSharedExerciseDeleteWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
@@ -121,7 +123,10 @@ export type GroupRpcName =
   | 'group_competition_session_detail'
   | 'group_competition_session_records'
   | 'group_competition_week_summary'
-  | 'group_competition_period_totals';
+  | 'group_competition_period_totals'
+  | 'group_shared_exercise_create'
+  | 'group_shared_exercises_list'
+  | 'group_shared_exercise_delete';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -306,7 +311,8 @@ export const getCompetitionHistory = ({ groupId, exerciseId, metric, certified, 
 export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
   competitionRpc('group_competition_stream_v2',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
     p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
-      item.kind === 'competition' ? item.event.group.group_id === groupId : item.group.group_id === groupId));
+      item.kind === 'competition' ? item.event.group.group_id === groupId :
+      item.kind === 'shared_exercise' ? item.group_id === groupId : item.group.group_id === groupId));
 export const getCompetitionSession = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionDetailWire> =>
   competitionRpc('group_competition_session_detail',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionDetailWire,p => p.group_id === groupId && p.session.member.user_id === memberId && p.session.session_id === sessionId);
 export const getCompetitionSessionRecords = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionRecordsWire> =>
@@ -342,3 +348,51 @@ export const updateCompetitionExercise = ({ groupId, exerciseId, revision, name,
       p.exercise.rules.load_input_mode === mode && p.exercise.rules.bodyweight_contribution === contribution && p.exercise.rules.default_metric === metric);
 export const archiveCompetitionExercise = (groupId: string, exerciseId: string, archived: boolean): Promise<CompetitionExerciseWriteWire> =>
   competitionRpc('group_competition_exercise_archive',{ p_group_id: groupId, p_exercise_id: exerciseId, p_archived: archived },isCompetitionExerciseWriteWire,p => p.exercise.group_exercise_id === exerciseId && (p.exercise.archived_at_ms !== null) === archived);
+
+export const createGroupSharedExercise = ({
+  groupId,
+  name,
+  mode,
+  contribution = 0,
+  mappings = [],
+  groupExerciseId = null,
+}: {
+  groupId: string;
+  name: string;
+  mode: 'total_load' | 'per_side_load';
+  contribution?: number;
+  mappings?: { muscle_group_id: string; weight: number; role?: 'primary' | 'secondary' | 'stabilizer' | null }[];
+  groupExerciseId?: string | null;
+}): Promise<GroupSharedExerciseWriteWire> =>
+  competitionRpc(
+    'group_shared_exercise_create',
+    {
+      p_group_id: groupId,
+      p_name: name,
+      p_load_input_mode: mode,
+      p_bodyweight_contribution: contribution,
+      p_mappings: mappings,
+      p_group_exercise_id: groupExerciseId,
+    },
+    isGroupSharedExerciseWriteWire,
+    (p) => p.group_id === groupId && p.shared_exercise.exercise.name === name.trim(),
+  );
+
+export const listGroupSharedExercises = (groupId: string): Promise<GroupSharedExercisesListWire> =>
+  competitionRpc(
+    'group_shared_exercises_list',
+    { p_group_id: groupId },
+    isGroupSharedExercisesListWire,
+    (p) => p.group_id === groupId,
+  );
+
+export const deleteGroupSharedExercise = (
+  groupId: string,
+  sharedExerciseId: string,
+): Promise<GroupSharedExerciseDeleteWire> =>
+  competitionRpc(
+    'group_shared_exercise_delete',
+    { p_group_id: groupId, p_shared_exercise_id: sharedExerciseId },
+    isGroupSharedExerciseDeleteWire,
+    (p) => p.group_id === groupId && p.shared_exercise_id === sharedExerciseId && p.deleted === true,
+  );
