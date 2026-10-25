@@ -51,6 +51,9 @@ export type ProjectedTriangle = {
   readonly muscleGroupId: MuscleBodyMaterialId;
   readonly fill: string;
   readonly selected: boolean;
+  readonly v0: number;
+  readonly v1: number;
+  readonly v2: number;
 };
 
 export type ProjectedPathBatch = {
@@ -98,6 +101,26 @@ export function normaliseBodyAngle(angleDeg: number): number {
 export function bodyOrientationForAngle(angleDeg: number): BodyOrientation {
   const angle = normaliseBodyAngle(angleDeg);
   return angle > 90 && angle <= 270 ? 'back' : 'front';
+}
+
+const POSTERIOR_MUSCLES = new Set<string>([
+  'delts_rear',
+  'rotator_cuff',
+  'back_lats',
+  'back_upper',
+  'traps_upper',
+  'traps_lower',
+  'spinal_erectors',
+  'triceps',
+  'hamstrings',
+  'glutes_max',
+  'hip_abductors',
+  'calves',
+]);
+
+/** Which canonical side of the body best showcases the given muscle group. */
+export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation {
+  return POSTERIOR_MUSCLES.has(canonicalMuscleId(muscleId)) ? 'back' : 'front';
 }
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
@@ -317,10 +340,68 @@ const projectSingleFace = (
     muscleGroupId: materialId,
     fill,
     selected,
+    v0: i0,
+    v1: i1,
+    v2: i2,
   };
 };
 
 const roundCoord = (n: number): number => Math.round(n * 10) / 10;
+
+const pointInTriangle = (
+  px: number,
+  py: number,
+  tri: ProjectedTriangle
+): boolean => {
+  const d1 = (px - tri.x1) * (tri.y0 - tri.y1) - (tri.x0 - tri.x1) * (py - tri.y1);
+  const d2 = (px - tri.x2) * (tri.y1 - tri.y2) - (tri.x1 - tri.x2) * (py - tri.y2);
+  const d3 = (px - tri.x0) * (tri.y2 - tri.y0) - (tri.x2 - tri.x0) * (py - tri.y0);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+};
+
+const OCCLUSION_DEPTH_BIAS = 0.005;
+
+const isEdgeOccluded = (
+  v0: number,
+  v1: number,
+  verts: RotatedVertices,
+  sortedTriangles: readonly ProjectedTriangle[]
+): boolean => {
+  const mx = (verts.sx[v0] + verts.sx[v1]) * 0.5;
+  const my = (verts.sy[v0] + verts.sy[v1]) * 0.5;
+  const mz = (verts.rz[v0] + verts.rz[v1]) * 0.5;
+  const minDepth = mz + OCCLUSION_DEPTH_BIAS;
+
+  for (let i = sortedTriangles.length - 1; i >= 0; i -= 1) {
+    const tri = sortedTriangles[i];
+    if (tri.depth <= minDepth) break;
+    if (
+      tri.v0 === v0 ||
+      tri.v0 === v1 ||
+      tri.v1 === v0 ||
+      tri.v1 === v1 ||
+      tri.v2 === v0 ||
+      tri.v2 === v1
+    ) {
+      continue;
+    }
+    const minX = Math.min(tri.x0, tri.x1, tri.x2);
+    if (mx < minX) continue;
+    const maxX = Math.max(tri.x0, tri.x1, tri.x2);
+    if (mx > maxX) continue;
+    const minY = Math.min(tri.y0, tri.y1, tri.y2);
+    if (my < minY) continue;
+    const maxY = Math.max(tri.y0, tri.y1, tri.y2);
+    if (my > maxY) continue;
+
+    if (pointInTriangle(mx, my, tri)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 const recordFaceEdges = (
   i0: number,
@@ -342,16 +423,19 @@ const recordFaceEdges = (
 const buildBoundaryContour = (
   edgeCounts: ReadonlyMap<number, number>,
   verts: RotatedVertices,
-  stroke: string
+  stroke: string,
+  sortedTriangles: readonly ProjectedTriangle[]
 ): ProjectedMuscleContour | null => {
   const segments: string[] = [];
   edgeCounts.forEach((count, key) => {
     if (count === 1) {
       const a = key >>> 16;
       const b = key & 0xffff;
-      segments.push(
-        `M${roundCoord(verts.sx[a])} ${roundCoord(verts.sy[a])}L${roundCoord(verts.sx[b])} ${roundCoord(verts.sy[b])}`
-      );
+      if (!isEdgeOccluded(a, b, verts, sortedTriangles)) {
+        segments.push(
+          `M${roundCoord(verts.sx[a])} ${roundCoord(verts.sy[a])}L${roundCoord(verts.sx[b])} ${roundCoord(verts.sy[b])}`
+        );
+      }
     }
   });
   if (segments.length === 0) return null;
@@ -457,24 +541,11 @@ export function projectMuscleBody({
   }
 
   const contour = edgeCounts
-    ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke)
+    ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke, triangles)
     : null;
 
   return { triangles, batches, contour };
 }
-
-const pointInTriangle = (
-  px: number,
-  py: number,
-  tri: ProjectedTriangle
-): boolean => {
-  const d1 = (px - tri.x1) * (tri.y0 - tri.y1) - (tri.x0 - tri.x1) * (py - tri.y1);
-  const d2 = (px - tri.x2) * (tri.y1 - tri.y2) - (tri.x1 - tri.x2) * (py - tri.y2);
-  const d3 = (px - tri.x0) * (tri.y2 - tri.y0) - (tri.x2 - tri.x0) * (py - tri.y0);
-  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
-  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
-  return !(hasNeg && hasPos);
-};
 
 /**
  * Hit-tests the frontmost visible triangle at `(x, y)` in SVG viewport coordinates.
