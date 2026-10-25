@@ -177,6 +177,19 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     expect(back.contour?.stroke).toBe(uiRoles.ink);
     expect(back.contour?.d.startsWith('M')).toBe(true);
     expect(front.contour).toBeNull();
+
+    // Contours on the opposite side of the body are depth-occluded:
+    // Front muscles (chest) produce no contour when looking from the back (180°).
+    const chestFromBack = projectMuscleBody({ angleDeg: 180, width, height, buckets, selectedId: 'chest' });
+    expect(chestFromBack.contour).toBeNull();
+    // Back muscles (glutes) produce no contour when looking from the front (0°).
+    const glutesFromFront = projectMuscleBody({ angleDeg: 0, width, height, buckets, selectedId: 'glutes_max' });
+    expect(glutesFromFront.contour).toBeNull();
+    // Front muscles (chest) produce a valid contour when looking from the front (0°).
+    const chestFromFront = projectMuscleBody({ angleDeg: 0, width, height, buckets, selectedId: 'chest' });
+    expect(chestFromFront.contour).not.toBeNull();
+    expect(chestFromFront.contour?.d.startsWith('M')).toBe(true);
+
     const latsTri = back.triangles.filter(t => t.muscleGroupId === 'back_lats').at(-1)!;
     const latsCx = (latsTri.x0 + latsTri.x1 + latsTri.x2) / 3;
     const latsCy = (latsTri.y0 + latsTri.y1 + latsTri.y2) / 3;

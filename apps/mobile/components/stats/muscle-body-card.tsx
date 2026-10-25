@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 
@@ -168,7 +168,7 @@ function MusclePickerSheet({
       testID="stats-muscle-picker-sheet"
       title="Select Muscle"
       visible={visible}>
-      <View style={styles.sheetList}>
+      <ScrollView contentContainerStyle={styles.sheetList} style={styles.sheetScroll}>
         {muscles.map(row => {
           const isSelected = row.muscleGroupId === selectedId;
           const figures = comparisonFigures(row, metric);
@@ -195,7 +195,7 @@ function MusclePickerSheet({
             </ListRow>
           );
         })}
-      </View>
+      </ScrollView>
     </Sheet>
   );
 }
@@ -456,6 +456,9 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
+  },
+  sheetScroll: {
+    maxHeight: 460,
   },
   sheetList: {
     paddingBottom: uiSpace.lg,
