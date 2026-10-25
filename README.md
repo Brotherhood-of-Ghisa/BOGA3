@@ -5,6 +5,10 @@ and enjoy progressing together. It combines quick workout logging, detailed
 analytics, adaptable training plans and private social groups in one mobile app.
 Workouts save locally as you train and sync when you are connected.
 
+## Development updates
+
+To follow recent development, read the [daily development log](https://github.com/Brotherhood-of-Ghisa/BOGA3/discussions/920). The workflow posts new `main` commit titles daily at 08:17 Europe/London and stays quiet when nothing has changed. These are merged changes; release availability is separate.
+
 ## Analytics: understand the work behind your progress
 
 BoGa connects individual sets to the bigger picture: how your strength changes,
