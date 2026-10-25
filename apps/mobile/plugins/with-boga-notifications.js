@@ -4,8 +4,10 @@ const { IOSConfig, withDangerousMod, withEntitlementsPlist, withInfoPlist, withX
 const { build: buildPlist } = require('@expo/plist').default;
 
 const TARGETS = [
-  { name: 'BogaNotificationService', suffix: 'notification-service', point: 'com.apple.usernotifications.service' },
-  { name: 'BogaNotificationContent', suffix: 'notification-content', point: 'com.apple.usernotifications.content-extension' },
+  { name: 'BogaNotificationService', suffix: 'notification-service', point: 'com.apple.usernotifications.service',
+    frameworks: ['UserNotifications'] },
+  { name: 'BogaNotificationContent', suffix: 'notification-content', point: 'com.apple.usernotifications.content-extension',
+    frameworks: ['UserNotifications', 'UserNotificationsUI'] },
 ];
 
 function notificationConfig(bundleId) {
@@ -66,14 +68,9 @@ function configureTargets(project, config, fonts) {
   return project;
 }
 
-// A content extension must link UserNotificationsUI itself: Swift drops a
-// framework used only for a protocol conformance, and without it the extension
-// crashes at launch and iOS shows a blank expanded notification.
-const TARGET_FRAMEWORKS = {
-  BogaNotificationService: ['UserNotifications'],
-  BogaNotificationContent: ['UserNotifications', 'UserNotificationsUI'],
-};
-
+// Frameworks are linked explicitly: the linker drops an autolinked framework
+// whose symbols nothing references, and a content extension without
+// UserNotificationsUI crashes at launch, leaving the expanded notification blank.
 function targetBuildSettings(target, config) {
   return { CODE_SIGN_ENTITLEMENTS: `"${target.name}/${target.name}.entitlements"`,
     INFOPLIST_FILE: `"${target.name}/${target.name}-Info.plist"`, SWIFT_VERSION: '5.9',
@@ -82,7 +79,7 @@ function targetBuildSettings(target, config) {
     PRODUCT_BUNDLE_IDENTIFIER: `"${config.ios.bundleIdentifier}.${target.suffix}"`,
     CURRENT_PROJECT_VERSION: config.ios.buildNumber ?? '1', MARKETING_VERSION: config.version ?? '1.0',
     GENERATE_INFOPLIST_FILE: 'NO',
-    OTHER_LDFLAGS: `"${['$(inherited)', ...TARGET_FRAMEWORKS[target.name].flatMap(name => ['-framework', name])].join(' ')}"` };
+    OTHER_LDFLAGS: `"${['$(inherited)', ...target.frameworks.flatMap(name => ['-framework', name])].join(' ')}"` };
 }
 
 function withBogaNotifications(config, { fonts = [] } = {}) {
