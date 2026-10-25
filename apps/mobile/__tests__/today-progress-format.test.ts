@@ -6,6 +6,7 @@
 
 import {
   CHART_RIGHT_GUTTER,
+  CHART_RIGHT_GUTTER_BACK,
   formatSessionSummaryFigures,
   formatPeriodDayLabel,
   formatPeriodRange,
@@ -16,6 +17,7 @@ import {
   sessionSummaryAccessibilityLabel,
   periodChartAccessibilityLabel,
   periodChartAccessibilityValue,
+  comparedLineLabel,
   periodChartGeometry,
   periodDayAtX,
   periodDayFigures,
@@ -37,6 +39,7 @@ const counts = (workingSets: number, sessions = 0, prs = 0): ProgressCounts => (
 const period = (overrides: {
   now: Date;
   weeks?: number;
+  compareBack?: number;
   cumulative: number[];
   previousCumulative?: number[];
   projected?: number;
@@ -44,19 +47,20 @@ const period = (overrides: {
   toSameDay?: ProgressCounts;
   total?: ProgressCounts;
 }): TodayProgressPeriod => {
-  const { now, weeks = 4 } = overrides;
+  const { now, weeks = 4, compareBack = 1 } = overrides;
   const last = (values: number[]) => values[values.length - 1] ?? 0;
   const previousCumulative = overrides.previousCumulative ?? [];
   return {
     window: localPeriodWindow(now, weeks),
     weeks,
+    compareBack,
     dayOfPeriod: overrides.cumulative.length,
     daysInPeriod: weeks * 7,
     cumulativeWorkingSets: overrides.cumulative,
     toDate: overrides.toDate ?? counts(last(overrides.cumulative)),
     projectedWorkingSets: overrides.projected ?? 0,
     previous: {
-      window: localPeriodWindow(now, weeks, -1),
+      window: localPeriodWindow(now, weeks, -compareBack),
       cumulativeWorkingSets: previousCumulative,
       toSameDay: overrides.toSameDay ?? counts(0),
       total: overrides.total ?? counts(last(previousCumulative)),
@@ -144,7 +148,9 @@ describe('the period against the previous period', () => {
     // 38 sets over 19 days: 2 a day, reaching the projection on the last day.
     const projected = periodDayFigures(october, 21);
     expect(projected).toMatchObject({ when: 'projected', workingSets: 44, previousWorkingSets: 63, difference: -19 });
-    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY')).toBe('26 Oct (projected)');
+    // Shown as its date alone; spoken, it says it is projected.
+    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY')).toBe('26 Oct');
+    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY', { spoken: true })).toBe('26 Oct (projected)');
     expect(periodDayFigures(october, 27).workingSets).toBe(october.projectedWorkingSets);
 
     // A selection outside the period stays on its edge.
@@ -166,7 +172,20 @@ describe('the period against the previous period', () => {
     expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe(
       '4-week period, Oct 5 to Nov 1: Today 18 sets, against the last period, Sep 7 to Oct 4: 6 sets by Sep 25, +12',
     );
-    expect(periodChartAccessibilityValue(periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, last period 6');
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, last period 6');
+  });
+
+  it('speaks an earlier compared period by how far back it is', () => {
+    const october = period({ now, compareBack: 3, cumulative: days(19, () => 18), toSameDay: counts(6), total: counts(9) });
+    expect(formatPeriodRange(october.previous.window, 'YYYY-MM-DD')).toBe('Jul 13 to Aug 9');
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe(
+      '4-week period, Oct 5 to Nov 1: Today 18 sets, against the period 3 back, Jul 13 to Aug 9: 6 sets by Jul 31, +12',
+    );
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, period 3 back 6');
+    expect(periodChartAccessibilityLabel(october)).toContain('against the period 3 back 6 by day 19; the period 3 back finished at 9.');
+    // The chart labels its compared line the same way.
+    expect(comparedLineLabel(october)).toBe('3 BACK');
+    expect(comparedLineLabel({ compareBack: 1 })).toBe('LAST');
   });
 
   it('speaks the chart as one sentence', () => {
@@ -195,6 +214,10 @@ describe('the period chart geometry', () => {
     );
 
     expect(geometry.plot.width).toBe(plotWidth);
+    // An earlier compared period's wider label takes a wider gutter.
+    expect(periodChartGeometry(period({ now, compareBack: 2, cumulative: days(19, () => 0) }), width).plot.width).toBe(
+      width - CHART_RIGHT_GUTTER_BACK,
+    );
     expect(geometry.current).toHaveLength(19);
     expect(geometry.current[0].x).toBe(0);
     expect(geometry.previous[27].x).toBeCloseTo(plotWidth);

@@ -14,6 +14,7 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
+import { buildCompetitionSession } from './competition-session-view-model';
 import { SHOWN_BOARD } from './competition-session-records-view-model';
 import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
 import type { GroupMemberRef } from './types';
@@ -21,10 +22,12 @@ import type { GroupMemberRef } from './types';
 import type {
   CompetitionEventWire,
   CompetitionHistoryValueWire,
+  CompetitionStreamItemWire,
   CompetitionWeekSummaryWire as GroupWeekSummaryResult,
 } from './competition-wire';
 import { formatCompetitionHistoricalValue } from './competition-view-model';
-type GroupWeekLatestSession = NonNullable<GroupWeekSummaryResult['latest_completed']>;
+/** A completed session as Today's group card draws it. */
+export type GroupWeekLatestSession = NonNullable<GroupWeekSummaryResult['latest_completed']>;
 type GroupWeekTrainingSession = GroupWeekSummaryResult['training_now'][number];
 /** One current member's week: competition rank (equal working sets and group records share a rank). */
 export type GroupWeekBoardRow = GroupWeekSummaryResult['members'][number];
@@ -194,7 +197,7 @@ const completedDuration = (session: GroupWeekLatestSession): number | null => {
   return null;
 };
 
-const completedRow = (
+export const completedRow = (
   session: GroupWeekLatestSession,
   myUserId: string,
   dateFormat: ExerciseDateFormat,
@@ -241,4 +244,36 @@ export const buildLatestActivity = (
   if (first && rest.length === 0) return trainingRow(first, myUserId, nowMs, dateFormat);
   if (first) return severalRow(summary.training_now, myUserId);
   return summary.latest_completed ? completedRow(summary.latest_completed, myUserId, dateFormat) : null;
+};
+
+/**
+ * The completed sessions in loaded stream pages, newest first, each in the
+ * week summary's shape: working sets and exercises counted from the shared
+ * sets as the group's stream card counts them, and the session's group
+ * records from the record events loaded with it.
+ */
+export const completedSessionsFromStream = (items: CompetitionStreamItemWire[]): GroupWeekLatestSession[] => {
+  const recordsBySession = new Map<string, CompetitionEventWire[]>();
+  for (const item of items) {
+    if (item.kind !== 'competition' || item.event.kind !== 'record' || item.event.voided || item.event.session_id === null) continue;
+    const records = recordsBySession.get(item.event.session_id) ?? [];
+    records.push(item.event);
+    recordsBySession.set(item.event.session_id, records);
+  }
+  return items.flatMap((item) => {
+    if (item.kind !== 'session' || item.session.status !== 'completed') return [];
+    const { session } = item;
+    const counts = buildCompetitionSession(session);
+    return [{
+      member: session.member,
+      session_id: session.session_id,
+      started_at_ms: session.started_at_ms,
+      completed_at_ms: session.completed_at_ms,
+      duration_sec: session.duration_sec,
+      gym_name: session.gym_name,
+      working_sets: counts.setCount,
+      exercise_count: counts.exerciseCount,
+      group_records: recordsBySession.get(session.session_id) ?? [],
+    }];
+  });
 };

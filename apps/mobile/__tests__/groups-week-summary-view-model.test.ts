@@ -8,13 +8,14 @@ import {
   buildLatestActivity,
   buildWeekBoard,
   buildGroupRecordLine,
+  completedSessionsFromStream,
   formatTrainingStart,
   groupRecordBoards,
   joinNames,
   type GroupWeekBoardRow,
 } from '@/src/groups';
 
-import { competitionEvent } from './helpers/competition-fixtures';
+import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
 import type { CompetitionEventWire,CompetitionHistoricalMetric,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
 type GroupWeekLatestSession = NonNullable<CompetitionWeekSummaryWire['latest_completed']>;
 type GroupWeekTrainingSession = CompetitionWeekSummaryWire['training_now'][number];
@@ -287,5 +288,34 @@ describe('formatting', () => {
       ],
     };
     expect(groupRecordBoards([event])).toHaveLength(1);
+  });
+});
+
+describe('completedSessionsFromStream', () => {
+  const session = (sessionId: string, status: 'completed' | 'active' | 'draft' = 'completed') => ({
+    kind: 'session' as const, key: sessionId, sort_at_ms: 1, groups: [{ group_id: 'g1', name: 'Crew' }],
+    session: { ...competitionSession.session, session_id: sessionId, status },
+  });
+  const recordFor = (sessionId: string | null, overrides: Partial<CompetitionEventWire> = {}) => ({
+    kind: 'competition' as const, key: `record-${sessionId}-${overrides.event_id ?? ''}`, sort_at_ms: 1,
+    event: { ...competitionEvent, session_id: sessionId, ...overrides },
+  });
+
+  it('keeps completed sessions in stream order, counted as the stream card counts them, with their live group records', () => {
+    const sessions = completedSessionsFromStream([
+      session('live', 'active'),
+      session('s2'),
+      recordFor('s2', { event_id: 'kept' }),
+      recordFor('s2', { event_id: 'voided', voided: true }),
+      recordFor('s2', { event_id: 'lead', kind: 'lead_change' }),
+      recordFor(null, { event_id: 'unplaced' }),
+      session('draft', 'draft'),
+      session('s1'),
+    ]);
+
+    expect(sessions.map((entry) => entry.session_id)).toEqual(['s2', 's1']);
+    expect(sessions[0]).toMatchObject({ working_sets: 1, exercise_count: 1, duration_sec: 2_600, gym_name: 'Gym' });
+    expect(sessions[0].group_records.map((event) => event.event_id)).toEqual(['kept']);
+    expect(sessions[1].group_records).toEqual([]);
   });
 });
