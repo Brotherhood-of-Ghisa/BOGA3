@@ -186,8 +186,11 @@ export const sessionSummaryAccessibilityLabel = (
     .join(', ');
 };
 
-export const weekFigureAccessibilityLabel = (label: string, counts: { current: number; previous: number }): string =>
-  `${label} ${counts.current}, vs ${counts.previous} last week`;
+export const weekFigureAccessibilityLabel = (
+  label: string,
+  counts: { current: number; previous: number },
+  previousWeek = 'last week',
+): string => `${label} ${counts.current}, vs ${counts.previous} ${previousWeek}`;
 
 // --- The period chart's geometry ------------------------------------------
 
