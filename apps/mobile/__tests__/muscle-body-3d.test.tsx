@@ -173,6 +173,10 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     // At 180° (back view), posterior muscles (`back_lats`, `glutes_max`) are frontmost.
     const back = projectMuscleBody({ angleDeg: 180, width, height, buckets, selectedId: 'back_lats' });
     expect(back.batches.some(b => b.selected && b.stroke === uiRoles.ink)).toBe(true);
+    expect(back.contour).not.toBeNull();
+    expect(back.contour?.stroke).toBe(uiRoles.ink);
+    expect(back.contour?.d.startsWith('M')).toBe(true);
+    expect(front.contour).toBeNull();
     const latsTri = back.triangles.filter(t => t.muscleGroupId === 'back_lats').at(-1)!;
     const latsCx = (latsTri.x0 + latsTri.x1 + latsTri.x2) / 3;
     const latsCy = (latsTri.y0 + latsTri.y1 + latsTri.y2) / 3;
@@ -181,6 +185,7 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     expect(projectMuscleBody({ angleDeg: 0, width: 0, height: 280, buckets })).toEqual({
       triangles: [],
       batches: [],
+      contour: null,
     });
   });
 });
@@ -206,6 +211,7 @@ describe('MuscleBodyCard', () => {
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Front view, 0 degrees' });
     expect(screen.UNSAFE_getAllByType(Path).length).toBeGreaterThan(10);
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
 
     // Rotate via accessibility actions (30° steps).
     fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
@@ -267,6 +273,8 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
+    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-body-contour').props.strokeWidth).toBe(1.5);
     expect(
       screen.getByLabelText('Select Chest. Now 8 working sets.').props.accessibilityState
     ).toEqual({

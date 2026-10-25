@@ -48,6 +48,8 @@ const PAN_ACTIVATION_X = 8;
 const PAN_FAIL_Y = 12;
 const DEGREES_PER_POINT = 0.85;
 const ACCESSIBILITY_ANGLE_STEP = 30;
+const FACET_STROKE_WIDTH = 0.35;
+const CONTOUR_STROKE_WIDTH = 1.5;
 
 const LEGACY_REVERSE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   delts_front: ['delts_front', 'front_delts'],
@@ -232,9 +234,21 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
                 key={batch.key}
                 stroke={batch.fill}
                 strokeLinejoin="round"
-                strokeWidth={batch.selected ? 0.55 : 0.35}
+                strokeWidth={FACET_STROKE_WIDTH}
               />
             ))}
+            {projected.contour ? (
+              <Path
+                d={projected.contour.d}
+                fill="none"
+                key="stats-muscle-contour"
+                stroke={projected.contour.stroke}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={CONTOUR_STROKE_WIDTH}
+                testID="stats-muscle-body-contour"
+              />
+            ) : null}
           </Svg>
         </View>
       </GestureDetector>

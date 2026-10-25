@@ -61,9 +61,15 @@ export type ProjectedPathBatch = {
   readonly selected: boolean;
 };
 
+export type ProjectedMuscleContour = {
+  readonly d: string;
+  readonly stroke: string;
+};
+
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
+  readonly contour: ProjectedMuscleContour | null;
 };
 
 export const SHADE_STEPS = 12;
@@ -224,12 +230,12 @@ type ProjectionContext = {
 const resolveFaceFill = (
   materialId: MuscleBodyMaterialId,
   step: number,
-  selected: boolean,
+  _selected: boolean,
   ctx: ProjectionContext
 ): string => {
   if (materialId === 'neutral') return ctx.palette.neutral[step];
   const bucket = ctx.buckets.get(materialId) ?? 0;
-  return selected ? ctx.palette.selected[bucket][step] : ctx.palette.buckets[bucket][step];
+  return ctx.palette.buckets[bucket][step];
 };
 
 type RotatedVertices = {
@@ -316,6 +322,42 @@ const projectSingleFace = (
 
 const roundCoord = (n: number): number => Math.round(n * 10) / 10;
 
+const recordFaceEdges = (
+  i0: number,
+  i1: number,
+  i2: number,
+  counts: Map<number, number>
+) => {
+  const addEdge = (a: number, b: number) => {
+    const min = a < b ? a : b;
+    const max = a < b ? b : a;
+    const key = (min << 16) | max;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  };
+  addEdge(i0, i1);
+  addEdge(i1, i2);
+  addEdge(i2, i0);
+};
+
+const buildBoundaryContour = (
+  edgeCounts: ReadonlyMap<number, number>,
+  verts: RotatedVertices,
+  stroke: string
+): ProjectedMuscleContour | null => {
+  const segments: string[] = [];
+  edgeCounts.forEach((count, key) => {
+    if (count === 1) {
+      const a = key >>> 16;
+      const b = key & 0xffff;
+      segments.push(
+        `M${roundCoord(verts.sx[a])} ${roundCoord(verts.sy[a])}L${roundCoord(verts.sx[b])} ${roundCoord(verts.sy[b])}`
+      );
+    }
+  });
+  if (segments.length === 0) return null;
+  return { d: segments.join(''), stroke };
+};
+
 const batchSlabTriangles = (
   slabTriangles: readonly ProjectedTriangle[],
   slabIndex: number,
@@ -380,7 +422,7 @@ export function projectMuscleBody({
   mesh = MUSCLE_BODY_MESH,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
   if (width <= 0 || height <= 0) {
-    return { triangles: [], batches: [] };
+    return { triangles: [], batches: [], contour: null };
   }
   const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
   const selectedCanonicalId = selectedId ? canonicalMuscleId(selectedId) : null;
@@ -393,10 +435,16 @@ export function projectMuscleBody({
     palette,
   };
   const triangles: ProjectedTriangle[] = [];
+  const edgeCounts = selectedCanonicalId ? new Map<number, number>() : null;
 
   for (const face of mesh.faces) {
     const projected = projectSingleFace(face, ctx);
-    if (projected) triangles.push(projected);
+    if (projected) {
+      triangles.push(projected);
+      if (edgeCounts && projected.selected) {
+        recordFaceEdges(face[0], face[1], face[2], edgeCounts);
+      }
+    }
   }
 
   triangles.sort((a, b) => a.depth - b.depth);
@@ -408,7 +456,11 @@ export function projectMuscleBody({
     batches.push(...batchSlabTriangles(slice, i / slabSize, palette.selectedStroke));
   }
 
-  return { triangles, batches };
+  const contour = edgeCounts
+    ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke)
+    : null;
+
+  return { triangles, batches, contour };
 }
 
 const pointInTriangle = (
