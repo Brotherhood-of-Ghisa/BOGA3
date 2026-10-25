@@ -6,6 +6,7 @@ import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './sch
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { validateExerciseCore, type LoadInputMode } from '@/src/exercise-core';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
+import { validateExerciseRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type ExerciseCatalogMuscleGroup = {
@@ -33,6 +34,8 @@ export type ExerciseCatalogExercise = {
   loadInputMode?: LoadInputMode;
   /** `Track each gym separately` ([[gym.split]]). */
   splitByGym: boolean;
+  /** Rest timer default in seconds; null uses the global timer ([[timer.rest-default]]). */
+  restTimerSec: number | null;
   deletedAt: Date | null;
   mappings: ExerciseCatalogExerciseMuscleMapping[];
 };
@@ -49,6 +52,8 @@ export type SaveExerciseCatalogExerciseInput = {
   loadInputMode?: LoadInputMode;
   /** Omission preserves the stored value (a new exercise starts whole). */
   splitByGym?: boolean;
+  /** Null clears it back to the global timer; omission preserves the stored value. */
+  restTimerSec?: number | null;
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -69,6 +74,7 @@ type DrizzleExerciseRow = {
   name: string;
   loadInputMode: LoadInputMode;
   splitByGym: boolean;
+  restTimerSec: number | null;
   deletedAt: Date | null;
 };
 
@@ -81,6 +87,7 @@ export type ExerciseCatalogStore = {
     name: string;
     loadInputMode?: LoadInputMode;
     splitByGym?: boolean;
+    restTimerSec?: number | null;
     mappings: {
       muscleGroupId: string;
       weight: number;
@@ -130,6 +137,7 @@ const mapExerciseGraph = (
     loadInputMode: exerciseRow.loadInputMode,
     bodyweightContribution: exerciseRow.bodyweightContribution,
     splitByGym: exerciseRow.splitByGym,
+    restTimerSec: exerciseRow.restTimerSec,
     deletedAt: exerciseRow.deletedAt,
     mappings: mappingRows
       .filter((mapping) => mapping.exerciseDefinitionId === exerciseRow.id)
@@ -153,6 +161,7 @@ const listExerciseGraphs = async (
       loadInputMode: exerciseDefinitions.loadInputMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
       splitByGym: exerciseDefinitions.splitByGym,
+      restTimerSec: exerciseDefinitions.restTimerSec,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions);
@@ -199,6 +208,8 @@ export type ExerciseGraphWrite = {
   loadInputMode: LoadInputMode;
   /** Omission preserves the stored value. */
   splitByGym?: boolean;
+  /** Omission preserves the stored value; null clears it. */
+  restTimerSec?: number | null;
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -237,6 +248,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
         ...contributionUpdate,
         // Undefined keeps the stored value: Drizzle drops undefined keys.
         splitByGym: input.splitByGym,
+        restTimerSec: input.restTimerSec,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -252,6 +264,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
         id: exerciseId,
         ...contributionUpdate,
         splitByGym: input.splitByGym,
+        restTimerSec: input.restTimerSec,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -341,6 +354,7 @@ export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): 
       loadInputMode: exerciseDefinitions.loadInputMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
       splitByGym: exerciseDefinitions.splitByGym,
+      restTimerSec: exerciseDefinitions.restTimerSec,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions)
@@ -400,6 +414,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         loadInputMode: input.loadInputMode ?? 'total_load',
         bodyweightContribution: input.bodyweightContribution,
         splitByGym: input.splitByGym,
+        restTimerSec: input.restTimerSec,
         mappings: input.mappings,
         now: input.now,
       });
@@ -495,6 +510,8 @@ export const normalizeExerciseGraphInput = (
     ? null
     : validateBodyweightContribution(input.bodyweightContribution);
   if (checkedContribution && !checkedContribution.ok) throw new Error(checkedContribution.message);
+  const checkedRestTimer = input.restTimerSec === undefined ? null : validateExerciseRestTimerSec(input.restTimerSec);
+  if (checkedRestTimer && !checkedRestTimer.ok) throw new Error(checkedRestTimer.message);
   return {
     name,
     loadInputMode,
@@ -502,6 +519,7 @@ export const normalizeExerciseGraphInput = (
     now,
     ...(checkedContribution?.ok ? { bodyweightContribution: checkedContribution.value } : {}),
     splitByGym: input.splitByGym,
+    ...(checkedRestTimer?.ok ? { restTimerSec: checkedRestTimer.value } : {}),
   };
 };
 

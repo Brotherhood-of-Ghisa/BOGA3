@@ -140,8 +140,9 @@ describe('domain schema and runtime migrations', () => {
     // block's machine snapshot, m0020 adds the gym-split flag, m0021 adds
     // the facts' reporting bucket with the triggers that keep it fresh, and
     // m0022 adds last_modified_by across the four authored plan tables, and
-    // m0023 adds the muscle report group and tracked flag.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(24);
+    // m0023 adds the muscle report group and tracked flag, and m0024 adds the
+    // exercise rest timer default.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(25);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -195,6 +196,7 @@ describe('domain schema and runtime migrations', () => {
       'm0021',
       'm0022',
       'm0023',
+      'm0024',
     ]);
   });
 
@@ -371,6 +373,15 @@ describe('domain schema and runtime migrations', () => {
     // schema drift rule"); it defaults off, so an upgrade changes no report.
     expect(localRuntimeMigrations.migrations.m0020)
       .toContain('ADD `split_by_gym` integer DEFAULT false NOT NULL');
+  });
+
+  it('adds the nullable exercise rest timer in the m0024 follow-up migration', () => {
+    // Synced, so it pairs with app_public.exercise_definitions.rest_timer_sec
+    // (spec 05, "Client schema drift rule"). Nullable with no default or CHECK:
+    // existing exercises keep the global timer, and a pulled value never fails
+    // a constraint.
+    expect(localRuntimeMigrations.migrations.m0024.trim())
+      .toBe('ALTER TABLE `exercise_definitions` ADD `rest_timer_sec` integer;');
   });
 
   it('adds the facts reporting bucket and refreshes its triggers in m0021', () => {

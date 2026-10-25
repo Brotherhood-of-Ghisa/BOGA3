@@ -388,6 +388,7 @@ describe('BoGa MCP server', () => {
         exercise: {
           muscles: [{ muscle_id: 'chest_sternal', role: 'primary' }],
           name: 'Cable Fly',
+          rest_timer_sec: 120,
           split_by_gym: true,
         },
         idempotency_key: 'ex-create-1',
@@ -396,7 +397,7 @@ describe('BoGa MCP server', () => {
     });
     const updated = await running.client.callTool({
       arguments: {
-        changes: { load_input_mode: 'per_side_load', split_by_gym: false },
+        changes: { load_input_mode: 'per_side_load', rest_timer_sec: null, split_by_gym: false },
         exercise_id: 'exercise-a',
         expected_revision: 1,
         idempotency_key: 'ex-update-1',
@@ -426,12 +427,13 @@ describe('BoGa MCP server', () => {
       }));
     expect(posts).toEqual([
       {
-        body: { muscles: [{ muscle_id: 'chest_sternal', role: 'primary' }], name: 'Cable Fly', split_by_gym: true },
+        body: { muscles: [{ muscle_id: 'chest_sternal', role: 'primary' }], name: 'Cable Fly', rest_timer_sec: 120, split_by_gym: true },
         key: 'ex-create-1',
         path: 'exercises',
       },
       {
-        body: { expected_revision: 1, load_input_mode: 'per_side_load', split_by_gym: false },
+        // null reaches the API, which clears the exercise's own rest timer.
+        body: { expected_revision: 1, load_input_mode: 'per_side_load', rest_timer_sec: null, split_by_gym: false },
         key: 'ex-update-1',
         path: 'exercises/exercise-a',
       },
@@ -454,6 +456,25 @@ describe('BoGa MCP server', () => {
         idempotency_key: 'ex-bad-1',
       },
       name: 'create_exercise',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it.each([10, 601, 90.5, '90'])('rejects rest_timer_sec %p before calling the API', async (restTimerSec) => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+
+    const result = await running.client.callTool({
+      arguments: {
+        changes: { rest_timer_sec: restTimerSec },
+        exercise_id: 'exercise-a',
+        expected_revision: 1,
+        idempotency_key: 'ex-bad-rest',
+      },
+      name: 'update_exercise',
     });
 
     expect(result.isError).toBe(true);

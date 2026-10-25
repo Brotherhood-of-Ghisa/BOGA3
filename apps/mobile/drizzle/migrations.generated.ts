@@ -151,6 +151,12 @@ export const generatedMigrationBundle = {
     tag: "0023_muscle_groups_report_group_tracked",
     breakpoints: true,
   },
+  {
+    idx: 24,
+    when: 1792924450424,
+    tag: "0024_exercise_rest_timer_sec",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -866,6 +872,7 @@ ALTER TABLE \`session_plan_sets\` ADD \`last_modified_by\` text DEFAULT 'human' 
   m0023: `ALTER TABLE \`muscle_groups\` ADD \`report_group\` text;--> statement-breakpoint
 ALTER TABLE \`muscle_groups\` ADD \`tracked\` integer DEFAULT 1 NOT NULL CONSTRAINT "muscle_groups_tracked_boolean_guard" CHECK (\`tracked\` in (0, 1));
 `,
+  m0024: `ALTER TABLE \`exercise_definitions\` ADD \`rest_timer_sec\` integer;`,
   },
 } as const;
 

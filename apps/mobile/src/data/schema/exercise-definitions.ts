@@ -17,6 +17,10 @@ export const exerciseDefinitions = sqliteTable(
     // gym.split). Synced and retroactive: it selects the reporting bucket at read
     // time and never rewrites a raw row.
     splitByGym: integer('split_by_gym', { mode: 'boolean' }).notNull().default(false),
+    // Rest timer default in whole seconds (docs/product/timer.md, timer.rest-default);
+    // null uses the device's global rest timer. Synced; no CHECK, because a pulled
+    // out-of-range value must not fail the pull — readers fall back instead.
+    restTimerSec: integer('rest_timer_sec'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),

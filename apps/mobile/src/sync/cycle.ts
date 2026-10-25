@@ -636,6 +636,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('load_input_mode', 'loadInputMode'),
     SC('bodyweight_contribution', 'bodyweightContribution'),
     SC('split_by_gym', 'splitByGym'),
+    KEEP('rest_timer_sec', 'restTimerSec'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),

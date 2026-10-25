@@ -1302,8 +1302,8 @@ agent_get "exercises?query=Agent%20A%20Bench"
 assert_status "200" "catalog view"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg ex "${EXERCISE_A}" --argjson rev "${NOW_MS}" '
   .data.exercises[] | select(.id == $ex)
-  | .split_by_gym == false and .deleted == false and .revision == $rev
-' >/dev/null || fail "catalog view lacks split_by_gym, revision or deleted"
+  | .split_by_gym == false and .rest_timer_sec == null and .deleted == false and .revision == $rev
+' >/dev/null || fail "catalog view lacks split_by_gym, rest_timer_sec, revision or deleted"
 # Gym usage counts sessions holding a working set: the warm-up-only exercise has none.
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "gym usage of an unsplit exercise"
@@ -1321,7 +1321,7 @@ echo "[agent-api-test] verifying exercise create, replay and validation"
 CREATE_NAME="agent-api-${RUN_TAG} Cable Fly"
 CREATE_KEY="agent-api-${RUN_TAG}-ex-create"
 CREATE_BODY="$(jq -nc --arg name "${CREATE_NAME}" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
-  {name:$name,split_by_gym:true,
+  {name:$name,split_by_gym:true,rest_timer_sec:120,
    muscles:[{muscle_id:$a2,role:"secondary"},{muscle_id:$a,role:"primary"}]}')"
 agent_post "exercises" "${CREATE_BODY}" "${CREATE_KEY}"
 assert_status "200" "exercise create"
@@ -1329,6 +1329,7 @@ CREATED_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.exercise_id')"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg name "${CREATE_NAME}" '
   .data.idempotent_replay == false
   and .data.exercise.name == $name and .data.exercise.split_by_gym == true
+  and .data.exercise.rest_timer_sec == 120
   and .data.exercise.load_input_mode == "total_load"
   and .data.exercise.revision == .data.revision
   and (.data.exercise.muscles | map(.role) | sort) == ["primary","secondary"]
@@ -1401,6 +1402,36 @@ assert_status "404" "cross-owner exercise update"
 [[ "$(run_psql "select name from app_public.exercise_definitions
   where owner_user_id = '${USER_B_UUID}'::uuid and id = '${EXERCISE_B}';")" == "User B Secret Lift" ]] ||
   fail "a cross-owner update touched user B's exercise"
+
+echo "[agent-api-test] verifying the exercise rest timer is range-checked and clears on null"
+REST_REVISION="$(run_psql "select client_updated_at_ms from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${CREATED_ID}';")"
+agent_post "exercises/${CREATED_ID}" "$(jq -nc --argjson rev "${REST_REVISION}" '{expected_revision:$rev,rest_timer_sec:601}')" \
+  "agent-api-${RUN_TAG}-ex-rest-range"
+assert_status "400" "exercise rest timer out of range"
+agent_post "exercises/${CREATED_ID}" "$(jq -nc --argjson rev "${REST_REVISION}" '{expected_revision:$rev,load_input_mode:"per_side_load"}')" \
+  "agent-api-${RUN_TAG}-ex-rest-kept"
+assert_status "200" "exercise update omitting rest_timer_sec"
+REST_REVISION="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.revision')"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.exercise.rest_timer_sec == 120' >/dev/null ||
+  fail "an update omitting rest_timer_sec changed it"
+agent_post "exercises/${CREATED_ID}" "$(jq -nc --argjson rev "${REST_REVISION}" '{expected_revision:$rev,rest_timer_sec:null}')" \
+  "agent-api-${RUN_TAG}-ex-rest-clear"
+assert_status "200" "exercise rest timer cleared"
+[[ "$(run_psql "select coalesce(rest_timer_sec::text, 'null') from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${CREATED_ID}';")" == "null" ]] ||
+  fail "an explicit null did not clear the exercise rest timer"
+# The range is not a server CHECK: a stored value outside it (another writer)
+# reads as null, the global timer, as it does in the app.
+update_training_fixture "update app_public.exercise_definitions set rest_timer_sec = 5
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${CREATED_ID}';" >/dev/null
+agent_get "exercises?query=Cable%20Fly"
+assert_status "200" "catalog view of an out-of-range rest timer"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${CREATED_ID}" \
+  '.data.exercises[] | select(.id == $id) | .rest_timer_sec == null' >/dev/null ||
+  fail "an out-of-range stored rest timer reached the agent"
+update_training_fixture "update app_public.exercise_definitions set rest_timer_sec = null
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${CREATED_ID}';" >/dev/null
 
 echo "[agent-api-test] verifying soft delete and restore"
 CREATED_REVISION="$(run_psql "select client_updated_at_ms from app_public.exercise_definitions

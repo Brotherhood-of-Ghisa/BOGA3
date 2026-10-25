@@ -95,6 +95,7 @@ Query parameters:
     "name": "Bench press",
     "load_input_mode": "total_load",
     "split_by_gym": false,
+    "rest_timer_sec": null,
     "deleted": false,
     "revision": 1760000000000,
     "muscles": [{"id": "muscle-id", "name": "Chest", "family": "Chest", "weight": 1, "role": "primary"}],
@@ -129,6 +130,7 @@ nonexistent exercise produce the same `404` envelope.
     "muscles": [],
     "equipment": [],
     "split_by_gym": true,
+    "rest_timer_sec": 120,
     "gym_usage": {
       "gyms": [{ "gym": { "id": "gym-id", "name": "Home" }, "session_count": 23,
         "last_performed_at": "2026-07-25T18:00:00.000Z" }],
@@ -511,9 +513,12 @@ Every route requires write access and an `Idempotency-Key`; replay and conflict
 behave as for plans. Bodies are strict JSON:
 
 - `POST /v1/agent/exercises` — `{name, muscles, load_input_mode?,
-  bodyweight_contribution?, split_by_gym?}`; defaults `total_load`, `0`, `false`.
+  bodyweight_contribution?, split_by_gym?, rest_timer_sec?}`; defaults
+  `total_load`, `0`, `false`, `null`. `rest_timer_sec` is null or whole seconds
+  15–600 ([[timer.rest-default]]); null uses the device-local global timer.
 - `POST /v1/agent/exercises/{id}` — `{expected_revision, ...fields}`: only the
-  fields present change; `muscles` replaces the whole set.
+  fields present change; `muscles` replaces the whole set, and
+  `rest_timer_sec: null` clears the exercise's own timer.
 - `POST /v1/agent/exercises/{id}/delete` and `/restore` — `{expected_revision}`.
   Soft delete only; logged history keeps its rows.
 

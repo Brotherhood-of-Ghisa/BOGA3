@@ -1113,6 +1113,33 @@ describe('ExercisePageScreen', () => {
     act(() => updatePreferences({ timerInTitleBar: false }));
     __resetRestTimerForTests();
   });
+
+  it("rests for the exercise's own timer instead of the global one ([[timer.rest-default]])", async () => {
+    __resetRestTimerForTests();
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    await seedPage(async () => {
+      localDatabase().update(exerciseDefinitions).set({ restTimerSec: 45 }).where(eq(exerciseDefinitions.id, BENCH_DEF)).run();
+    });
+    await renderPage();
+
+    // The global timer is 90s; Bench's own 45s wins on auto-start and on Restart.
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    expect(await screen.findByTestId('rest-timer-countdown')).toHaveTextContent('0:45');
+    fireEvent.press(screen.getByTestId('rest-timer-plus-15'));
+    fireEvent.press(screen.getByTestId('rest-timer-restart'));
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('0:45');
+
+    // A changed global timer does not move an exercise that has its own.
+    act(() => updatePreferences({ restTimerDurationSec: 120 }));
+    fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-page-rest-timer-button'));
+    expect(await screen.findByTestId('rest-timer-countdown')).toHaveTextContent('0:45');
+    act(() => updatePreferences({ restTimerDurationSec: 90 }));
+    __resetRestTimerForTests();
+  });
 });
 
 describe('exercise page route', () => {

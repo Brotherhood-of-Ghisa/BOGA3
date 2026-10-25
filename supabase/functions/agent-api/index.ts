@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.9
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
 import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
+import { isRestTimerSec } from '../../../apps/mobile/src/exercise-core/rest-timer.ts';
 import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
@@ -74,6 +75,8 @@ type ExerciseDefinitionRow = ExerciseLoadRow & {
   load_input_mode: string;
   name: string;
   split_by_gym: boolean;
+  /** The exercise's own rest timer in seconds; null uses the device's global timer. */
+  rest_timer_sec: number | null;
 };
 
 /** The revision an exercise edit must quote is the definition's LWW stamp. */
@@ -114,7 +117,10 @@ type SessionRow = SessionWeightRow & {
 
 type SetRow = EnteredSetRow & { session_exercise_id: string };
 
-const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution,split_by_gym';
+/** An out-of-range stored value reads as null, as the app ignores it ([[timer.rest-default]]). */
+const projectRestTimerSec = (value: number | null): number | null => (isRestTimerSec(value) ? value : null);
+
+const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution,split_by_gym,rest_timer_sec';
 /** Catalog reads add what an exercise edit needs: its revision and deleted state. */
 const CATALOG_EXERCISE_COLUMNS = `${EXERCISE_COLUMNS},client_updated_at_ms,deleted_at`;
 const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec';
@@ -743,6 +749,7 @@ const projectCatalogExercises = async (
     name: row.name,
     ...exerciseLoadPayload(row, bodyweightCalculationsEnabled),
     split_by_gym: row.split_by_gym === true,
+    rest_timer_sec: projectRestTimerSec(row.rest_timer_sec),
     deleted: row.deleted_at !== null,
     revision: Number(row.client_updated_at_ms),
     muscles: mappings.get(row.id) ?? [],
@@ -1287,6 +1294,7 @@ const getExerciseContext = async (
       muscles: mappings.get(exerciseId) ?? [],
       equipment: equipmentByExercise.get(exerciseId) ?? [],
       split_by_gym: definition.split_by_gym,
+      rest_timer_sec: projectRestTimerSec(definition.rest_timer_sec),
       gym_usage: gymUsage,
       ...splitFields,
     },

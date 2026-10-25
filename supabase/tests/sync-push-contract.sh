@@ -425,6 +425,45 @@ service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${E
 assert_json_expr 'length == 1 and .[0].split_by_gym == false' "an explicit false clears the flag"
 
 # ===========================================================================
+# 3b'. The exercise rest timer is additive and nullable: an insert without the
+#      key stores null (the global timer), a writer that omits it keeps the
+#      stored value, and an explicit null clears it.
+# ===========================================================================
+
+echo "[sync-push] an omitted rest_timer_sec keeps the stored value"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=rest_timer_sec"
+assert_json_expr 'length == 1 and .[0].rest_timer_sec == null' \
+  "an insert without the key stores null"
+
+push_rest_timer() {
+  local at="$1" fields="$2"
+  PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+    --argjson cuam "${at}" --argjson ts "${at}" --argjson extra "${fields}" \
+    '{entities: [
+      {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+       fields: ({name: "Older Writer", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
+                 created_at: $ts, updated_at: $ts, deleted_at: null} + $extra)}
+    ]}')"
+  sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+}
+
+push_rest_timer "$((BASE_MS + 170))" '{"rest_timer_sec": 120}'
+assert_status "200" "exercise-definition rest_timer_sec set"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=rest_timer_sec"
+assert_json_expr 'length == 1 and .[0].rest_timer_sec == 120' "a payload carrying the key sets it"
+
+push_rest_timer "$((BASE_MS + 180))" '{}'
+assert_status "200" "exercise-definition update omitting rest_timer_sec"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=rest_timer_sec"
+assert_json_expr 'length == 1 and .[0].rest_timer_sec == 120' \
+  "a newer write omitting the key keeps the stored rest timer"
+
+push_rest_timer "$((BASE_MS + 190))" '{"rest_timer_sec": null}'
+assert_status "200" "exercise-definition rest_timer_sec cleared"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=rest_timer_sec"
+assert_json_expr 'length == 1 and .[0].rest_timer_sec == null' "an explicit null clears it to the global timer"
+
+# ===========================================================================
 # 3c. The muscle setup columns are additive: an insert without the keys stores
 #     the defaults (the entry is its own, tracked muscle) and a writer that
 #     omits them keeps the stored values, so a build predating the fields

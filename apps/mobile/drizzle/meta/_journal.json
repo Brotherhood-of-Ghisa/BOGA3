@@ -169,6 +169,13 @@
       "when": 1792847536927,
       "tag": "0023_muscle_groups_report_group_tracked",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792924450424,
+      "tag": "0024_exercise_rest_timer_sec",
+      "breakpoints": true
     }
   ]
 }

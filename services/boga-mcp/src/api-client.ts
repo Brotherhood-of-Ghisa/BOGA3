@@ -73,6 +73,8 @@ export type ExerciseFields = {
   load_input_mode?: 'per_side_load' | 'total_load';
   muscles?: Array<{ muscle_id: string; role: 'primary' | 'secondary' }>;
   name?: string;
+  /** Whole seconds 15..600; null clears it back to the person's global rest timer. */
+  rest_timer_sec?: number | null;
   split_by_gym?: boolean;
 };
 

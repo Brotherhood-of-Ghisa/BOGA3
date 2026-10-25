@@ -30,7 +30,7 @@ const BROAD_SETUP = broadMuscleSetup(UNTRACKED);
 const catalogById = Object.fromEntries(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => [seed.id, seed])) as
   unknown as Record<string, ExerciseCatalogMuscleGroup>;
 const exercise = (mappings: [string, 'primary' | 'secondary' | 'stabilizer'][]): ExerciseCatalogExercise => ({
-  id: 'squat', name: 'Squat', bodyweightContribution: 0, splitByGym: false, deletedAt: null,
+  id: 'squat', name: 'Squat', bodyweightContribution: 0, splitByGym: false, restTimerSec: null, deletedAt: null,
   mappings: mappings.map(([muscleGroupId, role]) => ({ id: `${muscleGroupId}-map`, muscleGroupId, weight: role === 'primary' ? 1 : .5, role })),
 });
 

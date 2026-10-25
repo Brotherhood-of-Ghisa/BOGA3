@@ -1,0 +1,1 @@
+ALTER TABLE `exercise_definitions` ADD `rest_timer_sec` integer;
