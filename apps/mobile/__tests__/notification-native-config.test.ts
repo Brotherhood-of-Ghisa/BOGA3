@@ -70,6 +70,16 @@ it('embeds the app fonts in expanded content and keeps the provider category', (
   expect(info.CFBundleShortVersionString).toBe(config.version);
 });
 
+it('links UserNotificationsUI into expanded content, which otherwise crashes at launch', () => {
+  const config = { version: '2.1.0', ios: { bundleIdentifier: 'com.phano.boga3.dev', buildNumber: '42' } };
+  const flags = Object.fromEntries(plugin.TARGETS.map((target: { name: string }) =>
+    [target.name, plugin.targetBuildSettings(target, config).OTHER_LDFLAGS]));
+  expect(flags).toEqual({
+    BogaNotificationService: '"$(inherited) -framework UserNotifications"',
+    BogaNotificationContent: '"$(inherited) -framework UserNotifications -framework UserNotificationsUI"',
+  });
+});
+
 it('generates real extension plists, sources and fonts through the production config mod', async () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'boga-notification-plugin-'));
   const fonts = ['./node_modules/@expo-google-fonts/archivo/600SemiBold/Archivo_600SemiBold.ttf'];

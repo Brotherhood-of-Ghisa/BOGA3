@@ -60,16 +60,29 @@ function configureTargets(project, config, fonts) {
     }
     const configurations = IOSConfig.XcodeUtils.getBuildConfigurationsForListId(project, added.pbxNativeTarget.buildConfigurationList);
     for (const [, configuration] of configurations) {
-      Object.assign(configuration.buildSettings, { CODE_SIGN_ENTITLEMENTS: `"${target.name}/${target.name}.entitlements"`,
-        INFOPLIST_FILE: `"${target.name}/${target.name}-Info.plist"`, SWIFT_VERSION: '5.9',
-        IPHONEOS_DEPLOYMENT_TARGET: '16.0', TARGETED_DEVICE_FAMILY: '"1,2"',
-        APPLICATION_EXTENSION_API_ONLY: 'YES', CODE_SIGN_STYLE: 'Automatic',
-        PRODUCT_BUNDLE_IDENTIFIER: `"${config.ios.bundleIdentifier}.${target.suffix}"`,
-        CURRENT_PROJECT_VERSION: config.ios.buildNumber ?? '1', MARKETING_VERSION: config.version ?? '1.0',
-        GENERATE_INFOPLIST_FILE: 'NO' });
+      Object.assign(configuration.buildSettings, targetBuildSettings(target, config));
     }
   }
   return project;
+}
+
+// A content extension must link UserNotificationsUI itself: Swift drops a
+// framework used only for a protocol conformance, and without it the extension
+// crashes at launch and iOS shows a blank expanded notification.
+const TARGET_FRAMEWORKS = {
+  BogaNotificationService: ['UserNotifications'],
+  BogaNotificationContent: ['UserNotifications', 'UserNotificationsUI'],
+};
+
+function targetBuildSettings(target, config) {
+  return { CODE_SIGN_ENTITLEMENTS: `"${target.name}/${target.name}.entitlements"`,
+    INFOPLIST_FILE: `"${target.name}/${target.name}-Info.plist"`, SWIFT_VERSION: '5.9',
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0', TARGETED_DEVICE_FAMILY: '"1,2"',
+    APPLICATION_EXTENSION_API_ONLY: 'YES', CODE_SIGN_STYLE: 'Automatic',
+    PRODUCT_BUNDLE_IDENTIFIER: `"${config.ios.bundleIdentifier}.${target.suffix}"`,
+    CURRENT_PROJECT_VERSION: config.ios.buildNumber ?? '1', MARKETING_VERSION: config.version ?? '1.0',
+    GENERATE_INFOPLIST_FILE: 'NO',
+    OTHER_LDFLAGS: `"${['$(inherited)', ...TARGET_FRAMEWORKS[target.name].flatMap(name => ['-framework', name])].join(' ')}"` };
 }
 
 function withBogaNotifications(config, { fonts = [] } = {}) {
@@ -121,3 +134,5 @@ module.exports = withBogaNotifications;
 module.exports.notificationConfig = notificationConfig;
 module.exports.extensionInfo = extensionInfo;
 module.exports.configureTargets = configureTargets;
+module.exports.targetBuildSettings = targetBuildSettings;
+module.exports.TARGETS = TARGETS;
