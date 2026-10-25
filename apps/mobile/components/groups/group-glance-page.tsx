@@ -72,9 +72,9 @@ function useHoldFade(holding: boolean): boolean {
  * At a glance: the period stepper on its own card, since it sets the period
  * for everything under it; then the group's own total against the period
  * before; then the period's top five by the chosen metric; then every
- * member's place over the six periods ending at it. Selecting a column in the chart (its
- * label turns strong) reads that period's full ranking into the table under
- * it. The figures are the screen's period-totals read.
+ * member's place over the six periods ending at it. Selecting a column in
+ * the chart reads that period's full ranking into the table under it. The
+ * figures are the screen's period-totals read.
  */
 export function GroupGlancePage({
   myUserId,
