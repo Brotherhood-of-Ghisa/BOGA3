@@ -25,14 +25,6 @@ Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
 the session summary, Progress, the muscle heatmaps and Stats.
 Signature: `primary + ½ secondary`
 
-### muscle.map-area · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
-### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
 ### muscle.progress-layout · presentation · accepted
 
 Both Progress breakdowns use Settings → Progress → Progress view (`List` /
@@ -72,14 +64,6 @@ Code: `deriveSessionMuscleVolumeComparisons` in
 `apps/mobile/src/session-insights/calculations.ts`, over
 `reportSessionMuscles` in `apps/mobile/src/session-insights/catalog-muscles.ts`.
 
-
-### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
-### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
 
 ### muscle.report-groups · definition · accepted
 

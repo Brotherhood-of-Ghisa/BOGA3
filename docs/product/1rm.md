@@ -48,10 +48,6 @@ existing 1RM. A positive-RIR single uses u>1 analytically; its global figure sta
 
 Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
 
-### 1rm.curve-reference · calculation · superseded-by: 1rm.curve-fitting
-
-Replaced by [[1rm.curve-fitting]].
-
 ### 1rm.curve-fitting · calculation · accepted
 
 Replace Reference with One curve / Two curves and Parsimonious / Rich; default

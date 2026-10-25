@@ -55,7 +55,3 @@ whole-exercise PRs side by side is parked.
 Why: choosing the gym asks "what are my PRs here", so no second switch.
 Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`;
 `withBlockRecords` in `apps/mobile/src/data/exercise-history.ts`.
-
-### gym.split-label · presentation · superseded-by: gym.split
-
-Replaced by [[gym.split]] on 2026-10-18: no list mixes per-gym rows to label.

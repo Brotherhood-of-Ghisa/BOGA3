@@ -222,5 +222,6 @@ Deviations**, using data and `file:line` pointers, not prose (~25 lines; link,
 don't quote). **Tests** lists each lane run, result and evidence link ("CI green"
 alone is insufficient), reviewer-agent agreement, and skipped defaults with
 reasons.
-Before opening, run `docs/procedures/product-review.md` on the branch diff
-alongside `/code-review`; put its verdict on **Tests**' `Product facts:` line.
+Before opening, spawn a separate agent to run
+`docs/procedures/product-review.md` on the branch diff alongside
+`/code-review`; put its verdict on **Tests**' `Product facts:` line.

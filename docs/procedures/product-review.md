@@ -1,19 +1,23 @@
 # Product review
 
-Load when opening or reviewing a PR. A prompt any agent runs on a change,
-checking it against the product decisions in `docs/product/` — not code
-quality (that is `/code-review`).
+Load when opening or reviewing a PR. The prompt for a separate reviewer
+agent, never the builder: the builder spawns it on the change and puts its
+verdict on the PR. It checks the change against the product decisions in
+`docs/product/` — not code quality (that is `/code-review`).
 
 ## Inputs
 
-- Every `*.md` in `docs/product/` except `README.md`: the facts.
 - The change: a PR diff (`gh pr diff <n>`) or a branch diff against
   `origin/main`, plus the PR title and body if there is one.
+- The facts it reaches: `./boga docs facts origin/main` (facts whose `Code:`
+  or `Pending:` paths, or own file, the diff touches), plus every subject in
+  `docs/product/README.md` whose trigger the diff matches.
 - The repository at the change's base, for context only.
 
 ## Method
 
-1. Read every fact. Note each fact's status and any `Pending:` line.
+1. Read the facts it reaches. Note each one's status and any `Pending:`
+   line.
 2. For each changed file, ask what a user could now observe differently
    (figures, counts, rows, labels, words) and where. Shared calculation code
    reaches every screen that reads it.

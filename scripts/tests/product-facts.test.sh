@@ -6,8 +6,9 @@
 # kinds and statuses are known, `[[id]]` references and fact-table markers
 # name a fact, a `Signature:` outside docs/product/ needs a citation in its
 # paragraph (fenced code included), every fact's statement fits the per-fact
-# word cap (examples and the `Why:` trailer excluded), and the docs/product/
-# corpus fits its combined budget.
+# word cap (examples and the `Why:` trailer excluded), docs/product/ holds at
+# most its `facts` cap, a `dir/` budget row covers each doc under it, and
+# `facts <ref>` lists the facts a diff reaches.
 
 set -euo pipefail
 
@@ -23,7 +24,8 @@ cp "${REPO_ROOT}/scripts/gen-docs.sh" "${REPO_ROOT}/scripts/lane-timing.sh" "${F
 printf 'lint\textra\tnone\tyes\t.\ttrue\n' > "${FIX}/scripts/lanes.tsv"
 printf '# Fixture\n\n> **Owns:** fixture.\n\n<!-- boga:gen:lane-matrix -->\n<!-- /boga:gen:lane-matrix -->\n' \
   > "${FIX}/docs/specs/02-quality-and-test-gates.md"
-printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t900\n' > "${FIX}/scripts/doc-budgets.tsv"
+printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\nfacts\tdocs/product/\t9\n' > "${FIX}/scripts/doc-budgets.tsv"
+mkdir -p "${FIX}/src" && printf 'export const estimate = 1;\n' > "${FIX}/src/lift.ts"
 printf 'Always load: `docs/product/README.md` and `docs/spec.md`.\n' > "${FIX}/AGENTS.md"
 # README holds format examples, never facts.
 printf '# Facts\n\n### Format\n\n```markdown\n### <subject>.<slug> · <kind> · <status>\nSignature: `<text>`\n```\n\nCite as `[[<id>]]`, tables as `<!-- fact-table: <id> -->`.\n' \
@@ -43,12 +45,12 @@ cat > "${FIX}/docs/product/lift.md" <<'MD'
 | --- | --- |
 | 100 | 116.6 |
 
-Code: `estimate`.
+Code: `estimate` in `src/lift.ts`.
 Signature: `48.8`, `n of m sets done`
 
-### lift.old-formula · calculation · superseded-by: lift.formula
+### lift.reps · definition · accepted
 
-Replaced by [[lift.formula]].
+Reps feed [[lift.formula]].
 
 ### lift.count · definition · open
 
@@ -66,7 +68,7 @@ Unrelated figures: 148.8 kg, 48.85 kg, `n of m sets`.
 MD
 cp "${SPEC}" "${FIX}/spec.orig"
 git -C "${FIX}" init -q
-gd() { BOGA_TIMINGS_DIR="${FIX}/store" "${FIX}/scripts/gen-docs.sh" "$1" 2>&1; }
+gd() { BOGA_TIMINGS_DIR="${FIX}/store" "${FIX}/scripts/gen-docs.sh" "$@" 2>&1; }
 expect_fail() { # <what> <expected output fragment>...
   local what="$1"; shift
   out="$(gd check)" && fail "${what} must fail the check"
@@ -78,7 +80,7 @@ expect_fail() { # <what> <expected output fragment>...
 gd gen >/dev/null || fail "fixture gen must pass: $(gd gen)"
 gd check >/dev/null || fail "a well-formed corpus with cited signatures must pass: $(gd check)"
 out="$(gd budgets)"
-grep -q "corpus docs/product/: [0-9]* of 900 words in 1 docs (ok)" <<<"${out}" || fail "budgets must report the corpus: ${out}"
+grep -qx "facts docs/product/: 3 of 9 (ok)" <<<"${out}" || fail "budgets must report the fact cap: ${out}"
 grep -q "3 product facts, [0-9]* statement words;.* cap 130" <<<"${out}" || fail "budgets must report fact sizes: ${out}"
 grep -qx "over the cap: none" <<<"${out}" || fail "budgets must report an empty over-cap list: ${out}"
 
@@ -96,8 +98,8 @@ restore; printf '\n### lift.extra · rule · accepted\n' >> "${FACTS}"
 expect_fail "an unknown kind" "lift.md:26: fact 'lift.extra' has unknown kind 'rule'"
 restore; printf '\n### lift.extra · principle · draft\n' >> "${FACTS}"
 expect_fail "an unknown status" "lift.md:26: fact 'lift.extra' has unknown status 'draft'"
-restore; printf '\n### lift.extra · principle · superseded-by: lift.gone\n' >> "${FACTS}"
-expect_fail "a superseded-by naming no fact" "fact 'lift.extra' is superseded by 'lift.gone', which is no fact"
+restore; printf '\n### lift.extra · principle · superseded-by: lift.formula\n' >> "${FACTS}"
+expect_fail "a superseded status (replaced facts are deleted)" "fact 'lift.extra' has unknown status 'superseded-by: lift.formula'"
 restore; printf '\n### copy.terse · principle · accepted\n' >> "${FACTS}"
 expect_fail "a fact outside its subject's file" "lift.md:26: fact 'copy.terse' is in lift.md"
 restore; printf '\nSignature: 48.8\n' >> "${FACTS}"
@@ -153,10 +155,31 @@ grep -q "4 product facts," <<<"${out}" || fail "budgets must count the new fact:
 grep -qx "over the cap: none" <<<"${out}" || fail "a tabled fact must not report over the cap: ${out}"
 restore; gd check >/dev/null || fail "restored facts must pass: $(gd check)"
 
-# Corpus budget: the directory's docs share one limit.
-printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\ncorpus\tdocs/product/\t20\n' > "${FIX}/scripts/doc-budgets.tsv"
-expect_fail "a corpus over its budget" "docs/product/: " "words in 1 docs, over its 20-word corpus budget"
-printf 'corpus\tdocs/product\t20\n' >> "${FIX}/scripts/doc-budgets.tsv"
-expect_fail "a corpus row without a trailing slash" "malformed row: 'corpus\\tdocs/product\\t20'"
+# Fact cap: docs/product/ holds at most its `facts` count.
+TSV="${FIX}/scripts/doc-budgets.tsv"
+printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\nfacts\tdocs/product/\t2\n' > "${TSV}"
+expect_fail "more facts than the cap" "docs/product/: 3 facts, over its cap of 2"
+printf 'facts\tdocs/product\t9\n' >> "${TSV}"
+expect_fail "a facts row without a trailing slash" "malformed row: 'facts\\tdocs/product\\t9'"
+
+# A `dir/` budget covers each doc under it; a doc's own row wins.
+printf 'budget\tAGENTS.md\t500\nbudget\t*\t500\nbudget\tdocs/product/\t20\n' > "${TSV}"
+expect_fail "a doc over its directory's budget" "docs/product/README.md: " "over its 20-word budget"
+printf 'budget\tdocs/product/README.md\t500\n' >> "${TSV}"
+gd check >/dev/null || fail "a doc's own row must win over its directory's: $(gd check)"
+
+# `facts` lists every fact; with a ref, those whose Code: paths or own file
+# the diff from it touches.
+out="$(gd facts)"
+[[ "$(wc -l <<<"${out}")" -eq 3 ]] || fail "facts must list every fact: ${out}"
+git -C "${FIX}" add -A && git -C "${FIX}" -c user.name=t -c user.email=t@t commit -qm base
+printf '// changed\n' >> "${FIX}/src/lift.ts"
+out="$(gd facts HEAD)"
+[[ "${out}" == "lift.formula  accepted  docs/product/lift.md:"* && "$(wc -l <<<"${out}")" -eq 1 ]] \
+  || fail "facts <ref> must list only the fact whose Code: path changed: ${out}"
+git -C "${FIX}" checkout -q -- src/lift.ts
+printf '\nMore.\n' >> "${FACTS}"
+out="$(gd facts HEAD)"
+[[ "$(wc -l <<<"${out}")" -eq 3 ]] || fail "facts <ref> must list every fact in a changed fact file: ${out}"
 
 echo "  product-facts: all assertions passed"

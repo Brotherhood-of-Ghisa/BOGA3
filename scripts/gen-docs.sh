@@ -5,6 +5,8 @@
 #   ./scripts/gen-docs.sh gen     # rewrite generated blocks in place
 #   ./scripts/gen-docs.sh check   # fail if blocks are stale or docs are broken
 #   ./scripts/gen-docs.sh budgets # report word counts of the agent-loadable docs
+#   ./scripts/gen-docs.sh facts [<ref>] # list product fact IDs; with <ref>, only facts
+#                                 # whose Code:/Pending: paths the diff from <ref> touches
 #
 # Canonical invocations: `./boga docs gen` / `./boga docs check`; `check` also
 # runs as the `docs-check` lane (fast gate + CI).
@@ -30,7 +32,7 @@
 #        every `components/<area>/` folder, and no row names a folder that is
 #        gone (so adding a component forces a catalog edit),
 #      - every doc reachable from AGENTS.md fits its word budget, and each
-#        `corpus` directory fits its combined one
+#        `facts` directory holds at most its number of facts
 #        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings),
 #      - product facts (docs/procedures/product-facts-authoring.md): every fact heading parses,
 #        IDs are unique, every `[[id]]` and fact-table marker names a fact,
@@ -44,16 +46,17 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-check}"
+DIFF_REF="${2:-}"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lane-timing.sh"
 RECORDS_DIR="$(boga_timing_records_dir)"
 
 case "${MODE}" in
-  gen|check|budgets) ;;
-  *) echo "usage: $0 gen|check|budgets" >&2; exit 2 ;;
+  gen|check|budgets|facts) ;;
+  *) echo "usage: $0 gen|check|budgets|facts [<ref>]" >&2; exit 2 ;;
 esac
 
-REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" RECORDS_DIR="${RECORDS_DIR}" python3 - <<'PY'
+REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" DIFF_REF="${DIFF_REF}" RECORDS_DIR="${RECORDS_DIR}" python3 - <<'PY'
 import json, os, re, statistics, subprocess, sys
 
 root = os.environ["REPO_ROOT"]
@@ -476,8 +479,9 @@ if os.path.exists(CATALOG) and os.path.isdir(UI_DIR):
 
 # 8. word budgets for the docs an agent can load: AGENTS.md and every
 #    persistent doc reachable from it through Markdown links or inline-code
-#    `.md` paths. Words are whitespace-separated tokens (`wc -w`). Limits,
-#    exempt prefixes and grandfathered ceilings live in scripts/doc-budgets.tsv;
+#    `.md` paths. Words are whitespace-separated tokens (`wc -w`). Limits (a
+#    doc's own, else its longest `dir/` prefix's, else `*`), exempt prefixes,
+#    fact-count caps and grandfathered ceilings live in scripts/doc-budgets.tsv;
 #    a ceiling only falls (`gen` lowers it to the current count and drops it
 #    once the doc fits its budget; nothing ever raises or adds one).
 ENTRYPOINT = "AGENTS.md"
@@ -505,9 +509,9 @@ def reachable_docs():
                     break
     return via
 
-budget_rows, corpus_rows = [], []
+budget_rows, fact_caps = [], {}
 if os.path.exists(os.path.join(root, ENTRYPOINT)):
-    limits, exempt, ceilings, corpora = {}, [], {}, {}
+    limits, exempt, ceilings = {}, [], {}
     with open(BUDGETS_TSV) as f:
         for line in f:
             if not line.strip() or line.lstrip().startswith("#"):
@@ -519,8 +523,8 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
                 exempt.append(parts[1])
             elif parts[0] == "ceiling" and len(parts) == 3:
                 ceilings[parts[1]] = int(parts[2])
-            elif parts[0] == "corpus" and len(parts) == 3 and parts[1].endswith("/"):
-                corpora[parts[1]] = int(parts[2])
+            elif parts[0] == "facts" and len(parts) == 3 and parts[1].endswith("/"):
+                fact_caps[parts[1]] = int(parts[2])
             else:
                 problems.append(f"scripts/doc-budgets.tsv: malformed row: {line.rstrip()!r}")
     via = reachable_docs()
@@ -530,7 +534,8 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
         if any(doc.startswith(p) for p in exempt):
             budget_rows.append((words, None, None, "exempt", doc, parent))
             continue
-        limit = limits.get(doc, limits["*"])
+        prefixes = [p for p in limits if p.endswith("/") and doc.startswith(p)]
+        limit = limits.get(doc, limits[max(prefixes, key=len)] if prefixes else limits["*"])
         ceiling = ceilings.get(doc)
         status = "ok" if words <= limit else "grandfathered"
         if ceiling is None and words > limit:
@@ -561,16 +566,6 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
         print("[gen-docs] lowered grandfathered ceilings in scripts/doc-budgets.tsv")
     elif mode != "gen":
         problems += stale
-    # A corpus is a directory an agent loads whole, so its docs share one
-    # budget on top of their own. Its README is the index, read on its own
-    # and held to its own budget, so the corpus leaves it out.
-    for prefix, limit in sorted(corpora.items()):
-        docs = [rel for rel in PERSISTENT_DOCS if rel.startswith(prefix) and rel != prefix + "README.md"]
-        words = sum(len(open(os.path.join(root, rel), encoding="utf-8").read().split()) for rel in docs)
-        corpus_rows.append((words, limit, prefix, len(docs)))
-        if words > limit:
-            problems.append(f"{prefix}: {words} words in {len(docs)} docs, over its {limit}-word corpus "
-                            "budget — trim it; the product review loads it whole (rules: docs/specs/README.md)")
 
 # 9. product facts (docs/procedures/product-facts-authoring.md, "Fact format"). Every `### `
 #    heading in a subject file is a fact header `### <subject>.<slug> · <kind>
@@ -583,9 +578,10 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
 #    Every fact's statement fits FACT_STATEMENT_WORDS. The statement is what an
 #    agent must read to apply the fact: the lines between the header and the
 #    `Why:` trailer, less the `<!-- fact-table -->` example rows (those are test
-#    fixtures, bounded by the corpus budget, not by this cap). A fact over the
-#    cap is stating a screen rather than a decision — split it, or move the
-#    render detail to the component that owns it.
+#    fixtures, bounded by their file's budget, not by this cap). A `facts`
+#    row in scripts/doc-budgets.tsv caps how many facts its directory holds.
+#    A fact over the cap is stating a screen rather than a decision — split
+#    it, or move the render detail to the component that owns it.
 PRODUCT_DIR = "docs/product/"
 PRODUCT_NON_FACT = {"README.md"}
 FACT_STATEMENT_WORDS = 130
@@ -628,10 +624,13 @@ def statement_words(rel):
         out[current] = out.get(current, 0) + len(line.split())
     return out
 
-def parse_fact_file(rel, facts, signatures):
-    """Fill facts (id -> (rel, line, status)) and signatures (id -> texts)."""
+CODE_TRAILER = re.compile(r"^(?:Code|Pending):")
+
+def parse_fact_file(rel, facts, signatures, code_paths):
+    """Fill facts (id -> (rel, line, status)), signatures (id -> texts) and
+    code_paths (id -> repo paths its `Code:`/`Pending:` lines cite)."""
     subject = os.path.basename(rel)[:-len(".md")]
-    current, fenced = None, False
+    current, fenced, trailer = None, False, False
     for ln, line in enumerate(open(os.path.join(root, rel), encoding="utf-8"), 1):
         line = line.rstrip("\n")
         if line.lstrip().startswith("```"):
@@ -639,8 +638,15 @@ def parse_fact_file(rel, facts, signatures):
         if fenced:
             continue
         if line.startswith("### "):
-            current = parse_fact_header(rel, ln, line, subject, facts)
+            current, trailer = parse_fact_header(rel, ln, line, subject, facts), False
             continue
+        if CODE_TRAILER.match(line):
+            trailer = True
+        elif not line.strip() or re.match(r"[A-Z][a-z]+:", line):
+            trailer = False  # a trailer line may wrap; a blank or the next trailer ends it
+        if trailer and current is not None:
+            code_paths.setdefault(current, []).extend(
+                t.rstrip("/") for t in re.findall(r"`([^`\s]+/[^`\s]*)`", line))
         if re.match(r"#{1,6} ", line):
             current = None  # a Signature under another section belongs to no fact
             if re.match(r"#+ \S+\.\S+ · ", line):
@@ -669,9 +675,9 @@ def parse_fact_header(rel, ln, line, subject, facts):
         problems.append(f"{rel}:{ln}: fact '{fid}' is in {subject}.md — a fact lives in its subject's file")
     if kind not in FACT_KINDS:
         problems.append(f"{rel}:{ln}: fact '{fid}' has unknown kind '{kind}' — one of {', '.join(sorted(FACT_KINDS))}")
-    if status not in ("accepted", "open") and not re.fullmatch(r"superseded-by: \S+", status):
-        problems.append(f"{rel}:{ln}: fact '{fid}' has unknown status '{status}' — accepted, open "
-                        "or superseded-by: <id>")
+    if status not in ("accepted", "open"):
+        problems.append(f"{rel}:{ln}: fact '{fid}' has unknown status '{status}' — accepted or open "
+                        "(a replaced fact is deleted and its citations re-pointed)")
     if fid in facts:
         first, first_ln, _ = facts[fid]
         problems.append(f"{rel}:{ln}: duplicate fact ID '{fid}' (first at {first}:{first_ln})")
@@ -719,11 +725,11 @@ def restatements(signatures):
                     found.setdefault((rel, fid), []).append((start + para.count("\n", 0, pos), text))
     return found
 
-facts, signatures, fact_words = {}, {}, {}
+facts, signatures, fact_words, code_paths = {}, {}, {}, {}
 for rel in PERSISTENT_DOCS:
     if (rel.startswith(PRODUCT_DIR) and "/" not in rel[len(PRODUCT_DIR):]
             and os.path.basename(rel) not in PRODUCT_NON_FACT):
-        parse_fact_file(rel, facts, signatures)
+        parse_fact_file(rel, facts, signatures, code_paths)
         fact_words.update(statement_words(rel))
 for fid, (rel, ln, status) in sorted(facts.items()):
     words = fact_words.get(fid, 0)
@@ -732,10 +738,12 @@ for fid, (rel, ln, status) in sorted(facts.items()):
                         f"{FACT_STATEMENT_WORDS}-word cap — state the decision, not the screen: split "
                         "it, or move render detail to the component that owns it "
                         "(rules: docs/procedures/product-facts-authoring.md)")
-for fid, (rel, ln, status) in sorted(facts.items()):
-    target = status.split(": ", 1)[1] if status.startswith("superseded-by: ") else None
-    if target is not None and target not in facts:
-        problems.append(f"{rel}:{ln}: fact '{fid}' is superseded by '{target}', which is no fact")
+for prefix, cap in sorted(fact_caps.items()):
+    count = sum(rel.startswith(prefix) for rel, _, _ in facts.values())
+    if count > cap:
+        problems.append(f"{prefix}: {count} facts, over its cap of {cap} — cut or merge one first "
+                        "(test: docs/procedures/product-facts-authoring.md); raising the cap needs "
+                        "the operator's agreement")
 for rel in PERSISTENT_DOCS:
     for ln, line in enumerate(open(os.path.join(root, rel), encoding="utf-8"), 1):
         for fid in FACT_REF.findall(line) + FACT_TABLE.findall(line):
@@ -755,6 +763,26 @@ for rel in sorted(r for r in listed if r.startswith(DESIGN_TARGETS)
     problems.append(f"{rel}: design targets are build inputs, not specs — keep the brief in the task "
                     "or PR and move what must last to its owner (docs/specs/ui/ai-design-policy.md)")
 
+if mode == "facts":
+    # Every fact, or (with a ref) the facts a diff from that ref reaches: its
+    # Code:/Pending: paths or its own file changed. The product reviewer's
+    # starting set; it still matches subjects by their load triggers.
+    ref = os.environ.get("DIFF_REF", "")
+    changed = None
+    if ref:
+        base = subprocess.run(["git", "-C", root, "merge-base", ref, "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+        changed = subprocess.run(["git", "-C", root, "diff", "--name-only", base], capture_output=True,
+                                 text=True, check=True).stdout.split()
+    def reached(fid):
+        own = facts[fid][0]
+        paths = code_paths.get(fid, [])
+        return any(c == own or any(c == p or c.startswith(p + "/") for p in paths) for c in changed)
+    for fid, (rel, ln, status) in sorted(facts.items()):
+        if changed is None or reached(fid):
+            print(f"{fid}  {status}  {rel}:{ln}")
+    sys.exit(0)
+
 if mode == "budgets":
     print(f"{'words':>6}  {'budget':>6}  {'ceiling':>7}  {'status':<13}  doc  (loaded via)")
     for words, limit, ceiling, status, doc, parent in sorted(budget_rows, reverse=True):
@@ -763,8 +791,9 @@ if mode == "budgets":
     print(f"\n{len(budgeted)} budgeted docs, {sum(r[0] for r in budgeted)} words; "
           f"{sum(r[0] > r[1] for r in budgeted)} over budget by "
           f"{sum(r[0] - r[1] for r in budgeted if r[0] > r[1])} words in total")
-    for words, limit, prefix, count in corpus_rows:
-        print(f"corpus {prefix}: {words} of {limit} words in {count} docs ({'ok' if words <= limit else 'OVER'})")
+    for prefix, cap in sorted(fact_caps.items()):
+        count = sum(rel.startswith(prefix) for rel, _, _ in facts.values())
+        print(f"facts {prefix}: {count} of {cap} ({'ok' if count <= cap else 'OVER'})")
     if fact_words:
         ranked = sorted(fact_words.items(), key=lambda kv: -kv[1])
         over = [f"{fid} ({n})" for fid, n in ranked if n > FACT_STATEMENT_WORDS]
