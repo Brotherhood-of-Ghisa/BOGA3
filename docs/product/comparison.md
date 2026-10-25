@@ -40,9 +40,10 @@ Weeks start Monday, local time.
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
+| Groups, At a glance total | the stepper's calendar week (until now when current), every current member | that week's whole previous calendar week, the same members |
 
 Why: include the unfinished week; Today's bar targets last week's whole total.
-Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week window in `apps/mobile/src/progress-summary/calculations.ts`.
+Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week window in `apps/mobile/src/progress-summary/calculations.ts`; `buildGroupWeekTotals` in `apps/mobile/src/groups/home-view-model.ts`.
 
 ### comparison.history-window · definition · accepted
 
