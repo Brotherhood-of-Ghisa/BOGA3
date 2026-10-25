@@ -96,7 +96,7 @@ import * as insightsRepository from '@/src/session-insights/repository';
 import { getRestTimerEntry } from '@/src/session-recorder/rest-timer';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
 import { setAccountLocalPreferences } from '@/src/preferences/account-local';
-import { resetSessionPositions } from '@/src/location/session-position';
+import { resetSessionPositions, SESSION_POSITION_RETRY_DELAY_MS } from '@/src/location/session-position';
 import {
   bootLocalApp,
   closeLocalData,
@@ -675,22 +675,30 @@ describe('Session view', () => {
   });
 
   it('updates the suggestion as reading refines a coarse fix', async () => {
-    // A coarse first fix ~1.3 km off puts the gym out of reach; the refined one
-    // that follows after the retry wait lands on it.
+    // A coarse first fix ~1.3 km off puts the gym out of reach; the refined
+    // second read, issued after the real retry wait, lands on it.
+    let resolveRefined: (value: unknown) => void = () => undefined;
+    const refined = new Promise((resolve) => {
+      resolveRefined = resolve;
+    });
     location.getCurrentForegroundPositionLazy
       .mockResolvedValueOnce(positionAt({ latitude: HARBOUR.latitude + 0.012, longitude: HARBOUR.longitude }, 1_500))
-      .mockResolvedValue(positionAt(HARBOUR, 30));
+      .mockReturnValue(refined);
     await openSession(() =>
       upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
     );
 
     await openGymSheet();
-    await act(async () => {});
+    await waitFor(() => expect(location.getCurrentForegroundPositionLazy.mock.calls.length).toBeGreaterThanOrEqual(2), {
+      timeout: SESSION_POSITION_RETRY_DELAY_MS * 3,
+    });
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
 
-    expect(await screen.findByTestId('session-view-gym-suggestion', {}, { timeout: 4_000 })).toHaveTextContent(
-      'Nearby · Harbour Barbell'
-    );
+    await act(async () => {
+      resolveRefined(positionAt(HARBOUR, 30));
+    });
+
+    expect(await screen.findByTestId('session-view-gym-suggestion')).toHaveTextContent('Nearby · Harbour Barbell');
   });
 
   it('does not suggest the gym the session already has', async () => {

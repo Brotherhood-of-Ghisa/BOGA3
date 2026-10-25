@@ -41,8 +41,11 @@ const ACQUISITION_BUDGET_MS = SESSION_POSITION_ACQUISITION_BUDGET_MS;
 const isRetryableRead = (status: CurrentForegroundPositionResult['status']): boolean =>
   status !== 'permission_denied' && status !== 'unavailable';
 
-const isGoodFix = (position: ForegroundLocationPosition): boolean =>
-  position.accuracyM !== null && position.accuracyM >= 0 && position.accuracyM <= SESSION_POSITION_GOOD_ACCURACY_M;
+
+// A fix's accuracy when it is a real radius; `null`, negative or non-finite
+// readings count as unknown.
+const knownAccuracyM = ({ accuracyM }: ForegroundLocationPosition): number | null =>
+  accuracyM !== null && Number.isFinite(accuracyM) && accuracyM >= 0 ? accuracyM : null;
 
 // Whether `next` should replace the held fix: any fix beats none, a known
 // accuracy beats an unknown one, and a tighter one beats a looser one.
@@ -51,8 +54,15 @@ const isMoreAccurate = (
   held: ForegroundLocationPosition | null
 ): boolean => {
   if (!held) return true;
-  if (next.accuracyM === null) return false;
-  return held.accuracyM === null || next.accuracyM < held.accuracyM;
+  const nextAccuracyM = knownAccuracyM(next);
+  const heldAccuracyM = knownAccuracyM(held);
+  if (nextAccuracyM === null) return false;
+  return heldAccuracyM === null || nextAccuracyM < heldAccuracyM;
+};
+
+const isGoodFix = (position: ForegroundLocationPosition): boolean => {
+  const accuracyM = knownAccuracyM(position);
+  return accuracyM !== null && accuracyM <= SESSION_POSITION_GOOD_ACCURACY_M;
 };
 
 const gaveUpReasonFor = (result: CurrentForegroundPositionResult): SessionPositionGaveUpReason => {

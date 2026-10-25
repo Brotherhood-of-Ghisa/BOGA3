@@ -91,14 +91,14 @@ describe('session position', () => {
     });
   });
 
-  it('keeps the most accurate fix: a looser or unknown-accuracy read never replaces it', async () => {
+  it('keeps the most accurate fix: a looser or unknown-accuracy (null, negative, NaN) read never replaces it', async () => {
     const updates: (number | null)[] = [];
     subscribeSessionPosition('session-1', (position) => updates.push(position.accuracyM));
-    const read = readerOf([fixAt(null), fixAt(300), fixAt(900), fixAt(null), { status: 'timeout', timeoutMs: 1 }, fixAt(50)]);
+    const read = readerOf([fixAt(-5), fixAt(300), fixAt(900), fixAt(null), fixAt(Number.NaN), fixAt(50)]);
 
     await beginSessionPosition('session-1', {}, read, 0);
 
-    expect(updates).toEqual([null, 300, 50]);
+    expect(updates).toEqual([-5, 300, 50]);
     expect(getSessionPosition('session-1')?.accuracyM).toBe(50);
   });
 

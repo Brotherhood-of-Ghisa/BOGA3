@@ -32,9 +32,9 @@
     validation, coordinate-bearing upsert payloads, bootstrap fetch/merge/
     convergence, and reinstall restore parity,
   - the gym UI's reads with an injected position reader: the gym sheet's
-    nearby suggestion (one confident match only; nothing on denial, services
-    off, low accuracy, no match, a tie, a read failure or the 1.5 s timeout;
-    never a preselect) and `Save current location` (accuracy gate, inline
+    nearby suggestion (every located gym within 1 km of any fix, nearest
+    first, updating as reading refines the fix; nothing without a fix or with
+    no gym in reach; never a preselect) and `Save current location` (accuracy gate, inline
     failures) — `gym-location-reads.test.ts`, `session-view-screen.test.tsx`,
     `gyms-screen.test.tsx`. The simulator cannot fake a location reliably, so
     the suggestion row has no Maestro step.

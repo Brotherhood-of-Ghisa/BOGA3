@@ -219,7 +219,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     const initialState = getSessionPositionState(sessionId);
     setGpsState(initialState);
     // The sheet has an audience for the fix, so a spent acquisition — one that
-    // ran out of its retry budget before any read landed — is resumed.
+    // ran out of its read budget with no fix or only a coarse one — resumes.
     void beginSessionPosition(sessionId, { resume: true });
 
     listGymDirectory()
