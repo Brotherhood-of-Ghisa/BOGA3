@@ -1,4 +1,4 @@
-import { formatShortDate, formatMonthYear } from '@/src/utils/local-time';
+import { formatDayMonth, formatMonthYear } from '@/src/utils/local-time';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatWeekRange } from '@/components/today/progress-format';
 import type { GroupHomePeriod } from '@/src/groups/home-periods';
@@ -23,6 +23,6 @@ export const groupHomePeriodLabel = (_period: GroupHomePeriod, window: LocalWind
     : { title: formatWeekRange(window, dateFormat), detail: monthDetail(window) };
 };
 
-/** A chart column names its Monday. */
+/** A chart column names its Monday, without the year: `12 Oct`, or `Oct 12`. */
 export const groupHomeColumnLabel = (_period: GroupHomePeriod, window: LocalWindow, dateFormat: ExerciseDateFormat): string =>
-  formatShortDate(window.start, dateFormat);
+  formatDayMonth(window.start, dateFormat);

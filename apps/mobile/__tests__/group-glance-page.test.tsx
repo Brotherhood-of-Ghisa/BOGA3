@@ -1,12 +1,13 @@
 /**
  * The Groups screen's At a glance section: the stepper on its own card, the
- * period board by the chosen metric, and the position chart with the selected
- * period's table; a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
+ * group's week total, the period board by the chosen metric, and the position
+ * chart with the selected period's table; a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
  * offset are the screen's (groups-screens.test.tsx), so they arrive as props;
  * here a fixed six-week series pins every figure.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
+import { Circle, Svg } from 'react-native-svg';
 
 import { GROUP_GLANCE_HOLD_FADE_DELAY_MS, GroupGlancePage } from '@/components/groups/group-glance-page';
 import { GroupApiError } from '@/src/groups/api';
@@ -178,8 +179,8 @@ describe('At a glance: a held read while the next one lands', () => {
     expect(byId('group-home-period-title')).toHaveTextContent('Last week');
     expect(screen.queryByTestId('group-glance-loading')).toBeNull();
     expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
-    // Drawn as the week it was read for: still "so far".
-    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
+    // Drawn as the week it was read for: its newest column is still this week.
+    expect(byId(`group-rank-chart-label-${GROUP_RANK_PERIODS - 1}`)).toHaveTextContent('12 Oct');
     expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
     expect(opacity()).toBeUndefined();
 
@@ -204,7 +205,7 @@ describe('At a glance: a held read while the next one lands', () => {
     );
     expect(opacity()).toBeUndefined();
     expect(byId('group-glance-figures').props.accessibilityState).toEqual({ busy: false });
-    expect(byId('group-position-selected')).toHaveTextContent('05-10-2026 – 11-10-2026');
+    expect(byId(`group-rank-chart-label-${GROUP_RANK_PERIODS - 1}`)).toHaveTextContent('5 Oct');
   });
 
 });
@@ -215,7 +216,23 @@ describe('At a glance: position over time', () => {
 
     expect(byId('group-rank-chart')).toBeTruthy();
     expect(screen.getAllByTestId(/^group-rank-chart-label-\d+$/)).toHaveLength(GROUP_RANK_PERIODS);
-    expect(byId('group-position-selected')).toHaveTextContent('12-10-2026 – 18-10-2026 · so far');
+    expect(byId(`group-rank-chart-label-${GROUP_RANK_PERIODS - 1}`).props.accessibilityState).toEqual({ selected: true });
+    // The selection shows on the chart alone: no date line above the table.
+    expect(screen.queryByTestId('group-position-selected')).toBeNull();
+  });
+
+  it('names each column by its Monday, without the year', () => {
+    renderPage();
+    const labels = screen.getAllByTestId(/^group-rank-chart-label-\d+$/).map((node) => node.props.accessibilityLabel);
+    expect(labels).toEqual(['7 Sep', '14 Sep', '21 Sep', '28 Sep', '5 Oct', '12 Oct']);
+  });
+
+  it('centres each column\'s points in its band, 30pt a place', () => {
+    renderPage();
+    // Jest runs no layout pass: the plot keeps its 300pt fallback width, 50pt a column.
+    const xs = [...new Set(screen.UNSAFE_getAllByType(Circle).map((circle) => Number(circle.props.cx)))].sort((a, b) => a - b);
+    expect(xs).toEqual([25, 75, 125, 175, 225, 275]);
+    expect(within(byId('group-rank-chart-plot')).UNSAFE_getByType(Svg).props.height).toBe(NEWEST.length * 30);
   });
 
   it('reads the selected period into the table: place, sets and PRs for every member', () => {
@@ -231,15 +248,40 @@ describe('At a glance: position over time', () => {
     // The oldest column: six weeks back, never "so far", and I led it.
     fireEvent.press(byId('group-rank-chart-label-0'));
     expect(byId('group-rank-chart-label-0').props.accessibilityState).toEqual({ selected: true });
-    expect(byId('group-position-selected')).toHaveTextContent('07-09-2026 – 13-09-2026');
-    expect(String(byId('group-position-selected').props.children)).not.toContain('so far');
     expect(byId(`group-rank-table-row-${ME}-sets`)).toHaveTextContent('99');
     expect(byId(`group-rank-table-row-${ME}`).props.accessibilityLabel).toMatch(/^1, You,/);
   });
 
-  it('marks no column "so far" once the stepper has left the current period', () => {
-    renderPage({ offset: -1 });
-    expect(byId('group-position-selected')).toHaveTextContent('05-10-2026 – 11-10-2026');
-    expect(String(byId('group-position-selected').props.children)).not.toContain('so far');
+});
+
+describe('At a glance: the group total', () => {
+  // The week before the newest: fewer sets, more records.
+  const withPreviousWeek = (series: GroupHomeWindow[]): GroupHomeWindow[] =>
+    series.map((read, index) =>
+      index === series.length - 2 ? { ...read, members: [member('marco', 'Marco', 50, 3), member(ME, 'You', 30, 6)] } : read,
+    );
+
+  it('sums every member\'s sets and PRs for the week, against last week, above the board', () => {
+    renderPage({ series: withPreviousWeek(seriesFor('week')) });
+    const totals = within(byId('group-week-totals-card'));
+
+    expect(within(byId('group-glance-figures')).getAllByTestId(/-card$/).map((node) => node.props.testID)).toEqual([
+      'group-week-totals-card',
+      'group-home-board-card',
+      'group-position-card',
+    ]);
+    expect(totals.getByText('Group total')).toBeTruthy();
+    expect(byId('group-week-totals-sets-value')).toHaveTextContent('160');
+    expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 last wk');
+    expect(byId('group-week-totals-prs-value')).toHaveTextContent('7');
+    expect(byId('group-week-totals-prs-previous')).toHaveTextContent('vs 9 last wk');
+    expect(byId('group-week-totals-sets').props.accessibilityLabel).toBe('Sets 160, vs 80 last week');
+  });
+
+  it('follows the stepper: an earlier week compares with the week before it', () => {
+    renderPage({ offset: -2, series: withPreviousWeek(seriesFor('week', -2)) });
+
+    expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 wk before');
+    expect(byId('group-week-totals-prs').props.accessibilityLabel).toBe('PRs 7, vs 9 the week before');
   });
 });
