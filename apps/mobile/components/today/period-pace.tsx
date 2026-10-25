@@ -16,7 +16,6 @@ import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
   CHART_HEIGHT,
-  comparedLineLabel,
   formatPeriodDayLabel,
   formatPeriodRange,
   formatSignedCount,
@@ -45,10 +44,9 @@ const WEEK_TICK = 4;
 
 const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
 
-function PeriodChart({ geometry, comparedLabel }: { geometry: PeriodChartGeometry; comparedLabel: string }) {
+function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
   const { plot, current, previous, projection, today, selected, weekStartsX } = geometry;
   const area = [{ x: 0, y: plot.bottom }, ...current, { x: today.current.x, y: plot.bottom }];
-  const previousEnd = previous[previous.length - 1];
   const todayAnchor = todayLabelAnchor(today.current.x, plot.width);
 
   return (
@@ -112,11 +110,6 @@ function PeriodChart({ geometry, comparedLabel }: { geometry: PeriodChartGeometr
         stroke={selected.projected ? uiRoles.ink : uiRoles.surface}
         strokeWidth={2}
       />
-      {previousEnd ? (
-        <SvgText {...axisLabel} fill={uiRoles.inkMuted} letterSpacing={1} x={previousEnd.x + 6} y={previousEnd.y + 4}>
-          {comparedLabel}
-        </SvgText>
-      ) : null}
       <SvgText {...axisLabel} fill={uiRoles.ink} letterSpacing={1} textAnchor={todayAnchor} x={today.current.x} y={plot.bottom + AXIS_LABEL_OFFSET}>
         TODAY
       </SvgText>
@@ -232,7 +225,7 @@ export function PeriodPace({
             the height the card leaves it. */}
         <View pointerEvents="none" style={fill ? StyleSheet.absoluteFill : null}>
           <Svg height={height} style={styles.chart} width={width}>
-            <PeriodChart comparedLabel={comparedLineLabel(period)} geometry={geometry} />
+            <PeriodChart geometry={geometry} />
           </Svg>
         </View>
       </View>

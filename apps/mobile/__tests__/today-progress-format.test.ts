@@ -6,7 +6,6 @@
 
 import {
   CHART_RIGHT_GUTTER,
-  CHART_RIGHT_GUTTER_BACK,
   formatSessionSummaryFigures,
   formatPeriodDayLabel,
   formatPeriodRange,
@@ -17,7 +16,6 @@ import {
   sessionSummaryAccessibilityLabel,
   periodChartAccessibilityLabel,
   periodChartAccessibilityValue,
-  comparedLineLabel,
   periodChartGeometry,
   periodDayAtX,
   periodDayFigures,
@@ -183,9 +181,6 @@ describe('the period against the previous period', () => {
     );
     expect(periodChartAccessibilityValue(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, period 3 back 6');
     expect(periodChartAccessibilityLabel(october)).toContain('against the period 3 back 6 by day 19; the period 3 back finished at 9.');
-    // The chart labels its compared line the same way.
-    expect(comparedLineLabel(october)).toBe('3 BACK');
-    expect(comparedLineLabel({ compareBack: 1 })).toBe('LAST');
   });
 
   it('speaks the chart as one sentence', () => {
@@ -214,10 +209,8 @@ describe('the period chart geometry', () => {
     );
 
     expect(geometry.plot.width).toBe(plotWidth);
-    // An earlier compared period's wider label takes a wider gutter.
-    expect(periodChartGeometry(period({ now, compareBack: 2, cumulative: days(19, () => 0) }), width).plot.width).toBe(
-      width - CHART_RIGHT_GUTTER_BACK,
-    );
+    // The compared period never changes the plot's width: its line carries no label.
+    expect(periodChartGeometry(period({ now, compareBack: 2, cumulative: days(19, () => 0) }), width).plot.width).toBe(plotWidth);
     expect(geometry.current).toHaveLength(19);
     expect(geometry.current[0].x).toBe(0);
     expect(geometry.previous[27].x).toBeCloseTo(plotWidth);
@@ -284,7 +277,7 @@ describe('the period chart geometry', () => {
   });
 
   it('draws nothing wider than the space it is given, and writes points to one decimal', () => {
-    const narrow = periodChartGeometry(period({ now, cumulative: [1, 2] }), 10);
+    const narrow = periodChartGeometry(period({ now, cumulative: [1, 2] }), 6);
     expect(narrow.plot.width).toBe(0);
     expect(narrow.today.previous.x).toBe(0);
     expect(toPolyline([{ x: 0, y: 80.25 }, { x: 9.731, y: 6 }])).toBe('0.0,80.3 9.7,6.0');

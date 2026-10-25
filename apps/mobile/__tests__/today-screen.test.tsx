@@ -194,9 +194,9 @@ describe('Today: the Progress card over real data', () => {
     await logHistory();
     await renderToday();
     const chart = text('today-progress-chart');
-    // The fallback 326pt chart's plot is 292pt across 28 days.
+    // The fallback 326pt chart's plot is 318pt across 28 days.
     const touchDay = (event: 'responderRelease' | 'responderMove', dayIndex: number) =>
-      fireEvent(chart, event, { nativeEvent: { locationX: (dayIndex / 27) * 292 } });
+      fireEvent(chart, event, { nativeEvent: { locationX: (dayIndex / 27) * 318 } });
 
     // Wed 7 Oct, day 3: 6 Oct's 6 sets against none by 9 Sep.
     touchDay('responderRelease', 2);
