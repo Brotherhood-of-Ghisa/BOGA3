@@ -14,6 +14,7 @@ import {
   deriveRestTimerView,
   dismissRestTimer,
   formatRestTimerSeconds,
+  getLastStartedTimerMode,
   getRestTimerEntry,
   isRestTimerAutoStartSuppressed,
   REPEATING_TIMER_STEP_SEC,
@@ -512,6 +513,45 @@ describe('rest-timer store and pure rules', () => {
     jest.advanceTimersByTime(90_000);
     expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
     expect(Vibration.vibrate).toHaveBeenCalledWith(400);
+  });
+
+  it('title-bar tap: starts the last-used mode, stops rest without suppressing auto-start, pauses and resumes repeating', () => {
+    const { result } = renderHook(() =>
+      useSessionRestTimer('session-1', { defaultDurationSec: 60, defaultRepeatingIntervalSec: 45 }),
+    );
+    expect(getLastStartedTimerMode()).toBe('rest');
+    act(() => result.current.tapTitleBar());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'rest', durationSec: 60 });
+
+    act(() => result.current.tapTitleBar());
+    expect(getRestTimerEntry()).toBeNull();
+    expect(isRestTimerAutoStartSuppressed('session-1')).toBe(false);
+    act(() => result.current.onSetConfirmed());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'rest' });
+
+    act(() => result.current.switchMode('repeating'));
+    expect(getLastStartedTimerMode()).toBe('repeating');
+    act(() => result.current.tapTitleBar());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'repeating', pausedAtMs: expect.any(Number) });
+    act(() => result.current.tapTitleBar());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'repeating', pausedAtMs: null });
+
+    act(() => result.current.dismiss());
+    act(() => result.current.tapTitleBar());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'repeating', intervalSec: 45 });
+    act(() => result.current.dismiss());
+    act(() => result.current.startLastMode());
+    expect(getRestTimerEntry()).toMatchObject({ mode: 'repeating' });
+
+    __resetRestTimerForTests();
+    expect(getLastStartedTimerMode()).toBe('rest');
+  });
+
+  it('title-bar tap and startLastMode do nothing without an active session', () => {
+    const { result } = renderHook(() => useSessionRestTimer('session-1', { isActiveSession: false }));
+    act(() => result.current.tapTitleBar());
+    act(() => result.current.startLastMode());
+    expect(getRestTimerEntry()).toBeNull();
   });
 
   it('handles vibration errors gracefully in triggerRestCompletionCue', () => {

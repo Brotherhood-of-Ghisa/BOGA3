@@ -16,6 +16,7 @@ export const SETTINGS_SUB_PAGES = {
   progress: '/settings-progress',
   effort: '/settings-effort',
   other: '/settings-other',
+  experiments: '/settings-experiments',
   dataSync: '/settings-data-sync',
   developerTools: '/settings-developer-tools',
 } as const;

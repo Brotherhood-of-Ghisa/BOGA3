@@ -21,6 +21,19 @@ describe('RestTimerBar', () => {
     expect(screen.queryByText(/Round 0/)).toBeNull();
   });
 
+  it('offers a collapse control only when the host gives one', () => {
+    const onCollapse = jest.fn();
+    const view: RestTimerView = {
+      mode: 'rest', status: 'running', sessionId: 'session-1', remainingSec: 60, formatted: '1:00', durationSec: 90,
+    };
+    const { rerender } = render(<RestTimerBar onAdjust={jest.fn()} onDismiss={jest.fn()} onRestart={jest.fn()} view={view} />);
+    expect(screen.queryByTestId('rest-timer-collapse')).toBeNull();
+    rerender(<RestTimerBar onAdjust={jest.fn()} onCollapse={onCollapse} onDismiss={jest.fn()} onRestart={jest.fn()} view={view} />);
+    expect(screen.getByLabelText('Hide timer controls')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('rest-timer-collapse'));
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+  });
+
   it('renders nothing when view is idle', () => {
     const idleView: RestTimerView = { status: 'idle' };
     render(

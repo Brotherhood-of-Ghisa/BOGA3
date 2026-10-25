@@ -44,6 +44,7 @@ export const ICON_GLYPHS = {
   'chevron-left': [path('m15 18-6-6 6-6')],
   'chevron-right': [path('m9 18 6-6-6-6')],
   'chevron-down': [path('m6 9 6 6 6-6')],
+  'chevron-up': [path('m18 15-6-6-6 6')],
   'arrow-up': [path('m5 12 7-7 7 7'), path('M12 19V5')],
   'arrow-down': [path('M12 5v14'), path('m19 12-7 7-7-7')],
   // Leaves the app (an external link).

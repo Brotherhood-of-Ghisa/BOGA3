@@ -19,6 +19,9 @@ export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
 // Today as one scrolling page (`list`), or as two full-height cards, Progress
 // and the group, swiped between (`cards`).
 export type TodayLayout = 'list' | 'cards';
+// Settings › Experiments. `timerInTitleBar`: the session and exercise title
+// bars show the running timer as a countdown pill; tap starts or stops it,
+// long press opens the timer card (`components/session-recorder/title-bar-timer.tsx`).
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
 export const MIN_REST_TIMER_SECONDS = 15;
 export const MAX_REST_TIMER_SECONDS = 600;
@@ -49,6 +52,7 @@ export type AccountLocalPreferences = {
   restTimerDurationSec: number;
   repeatingTimerIntervalSec: number;
   todayLayout: TodayLayout;
+  timerInTitleBar: boolean;
   developerMode: boolean;
 };
 export type ExerciseListPreferences = Pick<AccountLocalPreferences, 'sort' | 'showNeverDone' | 'dateFormat' | 'pastRecordsGymScope'>;
@@ -80,6 +84,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
   repeatingTimerIntervalSec: DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
   todayLayout: 'list',
+  timerInTitleBar: false,
   developerMode: false,
 };
 
@@ -93,6 +98,7 @@ export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
 // Stored as `true` / `false`.
 export const booleanPreferenceFields: (keyof AccountLocalPreferences)[] = [
   'showNeverDone', 'restTimerAutoStart', 'developerMode', 'progressGrouped', 'progressCountSecondary',
+  'timerInTitleBar',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
 export const isNonNegativeSafeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -120,6 +126,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: `Rest timer must be a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`,
   todayLayout: 'Choose List or Cards for Today.',
+  timerInTitleBar: 'Choose whether the timer runs in the title bar.',
   developerMode: 'Choose whether to show developer tools.',
   repeatingTimerIntervalSec: `Repeating interval must be a whole number of seconds from ${MIN_REPEATING_TIMER_INTERVAL_SECONDS} to ${MAX_REPEATING_TIMER_INTERVAL_SECONDS}.`,
 };
@@ -133,6 +140,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'restTimerAutoStart':
     case 'progressGrouped':
     case 'progressCountSecondary':
+    case 'timerInTitleBar':
     case 'developerMode': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';

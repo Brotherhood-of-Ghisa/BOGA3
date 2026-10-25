@@ -10,6 +10,7 @@ import {
   Card,
   ScreenScroll,
   SegmentedControl,
+  SwitchRow,
   uiFonts,
   uiRoles,
   uiSpace,
@@ -79,8 +80,20 @@ export function OtherSettingsScreen() {
             value={values.pastRecordsGymScope}
           />
         </View>
-        {/* List keeps Today one scrolling page; Cards gives Progress and the
-            group a full-height card each, swiped between. */}
+      </Card>
+    </SubPage>
+  );
+}
+
+// Features being tried out, each off by default.
+export function ExperimentsSettingsScreen() {
+  const { values, pending } = useAccountLocalPreferenceState();
+  const current = { ...values, ...pending };
+  return (
+    <SubPage testID="settings-experiments-screen">
+      {/* List keeps Today one scrolling page; Cards gives Progress and the
+          group a full-height card each, swiped between. */}
+      <Card style={styles.cardBody}>
         <View style={styles.preference}>
           <Text allowFontScaling={false} style={styles.fieldLabel}>Today layout</Text>
           <SegmentedControl
@@ -88,9 +101,17 @@ export function OtherSettingsScreen() {
             onChange={(todayLayout) => updatePreferences({ todayLayout })}
             options={TODAY_LAYOUT_OPTIONS}
             testIDPrefix="settings-today-layout"
-            value={values.todayLayout}
+            value={current.todayLayout}
           />
         </View>
+      </Card>
+      <Card>
+        <SwitchRow
+          label="Timer in title bar"
+          onValueChange={(timerInTitleBar) => updatePreferences({ timerInTitleBar })}
+          testID="settings-timer-in-title-bar"
+          value={current.timerInTitleBar}
+        />
       </Card>
     </SubPage>
   );

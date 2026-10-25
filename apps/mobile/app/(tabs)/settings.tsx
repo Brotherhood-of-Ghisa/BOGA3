@@ -6,7 +6,7 @@ import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import { SettingsCard } from '@/components/settings/settings-card';
-import { effortStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
+import { effortStatus, experimentsStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
 import { useSyncStatusSnapshot } from '@/components/sync-status/use-sync-status';
 import {
   Card,
@@ -92,6 +92,13 @@ export default function SettingsScreen() {
         onPress={() => router.push(SETTINGS_SUB_PAGES.other)}
         status={values.dateFormat}
         testID="settings-other-row"
+      />
+      <SettingsCard
+        icon="sparkles"
+        label="Experiments"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.experiments)}
+        status={experimentsStatus(values)}
+        testID="settings-experiments-row"
       />
       <AboutCard />
     </ScreenScroll>
