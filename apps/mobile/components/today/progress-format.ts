@@ -120,10 +120,6 @@ export const weekShare = (counts: { current: number; previous: number }): { lap:
 
 const setCount = (count: number) => plural(count, 'set', 'sets');
 
-/** The compared line's end label on the chart: `LAST`, or how many periods back, `2 BACK` (never signed: a sign reads as a difference). */
-export const comparedLineLabel = (period: Pick<TodayProgressPeriod, 'compareBack'>): string =>
-  period.compareBack === 1 ? 'LAST' : `${period.compareBack} BACK`;
-
 /** The compared period, spoken: `last period`, or how far back Today stepped. */
 export const comparedPeriodName = (period: Pick<TodayProgressPeriod, 'compareBack'>): string =>
   period.compareBack === 1 ? 'last period' : `period ${period.compareBack} back`;
@@ -227,10 +223,8 @@ export type PeriodChartGeometry = {
   weekStartsX: number[];
 };
 
-// Room on the right for the compared period's label at the end of its line:
-// `LAST`, or the wider `2 BACK`.
-export const CHART_RIGHT_GUTTER = 34;
-export const CHART_RIGHT_GUTTER_BACK = 56;
+// Room on the right for the dots at the lines' ends.
+export const CHART_RIGHT_GUTTER = 8;
 export const CHART_HEIGHT = 126;
 const PLOT_TOP = 6;
 // Below the plot: the week ticks and the `TODAY` axis label.
@@ -247,7 +241,7 @@ export const periodChartGeometry = (
   height: number = CHART_HEIGHT,
   selected: PeriodDayFigures = periodDayFigures(period, null)
 ): PeriodChartGeometry => {
-  const plotWidth = Math.max(0, width - (period.compareBack === 1 ? CHART_RIGHT_GUTTER : CHART_RIGHT_GUTTER_BACK));
+  const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
   const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
   const days = period.daysInPeriod;
   const yMax = Math.max(1, period.projectedWorkingSets, period.previous.total.workingSets, period.toDate.workingSets);
