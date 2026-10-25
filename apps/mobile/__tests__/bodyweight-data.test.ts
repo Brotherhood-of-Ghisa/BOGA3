@@ -194,14 +194,14 @@ it('puts only the final preference and contribution fields on the sync wire', ()
   });
   const definition = entityToWire({
     id: 'definition', name: 'Pull-Up', loadInputMode: 'total_load', bodyweightContribution: 0.7,
-    splitByGym: true, deletedAt: null, createdAt: new Date(1000), updatedAt: new Date(1000),
+    splitByGym: true, restTimerSec: 90, deletedAt: null, createdAt: new Date(1000), updatedAt: new Date(1000),
     localDirty: true, localUpdatedAtMs: 100,
   }, 'exercise_definitions');
   expect(definition.fields).toMatchObject({
-    bodyweight_contribution: 0.7, load_input_mode: 'total_load', split_by_gym: true,
+    bodyweight_contribution: 0.7, load_input_mode: 'total_load', split_by_gym: true, rest_timer_sec: 90,
   });
   expect(Object.keys(definition.fields).sort()).toEqual([
     'bodyweight_contribution', 'created_at', 'deleted_at', 'load_input_mode', 'name',
-    'split_by_gym', 'updated_at',
+    'rest_timer_sec', 'split_by_gym', 'updated_at',
   ]);
 });

@@ -1,5 +1,8 @@
 // Device-local account choices. Keep this module free of data, auth and UI imports.
 import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy';
+import { isRestTimerSec, MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS, REST_TIMER_RANGE_MESSAGE } from '../exercise-core/rest-timer';
+
+export { MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS };
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
@@ -23,8 +26,6 @@ export type TodayLayout = 'list' | 'cards';
 // bars show the running timer as a countdown pill; tap starts or stops it,
 // long press opens the timer card (`components/session-recorder/title-bar-timer.tsx`).
 export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
-export const MIN_REST_TIMER_SECONDS = 15;
-export const MAX_REST_TIMER_SECONDS = 600;
 export const DEFAULT_REST_TIMER_SECONDS = 90;
 export const MIN_REPEATING_TIMER_INTERVAL_SECONDS = 15;
 export const MAX_REPEATING_TIMER_INTERVAL_SECONDS = 600;
@@ -124,7 +125,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
-  restTimerDurationSec: `Rest timer must be a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`,
+  restTimerDurationSec: REST_TIMER_RANGE_MESSAGE,
   todayLayout: 'Choose List or Cards for Today.',
   timerInTitleBar: 'Choose whether the timer runs in the title bar.',
   developerMode: 'Choose whether to show developer tools.',
@@ -158,8 +159,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
-    case 'restTimerDurationSec':
-      return isPositiveSafeInteger(value) && value >= MIN_REST_TIMER_SECONDS && value <= MAX_REST_TIMER_SECONDS;
+    case 'restTimerDurationSec': return isRestTimerSec(value);
     case 'repeatingTimerIntervalSec':
       return isPositiveSafeInteger(value) && value >= MIN_REPEATING_TIMER_INTERVAL_SECONDS && value <= MAX_REPEATING_TIMER_INTERVAL_SECONDS;
   }

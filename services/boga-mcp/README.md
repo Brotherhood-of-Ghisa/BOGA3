@@ -35,7 +35,8 @@ Eight read-only tools:
 - `list_muscles` — the muscle ids exercise mappings name, each with the
   person's `report_group` and `tracked` setup.
 - `search_exercises` — database-side filter by name, muscle, equipment; each
-  exercise carries `split_by_gym`, `deleted` and its `revision`.
+  exercise carries `split_by_gym`, `rest_timer_sec`, `deleted` and its
+  `revision`.
 - `get_exercise_context` — compact recent preview, lifetime PRs and totals.
 - `get_recent_workouts` — completed workout list with working-set volume.
 - `get_exercise_history` — keyset-paginated performed set history.
@@ -49,8 +50,10 @@ Two create-only planning tools (require write access, idempotent):
 Four exercise tools (require the same write access, idempotent; edits quote the
 `revision` they read and fail `REVISION_CONFLICT` when it moved):
 - `create_exercise` — name, muscles (one primary, distinct secondaries), load
-  mode, bodyweight contribution, `split_by_gym`.
-- `update_exercise` — change any of those; `muscles` replaces the mapping.
+  mode, bodyweight contribution, `split_by_gym`, `rest_timer_sec`
+  ([[timer.rest-default]]).
+- `update_exercise` — change any of those; `muscles` replaces the mapping and
+  `rest_timer_sec: null` clears the exercise's own timer.
   Marked destructive.
 - `delete_exercise` — soft delete; history stays. Marked destructive.
 - `restore_exercise` — undo a soft delete.

@@ -13,6 +13,7 @@ import {
   type ReportedMuscle,
 } from '@/src/data/muscle-analytics';
 import { validateExerciseCore } from '@/src/exercise-core';
+import { isRestTimerSec, validateExerciseRestTimerSec, type ExerciseRestTimerValidation } from '@/src/exercise-core/rest-timer';
 
 import { isUntrackedEntry, muscleIdOfEntry, reportedMappings } from './muscle-setup';
 
@@ -34,6 +35,7 @@ export type ExerciseEditorPrefill = {
   name: string;
   loadInputMode: EditorLoadInputMode;
   splitByGym?: boolean;
+  restTimerSec?: number | null;
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
 };
 
@@ -45,6 +47,7 @@ export const buildDuplicateExercisePrefill = (
   loadInputMode: exercise.loadInputMode ?? 'total_load',
   bodyweightContribution: exercise.bodyweightContribution,
   splitByGym: exercise.splitByGym,
+  restTimerSec: exercise.restTimerSec,
   mappings: exercise.mappings.map((mapping) => ({
     muscleGroupId: mapping.muscleGroupId,
     weight: mapping.weight,
@@ -112,6 +115,8 @@ export type EditorOpenState = {
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   contributionPercentage: string;
   splitByGym: boolean;
+  /** The rest timer field's text: blank uses the global timer ([[timer.rest-default]]). */
+  restTimerText: string;
 };
 
 const prefillAsExercise = (prefill: ExerciseEditorPrefill): ExerciseCatalogExercise => ({
@@ -120,6 +125,7 @@ const prefillAsExercise = (prefill: ExerciseEditorPrefill): ExerciseCatalogExerc
   loadInputMode: prefill.loadInputMode,
   bodyweightContribution: 0,
   splitByGym: prefill.splitByGym ?? false,
+  restTimerSec: prefill.restTimerSec ?? null,
   deletedAt: null,
   mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
 });
@@ -139,6 +145,7 @@ export const editorOpenState = (
       ...buildEditorMuscleSelectionsFromExercise(editingExercise, assignment),
       contributionPercentage,
       splitByGym: editingExercise.splitByGym,
+      restTimerText: restTimerText(editingExercise.restTimerSec),
     };
   }
   if (prefill) {
@@ -149,6 +156,7 @@ export const editorOpenState = (
       ...buildEditorMuscleSelectionsFromExercise(prefilled, assignment),
       contributionPercentage,
       splitByGym: prefilled.splitByGym,
+      restTimerText: restTimerText(prefilled.restTimerSec),
     };
   }
   return {
@@ -158,7 +166,20 @@ export const editorOpenState = (
     secondaryMuscleRows: [],
     contributionPercentage,
     splitByGym: false,
+    restTimerText: '',
   };
+};
+
+// A stored value outside the range opens blank, as the timer ignores it too.
+const restTimerText = (restTimerSec: number | null) => (isRestTimerSec(restTimerSec) ? String(restTimerSec) : '');
+
+/** What the rest timer field saves: blank is null (the global timer), else whole seconds in range. */
+export const parseRestTimerText = (text: string): ExerciseRestTimerValidation => {
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    return validateExerciseRestTimerSec(null);
+  }
+  return validateExerciseRestTimerSec(/^\d+$/.test(trimmed) ? Number(trimmed) : NaN);
 };
 
 /** The muscles the selector offers: the current primary or any unchosen muscle; for secondaries, only unchosen ones. */

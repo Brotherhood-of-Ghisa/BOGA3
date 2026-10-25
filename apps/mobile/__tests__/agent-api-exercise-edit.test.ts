@@ -35,6 +35,8 @@ const rejection = (read: () => unknown): string => {
 const primary = { muscle_id: 'chest_sternal', role: 'primary' };
 const secondary = { muscle_id: 'triceps_long', role: 'secondary' };
 
+const REST_REJECTION = 'rest_timer_sec must be null or a whole number of seconds from 15 to 600.';
+
 describe('agent exercise create', () => {
   it('takes the app defaults for omitted optional fields', () => {
     expect(normalizeExerciseCreate({ name: '  Incline  Press ', muscles: [primary] })).toEqual({
@@ -44,6 +46,14 @@ describe('agent exercise create', () => {
       split_by_gym: false,
       muscles: [{ muscle_id: 'chest_sternal', role: 'primary', weight: 1 }],
     });
+  });
+
+  it('keeps a rest timer in the app\'s range', () => {
+    expect(normalizeExerciseCreate({ name: 'Row', rest_timer_sec: 15, muscles: [primary] }).rest_timer_sec).toBe(15);
+    expect(normalizeExerciseCreate({ name: 'Row', rest_timer_sec: 600, muscles: [primary] }).rest_timer_sec).toBe(600);
+    expect(normalizeExerciseCreate({ name: 'Row', rest_timer_sec: null, muscles: [primary] }).rest_timer_sec).toBeNull();
+    // Unsent, the key stays out, so the idempotency hash of a create body is unchanged.
+    expect(normalizeExerciseCreate({ name: 'Row', muscles: [primary] })).not.toHaveProperty('rest_timer_sec');
   });
 
   it('weights muscles as the editor does and lists the primary first', () => {
@@ -68,6 +78,10 @@ describe('agent exercise create', () => {
     ['an unknown load mode', { name: 'Row', load_input_mode: 'kg', muscles: [primary] }, 'load_input_mode must be one of: total_load, per_side_load.'],
     ['a contribution above 1', { name: 'Row', bodyweight_contribution: 1.5, muscles: [primary] }, 'bodyweight_contribution must be a number from 0 to 1.'],
     ['a non-boolean split', { name: 'Row', split_by_gym: 'yes', muscles: [primary] }, 'split_by_gym must be true or false.'],
+    ['a rest timer below 15', { name: 'Row', rest_timer_sec: 14, muscles: [primary] }, REST_REJECTION],
+    ['a rest timer above 600', { name: 'Row', rest_timer_sec: 601, muscles: [primary] }, REST_REJECTION],
+    ['a fractional rest timer', { name: 'Row', rest_timer_sec: 90.5, muscles: [primary] }, REST_REJECTION],
+    ['a text rest timer', { name: 'Row', rest_timer_sec: '90', muscles: [primary] }, REST_REJECTION],
     ['no muscles', { name: 'Row', muscles: [] }, `muscles must list 1 to ${MAX_EXERCISE_MUSCLES} muscles.`],
     ['no primary', { name: 'Row', muscles: [secondary] }, 'muscles must have exactly one primary muscle.'],
     ['two primaries', { name: 'Row', muscles: [primary, { muscle_id: 'lats', role: 'primary' }] }, 'muscles must have exactly one primary muscle.'],
@@ -96,6 +110,12 @@ describe('agent exercise update', () => {
       expected_revision: 1_760_000_000_000,
       changes: { split_by_gym: true },
     });
+  });
+
+  it('clears the rest timer on an explicit null and leaves it alone when absent', () => {
+    expect(normalizeExerciseUpdate({ expected_revision: 5, rest_timer_sec: null }).changes).toEqual({ rest_timer_sec: null });
+    expect(normalizeExerciseUpdate({ expected_revision: 5, rest_timer_sec: 120 }).changes).toEqual({ rest_timer_sec: 120 });
+    expect(normalizeExerciseUpdate({ expected_revision: 5, name: 'Row' }).changes).not.toHaveProperty('rest_timer_sec');
   });
 
   it('replaces the whole muscle set when muscles is present', () => {

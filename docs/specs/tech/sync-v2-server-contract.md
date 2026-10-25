@@ -111,8 +111,10 @@ listed here:
 
 - **`session_exercise_tags`** has no client `updated_at`; it still carries the
   universal server columns.
-- **`muscle_groups.report_group` and `tracked`** keep their value when a push,
-  or a pull on the client, omits the key (`split_by_gym` does on push).
+- **`muscle_groups.report_group` and `tracked`, and
+  `exercise_definitions.rest_timer_sec`,** keep their value when a push, or a
+  pull on the client, omits the key (`split_by_gym` does on push). An explicit
+  `rest_timer_sec: null` clears it.
 - **`user_settings`** is a singleton whose client id is `settings`. The
   singleton is client-enforced; the server is a plain LWW mirror.
 - **`exercise_group_links`** is the member's own data, not a group table. Only

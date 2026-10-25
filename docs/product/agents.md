@@ -5,7 +5,8 @@
 A connected coaching agent reads training data, muscle setup included. One
 per-agent switch, **Allow this coach to make changes** (default off; on for
 agents that already had plan creation), lets it create plans and programmes, and
-create, edit (name, load mode, bodyweight contribution, [[gym.split]], muscles),
+create, edit (name, load mode, bodyweight contribution, [[gym.split]],
+[[timer.rest-default]], muscles),
 soft delete and restore exercises. It never edits or deletes plans, changes
 muscles or setup, starts workouts, or changes sessions or sets.
 

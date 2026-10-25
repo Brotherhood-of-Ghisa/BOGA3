@@ -252,8 +252,8 @@ the data-model-level invariants.
    [[set.eligibility]]).
 5. **Planned targets and performance state are `in sync scope`** —
    `exercise_sets.planned_weight_value`, `planned_reps_value`,
-   `planned_set_type` and `performance_status` ride the existing envelope,
-   adding no column, server migration or envelope field. `performance_status`
+   `planned_set_type` and `performance_status` ride the existing envelope.
+   `performance_status`
    is nullable unconstrained text carrying the whole state: `planned`,
    `unperformed`, and `null` on a valid actual row meaning confirmed/performed
    ([[set.performed]]).
@@ -295,6 +295,8 @@ the data-model-level invariants.
    (the key of the muscle an entry reports under; null = itself) and `tracked`
    (default 1). Null and 1 mean per-entry reporting: no backfill. Catalogue
    seeding and bundle migrations never write either.
+11. `exercise_definitions.rest_timer_sec` is `in sync scope`, unchecked
+   ([[timer.rest-default]]).
 
 ### Entity coverage (Sync v2)
 

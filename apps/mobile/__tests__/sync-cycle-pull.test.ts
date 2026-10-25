@@ -17,7 +17,7 @@ import {
   PRIMARY_RUNTIME_STATE_ID,
   type Transaction,
 } from '@/src/data/clock';
-import { gyms, muscleGroups, sessions, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, gyms, muscleGroups, sessions, syncRuntimeState } from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -184,6 +184,64 @@ describe('applyPullPage carries the muscle report group and tracked flag', () =>
   it('inserts the column defaults when a new row arrives without either key', () => {
     database.transaction((tx) => applyPullPage(tx as Transaction, [muscleWire(100)], 'muscle_groups'));
     expect(readMuscleSetup()).toEqual({ reportGroup: null, tracked: 1 });
+  });
+});
+
+const exerciseWire = (ms: number, restTimer?: { rest_timer_sec: number | null }): WireEntity => ({
+  type: 'exercise_definitions',
+  id: 'bench',
+  client_updated_at_ms: ms,
+  fields: {
+    name: 'Bench Press',
+    load_input_mode: 'total_load',
+    bodyweight_contribution: 0,
+    split_by_gym: false,
+    ...restTimer,
+    created_at: ms,
+    updated_at: ms,
+    deleted_at: null,
+  },
+});
+
+const readRestTimerSec = () =>
+  database
+    .select({ restTimerSec: exerciseDefinitions.restTimerSec })
+    .from(exerciseDefinitions)
+    .where(eq(exerciseDefinitions.id, 'bench'))
+    .get()?.restTimerSec;
+
+describe('applyPullPage carries the exercise rest timer', () => {
+  beforeEach(() => {
+    fixture = createInMemoryDatabase();
+    database = fixture.database;
+  });
+
+  it('writes the value on insert, and an incoming null clears it', () => {
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [exerciseWire(100, { rest_timer_sec: 120 })], 'exercise_definitions'),
+    );
+    expect(readRestTimerSec()).toBe(120);
+
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [exerciseWire(200, { rest_timer_sec: null })], 'exercise_definitions'),
+    );
+    expect(readRestTimerSec()).toBeNull();
+  });
+
+  it('keeps the local value when a newer envelope omits the key', () => {
+    database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [exerciseWire(100, { rest_timer_sec: 120 })], 'exercise_definitions'),
+    );
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [exerciseWire(200)], 'exercise_definitions'),
+    );
+    expect(changed).toBe(1);
+    expect(readRestTimerSec()).toBe(120);
+  });
+
+  it('stores null (the global timer) when a new row arrives without the key', () => {
+    database.transaction((tx) => applyPullPage(tx as Transaction, [exerciseWire(100)], 'exercise_definitions'));
+    expect(readRestTimerSec()).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@ import {
   editorOpenState,
   validateEditorInput,
   type EditorMapping,
+  parseRestTimerText,
 } from '@/src/exercise-catalog/editor-model';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
@@ -18,6 +19,7 @@ describe('exercise-editor-model', () => {
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
         splitByGym: false,
+        restTimerSec: null,
         deletedAt: null,
         mappings: [
           { id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -32,6 +34,7 @@ describe('exercise-editor-model', () => {
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
         splitByGym: false,
+        restTimerSec: null,
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -45,6 +48,7 @@ describe('exercise-editor-model', () => {
         name: 'Bodyweight Squat',
         bodyweightContribution: 1,
         splitByGym: false,
+        restTimerSec: null,
         deletedAt: null,
         mappings: [{ id: 'm3', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
       };
@@ -63,6 +67,7 @@ describe('exercise-editor-model', () => {
         loadInputMode: 'per_side_load',
         bodyweightContribution: 0,
         splitByGym: false,
+        restTimerSec: null,
         deletedAt: null,
         mappings: [{ id: 'm4', muscleGroupId: 'biceps', weight: 1, role: 'primary' }],
       };
@@ -79,6 +84,7 @@ describe('exercise-editor-model', () => {
         loadInputMode: 'total_load',
         bodyweightContribution: 0.2,
         splitByGym: false,
+        restTimerSec: null,
         deletedAt: null,
         mappings: [
           { id: 'm5', muscleGroupId: 'shoulders', weight: 1, role: 'primary' },
@@ -105,6 +111,7 @@ describe('exercise-editor-model', () => {
       name: 'Bench Press',
       bodyweightContribution: 0,
       splitByGym: true,
+      restTimerSec: null,
       deletedAt: null,
       mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
     };
@@ -120,6 +127,44 @@ describe('exercise-editor-model', () => {
     });
   });
 
+  describe('Rest timer ([[timer.rest-default]])', () => {
+    const timed: ExerciseCatalogExercise = {
+      id: 'bench-1',
+      name: 'Bench Press',
+      bodyweightContribution: 0,
+      splitByGym: false,
+      restTimerSec: 120,
+      deletedAt: null,
+      mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    };
+
+    it('opens on the edited exercise\'s timer, and a duplicate keeps it', () => {
+      expect(editorOpenState(timed, null).restTimerText).toBe('120');
+      expect(editorOpenState(null, buildDuplicateExercisePrefill(timed)).restTimerText).toBe('120');
+    });
+
+    it('opens blank (the global timer) for a new exercise and a prefill without one', () => {
+      expect(editorOpenState(null, null).restTimerText).toBe('');
+      expect(editorOpenState({ ...timed, restTimerSec: null }, null).restTimerText).toBe('');
+      expect(editorOpenState(null, { name: 'Bench', loadInputMode: 'total_load', mappings: [] }).restTimerText).toBe('');
+    });
+
+    it('opens blank on a stored value outside the range, as the timer ignores it, so Save is not blocked', () => {
+      expect(editorOpenState({ ...timed, restTimerSec: 5 }, null).restTimerText).toBe('');
+    });
+
+    it('saves blank as null and whole seconds in range as a number', () => {
+      expect(parseRestTimerText('')).toEqual({ ok: true, value: null });
+      expect(parseRestTimerText('   ')).toEqual({ ok: true, value: null });
+      expect(parseRestTimerText(' 15 ')).toEqual({ ok: true, value: 15 });
+      expect(parseRestTimerText('600')).toEqual({ ok: true, value: 600 });
+    });
+
+    it.each(['14', '601', '1.5', '-30', '1e2', 'ninety'])('rejects %p', (text) => {
+      expect(parseRestTimerText(text).ok).toBe(false);
+    });
+  });
+
   describe("in the user's muscles ([[muscle.no-breakdown]])", () => {
     const broad = buildMuscleSetup(broadMuscleRows()).assignment;
     const detailed = buildMuscleSetup(detailedMuscleRows()).assignment;
@@ -128,6 +173,7 @@ describe('exercise-editor-model', () => {
       name: 'Exercise',
       bodyweightContribution: 0,
       splitByGym: false,
+      restTimerSec: null,
       deletedAt: null,
       mappings: mappings.map((mapping) => ({ id: `map-${mapping.muscleGroupId}`, ...mapping })),
     });

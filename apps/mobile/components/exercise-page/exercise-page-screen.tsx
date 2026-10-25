@@ -28,6 +28,7 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { resolveRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { exerciseHistoryHref, exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
@@ -154,7 +155,7 @@ export function ExercisePageScreen({
   const [listPreferences] = useExerciseListPreferences();
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
   const restTimer = useSessionRestTimer(sessionId, {
-    defaultDurationSec: trainingPreferences.restTimerDurationSec,
+    defaultDurationSec: resolveRestTimerSec(editingExercise?.restTimerSec, trainingPreferences.restTimerDurationSec),
     defaultRepeatingIntervalSec: trainingPreferences.repeatingTimerIntervalSec,
     autoStart: trainingPreferences.restTimerAutoStart,
     isActiveSession: !isCompletedSession,

@@ -50,6 +50,7 @@ const exercise = (over: Partial<ExerciseCatalogExercise> = {}): ExerciseCatalogE
   loadInputMode: 'total_load',
   bodyweightContribution: 0,
   splitByGym: false,
+  restTimerSec: null,
   deletedAt: null,
   mappings: [
     { id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -98,6 +99,7 @@ describe('editing an existing exercise', () => {
       name: 'Bench Press',
       loadInputMode: 'total_load',
       splitByGym: false,
+      restTimerSec: null,
       mappings: [
         { muscleGroupId: 'chest', weight: 1, role: 'primary' },
         { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -235,6 +237,55 @@ describe('Track each gym separately', () => {
     view.rerender(editor(false));
     view.rerender(editor(true));
     expect(splitSwitch().props.accessibilityState).toMatchObject({ checked: true });
+  });
+});
+
+describe('Rest timer', () => {
+  const restField = () => screen.getByTestId('exercise-editor-rest-timer');
+  const benchPrefill = { name: 'Bench', loadInputMode: 'total_load' as const, mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' as const }] };
+
+  it('opens blank for an exercise on the global timer, showing that timer as the placeholder', async () => {
+    renderEditor({ editingExercise: exercise() });
+    expect(restField()).toHaveProp('value', '');
+    expect(restField()).toHaveProp('placeholder', '90');
+    await save();
+    expect(onSave.mock.calls[0][0].restTimerSec).toBeNull();
+  });
+
+  it('opens on the exercise\'s own timer and saves a change to it', async () => {
+    renderEditor({ editingExercise: exercise({ restTimerSec: 120 }) });
+    expect(restField()).toHaveProp('value', '120');
+    fireEvent.changeText(restField(), ' 45 ');
+    await save();
+    expect(onSave.mock.calls[0][0].restTimerSec).toBe(45);
+  });
+
+  it('clearing the field saves null, so the exercise goes back to the global timer', async () => {
+    renderEditor({ editingExercise: exercise({ restTimerSec: 120 }) });
+    fireEvent.changeText(restField(), '');
+    await save();
+    expect(onSave.mock.calls[0][0].restTimerSec).toBeNull();
+  });
+
+  it('shows the rest timer error beside the other field errors on the same Save', async () => {
+    renderEditor({ prefill: { ...benchPrefill, name: '' } });
+    fireEvent.changeText(restField(), '5');
+    await save();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText('Exercise name is required')).toBeTruthy();
+    expect(screen.getByText('Rest timer must be a whole number of seconds from 15 to 600.')).toBeTruthy();
+  });
+
+  it.each(['10', '601', '1.5', 'abc'])('rejects %p inline and does not save', async (text) => {
+    renderEditor({ prefill: benchPrefill });
+    fireEvent.changeText(restField(), text);
+    await save();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText('Rest timer must be a whole number of seconds from 15 to 600.')).toBeTruthy();
+    fireEvent.changeText(restField(), '60');
+    expect(screen.queryByText('Rest timer must be a whole number of seconds from 15 to 600.')).toBeNull();
+    await save();
+    expect(onSave.mock.calls[0][0].restTimerSec).toBe(60);
   });
 });
 

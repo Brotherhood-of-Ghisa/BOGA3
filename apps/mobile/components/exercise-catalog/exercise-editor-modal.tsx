@@ -3,6 +3,7 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { ListRow } from '@/components/ui/list-row';
@@ -14,6 +15,7 @@ import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import type { ReportedMuscle } from '@/src/data/muscle-analytics';
 import {
@@ -132,6 +134,7 @@ function EditorBody({ form }: { form: EditorForm }) {
             testIDPrefix="exercise-editor"
           />
           <GymSplitField onChange={form.setSplitByGym} value={form.splitByGym} />
+          <RestTimerField error={form.restTimerError} onChange={form.changeRestTimer} value={form.restTimerText} />
           <PrimaryMuscleField
             error={form.validation.primaryMuscleError}
             muscleById={musclesById}
@@ -195,6 +198,30 @@ function GymSplitField({ value, onChange }: { value: boolean; onChange: (value: 
         />
       </Card>
     </View>
+  );
+}
+
+/**
+ * The exercise's own rest timer ([[timer.rest-default]]). Blank uses the
+ * global rest timer, whose value shows as the placeholder.
+ */
+function RestTimerField({ value, error, onChange }: {
+  value: string;
+  error: string | null;
+  onChange: (text: string) => void;
+}) {
+  const globalRestTimerSec = useAccountLocalPreferenceState().values.restTimerDurationSec;
+  return (
+    <FormField
+      accessibilityLabel="Rest timer seconds"
+      error={error}
+      keyboardType="number-pad"
+      label="Rest timer (seconds)"
+      onChangeText={onChange}
+      placeholder={String(globalRestTimerSec)}
+      testID="exercise-editor-rest-timer"
+      value={value}
+    />
   );
 }
 

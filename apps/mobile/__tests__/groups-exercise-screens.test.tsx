@@ -739,7 +739,7 @@ describe('Link your exercise (E0.4, link-only pick sheet)', () => {
   it('Add as new opens the prefilled editor and creates my exercise with its link, adding nothing to a session', async () => {
     const create = jest.mocked(createExerciseWithGroupLink);
     create.mockResolvedValue({
-      exercise: { bodyweightContribution: 0, splitByGym: false, id: 'ex-new', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
+      exercise: { bodyweightContribution: 0, splitByGym: false, restTimerSec: null, id: 'ex-new', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
       link: {} as never,
     });
     await openExercisesAs('member');

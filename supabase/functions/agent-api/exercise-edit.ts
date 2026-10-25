@@ -2,6 +2,7 @@
 // so Jest covers these rules beside the app's own exercise editor rules
 // (`apps/mobile/src/exercise-catalog/editor-model.ts`), which they mirror:
 // a trimmed non-empty name, a known load mode, a 0..1 bodyweight contribution,
+// a rest timer of null (the global timer) or 15..600 whole seconds,
 // exactly one primary muscle (weight 1) plus distinct secondaries (weight ½).
 //
 // The SQL writers (`agent_*_exercise` in
@@ -10,6 +11,11 @@
 
 import { validateBodyweightContribution } from '../../../apps/mobile/src/exercise-core/bodyweight-contribution.ts';
 import { isLoadInputMode, LOAD_INPUT_MODES } from '../../../apps/mobile/src/exercise-core/index.ts';
+import {
+  MAX_REST_TIMER_SECONDS,
+  MIN_REST_TIMER_SECONDS,
+  validateExerciseRestTimerSec,
+} from '../../../apps/mobile/src/exercise-core/rest-timer.ts';
 
 export const MAX_EXERCISE_NAME_LENGTH = 100;
 export const MAX_EXERCISE_MUSCLES = 12;
@@ -30,6 +36,8 @@ export type ExerciseCreate = {
   load_input_mode: string;
   bodyweight_contribution: number;
   split_by_gym: boolean;
+  /** Null uses the device's global rest timer; omitted on create, it stores null. */
+  rest_timer_sec?: number | null;
   muscles: ExerciseMuscleInput[];
 };
 
@@ -43,7 +51,7 @@ export type ExerciseUpdate = {
 /** A rejected exercise write; the Edge Function answers it as 400 INVALID_ARGUMENT. */
 export class ExerciseEditError extends Error {}
 
-const CREATE_KEYS = new Set(['name', 'load_input_mode', 'bodyweight_contribution', 'split_by_gym', 'muscles']);
+const CREATE_KEYS = new Set(['name', 'load_input_mode', 'bodyweight_contribution', 'split_by_gym', 'rest_timer_sec', 'muscles']);
 const UPDATE_KEYS = new Set([...CREATE_KEYS, 'expected_revision']);
 const REVISION_KEYS = new Set(['expected_revision']);
 
@@ -81,6 +89,14 @@ const readContribution = (value: unknown): number => {
 const readSplitByGym = (value: unknown): boolean => {
   if (typeof value !== 'boolean') fail('split_by_gym must be true or false.');
   return value as boolean;
+};
+
+const readRestTimerSec = (value: unknown): number | null => {
+  const checked = validateExerciseRestTimerSec(value);
+  if (!checked.ok) {
+    return fail(`rest_timer_sec must be null or a whole number of seconds from ${MIN_REST_TIMER_SECONDS} to ${MAX_REST_TIMER_SECONDS}.`);
+  }
+  return checked.value;
 };
 
 const readMuscle = (value: unknown, index: number): ExerciseMuscleInput => {
@@ -134,6 +150,9 @@ export const normalizeExerciseCreate = (body: JsonObject): ExerciseCreate => {
     load_input_mode: body.load_input_mode === undefined ? 'total_load' : readLoadInputMode(body.load_input_mode),
     bodyweight_contribution: body.bodyweight_contribution === undefined ? 0 : readContribution(body.bodyweight_contribution),
     split_by_gym: body.split_by_gym === undefined ? false : readSplitByGym(body.split_by_gym),
+    // Omitted when not sent, so a create body hashes (for idempotency) as it
+    // did before the field existed.
+    ...(body.rest_timer_sec === undefined ? {} : { rest_timer_sec: readRestTimerSec(body.rest_timer_sec) }),
     muscles: readMuscles(body.muscles),
   };
 };
@@ -149,6 +168,8 @@ export const normalizeExerciseUpdate = (body: JsonObject): ExerciseUpdate => {
     changes.bodyweight_contribution = readContribution(body.bodyweight_contribution);
   }
   if (body.split_by_gym !== undefined) changes.split_by_gym = readSplitByGym(body.split_by_gym);
+  // An explicit null clears the exercise's own timer back to the global one.
+  if (body.rest_timer_sec !== undefined) changes.rest_timer_sec = readRestTimerSec(body.rest_timer_sec);
   if (body.muscles !== undefined) changes.muscles = readMuscles(body.muscles);
   if (Object.keys(changes).length === 0) fail('Name at least one field to change.');
   return { expected_revision, changes };

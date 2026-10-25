@@ -7,6 +7,7 @@ import {
   createBlankValidationState,
   editorOpenState,
   parseBodyweightPercentage,
+  parseRestTimerText,
   validateEditorInput,
   type EditableSecondaryMuscleRow,
   type EditorLoadInputMode,
@@ -23,6 +24,8 @@ export type ExerciseEditorSaveInput = {
   name: string;
   loadInputMode: EditorLoadInputMode;
   splitByGym: boolean;
+  /** Null uses the global rest timer. */
+  restTimerSec: number | null;
   mappings: EditorMapping[];
 };
 
@@ -51,6 +54,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
   const [bodyweightContributionError, setBodyweightContributionError] = useState<string | null>(null);
   const [loadInputMode, setLoadInputMode] = useState<EditorLoadInputMode>('total_load');
   const [splitByGym, setSplitByGym] = useState(false);
+  const [restTimerText, setRestTimerText] = useState('');
+  const [restTimerError, setRestTimerError] = useState<string | null>(null);
   const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
   const [validation, setValidation] = useState<EditorValidationState>(createBlankValidationState);
@@ -77,6 +82,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
       setExerciseName(open.name);
       setLoadInputMode(open.loadInputMode);
       setSplitByGym(open.splitByGym);
+      setRestTimerText(open.restTimerText);
+      setRestTimerError(null);
       setPrimaryMuscleGroupId(open.primaryMuscleGroupId);
       setSecondaryMuscleRows(open.secondaryMuscleRows);
       setBodyweightContributionField({ percentage: open.contributionPercentage });
@@ -142,6 +149,12 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     setBodyweightContributionError(null);
   };
 
+  const changeRestTimer = (text: string) => {
+    setRestTimerText(text);
+    setRestTimerError(null);
+    setSaveError(null);
+  };
+
   const save = async () => {
     setValidation(createBlankValidationState());
     setSaveError(null);
@@ -154,7 +167,9 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
       assignment: shownFor?.assignment ?? muscleSetup.assignment,
     });
     setValidation(checked.validation);
-    if (!checked.mappings) {
+    const restTimer = parseRestTimerText(restTimerText);
+    setRestTimerError(restTimer.ok ? null : restTimer.message);
+    if (!checked.mappings || !restTimer.ok) {
       return;
     }
     const contribution = validateBodyweightContribution(parseBodyweightPercentage(bodyweightContributionField.percentage) / 100);
@@ -166,7 +181,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     Keyboard.dismiss();
     setIsSaving(true);
     try {
-      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, splitByGym, mappings: checked.mappings };
+      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, splitByGym, restTimerSec: restTimer.value, mappings: checked.mappings };
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
@@ -186,6 +201,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     bodyweightContributionError,
     loadInputMode,
     splitByGym,
+    restTimerText,
+    restTimerError,
     primaryMuscleGroupId,
     secondaryMuscleRows,
     selectedSecondaryMuscleIds,
@@ -195,6 +212,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     setSplitByGym,
     changeName,
     changeContribution,
+    changeRestTimer,
     openMuscleSelector,
     closeMuscleSelector: () => setMuscleSelectorMode(null),
     selectPrimaryMuscle,

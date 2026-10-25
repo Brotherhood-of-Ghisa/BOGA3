@@ -278,10 +278,10 @@ run_psql_sql "
   insert into app_public.gyms (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms, server_received_at)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-gym-1', 'Gym 1',
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:00.000+00');
-  insert into app_public.exercise_definitions (owner_user_id, id, name, split_by_gym, created_at, updated_at, client_updated_at_ms, server_received_at)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-1', 'Bench', false,
+  insert into app_public.exercise_definitions (owner_user_id, id, name, split_by_gym, rest_timer_sec, created_at, updated_at, client_updated_at_ms, server_received_at)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-1', 'Bench', false, null,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:01.000+00'),
-           ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-2', 'Squat', true,
+           ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-2', 'Squat', true, 150,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:02.000+00');
 " >/dev/null
 
@@ -305,6 +305,8 @@ assert_jq '.next_cursor.type == "exercise_definitions" and .next_cursor.id == "p
 # value — a column the projection forgets cannot round-trip.
 assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-1")][0].fields.split_by_gym == false' "scenario 1 projects split_by_gym false"
 assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-2")][0].fields.split_by_gym == true' "scenario 1 projects split_by_gym true"
+assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-1")][0].fields | has("rest_timer_sec") and .rest_timer_sec == null' "scenario 1 projects rest_timer_sec null"
+assert_jq '[.entities[] | select(.id == "pull-'"${RUN_TAG}"'-ed-2")][0].fields.rest_timer_sec == 150' "scenario 1 projects rest_timer_sec 150"
 
 # Also exercise the cursor=null snapshot path: the initial pull of this layer
 # must include all three seeded rows (count scoped to our run tag so unrelated
