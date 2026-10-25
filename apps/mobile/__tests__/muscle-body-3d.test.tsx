@@ -281,9 +281,26 @@ describe('MuscleBodyCard', () => {
       selected: true,
       expanded: true,
     });
+
+    // Next button cycles to back_lats and auto-orients to Back view (180°).
+    fireEvent.press(screen.getByTestId('stats-muscle-body-next'));
+    expect(onSelect).toHaveBeenCalledWith('back_lats');
+    expect(viewport.props.accessibilityValue).toEqual({ text: 'Back view, 180 degrees' });
+
+    // Prev button cycles backwards to quads.
+    fireEvent.press(screen.getByTestId('stats-muscle-body-prev'));
+    expect(onSelect).toHaveBeenCalledWith('quads');
+
+    // Tapping the picker trigger opens the bottom sheet.
+    fireEvent.press(screen.getByTestId('stats-muscle-body-picker-trigger'));
+    expect(screen.getByTestId('stats-muscle-picker-sheet')).toBeTruthy();
+    // Choosing back_lats in the sheet selects it and auto-orients to back view.
+    fireEvent.press(screen.getByTestId('stats-muscle-picker-row-back_lats'));
+    expect(onSelect).toHaveBeenCalledWith('back_lats');
+    expect(viewport.props.accessibilityValue).toEqual({ text: 'Back view, 180 degrees' });
   });
 
-  it('renders MuscleBodyCard in 3D Muscle layout and discloses selected muscle contributions with history links', () => {
+  it('renders MuscleBodyCard in 3D Muscle layout with top trained muscle selected by default and discloses contributions', () => {
     const chestWithContributors: ProgressMuscleComparison = {
       ...muscles[0],
       exercises: [
@@ -334,8 +351,15 @@ describe('MuscleBodyCard', () => {
 
     expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    expect(screen.queryByTestId('stats-contributions')).toBeNull();
+    // Default selected muscle is top trained (Chest), disclosing contributions immediately.
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+    expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('8');
 
+    fireEvent.press(screen.getByTestId('stats-contributions-view-daily'));
+    expect(onOpenMuscleHistory).toHaveBeenCalledWith({ muscleGroupId: 'chest' }, 'daily');
+
+    // Tapping the selected muscle keeps it selected in 3D view.
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
     const projected = projectMuscleBody({
@@ -352,22 +376,8 @@ describe('MuscleBodyCard', () => {
         y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
       });
     });
-
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
-    expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('8');
-    fireEvent.press(screen.getByTestId('stats-contributions-view-daily'));
-    expect(onOpenMuscleHistory).toHaveBeenCalledWith({ muscleGroupId: 'chest' }, 'daily');
-
-    // Tapping the selected muscle again clears the selection.
-    act(() => {
-      tapGesture.handlers.onEnd({
-        x: (chestTri.x0 + chestTri.x1 + chestTri.x2) / 3,
-        y: (chestTri.y0 + chestTri.y1 + chestTri.y2) / 3,
-      });
-    });
-    expect(screen.queryByTestId('stats-muscle-body-selected')).toBeNull();
-    expect(screen.queryByTestId('stats-contributions')).toBeNull();
   });
 
   it('shades the 3D body from filtered exercises in Exercise 3D view and scopes the exercise list on muscle tap', () => {

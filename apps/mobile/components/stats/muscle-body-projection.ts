@@ -100,6 +100,26 @@ export function bodyOrientationForAngle(angleDeg: number): BodyOrientation {
   return angle > 90 && angle <= 270 ? 'back' : 'front';
 }
 
+const POSTERIOR_MUSCLES = new Set<string>([
+  'delts_rear',
+  'rotator_cuff',
+  'back_lats',
+  'back_upper',
+  'traps_upper',
+  'traps_lower',
+  'spinal_erectors',
+  'triceps',
+  'hamstrings',
+  'glutes_max',
+  'hip_abductors',
+  'calves',
+]);
+
+/** Which canonical side of the body best showcases the given muscle group. */
+export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation {
+  return POSTERIOR_MUSCLES.has(canonicalMuscleId(muscleId)) ? 'back' : 'front';
+}
+
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
 
 const readMetricValue = (

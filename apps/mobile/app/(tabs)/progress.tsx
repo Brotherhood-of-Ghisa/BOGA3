@@ -338,6 +338,24 @@ export function StatsScreenShell({
   const tableVisible = muscleLayout === 'list' || (viewMode === 'exercise' && muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const exerciseSpatial = muscleLayout !== 'list' && !(muscleLayout === '3d' && exerciseMetric === 'estimatedOneRepMax');
   const [contributionId, setContributionId] = useState<string | null>(null);
+
+  const defaultMuscleId = useMemo(() => {
+    if (!summary?.muscles || summary.muscles.length === 0) return 'chest';
+    let topMuscle: ProgressMuscleComparison | null = null;
+    let topVal = -1;
+    for (const m of summary.muscles) {
+      const val = m.current[tableMetric];
+      const num = val !== null && Number.isFinite(val) ? val : 0;
+      if (num > topVal) {
+        topVal = num;
+        topMuscle = m;
+      }
+    }
+    return topMuscle && topVal > 0 ? topMuscle.muscleGroupId : 'chest';
+  }, [summary, tableMetric]);
+
+  const effectiveContributionId =
+    contributionId ?? (muscleLayout === '3d' && viewMode === 'muscle' ? defaultMuscleId : null);
   // The row whose history was opened, held only until the return it is for:
   // any other way back to Progress (a tab, the Sessions link) leaves the
   // reader where it landed.
@@ -362,7 +380,13 @@ export function StatsScreenShell({
     if (row) focus(row);
   }, [focus, isFocused]);
   const showContributions = (id: string) => {
-    setContributionId(current => current === id ? null : id);
+    setContributionId(current =>
+      muscleLayout === '3d' && viewMode === 'muscle'
+        ? id
+        : (current ?? (muscleLayout === '3d' && viewMode === 'muscle' ? defaultMuscleId : null)) === id
+          ? null
+          : id
+    );
   };
   // The press that opens history: the keyboard goes, the row is remembered for
   // the return, and any pending focus request for an earlier row is dropped.
@@ -435,7 +459,7 @@ export function StatsScreenShell({
         {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={bodyReady}
           exercises={exerciseMappings} muscles={summary?.muscles ?? []} countSecondary={countSecondary} report={muscleReport}
           items={filteredExerciseListItems}
-          selectedMuscleId={contributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={contributionId} muscleLayout={muscleLayout}
+          selectedMuscleId={effectiveContributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
           tickers={muscleTickers} tickerStatus={muscleTickerStatus} tickerWeeks={targetWindowWeeks} report={muscleReport}
           grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}

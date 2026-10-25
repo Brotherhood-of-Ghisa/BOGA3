@@ -178,13 +178,15 @@ describe('The 3D body on the Progress screens under Broad', () => {
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
   });
 
-  it('selects nothing when an untracked facet is tapped in Muscle 3D', async () => {
+  it('does not select an untracked facet when tapped in Muscle 3D', async () => {
     await choose('broad');
     act(() => updatePreferences({ progressMuscleLayout: '3d' }));
     await renderProgress('muscle');
     await screen.findByTestId('stats-muscle-body-card');
+    const initialSelected = screen.getByTestId('stats-muscle-body-selected').props.children;
     await tapEntryOnBody('spinal_erectors');
-    expect(screen.queryByTestId('stats-muscle-body-selected')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent(initialSelected);
+    expect(screen.queryByText('Spinal erectors')).toBeNull();
   });
 
   it('selects Back when a member facet is tapped in Exercise 3D', async () => {

@@ -6,7 +6,10 @@ import Svg, { Path } from 'react-native-svg';
 import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 import {
   Card,
+  Icon,
+  ListRow,
   SegmentedControl,
+  Sheet,
   uiFonts,
   uiRoles,
   uiSpace,
@@ -20,6 +23,7 @@ import { comparisonFigures, metricUnit } from './comparison-columns';
 import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
+  canonicalOrientationForMuscle,
   computeMuscleBuckets,
   hitTestProjectedMuscle,
   normaliseBodyAngle,
@@ -68,6 +72,133 @@ const resolveDatasetMuscleId = (
   const match = muscles.find(row => candidates.includes(row.muscleGroupId));
   return match ? match.muscleGroupId : canonicalId;
 };
+
+type HeaderProps = {
+  readonly orientation: BodyOrientation;
+  readonly onOrientationChange: (next: BodyOrientation) => void;
+  readonly selectedMuscle: ProgressMuscleComparison | null;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
+  readonly onOpenPicker: () => void;
+};
+
+function MuscleBodyHeader({
+  orientation,
+  onOrientationChange,
+  selectedMuscle,
+  onPrev,
+  onNext,
+  onOpenPicker,
+}: HeaderProps) {
+  return (
+    <View style={styles.headerRow}>
+      <SegmentedControl
+        accessibilityLabel="Body orientation"
+        density="compact"
+        layout="inline"
+        onChange={onOrientationChange}
+        options={ORIENTATION_OPTIONS}
+        selectedGround="selection"
+        testIDPrefix="stats-muscle-body-angle"
+        value={orientation}
+      />
+      <View style={styles.stepperContainer}>
+        <Pressable
+          accessibilityLabel="Previous muscle"
+          accessibilityRole="button"
+          hitSlop={uiSpace.sm}
+          onPress={onPrev}
+          style={styles.stepperButton}
+          testID="stats-muscle-body-prev">
+          <Icon name="chevron-left" size="sm" />
+        </Pressable>
+        <Pressable
+          accessibilityHint="Opens muscle list sheet"
+          accessibilityLabel={`Selected muscle: ${selectedMuscle?.displayName ?? 'None'}. Tap to choose another muscle.`}
+          accessibilityRole="button"
+          hitSlop={uiSpace.xs}
+          onPress={onOpenPicker}
+          style={styles.pickerTrigger}
+          testID="stats-muscle-body-picker-trigger">
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={styles.selectedName}
+            testID="stats-muscle-body-selected">
+            {selectedMuscle?.displayName ?? 'Select'}
+          </Text>
+          <Icon name="chevron-down" size="xs" />
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Next muscle"
+          accessibilityRole="button"
+          hitSlop={uiSpace.sm}
+          onPress={onNext}
+          style={styles.stepperButton}
+          testID="stats-muscle-body-next">
+          <Icon name="chevron-right" size="sm" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+type PickerSheetProps = {
+  readonly visible: boolean;
+  readonly onDismiss: () => void;
+  readonly muscles: readonly ProgressMuscleComparison[];
+  readonly metric: ProgressMetric;
+  readonly selectedId: string | null;
+  readonly onSelectMuscle: (id: string) => void;
+};
+
+function MusclePickerSheet({
+  visible,
+  onDismiss,
+  muscles,
+  metric,
+  selectedId,
+  onSelectMuscle,
+}: PickerSheetProps) {
+  const unit = metricUnit(metric);
+  return (
+    <Sheet
+      dismissLabel="Dismiss muscle picker"
+      onDismiss={onDismiss}
+      testID="stats-muscle-picker-sheet"
+      title="Select Muscle"
+      visible={visible}>
+      <View style={styles.sheetList}>
+        {muscles.map(row => {
+          const isSelected = row.muscleGroupId === selectedId;
+          const figures = comparisonFigures(row, metric);
+          return (
+            <ListRow
+              accessibilityHint="Selects this muscle on the 3D model"
+              accessibilityLabel={`${row.displayName}, ${figures.now} ${unit}.`}
+              density="sheet"
+              key={row.muscleGroupId}
+              onPress={() => onSelectMuscle(row.muscleGroupId)}
+              selected={isSelected}
+              testID={`stats-muscle-picker-row-${row.muscleGroupId}`}
+              trailing={isSelected ? <Icon name="check" size="md" /> : undefined}>
+              <View style={styles.sheetRowContent}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.sheetRowName, isSelected && styles.sheetRowNameSelected]}>
+                  {row.displayName}
+                </Text>
+                <Text allowFontScaling={false} style={styles.sheetRowMeta}>
+                  {figures.now} {unit}
+                </Text>
+              </View>
+            </ListRow>
+          );
+        })}
+      </View>
+    </Sheet>
+  );
+}
 
 function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: Props) {
   const unit = metricUnit(metric);
@@ -137,6 +268,32 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
     [muscles, selectedId]
   );
 
+  const [sheetVisible, setSheetVisible] = useState(false);
+
+  const selectWithAutoOrientation = (targetId: string) => {
+    onSelect(targetId);
+    const targetOrientation = canonicalOrientationForMuscle(targetId);
+    if (targetOrientation !== orientation) {
+      setDragOffsetDeg(0);
+      setBaseAngleDeg(targetOrientation === 'front' ? 0 : 180);
+    }
+  };
+
+  const handleNextMuscle = () => {
+    if (muscles.length === 0) return;
+    const currentIndex = muscles.findIndex(row => row.muscleGroupId === selectedId);
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % muscles.length;
+    selectWithAutoOrientation(muscles[nextIndex].muscleGroupId);
+  };
+
+  const handlePrevMuscle = () => {
+    if (muscles.length === 0) return;
+    const currentIndex = muscles.findIndex(row => row.muscleGroupId === selectedId);
+    const prevIndex =
+      currentIndex < 0 ? muscles.length - 1 : (currentIndex - 1 + muscles.length) % muscles.length;
+    selectWithAutoOrientation(muscles[prevIndex].muscleGroupId);
+  };
+
   const handleTapPoint = (x: number, y: number) => {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const hit = hitTestProjectedMuscle(projected, x, y);
@@ -173,30 +330,17 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
 
   return (
     <Card style={styles.card} testID="stats-muscle-body-card">
-      <View style={styles.headerRow}>
-        <SegmentedControl
-          accessibilityLabel="Body orientation"
-          density="compact"
-          layout="inline"
-          onChange={next => {
-            setDragOffsetDeg(0);
-            setBaseAngleDeg(next === 'front' ? 0 : 180);
-          }}
-          options={ORIENTATION_OPTIONS}
-          selectedGround="selection"
-          testIDPrefix="stats-muscle-body-angle"
-          value={orientation}
-        />
-        {selectedMuscle ? (
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={styles.selectedName}
-            testID="stats-muscle-body-selected">
-            {selectedMuscle.displayName}
-          </Text>
-        ) : null}
-      </View>
+      <MuscleBodyHeader
+        onNext={handleNextMuscle}
+        onOpenPicker={() => setSheetVisible(true)}
+        onOrientationChange={next => {
+          setDragOffsetDeg(0);
+          setBaseAngleDeg(next === 'front' ? 0 : 180);
+        }}
+        onPrev={handlePrevMuscle}
+        orientation={orientation}
+        selectedMuscle={selectedMuscle}
+      />
       <GestureDetector gesture={gesture}>
         <View
           accessible
@@ -258,6 +402,17 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         onSelect={onSelect}
         selectedId={selectedId}
       />
+      <MusclePickerSheet
+        metric={metric}
+        muscles={muscles}
+        onDismiss={() => setSheetVisible(false)}
+        onSelectMuscle={targetId => {
+          setSheetVisible(false);
+          selectWithAutoOrientation(targetId);
+        }}
+        selectedId={selectedId}
+        visible={sheetVisible}
+      />
       <HeatmapLegend label={metric === 'workingSetCount' ? 'Sets per muscle' : 'Volume per muscle'} />
     </Card>
   );
@@ -274,14 +429,60 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: uiSpace.sm,
   },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+    maxWidth: '65%',
+  },
+  stepperButton: {
+    padding: uiSpace.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 28,
+    minHeight: 28,
+  },
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.xs,
+    paddingVertical: uiSpace.xs,
+    maxWidth: 160,
+  },
   selectedName: {
-    flex: 1,
-    textAlign: 'right',
     fontFamily: uiFonts.display.family,
     fontWeight: '600',
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
+  },
+  sheetList: {
+    paddingBottom: uiSpace.lg,
+  },
+  sheetRowContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: uiSpace.sm,
+  },
+  sheetRowName: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  sheetRowNameSelected: {
+    color: uiRoles.accent,
+  },
+  sheetRowMeta: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
   viewport: {
     alignItems: 'center',
