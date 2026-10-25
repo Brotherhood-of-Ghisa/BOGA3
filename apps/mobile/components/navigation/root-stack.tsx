@@ -79,6 +79,7 @@ export function RootStack() {
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
         <Stack.Screen name="settings-other" options={{ title: 'Other' }} />
+        <Stack.Screen name="settings-experiments" options={{ title: 'Experiments' }} />
         <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
         <Stack.Screen name="settings-developer-tools" options={{ title: 'Developer tools' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />

@@ -56,6 +56,7 @@ import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
+import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
@@ -158,6 +159,7 @@ export function ExercisePageScreen({
     autoStart: trainingPreferences.restTimerAutoStart,
     isActiveSession: !isCompletedSession,
   });
+  const timerHost = useTitleBarTimer(restTimer, trainingPreferences.timerInTitleBar);
   const isFilteredByGym = isGymFiltered(listPreferences.pastRecordsGymScope, currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
@@ -440,17 +442,21 @@ export function ExercisePageScreen({
         onOpenOptions={() => setOpenSheet('options')}
         onToggleRestTimer={restTimer.toggleForSession}
         restTimerActive={restTimer.isActive}
+        titleBarTimer={timerHost.titleBarTimer}
         title={exercise.name}
       />
-      <RestTimerBar
-        onAdjust={restTimer.adjust}
-        onDismiss={restTimer.dismiss}
-        onResetRepeating={restTimer.resetRepeating}
-        onRestart={restTimer.restart}
-        onSwitchMode={restTimer.switchMode}
-        onToggleRepeating={restTimer.toggleRepeating}
-        view={restTimer.view}
-      />
+      {timerHost.cardVisible ? (
+        <RestTimerBar
+          onAdjust={restTimer.adjust}
+          onCollapse={timerHost.collapseCard}
+          onDismiss={restTimer.dismiss}
+          onResetRepeating={restTimer.resetRepeating}
+          onRestart={restTimer.restart}
+          onSwitchMode={restTimer.switchMode}
+          onToggleRepeating={restTimer.toggleRepeating}
+          view={restTimer.view}
+        />
+      ) : null}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.body}>
         {/* Page gutter: the target's 14 snaps to `md` 12, the same inset as a
             card's content, so page and card share one rhythm. */}

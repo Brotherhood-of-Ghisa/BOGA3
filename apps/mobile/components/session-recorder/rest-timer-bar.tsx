@@ -22,6 +22,8 @@ export type RestTimerBarProps = {
   onSwitchMode?: (mode: TimerMode) => void;
   onToggleRepeating?: () => void;
   onResetRepeating?: () => void;
+  // The title-bar timer's card: hides the card and leaves the timer running.
+  onCollapse?: () => void;
 };
 
 const MODE_OPTIONS: readonly SegmentedControlOption<TimerMode>[] = [
@@ -44,6 +46,7 @@ export function RestTimerBar({
   onSwitchMode,
   onToggleRepeating,
   onResetRepeating,
+  onCollapse,
 }: RestTimerBarProps) {
   if (view.status === 'idle') {
     return null;
@@ -65,14 +68,26 @@ export function RestTimerBar({
           testIDPrefix="timer-mode-selector"
           value={isRepeating ? 'repeating' : 'rest'}
         />
-        <IconButton
-          accessibilityLabel="Dismiss timer"
-          name="x"
-          onPress={onDismiss}
-          size="sm"
-          testID="rest-timer-dismiss"
-          tone="muted"
-        />
+        <View style={styles.headerActions}>
+          {onCollapse ? (
+            <IconButton
+              accessibilityLabel="Hide timer controls"
+              name="chevron-up"
+              onPress={onCollapse}
+              size="sm"
+              testID="rest-timer-collapse"
+              tone="muted"
+            />
+          ) : null}
+          <IconButton
+            accessibilityLabel="Dismiss timer"
+            name="x"
+            onPress={onDismiss}
+            size="sm"
+            testID="rest-timer-dismiss"
+            tone="muted"
+          />
+        </View>
       </View>
       <View style={[styles.actionRow, isRepeating ? styles.repeatingActionRow : null]}>
         {isRepeating ? (
@@ -194,6 +209,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   actionRow: {
     flexDirection: 'row',

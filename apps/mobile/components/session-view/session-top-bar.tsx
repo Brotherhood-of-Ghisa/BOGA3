@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -20,6 +21,8 @@ type SessionTopBarProps =
       // Starts or dismisses the active session's rest timer.
       onToggleRestTimer?: () => void;
       restTimerActive?: boolean;
+      // Settings › Experiments › Timer in title bar: replaces the timer button.
+      titleBarTimer?: Omit<TitleBarTimerProps, 'testID'>;
       // While a Finish is being written, so a second tap cannot start another.
       finishDisabled?: boolean;
     }
@@ -86,7 +89,9 @@ export function SessionTopBar(props: SessionTopBarProps) {
           {copy.title}
         </Text>
       )}
-      {props.mode === 'active' && props.onToggleRestTimer ? (
+      {props.mode === 'active' && props.titleBarTimer ? (
+        <TitleBarTimer {...props.titleBarTimer} testID="session-view-rest-timer-button" />
+      ) : props.mode === 'active' && props.onToggleRestTimer ? (
         <IconButton
           accessibilityLabel={props.restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
           hitSlop={uiSpace.xs}

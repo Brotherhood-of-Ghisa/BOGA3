@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
+import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 import type { Session } from '@/components/session-recorder/types';
 import {
   SessionExerciseCard,
@@ -149,6 +150,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     autoStart: trainingPreferences.restTimerAutoStart,
     isActiveSession: isActiveSessionReady(state),
   });
+  const timerHost = useTitleBarTimer(restTimer, trainingPreferences.timerInTitleBar);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [gymPicker, setGymPicker] = useState<GymPickerState>(CLOSED_GYM_PICKER);
   // The developer GPS panel's live view of the session's position acquisition;
@@ -469,20 +471,24 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
             onOpenOptions={() => setIsOptionsVisible(true)}
             onToggleRestTimer={restTimer.toggleForSession}
             restTimerActive={restTimer.isActive}
+            titleBarTimer={timerHost.titleBarTimer}
           />
         )
       ) : (
         <View style={[styles.statusSpacer, { paddingTop: insets.top }]} />
       )}
-      <RestTimerBar
-        onAdjust={restTimer.adjust}
-        onDismiss={restTimer.dismiss}
-        onResetRepeating={restTimer.resetRepeating}
-        onRestart={restTimer.restart}
-        onSwitchMode={restTimer.switchMode}
-        onToggleRepeating={restTimer.toggleRepeating}
-        view={restTimer.view}
-      />
+      {timerHost.cardVisible ? (
+        <RestTimerBar
+          onAdjust={restTimer.adjust}
+          onCollapse={timerHost.collapseCard}
+          onDismiss={restTimer.dismiss}
+          onResetRepeating={restTimer.resetRepeating}
+          onRestart={restTimer.restart}
+          onSwitchMode={restTimer.switchMode}
+          onToggleRepeating={restTimer.toggleRepeating}
+          view={restTimer.view}
+        />
+      ) : null}
       {body}
       {/* A completed session is history, which lives under Progress. */}
       {/* Train while this workout is in progress is this screen: nothing to open. */}

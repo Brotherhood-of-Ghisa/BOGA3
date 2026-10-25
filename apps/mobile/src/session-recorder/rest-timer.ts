@@ -69,6 +69,9 @@ let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = 
 let isForeground = false;
 let cueGeneration = 0;
 let restCompletionTimeout: ReturnType<typeof setTimeout> | null = null;
+// The mode last started, so a title-bar tap starts the timer you last used.
+// Kept for the app's run only.
+let lastStartedMode: TimerMode = 'rest';
 const listeners = new Set<() => void>();
 const suppressedAutoStartSessionIds = new Set<string>();
 
@@ -283,6 +286,8 @@ export const deriveRestTimerView = (
   };
 };
 
+export const getLastStartedTimerMode = (): TimerMode => lastStartedMode;
+
 export const getRestTimerEntry = (): WorkoutTimerEntry | null => activeEntry;
 
 export const subscribeRestTimer = (listener: () => void): (() => void) => {
@@ -300,6 +305,7 @@ export const startRestTimer = (
   const normalizedDuration = Math.max(1, Math.round(durationSec));
   if (!sessionId || !Number.isFinite(normalizedDuration)) return;
   suppressedAutoStartSessionIds.delete(sessionId);
+  lastStartedMode = 'rest';
   activeEntry = {
     mode: 'rest',
     sessionId,
@@ -354,6 +360,7 @@ export const startRepeatingTimer = (
 ): void => {
   if (!sessionId || !Number.isFinite(intervalSec)) return;
   suppressedAutoStartSessionIds.delete(sessionId);
+  lastStartedMode = 'repeating';
   const clampedInterval = Math.max(
     MIN_REPEATING_TIMER_INTERVAL_SECONDS,
     Math.min(MAX_REPEATING_TIMER_INTERVAL_SECONDS, Math.round(intervalSec)),
@@ -510,6 +517,7 @@ export const __resetRestTimerForTests = (): void => {
   lastSignaledRound = null;
   lastSignaledRestEndsAtMs = null;
   suppressedAutoStartSessionIds.clear();
+  lastStartedMode = 'rest';
   updateRepeatingTimerResources();
   scheduleRoundBoundaryCue();
   scheduleRestCompletionCue();
@@ -640,6 +648,32 @@ export function useSessionRestTimer(
     startRestTimer(sessionId, defaultDurationSec, now());
   }, [autoStart, defaultDurationSec, isActiveSession, now, sessionId]);
 
+  // Starts the mode last used, at its default length.
+  const startLastMode = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    if (getLastStartedTimerMode() === 'repeating') {
+      startRepeatingTimer(sessionId, defaultRepeatingIntervalSec, now());
+    } else {
+      startRestTimer(sessionId, defaultDurationSec, now());
+    }
+  }, [defaultDurationSec, defaultRepeatingIntervalSec, isActiveSession, now, sessionId]);
+
+  // The title-bar timer's tap: start the last-used mode when idle, pause or
+  // resume a repeating timer, stop a rest timer. Stopping here keeps
+  // auto-start on, unlike the card's dismiss: it is the everyday "rested
+  // enough" tap, not "no timer this session".
+  const tapTitleBar = useCallback(() => {
+    if (!isActiveSession || !sessionId) return;
+    const current = getRestTimerEntry();
+    if (current?.sessionId !== sessionId) {
+      startLastMode();
+    } else if (current.mode === 'repeating') {
+      toggleRepeatingTimer(sessionId, now());
+    } else {
+      dismissRestTimer(sessionId, { suppressAutoStart: false });
+    }
+  }, [isActiveSession, now, sessionId, startLastMode]);
+
   const startRepeating = useCallback(() => {
     if (!isActiveSession || !sessionId) return;
     startRepeatingTimer(sessionId, defaultRepeatingIntervalSec, now());
@@ -682,6 +716,8 @@ export function useSessionRestTimer(
     toggle,
     toggleForSession: isActiveSession ? toggle : undefined,
     onSetConfirmed,
+    startLastMode,
+    tapTitleBar,
     startRepeating,
     stopRepeating,
     toggleRepeating,

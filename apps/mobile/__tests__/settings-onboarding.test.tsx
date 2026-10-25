@@ -99,6 +99,7 @@ const CARD_ORDER = [
   'settings-developer-tools-row',
   'settings-data-sync-row',
   'settings-other-row',
+  'settings-experiments-row',
   'settings-about-card',
 ];
 
@@ -145,6 +146,7 @@ describe('the Settings list', () => {
     ['settings-developer-tools-row', '/settings-developer-tools'],
     ['settings-data-sync-row', '/settings-data-sync'],
     ['settings-other-row', '/settings-other'],
+    ['settings-experiments-row', '/settings-experiments'],
   ])('%s opens %s', async (testID, route) => {
     await renderSettings();
     fireEvent.press(screen.getByTestId(testID));
@@ -165,6 +167,7 @@ describe('the Settings list', () => {
     expect(statusOf('settings-effort-row')).toBe('Effort, Default');
     expect(statusOf('settings-other-row')).toBe('Other, DD-MM-YYYY');
     expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode off');
+    expect(statusOf('settings-experiments-row')).toBe('Experiments, Off');
 
     await waitFor(() => {
       updatePreferences({
@@ -174,12 +177,15 @@ describe('the Settings list', () => {
         targetWindowWeeks: 6,
         displayEfforts: ['rir_0'],
         dateFormat: 'YYYY-MM-DD',
+        todayLayout: 'cards',
+        timerInTitleBar: true,
       });
       expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 120 s · Auto-start off');
     });
     expect(statusOf('settings-progress-row')).toBe('Progress, 3D · 6-week period');
     expect(statusOf('settings-effort-row')).toBe('Effort, Custom');
     expect(statusOf('settings-other-row')).toBe('Other, YYYY-MM-DD');
+    expect(statusOf('settings-experiments-row')).toBe('Experiments, Today cards · Title-bar timer');
   });
 
   it('keeps the Developer mode switch off the list, naming its state on Developer tools', async () => {

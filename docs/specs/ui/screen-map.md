@@ -39,7 +39,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings in the user's muscles ([[muscle.no-breakdown]]); a gym pill scopes the row stats. A one-line title bar (back, `Exercises`, ⋮ for Manage), then search beside a labelled `Add`. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
 | `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
-| `/settings` | One card per destination (icon, label, current value): Account, Appearance (sheet), Bodyweight, Rest timer, Notifications (scrollable sheet), Progress, Effort, Developer tools, Data & sync, Other; About last, not pressable. The rest live on sub pages | `(tabs)/settings.tsx`, `components/settings/` |
+| `/settings` | One card per destination (icon, label, current value): Account, Appearance (sheet), Bodyweight, Rest timer, Notifications (scrollable sheet), Progress, Effort, Developer tools, Data & sync, Other, Experiments; About last, not pressable. The rest live on sub pages | `(tabs)/settings.tsx`, `components/settings/` |
 
 ## Sessions
 
@@ -67,7 +67,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format, past-records gym filter, Today layout; the sync status and Backups cards; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format, gym filter; Today layout, title-bar timer; the sync status and Backups cards; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 
@@ -199,6 +199,6 @@ The session and exercise timer strips expand their repeating readout fullscreen
 (`components/session-recorder/repeating-timer-focus.tsx`). Close, Back and
 accessibility escape collapse without changing the timer; the strip’s dismiss
 control remains separate. Phase sits above the countdown-only ring, followed by
-interval controls, a wide Pause/Resume action and bottom Reset. Both presentations
-share the store and [[timer.repeating-cues]] / [[timer.foreground-awake]].
-This is in-route state, not a new route.
+interval controls, a wide Pause/Resume action and bottom Reset. Both share
+the store and [[timer.repeating-cues]] / [[timer.foreground-awake]].
+In-route state, not a new route.

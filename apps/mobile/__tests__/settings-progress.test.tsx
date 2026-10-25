@@ -16,6 +16,7 @@ import { Storage } from 'expo-sqlite/kv-store';
 import {
   DataSyncSettingsScreen,
   EffortSettingsScreen,
+  ExperimentsSettingsScreen,
   OtherSettingsScreen,
   ProgressSettingsScreen,
   RestTimerSettingsScreen,
@@ -340,10 +341,10 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
 
-it('switches Today between List and Cards on Other, saved per account', async () => {
+it('switches Today between List and Cards on Experiments, saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<OtherSettingsScreen />);
+  render(<ExperimentsSettingsScreen />);
   const selector = within(screen.getByTestId('settings-today-layout-row'));
   expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['Show Today as a list', 'Show Today as cards']);
   expect(values().todayLayout).toBe('list');
@@ -352,4 +353,26 @@ it('switches Today between List and Cards on Other, saved per account', async ()
   expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout')).toBe('cards');
   fireEvent.press(screen.getByTestId('settings-today-layout-list'));
   expect(values().todayLayout).toBe('list');
+});
+
+it('turns the title-bar timer on and off on Experiments, off by default and saved per account', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<ExperimentsSettingsScreen />);
+  const toggle = screen.getByTestId('settings-timer-in-title-bar');
+  expect(toggle).toHaveProp('accessibilityState', { checked: false });
+  fireEvent.press(toggle);
+  expect(values().timerInTitleBar).toBe(true);
+  expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.timerInTitleBar')).toBe('true');
+  expect(screen.getByTestId('settings-timer-in-title-bar')).toHaveProp('accessibilityState', { checked: true });
+  fireEvent.press(screen.getByTestId('settings-timer-in-title-bar'));
+  expect(values().timerInTitleBar).toBe(false);
+});
+
+it('keeps Today layout off Other, which now holds only the date and gym filters', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<OtherSettingsScreen />);
+  expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
+  expect(screen.queryByTestId('settings-today-layout-row')).toBeNull();
 });

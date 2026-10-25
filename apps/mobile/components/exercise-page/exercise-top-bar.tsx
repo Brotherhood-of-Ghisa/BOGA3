@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { IconButton } from '@/components/ui/icon-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
@@ -11,6 +12,8 @@ type ExerciseTopBarProps = {
   // Present on an active session: starts or dismisses the rest timer.
   onToggleRestTimer?: () => void;
   restTimerActive?: boolean;
+  // Settings › Experiments › Timer in title bar: replaces the timer button.
+  titleBarTimer?: Omit<TitleBarTimerProps, 'testID'>;
 };
 
 // Back · exercise name · timer · ⋮. No subtitle.
@@ -20,6 +23,7 @@ export function ExerciseTopBar({
   onOpenOptions,
   onToggleRestTimer,
   restTimerActive = false,
+  titleBarTimer,
 }: ExerciseTopBarProps) {
   return (
     <View style={styles.bar}>
@@ -27,7 +31,9 @@ export function ExerciseTopBar({
       <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
         {title}
       </Text>
-      {onToggleRestTimer ? (
+      {titleBarTimer ? (
+        <TitleBarTimer {...titleBarTimer} testID="exercise-page-rest-timer-button" />
+      ) : onToggleRestTimer ? (
         <IconButton
           accessibilityLabel={restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
           name="timer"

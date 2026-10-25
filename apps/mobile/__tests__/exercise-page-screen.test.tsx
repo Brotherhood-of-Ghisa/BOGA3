@@ -63,6 +63,7 @@ import {
 } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_PAGE_FIXTURE } from '@/src/maestro/exercise-page-fixture';
 import { updatePreferences } from '@/src/preferences/hooks';
+import { __resetRestTimerForTests } from '@/src/session-recorder/rest-timer';
 import {
   bootLocalApp,
   closeLocalData,
@@ -1042,6 +1043,75 @@ describe('ExercisePageScreen', () => {
     await screen.findByTestId('exercise-page');
     expect(screen.queryByTestId('exercise-page-rest-timer-button')).toBeNull();
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+  });
+
+  it('runs the timer in the title bar when the experiment is on: tap starts and stops, long press opens the card', async () => {
+    __resetRestTimerForTests();
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    act(() => updatePreferences({ timerInTitleBar: true }));
+    await openPage();
+    const timerButton = () => screen.getByTestId('exercise-page-rest-timer-button');
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Start timer');
+    expect(screen.queryByTestId('exercise-page-rest-timer-button-pill')).toBeNull();
+
+    // Auto-start counts down in the title bar; the card stays closed.
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    expect(await screen.findByTestId('exercise-page-rest-timer-button-countdown')).toHaveTextContent('1:30');
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Rest timer, 1:30 remaining');
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Long press opens the card; collapsing it leaves the timer running.
+    fireEvent(timerButton(), 'longPress');
+    expect(screen.getByTestId('rest-timer-countdown')).toHaveTextContent('1:30');
+    fireEvent.press(screen.getByTestId('rest-timer-minus-15'));
+    fireEvent.press(screen.getByTestId('rest-timer-collapse'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    expect(screen.getByTestId('exercise-page-rest-timer-button-countdown')).toHaveTextContent('1:15');
+
+    // Tap stops it without suppressing auto-start: the next set starts it again.
+    fireEvent.press(timerButton());
+    expect(screen.queryByTestId('exercise-page-rest-timer-button-pill')).toBeNull();
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    expect(await screen.findByTestId('exercise-page-rest-timer-button-countdown')).toHaveTextContent('1:30');
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Switching to Repeating in the card: a tap then pauses and resumes it.
+    fireEvent(timerButton(), 'accessibilityAction', { nativeEvent: { actionName: 'longpress' } });
+    fireEvent.press(screen.getByTestId('timer-mode-selector-repeating'));
+    fireEvent.press(screen.getByTestId('rest-timer-collapse'));
+    expect(screen.getByTestId('exercise-page-rest-timer-button-countdown')).toHaveTextContent('0:15');
+    fireEvent.press(timerButton());
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Repeating timer preparation, 0:15 remaining, paused');
+    fireEvent(timerButton(), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Repeating timer preparation, 0:15 remaining');
+
+    // Dismissed from the card, the card closes; the next tap starts Repeating, the mode last used.
+    fireEvent(timerButton(), 'longPress');
+    fireEvent.press(screen.getByTestId('rest-timer-dismiss'));
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Start timer');
+    fireEvent.press(timerButton());
+    expect(timerButton()).toHaveProp('accessibilityLabel', 'Repeating timer preparation, 0:15 remaining');
+    expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
+
+    // Long press on an idle timer starts it and opens the card.
+    fireEvent(timerButton(), 'longPress');
+    fireEvent.press(screen.getByTestId('rest-timer-dismiss'));
+    fireEvent(timerButton(), 'longPress');
+    expect(screen.getByTestId('rest-timer-bar')).toBeTruthy();
+    expect(screen.getByTestId('repeating-timer-readout')).toBeTruthy();
+
+    // A completed session's page has no timer, as with the setting off.
+    screen.unmount();
+    render(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
+    await screen.findByTestId('exercise-page');
+    expect(screen.queryByTestId('exercise-page-rest-timer-button')).toBeNull();
+    act(() => updatePreferences({ timerInTitleBar: false }));
+    __resetRestTimerForTests();
   });
 });
 
