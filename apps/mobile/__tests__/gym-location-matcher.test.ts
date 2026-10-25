@@ -1,7 +1,7 @@
 import {
   DEFAULT_MATCH_RADIUS_M,
   DEFAULT_MAX_POSITION_ACCURACY_M,
-  DEFAULT_SUGGESTION_MAX_ACCURACY_M,
+  DEFAULT_SUGGESTION_RADIUS_M,
   DEFAULT_TIE_THRESHOLD_M,
   findNearbyGymsForPosition,
   matchNearestGymForPosition,
@@ -156,38 +156,37 @@ describe("findNearbyGymsForPosition (the gym sheet's suggestion list)", () => {
     longitude: -0.1246,
   });
 
-  it('returns the nearest gyms nearest first, at most two, ties included', () => {
+  // basePosition sits at latitude 51.5007; 0.001 degrees of latitude is ~111 m.
+  it('returns every gym within a kilometre, nearest first, ties included', () => {
     const result = findNearbyGymsForPosition(basePosition, [
-      gymAt('third-nearest', 51.502),
+      gymAt('third-nearest', 51.5087),
       gymAt('nearest', 51.5008),
       gymAt('second-nearest', 51.5009),
+      gymAt('just-past-a-kilometre', 51.5098),
       gymAt('no-location', null as unknown as number),
     ]);
 
-    expect(result.map((match) => match.gym.id)).toEqual(['nearest', 'second-nearest']);
+    expect(result.map((match) => match.gym.id)).toEqual(['nearest', 'second-nearest', 'third-nearest']);
+    expect(result[2].distanceM).toBeGreaterThan(850);
+    expect(result[2].distanceM).toBeLessThanOrEqual(DEFAULT_SUGGESTION_RADIUS_M);
   });
 
-  it('trusts a fix the confident matcher refuses and grows the radius with its accuracy', () => {
-    const gyms = [gymAt('few-hundred-metres-out', 51.5033)];
+  it('ignores the accuracy of the fix, however coarse or unknown', () => {
+    const gyms = [gymAt('a-gym', 51.505)];
 
-    // The same fix is below the confident matcher's accuracy gate.
-    expect(matchNearestGymForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M }, gyms).status).toBe(
-      'low_accuracy'
-    );
+    const coarseFix = { ...basePosition, accuracyM: 3_000 };
+    const unknownAccuracyFix = { ...basePosition, accuracyM: null };
 
-    const result = findNearbyGymsForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M }, gyms);
-    expect(result).toHaveLength(1);
-    expect(result[0].gym.id).toBe('few-hundred-metres-out');
-    expect(result[0].distanceM).toBeGreaterThan(DEFAULT_MATCH_RADIUS_M);
+    // The confident matcher refuses this fix; the suggestion does not.
+    expect(matchNearestGymForPosition(coarseFix, gyms).status).toBe('low_accuracy');
+    expect(findNearbyGymsForPosition(coarseFix, gyms).map((match) => match.gym.id)).toEqual(['a-gym']);
+    expect(findNearbyGymsForPosition(unknownAccuracyFix, gyms)).toHaveLength(1);
   });
 
-  it('suggests nothing without a fix, on a fix too coarse to trust, and on no gym in range', () => {
-    const gyms = [gymAt('a-gym', 51.501)];
+  it('suggests nothing when no gym is within reach, and honours a custom radius', () => {
+    const gyms = [gymAt('far-away', 51.53)];
 
-    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: null }, gyms)).toEqual([]);
-    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: DEFAULT_SUGGESTION_MAX_ACCURACY_M + 1 }, gyms)).toEqual(
-      []
-    );
-    expect(findNearbyGymsForPosition({ ...basePosition, accuracyM: 50 }, [gymAt('far-away', 51.53)])).toEqual([]);
+    expect(findNearbyGymsForPosition(basePosition, gyms)).toEqual([]);
+    expect(findNearbyGymsForPosition(basePosition, gyms, { radiusM: 5_000 })).toHaveLength(1);
   });
 });

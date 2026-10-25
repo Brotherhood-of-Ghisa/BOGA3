@@ -8,23 +8,25 @@ import type { CurrentForegroundPositionResult, ForegroundLocationPosition } from
  * it.
  *
  * The gym sheet never selects a gym from a position — it suggests — so the
- * cache trades strictness for availability: a fix at least as accurate as
- * {@link SESSION_POSITION_MAX_ACCURACY_M} is trusted the moment it lands and
- * the sheet updates live. A coarser fix — or a read that times out or fails —
- * is retried after a wait, because a cold GPS pipeline tightens over seconds,
- * and three reads fired back to back only see the same coarse cached fix.
- * Permission denial and services-off give up at once; anything else keeps
- * retrying inside the attempt and wall-clock budgets. A session that ends its
- * acquisition with no usable fix gives up until the gym sheet re-arms it
- * (`resume`), when the person opening the sheet is waiting on exactly that.
+ * cache trades strictness for availability: the first fix that lands is
+ * published at once, whatever its accuracy, so the sheet suggests straight
+ * away. Reading then continues, after a wait between reads so the GPS
+ * pipeline can tighten, until a fix is good — at least as accurate as
+ * {@link SESSION_POSITION_GOOD_ACCURACY_M} — and each more accurate fix
+ * replaces the held one and updates the sheet live. Timed-out or failed reads
+ * retry the same way. Permission denial and services-off stop at once;
+ * anything else keeps reading inside the attempt and wall-clock budgets. An
+ * acquisition that spends its budget without a good fix keeps its best one,
+ * and the gym sheet can re-arm it (`resume`), when the person opening the
+ * sheet is waiting on exactly that.
  */
 
-// Gyms usually sit more than a kilometre apart, so a fix this coarse still
-// names the right gym or gyms. The matcher pairs this with its own radius.
-export const SESSION_POSITION_MAX_ACCURACY_M = 500;
+// A fix this accurate ends the acquisition: the same bar a gym's saved
+// location must meet, and well inside the 1 km the suggestion reaches.
+export const SESSION_POSITION_GOOD_ACCURACY_M = 100;
 
 // How many reads one acquisition tries before giving up, how long it waits
-// between them — so the GPS pipeline can tighten — and how long the whole
+// between them — so the GPS pipeline can answer — and how long the whole
 // acquisition may run.
 export const SESSION_POSITION_MAX_READS = 6;
 export const SESSION_POSITION_RETRY_DELAY_MS = 2_000;
@@ -39,9 +41,28 @@ const ACQUISITION_BUDGET_MS = SESSION_POSITION_ACQUISITION_BUDGET_MS;
 const isRetryableRead = (status: CurrentForegroundPositionResult['status']): boolean =>
   status !== 'permission_denied' && status !== 'unavailable';
 
-const isUsableFix = (position: ForegroundLocationPosition): boolean => {
-  const { accuracyM } = position;
-  return accuracyM !== null && accuracyM >= 0 && accuracyM <= SESSION_POSITION_MAX_ACCURACY_M;
+
+// A fix's accuracy when it is a real radius; `null`, negative or non-finite
+// readings count as unknown.
+const knownAccuracyM = ({ accuracyM }: ForegroundLocationPosition): number | null =>
+  accuracyM !== null && Number.isFinite(accuracyM) && accuracyM >= 0 ? accuracyM : null;
+
+// Whether `next` should replace the held fix: any fix beats none, a known
+// accuracy beats an unknown one, and a tighter one beats a looser one.
+const isMoreAccurate = (
+  next: ForegroundLocationPosition,
+  held: ForegroundLocationPosition | null
+): boolean => {
+  if (!held) return true;
+  const nextAccuracyM = knownAccuracyM(next);
+  const heldAccuracyM = knownAccuracyM(held);
+  if (nextAccuracyM === null) return false;
+  return heldAccuracyM === null || nextAccuracyM < heldAccuracyM;
+};
+
+const isGoodFix = (position: ForegroundLocationPosition): boolean => {
+  const accuracyM = knownAccuracyM(position);
+  return accuracyM !== null && accuracyM <= SESSION_POSITION_GOOD_ACCURACY_M;
 };
 
 const gaveUpReasonFor = (result: CurrentForegroundPositionResult): SessionPositionGaveUpReason => {
@@ -58,7 +79,10 @@ export type SessionPositionGaveUpReason =
   | 'read_error';
 
 export type SessionPositionState = {
+  // `reading` may already hold a fix it is still refining; `available` is a
+  // settled acquisition with a fix, `unavailable` one without.
   status: 'reading' | 'available' | 'unavailable';
+  // The most accurate fix so far.
   position: ForegroundLocationPosition | null;
   attempts: number;
   lastRead: { status: CurrentForegroundPositionResult['status']; accuracyM: number | null } | null;
@@ -66,7 +90,8 @@ export type SessionPositionState = {
 };
 
 type SessionPositionEntry = SessionPositionState & {
-  // Whether the sheet may clear the settled failure and acquire again.
+  // Whether the sheet may re-arm a settled acquisition: one that spent its
+  // budget without a good fix.
   resumable: boolean;
 };
 
@@ -110,13 +135,11 @@ const setEntry = (sessionId: string, entry: SessionPositionEntry) => {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * The session's cached fix, or `null` while it is still being acquired or the
- * session gave up on one.
+ * The session's best fix so far — held while reading continues to refine it —
+ * or `null` before any fix lands or when the session gave up without one.
  */
-export const getSessionPosition = (sessionId: string): ForegroundLocationPosition | null => {
-  const entry = entries.get(sessionId);
-  return entry?.status === 'available' ? entry.position : null;
-};
+export const getSessionPosition = (sessionId: string): ForegroundLocationPosition | null =>
+  entries.get(sessionId)?.position ?? null;
 
 /**
  * The session's acquisition diagnostics: what the reads saw and why a fix is
@@ -157,14 +180,14 @@ export const subscribeSessionPositionState = (
 };
 
 /**
- * Starts the session's acquisition, or resumes nothing when it already ran: a
- * cached fix or a recorded failure makes this a no-op, as does a read still in
- * flight. With `resume`, a settled failure from a finished acquisition — one
- * that ran out of its retry budget, not a denial — is cleared and the
- * acquisition runs again: the gym sheet passes it, because the person opening
- * the sheet is waiting on exactly that fix. The read takes the position reader
- * as a parameter, so tests inject one instead of the native module, and the
- * retry wait as a second one, so tests run without the waits.
+ * Starts the session's acquisition, or does nothing when it already ran: a
+ * good fix or a denial makes this a no-op, as does a read still in flight.
+ * With `resume`, an acquisition that spent its budget — holding only a coarse
+ * fix, or none — reads again, keeping its best fix meanwhile: the gym sheet
+ * passes it, because the person opening the sheet is waiting on exactly that
+ * fix. The read takes the position reader as a parameter, so tests inject one
+ * instead of the native module, and the retry wait as a second one, so tests
+ * run without the waits.
  */
 export const beginSessionPosition = async (
   sessionId: string,
@@ -174,20 +197,31 @@ export const beginSessionPosition = async (
 ): Promise<void> => {
   const existing = entries.get(sessionId);
   if (existing) {
-    // A read already in flight, a held fix, a denial, or — unless resumed —
+    // A read already in flight, a good fix, a denial, or — unless resumed —
     // an acquisition that already spent its budget.
-    if (existing.status !== 'unavailable' || !existing.resumable || !resume) return;
+    if (existing.status === 'reading' || !existing.resumable || !resume) return;
   }
 
+  // A resumed acquisition keeps the best fix it had while it reads for a
+  // better one.
   const entry: SessionPositionEntry = {
     status: 'reading',
-    position: null,
+    position: existing?.position ?? null,
     attempts: 0,
     lastRead: existing?.lastRead ?? null,
     gaveUpReason: null,
     resumable: false,
   };
   setEntry(sessionId, entry);
+
+  // Ends the acquisition: a held fix settles as available, none as a give-up.
+  const settle = (reason: SessionPositionGaveUpReason, resumable: boolean) =>
+    setEntry(sessionId, {
+      ...entry,
+      status: entry.position ? 'available' : 'unavailable',
+      gaveUpReason: entry.position ? null : reason,
+      resumable,
+    });
 
   try {
     // The deadline bounds the whole acquisition, so a slow read cannot stretch
@@ -206,39 +240,33 @@ export const beginSessionPosition = async (
         status: result.status,
         accuracyM: result.status === 'success' ? result.position.accuracyM : null,
       };
+      const fix = result.status === 'success' ? result.position : null;
+      const improved = fix !== null && isMoreAccurate(fix, entry.position);
+      if (improved) entry.position = fix;
       setEntry(sessionId, { ...entry });
+      if (improved) notifyPosition(sessionId, fix);
 
-      if (result.status === 'success' && isUsableFix(result.position)) {
-        setEntry(sessionId, { ...entry, status: 'available', position: result.position });
-        notifyPosition(sessionId, result.position);
+      if (entry.position && isGoodFix(entry.position)) {
+        settle('no_fix', false);
         return;
       }
       if (!isRetryableRead(result.status)) {
-        // Permission denied or services off: no fix is coming, however long
-        // the pipeline has.
-        setEntry(sessionId, {
-          ...entry,
-          status: 'unavailable',
-          gaveUpReason: gaveUpReasonFor(result),
-        });
+        // Permission denied or services off: no better fix is coming, however
+        // long the pipeline has.
+        settle(gaveUpReasonFor(result), false);
         return;
       }
 
       const isLastAttempt = attempt >= MAX_READS || Date.now() + Math.max(retryDelayMs, 0) >= deadline;
       if (isLastAttempt) {
-        setEntry(sessionId, {
-          ...entry,
-          status: 'unavailable',
-          gaveUpReason: gaveUpReasonFor(result),
-          resumable: true,
-        });
+        settle(gaveUpReasonFor(result), true);
         return;
       }
 
       if (retryDelayMs > 0) await wait(retryDelayMs);
     }
   } catch {
-    setEntry(sessionId, { ...entry, status: 'unavailable', gaveUpReason: 'read_error', resumable: true });
+    settle('read_error', true);
   }
 };
 
