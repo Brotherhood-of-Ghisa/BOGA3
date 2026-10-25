@@ -10,10 +10,11 @@
 
 More is better; zero is unsigned; colour never replaces the sign.
 
-Today's week figures show none: each fills a bar in laps of last week's total.
+Today's week figures and a group's At a glance total show none: each fills a
+bar in laps of the previous week's total.
 
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
-Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
 
 ### comparison.allowed-periods · principle · accepted
 

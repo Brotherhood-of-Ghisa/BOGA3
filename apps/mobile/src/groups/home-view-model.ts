@@ -123,8 +123,6 @@ export type GroupRankEntry = {
 export type GroupRankPeriod = {
   key: string;
   window: LocalWindow;
-  /** The period still running. */
-  current: boolean;
   /** Every current member, best first. */
   entries: GroupRankEntry[];
 };
@@ -149,23 +147,20 @@ export type GroupRankSeries = {
 /**
  * The position chart: every member's place by the chosen metric in each read
  * period (oldest first), plus each period's full ranking for the table under
- * it. `includesCurrent` marks the newest period as the one still running.
+ * it.
  */
 export const buildGroupRankSeries = ({
   period,
   reads,
   metric,
-  includesCurrent,
 }: {
   period: GroupHomePeriod;
   reads: GroupHomeWindow[];
   metric: GroupHomeMetric;
-  includesCurrent: boolean;
 }): GroupRankSeries => {
-  const built: GroupRankPeriod[] = reads.map((read, index) => ({
+  const built: GroupRankPeriod[] = reads.map((read) => ({
     key: `${period}:${read.window.start.getTime()}`,
     window: read.window,
-    current: includesCurrent && index === reads.length - 1,
     entries: rankMembers(read.members, metric).map(({ member, rank }) => ({
       userId: member.userId,
       name: member.name,
@@ -190,3 +185,21 @@ export const buildGroupRankSeries = ({
     depth: Math.max(1, ...built.map((window) => window.entries.length)),
   };
 };
+
+export type GroupWeekTotals = Record<GroupHomeMetric, number>;
+
+const sumWindow = (read: GroupHomeWindow | undefined): GroupWeekTotals => ({
+  sets: (read?.members ?? []).reduce((total, row) => total + row.sets, 0),
+  prs: (read?.members ?? []).reduce((total, row) => total + row.prs, 0),
+});
+
+/**
+ * The group's own total for the newest period in a read, and for the one
+ * before it: every current member's working sets and group records, summed.
+ * The read carries current members only, so a member who left drops out of
+ * both weeks. A read of one period compares with zero.
+ */
+export const buildGroupWeekTotals = (reads: GroupHomeWindow[]): { current: GroupWeekTotals; previous: GroupWeekTotals } => ({
+  current: sumWindow(reads[reads.length - 1]),
+  previous: sumWindow(reads[reads.length - 2]),
+});

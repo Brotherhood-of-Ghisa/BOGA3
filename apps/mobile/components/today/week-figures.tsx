@@ -29,20 +29,26 @@ export function ShareBar({ current, previous, testID }: ShareBarProps) {
   );
 }
 
+/** How a figure names the week it is compared with: short on screen, spelled out when spoken. */
+export type PreviousWeekName = { short: string; spoken: string };
+
+export const LAST_WEEK: PreviousWeekName = { short: 'last wk', spoken: 'last week' };
+
 type FigureProps = {
   label: string;
   current: number;
   previous: number;
   record?: boolean;
+  previousWeek?: PreviousWeekName;
   testID: string;
 };
 
-function WeekFigure({ label, current, previous, record = false, testID }: FigureProps) {
+export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID }: FigureProps) {
   const showRecord = record && current > 0;
   return (
     <View
       accessible
-      accessibilityLabel={weekFigureAccessibilityLabel(label, { current, previous })}
+      accessibilityLabel={weekFigureAccessibilityLabel(label, { current, previous }, previousWeek.spoken)}
       style={styles.figure}
       testID={testID}>
       <Text allowFontScaling={false} style={todayText.microLabel}>
@@ -58,7 +64,7 @@ function WeekFigure({ label, current, previous, record = false, testID }: Figure
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
       <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-previous`}>
-        vs {previous} last wk
+        vs {previous} {previousWeek.short}
       </Text>
     </View>
   );
@@ -82,7 +88,7 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
           {formatWeekRange(week.window, dateFormat)}
         </Text>
       </View>
-      <View style={styles.figures}>
+      <View style={weekFigureStyles.figures}>
         <WeekFigure
           current={week.current.sessions}
           label="Sessions"
@@ -109,6 +115,13 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
 
 const BAR_HEIGHT = 6;
 
+export const weekFigureStyles = StyleSheet.create({
+  figures: {
+    flexDirection: 'row',
+    gap: uiSpace.sm,
+  },
+});
+
 const styles = StyleSheet.create({
   block: {
     gap: uiSpace.md,
@@ -117,10 +130,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-  },
-  figures: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
   },
   figure: {
     flex: 1,

@@ -9,20 +9,20 @@ import type { GroupRankSeries } from '@/src/groups/home-view-model';
 // Until the first layout pass reports the plot's width (and in Jest, where
 // none runs): roughly a 390pt phone's card minus the rank axis.
 const FALLBACK_PLOT_WIDTH = 300;
-const ROW_HEIGHT = 20;
+const ROW_HEIGHT = 30;
 const MARKER_RADIUS = 8;
 const AXIS_WIDTH = 16;
 
 const rowY = (rank: number): number => (rank - 0.5) * ROW_HEIGHT;
 
-const columnX = (index: number, count: number, width: number): number =>
-  count <= 1 ? width / 2 : MARKER_RADIUS + (index * (width - MARKER_RADIUS * 2)) / (count - 1);
+// A column's points sit at the middle of its band, under its label.
+const columnX = (index: number, count: number, width: number): number => ((index + 0.5) * width) / Math.max(1, count);
 
 export type GroupRankChartProps = {
   series: GroupRankSeries;
   selectedIndex: number;
   onSelect: (index: number) => void;
-  /** A formatted week date or month name for each column. */
+  /** A short, yearless date for each column. */
   columnLabels: string[];
   accessibilityLabel: string;
 };

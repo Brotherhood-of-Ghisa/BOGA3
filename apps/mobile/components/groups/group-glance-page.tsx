@@ -15,7 +15,12 @@ import {
   type GroupHomeWindow,
 } from '@/src/groups/home-periods';
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
-import { buildGroupHomeBoard, buildGroupRankSeries, GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
+import {
+  buildGroupHomeBoard,
+  buildGroupRankSeries,
+  buildGroupWeekTotals,
+  GROUP_HOME_METRIC_LABELS,
+} from '@/src/groups/home-view-model';
 
 import { GroupHomeBoard } from './group-home-board';
 import { groupHomeColumnLabel, groupHomePeriodLabel } from './group-home-labels';
@@ -23,6 +28,7 @@ import { GroupHomeStepper } from './group-home-stepper';
 import { GroupRankChart } from './group-rank-chart';
 import { GroupRankTable } from './group-rank-table';
 import { GroupMissingDataState } from './group-state-view';
+import { GroupWeekTotalsFigures } from './group-week-totals';
 
 export type GroupGlancePageProps = {
   myUserId: string;
@@ -64,9 +70,10 @@ function useHoldFade(holding: boolean): boolean {
 
 /**
  * At a glance: the period stepper on its own card, since it sets the period
- * for everything under it; then the period's top five by the chosen metric;
- * then every member's place over the six periods ending at it. Selecting a
- * column in the chart reads that period's full ranking into the table under
+ * for everything under it; then the group's own total against the period
+ * before; then the period's top five by the chosen metric; then every
+ * member's place over the six periods ending at it. Selecting a column in the chart (its
+ * label turns strong) reads that period's full ranking into the table under
  * it. The figures are the screen's period-totals read.
  */
 export function GroupGlancePage({
@@ -115,7 +122,8 @@ export function GroupGlancePage({
   const figures = held ?? { period, offset };
   const read = series[series.length - 1];
   const board = buildGroupHomeBoard({ members: read?.members ?? [], metric, myUserId });
-  const rankSeries = buildGroupRankSeries({ period: figures.period, reads: series, metric, includesCurrent: figures.offset === 0 });
+  const totals = buildGroupWeekTotals(series);
+  const rankSeries = buildGroupRankSeries({ period: figures.period, reads: series, metric });
   const found = rankSeries.periods.findIndex((entry) => entry.key === selectedKey);
   const selectedIndex = found >= 0 ? found : rankSeries.periods.length - 1;
   const selected = rankSeries.periods[selectedIndex];
@@ -128,6 +136,12 @@ export function GroupGlancePage({
         accessibilityState={{ busy: held !== null }}
         style={[styles.sections, faded ? styles.held : null]}
         testID="group-glance-figures">
+        <Card testID="group-week-totals-card">
+          <View style={styles.card}>
+            <GroupWeekTotalsFigures current={totals.current} offset={figures.offset} previous={totals.previous} />
+          </View>
+        </Card>
+
         <Card testID="group-home-board-card">
           <View style={styles.card}>
             <GroupHomeBoard board={board} metric={metric} />
@@ -151,9 +165,6 @@ export function GroupGlancePage({
               {selected ? (
                 <>
                   <View style={styles.divider} />
-                  <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="group-position-selected">
-                    {`${groupHomePeriodLabel(figures.period, selected.window, 0, dateFormat).detail}${selected.current ? ' · so far' : ''}`}
-                  </Text>
                   <GroupRankTable entries={selected.entries} />
                 </>
               ) : null}
