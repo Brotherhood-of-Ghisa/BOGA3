@@ -1,5 +1,6 @@
 import type { Session } from '@/components/session-recorder/types';
 import { getAuthSnapshot } from '@/src/auth';
+import { snapshotAfterSessionCompleted } from '@/src/backup/database-backups';
 import {
   completeSessionDraft,
   loadLatestSessionDraftSnapshot,
@@ -45,6 +46,7 @@ export const completeActiveSession = async (input: {
   await completeSessionDraft(persisted.sessionId);
   dismissRestTimer(persisted.sessionId, { suppressAutoStart: false });
   clearRestTimerAutoStartSuppression(persisted.sessionId);
+  snapshotAfterSessionCompleted();
   return persisted.sessionId;
 };
 

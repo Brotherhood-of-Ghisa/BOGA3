@@ -5,6 +5,7 @@ import { createSessionDraftRepository } from '@/src/data/session-drafts';
 import { deleteBodyWeightReading, listBodyWeightReadings,
   readCurrentBodyWeight, saveBodyWeightReading } from '@/src/data/bodyweight';
 import { isValidSessionWeight, resolveMeasurementDate, validateBodyWeight } from '@/src/bodyweight/weight-entry';
+import { snapshotAfterSessionCompleted } from '@/src/backup/database-backups';
 import { loadActiveSessionGraph, setSessionGym, completeActiveSession } from '@/src/session-recorder/session-lifecycle';
 import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
@@ -133,4 +134,6 @@ it('preserves exact active-session start through ordinary edits and completion',
   expect((await createSessionDraftRepository().loadSessionSnapshotById(sessionId))?.bodyWeightMeasurementId).toBe(reading.id);
   await completeActiveSession({ sessionId, gymId: null, startedAt: graph!.startedAt, completedHistorySession: graph!.session });
   expect(await createSessionDraftRepository().loadSessionSnapshotById(sessionId)).toMatchObject({ startedAt, bodyWeightKg: 80 });
+  // A finished workout asks for a database snapshot (`database-backups.test.ts`).
+  expect(snapshotAfterSessionCompleted).toHaveBeenCalledTimes(1);
 });

@@ -195,6 +195,25 @@ jest.mock('expo-sqlite/kv-store', () => {
   return { __esModule: true, Storage, AsyncStorage: Storage, default: Storage };
 });
 
+// Database snapshots write files under Documents and copy the native database,
+// neither of which Jest has. Suites that boot the app or finish a workout get a
+// stub; `database-backups.test.ts` unmocks it to drive the real module over a
+// temporary directory and a real SQLite file.
+jest.mock('@/src/backup/database-backups', () => {
+  const stub = {
+    start: () => () => undefined,
+    snapshotNow: async () => ({ name: '', takenAtMs: 0 }),
+    snapshotIfDue: async () => null,
+    exportDatabase: async () => undefined,
+    list: () => [],
+    subscribe: () => () => undefined,
+  };
+  return {
+    getDatabaseBackups: () => stub,
+    snapshotAfterSessionCompleted: jest.fn(),
+  };
+});
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');

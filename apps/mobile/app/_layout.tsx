@@ -12,6 +12,7 @@ import { RootStack } from '@/components/navigation/root-stack';
 import { launchTheme } from '@/components/ui/theme-launch';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
+import { getDatabaseBackups } from '@/src/backup/database-backups';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
 import { startLogFlushLoop, stopLogFlushLoop } from '@/src/logging';
@@ -50,6 +51,8 @@ export default function RootLayout() {
       // foreground sync is unaffected.
     });
 
+    let mounted = true;
+    let stopDatabaseBackups: (() => void) | null = null;
     void Promise.allSettled([
       bootstrapLocalDataLayer(),
       bootstrapAuthState(),
@@ -59,9 +62,14 @@ export default function RootLayout() {
       // until the network projection first goes online, after which the
       // scheduler is already heading into its first cycle.
       requestSync();
+      // Database snapshots start after the migrations have run: one now if
+      // the newest is a day old, and again on each return to the app.
+      if (mounted) stopDatabaseBackups = getDatabaseBackups().start();
     });
 
     return () => {
+      mounted = false;
+      stopDatabaseBackups?.();
       stopThemeAppIcon();
       stopSyncGateStateBridge();
       stopSyncScheduler();

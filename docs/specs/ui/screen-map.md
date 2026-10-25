@@ -67,7 +67,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format, past-records gym filter, Today layout; the sync status panel; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format, past-records gym filter, Today layout; the sync status and Backups cards; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 

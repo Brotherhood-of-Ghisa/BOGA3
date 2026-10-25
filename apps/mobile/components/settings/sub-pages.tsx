@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BackupPanel } from '@/components/settings/backup-panel';
 import { EffortSettings } from '@/components/preferences/effort-settings';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
 import { RestTimerSettings } from '@/components/preferences/rest-timer-settings';
@@ -106,6 +107,7 @@ export function DataSyncSettingsScreen() {
         onRefreshPreferences={retry}
         preferenceError={error}
       />
+      <BackupPanel />
     </SubPage>
   );
 }
