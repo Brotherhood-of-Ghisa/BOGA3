@@ -37,18 +37,24 @@ const systemNow = () => new Date();
 // scrolling page, or in the Cards layout a full-height card each.
 export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
   const router = useRouter();
-  const { state: progressState, retry: retryProgress } = useTodayProgress({ isFocused, load: loadProgress, now });
+  const { state: progressState, retry: retryProgress, showCompared, showSession } = useTodayProgress({
+    isFocused,
+    load: loadProgress,
+    now,
+  });
   // `View groups` opens the Groups screen on the group the card shows.
   const selectedGroupId = groupState.status === 'available' ? groupState.selectedGroupId : null;
   const groupsPath = selectedGroupId ? groupsStreamPath(selectedGroupId) : '/groups';
   const progressHandlers = {
     onOpenSession: (sessionId: string) => router.push(`/completed-session/${sessionId}`),
-    onOpenSessions: () => router.push('/sessions'),
     onOpenTrain: () => router.push('/train'),
     onRetry: () => {
       void retryProgress();
     },
+    onShowCompared: showCompared,
+    onShowSession: showSession,
   };
+  const openSessions = () => router.push('/sessions');
   const groupHandlers = {
     nowMs: now().getTime(),
     onFindGroup: () => router.push('/group/mine'),
@@ -68,7 +74,7 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
             key: 'progress',
             label: 'Progress',
             content: <TodayProgressSection {...progressHandlers} fill state={progressState} />,
-            footer: { label: 'View progress', onPress: () => router.push('/progress'), testID: 'today-view-progress-button' },
+            footer: { label: 'Sessions', onPress: openSessions, testID: 'today-sessions-button' },
             testID: 'today-progress-section',
           },
           {
@@ -100,7 +106,7 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
       testID="today-screen">
       <View style={styles.section} testID="today-progress-section">
         <SectionHeader
-          action={{ label: 'View progress', onPress: () => router.push('/progress'), testID: 'today-view-progress-button' }}
+          action={{ label: 'Sessions', onPress: openSessions, testID: 'today-sessions-button' }}
           title="Progress"
         />
         <TodayProgressSection {...progressHandlers} state={progressState} />
@@ -162,16 +168,18 @@ function GroupSectionHeading({
 
 function TodayProgressSection({
   onOpenSession,
-  onOpenSessions,
   onOpenTrain,
   onRetry,
+  onShowCompared,
+  onShowSession,
   state,
   fill = false,
 }: {
   onOpenSession: (sessionId: string) => void;
-  onOpenSessions: () => void;
   onOpenTrain: () => void;
   onRetry: () => void;
+  onShowCompared: (periodsBack: number) => void;
+  onShowSession: (offset: number) => void;
   state: TodayProgressState;
   fill?: boolean;
 }) {
@@ -210,7 +218,13 @@ function TodayProgressSection({
   }
 
   return (
-    <TodayProgressCard fill={fill} onOpenSession={onOpenSession} onOpenSessions={onOpenSessions} progress={state.progress} />
+    <TodayProgressCard
+      fill={fill}
+      onOpenSession={onOpenSession}
+      onShowCompared={onShowCompared}
+      onShowSession={onShowSession}
+      progress={state.progress}
+    />
   );
 }
 

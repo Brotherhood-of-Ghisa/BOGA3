@@ -44,6 +44,7 @@ jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
   getCompetitionWeek: jest.fn(),
+  getCompetitionStream: jest.fn(),
 }));
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
@@ -60,7 +61,7 @@ import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
-import { competitionEvent } from './helpers/competition-fixtures';
+import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -140,6 +141,7 @@ beforeEach(() => {
   setLastViewedGroupId(null);
   api.listMyGroups.mockReset();
   api.getCompetitionWeek.mockReset();
+  api.getCompetitionStream.mockReset();
   signedIn();
 });
 
@@ -282,6 +284,82 @@ describe('Today: the group card', () => {
     expect(screen.getByText('maria, sam and tom')).toBeTruthy();
     fireEvent.press(byId('today-group-latest-several'));
     expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1');
+  });
+
+  describe('stepping back through the group\'s completed sessions', () => {
+    const streamSession = (userId: string, sessionId: string, startedAtMs: number, status: 'completed' | 'active' = 'completed') => ({
+      kind: 'session' as const,
+      key: `${userId}:${sessionId}`,
+      sort_at_ms: startedAtMs,
+      groups: [{ group_id: 'g1', name: 'Iron Wednesdays' }],
+      session: { ...competitionSession.session, member: member(userId), session_id: sessionId, status, started_at_ms: startedAtMs,
+        completed_at_ms: status === 'completed' ? startedAtMs + 3_600_000 : null, duration_sec: status === 'completed' ? 3_600 : null },
+    });
+    const DAY = 24 * 60 * 60 * 1000;
+    const record = { ...competitionEvent, member: member('sam'), session_id: 'sam-1' };
+    const firstPage = {
+      contract_version: 4 as const,
+      items: [
+        // The latest activity's own session is not stepped to again, nor one still in progress.
+        streamSession('dave', 'dave-done', NOW.getTime() - 3 * 60 * 60 * 1000),
+        streamSession('tom', 'tom-live', NOW.getTime() - DAY, 'active'),
+        { kind: 'competition' as const, key: 'event1', sort_at_ms: NOW.getTime() - 2 * DAY, event: record },
+        streamSession('sam', 'sam-1', NOW.getTime() - 2 * DAY),
+      ],
+      next_cursor: 'older',
+      has_more: true,
+    };
+    const secondPage = { contract_version: 4 as const, items: [streamSession('maria', 'maria-1', NOW.getTime() - 5 * DAY)], next_cursor: null, has_more: false };
+
+    it('reads the stream only when asked, steps back a session at a time and forward again to the latest', async () => {
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      api.getCompetitionWeek.mockResolvedValue(summary());
+      api.getCompetitionStream.mockResolvedValueOnce(firstPage).mockResolvedValueOnce(secondPage);
+      await renderToday();
+      await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
+
+      expect(api.getCompetitionStream).not.toHaveBeenCalled();
+      expect(byId('today-group-latest-heading')).toHaveTextContent('Latest activity');
+      expect(byId('today-group-latest-step-newer')).toBeDisabled();
+
+      fireEvent.press(byId('today-group-latest-step-older'));
+      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam'));
+      expect(api.getCompetitionStream).toHaveBeenCalledWith('g1', null);
+      expect(byId('today-group-latest-heading')).toHaveTextContent('Earlier session');
+      expect(byId('today-group-latest-completed-figures')).toHaveTextContent('1 set · 1 exercise');
+      expect(byId('today-group-latest-completed-record')).toHaveTextContent('Pull-up 1RM 145.7 %BW · group record');
+      fireEvent.press(byId('today-group-latest-completed'));
+      expect(mockPush).toHaveBeenLastCalledWith('/group-session/sam/sam-1?groupId=g1');
+
+      // Past the first page: the next one is read.
+      fireEvent.press(byId('today-group-latest-step-older'));
+      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('maria'));
+      expect(api.getCompetitionStream).toHaveBeenLastCalledWith('g1', 'older');
+      expect(byId('today-group-latest-step-older')).toBeDisabled();
+
+      fireEvent.press(byId('today-group-latest-step-newer'));
+      expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam');
+      fireEvent.press(byId('today-group-latest-step-newer'));
+      expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
+      expect(byId('today-group-latest-heading')).toHaveTextContent('Latest activity');
+      expect(api.getCompetitionStream).toHaveBeenCalledTimes(2);
+    });
+
+    it('says so when the earlier sessions cannot be read, and tries again on the next tap', async () => {
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      api.getCompetitionWeek.mockResolvedValue(summary());
+      api.getCompetitionStream.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable')).mockResolvedValueOnce(firstPage);
+      await renderToday();
+      await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
+
+      fireEvent.press(byId('today-group-latest-step-older'));
+      await waitFor(() => expect(byId('today-group-latest-step-failed')).toHaveTextContent("Couldn't load earlier sessions."));
+      expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
+
+      fireEvent.press(byId('today-group-latest-step-older'));
+      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam'));
+      expect(screen.queryByTestId('today-group-latest-step-failed')).toBeNull();
+    });
   });
 
   it('says so when the group has no shared session yet', async () => {

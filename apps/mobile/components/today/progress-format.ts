@@ -85,11 +85,18 @@ export const periodDayFigures = (period: TodayProgressPeriod, dayIndex: number |
   };
 };
 
-/** `Today`, `Oct 9`, `Oct 27 (projected)`. */
-export const formatPeriodDayLabel = (figures: PeriodDayFigures, dateFormat: ExerciseDateFormat): string => {
+/**
+ * `Today`, `Oct 9`. A projected day shows as its date alone (the hollow dot
+ * on the chart marks it); spoken, it says so: `Oct 27 (projected)`.
+ */
+export const formatPeriodDayLabel = (
+  figures: PeriodDayFigures,
+  dateFormat: ExerciseDateFormat,
+  { spoken = false }: { spoken?: boolean } = {}
+): string => {
   if (figures.when === 'today') return 'Today';
   const date = formatDayMonth(figures.date, dateFormat);
-  return figures.when === 'projected' ? `${date} (projected)` : date;
+  return spoken && figures.when === 'projected' ? `${date} (projected)` : date;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -113,6 +120,14 @@ export const weekShare = (counts: { current: number; previous: number }): { lap:
 
 const setCount = (count: number) => plural(count, 'set', 'sets');
 
+/** The compared line's end label on the chart: `LAST`, or how many periods back, `2 BACK` (never signed: a sign reads as a difference). */
+export const comparedLineLabel = (period: Pick<TodayProgressPeriod, 'compareBack'>): string =>
+  period.compareBack === 1 ? 'LAST' : `${period.compareBack} BACK`;
+
+/** The compared period, spoken: `last period`, or how far back Today stepped. */
+export const comparedPeriodName = (period: Pick<TodayProgressPeriod, 'compareBack'>): string =>
+  period.compareBack === 1 ? 'last period' : `period ${period.compareBack} back`;
+
 /** Both periods and the selected day's figures, spoken as one heading. */
 export const periodFiguresAccessibilityLabel = (
   period: TodayProgressPeriod,
@@ -121,8 +136,8 @@ export const periodFiguresAccessibilityLabel = (
 ): string =>
   [
     `${period.weeks}-week period, ${formatPeriodRange(period.window, dateFormat)}:`,
-    `${formatPeriodDayLabel(figures, dateFormat)} ${setCount(figures.workingSets)},`,
-    `against the last period, ${formatPeriodRange(period.previous.window, dateFormat)}:`,
+    `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })} ${setCount(figures.workingSets)},`,
+    `against the ${comparedPeriodName(period)}, ${formatPeriodRange(period.previous.window, dateFormat)}:`,
     `${setCount(figures.previousWorkingSets)} by ${formatDayMonth(figures.previousDate, dateFormat)},`,
     formatSignedCount(figures.difference),
   ].join(' ');
@@ -131,14 +146,18 @@ export const periodFiguresAccessibilityLabel = (
 export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): string =>
   [
     `Cumulative sets: this period ${period.toDate.workingSets} by day ${period.dayOfPeriod} of ${period.daysInPeriod}`,
-    `against the last period ${period.previous.toSameDay.workingSets} by day ${period.dayOfPeriod};`,
-    `the last period finished at ${period.previous.total.workingSets}.`,
+    `against the ${comparedPeriodName(period)} ${period.previous.toSameDay.workingSets} by day ${period.dayOfPeriod};`,
+    `the ${comparedPeriodName(period)} finished at ${period.previous.total.workingSets}.`,
     `On course for ${period.projectedWorkingSets}.`,
   ].join(' ');
 
 /** The selected day, as the adjustable chart's value. */
-export const periodChartAccessibilityValue = (figures: PeriodDayFigures, dateFormat: ExerciseDateFormat): string =>
-  `${formatPeriodDayLabel(figures, dateFormat)}: ${setCount(figures.workingSets)}, last period ${figures.previousWorkingSets}`;
+export const periodChartAccessibilityValue = (
+  period: Pick<TodayProgressPeriod, 'compareBack'>,
+  figures: PeriodDayFigures,
+  dateFormat: ExerciseDateFormat
+): string =>
+  `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })}: ${setCount(figures.workingSets)}, ${comparedPeriodName(period)} ${figures.previousWorkingSets}`;
 
 const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
 
@@ -208,8 +227,10 @@ export type PeriodChartGeometry = {
   weekStartsX: number[];
 };
 
-// Room on the right for the previous period's label at the end of its line.
+// Room on the right for the compared period's label at the end of its line:
+// `LAST`, or the wider `2 BACK`.
 export const CHART_RIGHT_GUTTER = 34;
+export const CHART_RIGHT_GUTTER_BACK = 56;
 export const CHART_HEIGHT = 126;
 const PLOT_TOP = 6;
 // Below the plot: the week ticks and the `TODAY` axis label.
@@ -226,7 +247,7 @@ export const periodChartGeometry = (
   height: number = CHART_HEIGHT,
   selected: PeriodDayFigures = periodDayFigures(period, null)
 ): PeriodChartGeometry => {
-  const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
+  const plotWidth = Math.max(0, width - (period.compareBack === 1 ? CHART_RIGHT_GUTTER : CHART_RIGHT_GUTTER_BACK));
   const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
   const days = period.daysInPeriod;
   const yMax = Math.max(1, period.projectedWorkingSets, period.previous.total.workingSets, period.toDate.workingSets);

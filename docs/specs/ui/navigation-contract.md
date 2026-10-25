@@ -168,7 +168,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
 | `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
 | `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
-| `/today` | `/progress`, `/sessions`, `/completed-session/<id>`, `/train` | the Progress card's `View progress`, `All sessions`, latest-session row, and the empty panel's `Open Train` (`push`) |
+| `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's `Sessions`, the latest-session row (or the earlier session its arrows stepped to), and the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
@@ -188,7 +188,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the tab's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards segment (`push`, no query) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
-| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or latest completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
+| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | `View groups`, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 

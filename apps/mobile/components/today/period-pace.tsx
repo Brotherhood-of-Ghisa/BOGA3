@@ -16,6 +16,7 @@ import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
   CHART_HEIGHT,
+  comparedLineLabel,
   formatPeriodDayLabel,
   formatPeriodRange,
   formatSignedCount,
@@ -30,6 +31,7 @@ import {
   toPolyline,
   type PeriodChartGeometry,
 } from './progress-format';
+import { StepArrows } from './step-arrows';
 import { todayText } from './text-styles';
 
 // Until the first layout pass reports the card's width (and in Jest, where
@@ -43,7 +45,7 @@ const WEEK_TICK = 4;
 
 const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
 
-function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
+function PeriodChart({ geometry, comparedLabel }: { geometry: PeriodChartGeometry; comparedLabel: string }) {
   const { plot, current, previous, projection, today, selected, weekStartsX } = geometry;
   const area = [{ x: 0, y: plot.bottom }, ...current, { x: today.current.x, y: plot.bottom }];
   const previousEnd = previous[previous.length - 1];
@@ -112,7 +114,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       />
       {previousEnd ? (
         <SvgText {...axisLabel} fill={uiRoles.inkMuted} letterSpacing={1} x={previousEnd.x + 6} y={previousEnd.y + 4}>
-          LAST
+          {comparedLabel}
         </SvgText>
       ) : null}
       <SvgText {...axisLabel} fill={uiRoles.ink} letterSpacing={1} textAnchor={todayAnchor} x={today.current.x} y={plot.bottom + AXIS_LABEL_OFFSET}>
@@ -126,9 +128,19 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // selected day's working sets (today until the chart is touched; after today,
 // the projection's) against the previous period's at the same day, and their
 // difference ([[comparison.change-display]]); then the cumulative lines by day.
-// `fill` lets the chart take the height the block is given (Today's cards
-// layout) instead of its own.
-export function PeriodPace({ period, fill = false }: { period: TodayProgressPeriod; fill?: boolean }) {
+// The arrows by `vs` compare against an earlier or later period, never later
+// than the previous one. `fill` lets the chart take the height the block is
+// given (Today's cards layout) instead of its own.
+export function PeriodPace({
+  period,
+  fill = false,
+  onShowCompared,
+}: {
+  period: TodayProgressPeriod;
+  fill?: boolean;
+  /** Compares against the period this many periods back. */
+  onShowCompared?: (periodsBack: number) => void;
+}) {
   const dateFormat = useDateFormat();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   // The selected day belongs to the period it was picked in; another period
@@ -171,9 +183,19 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
           </View>
         </View>
         <View style={styles.column}>
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
-            vs {formatPeriodRange(period.previous.window, dateFormat)}
-          </Text>
+          <View style={styles.comparedRow}>
+            <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
+              vs {formatPeriodRange(period.previous.window, dateFormat)}
+            </Text>
+            {onShowCompared ? (
+              <StepArrows
+                noun="period"
+                onNewer={period.compareBack > 1 ? () => onShowCompared(period.compareBack - 1) : null}
+                onOlder={() => onShowCompared(period.compareBack + 1)}
+                testID="today-progress-period-compare"
+              />
+            ) : null}
+          </View>
           <View style={styles.previousRow}>
             <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-sets">
               {figures.previousWorkingSets}
@@ -197,7 +219,7 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         accessibilityLabel={periodChartAccessibilityLabel(period)}
         accessibilityRole="adjustable"
-        accessibilityValue={{ text: periodChartAccessibilityValue(figures, dateFormat) }}
+        accessibilityValue={{ text: periodChartAccessibilityValue(period, figures, dateFormat) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
         onResponderMove={fill ? undefined : onTouch}
@@ -205,9 +227,12 @@ export function PeriodPace({ period, fill = false }: { period: TodayProgressPeri
         onStartShouldSetResponder={() => true}
         style={fill ? styles.fillChart : null}
         testID="today-progress-chart">
-        <View pointerEvents="none">
+        {/* Filling, the drawing sits over the box rather than in it, so the
+            last measured height never props the box up: the box takes only
+            the height the card leaves it. */}
+        <View pointerEvents="none" style={fill ? StyleSheet.absoluteFill : null}>
           <Svg height={height} style={styles.chart} width={width}>
-            <PeriodChart geometry={geometry} />
+            <PeriodChart comparedLabel={comparedLineLabel(period)} geometry={geometry} />
           </Svg>
         </View>
       </View>
@@ -238,6 +263,14 @@ const styles = StyleSheet.create({
   currentFigure: {
     flexShrink: 1,
   },
+  // `vs` and its arrows: the arrows' row is no taller than the label's.
+  comparedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: uiSpace.xs,
+    marginVertical: -3,
+  },
   // The previous period's figure under its `vs`, the difference at the edge.
   previousRow: {
     flexDirection: 'row',
@@ -253,7 +286,9 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   fillChart: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
     minHeight: MIN_FILL_CHART_HEIGHT,
   },
 });

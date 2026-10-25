@@ -18,4 +18,5 @@ export {
   type LatestCompletedSessionRow,
   type PersonalRecordFact,
   type ProgressSummaryStore,
+  type TodayProgressOptions,
 } from './repository';

@@ -207,14 +207,16 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-chart-today')).toBeTruthy();
 
     // Sunday, day 14: 18 sets over 12 days projects 21; the previous period had 20 Sep's 6, so dragging there.
+    // A projected day shows as its date alone; only the spoken value says it is projected.
     touchDay('responderMove', 13);
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 Oct (projected) 21 sets');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('18 Oct 21 sets');
+    expect(screen.queryByText(/projected/)).toBeNull();
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('6 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+15');
 
     // The adjustable chart steps a day at a time, and back to today.
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('17 Oct (projected) 20 sets');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('17 Oct 20 sets');
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(chart).toHaveProp('accessibilityValue', { text: '19 Oct (projected): 23 sets, last period 6' });
@@ -246,10 +248,11 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 6 sets');
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('12 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('−6');
-    expect(loadProgress.mock.calls).toEqual([[NOW, 3], [NOW, 1]]);
+    const options = { compareBack: 1, sessionOffset: 0 };
+    expect(loadProgress.mock.calls).toEqual([[NOW, 3, options], [NOW, 1, options]]);
   });
 
-  it('shows the latest completed session and opens it, all sessions and the Progress tab', async () => {
+  it('shows the latest completed session and opens it, and the heading opens the sessions list', async () => {
     await bootLocalApp();
     await logHistory();
     await renderToday();
@@ -269,9 +272,60 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.queryByTestId('today-latest-session-member')).toBeNull();
 
     fireEvent.press(row);
-    fireEvent.press(text('today-all-sessions-button'));
-    fireEvent.press(text('today-view-progress-button'));
-    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions'], ['/progress']]);
+    fireEvent.press(text('today-sessions-button'));
+    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions']]);
+    // The sessions link is the section's own; the card no longer repeats it.
+    expect(screen.queryByTestId('today-all-sessions-button')).toBeNull();
+    expect(screen.queryByTestId('today-view-progress-button')).toBeNull();
+  });
+
+  it('compares against an earlier period with the arrows by vs, never later than the previous one', async () => {
+    await bootLocalApp();
+    await logHistory();
+    const loadProgress = jest.fn(loadTodayProgress);
+    await renderToday({ loadProgress });
+
+    expect(text('today-progress-period-compare-newer')).toBeDisabled();
+    fireEvent.press(text('today-progress-period-compare-older'));
+    // Two periods back, 10 Aug – 6 Sep: nothing by its 12th day, 3 Sep's 6 sets in all.
+    await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('vs 10 Aug to 6 Sep'));
+    expect(text('today-progress-period-range')).toHaveTextContent('5 Oct to 1 Nov');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
+    expect(text('today-progress-chart').props.accessibilityLabel).toContain('the period 2 back finished at 6.');
+    expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 2, sessionOffset: 0 });
+
+    expect(text('today-progress-period-compare-newer')).toBeEnabled();
+    fireEvent.press(text('today-progress-period-compare-newer'));
+    await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('vs 7 Sep to 4 Oct'));
+    expect(text('today-progress-period-compare-newer')).toBeDisabled();
+  });
+
+  it('steps back through the completed sessions with the arrows by the latest session', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+
+    expect(text('today-latest-session-title')).toHaveTextContent('Latest session');
+    expect(text('today-latest-session-step-newer')).toBeDisabled();
+    fireEvent.press(text('today-latest-session-step-older'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('08-10-2026 09:00'));
+    expect(text('today-latest-session-title')).toHaveTextContent('Earlier session');
+    expect(text('today-latest-session-figures')).toHaveTextContent('6 sets · 2 exercises');
+    // The figures above it stay on this week and period.
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
+
+    fireEvent.press(text('today-latest-session'));
+    expect(mockPush).toHaveBeenLastCalledWith('/completed-session/oct-08');
+
+    // Back to the oldest: no older one.
+    for (const start of ['06-10-2026 09:00', '20-09-2026 09:00', '03-09-2026 09:00']) {
+      fireEvent.press(text('today-latest-session-step-older'));
+      await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent(start));
+    }
+    expect(text('today-latest-session-step-older')).toBeDisabled();
+
+    fireEvent.press(text('today-latest-session-step-newer'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('20-09-2026 09:00'));
   });
 
   it('formats the latest session start stamp according to user date format preferences', async () => {
@@ -317,7 +371,7 @@ describe('Today: the Progress card over real data', () => {
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15-10-2026 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
-    expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4);
+    expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 1, sessionOffset: 0 });
   });
 
   it('reads again when the app returns to the foreground, so a new day moves the windows', async () => {
@@ -341,7 +395,7 @@ describe('Today: the Progress card over real data', () => {
     act(() => onAppState?.('active'));
     await waitFor(() => expect(text('today-progress-week-range')).toHaveTextContent('19-10-2026 – 25-10-2026'));
     expect(text('today-progress-chart').props.accessibilityLabel).toContain('by day 15 of 28');
-    expect(loadProgress).toHaveBeenLastCalledWith(current, 4);
+    expect(loadProgress).toHaveBeenLastCalledWith(current, 4, { compareBack: 1, sessionOffset: 0 });
 
     view.unmount();
     expect(remove).toHaveBeenCalled();
@@ -532,6 +586,10 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
 
     const chart = () => within(text('today-progress-chart')).UNSAFE_getByType(Svg);
     expect(chart().props).toMatchObject({ width: 326, height: 126 });
+    // The drawing sits over its box, so its last height never props the box
+    // up: the box takes only what the card leaves, down to its floor.
+    expect(text('today-progress-chart')).toHaveStyle({ flexBasis: 0, flexGrow: 1, minHeight: 72 });
+    expect(chart().parent?.parent?.props.style).toMatchObject({ position: 'absolute' });
     layout('today-progress-chart', { width: 313, height: 240 });
     expect(chart().props).toMatchObject({ width: 313, height: 240 });
   });
@@ -552,10 +610,9 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 353, y: 0 } } });
     expect(selected('today-group-section-tab')).toBe(true);
 
-    fireEvent.press(text('today-view-progress-button'));
+    fireEvent.press(text('today-sessions-button'));
     fireEvent.press(text('today-view-groups-button'));
-    fireEvent.press(text('today-all-sessions-button'));
-    expect(mockPush.mock.calls).toEqual([['/progress'], ['/groups'], ['/sessions']]);
+    expect(mockPush.mock.calls).toEqual([['/sessions'], ['/groups']]);
   });
 
   it.each([
@@ -569,6 +626,6 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     await waitFor(() => expect(within(text('today-progress-section')).getByTestId(panel)).toBeTruthy());
     // Centred in the card's whole body rather than drawn in a card of its own.
     expect(text(panel)).toHaveStyle({ flex: 1, justifyContent: 'center' });
-    expect(within(text('today-progress-section')).getByTestId('today-view-progress-button')).toBeTruthy();
+    expect(within(text('today-progress-section')).getByTestId('today-sessions-button')).toBeTruthy();
   });
 });

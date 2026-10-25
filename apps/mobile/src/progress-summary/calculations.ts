@@ -35,6 +35,8 @@ export type TodayProgressPeriod = {
    */
   window: LocalWindow;
   weeks: number;
+  /** How many periods back the compared period is: 1 is the previous period. */
+  compareBack: number;
   /** Today's day of the period: 1 on its first day. */
   dayOfPeriod: number;
   daysInPeriod: number;
@@ -44,9 +46,10 @@ export type TodayProgressPeriod = {
   toDate: ProgressCounts;
   /** Linear: working sets so far per elapsed day (today included) over the whole period. */
   projectedWorkingSets: number;
+  /** The compared period: the previous one unless Today stepped further back. */
   previous: {
     window: LocalWindow;
-    /** Working sets through each day of the whole previous period. */
+    /** Working sets through each day of the whole compared period. */
     cumulativeWorkingSets: number[];
     /** Through the same day of the period. */
     toSameDay: ProgressCounts;
@@ -82,27 +85,35 @@ export type TodayProgress =
       status: 'ready';
       week: TodayProgressWeek;
       period: TodayProgressPeriod;
+      /** The latest session, or an older one Today stepped back to. */
       latest: LatestSessionSummary;
+      /** How many completed sessions are newer than `latest`: 0 is the latest. */
+      latestOffset: number;
+      hasOlderSession: boolean;
     };
 
 export type TodayProgressInput = {
   now: Date;
   /** Settings' Progress period, in weeks. */
   periodWeeks: number;
-  /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now)`. */
+  /** The compared period, in periods back; 1 (the previous period) when absent. */
+  compareBack?: number;
+  /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now, periodWeeks, compareBack)`. */
   sessions: ProgressSession[];
   /** `completed_at` of each PR over the same range: one per record kind (`sessionRecordKinds`). */
   prAchievedAt: Date[];
   /** Null when the user has no completed session. */
   latest: LatestSessionSummary | null;
+  latestOffset?: number;
+  hasOlderSession?: boolean;
 };
 
 /**
- * The one range that covers the previous period and this one, which always
- * hold last week and this week too: a period is whole Monday–Sunday weeks.
+ * The one range that covers the compared period through this one, which
+ * always holds last week and this week too: a period is whole Monday–Sunday weeks.
  */
-export const todayProgressLoadWindow = (now: Date, periodWeeks: number): LocalWindow => ({
-  start: localPeriodWindow(now, periodWeeks, -1).start,
+export const todayProgressLoadWindow = (now: Date, periodWeeks: number, compareBack = 1): LocalWindow => ({
+  start: localPeriodWindow(now, periodWeeks, -compareBack).start,
   end: localPeriodWindow(now, periodWeeks).end,
 });
 
@@ -158,15 +169,16 @@ const cumulativeByDay = (sessions: ProgressSession[], period: LocalWindow, days:
 };
 
 const derivePeriod = (input: TodayProgressInput): TodayProgressPeriod => {
-  const { now, periodWeeks } = input;
+  const { now, periodWeeks, compareBack = 1 } = input;
   const window = localPeriodWindow(now, periodWeeks);
-  const previousWindow = localPeriodWindow(now, periodWeeks, -1);
+  const previousWindow = localPeriodWindow(now, periodWeeks, -compareBack);
   const daysInPeriod = periodWeeks * 7;
   const dayOfPeriod = localDaysBetween(window.start, now) + 1;
   const toDate = countIn(input, { start: window.start, end: startOfLocalDay(now, 1) });
   return {
     window,
     weeks: periodWeeks,
+    compareBack,
     dayOfPeriod,
     daysInPeriod,
     cumulativeWorkingSets: cumulativeByDay(input.sessions, window, daysInPeriod).slice(0, dayOfPeriod),
@@ -193,5 +205,7 @@ export const deriveTodayProgress = (input: TodayProgressInput): TodayProgress =>
     },
     period: derivePeriod(input),
     latest: input.latest,
+    latestOffset: input.latestOffset ?? 0,
+    hasOlderSession: input.hasOlderSession ?? false,
   };
 };

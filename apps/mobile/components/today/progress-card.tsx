@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -16,6 +15,7 @@ import {
   sessionSummaryAccessibilityLabel,
 } from './progress-format';
 import { SessionSummaryRow } from './session-summary-row';
+import { StepArrows } from './step-arrows';
 import { todayText } from './text-styles';
 import { WeekFigures } from './week-figures';
 
@@ -23,8 +23,11 @@ type ReadyProgress = Extract<TodayProgress, { status: 'ready' }>;
 
 export type TodayProgressCardProps = {
   progress: ReadyProgress;
-  onOpenSessions: () => void;
   onOpenSession: (sessionId: string) => void;
+  /** Compares the period against the one this many periods back. */
+  onShowCompared?: (periodsBack: number) => void;
+  /** Shows the completed session this many places before the latest. */
+  onShowSession?: (offset: number) => void;
   dateFormat?: ExerciseDateFormat;
   /** The cards layout: no card of its own (the page is one), the chart taking the height left. */
   fill?: boolean;
@@ -57,21 +60,37 @@ function LatestSessionRow({
 }
 
 // Today's Progress card: this week against last week, the period against the
-// previous period day by day, the latest session.
-export function TodayProgressCard({ progress, onOpenSessions, onOpenSession, dateFormat, fill = false }: TodayProgressCardProps) {
+// previous period (or an earlier one) day by day, the latest session (or an
+// earlier one, stepped back to with the arrows).
+export function TodayProgressCard({
+  progress,
+  onOpenSession,
+  onShowCompared,
+  onShowSession,
+  dateFormat,
+  fill = false,
+}: TodayProgressCardProps) {
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
+  const { latestOffset, hasOlderSession } = progress;
   const body = (
     <>
       <WeekFigures week={progress.week} />
       <View style={styles.divider} />
-      <PeriodPace fill={fill} period={progress.period} />
+      <PeriodPace fill={fill} onShowCompared={onShowCompared} period={progress.period} />
       <View style={styles.divider} />
       <View style={styles.latestHeading}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
-          Latest session
+        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-latest-session-title">
+          {latestOffset === 0 ? 'Latest session' : 'Earlier session'}
         </Text>
-        <ActionButton label="All sessions" onPress={onOpenSessions} testID="today-all-sessions-button" variant="text" />
+        {onShowSession ? (
+          <StepArrows
+            noun="session"
+            onNewer={latestOffset > 0 ? () => onShowSession(latestOffset - 1) : null}
+            onOlder={hasOlderSession ? () => onShowSession(latestOffset + 1) : null}
+            testID="today-latest-session-step"
+          />
+        ) : null}
       </View>
       <LatestSessionRow
         dateFormat={resolvedDateFormat}
@@ -108,12 +127,11 @@ const styles = StyleSheet.create({
     marginHorizontal: -uiSpace.md,
     backgroundColor: uiRoles.ruleSoft,
   },
-  // The text button's tap target is taller than the label; pull it into the
-  // card's rhythm as the target does.
+  // The arrows are a little taller than the label; pull them into the card's rhythm.
   latestHeading: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: -uiSpace.sm,
+    marginVertical: -3,
   },
 });

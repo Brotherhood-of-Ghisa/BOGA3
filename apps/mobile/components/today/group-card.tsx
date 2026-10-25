@@ -8,6 +8,7 @@ import {
   WEEK_BOARD_SIZE,
   buildLatestActivity,
   buildWeekBoard,
+  completedRow,
   type LatestActivityViewModel,
   type WeekBoardRowViewModel,
   type WeekBoardViewModel,
@@ -17,7 +18,9 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SessionSummaryRow, TrainingNowMark } from './session-summary-row';
+import { StepArrows } from './step-arrows';
 import { todayText } from './text-styles';
+import { useGroupSessionSteps, type GroupStreamPageLoader } from './use-group-session-steps';
 
 export type TodayGroupCardProps = {
   selectedGroupId: string;
@@ -30,6 +33,8 @@ export type TodayGroupCardProps = {
   dateFormat?: ExerciseDateFormat;
   /** The cards layout: no card of its own, and the board shows as many rows as fit. */
   fill?: boolean;
+  /** Reads the group's older stream pages for the session arrows; online by default. */
+  loadStreamPage?: GroupStreamPageLoader;
 };
 
 // A board figure: Plex Mono 500 at `sm`, right-aligned in its column.
@@ -218,13 +223,21 @@ export function TodayGroupCard({
   onOpenSession,
   dateFormat,
   fill = false,
+  loadStreamPage,
 }: TodayGroupCardProps) {
   const [listPreferences] = useExerciseListPreferences();
   const [boardHeight, setBoardHeight] = useState<number | null>(null);
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const size = fill && boardHeight !== null ? boardRowsThatFit(boardHeight) : WEEK_BOARD_SIZE;
   const board = buildWeekBoard(summary.members, myUserId, size);
-  const activity = buildLatestActivity(summary, myUserId, nowMs, resolvedDateFormat);
+  const latestActivity = buildLatestActivity(summary, myUserId, nowMs, resolvedDateFormat);
+  const steps = useGroupSessionSteps(
+    selectedGroupId,
+    latestActivity && latestActivity.kind !== 'several' ? latestActivity.sessionId : null,
+    loadStreamPage,
+  );
+  // The arrows step back from the latest activity through the group's completed sessions.
+  const activity = steps.session ? completedRow(steps.session, myUserId, resolvedDateFormat) : latestActivity;
   const openGroup = () => onOpenGroup(selectedGroupId);
 
   const onBoardLayout = (event: LayoutChangeEvent) => {
@@ -235,9 +248,24 @@ export function TodayGroupCard({
   const latest = (
     <View style={styles.latest}>
       <View style={styles.divider} />
-      <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
-        Latest activity
-      </Text>
+      <View style={styles.latestHeading}>
+        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-group-latest-heading">
+          {steps.session ? 'Earlier session' : 'Latest activity'}
+        </Text>
+        {latestActivity ? (
+          <StepArrows
+            noun="session"
+            onNewer={steps.index > 0 ? steps.newer : null}
+            onOlder={steps.canOlder ? steps.older : null}
+            testID="today-group-latest-step"
+          />
+        ) : null}
+      </View>
+      {steps.failed ? (
+        <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-group-latest-step-failed">
+          {"Couldn't load earlier sessions."}
+        </Text>
+      ) : null}
       <LatestActivity
         activity={activity}
         onOpenGroup={openGroup}
@@ -405,6 +433,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
     gap: uiSpace.md,
+  },
+  // The arrows are a little taller than the label; pull them into the card's rhythm.
+  latestHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: -3,
   },
   // A `rule-soft` hairline across the card, edge to edge.
   divider: {

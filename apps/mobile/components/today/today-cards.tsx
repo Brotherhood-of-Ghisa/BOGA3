@@ -22,7 +22,7 @@ export type TodayCardPage = {
   label: string;
   /** The card's body; it fills the card, which scrolls only if it cannot fit. */
   content: ReactNode;
-  /** The link row closing the card (`View progress`, `View group`). */
+  /** The link row closing the card (`Sessions`, `View group`). */
   footer: { label: string; onPress: () => void; testID: string };
   /** Beside the tabs while this page shows (the group switch). */
   accessory?: ReactNode;
