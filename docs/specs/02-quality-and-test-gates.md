@@ -228,6 +228,8 @@ local-only** — backend/sync by choice, Maestro iOS/Android by necessity — so
 breakage there accumulates on `main` invisibly until a human runs the gate. Run
 the slow gate for your area before the PR.
 
+Updates: [workflow](../../.github/workflows/daily-development-log.yml).
+
 ## Maintenance
 
 Changing a gate or lane means updating the registries in the same change:
