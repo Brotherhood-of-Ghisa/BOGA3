@@ -40,7 +40,12 @@ jest.mock('@/src/logging', () => ({
   logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
 
-import { __resetLocalDataLayerForTests, bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data/bootstrap';
+import {
+  __resetLocalDataLayerForTests,
+  bootstrapLocalDataLayer,
+  copyLocalDatabaseTo,
+  resetLocalAppData,
+} from '@/src/data/bootstrap';
 import { localRuntimeMigrations } from '@/src/data/migrations';
 
 const createSqliteClient = (
@@ -338,6 +343,34 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(2);
     expect(sqliteClient.closeAsync).toHaveBeenCalledTimes(1);
     expect(resetSqliteClient.closeAsync).not.toHaveBeenCalled();
+  });
+
+  it('copies the database with VACUUM INTO only after an in-flight reset has deleted and reopened it', async () => {
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const resetSqliteClient = { ...createSqliteClient('sqlite-client-after-reset'), runAsync: jest.fn() };
+    mockOpenDatabaseSync.mockReturnValueOnce(sqliteClient).mockReturnValueOnce(resetSqliteClient);
+    mockDrizzle.mockReturnValue({ name: 'local-db' });
+    mockMigrate.mockResolvedValue(undefined);
+    let resolveDelete!: () => void;
+    mockDeleteDatabaseAsync.mockImplementation(() => new Promise<void>((resolve) => (resolveDelete = resolve)));
+    const flushMicrotasks = async () => {
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    };
+
+    await bootstrapLocalDataLayer();
+    const reset = resetLocalAppData();
+    await flushMicrotasks();
+    const copy = copyLocalDatabaseTo('/Documents/backups/copy.db.partial');
+    await flushMicrotasks();
+
+    // Queued behind the reset: no copy and no reopen while the delete runs.
+    expect(resetSqliteClient.runAsync).not.toHaveBeenCalled();
+    expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(1);
+
+    resolveDelete();
+    await Promise.all([reset, copy]);
+    expect(resetSqliteClient.runAsync).toHaveBeenCalledWith('VACUUM INTO ?', '/Documents/backups/copy.db.partial');
+    expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(2);
   });
 
   it('a rejected reset does not wedge the data-layer lock chain — a later bootstrap still resolves', async () => {

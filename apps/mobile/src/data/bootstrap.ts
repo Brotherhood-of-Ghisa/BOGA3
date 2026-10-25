@@ -248,6 +248,19 @@ export const resetLocalAppData = (): Promise<LocalDatabase> =>
     return database;
   });
 
+/**
+ * Writes a consistent, compacted copy of the local database to `path`
+ * (`VACUUM INTO`, for `src/backup`). It holds the data-layer lock, so a reset
+ * cannot close or delete the database mid-copy and a copy asked for during
+ * boot waits for the migrations. It runs on the shared connection: the app
+ * does not use WAL, so a second connection's read lock would make the app's
+ * writes fail during the copy, while here they wait for it.
+ */
+export const copyLocalDatabaseTo = (path: string): Promise<void> =>
+  runExclusiveDataLayerOperation(async () => {
+    await getSqliteDatabase().runAsync('VACUUM INTO ?', path);
+  });
+
 export const __resetLocalDataLayerForTests = () => {
   sqliteDatabase = null;
   localDatabase = null;

@@ -90,6 +90,10 @@ Define the canonical repository structure, path ownership, and placement convent
     retryable legacy browsing migration and the active profile's external store.
   - auth selects its scope; browsing hooks adapt its typed access for screens. It
     never imports the domain database, sync cycle or UI, and never nudges sync.
+- `apps/mobile/src/backup/`
+  - owns emergency backups: whole-database snapshots under Documents (the
+    newest 30; rules in `snapshots.ts`) and share-sheet Export. No permission
+    or server; they outlive an account wipe or a bad sync.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-planner/`
@@ -263,7 +267,3 @@ imports included) by `apps/mobile/dependency-cruiser.config.cjs`, lane
 
 Imports that broke a rule when it landed are grandfathered in
 `apps/mobile/dependency-cruiser-known-violations.json`; that list only shrinks.
-
-## Known cleanup opportunities (tracked)
-
-- Optional follow-up: add a repo-root command alias surface (for example root `package.json` script aliases) if ergonomics justify it; current canonical wrappers are `./scripts/quality-fast.sh` and `./scripts/quality-slow.sh`.
