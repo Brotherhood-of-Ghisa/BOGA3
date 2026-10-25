@@ -22,7 +22,7 @@ async function findCheckpoint(github, repo) {
     if (!discussion) throw new Error('Daily development log discussion not found');
     for (const comment of [...discussion.comments.nodes].reverse()) {
       // Readers can comment too; only trusted publishers may advance the cursor.
-      if (!['github-actions[bot]', 'bozothegrey'].includes(comment.author?.login)) continue;
+      if (!['github-actions', 'bozothegrey'].includes(comment.author?.login)) continue;
       const match = comment.body.match(MARKER);
       if (match) return { id: discussion.id, sha: match[1] };
     }

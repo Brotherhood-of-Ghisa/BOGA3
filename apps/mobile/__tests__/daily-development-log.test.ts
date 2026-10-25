@@ -32,7 +32,7 @@ describe('daily development log', () => {
         id: 'discussion', comments: {
           nodes: calls++ === 0
             ? [{ body: '<!-- boga-daily-log: ' + 'f'.repeat(40) + ' -->', author: { login: 'reader' } }]
-            : [{ body: '<!-- boga-daily-log: ' + 'a'.repeat(40) + ' -->', author: { login: 'github-actions[bot]' } }],
+            : [{ body: '<!-- boga-daily-log: ' + 'a'.repeat(40) + ' -->', author: { login: 'github-actions' } }],
           pageInfo: { hasPreviousPage: calls === 1, startCursor: 'previous' }
         }
       } } }) };
@@ -63,7 +63,7 @@ describe('daily development log', () => {
           if (query.includes('addDiscussionComment')) {
             if (fail) throw new Error('API failed');
             posts.push(variables.body);
-            comments.push({ body: variables.body, author: { login: 'github-actions[bot]' } });
+            comments.push({ body: variables.body, author: { login: 'github-actions' } });
             return { addDiscussionComment: { comment: { url: 'posted' } } };
           }
           return { repository: { discussion: { id: 'discussion', comments: {
