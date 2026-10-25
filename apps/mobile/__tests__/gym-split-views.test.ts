@@ -2,7 +2,7 @@
  * The views of a gym picker over a real, migrated database ([[gym.split]]):
  * every view reads the whole exercise until a gym is chosen, then only that
  * gym's sessions. On an exercise split per gym, a chosen gym's PR marks are its
- * own book's ([[gym.split-progress-prs]]), and Repeat last prefers the newest
+ * own book's ([[gym.split]]), and Repeat last prefers the newest
  * session in the book the block is planned for, falling back to the whole
  * exercise's newest. Nothing writes `split_by_gym` yet, so the fixture sets it.
  */

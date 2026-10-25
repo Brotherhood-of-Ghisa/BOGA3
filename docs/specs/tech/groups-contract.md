@@ -158,7 +158,8 @@ Session cards and the friend view count on the viewing device
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
 screens' TS. Counts come only from permitted set context: `Sets` as
 [[set.count-display]], `exercises` those holding a working set. Normalized
-figures and totals follow [[groups.normalized-set-display]]; ordinary Volume
+figures follow `group-competition-contract.md` §2 (load it to change
+them); ordinary Volume
 uses [[set.eligibility]]. The device uses the source entry factor for total
 load, independently of target mode. No set rules are mirrored in SQL; each
 co-member's device receives permitted live sets and safe published projections,

@@ -55,5 +55,5 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   derived history without rewriting raw sets (`Top weight` stays raw; contract
   §4); a group score keeps the reading bound when its set was scored. User-facing calculation surfaces
   use `Weight`, `Top weight`, `1RM` and `Volume`; only the approved RM chart
-  coordinate ([[1rm.curve-load]]) exposes calculated load. The complete boundary is owned by
+  coordinate exposes calculated load. The complete boundary is owned by
   `tech/bodyweight-load-contract.md`.

@@ -3,7 +3,7 @@
 // insights read one reading of the catalogue, so a session's figures agree
 // everywhere. Under Broad a set counts once per muscle at its strongest role
 // ([[muscle.set-count]]), and the comparison keeps a muscle that is primary for
-// any of its entries ([[muscle.comparison-primary-only]]).
+// any of its entries — a secondary-only muscle gets no comparison.
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import {

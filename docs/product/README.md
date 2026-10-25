@@ -8,13 +8,12 @@ load `docs/procedures/product-facts-authoring.md`.
 | File | Load when your task touches |
 | --- | --- |
 | `set.md` | any set, set count, record, Volume or 1RM figure; set rows; completing an exercise |
-| `copy.md` | any words on screen (every UI change); set entry; blank history cells |
+| `copy.md` | any words on screen (every UI change); dates; blank history cells |
 | `comparison.md` | period or session comparisons, change figures (`+4`, `+12%`), history windows, reference lines |
-| `1rm.md` | the 1RM estimate or its display; the RM curve |
-| `muscle.md` | attributing sets or work to muscles; muscle setup, lists, family headers |
-| `gym.md` | gyms, or how one exercise's history is grouped |
-| `groups.md` | group competition and certification |
-| `notifications.md` | any notification |
-| `appearance.md` | the app icon or the appearance theme |
-| `timer.md` | rest timer defaults, workout timer cues, Pause/Resume, screen awake |
+| `1rm.md` | the 1RM estimate or its display |
+| `muscle.md` | attributing sets or work to muscles; muscle setup, tracking, lists |
+| `gym.md` | gyms, gym pickers, or per-gym exercise figures |
+| `groups.md` | group set certification |
+| `notifications.md` | which notifications are sent, to whom, with what counts |
+| `timer.md` | rest timer defaults |
 | `agents.md` | what a coaching agent (MCP) may read or change |

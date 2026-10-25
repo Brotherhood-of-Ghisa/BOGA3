@@ -359,8 +359,7 @@ export const computeSelectedExerciseDailyEffort = async (
  * Both chart views share one graph read and one daily aggregation. A day's PR
  * marks are the whole exercise's (`pr_*`) while every gym is in view; with a
  * gym chosen they are each session's own (`own_pr_*`) — on a split exercise
- * that gym's book, and for no gym the whole exercise's ([[gym.split]],
- * [[gym.split-progress-prs]]). `gyms` lists the window's choices, unfiltered.
+ * that gym's book, and for no gym the whole exercise's ([[gym.split]]). `gyms` lists the window's choices, unfiltered.
  */
 export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
   const allSessions = await loadExerciseRawSessions(options);

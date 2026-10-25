@@ -33,7 +33,7 @@ export type PlanBlockEditorProps = {
  * One block's editor in the plan form: the picked exercise (its name row
  * opens the pick sheet) and the ordered target sets — effort, weight, reps per
  * set. Add set(s) asks how many exact copies of the last target to append.
- * Target entry follows the shared fields ([[copy.set-entry]]).
+ * Target entry reuses the recorder's `SetEntryFields`.
  */
 export function PlanBlockEditor({
   block,

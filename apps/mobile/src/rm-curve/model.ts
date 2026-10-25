@@ -20,7 +20,8 @@ function validateHistoryWeeks(weeks: number) {
   if (!Number.isSafeInteger(weeks) || weeks < 1 || weeks > MAX_HISTORY_LOOKBACK_WEEKS) throw new Error('Invalid History look-back');
 }
 
-/** [[1rm.curve-scope]]; the prior look-back is independently anchored to start. */
+/** Default range is Settings' History look-back through today; This week and Progress
+ * period are the alternatives. The prior look-back is independently anchored to start. */
 export function rmCurveWindow(historyLookbackWeeks: number, now = new Date(), range: RmCurveRange = 'history', progressWeeks = 1) {
   requireDate(now, 'now'); validateHistoryWeeks(historyLookbackWeeks);
   validateHistoryWeeks(progressWeeks);
@@ -104,7 +105,8 @@ export function buildRmCurveModel(graph: RmCurveGraph, scope: RmCurveEvaluation)
 
 export type RmCurveModel = ReturnType<typeof buildRmCurveModel>;
 
-/** [[1rm.curve-fitting]]; observations are filtered and in session order, so ties keep the first. */
+/** Each session fits on its highest existing 1RM among the filtered sets; observations are in
+ * session order, so ties keep the first. Sessions without a qualifying set are omitted. */
 function inferenceSessions(observations: RmCurveObservation[]): RegimeSession[] {
   const bests = new Map<string, RmCurveObservation>();
   for (const point of observations) {

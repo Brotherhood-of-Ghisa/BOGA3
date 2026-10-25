@@ -329,7 +329,7 @@ function SessionCard({
     .map((id) => tagOptions.find((tag) => tag.tagDefinitionId === id))
     .filter((tag): tag is ExerciseHistoryTagOption => tag !== undefined);
   // The records the session took when it was completed, in the book the gym
-  // filter names ([[gym.split-progress-prs]]), drawn as View Session draws
+  // filter names ([[gym.split]]), drawn as View Session draws
   // them ([[set.row-figures]]).
   const record = historyBlockRecord(entry);
   // Warm-ups read like working sets: the type column names them.

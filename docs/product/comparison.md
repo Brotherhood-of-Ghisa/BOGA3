@@ -39,10 +39,9 @@ Weeks start Monday, local time.
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
-| Today, period pace | N-week periods from Mon 29 Dec 2025: to today or a selected day, projected at today's rate | the previous period to that day; its daily series |
 
 Why: include the unfinished week; Today's bar targets last week's whole total.
-Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and period windows in `apps/mobile/src/progress-summary/calculations.ts`.
+Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week window in `apps/mobile/src/progress-summary/calculations.ts`.
 
 ### comparison.history-window · definition · accepted
 
@@ -55,69 +54,3 @@ use the whole window.
 Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
-
-### comparison.weekly-reference · calculation · accepted
-
-Known training weeks in [[comparison.history-window]] supply references, zeros
-included; exclude rest/future/unavailable weeks. Require six observations and a
-positive maximum.
-
-| Metric | Scale | Reference lines |
-| --- | --- | --- |
-| Sets | Zero to window maximum | Median |
-| Volume | Zero to window maximum | P25, median, P75 |
-| 1RM, Top weight | Symmetric linear range around median | P25, median, P75 |
-
-For strength minimum `a`, median `m` and maximum `b`, radius is
-`max(m − 0.9a, b − m)`; position is `50 + 50 × (value − m) / radius` percent.
-Compute the median even below six observations. Percentiles interpolate sorted
-values; coincident positions and accessible values remain. Empty/all-zero
-windows show `0`, without fill or references. Genuine zeros stay unfilled.
-
-Why: readable strength, proportional counts and Volume.
-Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.
-
-
-### comparison.muscle-ticker-window · calculation · accepted
-
-Muscle List Sets/Volume tickers use [[comparison.history-window]], current gym
-scope, mappings and personal effort policy. Each metric has its own eligible
-training days and first-history date. Each local training day contributes one
-observation at its last eligible completed session; active sessions do not.
-Its total covers the trailing configured Progress N weeks, shifted by local
-calendar time across DST, through that instant. A complete reading requires N
-weeks since that muscle's first eligible session. Read N weeks before the
-visible start for calculation only. This week changes table figures alone.
-Connect real observations across rest days without inventing samples; unavailable
-training observations break the line.
-
-Why: show comparable rolling effort without inventing history.
-Code: `apps/mobile/src/data/progress-muscle-tickers.ts`.
-
-### comparison.muscle-ticker-reference · calculation · accepted
-
-Sets reference is configured weekly working-set target × configured N.
-Volume reference is the median of overlapping complete N-week observations
-inside the visible history. Include known numeric zeros; exclude missing, rest
-and unavailable observations. Require six valid observations; a zero median is
-valid. Graph visibility follows [[comparison.muscle-ticker-extent]]. Reference
-colour compares the observation with its reference independently of the table's
-signed Change.
-
-Code: `apps/mobile/src/data/progress-muscle-tickers.ts`.
-
-### comparison.muscle-ticker-extent · presentation · accepted
-
-Sets and Volume require at least six complete observations spanning the
-configured Progress N weeks in local calendar time, including a positive value.
-Otherwise the graph stays blank; figures and history links remain. Flat positive
-histories qualify.
-
-Muscle List tickers retain the full configured history time scale. Available
-history is right-aligned and shortened in proportion to elapsed time, preserving
-its real dates and internal unavailable gaps. The complete plot fits within
-one-third of its actual table width. Charts mark only the latest valid
-observation, even if earlier than today.
-
-Why: sparse history must not imply a trend or longer coverage.
-Code: `apps/mobile/components/stats/muscle-ticker.tsx`.

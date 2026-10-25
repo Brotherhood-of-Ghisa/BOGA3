@@ -23,7 +23,8 @@ type SetEntryFieldsProps = {
   children: ReactNode;
 };
 
-/** Recorder entry fields reused by plan/programme targets; copy follows [[copy.set-entry]]. */
+/** Recorder entry fields reused by plan/programme targets: `Effort`, `Weight`, `Reps`; total-load
+ * and per-side share `Weight`, spoken as `Set N weight`. */
 export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>(function SetEntryFields(
   { number, weightValue, repsValue, setType, weightError, repsError,
     onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, testID, children },

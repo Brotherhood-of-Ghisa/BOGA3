@@ -518,6 +518,19 @@ describe('BoGa MCP server', () => {
     }
   });
 
+  // Machines change between gyms; dumbbells do not.
+  it('tells the coach to split machines and stations and keep free weights and bodyweight exercises whole', async () => {
+    const running = await startMcp();
+    active.push(running);
+
+    const { tools } = await running.client.listTools();
+    for (const name of ['create_exercise', 'update_exercise']) {
+      const description = tools.find((tool) => tool.name === name)?.description ?? '';
+      expect(description).toMatch(/split machines and stations/);
+      expect(description).toMatch(/keep free weights \(dumbbells, barbells, kettlebells\) and bodyweight exercises whole/);
+    }
+  });
+
   it('rejects caller-supplied user identity before invoking a tool API route', async () => {
     const running = await startMcp();
     active.push(running);

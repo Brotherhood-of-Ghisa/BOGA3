@@ -3,8 +3,9 @@
 > **Owns:** numerical fitting, snapshot lifecycle and calibration boundaries.
 > **Load when:** changing the RM chart or its likelihood assessment.
 
-Product choices are [[1rm.curve-fitting]], [[1rm.curve-population]],
-[[1rm.curve-effort]], [[1rm.curve-load]] and [[1rm.curve-scope]].
+Product choices live in code: scope and population in
+`apps/mobile/src/rm-curve/model.ts`, effort and load projection in
+`apps/mobile/src/exercise-calculations/rm-curve.ts`.
 
 ## Numerical authority
 
@@ -29,7 +30,7 @@ label, never claiming an exact physiological change time.
 ## Snapshot and execution
 
 The current SQLite graph supplies actual plotted coordinates and the session
-sample of [[1rm.curve-fitting]], retaining gym and dated bodyweight/loading
+sample (each completed session's highest displayed 1RM), retaining gym and dated bodyweight/loading
 context. All gyms combines rows once within the other selected filters.
 
 `useRmCurve` scopes reads to account revision, exercise, gym, dates, effort and
@@ -52,8 +53,8 @@ Real-history error mechanisms and independence cannot be certified from their
 observed coordinates. Runtime assessments therefore use the approved exploratory
 path: no calibrated interval, evidence emphasis or adequacy claim. Raw likelihood
 evidence is retained internally; curves stay readable at a uniform emphasis.
-Observation halos use the current fit's nuisance values under
-[[1rm.curve-uncertainty]]; their faded shape is a scale glyph, not a probability
+Observation halos use the current fit's nuisance values
+(`apps/mobile/src/strength-regimes/assessment.ts`); their faded shape is a scale glyph, not a probability
 contour. The marker footprint is padding. Hide Rich halos until a usable fit
 is available; an unidentified RIR probability cannot size positive-RIR halos.
 The simulated null references and uncertainty radii are conditional on their

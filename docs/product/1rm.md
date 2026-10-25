@@ -9,7 +9,7 @@ The estimated one-rep max of a set is Wathan's formula, shown to one decimal:
 ```
 
 A single (reps = 1) is not estimated: its 1RM is its load. A zero load gives
-`0.0`, a valid figure that is never a record. `load` is the calculated load
+`0.0`. `load` is the calculated load
 when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 
 <!-- fact-table: 1rm.formula -->
@@ -25,88 +25,3 @@ when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 Why: a single is a measured max; estimating above it would invent strength.
 Code: `estimateOneRepMax` in `apps/mobile/src/exercise-calculations/index.ts`; `formatOneRepMax` in `apps/mobile/src/exercise-calculations/format.ts`.
 Signature: `48.8`, `53.8`, `0.075`
-
-### 1rm.curve-population · definition · accepted
-
-Include confirmed personal working sets ([[set.performed]], [[set.eligibility]])
-with known canonical RIR; preserve numeric high RIR. Effort filters may narrow
-this population; sparse data never widens it. Missing/Unspecified and unknown
-labels remain distinct; neither supplies a normalized point or fit.
-Plot and fit within the selected exercise/time/effort/gym scope. All gyms pools
-including No gym; individual gyms remain selectable. Programme Technique/reset
-recorded as RIR4 remains working, not a Technique/warm-up label.
-
-Code: `RmCurveContent` in `apps/mobile/components/rm-curve/content.tsx`.
-
-### 1rm.curve-effort · calculation · accepted
-
-For RM analysis only, performed m reps at logged RIR n imply u=m+n RIR0-equivalent
-reps, a positive safe integer. Resolve load L and existing metrics with actual m;
-analytical total RM is `estimateOneRepMax(L, u)`. Never replace logged reps,
-global 1RM or records. X names RIR0-equivalent reps; details retain m, n and
-existing 1RM. A positive-RIR single uses u>1 analytically; its global figure stays unchanged.
-
-Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
-
-### 1rm.curve-fitting · calculation · accepted
-
-Replace Reference with One curve / Two curves and Parsimonious / Rich; default
-One curve + Parsimonious. One fits constant total 1RM; Two fits two free positive
-total 1RMs and a complete-session boundary against constant/linear/quadratic
-no-break alternatives. Only 1RM changes amplitude; no minimum increment.
-
-Fit each completed session’s highest unrounded displayed 1RM
-([[1rm.formula]], logged reps) among qualifying sets after exercise/time/gym/RIR
-filters. Ties keep the first in session order (block, set, then set ID).
-Omit sessions without qualifying sets. Plot all qualifying sets.
-Unavailable fits retain observations without historical fallback. Keep logged metrics.
-
-Code: `apps/mobile/src/strength-regimes/`.
-
-### 1rm.curve-uncertainty · calculation · accepted
-
-Parsimonious fixes uncertainty; Rich estimates jointly across periods. RIR0
-is exact; positive n permits n−1/n/n+1 with symmetric extremes and initial
-central probability p=0.50. Fixed total-load SD: 2.50 kg (per-side: 1.25).
-Halos add RIR SD √(1−p) horizontally and load SD vertically beyond markers;
-RIR0 has no horizontal spread. Rich requires usable current, identified
-estimates. Halos depict model spread. Curve shading shows relative evidence,
-never break/membership probability. Unverified histories stay exploratory
-without calibrated shading/confidence claims.
-
-Code: `apps/mobile/src/strength-regimes/assessment.ts`.
-
-### 1rm.curve-periods · presentation · accepted
-
-Before/From dates, distinct markers and matching point/curve hues identify
-complete-session periods. Selected details use the current fitted period's
-label/hue; invalidated fits remove it. Selection follows chart activation and
-Previous/Next, persists while valid, and never automatically chooses a
-representative. No set-list popup.
-
-Code: `apps/mobile/components/rm-curve/`.
-
-### 1rm.curve-load · presentation · accepted
-
-Chart load is calculated load divided by entry factor (total:1, per-side:2);
-analytical total 1RM uses the same factor. Ordinary points equal Weight;
-bodyweight points include the applicable dated contribution. This chart-only
-exception to hiding calculated load requires an axis distinct from Weight.
-Details retain raw Weight/existing 1RM. Logging, records, reading selection and
-personal missing-reading fallback retain their meaning.
-
-Why: shared curve across bodyweight contexts.
-Code: `projectRmCurveSet` in `apps/mobile/src/exercise-calculations/rm-curve.ts`.
-
-### 1rm.curve-scope · definition · accepted
-
-Fresh charts default to Settings' History look-back through today, All gyms
-(including No gym), All known RIR. Mounted-chart choices reset on opening another
-exercise. Offer This week, Settings’ Progress period and History look-back
-([[comparison.allowed-periods]]).
-Effort follows [[1rm.curve-population]]; range/gym/effort changes coherently
-recompute points and [[1rm.curve-fitting]].
-All gyms preserves provenance; pooling establishes neither equipment equivalence
-nor reliable strength changes.
-
-Code: `apps/mobile/components/rm-curve/screen.tsx`; `rmCurveWindow` and `buildRmCurveModel` in `apps/mobile/src/rm-curve/model.ts`.

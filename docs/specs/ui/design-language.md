@@ -45,7 +45,7 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 - **`danger` and the two change directions are not seeded** (§6): a decrease
   must not read as a delete, so `loss` keeps its own hue away from `danger`'s.
 
-`regimeOlder` / `regimeNewer` are fixed categorical hues for [[1rm.curve-periods]],
+`regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's fitted periods,
 with readable text contrast; they do not reuse the sequential `viz` ramp or
 the gain/loss meanings.
 
@@ -69,7 +69,8 @@ lands within 35° of it, then steps 35° away on the far side — that step is w
 makes the `record`-to-`accent` floor hold, so do not "simplify" it away.
 `ui-theme.test.ts` gates the generator and every preset.
 
-The launcher icon follows [[appearance.app-icon-theme]]. The native boundary,
+The launcher icon follows the theme applied at launch: one per preset, one
+rainbow icon for every custom colour, Warm as default and fallback. The native boundary,
 `apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
 active and retries interruptions after foregrounding. Other native failures
 attempt the primary icon and are logged without blocking boot. Matching icons

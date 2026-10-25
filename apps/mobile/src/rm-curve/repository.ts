@@ -3,7 +3,7 @@ import { buildRmCurveModel, rmCurvePriorStart, type RmCurveEvaluation } from './
 
 /**
  * Three-state gym scope (`src/utils/gym-scope-route.ts`): `{}` is every gym,
- * `null` is No gym, an ID selects that gym. Default: [[1rm.curve-scope]].
+ * `null` is No gym, an ID selects that gym. Default: every gym, pooling No gym.
  */
 export type RmCurveGym = { gymId?: string | null };
 

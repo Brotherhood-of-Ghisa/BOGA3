@@ -1,8 +1,10 @@
 import { formatCalendarDate } from '@/src/utils/local-time';
 import { useDateFormat } from '@/src/preferences/hooks';
-// Newest-first weekly rows. Length follows [[comparison.weekly-reference]]; colour retains
-// the adapter's independent intensity/target meaning. Reference calculations
-// follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
+// Newest-first weekly rows over [[comparison.history-window]]; colour retains the
+// adapter's independent intensity/target meaning. Known training weeks (zeros included;
+// rest, future and unavailable excluded) supply the scale and reference lines: Sets and
+// Volume run zero to the window maximum, strength is symmetric around the median.
+// Figure visibility follows [[copy.blank-history]].
 // Numeric labels follow the reference values when available, otherwise the scale.
 // They use measured widths, centre on their ticks within the plot,
 // and yield to the centre label on overlap; all ticks and spoken values remain.
@@ -145,7 +147,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   const max = values[values.length - 1] ?? 0;
   const { axisValues, position } = weeklyScale(values, metric);
-  // Reference eligibility follows [[comparison.weekly-reference]].
+  // References need six observations and a positive maximum; Sets draws only the median.
   const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metric !== 'workingSetCount' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);

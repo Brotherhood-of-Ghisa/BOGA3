@@ -13,7 +13,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → the columns and where each month label sits; `weekLabel` → a week's name on screen. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with the focused week between its previous / next arrows, y axis, month axis, the focused column in `ink` on a `ruleSoft` band; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`, a column wide enough to tap; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection and is told which week is focused (`FocusedTimelineWeek`), for the page's ⋮. |
-| `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; lengths and references follow [[comparison.weekly-reference]], colour is independent; a training week opens its sessions. |
+| `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; it computes their lengths and references, colour independently; a training week opens its sessions. |
 
 ## Data flow
 
@@ -53,10 +53,10 @@ the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
 report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
-(max). Weekly lengths follow [[comparison.weekly-reference]];
-unknown load never gets a filled length. Figure visibility follows
-[[copy.blank-history]]; Weekly reference calculations follow
-[[comparison.weekly-reference]] across [[comparison.history-window]]. A Volume sum that is not finite is never
+(max). Weekly lengths and references cover [[comparison.history-window]] and
+need the history minimum (to change it, load
+`docs/specs/tech/training-metrics-contract.md` §2); unknown load never gets a
+filled length. Figure visibility follows [[copy.blank-history]]. A Volume sum that is not finite is never
 plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
 Daily retains a neutral dashed rule.
 
@@ -131,15 +131,14 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- Weekly numeric annotations label the references of [[comparison.weekly-reference]]
-  when present, using `formatReferenceValue`; otherwise they label the scale.
+- Weekly numeric annotations label the references when present, using `formatReferenceValue`; otherwise they label the scale.
   They centre on their ticks using measured text and plot widths; edge labels
   stay inside the plot. On overlap the middle label wins, then the lower, then
   the upper. A label wider than the plot is ellipsized; full formatted values
   stay on accessible ticks. Labels remeasure on metric changes; ticks and
   references retain exact coordinates even if text is hidden.
 - Weekly references use discrete vertical dashes on the same scale
-  as the bars ([[comparison.weekly-reference]]). Accessible values use whole
+  as the bars. Accessible values use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
   retain the selected metric format. Axis marks announce the saved window, each
   reference and value accessibly, including coincident references; no visible

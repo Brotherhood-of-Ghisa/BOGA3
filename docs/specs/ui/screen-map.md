@@ -26,7 +26,7 @@ draws the same fixed bar on every screen that shows tabs.
 | --- | --- | --- |
 | `/today` | Landing page: how this week and the current fixed period ([[comparison.window]]) are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
-| `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; both breakdowns use Settings' saved layout ([[muscle.progress-layout]]) and [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle pairs periods under `Now` (Sets `12 (10)`) and sorts name / Now / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise 3D scopes the list to the tapped muscle, with aligned Primary effort / Secondary effort sections; 1RM uses List. Muscle List places compact Sets/Volume tickers beside names ([[comparison.muscle-ticker-extent]]); names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
+| `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; both breakdowns use Settings' saved layout (`List`/`3D`, default `List`) and [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle pairs periods under `Now` (Sets `12 (10)`) and sorts name / Now / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise 3D scopes the list to the tapped muscle, with aligned Primary effort / Secondary effort sections; 1RM uses List. Muscle List places compact Sets/Volume tickers beside names; names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four. Two untitled cards: Groups, Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
 
 ### Preserved tab roots
@@ -57,7 +57,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit` and delete/undelete. `presentation=completion` instead draws the post-Finish summary: results, then context, then the two-page breakdown, then record cards, volume vs median, Share | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
 | `/exercise-history` | One `exercise_definitions` row's history, from exercise Progress's ⋮ and the exercise page's ⋮: period and tag filters, a gym button in the header (`gymId` opens on a gym), all-time bests, one card per session with the records it took | `exercise-history.tsx` |
 | `/progress-history` | One muscle's or one exercise's effort history, titled by that subject and opened on Progress's metric, gym and secondary sets: optional `view=timeline\|daily\|weekly` overrides entry without saving; one row holds the view (Timeline \| Grid \| Weekly) selector, a metric chip stepping to the next metric on a tap, and the gym button — on a muscle, a Filters button holding the gym and [[muscle.secondary-filter]] — then the saved view, with loading / error+Retry / empty states; a Grid or Weekly training day or week opens its sessions; a rest day is not a button. The Timeline plots one value per Monday week, oldest left, and always focuses one — the selected week, else the newest — which its readout names between previous / next arrows; the header ⋮ opens that week's sessions and, on an exercise, History, RM curve (live only) and each muscle's history; with no action (a muscle's rest week) there is no ⋮. Under it, one card per exercise block opens its session; on a muscle's page, each card's progress button opens that exercise's history at the chosen gym. Native back preserves the originating screen | `progress-history.tsx`, `components/stats/history-view.tsx` |
-| `/rm-curve` | Selected-exercise analytics, titled by the exercise with `RM curve` on the chart; uses `components/rm-curve/` and [[1rm.curve-scope]]. History Options opens it; Back preserves History. Missing/deleted targets remain unavailable with Back | `rm-curve.tsx` |
+| `/rm-curve` | Selected-exercise analytics, titled by the exercise with `RM curve` on the chart; uses `components/rm-curve/`. History Options opens it; Back preserves History. Missing/deleted targets remain unavailable with Back | `rm-curve.tsx` |
 
 ## Account, library and tools
 
@@ -67,7 +67,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.progress-layout]], [[muscle.report-groups]]); the effort table; date format, gym filter; Today layout, title-bar timer; the sync status and Backups cards; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view, targets, periods and Muscles ([[muscle.report-groups]]); the effort table; date format, gym filter; Today layout, title-bar timer; the sync status and Backups cards; the Developer mode switch, then dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 
@@ -145,7 +145,7 @@ addressable, each resolving to a canonical owner for tab selection.
   image excludes gym and location, and optional historical enrichment can
   never block it.
 - A friend's session is read-only, with group #1 bands ([[set.row-figures]])
-  and normalized rows under [[groups.normalized-set-display]]; ordinary cards
+  and normalized `%BW` rows; ordinary cards
   retain permitted load.
 - Invite codes and leaderboard rows are read **online only, never cached**; the
   group stream and the podiums are cached and render offline behind the offline
@@ -193,12 +193,12 @@ addressable, each resolving to a canonical owner for tab selection.
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
   boards and podiums follow [[copy.no-weight-unit]]; record detail and history
   retain public witness state and original wire units. Normalized rows follow
-  [[groups.normalized-set-display]]. See `docs/specs/tech/group-competition-contract.md`.
+  `docs/specs/tech/group-competition-contract.md`.
 
 The session and exercise timer strips expand their repeating readout fullscreen
 (`components/session-recorder/repeating-timer-focus.tsx`). Close, Back and
 accessibility escape collapse without changing the timer; the strip’s dismiss
 control remains separate. Phase sits above the countdown-only ring, followed by
 interval controls, a wide Pause/Resume action and bottom Reset. Both share
-the store and [[timer.repeating-cues]] / [[timer.foreground-awake]].
+the store, its cues and its keep-awake.
 In-route state, not a new route.

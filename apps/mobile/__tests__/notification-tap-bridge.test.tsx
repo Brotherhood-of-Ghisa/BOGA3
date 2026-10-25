@@ -30,6 +30,11 @@ jest.mock('@/src/notifications', () => ({
   startNotificationLifecycle: () => mockStart(),
   subscribePendingNotificationTap: () => () => undefined,
 }));
+// The recipient launched in a custom colour, so the shared theme must be theirs, not Warm's.
+jest.mock('@/components/ui/theme-launch', () => ({
+  ...jest.requireActual('@/components/ui/theme-launch'),
+  launchTheme: jest.requireActual('@/components/ui/theme-presets').resolveThemePreset('hue:200'),
+}));
 jest.mock('@/src/auth', () => ({ useAuth: () => mockAuth }));
 jest.mock('@/src/navigation/root-route-access', () => ({ useRootRouteAccess: () => mockAccess }));
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn() }));
@@ -42,7 +47,9 @@ jest.mock('expo-router', () => ({
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
-import { uiRoles } from '@/components/ui/tokens';
+import { generateRoles } from '@/components/ui/theme';
+import { seedsFromHue } from '@/components/ui/theme-hue';
+import { getThemePreset } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 import { waitForGone } from './helpers/wait-for-gone';
 
@@ -60,13 +67,17 @@ beforeEach(() => {
   mockGroup = undefined;
 });
 
-it('shares the applied theme and stops its native listener lifecycle on unmount', () => {
+it("shares the recipient's applied app theme, custom colours included, for expanded notifications", () => {
+  const roles = generateRoles(seedsFromHue(200));
   const view = render(<NotificationTapBridge />);
   expect(mockStart).toHaveBeenCalledTimes(1);
   expect(mockSetTheme).toHaveBeenCalledWith({
-    paper: uiRoles.paper, surface: uiRoles.surface, rule: uiRoles.rule,
-    ink: uiRoles.ink, inkMuted: uiRoles.inkMuted, record: uiRoles.record, recordWash: uiRoles.recordWash,
+    paper: roles.paper, surface: roles.surface, rule: roles.rule,
+    ink: roles.ink, inkMuted: roles.inkMuted, record: roles.record, recordWash: roles.recordWash,
   });
+  // Warm-derived colours would mean the palette is fixed, not the recipient's.
+  const warm = generateRoles(getThemePreset('warm').seeds);
+  expect(mockSetTheme.mock.calls[0][0]).not.toEqual(expect.objectContaining({ paper: warm.paper, ink: warm.ink, record: warm.record }));
   view.unmount();
   expect(mockStop).toHaveBeenCalledTimes(1);
 });

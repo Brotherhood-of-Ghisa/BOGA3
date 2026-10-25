@@ -24,7 +24,8 @@ export function muscleTickerDescription(series: MuscleTickerSeries | undefined, 
 export function MuscleTicker({ series, start, end, width, rollingWeeks, testID }: {
   series: MuscleTickerSeries; start: Date; end: Date; width: number; rollingWeeks: number; testID: string;
 }) {
-  // Both metrics share the visibility rule of [[comparison.muscle-ticker-extent]].
+  // Both metrics draw only with six known observations, a positive value and a span of the
+  // rolling N weeks; otherwise blank, so sparse history never implies a trend.
   const known = series.observations.filter(row => row.value !== null);
   if (known.length < MIN_HISTORY_OBSERVATIONS || !known.some(row => row.value! > 0)
     || shiftCalendarWeeks(known[0].at, rollingWeeks) > known[known.length - 1].at) return null;

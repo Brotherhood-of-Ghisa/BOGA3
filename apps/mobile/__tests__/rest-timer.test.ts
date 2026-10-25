@@ -360,6 +360,17 @@ describe('rest-timer store and pure rules', () => {
     timer.mockRestore();
   });
 
+  // Session end (finish or abandon) dismisses the timer this way in `session-lifecycle.ts`.
+  it.each(['dismissal', 'mode switch', 'session end'] as const)('releases keep-awake on %s', (action) => {
+    AppState.currentState = 'active';
+    startRepeatingTimer('session-1');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(true);
+    if (action === 'dismissal') dismissRestTimer('session-1');
+    if (action === 'mode switch') switchTimerMode('session-1', 'rest');
+    if (action === 'session end') dismissRestTimer('session-1', { suppressAutoStart: false });
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(false);
+  });
+
   it.each([null, 'background'] as const)('waits for foreground from initial state %s and skips missed cues after backgrounding', (initial) => {
     AppState.currentState = initial as AppStateStatus;
     let change!: (state: AppStateStatus) => void;

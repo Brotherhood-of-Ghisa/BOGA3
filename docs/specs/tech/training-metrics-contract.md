@@ -91,21 +91,23 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
-**Session volume comparison.** A comparison draws its distribution — P25,
-median and P75, with the current Volume and its median delta — only from six
-known prior comparable sessions, genuine zeros included; the seventh reading is
-the session itself. Those priors are Settings' History look-back over
+**History minimum.** Session volume comparisons, Weekly heatmap references
+and Muscle List tickers need six known observations, zeros included
+(`apps/mobile/src/utils/history-reference.ts`); each owns its window.
+
+**Session volume comparison.** Its distribution — P25, median and P75, with the
+current Volume and its median delta — needs that minimum of prior comparable
+sessions; the seventh reading is the session itself. Those priors are Settings' History look-back over
 [[comparison.history-window]], anchored to the session's End, or now while
 active. Set eligibility is unchanged and record baselines stay all-time. Below
 the minimum nothing is drawn: no comparison is ever shown as an empty plot. The
 median delta carries its direction in colour like every other change figure
 (`ui/design-language.md` §6); above the median is the improvement.
 History and quartiles derive in
-`apps/mobile/src/session-insights/calculations.ts`; the minimum is shared with
-the weekly heatmap in `apps/mobile/src/utils/history-reference.ts`.
-
-The by-muscle comparison follows [[muscle.comparison-primary-only]], baselines
-included.
+`apps/mobile/src/session-insights/calculations.ts`. The by-muscle comparison
+covers only muscles the session worked as primary in some entry, and a prior
+session is its baseline only where it did the same
+(`deriveSessionMuscleVolumeComparisons`).
 
 **Counted-session statistics.**
 
@@ -159,7 +161,7 @@ sets. There are three kinds:
   the book a session's own records come from. Each facts row keeps two flag
   sets — `pr_*` against the whole exercise, `own_pr_*` against that book — so
   a view of every gym reads the first, and a session's own PRs (Today) and a
-  view with a gym chosen ([[gym.split-progress-prs]]) the second. The book is
+  view with a gym chosen ([[gym.split]]) the second. The book is
   picked by the session in hand, so a reader takes the session
   (`inSessionId`), never a second gym. The current-gym filter (today only the
   exercise page) narrows to the session's gym, and is off when it has none. A
@@ -251,7 +253,7 @@ displayed 1RM   = (total 1RM - c × B) / F
 
 Bodyweight contributes once. Ordinary per-side exercise Volume counts both
 sides; displayed 1RM stays in entered external-Weight units. Screens show Weight,
-1RM and Volume; only the RM chart's approved coordinate ([[1rm.curve-load]], §6)
+1RM and Volume; only the RM chart's approved coordinate (§6)
 exposes calculated load.
 
 **1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
@@ -287,13 +289,11 @@ choices may change which recorded set qualifies.
 - Ordinary total input contributes `E / 2` per side, and per-side input
   contributes `E`, retaining the same muscle Volume.
 
-**A muscle's set count** is [[muscle.set-count]]. One shared counter derives
-it everywhere (`countMuscleSets`, `muscle-analytics.ts`): a set counts once per
-muscle at its strongest role, weighted by that role, and a stabilizer adds
-nothing. Every muscle surface reads it. Family
+**A muscle's set count** is [[muscle.set-count]], derived everywhere by
+`countMuscleSets` (`muscle-analytics.ts`). Family
 counts deduplicate physical sets at the strongest role across the family's
 muscles; overlapping individual muscle counts must never be summed into a
-global total. Every figure is an exact half-step, shown unrounded. Nothing is
+global total. Figures are shown unrounded. Nothing is
 stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
 them. The window's own working-set total stays a count of physical sets.
 
@@ -317,16 +317,15 @@ Unlinked sets contribute no muscle/exercise row. A volume-only exercise remains 
 
 Every period exposes working-set count, Volume (§4 Totals) and the included
 Volume-set count; counts and Volume reconcile with the contribution rows.
-Changes are shown as [[comparison.change-display]]; each row's Volume change
-uses its own baseline, and the code's states are `empty`, `new`, a percentage,
-`unavailable` (`—`) when either sum is not finite, and `increased` if the
-percentage overflows. Row percentages are never summed. Calculation-column eligibility is independent
+Changes are shown as [[comparison.change-display]], each row's Volume change
+against its own baseline; the code adds `empty`, `unavailable` (`—`, a sum
+not finite) and `increased` (the percentage overflows). Row percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
 
-Muscle List tickers implement [[comparison.muscle-ticker-window]] and
-[[comparison.muscle-ticker-reference]] in `src/data/progress-muscle-tickers.ts`,
-sharing bounded raw aggregation and policy-refreshed first-training facts.
-Their history reads use completed sessions only.
+Muscle List tickers (`src/data/progress-muscle-tickers.ts`) plot rolling
+Progress-N-week totals over [[comparison.history-window]], sharing bounded raw
+aggregation and policy-refreshed first-training facts; their references need
+the history minimum (§2). Their history reads use completed sessions only.
 
 No derived figure is written back to a set or session.
 
@@ -357,10 +356,8 @@ revisions; personal facts rebuild under the new calculation rules.
 
 ## 6. RM curve analytics — experimental fitting
 
-[[1rm.curve-population]], [[1rm.curve-effort]], [[1rm.curve-fitting]],
-[[1rm.curve-load]] and [[1rm.curve-scope]] govern the read model. For fitting,
-numerical diagnostics, cancellation and calibration limits, load
-`strength-regimes-contract.md`. This branch implements the approved experimental
+For the read model's fitting, numerical diagnostics, cancellation and
+calibration limits, load `strength-regimes-contract.md`. This branch implements the approved experimental
 view; activation and human implemented-UI acceptance remain separate gates.
 
 `src/data/rm-curve.ts` reads one bounded SQLite snapshot; `src/rm-curve/` derives
@@ -369,8 +366,8 @@ hosted by `app/rm-curve.tsx`. No derived figure writes back to workouts.
 
 Resolve actual metrics with `calculateSetMetrics` at parsed performed reps m,
 then `getSessionSetRir` on raw effort and `isWorkingSet` with the account policy.
-Under [[1rm.curve-effort]], validate `Number.isSafeInteger(m+n)` before passing
-u to the shared estimator. Actual metrics can be finite while this second
+RM analysis uses u = m + n RIR0-equivalent reps; validate
+`Number.isSafeInteger(m+n)` before passing u to the shared estimator. Actual metrics can be finite while this second
 estimate overflows; retain only finite analytical values. Missing/unknown RIR
 cannot be inferred from targets.
 
