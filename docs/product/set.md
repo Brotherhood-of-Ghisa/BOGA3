@@ -39,18 +39,6 @@ Why: warm-ups, technique and cooldown work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
 Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults and the fixed group and coaching rule (`SHARED_EFFORT_POLICY`) in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
 
-### set.complete-cleanup · definition · accepted
-
-`Complete exercise` keeps only that exercise's confirmed performed sets
-([[set.performed]]); every other row goes — a planned set never done, typed
-values never confirmed, a blank row — so the exercise reads as what was
-trained. It asks first, naming the count, unless every row going is blank.
-The exercise page's swipe-left also deletes a planned row; the session view's
-Done keeps planned rows.
-
-Why: a finished exercise must not list sets nobody did.
-Code: `planCompleteExercise` in `apps/mobile/src/session-recorder/exercise-page-model.ts`.
-
 ### set.count-display · presentation · accepted
 
 An unqualified `Sets` is the working-set count ([[set.eligibility]]) on every
@@ -59,20 +47,18 @@ shown side by side. Only plain row counts count every row: `n of m sets done`
 and the remove-exercise alert's `its N sets`.
 
 Why: one number per idea.
-Code: the aggregators' `workingSetCount`.
+Code: the aggregators' `workingSetCount` (`apps/mobile/src/session-insights/calculations.ts`).
 Signature: `n of m sets done`
 
 ### set.row-figures · presentation · accepted
 
 Every set row shows every figure it can compute (Weight, reps, 1RM, Volume),
 planned and warm-up rows included; unrealised figures are faded. A warm-up
-row's real 1RM and Volume describe that row only. A set feeds records only as
-[[set.eligibility]] allows: a working set can make a 1RM or Weight record, a
-volume-included set a Volume record, one that is neither never a record, PR or
-best. The only highlights on a set list are the exercise's record sets: the
-one that took the 1RM record and the one that took the Weight record (a set
-may take both). The group session view highlights instead the set that took #1
-on a group 1RM board: one `#1 in group` band per set (decided 2026-10-08).
+row's real 1RM and Volume describe that row only; [[set.eligibility]] decides
+which sets can be records, never what a row shows. The only highlights on a set
+list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
+§3). The group session view highlights instead the set that took #1 on a group
+1RM board: one `#1 in group` band per set.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.

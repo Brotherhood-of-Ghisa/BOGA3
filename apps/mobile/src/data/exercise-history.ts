@@ -64,7 +64,7 @@ export type ExerciseHistorySessionEntry = ResolvedSessionWeight & {
  * The records one block took as they happened: its session's stored PR flags
  * (`exercise_session_facts`). With every gym in view they are the whole
  * exercise's (`pr_*`); with a gym chosen, the session's own (`own_pr_*`) —
- * a split exercise's gym book ([[gym.split-progress-prs]]). A strength record
+ * a split exercise's gym book ([[gym.split]]). A strength record
  * belongs to the block holding its set; Volume to the session's first listed
  * block of the exercise.
  */
@@ -377,7 +377,7 @@ const buildGymOptions = (
   });
 };
 
-/** The PR flags a view reads ([[gym.split-progress-prs]]). */
+/** The PR flags a view reads ([[gym.split]]). */
 const sessionPrFlags = (row: ExerciseHistorySessionRecordRow, own: boolean) =>
   own
     ? { e1rm: row.ownPrE1rm, weight: row.ownPrWeight, volume: row.ownPrVolume }

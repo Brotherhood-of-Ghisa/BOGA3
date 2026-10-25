@@ -4,6 +4,7 @@ import { Circle } from 'react-native-svg';
 
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import { uiRoles } from '@/components/ui/tokens';
+import { setRepeatingTimerAwake } from '@/src/session-recorder/repeating-timer-native';
 import {
   __resetRestTimerForTests, adjustRepeatingTimer, getRestTimerEntry, startRepeatingTimer,
   stopRepeatingTimer, useSessionRestTimer,
@@ -134,6 +135,19 @@ it.each(['requestClose', 'accessibilityEscape'] as const)('%s collapses without 
   advance(20_000);
   expand();
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:55');
+});
+
+it.each([false, true])('collapsing or reopening fullscreen neither releases nor reacquires keep-awake (paused=%s)', (paused) => {
+  startRepeatingTimer('session-1', 60);
+  if (paused) stopRepeatingTimer('session-1');
+  render(<TimerHost />);
+  expand();
+  jest.mocked(setRepeatingTimerAwake).mockClear();
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
+  expect(screen.queryByTestId('repeating-timer-focus')).toBeNull();
+  expand();
+  expect(screen.getByTestId('repeating-timer-focus')).toBeTruthy();
+  expect(setRepeatingTimerAwake).not.toHaveBeenCalled();
 });
 
 it('fits long figures, keeps rounds open-ended, and never announces countdown ticks', () => {

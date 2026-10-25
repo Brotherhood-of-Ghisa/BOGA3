@@ -34,13 +34,6 @@ unavailable and known zero.
 Why: distinguish missing data from measurements.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
 
-### copy.set-entry · presentation · accepted
-
-Workout, session-plan and programme set entry use `Effort`, `Weight`, `Reps`.
-Total-load and per-side exercises share `Weight`, accessible as `Set N weight`.
-
-Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`.
-
 ### copy.no-weight-unit · presentation · accepted
 
 While kg is the sole weight unit, visible/spoken labels omit kg/kilograms,

@@ -25,61 +25,13 @@ Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
 the session summary, Progress, the muscle heatmaps and Stats.
 Signature: `primary + ½ secondary`
 
-### muscle.map-area · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
-### muscle.map-colour · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
-### muscle.progress-layout · presentation · accepted
-
-Both Progress breakdowns use Settings → Progress → Progress view (`List` /
-`3D`, default `List`), remembered per account on this device. Exercise
-and Muscle share it; Exercise 1RM uses List for 3D.
-3D shades each muscle on the 5-step `viz0..viz4` ramp relative to
-the period's top muscle (`0`/unavailable → `viz0`; Exercise sums filtered
-exercises by [[muscle.set-count]]), and tapping a muscle scopes the exercise
-list below. Progress has no layout selector; changing layout keeps filters,
-selection and scroll. Approved 2026-10-20.
-
-A saved retired Map choice falls back to List. 3D contribution tables show
-individual exercises without subtotals.
-
-Code: `apps/mobile/components/preferences/progress-settings.tsx`,
-`apps/mobile/components/stats/muscle-body-projection.ts` and `apps/mobile/app/(tabs)/progress.tsx`.
-
 ### muscle.secondary-filter · presentation · accepted
 
 Progress and muscle history Filters offer `Count secondary sets` per visit:
 Progress opens on Settings' default, history on Progress's. Off counts primary
-work only. Approved 2026-10-23.
+work only.
 
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
-
-### muscle.comparison-primary-only · presentation · accepted
-
-A session's by-muscle volume comparison covers only muscles the session worked
-as **primary for any of their entries**. A muscle trained only as a secondary has no comparison, and a
-past session that trained it only as a secondary adds no baseline reading. A
-primary muscle's Volume still includes its secondary work at ½
-([[muscle.set-count]]). Decided 2026-10-18.
-
-Why: a secondary mapping is real work but not the muscle the lift is for, so
-comparing it against sessions that targeted it misleads.
-Code: `deriveSessionMuscleVolumeComparisons` in
-`apps/mobile/src/session-insights/calculations.ts`, over
-`reportSessionMuscles` in `apps/mobile/src/session-insights/catalog-muscles.ts`.
-
-
-### muscle.exercise-map-area · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
-
-### muscle.exercise-map-colour · presentation · superseded-by: muscle.progress-layout
-
-Map view dropped.
 
 ### muscle.report-groups · definition · accepted
 
@@ -88,18 +40,8 @@ anatomy entry) or **Broad**, per account, synced, with a Track switch per
 muscle. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle's switch is on while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family. Decided 2026-10-24.
+A merged muscle's switch is on while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family.
 
-| Broad muscle | Entries |
-| --- | --- |
-| Chest | Pectoralis, Serratus Anterior |
-| Back | Lats, Upper back, Upper Traps, Lower Traps |
-| Biceps | Biceps, Brachialis |
-| Core | Abs, Obliques |
-| Quads | Quads, Adductors, Hip flexors |
-| Glutes & Hams | Glute Max, Hamstrings, Hip Abductors |
-| Calves | Calves, Tibialis Anterior |
-| Front, Lateral, Rear Delts; Triceps | one entry each |
 
 Why: a simpler view.
 Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
@@ -121,25 +63,12 @@ An untracked muscle adds nothing to any muscle figure and is not shown. Exercise
 figures (sets, Volume, records, 1RM) do not change. No line reports the dropped work.
 
 Why: the user chose not to follow that muscle.
+Code: `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.family-sections · presentation · accepted
 
 In any list of muscles a family header shows only above two or more of the user's
-muscles; catalogue and picker cards stay one per family. In Progress, a
-headerless family lists first.
+muscles; catalogue and picker cards stay one per family.
 
 Why: a header over one muscle repeats it.
 Code: `apps/mobile/components/stats/progress-tables.tsx`.
-
-### muscle.catalog-names · presentation · accepted
-
-Catalog labels use the following names; custom names remain. Approved 2026-10-21.
-
-| Muscle ID | Label |
-| --- | --- |
-| `forearms_grip` | Forearms |
-| `abs_rectus` | Abs |
-| `hip_abductors` | Hip Abductors |
-
-Why: keep muscle labels concise.
-Code: `apps/mobile/src/data/exercise-catalog-seeds.ts` and `apps/mobile/src/data/bundle-migrations.ts`.

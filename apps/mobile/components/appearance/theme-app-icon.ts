@@ -7,7 +7,8 @@ import { logEvent } from '@/src/logging';
 
 let inFlight: Promise<void> | null = null;
 
-// Selection follows [[appearance.app-icon-theme]]; names match the config plugin.
+// Each preset has its own icon, every custom colour shares Rainbow, and Warm (the
+// default) is the primary icon and the fallback; names match the config plugin.
 async function applyThemeAppIcon(preset: ResolvedTheme['preset'], interrupted: () => boolean): Promise<boolean> {
   const iconName = preset.id === DEFAULT_THEME_PRESET_ID ? null : preset.id === 'custom' ? 'Rainbow' : preset.label;
   try {

@@ -19,6 +19,7 @@
 #   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
 #   boga android doctor|run|start              # verify Android environment or run dev client
 #   boga docs gen|check|budgets                # (re)generate / drift-check derived doc blocks; doc word counts
+#   boga docs facts [<ref>]                    # product fact IDs; with <ref>, those the diff from it reaches
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga timings import <dir>...|--git <ref>   # copy records into this machine's store
 #   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
@@ -367,7 +368,8 @@ case "${cmd}" in
     sub="${1:-check}"
     case "${sub}" in
       gen|check|budgets) exec "${REPO_ROOT}/scripts/gen-docs.sh" "${sub}" ;;
-      *) fail "usage: boga docs gen|check|budgets" ;;
+      facts) exec "${REPO_ROOT}/scripts/gen-docs.sh" facts "${@:2}" ;;
+      *) fail "usage: boga docs gen|check|budgets|facts [<ref>]" ;;
     esac
     ;;
   timings)  dispatch_script "${REPO_ROOT}/scripts/test-timings.sh" "$@" ;;

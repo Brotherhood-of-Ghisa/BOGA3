@@ -360,6 +360,16 @@ describe('rest-timer store and pure rules', () => {
     timer.mockRestore();
   });
 
+  // Session end: session-end-keep-awake.test.ts.
+  it.each(['dismissal', 'mode switch'] as const)('releases keep-awake on %s', (action) => {
+    AppState.currentState = 'active';
+    startRepeatingTimer('session-1');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(true);
+    if (action === 'dismissal') dismissRestTimer('session-1');
+    if (action === 'mode switch') switchTimerMode('session-1', 'rest');
+    expect(setRepeatingTimerAwake).toHaveBeenLastCalledWith(false);
+  });
+
   it.each([null, 'background'] as const)('waits for foreground from initial state %s and skips missed cues after backgrounding', (initial) => {
     AppState.currentState = initial as AppStateStatus;
     let change!: (state: AppStateStatus) => void;

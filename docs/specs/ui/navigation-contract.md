@@ -192,9 +192,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | `View groups`, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
-Progress filters stay in-route; Sessions last. [[muscle.progress-layout]]
-governs both layouts. Tapping a muscle in Exercise 3D discloses contributions;
-their links open full history at the selected metric/gym. Exercise 1RM follows [[muscle.progress-layout]]; layout switches reset scroll.
+Progress filters stay in-route; Sessions last. Tapping a muscle in Exercise 3D discloses contributions;
+their links open full history at the selected metric/gym. Exercise 1RM always uses List; layout switches reset scroll.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

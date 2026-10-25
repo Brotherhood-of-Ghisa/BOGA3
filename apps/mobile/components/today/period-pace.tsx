@@ -122,7 +122,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
   );
 }
 
-// The fixed period ([[comparison.window]]) against the previous period: the
+// The fixed period (`TodayProgressPeriod`) against the previous period: the
 // selected day's working sets (today until the chart is touched; after today,
 // the projection's) against the previous period's at the same day, and their
 // difference ([[comparison.change-display]]); then the cumulative lines by day.

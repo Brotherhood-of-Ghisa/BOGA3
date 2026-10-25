@@ -8,9 +8,11 @@
 # Rows (tab-separated):
 #   budget   <doc|*>  <words>   a doc's limit; `*` is the default for the rest
 #   exempt   <prefix>           docs under this prefix are reported, not budgeted
-#   corpus   <dir/>   <words>   a directory loaded whole: its persistent docs'
-#                               combined limit, on top of each doc's own; its
-#                               README (the index) is not counted
+#   budget   <dir/>   <words>   the limit for each doc under dir/ without its own row
+#                               (longest prefix wins)
+#   facts    <dir/>   <count>   at most this many product facts under dir/; a new
+#                               fact past it cuts or merges one first (raising it
+#                               needs the operator's agreement)
 #   ceiling  <doc>    <words>   grandfathered: the doc was over budget when the
 #                               budgets landed. It may not grow; `./boga docs gen`
 #                               lowers it as the doc shrinks and drops it once the
@@ -21,4 +23,6 @@ budget	docs/specs/02-quality-and-test-gates.md	2500
 budget	docs/specs/03-technical-architecture.md	2500
 budget	docs/specs/09-project-structure.md	2500
 budget	*	3000
-corpus	docs/product/	5100
+budget	docs/product/README.md	200
+budget	docs/product/	1000
+facts	docs/product/	32

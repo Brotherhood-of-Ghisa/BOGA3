@@ -33,8 +33,9 @@ known failed admissions become immutable forfeiture markers, never newer source
 timestamps. A first capture failure can forfeit that alert. If both the isolated
 write and its diagnostic fail, erased earlier timing cannot be reconstructed.
 
-[[notifications.completion-readiness]] uses a separate authenticated RPC after
-ordinary sync converges. The client declares canonical session, exercise, set,
+A completion summary needs the app to confirm its uploaded workout graph (older
+apps send none); that check uses a separate authenticated RPC after ordinary
+sync converges. The client declares canonical session, exercise, set,
 definition and link domain rows, including tombstones. The server compares exact
 membership and contents; sync clocks and bookkeeping are excluded because the
 existing future-clock clamp can leave their values different after convergence.
@@ -101,8 +102,8 @@ new placement is not attributed merely because its numeric position shifts.
 This excludes unrelated coalesced causes while preserving
 [[notifications.achievements]]. Unchanged evidence-set performance may retain only the same
 non-voided record identity or initial-set fingerprint; changing another set cannot
-admit a recompute-created replacement. Non-workout alerts follow
-[[notifications.non-workout-ranks]]. Operational snapshots are pruned after the
+admit a recompute-created replacement. Standalone rank changes (certification,
+corrections, links, membership, rules) send no alert yet (#737). Operational snapshots are pruned after the
 original completion delivery window; minimal workout/intent tombstones preserve
 deduplication. Unfinished, abandoned or hard-missing sources retain their actual
 baselines until completion; no maximum active age is imposed. Account deletion
@@ -166,11 +167,12 @@ platform randomness and preserves installation capability independently from
 the current decryption binding. Existing Auth SecureStore access remains in
 the app's default Keychain group. The plugin generates extension targets,
 shared entitlements and embedded fonts; applied launch colour roles are shared
-through an atomic app-group file, implementing [[notifications.theme]].
+through an atomic app-group file, so expanded content follows the app theme.
 The service extension leaves the original encrypted envelope in `userInfo`;
 the content extension and app tap both decrypt again against current identity.
 Native and JS readers validate version, recipient, binding, expiry and routing
-shape before use. Foreground handling implements [[notifications.foreground]].
+shape before use. In the foreground an alert shows the iOS banner without sound and never
+navigates (`apps/mobile/src/notifications/native-adapter.ts`).
 
 Settings' notification sheet reuses shared controls and reflects OS permission,
 registration and confirmed server preference state. Group mute uses the live
@@ -210,7 +212,7 @@ delay. The adapter checks expiry immediately before the request.
 
 Preparation rechecks opt-in, permission, binding/session, category/mute state,
 membership, live share/session and expiry. It composes a narrow public preview
-([[notifications.preview]]) from current names and authorized contributions;
+from current names and authorized contributions;
 no privileged raw event is a push payload. The workout's gym display name is
 resolved through the lifter's live owner-scoped row before encryption. Event
 producers must refresh coherent achievement contributions before handoff; the

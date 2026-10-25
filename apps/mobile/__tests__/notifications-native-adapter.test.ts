@@ -13,6 +13,17 @@ const { getNotificationNativeAdapter } = jest.requireActual<typeof import('@/src
 const native = getNotificationNativeAdapter();
 afterAll(() => { nativeLookup.mockRestore(); });
 beforeEach(() => { jest.clearAllMocks(); mockBridge.decrypt.mockReturnValue(notificationProjectionFixture()); });
+// The first release delivers iOS push only; Android is outside it.
+test.each([['ios', true], ['android', false]] as const)('native notifications are supported on %s: %s', (os, supported) => {
+  jest.isolateModules(() => {
+    const { Platform } = jest.requireActual<typeof import('react-native')>('react-native');
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+    const core = jest.requireMock<typeof import('expo-modules-core')>('expo-modules-core');
+    jest.spyOn(core, 'requireOptionalNativeModule').mockReturnValue(mockBridge);
+    const isolated = jest.requireActual<typeof import('@/src/notifications/native-adapter')>('@/src/notifications/native-adapter');
+    expect(isolated.getNotificationNativeAdapter().supported).toBe(supported);
+  });
+});
 test('foreground uses the normal iOS banner without sound, and malformed crypto fails closed', async () => {
   const stop = native.listen(jest.fn(), jest.fn());
   const handler = jest.mocked(Notifications.setNotificationHandler).mock.calls.at(-1)?.[0]!;

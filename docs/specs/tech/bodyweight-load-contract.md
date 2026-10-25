@@ -152,7 +152,7 @@ management or deletes anything. The personal exercise editor shows only
 The logger always says `Weight`; rows, records, History, Stats, completion and
 share surfaces use `Top weight`, `1RM` and `Volume`. They do not expose the
 calculation breakdown, except the approved RM chart coordinate
-([[1rm.curve-load]], §11), or prompt for a reading during a workout. A valid zero
+(§11), or prompt for a reading during a workout. A valid zero
 renders as a number in its figure's format (`training-metrics-contract.md` §4,
 [[1rm.formula]]), not as unavailable. Raw top Weight stays independent from derived
 1RM and Volume.
@@ -259,11 +259,12 @@ server-side; this changes no personal missing-reading fallback.
 
 ## 11. RM chart projection — approved contract, implementation pending
 
-[[1rm.curve-load]] authorizes one analytical coordinate, without changing
+The chart plots calculated load divided by the entry factor, on an axis
+distinct from Weight: one analytical coordinate, without changing
 entered Weight or displayed 1RM. With actual-reps kernel load `L`, analytical total reference RM
 `M`, entry factor `F` and `f(u) = estimateOneRepMax(1, u)`, project the chart
 point as `L/F` and its overlay as `M/[F × f(u)]`. The existing kernel resolves
-dated bodyweight and applies F once; u comes from [[1rm.curve-effort]]. The
+dated bodyweight and applies F once; u is the RIR0-equivalent reps (`training-metrics-contract.md` §6). The
 chart adds no second entry conversion.
 
 For internal checks, entered-Weight prediction is `(M/f(u) − cB)/F`; it depends

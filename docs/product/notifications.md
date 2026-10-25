@@ -1,13 +1,5 @@
 # Notifications
 
-### notifications.platform · definition · accepted
-
-The first release delivers native iOS push notifications; Android is outside
-it.
-
-Code: `apps/mobile/src/notifications/native-adapter.ts` and
-`apps/mobile/modules/boga-notifications/`.
-
 ### notifications.audience · definition · accepted
 
 Group workout notifications go to every other current member of the groups
@@ -46,13 +38,10 @@ Code: `supabase/migrations/20261014133141_notification_workout_events.sql`.
 ### notifications.achievements · definition · accepted
 
 The summary's bests are improvements to a member's own best on a linked group
-exercise under existing group competition rules, including below first place;
-private personal history/device preferences never supply them. Count one final
-best per group × group exercise × metric for the workout: Volume and 1RM count
-twice, two groups separately, repeated autosaves once. Count one net
-before-to-final position change per member × group exercise × metric × board
-scope × group, upward or downward. Intermediate hops do not multiply it;
-returning to the original position counts zero.
+exercise under group competition rules, including below first place. A workout
+counts one final best per group × group exercise × metric, and one net
+before-to-final position change, up or down, per member × group exercise ×
+metric × board scope × group.
 
 Code: `apps/mobile/src/notifications/workout-events.ts`; scoring is owned by
 `docs/specs/tech/group-competition-contract.md`.
@@ -65,50 +54,3 @@ original deadline.
 
 Why: avoid bursts from old offline history.
 Code: `supabase/migrations/20261014115352_notification_delivery.sql`.
-
-### notifications.completion-readiness · definition · accepted
-
-A completion summary requires a compatible app to confirm its uploaded workout
-graph and the server to verify matching evaluated results. Older app versions
-without confirmation produce no completion summaries.
-
-Why: completion can arrive before final exercise and set rows.
-Code: `apps/mobile/src/notifications/completion.ts`.
-
-### notifications.non-workout-ranks · definition · accepted
-
-The first release delivers workout-origin rank changes. Standalone changes
-from certification, corrections, links, membership or competition rules are
-deferred to a separately designed board-update notification. This excludes
-those causes, not non-first or downward positions within workout alerts.
-
-Pending: [board-update notification proposal #737](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/737).
-
-### notifications.theme · presentation · accepted
-
-Expanded notification content follows the recipient's currently applied app
-theme, including custom colours. The abbreviated banner retains the iOS system
-appearance. Warm-theme examples do not fix the notification palette for every
-user.
-
-Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationContent.swift`.
-
-### notifications.preview · presentation · accepted
-
-An alert identifies the lifter and one contributing group, or `N groups` when
-several contribute. Activity headings read `Started a workout at <gym name>` or
-`Finished a workout at <gym name>`, using `a secret location` when no mapped gym
-name is available. Previews show positive enabled achievement counts, without
-exercise names or lifting figures. Disabled and zero-count rows are omitted.
-Activity-off previews omit start/completion wording. Only enabled, currently
-authorized groups contribute.
-
-Code: `apps/mobile/modules/boga-notifications/ios/extensions/BogaNotificationContent.swift`.
-
-### notifications.foreground · presentation · accepted
-
-While BOGA is open, an eligible incoming notification shows the normal iOS
-banner without sound. Receiving it never navigates away from the current screen;
-opening its workout requires a tap.
-
-Code: `apps/mobile/src/notifications/native-adapter.ts`.
