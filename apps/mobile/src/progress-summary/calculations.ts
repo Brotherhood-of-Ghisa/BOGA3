@@ -28,7 +28,11 @@ export type TodayProgressWeek = {
 };
 
 export type TodayProgressPeriod = {
-  /** The fixed period holding today ([[comparison.window]]). */
+  /**
+   * The fixed period holding today: consecutive N-week periods (N is Settings'
+   * Progress period) anchored on Monday 29 Dec 2025, compared with the previous
+   * period up to the same day.
+   */
   window: LocalWindow;
   weeks: number;
   /** Today's day of the period: 1 on its first day. */
