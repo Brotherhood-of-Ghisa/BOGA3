@@ -63,6 +63,7 @@ An untracked muscle adds nothing to any muscle figure and is not shown. Exercise
 figures (sets, Volume, records, 1RM) do not change. No line reports the dropped work.
 
 Why: the user chose not to follow that muscle.
+Code: `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.family-sections · presentation · accepted
 

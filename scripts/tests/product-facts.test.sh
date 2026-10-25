@@ -48,11 +48,11 @@ cat > "${FIX}/docs/product/lift.md" <<'MD'
 Code: `estimate` in `src/lift.ts`.
 Signature: `48.8`, `n of m sets done`
 
-### lift.reps · definition · accepted
+### lift.reps · principle · accepted
 
 Reps feed [[lift.formula]].
 
-### lift.count · definition · open
+### lift.count · principle · open
 
 Undecided.
 MD
@@ -108,6 +108,8 @@ restore; printf '\n## Notes\n\nSignature: `53.8`\n' >> "${FACTS}"
 expect_fail "a Signature under a non-fact section" "lift.md:28: malformed Signature line"
 restore; printf '\n## lift.extra · principle · accepted\n' >> "${FACTS}"
 expect_fail "a fact header at the wrong level" "lift.md:26: fact header at the wrong level"
+restore; printf '\n### lift.extra · definition · accepted\n\nWhy: x.\nCode: `estimate`.\n' >> "${FACTS}"
+expect_fail "a non-principle fact citing no code path" "lift.md:26: fact 'lift.extra' cites no code path"
 restore; gd check >/dev/null || fail "restored facts must pass"
 
 # Case and line wraps do not hide a restatement; `148.8` and `48.85` above
@@ -139,13 +141,13 @@ gd check >/dev/null || fail "restoring the spec must pass: $(gd check)"
 # Per-fact statement cap: the statement is the header-to-`Why:` text, so
 # fact-table examples and the trailer are free of it.
 words() { python3 -c 'import sys; print("word " * int(sys.argv[1]))' "$1"; }
-restore; { printf '\n### lift.wordy · definition · accepted\n\n'; words 131; } >> "${FACTS}"
+restore; { printf '\n### lift.wordy · principle · accepted\n\n'; words 131; } >> "${FACTS}"
 expect_fail "a statement over the cap" \
   "lift.md:26: fact 'lift.wordy' states 131 words, over the 130-word cap"
-restore; { printf '\n### lift.terse · definition · accepted\n\n'; words 130; } >> "${FACTS}"
+restore; { printf '\n### lift.terse · principle · accepted\n\n'; words 130; } >> "${FACTS}"
 gd check >/dev/null || fail "a statement at the cap must pass: $(gd check)"
 restore
-{ printf '\n### lift.tabled · definition · accepted\n\n'; words 100
+{ printf '\n### lift.tabled · principle · accepted\n\n'; words 100
   printf '\n<!-- fact-table: lift.tabled -->\n\n| In | Out |\n| --- | --- |\n'
   for _ in $(seq 20); do printf '| %s | %s |\n' "$(words 3)" "$(words 3)"; done
   printf '\nWhy: '; words 60; printf 'Code: '; words 60; } >> "${FACTS}"
@@ -178,6 +180,19 @@ out="$(gd facts HEAD)"
 [[ "${out}" == "lift.formula  accepted  docs/product/lift.md:"* && "$(wc -l <<<"${out}")" -eq 1 ]] \
   || fail "facts <ref> must list only the fact whose Code: path changed: ${out}"
 git -C "${FIX}" checkout -q -- src/lift.ts
+git -C "${FIX}" mv src/lift.ts src/moved.ts
+out="$(gd facts HEAD)"
+grep -q "^lift.formula " <<<"${out}" || fail "facts <ref> must reach a fact whose Code: path was renamed away: ${out}"
+grep -qF "warning, docs-check has" <<<"${out}" || fail "facts must warn about docs-check problems: ${out}"
+git -C "${FIX}" mv src/moved.ts src/lift.ts
+mkdir -p "${FIX}/src/lift" && printf 'x\n' > "${FIX}/src/lift/new.ts"
+sed -i.bak 's|Code: `estimate` in `src/lift.ts`.|Code: `estimate` in `src/lift.ts`, `src/lift/`.|' "${FACTS}" && rm "${FACTS}.bak"
+git -C "${FIX}" add docs && git -C "${FIX}" -c user.name=t -c user.email=t@t commit -qm dir
+out="$(gd facts HEAD)"
+grep -q "^lift.formula " <<<"${out}" || fail "facts <ref> must reach a fact from a new untracked file: ${out}"
+git -C "${FIX}" add src/lift
+out="$(gd facts no-such-ref)" && fail "facts with an unknown ref must fail"
+grep -qF "no merge base with 'no-such-ref'" <<<"${out}" || fail "facts must name the bad ref: ${out}"
 printf '\nMore.\n' >> "${FACTS}"
 out="$(gd facts HEAD)"
 [[ "$(wc -l <<<"${out}")" -eq 3 ]] || fail "facts <ref> must list every fact in a changed fact file: ${out}"

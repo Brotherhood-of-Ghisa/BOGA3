@@ -9,9 +9,10 @@ verdict on the PR. It checks the change against the product decisions in
 
 - The change: a PR diff (`gh pr diff <n>`) or a branch diff against
   `origin/main`, plus the PR title and body if there is one.
-- The facts it reaches: `./boga docs facts origin/main` (facts whose `Code:`
-  or `Pending:` paths, or own file, the diff touches), plus every subject in
-  `docs/product/README.md` whose trigger the diff matches.
+- The facts it reaches: `./boga docs facts origin/main`, run in a checkout of
+  the change's head (the builder's worktree, or `gh pr checkout <n>`): facts
+  whose `Code:` or `Pending:` paths, or own file, the diff touches. Add every
+  subject in `docs/product/README.md` whose trigger the diff matches.
 - The repository at the change's base, for context only.
 
 ## Method

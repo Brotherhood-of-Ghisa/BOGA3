@@ -31,7 +31,7 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  * the Group records card, then one card per exercise with its performed sets
  * as `type · weight × reps · 1RM · VOL` and a `#1 in group` band on the set
  * that took a group record. Normalized sets use wrapped percentage rows
- * (load and 1RM as `%BW`, Volume as `%BW·reps`; private inputs never shown). Who and when
+ * (group-competition-contract.md §2). Who and when
  * are the screen title's. Read-only for
  * the session — no edit, delete or append; certification is the records
  * card's. Performed sets only: the server returns every live set raw, and the

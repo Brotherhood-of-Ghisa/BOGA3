@@ -92,8 +92,9 @@ facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
 **History minimum.** Session volume comparisons, Weekly heatmap references
-and Muscle List tickers need six known observations, zeros included
-(`apps/mobile/src/utils/history-reference.ts`); each owns its window.
+and Muscle List tickers share one minimum of known observations, zeros
+included (`MIN_HISTORY_OBSERVATIONS` in `apps/mobile/src/utils/history-reference.ts`);
+each owns its window.
 
 **Session volume comparison.** Its distribution — P25, median and P75, with the
 current Volume and its median delta — needs that minimum of prior comparable

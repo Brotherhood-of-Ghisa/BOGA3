@@ -47,7 +47,7 @@ shown side by side. Only plain row counts count every row: `n of m sets done`
 and the remove-exercise alert's `its N sets`.
 
 Why: one number per idea.
-Code: the aggregators' `workingSetCount`.
+Code: the aggregators' `workingSetCount` (`apps/mobile/src/session-insights/calculations.ts`).
 Signature: `n of m sets done`
 
 ### set.row-figures · presentation · accepted

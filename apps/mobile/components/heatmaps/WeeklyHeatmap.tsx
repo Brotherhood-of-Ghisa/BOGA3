@@ -147,7 +147,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   const max = values[values.length - 1] ?? 0;
   const { axisValues, position } = weeklyScale(values, metric);
-  // References need six observations and a positive maximum; Sets draws only the median.
+  // References need MIN_HISTORY_OBSERVATIONS and a positive maximum; Sets draws only the median.
   const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metric !== 'workingSetCount' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);

@@ -625,6 +625,8 @@ def statement_words(rel):
     return out
 
 CODE_TRAILER = re.compile(r"^(?:Code|Pending):")
+TRAILER_END = re.compile(r"^(?:Why:|Signature:|\||#|<!--)")
+fact_kinds = {}
 
 def parse_fact_file(rel, facts, signatures, code_paths):
     """Fill facts (id -> (rel, line, status)), signatures (id -> texts) and
@@ -642,11 +644,11 @@ def parse_fact_file(rel, facts, signatures, code_paths):
             continue
         if CODE_TRAILER.match(line):
             trailer = True
-        elif not line.strip() or re.match(r"[A-Z][a-z]+:", line):
-            trailer = False  # a trailer line may wrap; a blank or the next trailer ends it
+        elif not line.strip() or TRAILER_END.match(line):
+            trailer = False  # a Code:/Pending: line may wrap; a blank, table, heading or next trailer ends it
         if trailer and current is not None:
             code_paths.setdefault(current, []).extend(
-                t.rstrip("/") for t in re.findall(r"`([^`\s]+/[^`\s]*)`", line))
+                t.rstrip("/") for t in re.findall(r"`([^`\s]+/[^`\s]*)`", line) if not t.endswith(".md"))
         if re.match(r"#{1,6} ", line):
             current = None  # a Signature under another section belongs to no fact
             if re.match(r"#+ \S+\.\S+ · ", line):
@@ -683,6 +685,7 @@ def parse_fact_header(rel, ln, line, subject, facts):
         problems.append(f"{rel}:{ln}: duplicate fact ID '{fid}' (first at {first}:{first_ln})")
         return fid
     facts[fid] = (rel, ln, status)
+    fact_kinds[fid] = kind
     return fid
 
 def paragraphs(text):
@@ -738,6 +741,11 @@ for fid, (rel, ln, status) in sorted(facts.items()):
                         f"{FACT_STATEMENT_WORDS}-word cap — state the decision, not the screen: split "
                         "it, or move render detail to the component that owns it "
                         "(rules: docs/procedures/product-facts-authoring.md)")
+for fid, (rel, ln, status) in sorted(facts.items()):
+    if fact_kinds.get(fid) != "principle" and not code_paths.get(fid):
+        problems.append(f"{rel}:{ln}: fact '{fid}' cites no code path — its `Code:` (or `Pending:`) "
+                        "line names a file or directory in backticks, so `./boga docs facts <ref>` "
+                        "can reach it from a diff")
 for prefix, cap in sorted(fact_caps.items()):
     count = sum(rel.startswith(prefix) for rel, _, _ in facts.values())
     if count > cap:
@@ -767,13 +775,24 @@ if mode == "facts":
     # Every fact, or (with a ref) the facts a diff from that ref reaches: its
     # Code:/Pending: paths or its own file changed. The product reviewer's
     # starting set; it still matches subjects by their load triggers.
+    if problems:  # still list: a stale path is often what the reviewer must find
+        print(f"[gen-docs] facts: warning, docs-check has {len(problems)} problem(s):", file=sys.stderr)
+        for p in problems:
+            print(f"  - {p}", file=sys.stderr)
     ref = os.environ.get("DIFF_REF", "")
     changed = None
     if ref:
-        base = subprocess.run(["git", "-C", root, "merge-base", ref, "HEAD"], capture_output=True,
-                              text=True, check=True).stdout.strip()
-        changed = subprocess.run(["git", "-C", root, "diff", "--name-only", base], capture_output=True,
-                                 text=True, check=True).stdout.split()
+        git = lambda *a: subprocess.run(["git", "-C", root, *a], capture_output=True, text=True)
+        base = git("merge-base", ref, "HEAD")
+        if base.returncode:
+            print(f"[gen-docs] facts: no merge base with '{ref}' — fetch it, or name another ref",
+                  file=sys.stderr)
+            sys.exit(2)
+        # Committed and uncommitted changes since the base, both sides of a
+        # rename, and new untracked files.
+        diff = git("diff", "--name-status", "--no-renames", base.stdout.strip()).stdout
+        changed = [line.split("\t", 1)[1] for line in diff.splitlines() if "\t" in line]
+        changed += git("ls-files", "--others", "--exclude-standard").stdout.split()
     def reached(fid):
         own = facts[fid][0]
         paths = code_paths.get(fid, [])
