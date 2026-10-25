@@ -65,6 +65,43 @@ describe('session gym sheet GPS panel', () => {
     expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('Location read failed');
   });
 
+  it('shows a fix still being refined, and a settled coarse one as best effort', () => {
+    const coarse = { ...availableState.position!, accuracyM: 300 };
+    const { rerender } = renderSheet({
+      state: { ...availableState, status: 'reading', position: coarse, attempts: 2 },
+      nearbyGymCount: 3,
+      suggestionCount: 1,
+    });
+
+    expect(screen.getByTestId('session-gps-value-fix')).toHaveTextContent('Refining · ±300 m (attempt 2)');
+    expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('1 of 3 gyms within 1 km');
+
+    rerender(
+      <SessionGymSheet
+        gpsPanel={{ state: { ...availableState, position: coarse }, nearbyGymCount: 3, suggestionCount: 1 }}
+        onDismiss={() => {}}
+        onManage={() => {}}
+        onSelect={() => {}}
+        options={[]}
+        selectedGymId={null}
+        suggestions={[]}
+        visible
+      />
+    );
+    expect(screen.getByTestId('session-gps-value-fix')).toHaveTextContent('Best effort · ±300 m');
+  });
+
+  it('says it is waiting while no fix has landed', () => {
+    renderSheet({
+      state: { ...unavailableState, status: 'reading', gaveUpReason: null, attempts: 1 },
+      nearbyGymCount: 3,
+      suggestionCount: 0,
+    });
+
+    expect(screen.getByTestId('session-gps-value-fix')).toHaveTextContent('Acquiring (attempt 1)');
+    expect(screen.getByTestId('session-gps-value-suggestions')).toHaveTextContent('Waiting for a fix (attempt 1)');
+  });
+
   it('says no gym is within reach of a held fix', () => {
     renderSheet({ state: availableState, nearbyGymCount: 4, suggestionCount: 0 });
 

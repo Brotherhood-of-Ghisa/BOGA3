@@ -1,8 +1,9 @@
 /**
  * The session view's position cache (`src/location/session-position.ts`): the
  * recorder starts acquiring when the session opens, the sheet reads the cache
- * and hears about the fix the moment it lands — any fix, however coarse —
- * timed-out or failed reads retry after a wait, and only permission denials and services-off end the
+ * and hears about the first fix the moment it lands — any fix, however
+ * coarse — then about each more accurate one until a fix is good; timed-out
+ * or failed reads retry after a wait, and only permission denials and services-off end the
  * acquisition for good. Injected readers stand in for the native module.
  */
 
@@ -11,6 +12,7 @@ import {
   getSessionPosition,
   getSessionPositionState,
   resetSessionPositions,
+  SESSION_POSITION_GOOD_ACCURACY_M,
   SESSION_POSITION_MAX_READS,
   subscribeSessionPosition,
   subscribeSessionPositionState,
@@ -39,7 +41,7 @@ afterEach(() => {
 });
 
 describe('session position', () => {
-  it("caches the session's first fix and reads no more", async () => {
+  it("caches the session's first good fix and reads no more", async () => {
     const read = readerOf([fixAt(20)]);
     await beginSessionPosition('session-1', {}, read, 0);
 
@@ -70,16 +72,77 @@ describe('session position', () => {
     expect(updates).toHaveLength(0);
   });
 
-  it('trusts a coarse fix, or one with unknown accuracy, at once', async () => {
-    const coarse = readerOf([fixAt(3_000)]);
-    await beginSessionPosition('session-1', {}, coarse, 0);
-    const unknown = readerOf([fixAt(null)]);
-    await beginSessionPosition('session-2', {}, unknown, 0);
+  it('publishes a coarse fix at once and keeps reading until a good one', async () => {
+    const updates: (number | null)[] = [];
+    subscribeSessionPosition('session-1', (position) => updates.push(position.accuracyM));
+    const states: unknown[] = [];
+    subscribeSessionPositionState('session-1', (state) => states.push({ ...state }));
+    const read = readerOf([fixAt(3_000), fixAt(400), fixAt(SESSION_POSITION_GOOD_ACCURACY_M), fixAt(5)]);
 
-    expect(coarse).toHaveBeenCalledTimes(1);
-    expect(getSessionPosition('session-1')?.accuracyM).toBe(3_000);
-    expect(unknown).toHaveBeenCalledTimes(1);
-    expect(getSessionPosition('session-2')).toMatchObject({ latitude: 51.5, accuracyM: null });
+    await beginSessionPosition('session-1', {}, read, 0);
+
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(updates).toEqual([3_000, 400, SESSION_POSITION_GOOD_ACCURACY_M]);
+    // The coarse fix is readable while reading goes on.
+    expect(states[1]).toMatchObject({ status: 'reading', position: { accuracyM: 3_000 } });
+    expect(getSessionPositionState('session-1')).toMatchObject({
+      status: 'available',
+      position: { accuracyM: SESSION_POSITION_GOOD_ACCURACY_M },
+    });
+  });
+
+  it('keeps the most accurate fix: a looser or unknown-accuracy read never replaces it', async () => {
+    const updates: (number | null)[] = [];
+    subscribeSessionPosition('session-1', (position) => updates.push(position.accuracyM));
+    const read = readerOf([fixAt(null), fixAt(300), fixAt(900), fixAt(null), { status: 'timeout', timeoutMs: 1 }, fixAt(50)]);
+
+    await beginSessionPosition('session-1', {}, read, 0);
+
+    expect(updates).toEqual([null, 300, 50]);
+    expect(getSessionPosition('session-1')?.accuracyM).toBe(50);
+  });
+
+  it('settles on its best coarse fix when the budget runs out, and the sheet can resume refining it', async () => {
+    const read = readerOf(Array.from({ length: SESSION_POSITION_MAX_READS }, () => fixAt(300)));
+    await beginSessionPosition('session-1', {}, read, 0);
+
+    expect(read).toHaveBeenCalledTimes(SESSION_POSITION_MAX_READS);
+    expect(getSessionPositionState('session-1')).toMatchObject({
+      status: 'available',
+      position: { accuracyM: 300 },
+      gaveUpReason: null,
+    });
+
+    const notResumed = readerOf([fixAt(40)]);
+    await beginSessionPosition('session-1', {}, notResumed, 0);
+    expect(notResumed).not.toHaveBeenCalled();
+
+    // While the resumed read is in flight the coarse fix stays readable.
+    let finishRead: (value: unknown) => void = () => undefined;
+    const resumed = jest.fn(() => new Promise((resolve) => (finishRead = resolve)));
+    const resuming = beginSessionPosition('session-1', { resume: true }, resumed as never, 0);
+    expect(getSessionPosition('session-1')?.accuracyM).toBe(300);
+    finishRead(fixAt(40));
+    await resuming;
+    expect(getSessionPosition('session-1')?.accuracyM).toBe(40);
+
+    const afterGood = readerOf([fixAt(5)]);
+    await beginSessionPosition('session-1', { resume: true }, afterGood, 0);
+    expect(afterGood).not.toHaveBeenCalled();
+  });
+
+  it('keeps a coarse fix when a later read is denied, and does not resume', async () => {
+    await beginSessionPosition(
+      'session-1',
+      {},
+      readerOf([fixAt(300), { status: 'permission_denied', canAskAgain: false }]),
+      0
+    );
+
+    expect(getSessionPositionState('session-1')).toMatchObject({ status: 'available', position: { accuracyM: 300 } });
+    const resumed = readerOf([fixAt(40)]);
+    await beginSessionPosition('session-1', { resume: true }, resumed, 0);
+    expect(resumed).not.toHaveBeenCalled();
   });
 
   it('gives up after the read budget of timed-out reads and does not read again', async () => {
