@@ -19,7 +19,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, ne, notInArray, sql } from 'drizzle-orm';
 
 import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
@@ -34,8 +34,6 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstra
 import { observeRemoteTimestamp, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
-import { exerciseSets } from '@/src/data/schema';
-import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
 import {
   findPushBatchFkViolations,
@@ -920,14 +918,14 @@ const findProvenanceClearSplitCards = (tx: Transaction, selected: WireEntity[]):
       continue;
     }
     const stillClaiming = tx
-      .select({ id: exerciseSets.id })
-      .from(exerciseSets)
+      .select({ id: schema.exerciseSets.id })
+      .from(schema.exerciseSets)
       .where(
         and(
-          eq(exerciseSets.sessionExerciseId, String(entity.id)),
-          isNotNull(exerciseSets.sourcePlanSetId),
-          isNull(exerciseSets.deletedAt),
-          eq(exerciseSets.localDirty, true),
+          eq(schema.exerciseSets.sessionExerciseId, String(entity.id)),
+          isNotNull(schema.exerciseSets.sourcePlanSetId),
+          isNull(schema.exerciseSets.deletedAt),
+          eq(schema.exerciseSets.localDirty, true),
         ),
       )
       .all();
@@ -963,6 +961,115 @@ const findProvenanceClearSplitCards = (tx: Transaction, selected: WireEntity[]):
  * back together; a per-row insert failure (e.g. an FK violation) aborts the
  * whole page.
  */
+const PULL_SCRATCH_BASE = 5_000_000;
+let pullScratchOffset = 0;
+
+const liftCollidingOrderSlot = (
+  tx: Transaction,
+  type: EntityTableName,
+  values: Record<string, unknown>,
+  envelopeId: string,
+): void => {
+  if (typeof values.orderIndex !== 'number') {
+    return;
+  }
+  const scratchSlot = PULL_SCRATCH_BASE + (pullScratchOffset++ % 1_000_000);
+
+  if (type === 'session_plan_exercises' && typeof values.sessionPlanId === 'string') {
+    const colliding = tx
+      .select({ id: schema.sessionPlanExercises.id })
+      .from(schema.sessionPlanExercises)
+      .where(
+        and(
+          eq(schema.sessionPlanExercises.sessionPlanId, values.sessionPlanId),
+          eq(schema.sessionPlanExercises.orderIndex, values.orderIndex),
+          ne(schema.sessionPlanExercises.id, envelopeId),
+        ),
+      )
+      .get();
+    if (colliding) {
+      tx.update(schema.sessionPlanExercises)
+        .set({ orderIndex: scratchSlot } as never)
+        .where(eq(schema.sessionPlanExercises.id, colliding.id))
+        .run();
+    }
+  } else if (type === 'session_plan_sets' && typeof values.sessionPlanExerciseId === 'string') {
+    const colliding = tx
+      .select({ id: schema.sessionPlanSets.id })
+      .from(schema.sessionPlanSets)
+      .where(
+        and(
+          eq(schema.sessionPlanSets.sessionPlanExerciseId, values.sessionPlanExerciseId),
+          eq(schema.sessionPlanSets.orderIndex, values.orderIndex),
+          ne(schema.sessionPlanSets.id, envelopeId),
+        ),
+      )
+      .get();
+    if (colliding) {
+      tx.update(schema.sessionPlanSets)
+        .set({ orderIndex: scratchSlot } as never)
+        .where(eq(schema.sessionPlanSets.id, colliding.id))
+        .run();
+    }
+  } else if (type === 'session_exercises' && typeof values.sessionId === 'string') {
+    const colliding = tx
+      .select({ id: schema.sessionExercises.id })
+      .from(schema.sessionExercises)
+      .where(
+        and(
+          eq(schema.sessionExercises.sessionId, values.sessionId),
+          eq(schema.sessionExercises.orderIndex, values.orderIndex),
+          ne(schema.sessionExercises.id, envelopeId),
+        ),
+      )
+      .get();
+    if (colliding) {
+      tx.update(schema.sessionExercises)
+        .set({ orderIndex: scratchSlot } as never)
+        .where(eq(schema.sessionExercises.id, colliding.id))
+        .run();
+    }
+  } else if (type === 'exercise_sets' && typeof values.sessionExerciseId === 'string') {
+    const colliding = tx
+      .select({ id: schema.exerciseSets.id })
+      .from(schema.exerciseSets)
+      .where(
+        and(
+          eq(schema.exerciseSets.sessionExerciseId, values.sessionExerciseId),
+          eq(schema.exerciseSets.orderIndex, values.orderIndex),
+          ne(schema.exerciseSets.id, envelopeId),
+        ),
+      )
+      .get();
+    if (colliding) {
+      tx.update(schema.exerciseSets)
+        .set({ orderIndex: scratchSlot } as never)
+        .where(eq(schema.exerciseSets.id, colliding.id))
+        .run();
+    }
+  }
+};
+
+/**
+ * Applies one typed page of pulled wire entities under last-write-wins (LWW),
+ * keyed on `envelope.client_updated_at_ms`.
+ *
+ * Rules:
+ *  - Unknown id locally: insert row as-is with `local_dirty = false` and
+ *    `local_updated_at_ms = envelope.client_updated_at_ms`.
+ *  - Known id locally and `incoming.client_updated_at_ms > local.local_updated_at_ms`:
+ *    overwrite local with incoming; clear `local_dirty` (the server caught up
+ *    to or beat whatever local edit was there).
+ *  - Known id locally and `incoming.client_updated_at_ms <= local.local_updated_at_ms`:
+ *    ignore the incoming row entirely; keep the local row untouched (its local
+ *    dirty bit and timestamp survive so it wins on the next push leg).
+ *  - Reordering pulls lift colliding existing order slots into a scratch band
+ *    so permutation and tombstone order shifts do not violate unique indexes.
+ *
+ * Runs inside the caller's transaction so the whole page either lands or rolls
+ * back together; a per-row insert failure (e.g. an FK violation) aborts the
+ * whole page.
+ */
 export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
@@ -983,12 +1090,14 @@ export const applyPullPage = (
     const values = wireToEntity(envelope, type);
 
     if (!existing) {
+      liftCollidingOrderSlot(tx, type, values as Record<string, unknown>, envelope.id);
       tx.insert(table).values(values as never).run();
       changed += 1;
       continue;
     }
 
     if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+      liftCollidingOrderSlot(tx, type, values as Record<string, unknown>, envelope.id);
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
       changed += 1;
     }
@@ -1006,9 +1115,9 @@ export const applyPullPage = (
 
 const readCursorMap = (tx: Transaction): PullCursorMap => {
   const row = tx
-    .select({ pullCursor: syncRuntimeState.pullCursor })
-    .from(syncRuntimeState)
-    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+    .select({ pullCursor: schema.syncRuntimeState.pullCursor })
+    .from(schema.syncRuntimeState)
+    .where(eq(schema.syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
     .get();
 
   const raw = row?.pullCursor;
@@ -1028,10 +1137,10 @@ const readCursorMap = (tx: Transaction): PullCursorMap => {
 const writeCursorEntry = (tx: Transaction, layer: number, cursor: PullCursor): void => {
   const map = readCursorMap(tx);
   map[String(layer)] = cursor;
-  tx.insert(syncRuntimeState)
+  tx.insert(schema.syncRuntimeState)
     .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: map as never })
     .onConflictDoUpdate({
-      target: syncRuntimeState.id,
+      target: schema.syncRuntimeState.id,
       set: { pullCursor: map as never },
     })
     .run();

@@ -1349,6 +1349,13 @@ rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
   );
 " "attached block tombstone"
 rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_reorder_plan_blocks(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-att-reord', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_PLAN_INITIAL}',
+    jsonb_build_array('${BLOCK1_ID}')
+  );
+" "attached block reorder"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
   select app_public.agent_tombstone_plan(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-att-pldel', '${MUT_HASH_1}',
     '${PLAN_ID}', '${V_PLAN_INITIAL}'
@@ -1368,7 +1375,34 @@ rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
     '{\"name\": \"Mutated Resolved\"}'::jsonb
   );
 " "resolved block update"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_reorder_plan_blocks(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-res-reord', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${V_RESOLVED}',
+    jsonb_build_array('${BLOCK1_ID}')
+  );
+" "resolved block reorder"
 update_training_fixture "update app_public.session_plan_exercises set progress_status = 'pending' where id = '${BLOCK1_ID}';"
+
+# Finding 4: Deleting a preceding sibling when a subsequent block is consumed raises IMMUTABLE_BLOCK_MUTATION
+IMMUT_SIB_ID="agent-api-${RUN_TAG}-mut-consumed-sib"
+run_psql "
+  insert into app_public.session_plan_exercises (
+    owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by,
+    created_at, updated_at, deleted_at, client_updated_at_ms, server_received_at
+  ) values (
+    '${USER_A_UUID}'::uuid, '${IMMUT_SIB_ID}', '${PLAN_ID}', 1, 'Consumed Sibling',
+    'completed', 'human', ${NOW_MS}, ${NOW_MS}, null, ${NOW_MS}, timezone('utc', now())
+  );
+" >/dev/null
+V_IMMUT_TEST="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+rpc_expect_error "IMMUTABLE_BLOCK_MUTATION" "
+  select app_public.agent_tombstone_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-tomb-prior-to-consumed', '${MUT_HASH_1}',
+    '${PLAN_ID}', '${BLOCK1_ID}', '${V_IMMUT_TEST}'
+  );
+" "deletion renumbering consumed block"
+run_psql "delete from app_public.session_plan_exercises where id = '${IMMUT_SIB_ID}';" >/dev/null
 
 V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 rpc_expect_error "INVALID_ARGUMENT" "
@@ -1386,6 +1420,14 @@ rpc_expect_error "INVALID_ARGUMENT" "
     '${PROGRAMME_ID}', '${PROG_CHILD_1}', '${V_PROG_CUR}'
   );
 " "detach leaving < 2 plans"
+
+# Finding 5: tombstone_plan leaving < 2 plans in programme raises INVALID_ARGUMENT
+rpc_expect_error "INVALID_ARGUMENT" "
+  select app_public.agent_tombstone_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-pldel-under', '${MUT_HASH_1}',
+    '${PROG_CHILD_1}', '${V_PROG_CUR}'
+  );
+" "tombstone plan leaving < 2 plans in programme"
 
 RES_META="$(run_psql "
   select app_public.agent_update_plan_meta(
@@ -1477,6 +1519,8 @@ RES_UPD_BLOCK="$(run_psql "
   fail "kept set was not updated"
 [[ "$(run_psql "select deleted_at is not null from app_public.session_plan_sets where id = '${SET2_ID_2}';")" == "t" ]] ||
   fail "omitted set was not tombstoned"
+[[ "$(run_psql "select order_index >= 2000000 from app_public.session_plan_sets where id = '${SET2_ID_2}';")" == "t" ]] ||
+  fail "omitted set was not parked at order_index >= 2000000"
 
 V_PLAN_CUR="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 LIVE_SET_IDS="$(run_psql "select json_agg(id order by order_index desc) from app_public.session_plan_sets where session_plan_exercise_id = '${BLOCK2_ID}' and deleted_at is null;")"
@@ -1513,6 +1557,10 @@ run_psql "
 " >/dev/null
 [[ "$(run_psql "select deleted_at is not null from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "t" ]] ||
   fail "tombstoned block is not deleted"
+[[ "$(run_psql "select order_index >= 2000000 from app_public.session_plan_exercises where id = '${BLOCK2_ID}';")" == "t" ]] ||
+  fail "tombstoned block was not parked at order_index >= 2000000"
+[[ "$(run_psql "select bool_and(order_index >= 2000000) from app_public.session_plan_sets where session_plan_exercise_id = '${BLOCK2_ID}';")" == "t" ]] ||
+  fail "tombstoned block child sets were not parked at order_index >= 2000000"
 [[ "$(run_psql "select order_index from app_public.session_plan_exercises where id = '${BLOCK1_ID}';")" == "0" ]] ||
   fail "remaining sibling block was not redensified to order_index 0"
 
@@ -1590,6 +1638,115 @@ run_psql "
   fail "tombstoned programme is not deleted"
 [[ "$(run_psql "select count(*) from app_public.session_plans where id in ('${PROG_CHILD_1}', '${PROG_CHILD_2}') and programme_id is null and deleted_at is null;")" == "2" ]] ||
   fail "tombstone_programme did not detach live child plans as standalone live"
+
+# Finding 1: Two-owner isolation with shared child IDs
+SHARED_BLK_ID="shared-blk-${RUN_TAG}"
+SHARED_SET_ID="shared-set-${RUN_TAG}"
+PLAN_ISO_A="agent-api-${RUN_TAG}-iso-a"
+PLAN_ISO_B="agent-api-${RUN_TAG}-iso-b"
+run_psql "
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${PLAN_ISO_A}', 'Plan Iso A', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${PLAN_ISO_B}', 'Plan Iso B', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+  -- User A has 2 blocks: blk-0 at 0, SHARED_BLK_ID at 1
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${SHARED_BLK_ID}-0', '${PLAN_ISO_A}', 0, 'User A Blk 0', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${SHARED_BLK_ID}', '${PLAN_ISO_A}', 1, 'User A Shared Blk', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+  -- User B also has SHARED_BLK_ID at order_index 1
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SHARED_BLK_ID}', '${PLAN_ISO_B}', 1, 'User B Shared Blk', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+V_ISO_A="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_ISO_A}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_tombstone_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-iso-tomb', '${MUT_HASH_1}',
+    '${PLAN_ISO_A}', '${SHARED_BLK_ID}-0', '${V_ISO_A}'
+  );
+" >/dev/null
+# User A's shared block must be renumbered to 0 with agent attribution
+[[ "$(run_psql "select order_index || '|' || last_modified_by from app_public.session_plan_exercises where id = '${SHARED_BLK_ID}' and owner_user_id = '${USER_A_UUID}'::uuid;")" == "0|agent" ]] ||
+  fail "user A shared block was not renumbered"
+# User B's shared block MUST NOT be affected (still order 1, last_modified_by = 'human')
+[[ "$(run_psql "select order_index || '|' || last_modified_by from app_public.session_plan_exercises where id = '${SHARED_BLK_ID}' and owner_user_id = '${USER_B_UUID}'::uuid;")" == "1|human" ]] ||
+  fail "user A block deletion renumbering mutated user B shared block"
+
+# Finding 1: Two-owner isolation on programme plan renumbering
+SHARED_PROG_PL_ID="shared-pl-${RUN_TAG}"
+PROG_ISO_A="agent-api-${RUN_TAG}-prog-iso-a"
+PROG_ISO_B="agent-api-${RUN_TAG}-prog-iso-b"
+run_psql "
+  insert into app_public.training_programmes (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${PROG_ISO_A}', 'Prog Iso A', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.training_programmes (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${PROG_ISO_B}', 'Prog Iso B', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+  -- User A has 3 plans: pl-0 at 0, SHARED_PROG_PL_ID at 1, pl-2 at 2
+  insert into app_public.session_plans (owner_user_id, id, programme_id, programme_order_index, title, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${SHARED_PROG_PL_ID}-0', '${PROG_ISO_A}', 0, 'User A Pl 0', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plans (owner_user_id, id, programme_id, programme_order_index, title, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${SHARED_PROG_PL_ID}', '${PROG_ISO_A}', 1, 'User A Shared Pl', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plans (owner_user_id, id, programme_id, programme_order_index, title, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${SHARED_PROG_PL_ID}-2', '${PROG_ISO_A}', 2, 'User A Pl 2', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+  -- User B also has SHARED_PROG_PL_ID in programme B at programme_order_index 1
+  insert into app_public.session_plans (owner_user_id, id, programme_id, programme_order_index, title, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SHARED_PROG_PL_ID}', '${PROG_ISO_B}', 1, 'User B Shared Pl', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+V_PROG_ISO_A="$(run_psql "select to_char(app_public.agent_programme_graph_version('${USER_A_UUID}'::uuid, '${PROG_ISO_A}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+run_psql "
+  select app_public.agent_detach_programme_plan(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-iso-detach', '${MUT_HASH_1}',
+    '${PROG_ISO_A}', '${SHARED_PROG_PL_ID}-0', '${V_PROG_ISO_A}'
+  );
+" >/dev/null
+# User A's shared plan was renumbered to order 0 with agent attribution
+[[ "$(run_psql "select programme_order_index || '|' || last_modified_by from app_public.session_plans where id = '${SHARED_PROG_PL_ID}' and owner_user_id = '${USER_A_UUID}'::uuid;")" == "0|agent" ]] ||
+  fail "user A shared programme plan was not renumbered"
+# User B's shared plan MUST NOT be affected (still order 1, last_modified_by = 'human')
+[[ "$(run_psql "select programme_order_index || '|' || last_modified_by from app_public.session_plans where id = '${SHARED_PROG_PL_ID}' and owner_user_id = '${USER_B_UUID}'::uuid;")" == "1|human" ]] ||
+  fail "user A programme detach renumbering mutated user B shared plan"
+
+# Finding 3: Two-connection concurrency race on same base version
+V_RACE_PLAN="agent-api-${RUN_TAG}-race-plan"
+run_psql "
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${V_RACE_PLAN}', 'Initial Race Title', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+V_RACE_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${V_RACE_PLAN}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+
+# Conn 1 locks row in transaction and sleeps 1s
+docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+  begin;
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-1', '${MUT_HASH_1}',
+    '${V_RACE_PLAN}', '${V_RACE_BASE}', '{\"title\": \"Race Winner 1\"}'::jsonb
+  );
+  select pg_sleep(1);
+  commit;
+" >/dev/null 2>&1 &
+CONN1_PID=$!
+sleep 0.2
+
+# Conn 2 concurrently calls with same base version V but different receipt key
+CONN2_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-2', '${MUT_HASH_2}',
+    '${V_RACE_PLAN}', '${V_RACE_BASE}', '{\"title\": \"Race Loser 2\"}'::jsonb
+  );
+" 2>&1 || true)"
+wait "${CONN1_PID}"
+
+if [[ "${CONN2_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
+  fail "concurrency race: connection 2 did not raise PLAN_CONCURRENT_MODIFICATION, got: ${CONN2_OUT}"
+fi
+[[ "$(run_psql "select title from app_public.session_plans where id = '${V_RACE_PLAN}';")" == "Race Winner 1" ]] ||
+  fail "concurrency race: winning title was not preserved"
 
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"

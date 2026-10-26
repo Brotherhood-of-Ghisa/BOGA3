@@ -1,4 +1,4 @@
--- Migration: 20261021180000_agent_plan_programme_mutation_rpcs.sql
+-- Migration: 20261024140000_agent_plan_programme_mutation_rpcs.sql
 -- Service-role-only atomic RPCs for connected coaching agent plan and programme mutations.
 
 -- -----------------------------------------------------------------------------
@@ -156,18 +156,34 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _live_tstz timestamptz;
-  _base_tstz timestamptz;
-  _is_deleted boolean;
+  _live_tstz     timestamptz;
+  _base_tstz     timestamptz;
+  _is_deleted    boolean;
+  _programme_id  text;
 begin
   if p_base_version is null or length(btrim(p_base_version)) = 0 then
     raise exception 'PLAN_CONCURRENT_MODIFICATION' using errcode = 'P0001';
   end if;
 
+  -- Finding 3: lock parent programme first if present to preserve consistent hierarchy order
+  select sp.programme_id
+    into _programme_id
+    from app_public.session_plans sp
+   where sp.owner_user_id = p_owner and sp.id = p_plan_id;
+
+  if _programme_id is not null then
+    perform 1
+      from app_public.training_programmes tp
+     where tp.owner_user_id = p_owner and tp.id = _programme_id
+       for update;
+  end if;
+
+  -- Lock target plan row for update
   select (sp.deleted_at is not null)
     into _is_deleted
     from app_public.session_plans sp
-   where sp.owner_user_id = p_owner and sp.id = p_plan_id;
+   where sp.owner_user_id = p_owner and sp.id = p_plan_id
+     for update;
 
   if _is_deleted is null or _is_deleted = true then
     raise exception 'PLAN_CONCURRENT_MODIFICATION' using errcode = 'P0001';
@@ -193,22 +209,31 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _live_tstz timestamptz;
-  _base_tstz timestamptz;
+  _live_tstz  timestamptz;
+  _base_tstz  timestamptz;
   _is_deleted boolean;
 begin
   if p_base_version is null or length(btrim(p_base_version)) = 0 then
     raise exception 'PLAN_CONCURRENT_MODIFICATION' using errcode = 'P0001';
   end if;
 
+  -- Finding 3: lock programme row for update
   select (tp.deleted_at is not null)
     into _is_deleted
     from app_public.training_programmes tp
-   where tp.owner_user_id = p_owner and tp.id = p_programme_id;
+   where tp.owner_user_id = p_owner and tp.id = p_programme_id
+     for update;
 
   if _is_deleted is null or _is_deleted = true then
     raise exception 'PLAN_CONCURRENT_MODIFICATION' using errcode = 'P0001';
   end if;
+
+  -- Lock child plans in consistent id order
+  perform 1
+    from app_public.session_plans sp
+   where sp.owner_user_id = p_owner and sp.programme_id = p_programme_id
+   order by sp.id
+     for update;
 
   begin
     _base_tstz := p_base_version::timestamptz;
@@ -663,19 +688,35 @@ begin
    where spe.owner_user_id = p_owner and spe.id = p_exercise_id;
 
   if p_block ? 'sets' then
+    -- Finding 2: park tombstoned omitted sets at distinct slots >= 2000000
+    with dead_sets as (
+      select id, row_number() over (order by order_index, id) as seq
+        from app_public.session_plan_sets
+       where owner_user_id = p_owner
+         and session_plan_exercise_id = p_exercise_id
+         and deleted_at is null
+         and id not in (
+           select value ->> 'id'
+             from jsonb_array_elements(p_block -> 'sets')
+            where value ->> 'id' is not null
+         )
+    ),
+    base_order as (
+      select greatest(2000000, coalesce(max(order_index), 0) + 1) as start_idx
+        from app_public.session_plan_sets
+       where owner_user_id = p_owner
+         and session_plan_exercise_id = p_exercise_id
+    )
     update app_public.session_plan_sets sps
        set deleted_at = greatest(sps.client_updated_at_ms + 1, _now_ms),
+           order_index = b.start_idx + d.seq - 1,
            updated_at = greatest(sps.updated_at + 1, _now_ms),
            client_updated_at_ms = greatest(sps.client_updated_at_ms + 1, _now_ms),
            last_modified_by = 'agent'
+      from dead_sets d, base_order b
      where sps.owner_user_id = p_owner
        and sps.session_plan_exercise_id = p_exercise_id
-       and sps.deleted_at is null
-       and sps.id not in (
-         select value ->> 'id'
-           from jsonb_array_elements(p_block -> 'sets')
-          where value ->> 'id' is not null
-       );
+       and sps.id = d.id;
 
     for _set in select value from jsonb_array_elements(p_block -> 'sets') loop
       _reps := (_set ->> 'target_reps')::integer;
@@ -774,6 +815,18 @@ begin
   end if;
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
+
+  -- Finding 4: reject reorder if any block in the plan is consumed/immutable
+  if exists (
+    select 1
+      from app_public.session_plan_exercises spe
+     where spe.owner_user_id = p_owner
+       and spe.session_plan_id = p_plan_id
+       and spe.deleted_at is null
+       and app_public.agent_block_is_immutable(p_owner, spe.id)
+  ) then
+    raise exception 'IMMUTABLE_BLOCK_MUTATION' using errcode = 'P0001';
+  end if;
 
   if p_exercise_ids is null or jsonb_typeof(p_exercise_ids) != 'array' then
     raise exception 'INVALID_ARGUMENT' using errcode = 'P0001';
@@ -1047,12 +1100,14 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _operation   text := 'tombstone_plan_block';
-  _now_ms      bigint;
-  _replay      jsonb;
-  _count       integer;
-  _new_version text;
-  _result      jsonb;
+  _operation             text := 'tombstone_plan_block';
+  _now_ms                bigint;
+  _replay                jsonb;
+  _count                 integer;
+  _target_order          integer;
+  _tombstone_block_order integer;
+  _new_version           text;
+  _result                jsonb;
 begin
   _replay := app_public.agent_plan_claim_receipt(
     p_owner, p_client_id, _operation, p_idempotency_key, p_payload_sha256
@@ -1063,14 +1118,29 @@ begin
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
 
-  if not exists (
-    select 1 from app_public.session_plan_exercises
-     where owner_user_id = p_owner and id = p_exercise_id and session_plan_id = p_plan_id and deleted_at is null
-  ) then
+  select spe.order_index
+    into _target_order
+    from app_public.session_plan_exercises spe
+   where spe.owner_user_id = p_owner and spe.id = p_exercise_id and spe.session_plan_id = p_plan_id and spe.deleted_at is null;
+
+  if _target_order is null then
     raise exception 'FOREIGN_RESOURCE_REFERENCE' using errcode = 'P0001';
   end if;
 
   if app_public.agent_block_is_immutable(p_owner, p_exercise_id) then
+    raise exception 'IMMUTABLE_BLOCK_MUTATION' using errcode = 'P0001';
+  end if;
+
+  -- Finding 4: if any surviving block that would be renumbered is consumed/immutable, reject
+  if exists (
+    select 1
+      from app_public.session_plan_exercises spe
+     where spe.owner_user_id = p_owner
+       and spe.session_plan_id = p_plan_id
+       and spe.deleted_at is null
+       and spe.order_index > _target_order
+       and app_public.agent_block_is_immutable(p_owner, spe.id)
+  ) then
     raise exception 'IMMUTABLE_BLOCK_MUTATION' using errcode = 'P0001';
   end if;
 
@@ -1085,20 +1155,46 @@ begin
 
   _now_ms := coalesce(p_now_ms, (extract(epoch from clock_timestamp()) * 1000)::bigint);
 
+  -- Finding 2: park tombstoned block at distinct slot >= 2000000
+  select greatest(2000000, coalesce(max(order_index), 0) + 1)
+    into _tombstone_block_order
+    from app_public.session_plan_exercises
+   where owner_user_id = p_owner and session_plan_id = p_plan_id;
+
   update app_public.session_plan_exercises spe
      set deleted_at = greatest(spe.client_updated_at_ms + 1, _now_ms),
+         order_index = _tombstone_block_order,
          updated_at = greatest(spe.updated_at + 1, _now_ms),
          client_updated_at_ms = greatest(spe.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
-   where spe.owner_user_id = p_owner and spe.id = p_exercise_id;
+   where spe.owner_user_id = p_owner and spe.session_plan_id = p_plan_id and spe.id = p_exercise_id;
 
+  -- Finding 2: park tombstoned sets at distinct slots >= 2000000
+  with dead_sets as (
+    select id, row_number() over (order by order_index, id) as seq
+      from app_public.session_plan_sets
+     where owner_user_id = p_owner
+       and session_plan_exercise_id = p_exercise_id
+       and deleted_at is null
+  ),
+  base_order as (
+    select greatest(2000000, coalesce(max(order_index), 0) + 1) as start_idx
+      from app_public.session_plan_sets
+     where owner_user_id = p_owner
+       and session_plan_exercise_id = p_exercise_id
+  )
   update app_public.session_plan_sets sps
      set deleted_at = greatest(sps.client_updated_at_ms + 1, _now_ms),
+         order_index = b.start_idx + d.seq - 1,
          updated_at = greatest(sps.updated_at + 1, _now_ms),
          client_updated_at_ms = greatest(sps.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
-   where sps.owner_user_id = p_owner and sps.session_plan_exercise_id = p_exercise_id and sps.deleted_at is null;
+    from dead_sets d, base_order b
+   where sps.owner_user_id = p_owner
+     and sps.session_plan_exercise_id = p_exercise_id
+     and sps.id = d.id;
 
+  -- Finding 1: renumber surviving sibling blocks with owner and plan predicates
   with numbered as (
     select id, row_number() over (order by order_index, id) - 1 as new_order
       from app_public.session_plan_exercises
@@ -1110,7 +1206,10 @@ begin
          client_updated_at_ms = greatest(spe.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
     from numbered n
-   where spe.id = n.id and spe.order_index is distinct from n.new_order;
+   where spe.owner_user_id = p_owner
+     and spe.session_plan_id = p_plan_id
+     and spe.id = n.id
+     and spe.order_index is distinct from n.new_order;
 
   update app_public.session_plans sp
      set updated_at = greatest(sp.updated_at + 1, _now_ms),
@@ -1207,7 +1306,10 @@ begin
          client_updated_at_ms = greatest(sp.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
     from numbered n
-   where sp.id = n.id and sp.programme_order_index is distinct from n.new_order;
+   where sp.owner_user_id = p_owner
+     and sp.programme_id = p_programme_id
+     and sp.id = n.id
+     and sp.programme_order_index is distinct from n.new_order;
 
   update app_public.training_programmes tp
      set updated_at = greatest(tp.updated_at + 1, _now_ms),
@@ -1250,12 +1352,13 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _operation   text := 'tombstone_plan';
-  _now_ms      bigint;
-  _replay      jsonb;
-  _prog_id     text;
-  _new_version text;
-  _result      jsonb;
+  _operation        text := 'tombstone_plan';
+  _now_ms           bigint;
+  _replay           jsonb;
+  _prog_id          text;
+  _prog_plan_count  integer;
+  _new_version      text;
+  _result           jsonb;
 begin
   _replay := app_public.agent_plan_claim_receipt(
     p_owner, p_client_id, _operation, p_idempotency_key, p_payload_sha256
@@ -1282,6 +1385,18 @@ begin
     from app_public.session_plans sp
    where sp.owner_user_id = p_owner and sp.id = p_plan_id;
 
+  -- Finding 5: if plan belongs to a programme, enforce >=2 remaining live plans
+  if _prog_id is not null then
+    select count(*)
+      into _prog_plan_count
+      from app_public.session_plans
+     where owner_user_id = p_owner and programme_id = _prog_id and deleted_at is null;
+
+    if _prog_plan_count - 1 < 2 then
+      raise exception 'INVALID_ARGUMENT' using errcode = 'P0001';
+    end if;
+  end if;
+
   _now_ms := coalesce(p_now_ms, (extract(epoch from clock_timestamp()) * 1000)::bigint);
 
   update app_public.session_plans sp
@@ -1291,24 +1406,58 @@ begin
          last_modified_by = 'agent'
    where sp.owner_user_id = p_owner and sp.id = p_plan_id;
 
+  -- Finding 2: park tombstoned exercises at distinct slots >= 2000000
+  with dead_exercises as (
+    select id, row_number() over (order by order_index, id) as seq
+      from app_public.session_plan_exercises
+     where owner_user_id = p_owner and session_plan_id = p_plan_id and deleted_at is null
+  ),
+  base_order as (
+    select greatest(2000000, coalesce(max(order_index), 0) + 1) as start_idx
+      from app_public.session_plan_exercises
+     where owner_user_id = p_owner and session_plan_id = p_plan_id
+  )
   update app_public.session_plan_exercises spe
      set deleted_at = greatest(spe.client_updated_at_ms + 1, _now_ms),
+         order_index = b.start_idx + d.seq - 1,
          updated_at = greatest(spe.updated_at + 1, _now_ms),
          client_updated_at_ms = greatest(spe.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
-   where spe.owner_user_id = p_owner and spe.session_plan_id = p_plan_id and spe.deleted_at is null;
+    from dead_exercises d, base_order b
+   where spe.owner_user_id = p_owner and spe.session_plan_id = p_plan_id and spe.id = d.id;
 
+  -- Finding 2: park tombstoned child sets at distinct slots >= 2000000
+  with dead_sets as (
+    select sps.id, row_number() over (partition by sps.session_plan_exercise_id order by sps.order_index, sps.id) as seq
+      from app_public.session_plan_sets sps
+      join app_public.session_plan_exercises spe
+        on spe.id = sps.session_plan_exercise_id
+       and spe.owner_user_id = p_owner
+       and spe.session_plan_id = p_plan_id
+     where sps.owner_user_id = p_owner and sps.deleted_at is null
+  ),
+  base_order as (
+    select sps.session_plan_exercise_id, greatest(2000000, coalesce(max(sps.order_index), 0) + 1) as start_idx
+      from app_public.session_plan_sets sps
+      join app_public.session_plan_exercises spe
+        on spe.id = sps.session_plan_exercise_id
+       and spe.owner_user_id = p_owner
+       and spe.session_plan_id = p_plan_id
+      where sps.owner_user_id = p_owner
+      group by sps.session_plan_exercise_id
+  )
   update app_public.session_plan_sets sps
      set deleted_at = greatest(sps.client_updated_at_ms + 1, _now_ms),
+         order_index = b.start_idx + d.seq - 1,
          updated_at = greatest(sps.updated_at + 1, _now_ms),
          client_updated_at_ms = greatest(sps.client_updated_at_ms + 1, _now_ms),
          last_modified_by = 'agent'
+    from dead_sets d, base_order b
    where sps.owner_user_id = p_owner
-     and sps.session_plan_exercise_id in (
-       select id from app_public.session_plan_exercises where session_plan_id = p_plan_id and owner_user_id = p_owner
-     )
-     and sps.deleted_at is null;
+     and sps.session_plan_exercise_id = b.session_plan_exercise_id
+     and sps.id = d.id;
 
+  -- Finding 1: renumber surviving programme plans with composite owner and programme predicates
   if _prog_id is not null then
     with numbered as (
       select id, row_number() over (order by programme_order_index, id) - 1 as new_order
@@ -1321,7 +1470,10 @@ begin
            client_updated_at_ms = greatest(sp.client_updated_at_ms + 1, _now_ms),
            last_modified_by = 'agent'
       from numbered n
-     where sp.id = n.id and sp.programme_order_index is distinct from n.new_order;
+     where sp.owner_user_id = p_owner
+       and sp.programme_id = _prog_id
+       and sp.id = n.id
+       and sp.programme_order_index is distinct from n.new_order;
   end if;
 
   _new_version := to_char(app_public.agent_plan_graph_version(p_owner, p_plan_id) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"');

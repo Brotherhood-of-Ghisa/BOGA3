@@ -17,7 +17,16 @@ import {
   PRIMARY_RUNTIME_STATE_ID,
   type Transaction,
 } from '@/src/data/clock';
-import { exerciseDefinitions, gyms, muscleGroups, sessions, syncRuntimeState } from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  gyms,
+  muscleGroups,
+  sessionPlanExercises,
+  sessionPlans,
+  sessionPlanSets,
+  sessions,
+  syncRuntimeState,
+} from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -418,5 +427,206 @@ describe('pull cursor advances only after a committed page', () => {
 
     expect(readCursorJson()).toMatchObject({ '0': { type: 'gyms', id: 'gym-1' } });
     expect(database.select().from(gyms).all()).toHaveLength(1);
+  });
+});
+
+describe('applyPullPage collision-safe order application and tombstone parking', () => {
+  beforeEach(() => {
+    fixture = createInMemoryDatabase();
+    database = fixture.database;
+  });
+
+  const planWire = (id: string, ms: number, title: string): WireEntity => ({
+    type: 'session_plans',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      programme_id: null,
+      programme_order_index: null,
+      gym_id: null,
+      title,
+      scheduled_for: null,
+      provenance: 'agent',
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: null,
+    },
+  });
+
+  const blockWire = (
+    id: string,
+    planId: string,
+    orderIndex: number,
+    ms: number,
+    deletedAt: number | null = null,
+  ): WireEntity => ({
+    type: 'session_plan_exercises',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      session_plan_id: planId,
+      exercise_definition_id: null,
+      order_index: orderIndex,
+      name: `Block ${id}`,
+      progress_status: 'pending',
+      resolved_at: null,
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: deletedAt,
+    },
+  });
+
+  const setWire = (
+    id: string,
+    blockId: string,
+    orderIndex: number,
+    ms: number,
+    deletedAt: number | null = null,
+  ): WireEntity => ({
+    type: 'session_plan_sets',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      session_plan_exercise_id: blockId,
+      order_index: orderIndex,
+      target_weight_value: null,
+      target_reps: 10,
+      target_set_type: null,
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: deletedAt,
+    },
+  });
+
+  it('handles collision-safe block reordering on an already populated store', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Server reorders to [B, A], so B is now 0 and A is 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 1, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(b?.orderIndex).toBe(0);
+    expect(a?.orderIndex).toBe(1);
+  });
+
+  it('handles block tombstone parking above occupied slots on populated and wiped stores', () => {
+    // Populated store: A at 0, B at 1
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Pull Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Server tombstones A (parked at 2000000) and redensifies B to 0
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 2_000_000, 200, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(b?.orderIndex).toBe(0);
+    expect(a?.orderIndex).toBe(2_000_000);
+    expect(a?.deletedAt).not.toBeNull();
+
+    // Wiped (fresh restore) store: apply both rows from scratch
+    const freshFixture = createInMemoryDatabase();
+    freshFixture.database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Pull Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 2_000_000, 200, 200),
+          blockWire('block-b', 'plan-1', 0, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+    const freshA = freshFixture.database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const freshB = freshFixture.database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    expect(freshA?.orderIndex).toBe(2_000_000);
+    expect(freshB?.orderIndex).toBe(0);
+    freshFixture.close();
+  });
+
+  it('handles collision-safe set reordering and set tombstone parking', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(tx as Transaction, [blockWire('block-1', 'plan-1', 0, 100)], 'session_plan_exercises');
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-1', 'block-1', 0, 100),
+          setWire('set-2', 'block-1', 1, 100),
+        ],
+        'session_plan_sets',
+      );
+    });
+
+    // Swapped order
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-2', 'block-1', 0, 200),
+          setWire('set-1', 'block-1', 1, 200),
+        ],
+        'session_plan_sets',
+      );
+    });
+    const s2 = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-2')).get();
+    const s1 = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-1')).get();
+    expect(s2?.orderIndex).toBe(0);
+    expect(s1?.orderIndex).toBe(1);
+
+    // Set 1 tombstoned and parked at 2000000
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-1', 'block-1', 2_000_000, 300, 300),
+          setWire('set-2', 'block-1', 0, 300),
+        ],
+        'session_plan_sets',
+      );
+    });
+    const s1Dead = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-1')).get();
+    expect(s1Dead?.orderIndex).toBe(2_000_000);
+    expect(s1Dead?.deletedAt).not.toBeNull();
   });
 });
