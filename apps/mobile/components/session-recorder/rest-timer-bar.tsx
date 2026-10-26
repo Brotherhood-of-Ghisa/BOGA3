@@ -158,7 +158,7 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
   const isPaused = isRepeating && view.isPaused;
   const isPreparing = isRepeating && view.round === 0;
   const phase = isRepeating ? (isPreparing ? 'Get ready' : `Round ${view.round}`) : 'Rest';
-  const statusLabel = isCompleted ? 'Rest complete' : `${phase}${isPaused ? ' · PAUSED' : ''}`;
+  const statusLabel = isCompleted ? 'Rest complete' : phase;
   const accessiblePhase = isPreparing ? 'preparation' : phase.toLowerCase();
   // Repeating's View owns its changing label because iOS Text caches labels for repeated digits.
   const countdownLabel = isRepeating

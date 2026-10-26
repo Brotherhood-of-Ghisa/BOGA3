@@ -16,7 +16,7 @@ describe('RestTimerBar', () => {
         }}
       />,
     );
-    expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(isPaused ? 'Get ready · PAUSED' : 'Get ready');
+    expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(/^Get ready$/);
     expect(screen.getByLabelText(`Repeating timer preparation, 0:15 remaining${isPaused ? ', paused' : ''}`)).toBeTruthy();
     expect(screen.queryByText(/Round 0/)).toBeNull();
   });
@@ -175,7 +175,7 @@ describe('RestTimerBar', () => {
     fireEvent.press(screen.getByTestId('timer-mode-selector-rest'));
     expect(onSwitchMode).toHaveBeenCalledWith('rest');
 
-    // Paused state shows "Round 3 · PAUSED" and "Resume" button
+    // Resume and the spoken readout identify the paused state.
     const pausedRepeatingView: RestTimerView = {
       ...runningRepeatingView,
       status: 'paused',
@@ -192,7 +192,8 @@ describe('RestTimerBar', () => {
         view={pausedRepeatingView}
       />,
     );
-    expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent('Round 3 · PAUSED');
+    expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(/^Round 3$/);
+    expect(screen.getByLabelText('Repeating timer round 3, 0:42 remaining, paused')).toBeTruthy();
     expect(screen.getByTestId('repeating-timer-toggle')).toHaveTextContent('Resume');
   });
 });
