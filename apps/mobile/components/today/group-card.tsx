@@ -14,6 +14,7 @@ import {
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
+import { TodayGroupHeader } from './group-header';
 import { formatPeriodRange } from './progress-format';
 import { TrainingNowMark } from './session-summary-row';
 import { todayText } from './text-styles';
@@ -21,6 +22,11 @@ import { useGroupRecentSessions, type GroupStreamPageLoader } from './use-group-
 
 export type TodayGroupCardProps = {
   selectedGroupId: string;
+  /** The shown group's name, heading the board card. */
+  groupName: string;
+  /** My groups, for the switch beside the name; one group hides it. */
+  groups: { groupId: string; name: string }[];
+  onSelectGroup: (groupId: string) => void;
   summary: GroupWeekSummaryResult;
   myUserId: string;
   nowMs: number;
@@ -81,11 +87,18 @@ const boardAccessibilityLabel = (range: string, board: WeekBoardViewModel): stri
     .filter(Boolean)
     .join('; ');
 
-// This week's leaders by working sets, `PRs` being group records: the top
-// five, then the caller's own line when they are outside them.
-function WeekBoardCard({ board, range, onOpenGroup }: { board: WeekBoardViewModel; range: string; onOpenGroup: () => void }) {
+// The group's name and switch, then this week's leaders by working sets,
+// `PRs` being group records: the top five, then the caller's own line when
+// they are outside them.
+function WeekBoardCard({ board, range, onOpenGroup, header }: {
+  board: WeekBoardViewModel;
+  range: string;
+  onOpenGroup: () => void;
+  header: ReactNode;
+}) {
   return (
     <Card style={styles.boardCard} testID="today-group-card">
+      {header}
       <View style={styles.boardHeading}>
         <Text allowFontScaling={false} numberOfLines={1} style={[todayText.microLabel, todayText.microLabelStrong]}>
           This week
@@ -195,12 +208,14 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
   );
 }
 
-// Today's group page: this week's board, then up to four sessions, the
-// members training now first. The heading (in the list layout) or the tabs
-// (in the cards layout) name the group and own the way to it and the switch
-// between groups.
+// Today's group page: the board card, headed by the group's name (the way to
+// the group) and the switch between groups, then up to four sessions, the
+// members training now first.
 export function TodayGroupCard({
   selectedGroupId,
+  groupName,
+  groups,
+  onSelectGroup,
   summary,
   myUserId,
   nowMs,
@@ -238,7 +253,20 @@ export function TodayGroupCard({
 
   return (
     <View style={[styles.stack, fill ? styles.fill : null]}>
-      <WeekBoardCard board={board} onOpenGroup={() => onOpenGroup(selectedGroupId)} range={range} />
+      <WeekBoardCard
+        board={board}
+        header={
+          <TodayGroupHeader
+            groupName={groupName}
+            groups={groups}
+            onOpenHome={() => onOpenGroup(selectedGroupId)}
+            onSelectGroup={onSelectGroup}
+            selectedGroupId={selectedGroupId}
+          />
+        }
+        onOpenGroup={() => onOpenGroup(selectedGroupId)}
+        range={range}
+      />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
         <SessionsCard fill={fill && !showRecent} testID="today-group-live">
@@ -288,10 +316,10 @@ const styles = StyleSheet.create({
   boardCard: {
     paddingBottom: uiSpace.sm,
   },
-  // The way to the group sits beside the tabs (cards) or is the heading (list).
+  // `This week` and its range, under the header row.
   boardHeading: {
     paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
+    paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.xs,
   },
   board: {

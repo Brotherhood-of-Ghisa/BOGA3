@@ -1,5 +1,5 @@
-// Today's Plan page, derived: each muscle's sets over the last three days and
-// this week, the week's trained and planned days, and the next planned
+// Today's Plan page, derived: each muscle's sets over the last three days,
+// today and this week, the week's trained and planned days, and the next planned
 // sessions. Pure — the repository reads, this decides. The three days are a
 // fixed period of their own ([[comparison.allowed-periods]]); the week is
 // [[comparison.window]]'s.
@@ -37,6 +37,8 @@ export type RecoveryRow = {
   name: string;
   /** Sets on each recovery day, oldest first; null for a day without any. */
   days: (number | null)[];
+  /** Sets so far today; null for none. Not part of the row's order. */
+  today: number | null;
   /** Sets this calendar week, today included. */
   weekSets: number;
   /** The muscle's effective weekly target ([[muscle.weekly-targets]]). */
@@ -49,11 +51,13 @@ export type RecoveryTargets = { weeklyTarget: number; overrides: Readonly<Record
 const sumDays = (byDay: Record<string, number>, keys: string[]) => keys.reduce((total, key) => total + (byDay[key] ?? 0), 0);
 
 /**
- * One row per muscle, least trained over the recovery days first, then fewest
+ * One row per muscle, least trained over the recovery days first (today's
+ * sets so far leave the order alone, so it holds still mid-workout), then fewest
  * sets this week, then the muscles' own order.
  */
 export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWindow, targets: RecoveryTargets): RecoveryRow[] => {
   const recoveryKeys = window.recoveryDays.map(localDateKey);
+  const todayKey = localDateKey(window.today);
   const weekStartKey = localDateKey(window.week.start);
   const rows = daily.muscles.map((muscle, order) => {
     const byDay = daily.sets[muscle.id] ?? {};
@@ -65,6 +69,7 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
         muscleGroupId: muscle.id,
         name: muscle.displayName,
         days: recoveryKeys.map((key) => byDay[key] ?? null),
+        today: byDay[todayKey] ?? null,
         weekSets: sumDays(byDay, weekKeys),
         target: Object.hasOwn(targets.overrides, muscle.id) ? targets.overrides[muscle.id] : targets.weeklyTarget,
       },

@@ -79,7 +79,17 @@ describe('deriveRecoveryRows', () => {
 
   it('shows an untrained muscle with every day blank', () => {
     const rows = deriveRecoveryRows({ muscles: [muscle('core', 9)], sets: {}, sessionDays: [] }, window, TARGETS);
-    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], weekSets: 0, target: 8 }]);
+    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
+  });
+
+  it("carries today's sets so far in their own column, outside the order", () => {
+    // Today's 20 calves sets would make it the most trained; it stays second.
+    const withToday = { ...daily, sets: { ...daily.sets, calves: { ...daily.sets.calves, '2026-10-31': 20 } } };
+    const rows = deriveRecoveryRows(withToday, window, TARGETS);
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'calves', 'chest', 'back', 'quads']);
+    expect(rows.find((row) => row.muscleGroupId === 'calves')?.today).toBe(20);
+    expect(rows.find((row) => row.muscleGroupId === 'calves')?.days).toEqual([null, 1.5, null]);
+    expect(rows.find((row) => row.muscleGroupId === 'chest')?.today).toBeNull();
   });
 
   it("takes a muscle's own target where one is set, else the default", () => {

@@ -117,13 +117,21 @@ describe('Today: the Plan page over real data', () => {
     expect(within(text('today-plan-week-card')).getByText('Plan')).toBeTruthy();
   });
 
-  it("shows each muscle's sets on the last three days and this week against the target, least trained first", async () => {
+  it("shows each muscle's sets on the last three days, today and this week against the target, least trained first", async () => {
     await bootLocalApp();
-    // Monday is this week but no recovery day; Thursday and Friday are.
+    // Monday is this week but no recovery day; Thursday and Friday are; Saturday is today.
     await logSession('mon', local(2026, 10, 26, 9), [{ ...BENCH, count: 4 }]);
     await logSession('thu', local(2026, 10, 29, 9), [{ ...SQUAT, count: 3 }]);
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
+    await logSession('sat', local(2026, 10, 31, 9), [{ ...SQUAT, count: 5 }]);
     await renderToday();
+
+    // The columns: the three recovery days, then today.
+    expect(within(text('today-plan-recovery-card')).getByText('Wed')).toBeTruthy();
+    expect(text('today-plan-recovery-today')).toHaveTextContent('Sat');
+    expect(text('today-plan-muscle-quads-today')).toHaveTextContent('5');
+    expect(text('today-plan-muscle-chest-today')).toHaveTextContent('');
+    expect(text('today-plan-muscle-quads-week')).toHaveTextContent('8/8');
 
     const chest = within(text('today-plan-muscle-chest'));
     expect(chest.getByTestId('today-plan-muscle-chest-day-0')).toHaveTextContent('');
@@ -140,8 +148,9 @@ describe('Today: the Plan page over real data', () => {
     expect(order.indexOf('triceps')).toBeLessThan(order.indexOf('chest'));
     expect(order.indexOf('biceps')).toBeLessThan(order.indexOf('triceps'));
     expect(text('today-plan-muscle-chest').props.accessibilityLabel).toBe(
-      'Pectoralis, Wednesday 28 Oct 26: rest, Thursday 29 Oct 26: rest, Friday 30 Oct 26: 2 sets, this week 6 of 8 sets',
+      'Pectoralis, Wednesday 28 Oct 26: rest, Thursday 29 Oct 26: rest, Friday 30 Oct 26: 2 sets, today: none yet, this week 6 of 8 sets',
     );
+    expect(text('today-plan-muscle-quads').props.accessibilityLabel).toContain('Friday 30 Oct 26: rest, today: 5 sets, this week 8 of 8 sets');
   });
 
   it("takes the target from Settings and counts secondary sets as Settings' Progress default says", async () => {
@@ -202,6 +211,13 @@ describe('Today: the Plan page over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/progress-history?muscleGroupId=quads&metric=sets'], ['/progress']]);
   });
 
+  it('opens Train, where the planned sessions are listed, from the plan card', async () => {
+    await renderToday();
+
+    fireEvent.press(within(text('today-plan-week-card')).getByText('Sessions'));
+    expect(mockPush).toHaveBeenCalledWith('/train');
+  });
+
   it('marks the trained and planned days and lists the next planned sessions, each opening its plan', async () => {
     await bootLocalApp();
     await logSession('thu', local(2026, 10, 29, 9), [{ ...SQUAT, count: 3 }]);
@@ -253,7 +269,7 @@ describe('Today: the Plan page over real data', () => {
   it('reports a failed read inline and retries it (a failed read)', async () => {
     await bootLocalApp();
     const loadPlan = jest.fn().mockRejectedValueOnce(new Error('database is locked'));
-    loadPlan.mockResolvedValue({ recoveryDays: [], muscles: [], week: [], next: [] } satisfies TodayPlan);
+    loadPlan.mockResolvedValue({ recoveryDays: [], today: NOW, muscles: [], week: [], next: [] } satisfies TodayPlan);
     render(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={clock} />);
 
     await waitFor(() => expect(text('today-plan-error')).toBeTruthy());

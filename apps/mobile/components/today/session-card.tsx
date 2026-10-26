@@ -20,13 +20,14 @@ export type TodaySessionCardProps = {
   onOpenSessions: () => void;
   /** Shows the completed session this many places before the latest. */
   onShowSession?: (offset: number) => void;
-  /** The cards layout: four exercises show, more scroll inside the card. */
+  /** The cards layout: the table is four rows tall, and more exercises scroll inside it. */
   fill?: boolean;
 };
 
-// Four exercise rows show in the cards layout before the rows scroll; on a
-// phone too short for them the card gives way first, scrolling sooner, so the
-// progress card's chart keeps its floor.
+// The cards layout's table is always four exercise rows tall, so the card
+// keeps one height from session to session: fewer exercises leave blank rows,
+// more scroll. On a phone too short for them the card gives way first,
+// scrolling sooner, so the progress card's chart keeps its floor.
 export const VISIBLE_EXERCISE_ROWS = 4;
 const ROW_HEIGHT = 32;
 
@@ -81,7 +82,7 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
-// Exercise, sets, best set, 1RM; in the cards layout the rows past four scroll.
+// Exercise, sets, best set, 1RM; in the cards layout four rows tall, the rest scrolling.
 function ExerciseTable({ lines, fill }: { lines: SessionExerciseLine[]; fill: boolean }) {
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
   },
   fillRows: {
     flexShrink: 1,
-    maxHeight: VISIBLE_EXERCISE_ROWS * ROW_HEIGHT,
+    height: VISIBLE_EXERCISE_ROWS * ROW_HEIGHT,
   },
   row: {
     flexDirection: 'row',
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   tableHeader: {
     paddingBottom: uiSpace.xs,
   },
-  // A fixed height, so four rows are exactly `VISIBLE_EXERCISE_ROWS * ROW_HEIGHT`.
+  // A fixed height, so the table is exactly `VISIBLE_EXERCISE_ROWS * ROW_HEIGHT`.
   exerciseRow: {
     height: ROW_HEIGHT,
     borderTopWidth: 1,
