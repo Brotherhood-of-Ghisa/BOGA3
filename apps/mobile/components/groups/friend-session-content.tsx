@@ -30,7 +30,7 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  * Gym, Ex, Sets, Volume),
  * the Group records card, then one card per exercise with its performed sets
  * as `type · weight × reps · 1RM · VOL` and a `#1 in group` band on the set
- * that took a group record. Normalized sets use wrapped percentage rows
+ * that took a group record. Normalized sets use single-line percentage rows
  * (group-competition-contract.md §2). Who and when
  * are the screen title's. Read-only for
  * the session — no edit, delete or append; certification is the records
@@ -95,7 +95,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
             rowTestID={(row) => `group-session-set-row-${row.id}`}
             rows={card.rows}
             hideDerivedMetrics={card.hideDerivedMetrics}
-            stackedMetrics={card.stackedMetrics}
+            percentageMetrics={card.percentageMetrics}
             testID={`group-session-exercise-${card.id}`}
           />
         ))

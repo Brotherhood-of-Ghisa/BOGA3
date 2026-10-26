@@ -7,7 +7,7 @@ import { formatCompetitionFigure } from './competition-view-model';
 import type { CompetitionSessionWire } from './competition-wire';
 
 type CompetitionSessionRow = ReturnType<typeof formatSetRow> & { working: boolean };
-export type CompetitionSessionExerciseCard = { id: string; name: string; rows: CompetitionSessionRow[]; hideDerivedMetrics: boolean; stackedMetrics: boolean };
+export type CompetitionSessionExerciseCard = { id: string; name: string; rows: CompetitionSessionRow[]; hideDerivedMetrics: boolean; percentageMetrics: boolean };
 
 /**
  * Permitted set context only. Volume sums the volume-included sets whose kg the
@@ -31,18 +31,20 @@ export function buildCompetitionSession(session: CompetitionSessionWire) {
       }
       const row=formatSetRow({ id: set.set_id,weight,reps,setType: set.set_type,done: true,loadContext });
       const metrics = exercise.visibility === 'normalized' && 'normalized_metrics' in set ? set.normalized_metrics : null;
+      // Public Volume already includes the group's bodyweight contribution and both sides.
+      const loadPercent = metrics?.volume_percent_bw_reps == null ? null : metrics.volume_percent_bw_reps / reps;
       const figure = (value: number | null | undefined, unit: string) => value === null || value === undefined
         ? '—' : formatCompetitionFigure(value, unit);
       return [{ ...row, weightReps: exercise.visibility === 'ordinary' ? row.weightReps
-        : metrics?.added_load_percent_bw === null || metrics?.added_load_percent_bw === undefined ? `${reps} reps`
-          : `${figure(metrics.added_load_percent_bw, 'percent_bw')} × ${reps}`,
+        : loadPercent === null ? `${reps} reps`
+          : `${figure(loadPercent, 'percent_bw')} × ${reps}`,
         ...(metrics ? { oneRepMax: figure(metrics.e1rm_percent_bw, 'percent_bw'),
           volume: figure(metrics.volume_percent_bw_reps, 'percent_bw_reps') } : {}),
         working: isWorkingSetType(set.set_type) }];
     });
     return rows.length ? [{ id: exercise.session_exercise_id,name: exercise.name,rows,
       hideDerivedMetrics: exercise.visibility === 'normalized' && !exercise.sets.some(set => set.normalized_metrics),
-      stackedMetrics: exercise.visibility === 'normalized' }] : [];
+      percentageMetrics: exercise.visibility === 'normalized' }] : [];
   });
   return { cards,setCount: cards.flatMap(card => card.rows).filter(row => row.working).length,
     exerciseCount: cards.filter(card => card.rows.some(row => row.working)).length,

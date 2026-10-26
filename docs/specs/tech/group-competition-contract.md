@@ -98,6 +98,9 @@ and fenced by revision/source generation, never the reading-dependent hash.
 Old fingerprint fields cannot be renamed into this token without changing their
 origin. Cursor/token expiry or mismatch must reject a stale write.
 
+Group session rows implement [[set.row-figures]] with public Volume divided by
+reps and units in column headings. Other performance labels retain additional load.
+
 All group routes must obey disclosure selected by the current authorized
 group/comparison state, including old history, retired/archived revisions and
 View full session. Historic Off rules must not bypass current enabled redaction. Suppress session/week absolute totals if they would recover a

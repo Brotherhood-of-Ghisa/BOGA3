@@ -822,7 +822,9 @@ describe("Friend's session view", () => {
         normalized_metrics: { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 } })) })) } });
     render(<GroupSessionRoute />);
     const row = await screen.findByTestId('group-session-set-row-set-2');
-    expect(within(row).getByTestId('group-session-set-row-set-2-values').props.children).toBe('25.0 %BW × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveTextContent('125.0 × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveProp('accessibilityLabel', '125.0 %BW × 5');
+    expect(within(screen.getByTestId('group-session-exercise-ex-1-columns')).getByText('Vol\n%BW·reps')).toBeTruthy();
     expect(within(row).getByTestId('group-session-set-row-set-2-1rm').props.accessibilityLabel).toBe('1RM 145.7 %BW');
     expect(within(row).getByTestId('group-session-set-row-set-2-vol').props.accessibilityLabel).toBe('Vol 625.0 %BW·reps');
     expect(screen.queryByText(/102.5|110.0|kg/)).toBeNull();

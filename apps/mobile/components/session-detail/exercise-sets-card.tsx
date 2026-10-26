@@ -7,7 +7,7 @@ import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 import { RecordBand } from './record-band';
-import { SetSummaryRow } from './set-summary-row';
+import { SetSummaryColumns, SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
   name: string;
@@ -20,7 +20,7 @@ type ExerciseSetsCardBaseProps = {
   countMuted?: boolean;
   rows: SessionViewSetRow[];
   hideDerivedMetrics?: boolean;
-  stackedMetrics?: boolean;
+  percentageMetrics?: boolean;
   // The `record` band, one line per record this card holds; empty for none.
   record?: readonly RecordLine[];
   // Under the header, before the set rows (exercise history's gym, tags and
@@ -58,7 +58,7 @@ export function ExerciseSetsCard({
   countMuted = false,
   rows,
   hideDerivedMetrics = false,
-  stackedMetrics = false,
+  percentageMetrics = false,
   record = [],
   summary,
   accessory,
@@ -83,12 +83,13 @@ export function ExerciseSetsCard({
       {summary}
       {rows.length > 0 ? (
         <View style={styles.rows}>
+          {percentageMetrics && !hideDerivedMetrics ? <SetSummaryColumns testID={`${testID}-columns`} /> : null}
           {rows.map((row, index) => (
             <SetSummaryRow
               key={row.id}
               row={row}
               hideDerivedMetrics={hideDerivedMetrics}
-              stackedMetrics={stackedMetrics}
+              percentageMetrics={percentageMetrics}
               testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
             />
           ))}
