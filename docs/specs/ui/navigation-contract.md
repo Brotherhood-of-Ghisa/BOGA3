@@ -8,11 +8,10 @@ For the route inventory and owning files, load `screen-map.md`.
 - `expo-router`, file-based. Root layout `apps/mobile/app/_layout.tsx`; the root
   stack and every root screen declaration
   `apps/mobile/components/navigation/root-stack.tsx`.
-- Navigation is string-path based; there is no typed route layer. The few
-  constants and href builders live in `apps/mobile/src/navigation/routes.ts` and
-  `apps/mobile/src/navigation/active-session-entry.ts`. Build a parameterised
-  href with its builder rather than by interpolation: the builders
-  `encodeURIComponent` their ids.
+- Navigation uses string paths; href builders in
+  `apps/mobile/src/navigation/routes.ts` and
+  `apps/mobile/src/navigation/active-session-entry.ts` encode ids. Use the
+  builder for parameterised links.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
@@ -153,6 +152,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>` | `/progress-history`, `/exercise-history` | the records panel's `Progress` (`progressHistoryHref`) and ⋮ `Exercise history` (`exerciseHistoryHref`, gym per [[gym.view-filter]]); `push` |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
+| `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list or 3D-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=`, `?exerciseDefinitionId=` | a training day, week or Timeline card, and the focused week's ⋮ `View sessions` (`historyDayHref`, `sessionsWeekHref`, `push`); a muscle card opens exercise history, carrying metric/gym |

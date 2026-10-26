@@ -26,7 +26,8 @@ Groups use calendar weeks only.
 - Bad: a 30-day default, fixed 4/12/24-week presets or a monthly group view.
 - Good: changing either setting changes every consumer of that period.
 - Kept: lifetime record baselines and catalogue metadata, individual-session
-  views, calendar-date navigation and explicit coaching query bounds.
+  views, calendar-date navigation, explicit coaching query bounds and an
+  explicit expansion of exercise session history beyond History look-back.
 
 Why: consistent periods.
 Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`.

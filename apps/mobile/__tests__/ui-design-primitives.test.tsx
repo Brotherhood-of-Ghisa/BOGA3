@@ -697,6 +697,26 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('last');
   });
 
+  it('optionally handles a selected tap separately and stays inert when disabled', () => {
+    const onChange = jest.fn();
+    const onReselect = jest.fn();
+    const page = render(<SegmentedControl onChange={onChange} onReselect={onReselect}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    fireEvent.press(screen.getByTestId('view-records'));
+    expect(onReselect).toHaveBeenCalledWith('records');
+    expect(onChange).not.toHaveBeenCalled();
+    onReselect.mockClear();
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).toHaveBeenCalledWith('last');
+    expect(onReselect).not.toHaveBeenCalled();
+
+    page.rerender(<SegmentedControl disabled onChange={onChange} onReselect={onReselect}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    fireEvent.press(screen.getByTestId('view-records'));
+    expect(onReselect).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it('reuses filter segments as repeatable links and returns the native launcher', () => {
     const onNavigate = jest.fn();
     const target = { nativeTag: 88 };

@@ -5,13 +5,14 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import {
+  ActionButton,
   Card,
   ChipGroup,
   Icon,
@@ -24,6 +25,7 @@ import {
   Stat,
   StatePanel,
   Tag,
+  uiBorder,
   uiFonts,
   uiGeometry,
   uiRoles,
@@ -42,6 +44,7 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
 import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { historyBlockRecord } from '@/src/session-recorder/exercise-history-view';
 import {
   cardRecordBand,
@@ -50,7 +53,7 @@ import {
   recordFlagsFor,
 } from '@/src/session-recorder/session-view-model';
 
-type ExerciseHistoryPeriod = 'week' | 'progress' | 'history';
+type ExerciseHistoryPeriod = 'week' | 'progress' | 'history' | 'all';
 
 // The tag filter's "no filter" chip. Tag ids are generated, never this.
 const ALL_TAGS = 'all';
@@ -78,6 +81,13 @@ const formatOptionalOneRepMax = (value: number | null) =>
 const formatTagName = (tag: ExerciseHistoryTagOption) =>
   tag.deletedAt ? `${tag.name} (deleted)` : tag.name;
 
+const emptyHistoryMessage = (gymId: string | null | undefined, tagId: string | null) => {
+  if (gymId === null) return 'No completed sessions without a gym in this period.';
+  if (gymId !== undefined) return 'No completed sessions for this gym in this period.';
+  if (tagId) return 'No sessions in this period have the selected tag. Pick another tag or widen the period.';
+  return 'No completed sessions for this exercise in this period.';
+};
+
 export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
   period: ExerciseHistoryPeriod;
@@ -86,6 +96,8 @@ export type ExerciseHistoryScreenShellProps = {
   appliedGymId?: string | null;
   isLoading: boolean;
   errorMessage: string | null;
+  historyStart?: Date;
+  onRetry?: () => void;
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
   onSelectTag: (tagDefinitionId: string | null) => void;
   onPressSession: (sessionId: string) => void;
@@ -100,6 +112,8 @@ export function ExerciseHistoryScreenShell({
   appliedGymId,
   isLoading,
   errorMessage,
+  historyStart,
+  onRetry,
   onSelectPeriod,
   onSelectTag,
   onPressSession,
@@ -136,9 +150,10 @@ export function ExerciseHistoryScreenShell({
           density="compact"
           layout="fit"
           onChange={onSelectPeriod}
+          onReselect={onSelectPeriod}
           options={periodOptions}
           testIDPrefix="exercise-history-period-chip"
-          value={period}
+          value={period === 'all' ? 'history' : period}
         />
 
         {summary && tagOptions.length > 0 ? (
@@ -159,18 +174,6 @@ export function ExerciseHistoryScreenShell({
               value={appliedTagDefinitionId ?? ALL_TAGS}
             />
           </ScrollView>
-        ) : null}
-
-        {errorMessage ? (
-          <Card>
-            <StatePanel
-              body={errorMessage}
-              fill={false}
-              kind="error"
-              testID="exercise-history-error-state"
-              title="Could not load history"
-            />
-          </Card>
         ) : null}
 
         {!errorMessage && isLoading && !summary ? (
@@ -199,37 +202,65 @@ export function ExerciseHistoryScreenShell({
             {summary.sessions.length === 0 ? (
               <Card>
                 <StatePanel
-                  body={
-                    appliedGymId === null
-                      ? 'No completed sessions without a gym in this period.'
-                      : appliedGymId !== undefined
-                      ? 'No completed sessions for this gym in this period.'
-                      : appliedTagDefinitionId
-                        ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
-                        : 'No completed sessions for this exercise in this period.'
-                  }
+                  body={emptyHistoryMessage(appliedGymId, appliedTagDefinitionId)}
                   fill={false}
                   testID="exercise-history-empty-state"
                   title="No sessions in this view"
                 />
               </Card>
             ) : (
-              summary.sessions.map((entry) => (
-                <SessionCard
-                  entry={entry}
-                  key={entry.sessionExerciseId}
-                  onPress={() => onPressSession(entry.sessionId)}
-                  tagOptions={tagOptions}
-                />
-              ))
+              <HistorySessionCards summary={summary} historyStart={period === 'all' ? historyStart : undefined}
+                onPressSession={onPressSession} />
             )}
+            {summary.period.kind === 'history' && !errorMessage ? (
+              <ActionButton
+                disabled={isLoading}
+                label={isLoading ? 'Loading older sessions…' : 'Show older sessions'}
+                onPress={() => onSelectPeriod('all')}
+                testID="exercise-history-show-older"
+                variant="text"
+              />
+            ) : null}
           </>
+        ) : null}
+
+        {errorMessage ? (
+          <Card>
+            <StatePanel
+              body={errorMessage}
+              fill={false}
+              kind="error"
+              testID="exercise-history-error-state"
+              title="Could not load history"
+              action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'exercise-history-retry' } : undefined}
+            />
+          </Card>
         ) : null}
       </ScreenScroll>
 
       <MainTabBar activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </Screen>
   );
+}
+
+function HistorySessionCards({ summary, historyStart, onPressSession }: {
+  summary: ExerciseHistorySummary;
+  historyStart?: Date;
+  onPressSession: (sessionId: string) => void;
+}) {
+  const firstOlder = historyStart ? summary.sessions.findIndex(entry => entry.completedAt < historyStart) : -1;
+  return summary.sessions.map((entry, index) => (
+    <Fragment key={entry.sessionExerciseId}>
+      {index === firstOlder ? (
+        <View style={styles.olderDivider} testID="exercise-history-older-divider">
+          <View style={styles.olderRule} />
+          <Text accessibilityRole="header" allowFontScaling={false} style={styles.olderLabel}>Older sessions</Text>
+          <View style={styles.olderRule} />
+        </View>
+      ) : null}
+      <SessionCard entry={entry} onPress={() => onPressSession(entry.sessionId)} tagOptions={summary.tagOptions} />
+    </Fragment>
+  ));
 }
 
 // The exercise's all-time bests: two rows that open the session holding each.
@@ -419,6 +450,7 @@ export default function ExerciseHistoryRoute() {
     initialTagDefinitionId
   );
   const [summary, setSummary] = useState<ExerciseHistorySummary | null>(null);
+  const [historyStart, setHistoryStart] = useState<Date>();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const readGeneration = useRef(0);
@@ -438,12 +470,17 @@ export default function ExerciseHistoryRoute() {
         return;
       }
       setIsLoading(true);
-      setSummary(null);
+      setSummary(current => nextPeriod === 'all' && current?.period.kind === 'history'
+        && current.exerciseDefinitionId === exerciseDefinitionId
+        && current.appliedTagDefinitionId === nextTagDefinitionId && current.appliedGymId === nextGymId
+        ? current : null);
       setErrorMessage(null);
+      const now = new Date();
       try {
         const next = await loadExercisePerformanceHistory({
           exerciseDefinitionId,
-          period: { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
+          now,
+          period: nextPeriod === 'all' ? { kind: 'all' } : { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
             kind: nextPeriod === 'history' ? 'history' : 'progress' },
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
@@ -453,6 +490,7 @@ export default function ExerciseHistoryRoute() {
           setSummary(null);
           setErrorMessage('Exercise not found.');
         } else {
+          setHistoryStart(historyWeekBounds(historyLookbackWeeks, now).start);
           setSummary(next);
         }
       } catch (error) {
@@ -519,6 +557,8 @@ export default function ExerciseHistoryRoute() {
         appliedGymId={appliedGymId}
         isLoading={isLoading}
         errorMessage={errorMessage}
+        historyStart={historyStart}
+        onRetry={() => { void loadSummary(period, appliedTagDefinitionId, appliedGymId); }}
         onSelectPeriod={setPeriod}
         onSelectTag={setAppliedTagDefinitionId}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
@@ -529,6 +569,20 @@ export default function ExerciseHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
+  olderDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
+  },
+  olderRule: { flex: 1, height: uiBorder.width, backgroundColor: uiRoles.rule },
+  olderLabel: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
   // A chip row is as tall as its chips: a ScrollView grows by default, and
   // inside the page's scroll that stretched them into circles.
   chipScroll: {
