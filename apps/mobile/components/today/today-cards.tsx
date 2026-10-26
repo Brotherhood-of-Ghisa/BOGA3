@@ -13,17 +13,16 @@ import {
 } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type TodayCardPage = {
   key: string;
   /** The page's tab label: `Progress`, or the group's name. */
   label: string;
-  /** The card's body; it fills the card, which scrolls only if it cannot fit. */
+  /** The page's body. It draws its own cards, unless `framed`. */
   content: ReactNode;
-  /** The link row closing the card (`Sessions`, `View group`). */
-  footer: { label: string; onPress: () => void; testID: string };
+  /** A panel (loading, empty, an error): the page draws one card around it, which scrolls only if it cannot fit. */
+  framed: boolean;
   /** Beside the tabs while this page shows (the group switch). */
   accessory?: ReactNode;
   testID: string;
@@ -39,8 +38,9 @@ export const pageAtOffset = (offsetX: number, interval: number, pageCount: numbe
   interval > 0 ? Math.min(pageCount - 1, Math.max(0, Math.round(offsetX / interval))) : 0;
 
 /**
- * Today's cards layout: one full-height card per page, swiped between, the
- * next one peeking at the edge. Tabs over the cards name each page and move to
+ * Today's cards layout: one full-height page per tab, swiped between, the
+ * next one peeking at the edge. A page draws its own cards (You: progress
+ * and session; a group: board and sessions); a panel gets one card. Tabs over the cards name each page and move to
  * it on tap, so swiping is never the only way there. Each card owns the height
  * between the tabs and the tab bar; its body is laid out to fill it, and
  * scrolls instead of clipping when it cannot.
@@ -103,17 +103,29 @@ export function TodayCards({ pages, testID }: { pages: TodayCardPage[]; testID: 
         snapToInterval={interval}
         style={styles.pager}
         testID={`${testID}-pager`}>
-        {pages.map((candidate) => (
-          <Card key={candidate.key} style={{ width: cardWidth, height: cardHeight }} testID={candidate.testID}>
-            <ScrollView
-              alwaysBounceVertical={false}
-              contentContainerStyle={styles.body}
-              showsVerticalScrollIndicator={false}>
-              {candidate.content}
-            </ScrollView>
-            <FooterLink {...candidate.footer} />
-          </Card>
-        ))}
+        {pages.map((candidate) =>
+          candidate.framed ? (
+            <Card key={candidate.key} style={{ width: cardWidth, height: cardHeight }} testID={candidate.testID}>
+              <ScrollView
+                alwaysBounceVertical={false}
+                contentContainerStyle={styles.body}
+                showsVerticalScrollIndicator={false}>
+                {candidate.content}
+              </ScrollView>
+            </Card>
+          ) : (
+            // Its cards fill the page; on a phone too short for their floors the page scrolls rather than clips.
+            <View key={candidate.key} style={{ width: cardWidth, height: cardHeight }} testID={candidate.testID}>
+              <ScrollView
+                alwaysBounceVertical={false}
+                contentContainerStyle={styles.body}
+                showsVerticalScrollIndicator={false}
+                testID={`${candidate.testID}-scroll`}>
+                {candidate.content}
+              </ScrollView>
+            </View>
+          ),
+        )}
       </ScrollView>
     </View>
   );
@@ -135,21 +147,6 @@ function Tab({ label, selected, onPress, testID }: { label: string; selected: bo
         {label}
       </Text>
       <View style={[styles.tabMark, selected ? styles.tabMarkSelected : null]} />
-    </Pressable>
-  );
-}
-
-function FooterLink({ label, onPress, testID }: TodayCardPage['footer']) {
-  return (
-    <Pressable
-      accessibilityRole="link"
-      onPress={onPress}
-      style={({ pressed }) => [styles.footer, pressed ? styles.pressed : null]}
-      testID={testID}>
-      <Text allowFontScaling={false} style={styles.footerLabel}>
-        {label}
-      </Text>
-      <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
     </Pressable>
   );
 }
@@ -218,24 +215,5 @@ const styles = StyleSheet.create({
   },
   body: {
     flexGrow: 1,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: uiGeometry.tapTarget + 4,
-    paddingHorizontal: uiSpace.md,
-    borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
-  },
-  pressed: {
-    backgroundColor: uiRoles.paper,
-  },
-  footerLabel: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
 });

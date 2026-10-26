@@ -75,8 +75,8 @@ volume-included set. A scope with neither kind contributes nothing.
 **The workout in progress.** Progress's tables, `/progress-history` and
 Today's week and period also count the active session the recorder opens, dated
 the instant before the read: where finishing it now would date it. It takes no
-PR until completed. Lists (the week drill-down, Sessions, Today's latest
-session), records, the catalogue, groups and coaching read completed sessions
+PR until completed. Lists (the week drill-down, Sessions, Today's session
+card), records, the catalogue, groups and coaching read completed sessions
 only (`apps/mobile/src/data/in-progress-session.ts`).
 
 **Code.**
@@ -125,7 +125,7 @@ session is its baseline only where it did the same
 **Lists, not statistics.** These show sessions, not counts:
 
 - the sessions list;
-- Today's latest-session card and its empty state;
+- Today's session card and its empty state;
 - exercise history cards;
 - a group's latest session.
 
@@ -215,7 +215,7 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 | Exercise page records panel, exercise history `All-time bests` | All three holders of the bucket, each with its session and gym |
 | Exercise page set list, session view, completed-session and exercise history cards, completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`; history from the facts, `own_pr_*` with a gym chosen, `historyBlockRecord`) |
 | Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
-| Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
+| Today `PRs` and the session card | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each, counted (`3 PRs`); an exercise row's 1RM is in `record` when the session took that exercise's 1RM (`own_pr_e1rm`) |
 
 Every screen that shows a record set highlights it as [[set.row-figures]]
 says. Every band reads the same words

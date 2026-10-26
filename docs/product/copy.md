@@ -53,4 +53,8 @@ headings, relative and time-only labels keep their roles.
 Calendar-week headings may use a named month and shared year/day range in the
 selected order; accessibility retains complete numeric dates.
 
-Code: `apps/mobile/src/utils/local-time.ts`.
+- **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
+  whatever the setting. A range takes one dash and the year once, at its end:
+  `12 – 18 Oct 26`, `26 Oct – 1 Nov 26`; across years both ends carry it.
+
+Code: `apps/mobile/src/utils/local-time.ts` (Today: `formatCompactDate`, `formatCompactDateRange`).

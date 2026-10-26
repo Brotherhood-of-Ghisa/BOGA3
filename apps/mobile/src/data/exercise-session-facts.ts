@@ -310,6 +310,16 @@ export const loadExerciseSessionFacts = async (
     .all());
 };
 
+/** One completed session's facts, one per exercise definition it holds working or volume-included sets of. */
+export const loadSessionExerciseFacts = async (sessionId: string): Promise<ExerciseSessionFactRow[]> => {
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  return database.select(factColumns).from(exerciseSessionFacts)
+    .innerJoin(sessions, liveSessionJoin)
+    .where(eq(exerciseSessionFacts.sessionId, sessionId))
+    .all();
+};
+
 /**
  * Facts whose session set any PR of its own (`own_pr_*`, [[gym.split]]) with
  * `from <= completed_at < to`, in PR-history order: the PRs a session is

@@ -51,19 +51,20 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
     onRetry: () => {
       void retryProgress();
     },
+    onOpenSessions: () => router.push('/sessions'),
     onShowCompared: showCompared,
     onShowSession: showSession,
   };
-  const openSessions = () => router.push('/sessions');
+  const openGroupHome = (groupId: string) => router.push(`${groupsStreamPath(groupId)}&section=glance`);
   const groupHandlers = {
     nowMs: now().getTime(),
     onFindGroup: () => router.push('/group/mine'),
-    onOpenGroup: (groupId: string) => router.push(groupsStreamPath(groupId)),
+    // `View group` and the board open the group's home page.
+    onOpenGroup: (groupId: string) => openGroupHome(groupId),
     onOpenSession: (memberId: string, sessionId: string, groupId: string) =>
       router.push(`/group-session/${memberId}/${sessionId}?groupId=${encodeURIComponent(groupId)}`),
     onSignIn: () => router.push(SIGN_IN_ROUTE),
   };
-  const openGroupHome = (groupId: string) => router.push(`${groupsStreamPath(groupId)}&section=glance`);
 
   if (layout === 'cards') {
     const group = primaryGroup(groupState);
@@ -72,18 +73,16 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
         pages={[
           {
             key: 'progress',
-            label: 'Progress',
+            label: 'You',
             content: <TodayProgressSection {...progressHandlers} fill state={progressState} />,
-            footer: { label: 'Sessions', onPress: openSessions, testID: 'today-sessions-button' },
+            framed: !progressHasCards(progressState),
             testID: 'today-progress-section',
           },
           {
             key: 'group',
             label: group?.name ?? 'Group activity',
             content: <TodayGroupSection {...groupHandlers} fill state={groupState} />,
-            footer: group
-              ? { label: 'View group', onPress: () => openGroupHome(group.group_id), testID: 'today-view-group-button' }
-              : { label: 'View groups', onPress: () => router.push(groupsPath), testID: 'today-view-groups-button' },
+            framed: !groupHasCards(groupState),
             accessory: group && groupState.status === 'available' ? (
               <TodayGroupSwitch
                 groups={groupSwitchOptions(groupState)}
@@ -105,10 +104,7 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
       contentInsetAdjustmentBehavior="automatic"
       testID="today-screen">
       <View style={styles.section} testID="today-progress-section">
-        <SectionHeader
-          action={{ label: 'Sessions', onPress: openSessions, testID: 'today-sessions-button' }}
-          title="Progress"
-        />
+        <SectionHeader title="You" />
         <TodayProgressSection {...progressHandlers} state={progressState} />
       </View>
 
@@ -121,6 +117,17 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
 }
 
 type Available = Extract<TodayGroupState, { status: 'available' }>;
+
+// Ready progress draws its own two cards; the loading, error and empty panels take the page's card.
+const progressHasCards = (state: TodayProgressState) => state.status === 'loaded' && state.progress.status === 'ready';
+
+// The group's board and sessions draw their own cards; the account, no-group and missing-data panels take the page's card.
+const groupHasCards = (state: TodayGroupState) =>
+  state.status === 'available' &&
+  state.groups !== null &&
+  state.groups.length > 0 &&
+  state.selectedGroupId !== null &&
+  state.summary !== null;
 
 // The primary group — the one Today shows — when there is one to name.
 const primaryGroup = (state: TodayGroupState) =>
@@ -168,6 +175,7 @@ function GroupSectionHeading({
 
 function TodayProgressSection({
   onOpenSession,
+  onOpenSessions,
   onOpenTrain,
   onRetry,
   onShowCompared,
@@ -176,6 +184,7 @@ function TodayProgressSection({
   fill = false,
 }: {
   onOpenSession: (sessionId: string) => void;
+  onOpenSessions: () => void;
   onOpenTrain: () => void;
   onRetry: () => void;
   onShowCompared: (periodsBack: number) => void;
@@ -221,6 +230,7 @@ function TodayProgressSection({
     <TodayProgressCard
       fill={fill}
       onOpenSession={onOpenSession}
+      onOpenSessions={onOpenSessions}
       onShowCompared={onShowCompared}
       onShowSession={onShowSession}
       progress={state.progress}

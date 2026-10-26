@@ -9,6 +9,7 @@
  */
 
 import * as mockReact from 'react';
+import { ScrollView } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -142,6 +143,8 @@ beforeEach(() => {
   api.listMyGroups.mockReset();
   api.getCompetitionWeek.mockReset();
   api.getCompetitionStream.mockReset();
+  // The sessions card reads the stream when it has room; by default it holds nothing more.
+  api.getCompetitionStream.mockResolvedValue({ contract_version: 4, items: [], next_cursor: null, has_more: false });
   signedIn();
 });
 
@@ -181,6 +184,35 @@ describe('Today: the group card account states', () => {
   });
 });
 
+// Stream fixtures: a session item as the group stream carries it, and a group
+// record event on one of its sessions.
+const DAY = 24 * 60 * 60 * 1000;
+const streamSession = (userId: string, sessionId: string, startedAtMs: number, status: 'completed' | 'active' = 'completed') => ({
+  kind: 'session' as const,
+  key: `${userId}:${sessionId}`,
+  sort_at_ms: startedAtMs,
+  groups: [{ group_id: 'g1', name: 'Iron Wednesdays' }],
+  session: { ...competitionSession.session, member: member(userId), session_id: sessionId, status, started_at_ms: startedAtMs,
+    completed_at_ms: status === 'completed' ? startedAtMs + 3_600_000 : null, duration_sec: status === 'completed' ? 3_600 : null },
+});
+const boardValue = (metric: 'e1rm' | 'weight', value: number) =>
+  ({ role: 'record' as const, metric, unit: 'kg', value, unavailable: false, member: null });
+const deadlift = { ...competitionEvent, visibility: 'ordinary' as const, group_exercise: { group_exercise_id: 'gx-dl', name: 'Deadlift' } };
+const recordItem = (userId: string, sessionId: string, values: ReturnType<typeof boardValue>[]) => ({
+  kind: 'competition' as const,
+  key: `record-${sessionId}`,
+  sort_at_ms: NOW.getTime() - 2 * DAY,
+  event: { ...deadlift, event_id: `record-${sessionId}`, member: member(userId), session_id: sessionId, values },
+});
+const streamPage = (items: unknown[], nextCursor: string | null = null) =>
+  ({ contract_version: 4 as const, items, next_cursor: nextCursor, has_more: nextCursor !== null }) as Awaited<
+    ReturnType<typeof api.getCompetitionStream>
+  >;
+
+// The member names on the sessions cards (training now, then recent), top to bottom.
+const sessionMembers = () => within(byId('today-group-section')).queryAllByTestId(/^today-group-session-.*-member$/)
+  .map((node) => node.props.children as string);
+
 describe('Today: the group card', () => {
   it('with one group: the heading names it with no switch, and this local week is read', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
@@ -192,28 +224,51 @@ describe('Today: the group card', () => {
     expect(api.getCompetitionWeek).toHaveBeenCalledWith('g1',week.start.getTime(),week.end.getTime());
     expect(byId('today-group-title')).toHaveTextContent('Iron Wednesdays');
     expect(screen.queryByTestId('today-group-switch')).toBeNull();
-    expect(byId('today-group-board-title')).toHaveTextContent('This week');
+    // `This week` and this local week (Mon 5 – Sun 11 Oct 2026), in Today's range format.
+    expect(within(byId('today-group-card')).getByText(/This week/)).toBeTruthy();
+    expect(byId('today-group-board-range')).toHaveTextContent('5 – 11 Oct 26');
 
-    // The top three, the leader's bar in the darker step, then my own line.
+    // Four members fit the top five: I am on the board, with no line of my own.
     expect(byId('today-group-board-row-dave-name')).toHaveTextContent('dave');
     expect(byId('today-group-board-row-sam-rank')).toHaveTextContent('3');
     expect(byId('today-group-board-row-maria-fill')).toHaveStyle({ width: '67%' });
-    expect(screen.queryByTestId('today-group-board-row-me')).toBeNull();
-    expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 4th');
-    expect(byId('today-group-board-me-working-sets')).toHaveTextContent('21');
+    expect(byId('today-group-board-row-me-working-sets')).toHaveTextContent('21');
+    expect(screen.queryByTestId('today-group-board-me')).toBeNull();
     // The count column is the working sets, labelled `Sets` like every set count.
     expect(within(byId('today-group-board')).getByText('Sets')).toBeTruthy();
-    expect(byId('today-group-board').props.accessibilityLabel).toContain('You, 4th, 21 sets,');
 
-    fireEvent.press(byId('today-group-latest-completed'));
+    // The board, View group and the heading all open the group's home page, At a glance.
     fireEvent.press(byId('today-group-board'));
-    // The heading opens the group on the Groups screen, At a glance.
+    fireEvent.press(byId('today-view-group-button'));
     fireEvent.press(byId('today-group-title'));
     expect(mockPush.mock.calls).toEqual([
-      ['/group-session/dave/dave-done?groupId=g1'],
-      ['/groups?groupId=g1'],
+      ['/groups?groupId=g1&section=glance'],
+      ['/groups?groupId=g1&section=glance'],
       ['/groups?groupId=g1&section=glance'],
     ]);
+  });
+
+  it('shows the top five on the board, then my own line when I am outside them', async () => {
+    // Nine ranked members, me seventh.
+    const nine = ['dave', 'maria', 'sam', 'kit', 'jo', 'marco', ME, 'dee', 'tom'].map((userId, index) => ({
+      rank: index + 1,
+      member: member(userId),
+      working_sets: 60 - index * 5,
+      group_records: index === 6 ? 2 : 0,
+    }));
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary({ members: nine }));
+    await renderToday();
+    await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
+
+    const boardRows = screen.queryAllByTestId(/^today-group-board-row-[^-]+$/).map((row) => row.props.testID);
+    expect(boardRows).toEqual(['dave', 'maria', 'sam', 'kit', 'jo'].map((id) => `today-group-board-row-${id}`));
+    expect(byId('today-group-board-me-rank')).toHaveTextContent('7th');
+    expect(byId('today-group-board-me-working-sets')).toHaveTextContent('30');
+    expect(byId('today-group-board-me-records')).toHaveTextContent('2');
+    // No count of the members left off.
+    expect(screen.queryByText(/more$/)).toBeNull();
+    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 5 – 11 Oct 26; 1, dave, 60 sets, 0 PRs;.*; You, 7th, 30 sets, 2 PRs$/);
   });
 
   it('with several groups: the heading names the Groups screen pick, and its switch moves both', async () => {
@@ -226,7 +281,6 @@ describe('Today: the group card', () => {
 
     await waitFor(() => expect(byId('today-group-board-row-lena')).toBeTruthy());
     expect(byId('today-group-title')).toHaveTextContent('Lunch Club');
-    expect(byId('today-group-board-title')).toHaveTextContent('This week');
     expect(api.getCompetitionWeek).toHaveBeenLastCalledWith('g2',expect.any(Number),expect.any(Number));
 
     fireEvent.press(byId('today-group-switch'));
@@ -236,138 +290,109 @@ describe('Today: the group card', () => {
     expect(getLastViewedGroupId()).toBe('g1');
   });
 
-  it('draws the latest completed session as the Progress row, naming one group record and counting several', async () => {
-    const boardValue = (metric: 'e1rm' | 'weight', value: number) =>
-      ({ role: 'record' as const, metric, unit: 'kg', value, unavailable: false, member: null });
-    const deadlift = { ...competitionEvent, visibility: 'ordinary' as const, group_exercise: { group_exercise_id: 'gx-dl', name: 'Deadlift' } };
-    const latest = summary().latest_completed!;
-    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getCompetitionWeek.mockResolvedValueOnce(summary({
-      latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('e1rm', 213.3)] }] },
-    }));
-    const view = await renderToday();
-
-    await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
-    expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
-    expect(screen.queryByTestId('today-group-latest-completed-training-now')).toBeNull();
-    expect(byId('today-group-latest-completed-figures')).toHaveTextContent('18 sets · 4 exercises');
-    expect(byId('today-group-latest-completed-record')).toHaveTextContent('Deadlift 1RM 213.3 · group record');
-    view.unmount();
-
-    // One set #1 on Weight and on 1RM: two group records, only counted.
-    api.getCompetitionWeek.mockResolvedValueOnce(summary({
-      latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('weight', 200), boardValue('e1rm', 213.3)] }] },
-    }));
-    await renderToday();
-    await waitFor(() => expect(byId('today-group-latest-completed-record')).toHaveTextContent('2 group records'));
-    expect(screen.queryByText(/Deadlift/)).toBeNull();
-  });
-
-  it('opens one member training now on their session, and several on the group', async () => {
-    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: [live('maria')] }));
-    const view = await renderToday();
-
-    await waitFor(() => expect(byId('today-group-latest-training')).toBeTruthy());
-    // The shared session row, under the member's name and the training-now mark.
-    expect(byId('today-group-latest-training-member')).toHaveTextContent('maria');
-    expect(within(byId('today-group-latest-training-training-now')).getByText('Training now')).toBeTruthy();
-    expect(byId('today-group-latest-training-start')).toHaveTextContent('Started 11:30');
-    expect(screen.queryByTestId('today-group-latest-training-record')).toBeNull();
-    fireEvent.press(byId('today-group-latest-training'));
-    expect(mockPush).toHaveBeenLastCalledWith('/group-session/maria/maria-live?groupId=g1');
-    view.unmount();
-
-    api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: [live('maria'), live('sam'), live('tom')] }));
-    await renderToday();
-    await waitFor(() => expect(byId('today-group-latest-title')).toHaveTextContent('3 training now'));
-    expect(screen.getByText('maria, sam and tom')).toBeTruthy();
-    fireEvent.press(byId('today-group-latest-several'));
-    expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1');
-  });
-
-  describe('stepping back through the group\'s completed sessions', () => {
-    const streamSession = (userId: string, sessionId: string, startedAtMs: number, status: 'completed' | 'active' = 'completed') => ({
-      kind: 'session' as const,
-      key: `${userId}:${sessionId}`,
-      sort_at_ms: startedAtMs,
-      groups: [{ group_id: 'g1', name: 'Iron Wednesdays' }],
-      session: { ...competitionSession.session, member: member(userId), session_id: sessionId, status, started_at_ms: startedAtMs,
-        completed_at_ms: status === 'completed' ? startedAtMs + 3_600_000 : null, duration_sec: status === 'completed' ? 3_600 : null },
-    });
-    const DAY = 24 * 60 * 60 * 1000;
-    const record = { ...competitionEvent, member: member('sam'), session_id: 'sam-1' };
-    const firstPage = {
-      contract_version: 4 as const,
-      items: [
-        // The latest activity's own session is not stepped to again, nor one still in progress.
+  describe('the sessions card', () => {
+    it('lists members training now first, then recent sessions from the summary and the stream, four in all', async () => {
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      api.getCompetitionWeek.mockResolvedValue(summary({ training_now: [live('maria'), live('sam')] }));
+      api.getCompetitionStream.mockResolvedValue(streamPage([
+        // The summary's latest is shown once, and a session still in progress is not a recent one.
         streamSession('dave', 'dave-done', NOW.getTime() - 3 * 60 * 60 * 1000),
         streamSession('tom', 'tom-live', NOW.getTime() - DAY, 'active'),
-        { kind: 'competition' as const, key: 'event1', sort_at_ms: NOW.getTime() - 2 * DAY, event: record },
-        streamSession('sam', 'sam-1', NOW.getTime() - 2 * DAY),
-      ],
-      next_cursor: 'older',
-      has_more: true,
-    };
-    const secondPage = { contract_version: 4 as const, items: [streamSession('maria', 'maria-1', NOW.getTime() - 5 * DAY)], next_cursor: null, has_more: false };
-
-    it('reads the stream only when asked, steps back a session at a time and forward again to the latest', async () => {
-      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-      api.getCompetitionWeek.mockResolvedValue(summary());
-      api.getCompetitionStream.mockResolvedValueOnce(firstPage).mockResolvedValueOnce(secondPage);
+        streamSession('kit', 'kit-1', NOW.getTime() - 2 * DAY),
+        streamSession('jo', 'jo-1', NOW.getTime() - 3 * DAY),
+      ], 'older'));
       await renderToday();
-      await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
 
-      expect(api.getCompetitionStream).not.toHaveBeenCalled();
-      expect(byId('today-group-latest-heading')).toHaveTextContent('Latest activity');
-      expect(byId('today-group-latest-step-newer')).toBeDisabled();
-
-      fireEvent.press(byId('today-group-latest-step-older'));
-      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam'));
+      // Two live, the summary's latest, then one from the stream: four.
+      await waitFor(() => expect(sessionMembers()).toEqual(['maria', 'sam', 'dave', 'kit']));
+      // Training now and recent are a card each.
+      expect(within(byId('today-group-live')).queryAllByTestId(/-member$/).map((node) => node.props.children)).toEqual(['maria', 'sam']);
+      expect(within(byId('today-group-sessions')).queryAllByTestId(/-member$/).map((node) => node.props.children)).toEqual(['dave', 'kit']);
+      expect(api.getCompetitionStream).toHaveBeenCalledTimes(1);
       expect(api.getCompetitionStream).toHaveBeenCalledWith('g1', null);
-      expect(byId('today-group-latest-heading')).toHaveTextContent('Earlier session');
-      expect(byId('today-group-latest-completed-figures')).toHaveTextContent('1 set · 1 exercise');
-      expect(byId('today-group-latest-completed-record')).toHaveTextContent('Pull-up 1RM 145.7 %BW · group record');
-      fireEvent.press(byId('today-group-latest-completed'));
-      expect(mockPush).toHaveBeenLastCalledWith('/group-session/sam/sam-1?groupId=g1');
+      expect(within(byId('today-group-training-now')).getByText('Training now')).toBeTruthy();
+      expect(within(byId('today-group-training-now')).getByTestId('today-group-session-sam-live')).toBeTruthy();
+      expect(within(byId('today-group-recent')).getByText('Recent')).toBeTruthy();
+      expect(within(byId('today-group-recent')).getByTestId('today-group-session-kit-1')).toBeTruthy();
+      expect(screen.queryByTestId('today-group-session-jo-1')).toBeNull();
+      expect(screen.queryByTestId('today-group-session-tom-live')).toBeNull();
 
-      // Past the first page: the next one is read.
-      fireEvent.press(byId('today-group-latest-step-older'));
-      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('maria'));
-      expect(api.getCompetitionStream).toHaveBeenLastCalledWith('g1', 'older');
-      expect(byId('today-group-latest-step-older')).toBeDisabled();
+      // Live: today's start time and the figures so far, no record.
+      expect(byId('today-group-session-maria-live-when')).toHaveTextContent('Started 11:30');
+      expect(byId('today-group-session-maria-live-figures')).toHaveTextContent('3 exercises · 7 sets so far');
+      expect(screen.queryByTestId('today-group-session-maria-live-record')).toBeNull();
+      // Completed: Today's compact date and time, then the session's figures.
+      expect(byId('today-group-session-dave-done-when')).toHaveTextContent('6 Oct 26 09:00');
+      expect(byId('today-group-session-dave-done-figures')).toHaveTextContent('4 exercises · 18 sets');
+      expect(byId('today-group-session-kit-1-figures')).toHaveTextContent('1 exercise · 1 set');
 
-      fireEvent.press(byId('today-group-latest-step-newer'));
-      expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam');
-      fireEvent.press(byId('today-group-latest-step-newer'));
-      expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
-      expect(byId('today-group-latest-heading')).toHaveTextContent('Latest activity');
-      expect(api.getCompetitionStream).toHaveBeenCalledTimes(2);
+      // A row opens its member's session in the group.
+      fireEvent.press(byId('today-group-session-maria-live'));
+      fireEvent.press(byId('today-group-session-kit-1'));
+      expect(mockPush.mock.calls).toEqual([
+        ['/group-session/maria/maria-live?groupId=g1'],
+        ['/group-session/kit/kit-1?groupId=g1'],
+      ]);
     });
 
-    it('says so when the earlier sessions cannot be read, and tries again on the next tap', async () => {
+    it('reads the stream only when the live sessions and the latest leave room', async () => {
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      // Four training now fill the card: no latest, no stream.
+      api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: ['maria', 'sam', 'tom', 'kit'].map(live) }));
+      const view = await renderToday();
+      await waitFor(() => expect(sessionMembers()).toEqual(['maria', 'sam', 'tom', 'kit']));
+      expect(screen.queryByTestId('today-group-recent')).toBeNull();
+      // Nothing recent to show: no recent card, only the live one.
+      expect(screen.queryByTestId('today-group-sessions')).toBeNull();
+      expect(api.getCompetitionStream).not.toHaveBeenCalled();
+      view.unmount();
+
+      // Three training now and the summary's latest: four again, still no stream.
+      api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: ['maria', 'sam', 'tom'].map(live) }));
+      await renderToday();
+      await waitFor(() => expect(sessionMembers()).toEqual(['maria', 'sam', 'tom', 'dave']));
+      expect(within(byId('today-group-recent')).getByTestId('today-group-session-dave-done')).toBeTruthy();
+      expect(api.getCompetitionStream).not.toHaveBeenCalled();
+    });
+
+    it('names one group record and counts several', async () => {
+      const latest = summary().latest_completed!;
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      api.getCompetitionWeek.mockResolvedValue(summary({
+        latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('e1rm', 213.3)] }] },
+      }));
+      // One set #1 on Weight and on 1RM: two group records, only counted.
+      api.getCompetitionStream.mockResolvedValue(streamPage([
+        recordItem('sam', 'sam-1', [boardValue('weight', 200), boardValue('e1rm', 213.3)]),
+        streamSession('sam', 'sam-1', NOW.getTime() - 2 * DAY),
+      ]));
+      await renderToday();
+
+      await waitFor(() => expect(byId('today-group-session-sam-1-record')).toHaveTextContent('2 group records'));
+      expect(byId('today-group-session-dave-done-record')).toHaveTextContent('Deadlift 1RM 213.3');
+      expect(byId('today-group-session-dave-done-figures')).toHaveTextContent('4 exercises · 18 sets · Deadlift 1RM 213.3');
+      expect(byId('today-group-session-sam-1-figures')).toHaveTextContent('1 exercise · 1 set · 2 group records');
+    });
+
+    it("says so when the earlier sessions can't be read, keeping the summary's", async () => {
       api.listMyGroups.mockResolvedValue({ groups: [IRON] });
       api.getCompetitionWeek.mockResolvedValue(summary());
-      api.getCompetitionStream.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable')).mockResolvedValueOnce(firstPage);
+      api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'Server unavailable'));
       await renderToday();
-      await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
 
-      fireEvent.press(byId('today-group-latest-step-older'));
-      await waitFor(() => expect(byId('today-group-latest-step-failed')).toHaveTextContent("Couldn't load earlier sessions."));
-      expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
-
-      fireEvent.press(byId('today-group-latest-step-older'));
-      await waitFor(() => expect(byId('today-group-latest-completed-member')).toHaveTextContent('sam'));
-      expect(screen.queryByTestId('today-group-latest-step-failed')).toBeNull();
+      await waitFor(() => expect(byId('today-group-recent-failed')).toHaveTextContent("Couldn't load earlier sessions."));
+      expect(sessionMembers()).toEqual(['dave']);
     });
-  });
 
-  it('says so when the group has no shared session yet', async () => {
-    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getCompetitionWeek.mockResolvedValue(summary({ latest_completed: null }));
-    await renderToday();
+    it('says so when the group has no shared session yet', async () => {
+      api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+      api.getCompetitionWeek.mockResolvedValue(summary({ latest_completed: null }));
+      await renderToday();
 
-    await waitFor(() => expect(byId('today-group-latest-empty')).toBeTruthy());
+      await waitFor(() => expect(byId('today-group-latest-empty')).toHaveTextContent('No sessions shared to this group yet.'));
+      expect(api.getCompetitionStream).toHaveBeenCalledWith('g1', null);
+      expect(sessionMembers()).toEqual([]);
+    });
   });
 });
 
@@ -385,7 +410,7 @@ describe('Today: the group card offline and on errors', () => {
 
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     expect(byId('groups-offline-banner')).toBeTruthy();
-    expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 4th');
+    expect(byId('today-group-board-row-me-working-sets')).toHaveTextContent('21');
     expect(api.getCompetitionWeek).not.toHaveBeenCalled();
   });
 
@@ -452,22 +477,21 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     act(() => updatePreferences({ todayLayout: 'list' }));
   });
 
-  // Nine ranked members, me seventh.
-  const nine = ['dave', 'maria', 'sam', 'kit', 'jo', 'marco', ME, 'dee', 'tom'].map((userId, index) => ({
-    rank: index + 1,
-    member: member(userId),
-    working_sets: 60 - index * 5,
-    group_records: 0,
-  }));
+  it('lets the live card take the page and scroll its rows when it is the only sessions card', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary({ training_now: ['maria', 'sam', 'tom', 'kit'].map(live) }));
+    await renderToday();
 
-  const boardBox = (height: number) =>
-    fireEvent(byId('today-group-board-box'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 345, height } } });
-  const boardRows = () => screen.queryAllByTestId(/^today-group-board-row-[^-]+$/).map((row) => row.props.testID);
+    await waitFor(() => expect(byId('today-group-live')).toBeTruthy());
+    expect(screen.queryByTestId('today-group-sessions')).toBeNull();
+    expect(byId('today-group-live')).toHaveStyle({ flex: 1 });
+    expect(within(byId('today-group-live')).UNSAFE_getAllByType(ScrollView)).toHaveLength(1);
+  });
 
   it("names the group's card after it, and offers its switch only while that card shows", async () => {
     setLastViewedGroupId('g2');
     api.listMyGroups.mockResolvedValue({ groups: [IRON, LUNCH] });
-    api.getCompetitionWeek.mockResolvedValue(summary({ group_id: 'g2' }));
+    api.getCompetitionWeek.mockImplementation(async (groupId) => summary({ group_id: groupId }));
     await renderToday();
 
     await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
@@ -480,37 +504,14 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     await waitFor(() => expect(byId('today-group-section-tab')).toHaveTextContent('Iron Wednesdays'));
     expect(getLastViewedGroupId()).toBe('g1');
 
-    // The card's link opens the group At a glance, as the list layout's heading does.
+    // The first page is `You`; the group's page draws its own two cards, with no footer link.
+    expect(byId('today-progress-section-tab')).toHaveTextContent('You');
+    expect(within(byId('today-group-section')).getByTestId('today-group-sessions')).toBeTruthy();
+    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
+
+    // The board's View group opens the group At a glance, as the list layout's heading does.
     fireEvent.press(byId('today-view-group-button'));
     expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
-  });
-
-  it('shows as many board rows as the card has room for, counting the rest', async () => {
-    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getCompetitionWeek.mockResolvedValue(summary({ members: nine }));
-    await renderToday();
-    await waitFor(() => expect(byId('today-group-board-box')).toBeTruthy());
-
-    // Before the box is measured: the list layout's three, then my own line.
-    expect(boardRows()).toHaveLength(3);
-    expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 7th');
-    expect(byId('today-group-board-more')).toHaveTextContent('+5 more');
-
-    // 400pt: 34 of heading, 36 for my line and 22 for `+N more` leave 308, seven 40pt rows — me among them.
-    boardBox(400);
-    expect(boardRows()).toEqual(['dave', 'maria', 'sam', 'kit', 'jo', 'marco', ME].map((id) => `today-group-board-row-${id}`));
-    expect(screen.queryByTestId('today-group-board-me')).toBeNull();
-    expect(byId('today-group-board-more')).toHaveTextContent('+2 more');
-    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/7, You, 30 sets, 0 PRs; 2 more$/);
-
-    // Room for everyone: no `+N more`.
-    boardBox(600);
-    expect(boardRows()).toHaveLength(9);
-    expect(screen.queryByTestId('today-group-board-more')).toBeNull();
-
-    // Never fewer than three.
-    boardBox(120);
-    expect(boardRows()).toHaveLength(3);
   });
 
   it('centres the loading state in the card while My groups is read (a pending read)', async () => {
@@ -521,13 +522,14 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     expect(byId('today-group-missing')).toHaveStyle({ flex: 1, justifyContent: 'center' });
   });
 
-  it('fills the card with the signed-out panel, its link opening Groups', async () => {
+  it("shows the signed-out panel on the group's page, with no footer link", async () => {
     mockUseAuth.mockReturnValue({ isConfigured: true, user: null });
     await renderToday();
 
     expect(within(byId('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
     expect(byId('today-group-section-tab')).toHaveTextContent('Group activity');
-    fireEvent.press(byId('today-view-groups-button'));
-    expect(mockPush).toHaveBeenLastCalledWith('/groups');
+    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
+    fireEvent.press(byId('today-group-sign-in'));
+    expect(mockPush).toHaveBeenLastCalledWith(SIGN_IN_ROUTE);
   });
 });

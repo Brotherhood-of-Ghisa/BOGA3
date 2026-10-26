@@ -225,7 +225,6 @@ function HistoryRow({
       <SessionSummaryRow
         accessibilityHint="Opens the completed session"
         accessibilityLabel={deleted ? `Deleted. ${label}` : label}
-        chevron={false}
         duration={formatSessionSummaryDuration(figures)}
         figures={formatSessionSummaryFigures(figures)}
         gym={session.gymName}

@@ -7,11 +7,10 @@ import {
   type GestureResponderEvent,
   type LayoutChangeEvent,
 } from 'react-native';
-import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { changeToneColour } from '@/components/ui/change-tone';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { useDateFormat } from '@/src/preferences/hooks';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
@@ -26,28 +25,22 @@ import {
   periodDayAtX,
   periodDayFigures,
   periodFiguresAccessibilityLabel,
-  todayLabelAnchor,
   toPolyline,
   type PeriodChartGeometry,
 } from './progress-format';
-import { StepArrows } from './step-arrows';
+import { StepAround } from './step-arrows';
 import { todayText } from './text-styles';
 
 // Until the first layout pass reports the card's width (and in Jest, where
 // none runs): roughly a 390pt phone's card.
 const FALLBACK_CHART_WIDTH = 326;
-// The `TODAY` label's baseline, under the plot.
-const AXIS_LABEL_OFFSET = 15;
 // A filling chart never draws shorter than this; the card scrolls instead.
 export const MIN_FILL_CHART_HEIGHT = 72;
 const WEEK_TICK = 4;
 
-const axisLabel = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.xxs };
-
 function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
   const { plot, current, previous, projection, today, selected, weekStartsX } = geometry;
   const area = [{ x: 0, y: plot.bottom }, ...current, { x: today.current.x, y: plot.bottom }];
-  const todayAnchor = todayLabelAnchor(today.current.x, plot.width);
 
   return (
     <>
@@ -110,9 +103,6 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
         stroke={selected.projected ? uiRoles.ink : uiRoles.surface}
         strokeWidth={2}
       />
-      <SvgText {...axisLabel} fill={uiRoles.ink} letterSpacing={1} textAnchor={todayAnchor} x={today.current.x} y={plot.bottom + AXIS_LABEL_OFFSET}>
-        TODAY
-      </SvgText>
     </>
   );
 }
@@ -121,8 +111,8 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // selected day's working sets (today until the chart is touched; after today,
 // the projection's) against the previous period's at the same day, and their
 // difference ([[comparison.change-display]]); then the cumulative lines by day.
-// The arrows by `vs` compare against an earlier or later period, never later
-// than the previous one. `fill` lets the chart take the height the block is
+// The arrows either side of the compared range step to an earlier or later
+// period, never later than the previous one. `fill` lets the chart take the height the block is
 // given (Today's cards layout) instead of its own.
 export function PeriodPace({
   period,
@@ -134,7 +124,6 @@ export function PeriodPace({
   /** Compares against the period this many periods back. */
   onShowCompared?: (periodsBack: number) => void;
 }) {
-  const dateFormat = useDateFormat();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   // The selected day belongs to the period it was picked in; another period
   // (a new day, a changed Progress period) starts again at today.
@@ -156,14 +145,41 @@ export function PeriodPace({
     select(periodDayAtX(event.nativeEvent.locationX, geometry.plot.width, period.daysInPeriod));
   const onAccessibilityAction = (event: AccessibilityActionEvent) =>
     select(figures.dayIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
-  const label = formatPeriodDayLabel(figures, dateFormat);
+  const label = formatPeriodDayLabel(figures);
+  const canCompareNewer = period.compareBack > 1;
+  const compareActions = onShowCompared
+    ? [
+        { name: 'older', label: 'Previous period' },
+        ...(canCompareNewer ? [{ name: 'newer', label: 'Next period' }] : []),
+      ]
+    : undefined;
+  const onCompareAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'older') onShowCompared?.(period.compareBack + 1);
+    if (event.nativeEvent.actionName === 'newer' && canCompareNewer) onShowCompared?.(period.compareBack - 1);
+  };
+  const comparedRange = (
+    <Text
+      allowFontScaling={false}
+      numberOfLines={1}
+      style={[todayText.microLabel, todayText.microLabelFaint]}
+      testID="today-progress-period-previous-range">
+      {formatPeriodRange(period.previous.window)}
+    </Text>
+  );
 
   return (
     <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
-      <View accessible accessibilityLabel={periodFiguresAccessibilityLabel(period, figures, dateFormat)} style={styles.figures}>
+      {/* One element when spoken: its arrows are offered as its actions. */}
+      <View
+        accessibilityActions={compareActions}
+        accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)}
+        accessible
+        onAccessibilityAction={onCompareAction}
+        style={styles.figures}
+        testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
           <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
-            {formatPeriodRange(period.window, dateFormat)}
+            {formatPeriodRange(period.window)}
           </Text>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
@@ -175,20 +191,24 @@ export function PeriodPace({
             </Text>
           </View>
         </View>
-        <View style={styles.column}>
-          <View style={styles.comparedRow}>
-            <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="today-progress-period-previous-range">
-              vs {formatPeriodRange(period.previous.window, dateFormat)}
-            </Text>
-            {onShowCompared ? (
-              <StepArrows
-                noun="period"
-                onNewer={period.compareBack > 1 ? () => onShowCompared(period.compareBack - 1) : null}
-                onOlder={() => onShowCompared(period.compareBack + 1)}
-                testID="today-progress-period-compare"
-              />
-            ) : null}
-          </View>
+        {/* `vs` between the two periods, a rule above and below it. */}
+        <View style={styles.versus}>
+          <View style={styles.versusRule} />
+          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]}>vs</Text>
+          <View style={styles.versusRule} />
+        </View>
+        <View style={[styles.column, styles.comparedColumn]}>
+          {onShowCompared ? (
+            <StepAround
+              noun="period"
+              onNewer={canCompareNewer ? () => onShowCompared(period.compareBack - 1) : null}
+              onOlder={() => onShowCompared(period.compareBack + 1)}
+              testID="today-progress-period-compare">
+              {comparedRange}
+            </StepAround>
+          ) : (
+            comparedRange
+          )}
           <View style={styles.previousRow}>
             <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-sets">
               {figures.previousWorkingSets}
@@ -212,7 +232,7 @@ export function PeriodPace({
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         accessibilityLabel={periodChartAccessibilityLabel(period)}
         accessibilityRole="adjustable"
-        accessibilityValue={{ text: periodChartAccessibilityValue(period, figures, dateFormat) }}
+        accessibilityValue={{ text: periodChartAccessibilityValue(period, figures) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
         onResponderMove={fill ? undefined : onTouch}
@@ -237,9 +257,10 @@ const styles = StyleSheet.create({
   block: {
     gap: uiSpace.md,
   },
+  // The current period, `vs`, then the compared period.
   figures: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'stretch',
     gap: uiSpace.sm,
   },
   column: {
@@ -247,7 +268,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   currentColumn: {
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   currentRow: {
     flexDirection: 'row',
@@ -256,20 +278,28 @@ const styles = StyleSheet.create({
   currentFigure: {
     flexShrink: 1,
   },
-  // `vs` and its arrows: the arrows' row is no taller than the label's.
-  comparedRow: {
-    flexDirection: 'row',
+  versus: {
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: uiSpace.xs,
-    marginVertical: -3,
   },
-  // The previous period's figure under its `vs`, the difference at the edge.
+  versusRule: {
+    flex: 1,
+    width: 1,
+    backgroundColor: uiRoles.rule,
+  },
+  // Clear of `vs` on the left; on the right the arrow reaches past the edge, so its glyph sits on the figures' line.
+  comparedColumn: {
+    flexShrink: 0,
+    marginLeft: uiSpace.xs,
+    marginRight: -uiSpace.sm,
+  },
+  // The compared period's figure, the difference at the edge.
   previousRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
+    paddingHorizontal: uiSpace.sm,
   },
   chart: {
     overflow: 'visible',

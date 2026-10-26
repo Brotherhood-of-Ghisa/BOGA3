@@ -17,6 +17,8 @@ const HOUR_MS = 60 * 60 * 1000;
  * - Each session is a bench, squat and row block of three working sets
  *   (nine in all). Bench climbs 2.5 every fourth session and in the latest,
  *   so this week always has PRs: three each time (1RM, Weight and Volume).
+ * - The latest session adds three more blocks (press, pulldown, curl), so the
+ *   session card has more exercises than it shows without scrolling.
  *
  * Written through the session repository, so the facts table derives its PRs
  * exactly as it would for logged sessions.
@@ -25,6 +27,7 @@ export const TODAY_PROGRESS_FIXTURE = {
   gymId: 'maestro_today_progress_gym',
   gymName: 'Canal Street Gym',
   workingSetsPerSession: 9,
+  latestExtraExercises: 3,
 } as const;
 
 const dayOf = (start: Date, day: number) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + day, 7);
@@ -49,6 +52,13 @@ const workingSets = (sessionId: string, block: string, weightValue: string) =>
     performanceStatus: null,
   }));
 
+// The latest session's first blocks, beyond the three every session has.
+const latestExtras = (sessionId: string) => [
+  { id: `${sessionId}_press`, exerciseDefinitionId: 'seed_standing_barbell_overhead_press', name: 'Standing Barbell Overhead Press', sets: workingSets(sessionId, 'press', '45') },
+  { id: `${sessionId}_pulldown`, exerciseDefinitionId: 'seed_lat_pulldown', name: 'Lat Pulldown', sets: workingSets(sessionId, 'pulldown', '65') },
+  { id: `${sessionId}_curl`, exerciseDefinitionId: 'seed_dumbbell_biceps_curl', name: 'Dumbbell Biceps Curl', sets: workingSets(sessionId, 'curl', '14') },
+];
+
 export const seedTodayProgressFixture = async ({
   now = new Date(),
   periodWeeks = getAccountLocalPreferenceState().values.targetWindowWeeks,
@@ -67,6 +77,7 @@ export const seedTodayProgressFixture = async ({
         gymId: TODAY_PROGRESS_FIXTURE.gymId,
         startedAt,
         exercises: [
+          ...(index === days.length - 1 ? latestExtras(sessionId) : []),
           { id: `${sessionId}_bench`, exerciseDefinitionId: 'seed_barbell_bench_press', name: 'Barbell Bench Press', sets: workingSets(sessionId, 'bench', benchKg) },
           { id: `${sessionId}_squat`, exerciseDefinitionId: 'seed_barbell_back_squat', name: 'Barbell Back Squat', sets: workingSets(sessionId, 'squat', '100') },
           { id: `${sessionId}_row`, exerciseDefinitionId: 'seed_barbell_bent_over_row', name: 'Barbell Bent Over Row', sets: workingSets(sessionId, 'row', '70') },
