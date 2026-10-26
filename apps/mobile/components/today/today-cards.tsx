@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -45,14 +45,14 @@ export const pageAtOffset = (offsetX: number, interval: number, pageCount: numbe
  * between the tabs and the tab bar; its body is laid out to fill it, and
  * scrolls instead of clipping when it cannot.
  */
-export function TodayCards({ pages, testID }: { pages: TodayCardPage[]; testID: string }) {
+export function TodayCards({ pages, initialPage = 0, testID }: { pages: TodayCardPage[]; initialPage?: number; testID: string }) {
   const window = useWindowDimensions();
   const [width, setWidth] = useState(window.width);
   // A horizontal scroller sizes its content to the content, so the cards take
   // the pager's measured height explicitly. Until it is measured (and in
   // Jest), they size to their bodies.
   const [pagerHeight, setPagerHeight] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialPage);
   const scroller = useRef<ScrollViewInstance>(null);
   const cardWidth = Math.max(0, width - 2 * uiSpace.lg - PEEK);
   const interval = cardWidth + CARD_GAP;
@@ -65,6 +65,11 @@ export function TodayCards({ pages, testID }: { pages: TodayCardPage[]; testID: 
     const measured = Math.round(event.nativeEvent.layout.height);
     if (measured > 0 && measured !== pagerHeight) setPagerHeight(measured);
   };
+  // A new width moves the snap points: keep the page showing on its card.
+  useEffect(() => {
+    scroller.current?.scrollTo({ x: page * interval, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only a new interval re-aims; a page change scrolls itself.
+  }, [interval]);
   const cardHeight = pagerHeight === null ? undefined : Math.max(0, pagerHeight - TRACK_PADDING_TOP - TRACK_PADDING_BOTTOM);
   const onSettle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     setPage(pageAtOffset(event.nativeEvent.contentOffset.x, interval, pages.length));
@@ -95,6 +100,7 @@ export function TodayCards({ pages, testID }: { pages: TodayCardPage[]; testID: 
         contentContainerStyle={styles.track}
         decelerationRate="fast"
         horizontal
+        contentOffset={{ x: initialPage * interval, y: 0 }}
         onLayout={onPagerLayout}
         onMomentumScrollEnd={onSettle}
         ref={scroller}

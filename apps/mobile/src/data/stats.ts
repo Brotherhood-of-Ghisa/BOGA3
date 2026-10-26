@@ -11,6 +11,7 @@ import {
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseHistoryGymOptions } from './exercise-analytics';
+import { aggregateMuscleDailySets, type MuscleDailySets } from './muscle-daily-sets';
 import {
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
@@ -109,6 +110,15 @@ export type ComputeStatsSummaryOptions = ({ periodDays: StatsPeriodDays; periodW
   now?: Date;
   gymId?: string | null;
   /** `false` counts primary work only ([[muscle.secondary-filter]]); unset counts it by [[muscle.set-count]]. */
+  countSecondary?: boolean;
+};
+
+/** Every gym; the workout in progress counts, dated at `now`. */
+export type ComputeMuscleDailySetsOptions = {
+  start: Date;
+  end: Date;
+  now: Date;
+  /** `false` counts primary work only ([[muscle.secondary-filter]]). */
   countSecondary?: boolean;
 };
 
@@ -500,6 +510,13 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       muscles: aggregateProgressComparisons(input, periods),
     };
   },
+  /** Each of the user's muscles' working sets per local day, under their muscle setup. */
+  async computeMuscleDailySets(options: ComputeMuscleDailySetsOptions): Promise<MuscleDailySets> {
+    ensureDate(options.start, 'start');
+    ensureDate(options.end, 'end');
+    const input = await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now });
+    return aggregateMuscleDailySets(inputInScope(input, options));
+  },
   async computeSelectedMuscleDailyEffort(
     options: ComputeSelectedMuscleDailyEffortOptions
   ): Promise<SelectedMuscleDailyEffort[]> {
@@ -571,3 +588,5 @@ export const computeSelectedMuscleDailyEffortMetrics =
 export const computeSelectedMuscleHistoryEffort = defaultStatsRepository.computeSelectedMuscleHistoryEffort;
 
 export const computeProgressMuscleTickers = defaultStatsRepository.computeMuscleTickers;
+
+export const computeMuscleDailySets = defaultStatsRepository.computeMuscleDailySets;
