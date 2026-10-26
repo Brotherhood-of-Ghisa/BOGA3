@@ -77,6 +77,9 @@ export function RootStack() {
         {/* Settings' sub pages, one per Settings card. */}
         <Stack.Screen name="settings-rest-timer" options={{ title: 'Rest timer' }} />
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
+        <Stack.Screen name="settings-muscles" options={{ title: 'Muscles' }} />
+        <Stack.Screen name="settings-muscle-targets" options={{ title: 'Per muscle targets' }} />
+        <Stack.Screen name="settings-enabled-muscles" options={{ title: 'Enabled muscles' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
         <Stack.Screen name="settings-other" options={{ title: 'Other' }} />
         <Stack.Screen name="settings-experiments" options={{ title: 'Experiments' }} />

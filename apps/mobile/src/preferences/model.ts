@@ -1,6 +1,7 @@
 // Device-local account choices. Keep this module free of data, auth and UI imports.
 import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy';
 import { isRestTimerSec, MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS, REST_TIMER_RANGE_MESSAGE } from '../exercise-core/rest-timer';
+import { isMuscleTargetOverrides, type MuscleTargetMode, type MuscleTargetOverrides } from './muscle-targets';
 
 export { MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS };
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
@@ -36,6 +37,8 @@ export type AccountLocalPreferences = {
   dateFormat: ExerciseDateFormat;
   pastRecordsGymScope: PastRecordsGymScope;
   weeklyWorkingSetTarget: number;
+  muscleTargetMode: MuscleTargetMode;
+  muscleTargetOverrides: MuscleTargetOverrides;
   displayEfforts: EffortChoice[];
   workingSetEfforts: EffortChoice[];
   volumeEfforts: EffortChoice[];
@@ -68,6 +71,8 @@ export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
 export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   ...DEFAULT_EXERCISE_LIST_PREFERENCES,
   weeklyWorkingSetTarget: 8,
+  muscleTargetMode: 'single',
+  muscleTargetOverrides: {},
   displayEfforts: [...DEFAULT_DISPLAY_EFFORTS],
   workingSetEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.workingSetEfforts],
   volumeEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts],
@@ -95,6 +100,7 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
   ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressPeriod', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
   'todayLayout',
+  'muscleTargetMode',
 ];
 // Stored as `true` / `false`.
 export const booleanPreferenceFields: (keyof AccountLocalPreferences)[] = [
@@ -111,6 +117,8 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   dateFormat: 'Choose a valid date format.',
   pastRecordsGymScope: 'Choose a valid gym filter.',
   weeklyWorkingSetTarget: 'Weekly working-set target must be a positive whole number.',
+  muscleTargetMode: 'Choose Single or Per muscle targets.',
+  muscleTargetOverrides: 'Muscle targets must be positive whole numbers.',
   displayEfforts: 'Choose at least one effort label to display.',
   workingSetEfforts: 'Choose valid working-set effort labels.',
   volumeEfforts: 'Choose valid volume effort labels.',
@@ -146,6 +154,8 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
     case 'weeklyWorkingSetTarget': return isPositiveSafeInteger(value);
+    case 'muscleTargetMode': return value === 'single' || value === 'per-muscle';
+    case 'muscleTargetOverrides': return isMuscleTargetOverrides(value);
     case 'displayEfforts': return isEffortSelection(value) && value.length > 0;
     case 'workingSetEfforts':
     case 'volumeEfforts': return isEffortSelection(value);

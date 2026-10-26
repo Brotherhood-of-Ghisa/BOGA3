@@ -62,9 +62,9 @@ const mockCatalog = {
     },
   ],
   muscleGroups: [
-    { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20 },
-    { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 30 },
-    { id: 'core', displayName: 'Core', familyName: 'Core', sortOrder: 40 },
+    { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20, reportGroup: null, tracked: 1 },
+    { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 30, reportGroup: null, tracked: 1 },
+    { id: 'core', displayName: 'Core', familyName: 'Core', sortOrder: 40, reportGroup: null, tracked: 1 },
   ],
   muscleGroupsById: {
     front_delts: { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20 },
@@ -677,7 +677,8 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('grades a muscle page’s Sets against the saved weekly target for that one muscle', async () => {
-    await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 4 }); });
+    await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 8, muscleTargetMode: 'per-muscle',
+      muscleTargetOverrides: { detailed: { front_delts: 4 }, broad: { front_delts: 16 } } }); });
     render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByText('Volume per day')).toBeTruthy());
     expect(stats.computeSelectedMuscleHistoryEffort).toHaveBeenCalledWith(

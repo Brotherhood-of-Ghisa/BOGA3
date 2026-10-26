@@ -103,6 +103,9 @@ describe('buildHeatmapData', () => {
       muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4 } });
     expect(group.weekly.at(-1)).toMatchObject({ value: 8, level: 2, targetAttainment: .5 });
     expect(group.targetGrading).toEqual({ averaged: true });
+    const individual = buildHeatmapData(days, 'workingSetCount', { todayDateKey: TODAY, weeks: 4,
+      muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4, weeklyTargets: { quads: 16 } } });
+    expect(individual.weekly.at(-1)).toMatchObject({ value: 8, level: 1, targetAttainment: .25 });
     const volume = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 4,
       muscleTargets: { muscleIds: ['quads'], weeklyTarget: 1000 } });
     expect(volume.targetGrading).toBeUndefined();
