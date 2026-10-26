@@ -19,13 +19,14 @@ const data = (days: DailyEffortMetrics[], weeks = 8) => buildHeatmapData(days, '
 const chart = (loaded: ReturnType<typeof data>, onOpenWeek: (key: string) => void = jest.fn()) =>
   <WeeklyHeatmap data={loaded} metric="totalVolume" onOpenWeek={onOpenWeek} testIDPrefix={PREFIX} formatValue={String} metricLabel="Volume" />;
 
-it('shows newest first, full week dates, aligned values and proportional Volume lengths', () => {
+it('shows training weeks newest first, compact week dates, aligned values and proportional Volume lengths', () => {
   const loaded = data([day(TODAY, 12), day('2026-09-28', 54), day('2026-09-14', 60)]);
   const chronological = loaded.weekly.map(week => week.weekStartDateKey);
   render(chart(loaded));
-  expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual([...chronological].reverse().map(key => `bars-heatmap-cell-${key}`));
+  expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual(
+    ['2026-10-05', '2026-09-28', '2026-09-14'].map(key => `bars-heatmap-cell-${key}`));
   expect(loaded.weekly.map(week => week.weekStartDateKey)).toEqual(chronological);
-  expect(screen.getByText('28-09-2026 – 04-10-2026')).toBeTruthy();
+  expect(screen.getByText('28 Sep – 4 Oct 2026')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('20%');
   expect(style('bars-heatmap-bar-2026-09-28').width).toBe('90%');
   expect(style('bars-heatmap-bar-2026-09-14').width).toBe('100%');
@@ -35,6 +36,14 @@ it('shows newest first, full week dates, aligned values and proportional Volume 
 });
 
 const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
+
+it('shows both years for a week crossing New Year', () => {
+  render(chart(data([day('2025-12-31', 1750)], 52)));
+  expect(screen.getByText('29 Dec 2025 – 4 Jan 2026').props.children).toBe('29 Dec 2025 –\n4 Jan 2026');
+  expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
+    'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
+});
+
 const percentage = (id: string, property: 'left' | 'width') => Number.parseFloat(style(id)[property]);
 const renderValues = (values: number[], metric: CalendarHeatmapMetric) => render(<WeeklyHeatmap
   data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
@@ -128,14 +137,14 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
     day('2026-09-21', null), day('2026-09-28', 100), day(TODAY, 200),
   ];
   const { rerender } = render(chart(data(days, weeks)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks + 1);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(8);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks + 1}-week median 30`);
   expect(style('bars-heatmap-median').left).toBe('3%');
   expect(Number.parseFloat(style('bars-heatmap-p25').left)).toBeCloseTo(1.5);
   expect(Number.parseFloat(style('bars-heatmap-p75').left)).toBeCloseTo(15);
 
   rerender(chart(data(days, 12)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(13);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(7);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '13-week median 25');
   expect(style('bars-heatmap-median').left).toBe('12.5%');
   expect(style('bars-heatmap-p25').left).toBe('6.25%');
@@ -156,7 +165,7 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
   'keeps empty, all-zero, constant and short %s windows finite', metric => {
     for (const values of [[], [0, 0, 0, 0, 0, 0], [20, 20, 20, 20, 20, 20], [10]]) {
       const { unmount } = renderValues(values, metric);
-      for (const bar of screen.getAllByTestId(/^bars-heatmap-bar-/)) {
+      for (const bar of screen.queryAllByTestId(/^bars-heatmap-bar-/)) {
         const width = Number.parseFloat(StyleSheet.flatten(bar.props.style).width);
         expect(Number.isFinite(width)).toBe(true);
         expect(width).toBeGreaterThanOrEqual(0);
@@ -185,26 +194,25 @@ it('opens a training week, holds no selection, and announces the current week', 
   expect(open).toHaveBeenCalledWith('2026-09-28');
   expect(style('bars-heatmap-bar-2026-09-28').borderWidth).toBeUndefined();
   expect(style('bars-heatmap-bar-2026-10-05')).not.toHaveProperty('borderWidth');
-  expect(screen.getByText('Current week')).toBeTruthy();
+  expect(screen.queryByText('Current week')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('Current week');
 });
 
-it('leaves rest and unavailable values blank, announces their distinction and retains known zero', () => {
+it('hides rest weeks while retaining known zero and unavailable training with their openers', () => {
   const open = jest.fn();
   render(chart(data([day(TODAY, 0), day('2026-09-28', null)]), open));
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('0%');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('', { exact: true });
-  expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('', { exact: true });
+  expect(screen.queryByTestId('bars-heatmap-value-2026-09-21')).toBeNull();
   expect(screen.queryByText('Rest')).toBeNull();
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21').props.accessibilityLabel).toContain('Rest week');
+  expect(screen.queryByTestId('bars-heatmap-cell-2026-09-21')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 28-09-2026, Volume unavailable');
   expect(screen.queryByText(/\?/)).toBeNull();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
-  expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
-  // A rest week is not a button; a trained week whose figure is unavailable still opens.
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21')).toHaveProp('accessibilityRole', 'text');
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21').props.onPress).toBeUndefined();
+  // Both zero and unavailable training still open their sessions.
+  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-10-05'));
+  expect(open).toHaveBeenCalledWith('2026-10-05');
   fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-28'));
   expect(open).toHaveBeenCalledWith('2026-09-28');
 });
@@ -225,8 +233,8 @@ it('retains target colour independently of length and bounds long formatted valu
   expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
-it('retains the complete 520-week window while initially rendering a small recent subset', () => {
-  const loaded = data([day(TODAY, 12)], 520);
+it('virtualizes a dense 520-week training window while initially rendering a small recent subset', () => {
+  const loaded = data(data([], 520).weekly.map(week => day(week.weekStartDateKey, 12)), 520);
   render(chart(loaded));
   expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(521);
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).length).toBeLessThan(30);
@@ -244,7 +252,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
   render(chart(data(days)));
   expect(screen.queryByText('Current week is in progress.')).toBeNull();
   expect(screen.queryByText(/week average:/)).toBeNull();
-  expect(screen.getByText('Current week')).toBeTruthy();
+  expect(screen.queryByText('Current week')).toBeNull();
   expect(screen.getByText('Intensity (per week)')).toBeTruthy();
   if (count >= 6) expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '9-week median 20');
   else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();

@@ -1,6 +1,6 @@
 import { formatCalendarDate } from '@/src/utils/local-time';
 import { useDateFormat } from '@/src/preferences/hooks';
-// The virtualized month list owns scrolling. Calendar layout follows
+// The virtualized month list owns scrolling; empty months keep only headings.
 // Figure visibility follows [[copy.blank-history]].
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
@@ -65,9 +65,11 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
 }
 
 function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<typeof CalendarRow>[0], 'row' | 'monthKey'>) {
+  const hasTraining = month.weeks.some(row => row.days.some(({ day, future }) =>
+    !future && day && (day.hasTraining ?? day.value > 0)));
   return <View style={styles.month} testID={`${props.testID}-month-${month.key}`}>
     <Text allowFontScaling={false} accessibilityRole="header" style={styles.monthTitle} testID={`${props.testID}-month-title-${month.key}`}>{month.title}</Text>
-    <View style={styles.calendar}>
+    {hasTraining ? <View style={styles.calendar}>
       <View style={styles.row}>
         <View style={styles.labelSpacer} />
         <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
@@ -78,7 +80,7 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
       <View pointerEvents="none" style={styles.gridOverlay}>
         <View style={[styles.weekSeparator, { transform: [{ translateX: (props.gap - uiSpace.sm) * 3 / 8 + uiBorder.width / 2 }] }]} testID={`${props.testID}-week-separator-${month.key}`} />
       </View>
-    </View>
+    </View> : null}
   </View>;
 }
 

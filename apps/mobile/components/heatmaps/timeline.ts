@@ -1,5 +1,5 @@
 import type { ExerciseDateFormat } from '@/src/preferences/model';
-import { formatCalendarWeek } from '@/src/utils/local-time';
+import { formatCalendarWeek, formatCalendarWeekHeading } from '@/src/utils/local-time';
 // timeline.ts — the Timeline history view's data and geometry: one value per
 // week of the adapter's weekly series (`heatmapData.ts`), its zero-based y
 // scale, month labels and the columns. Pure, no React / react-native imports.
@@ -58,7 +58,7 @@ const toTimelineWeek = (week: WeekCell): TimelineWeek => {
 /** The focused week, as the readout names it and the page's ⋮ opens it. */
 export interface FocusedTimelineWeek {
   weekStartDateKey: string;
-  /** `weekLabel` of the week: what the readout shows. */
+  /** Full numeric date range for the page's session action. */
   label: string;
   /** False for a rest week, which has no sessions to open. */
   hasTraining: boolean;
@@ -68,7 +68,8 @@ export interface FocusedTimelineWeek {
 export const weekRangeLabel = (monday: Date, dateFormat: ExerciseDateFormat): string =>
   formatCalendarWeek(monday.toISOString().slice(0, 10), dateFormat);
 
-export const weekLabel = weekRangeLabel;
+export const weekLabel = (monday: Date, dateFormat: ExerciseDateFormat): string =>
+  formatCalendarWeekHeading(monday.toISOString().slice(0, 10), dateFormat);
 
 // The first week starting in a month carries its label: its Monday is one of
 // the month's first seven days.
