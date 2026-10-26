@@ -20,7 +20,7 @@ type ExerciseSetsCardBaseProps = {
   countMuted?: boolean;
   rows: SessionViewSetRow[];
   hideDerivedMetrics?: boolean;
-  stackedMetrics?: boolean;
+  percentageMetrics?: boolean;
   // The `record` band, one line per record this card holds; empty for none.
   record?: readonly RecordLine[];
   // Under the header, before the set rows (exercise history's gym, tags and
@@ -58,7 +58,7 @@ export function ExerciseSetsCard({
   countMuted = false,
   rows,
   hideDerivedMetrics = false,
-  stackedMetrics = false,
+  percentageMetrics = false,
   record = [],
   summary,
   accessory,
@@ -72,8 +72,8 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
-          {name}
+        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
+          {name}{percentageMetrics ? ' (% BW)' : ''}
         </Text>
         <Text allowFontScaling={false} style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
           {count}
@@ -88,7 +88,7 @@ export function ExerciseSetsCard({
               key={row.id}
               row={row}
               hideDerivedMetrics={hideDerivedMetrics}
-              stackedMetrics={stackedMetrics}
+              percentageMetrics={percentageMetrics}
               testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
             />
           ))}

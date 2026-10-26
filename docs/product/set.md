@@ -59,6 +59,8 @@ which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
 1RM board: one `#1 in group` band per set.
+In a shared group session, normalized Weight is effective total load as `%BW`;
+ordinary and personal Weight retain their existing meaning.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
