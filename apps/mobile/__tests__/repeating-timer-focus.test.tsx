@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Vibration } from 'react-native';
 import { Circle } from 'react-native-svg';
 
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
-import { uiRoles } from '@/components/ui/tokens';
+import { uiRoles, uiTypography } from '@/components/ui/tokens';
 import { setRepeatingTimerAwake } from '@/src/session-recorder/repeating-timer-native';
 import {
   __resetRestTimerForTests, adjustRepeatingTimer, getRestTimerEntry, startRepeatingTimer,
@@ -40,6 +40,11 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
   render(<TimerHost />);
   expand();
   expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent('Get ready');
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveStyle({ textAlign: 'center' });
+  const reset = screen.getByTestId('repeating-timer-focus-reset');
+  expect(within(reset).getByText('Reset')).toHaveStyle({ fontSize: uiTypography.size.xxl });
+  expect(reset).not.toHaveStyle({ borderWidth: 1 });
+  expect(reset).not.toHaveStyle({ backgroundColor: uiRoles.accent });
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:15');
   expect(screen.getByTestId('repeating-timer-focus-toggle').props.accessibilityLabel).toBe('Pause repeating timer');
   const meter = screen.getByTestId('repeating-timer-focus-meter');
@@ -58,6 +63,7 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
   const paused = getRestTimerEntry();
   expect(paused).toMatchObject({ accumulatedMs: 33_500, pausedAtMs: 33_500 });
   expect(screen.getByTestId('repeating-timer-focus-toggle')).toHaveTextContent('Resume');
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(/^Round 1$/);
   expect(screen.getByTestId('repeating-timer-focus-toggle').props.accessibilityLabel).toBe('Resume repeating timer');
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:42');
   expectProgress(42 / 60);
@@ -80,7 +86,7 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
   expect(cue).toHaveBeenCalledTimes(2);
 });
 
-it.each([false, true])('adjusts within bounds and resets to preparation, preserving paused=%s', (paused) => {
+it.each([false, true])('adjusts within bounds while preserving preparation and paused=%s', (paused) => {
   startRepeatingTimer('session-1', 15);
   if (paused) stopRepeatingTimer('session-1');
   render(<TimerHost />);
@@ -91,7 +97,7 @@ it.each([false, true])('adjusts within bounds and resets to preparation, preserv
   fireEvent.press(screen.getByTestId('repeating-timer-focus-plus'));
   expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('0:30');
   expect(screen.getByTestId('repeating-timer-focus-minus')).toBeEnabled();
-  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(paused ? 'Get ready · Paused' : 'Get ready');
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(/^Get ready$/);
   fireEvent.press(screen.getByTestId('repeating-timer-focus-reset'));
   expect(getRestTimerEntry()).toMatchObject({ accumulatedMs: 0, pausedAtMs: paused ? 0 : null });
   act(() => adjustRepeatingTimer('session-1', 570));
@@ -101,6 +107,26 @@ it.each([false, true])('adjusts within bounds and resets to preparation, preserv
   expect(getRestTimerEntry()).toMatchObject({ intervalSec: 600 });
   fireEvent.press(screen.getByTestId('repeating-timer-focus-minus'));
   expect(screen.getByTestId('repeating-timer-focus-interval')).toHaveTextContent('9:45');
+});
+
+it('shares interval changes and shortened-round rollover between compact and fullscreen controls', () => {
+  startRepeatingTimer('session-1', 60);
+  render(<TimerHost />);
+  advance(125_125); // Round 2, 50.125 seconds elapsed.
+  fireEvent.press(screen.getByTestId('repeating-timer-plus-15'));
+  expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(/^Round 2$/);
+  expect(screen.getByTestId('repeating-timer-countdown')).toHaveTextContent('0:25');
+  expand();
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-minus'));
+  expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:10');
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-minus'));
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(/^Round 3$/);
+  expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:45');
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-toggle'));
+  expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent(/^Round 3$/);
+  fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
+  expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(/^Round 3$/);
+  expect(screen.getByTestId('repeating-timer-countdown')).toHaveTextContent('0:45');
 });
 
 it('updates the persistent accessibility readout when phase/pause change at the same visible countdown', () => {

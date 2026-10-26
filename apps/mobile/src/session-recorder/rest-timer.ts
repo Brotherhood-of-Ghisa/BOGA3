@@ -464,15 +464,33 @@ export const adjustRepeatingTimer = (
   );
   if (nextInterval === activeEntry.intervalSec) return;
   const isPaused = activeEntry.pausedAtMs !== null;
+  const totalElapsedMs = isPaused ? activeEntry.accumulatedMs
+    : Math.max(0, nowMs - activeEntry.startedAtMs + activeEntry.accumulatedMs);
+  const preparationMs = REPEATING_TIMER_PREPARATION_SEC * 1000;
+  let accumulatedMs = totalElapsedMs;
+  let endedRound = false;
+  if (totalElapsedMs >= preparationMs) {
+    const elapsedMs = totalElapsedMs - preparationMs;
+    const intervalMs = activeEntry.intervalSec * 1000;
+    const completedRounds = Math.floor(elapsedMs / intervalMs);
+    const roundElapsedMs = elapsedMs % intervalMs;
+    endedRound = roundElapsedMs >= nextInterval * 1000;
+    // Rebase completed rounds to the new interval, retaining this round's exact progress.
+    accumulatedMs = preparationMs + (completedRounds + (endedRound ? 1 : 0)) * nextInterval * 1000
+      + (endedRound ? 0 : roundElapsedMs);
+  }
   activeEntry = {
     ...activeEntry,
     intervalSec: nextInterval,
     startedAtMs: nowMs,
-    accumulatedMs: 0,
+    accumulatedMs,
     pausedAtMs: isPaused ? nowMs : null,
   };
-  lastSignaledRound = 0;
   emit();
+  if (endedRound && isForeground && !isPaused) {
+    playRepeatingTimerCue('long', nowMs);
+    checkAndTriggerRoundBoundary(deriveRepeatingTimerView(activeEntry, sessionId, nowMs).round);
+  }
 };
 
 export const switchTimerMode = (
