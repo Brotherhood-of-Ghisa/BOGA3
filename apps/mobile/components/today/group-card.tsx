@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
@@ -88,11 +87,10 @@ function WeekBoardCard({ board, range, onOpenGroup }: { board: WeekBoardViewMode
   return (
     <Card style={styles.boardCard} testID="today-group-card">
       <View style={styles.boardHeading}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[todayText.microLabel, todayText.microLabelStrong, styles.boardTitle]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[todayText.microLabel, todayText.microLabelStrong]}>
           This week
           <Text allowFontScaling={false} style={todayText.microLabelFaint} testID="today-group-board-range">{`  ${range}`}</Text>
         </Text>
-        <ActionButton label="View group" onPress={onOpenGroup} testID="today-view-group-button" variant="text" />
       </View>
       <Pressable
         accessibilityHint="Opens the group"
@@ -199,7 +197,8 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
 
 // Today's group page: this week's board, then up to four sessions, the
 // members training now first. The heading (in the list layout) or the tabs
-// (in the cards layout) name the group and own the switch between groups.
+// (in the cards layout) name the group and own the way to it and the switch
+// between groups.
 export function TodayGroupCard({
   selectedGroupId,
   summary,
@@ -289,16 +288,11 @@ const styles = StyleSheet.create({
   boardCard: {
     paddingBottom: uiSpace.sm,
   },
+  // The way to the group sits beside the tabs (cards) or is the heading (list).
   boardHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingLeft: uiSpace.md,
-    paddingRight: uiSpace.xs,
-  },
-  boardTitle: {
-    flex: 1,
-    minWidth: 0,
+    paddingHorizontal: uiSpace.md,
+    paddingTop: uiSpace.md,
+    paddingBottom: uiSpace.xs,
   },
   board: {
     gap: 0,
