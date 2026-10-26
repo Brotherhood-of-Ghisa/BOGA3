@@ -4,8 +4,8 @@ appId: com.dinoderek.mobile
 #
 # Proves, over one fixture session (Lat Pulldown, Barbell Back Squat, Standing
 # Calf Raise) and the device's own muscle rows ([[muscle.report-groups]]):
-#   1. Settings → Progress → Muscles writes Broad and a Track switch (Calves
-#      off) from its sheet, and Progress, already mounted, shows the user's
+#   1. Settings → Muscles writes Broad and detailed enablement (Calves
+#      and Tibialis off) from full stack pages, and Progress, already mounted, shows the user's
 #      muscles on return: Chest and Back; no Serratus, Lats, Upper back or
 #      Calves row; Chest, now one muscle, loses its family header
 #      ([[muscle.no-breakdown]], [[muscle.untracked]],
@@ -19,7 +19,7 @@ appId: com.dinoderek.mobile
 #   5. Detailed with Calves back on restores every entry's row and header
 #      ([[muscle.report-groups]]: Detailed is today's figures).
 # Why device:
-#   1. a real sheet, segmented control and switch writing the on-device
+#   1. real stack pages, segmented controls and switches writing the on-device
 #      expo-sqlite, read back by a screen already mounted in the stack
 #      (focus refresh and the catalogue invalidation on the native runtime),
 #      and the keyboard for the muscle search;
@@ -27,7 +27,7 @@ appId: com.dinoderek.mobile
 #   3. the keyboard, and the editor sheet's panels;
 #   4. the model's gesture-handler tap on the native SVG (Jest has no layout
 #      and mocks the gesture);
-#   5. the same sheet and screen return, the other way.
+#   5. the same stack pages and screen return, the other way.
 # Jest counterpart: __tests__/muscle-report-settings.test.tsx (writes, dirty
 #   flags, derived preset, Track), __tests__/muscle-report.test.ts (the
 #   transform), __tests__/progress-muscle-report-local-data.test.tsx (Progress,
@@ -73,37 +73,83 @@ appId: com.dinoderek.mobile
           id: "stats-metric-chip"
 - assertVisible: { id: "stats-muscle-block-serratus_anterior" }
 
-# --- 1. Broad, Calves off, from the sheet; Progress re-reads on return -----
-- openLink: "boga3://settings-progress"
+# --- 1. Full pages: enabled muscles, native target keyboard, and Broad -----
+# Added device proof: Jest cannot establish UIKit stack return, number-pad
+# occlusion or lower-row scroll reachability. Target values/inheritance and
+# enabled-only filtering are asserted over real data by muscle-target-settings.
+- openLink: "boga3://settings"
+- extendedWaitUntil:
+    visible: { id: "settings-screen" }
+    timeout: 15000
 - scrollUntilVisible:
-    element:
-      id: "settings-muscles-row"
+    element: { id: "settings-muscles-row" }
     direction: DOWN
     centerElement: true
 - tapOn: { id: "settings-muscles-row" }
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-broad" }
+    visible: { id: "settings-muscles-screen" }
     timeout: 15000
-- tapOn: { id: "settings-muscle-preset-broad" }
+- tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
-    visible: { id: "settings-track-back_lats", text: "Back" }
+    visible: { id: "settings-enabled-muscles-row" }
     timeout: 15000
+- tapOn: { id: "settings-enabled-muscles-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-enabled-muscles-screen" }
+    timeout: 15000
+# Final two-row card: Calves is fully visible clear of native chrome at the
+# scroll end, but cannot reach the centre (the end-of-content exception).
 - scrollUntilVisible:
-    element:
-      id: "settings-track-calves"
+    element: { id: "settings-track-calves" }
     direction: DOWN
-    centerElement: true
 - tapOn: { id: "settings-track-calves" }
 - extendedWaitUntil:
     visible: { id: "settings-track-calves", checked: false }
     timeout: 15000
-- takeScreenshot: "muscle-report-02-broad-sheet"
-# The backdrop is hidden from the modal accessibility tree: tap the exposed
-# region above the panel.
-- tapOn: { point: "50%,8%" }
+# Tibialis is the final row: its first fully visible position clears chrome;
+# it cannot reach the viewport centre at the end of the scroll content.
+- scrollUntilVisible:
+    element: { id: "settings-track-tibialis_anterior" }
+    direction: DOWN
+- tapOn: { id: "settings-track-tibialis_anterior" }
 - extendedWaitUntil:
-    notVisible: { id: "settings-muscles-sheet" }
+    visible: { id: "settings-track-tibialis_anterior", checked: false }
     timeout: 15000
+- takeScreenshot: "muscles-enabled-page"
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: { id: "settings-enabled-muscles-row" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-target-mode-per-muscle" }
+- tapOn: { id: "settings-muscle-targets-row" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-target-chest" }
+    timeout: 15000
+- assertNotVisible: { id: "settings-muscle-target-calves" }
+- tapOn: { id: "settings-muscle-target-chest" }
+- eraseText
+- inputText: "12"
+- hideKeyboard
+- takeScreenshot: "muscles-targets-page"
+- scrollUntilVisible:
+    element: { id: "settings-muscle-target-hamstrings" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "settings-muscle-target-hamstrings" }
+- eraseText
+- inputText: "10"
+- takeScreenshot: "muscles-targets-lower-row-keyboard"
+- hideKeyboard
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-targets-row" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-preset-broad" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-preset-broad", selected: true }
+    timeout: 15000
+- assertNotVisible: { id: "settings-enabled-muscles-row" }
+- takeScreenshot: "muscles-settings-page"
 - openLink: "boga3://progress?breakdown=muscle"
 # Chest merges Serratus, so it is one muscle and its family has no header.
 - extendedWaitUntil:
@@ -206,31 +252,38 @@ appId: com.dinoderek.mobile
       id: "settings-muscle-view-list"
     direction: DOWN
 - tapOn: { id: "settings-muscle-view-list" }
-- scrollUntilVisible:
-    element:
-      id: "settings-muscles-row"
-    direction: DOWN
-    centerElement: true
-- tapOn: { id: "settings-muscles-row" }
+- openLink: "boga3://settings-muscles"
 - extendedWaitUntil:
     visible: { id: "settings-muscle-preset-detailed" }
     timeout: 15000
 - tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
+    visible: { id: "settings-enabled-muscles-row" }
+    timeout: 15000
+- tapOn: { id: "settings-enabled-muscles-row" }
+- extendedWaitUntil:
     visible: { id: "settings-track-back_upper" }
     timeout: 15000
+# Final two-row card: Calves is fully visible clear of native chrome at the
+# scroll end, but cannot reach the centre (the end-of-content exception).
 - scrollUntilVisible:
-    element:
-      id: "settings-track-calves"
+    element: { id: "settings-track-calves" }
     direction: DOWN
-    centerElement: true
 - tapOn: { id: "settings-track-calves" }
 - extendedWaitUntil:
     visible: { id: "settings-track-calves", checked: true }
     timeout: 15000
-- tapOn: { point: "50%,8%" }
+# Final row, fully visible clear of chrome; see the end-of-content rule above.
+- scrollUntilVisible:
+    element: { id: "settings-track-tibialis_anterior" }
+    direction: DOWN
+- tapOn: { id: "settings-track-tibialis_anterior" }
 - extendedWaitUntil:
-    notVisible: { id: "settings-muscles-sheet" }
+    visible: { id: "settings-track-tibialis_anterior", checked: true }
+    timeout: 15000
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: { id: "settings-enabled-muscles-row" }
     timeout: 15000
 - openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:

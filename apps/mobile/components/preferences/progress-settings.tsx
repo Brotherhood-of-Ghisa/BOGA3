@@ -2,7 +2,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card, SegmentedControl, SwitchRow, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
-import { MuscleSettingsRow } from './muscle-settings';
 import { PreferenceNumberField } from './number-field';
 
 const BREAKDOWN_OPTIONS = [{ value: 'muscle', label: 'Muscle' }, { value: 'exercise', label: 'Exercise' }] as const;
@@ -23,9 +22,6 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
           onChange={progressMuscleLayout => updatePreferences({ progressMuscleLayout })}
           testIDPrefix="settings-muscle-view" />
       </View>
-      <PreferenceNumberField label="Target weekly working sets per muscle" testID="settings-weekly-working-set-target"
-        value={pending.weeklyWorkingSetTarget ?? values.weeklyWorkingSetTarget}
-        onCommit={weeklyWorkingSetTarget => updatePreferences({ weeklyWorkingSetTarget })} />
       <PreferenceNumberField label="Progress period (weeks)" testID="settings-target-window"
         value={pending.targetWindowWeeks ?? values.targetWindowWeeks}
         onCommit={targetWindowWeeks => updatePreferences({ targetWindowWeeks })} />
@@ -33,7 +29,6 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
         value={pending.historyLookbackWeeks ?? values.historyLookbackWeeks}
         onCommit={historyLookbackWeeks => updatePreferences({ historyLookbackWeeks })} />
     </Card>
-    <Card><MuscleSettingsRow /></Card>
   </View>;
 }
 

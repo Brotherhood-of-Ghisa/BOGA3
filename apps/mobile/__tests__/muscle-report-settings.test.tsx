@@ -10,10 +10,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
 }));
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
-import ProgressSettingsRoute from '../app/settings-progress';
-import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { muscleGroups } from '@/src/data/schema';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import {
@@ -24,7 +21,7 @@ import {
   setMuscleTracked,
 } from '@/src/data/muscle-report-settings';
 import {
-  __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount,
+  __resetAccountLocalPreferencesForTests,
 } from '@/src/preferences/account-local';
 import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
@@ -157,94 +154,5 @@ describe('muscle setup derived from rows', () => {
     await setMuscleTracked(['adductors'], false);
     const quads = buildSettingsMuscleSections(await listMuscleReportRows()).flatMap(section => section.muscles).find(muscle => muscle.id === 'quads');
     expect(quads?.tracked).toBe(true);
-  });
-});
-
-describe('Settings → Progress → Muscles', () => {
-  const openMuscles = async () => {
-    setAccountLocalPreferenceAccount('A', true);
-    await ensureAccountLocalPreferencesLoaded();
-    render(<ProgressSettingsRoute />);
-    await waitFor(() => expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Detailed/));
-    fireEvent.press(screen.getByTestId('settings-muscles-row'));
-    await screen.findByTestId('settings-muscle-preset-row');
-  };
-  const selected = (id: string) => screen.getByTestId(`settings-muscle-preset-${id}`).props.accessibilityState.selected;
-
-  it('shows Detailed, then switches to Broad and back, writing the rows', async () => {
-    await openMuscles();
-    expect(selected('detailed')).toBe(true);
-    expect(screen.getByTestId('settings-track-chest')).toBeTruthy();
-    expect(screen.getByTestId('settings-track-serratus_anterior')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-    await waitFor(() => expect(selected('broad')).toBe(true));
-    expect(stored().get('serratus_anterior')?.reportGroup).toBe('chest');
-    expect(screen.queryByTestId('settings-track-serratus_anterior')).toBeNull();
-    expect(screen.getByTestId('settings-track-back_lats')).toBeTruthy();
-    expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Broad/);
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-detailed'));
-    await waitFor(() => expect(selected('detailed')).toBe(true));
-    expect(stored().get('serratus_anterior')).toMatchObject({ reportGroup: null, tracked: 1 });
-  });
-
-  it('switches a muscle off and on across all its entries and shows only family headers over several muscles', async () => {
-    await openMuscles();
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-    await waitFor(() => expect(selected('broad')).toBe(true));
-    expect(within(screen.getByTestId('settings-muscles-family-Shoulders')).getByText('Shoulders')).toBeTruthy();
-    expect(within(screen.getByTestId('settings-muscles-family-Chest')).queryByText('Chest', { exact: true })).toBeTruthy();
-    expect(within(screen.getByTestId('settings-muscles-family-Lower Legs')).queryByRole('header')).toBeNull();
-    const calves = () => screen.getByTestId('settings-track-calves');
-    expect(calves().props.accessibilityState.checked).toBe(true);
-    fireEvent.press(calves());
-    await waitFor(() => expect(calves().props.accessibilityState.checked).toBe(false));
-    expect(stored().get('calves')?.tracked).toBe(0);
-    expect(stored().get('tibialis_anterior')?.tracked).toBe(0);
-    expect(selected('broad')).toBe(true);
-    fireEvent.press(calves());
-    await waitFor(() => expect(calves().props.accessibilityState.checked).toBe(true));
-    expect(stored().get('tibialis_anterior')?.tracked).toBe(1);
-  });
-
-  it('names a setup that matches neither preset and lets a preset replace it', async () => {
-    await listMuscleReportRows();
-    localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
-    setAccountLocalPreferenceAccount('A', true);
-    await ensureAccountLocalPreferencesLoaded();
-    render(<ProgressSettingsRoute />);
-    await waitFor(() => expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Custom/));
-    fireEvent.press(screen.getByTestId('settings-muscles-row'));
-    await screen.findByTestId('settings-muscle-preset-row');
-    expect(selected('detailed')).toBe(false);
-    expect(selected('broad')).toBe(false);
-    expect(screen.getByTestId('settings-muscle-custom')).toHaveTextContent('Custom');
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-detailed'));
-    await waitFor(() => expect(selected('detailed')).toBe(true));
-    expect(stored().get('biceps')?.reportGroup).toBeNull();
-  });
-
-  it('reports a failed save, keeps the shown choice and recovers on the next try', async () => {
-    await openMuscles();
-    const write = jest.spyOn(localDatabase(), 'transaction').mockImplementationOnce(() => { throw new Error('disk full'); });
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-    await screen.findByText('Couldn’t save the change. Try again.');
-    expect(selected('detailed')).toBe(true);
-    expect(screen.queryByText('Retry')).toBeNull();
-    write.mockRestore();
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-    await waitFor(() => expect(selected('broad')).toBe(true));
-    expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
-  });
-
-  it('re-reads the rows when the catalog is invalidated, and clears a stale error', async () => {
-    await openMuscles();
-    jest.spyOn(localDatabase(), 'transaction').mockImplementationOnce(() => { throw new Error('disk full'); });
-    fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-    await screen.findByTestId('settings-muscles-error');
-    localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
-    act(() => invalidateExerciseCatalogCache());
-    await screen.findByTestId('settings-muscle-custom');
-    expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
-    expect(screen.getByTestId('settings-muscles-row')).toHaveTextContent(/Custom/);
   });
 });

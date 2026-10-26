@@ -22,6 +22,17 @@ const source = (dates: Date[], weights = dates.map(() => '40')): MuscleAnalytics
 });
 const options = { historyWeeks: 5, rollingWeeks: 1, weeklyTarget: 8, now: date(31) };
 
+it('scales each effective muscle target by the rolling period without changing Volume references', () => {
+  const input = source([date(8), date(15), date(22)]);
+  const starts = { back: { workingSetCount: date(1), totalVolume: date(1) } };
+  const baseline = aggregateProgressMuscleTickers(input, { ...options, rollingWeeks: 2 }, starts);
+  const custom = aggregateProgressMuscleTickers(input, { ...options, rollingWeeks: 2, weeklyTargets: { back: 12 } }, starts);
+  expect(custom.muscles.back.workingSetCount.reference).toBe(24);
+  expect(baseline.muscles.back.workingSetCount.reference).toBe(16);
+  expect(custom.muscles.back.workingSetCount.observations).toEqual(baseline.muscles.back.workingSetCount.observations);
+  expect(custom.muscles.back.totalVolume).toEqual(baseline.muscles.back.totalVolume);
+});
+
 it('rolls N local weeks to each final training instant, includes the exact lower boundary, and keeps the configured full target', () => {
   const input = source([date(1), date(8, 11), date(8, 13), date(15, 13)]);
   const result = aggregateProgressMuscleTickers(input, options, { back: { workingSetCount: date(1), totalVolume: date(1) } });

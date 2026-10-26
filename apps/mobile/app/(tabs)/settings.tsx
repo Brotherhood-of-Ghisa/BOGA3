@@ -66,6 +66,13 @@ export default function SettingsScreen() {
         testID="settings-progress-row"
       />
       <SettingsCard
+        icon="sliders"
+        label="Muscles"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.muscles)}
+        status={values.muscleTargetMode === 'per-muscle' ? 'Per muscle targets' : 'Single target'}
+        testID="settings-muscles-row"
+      />
+      <SettingsCard
         icon="gauge"
         label="Effort"
         onPress={() => router.push(SETTINGS_SUB_PAGES.effort)}

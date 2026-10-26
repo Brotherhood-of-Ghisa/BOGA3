@@ -206,7 +206,6 @@ it('saves both window settings, and retains invalid numeric drafts in the centra
 
 it.each([
   ['settings-history-lookback', 'historyLookbackWeeks', 52, 104],
-  ['settings-weekly-working-set-target', 'weeklyWorkingSetTarget', 8, 12],
 ] as const)('keeps a failed %s save as a draft and retries it with Refresh', async (id, field, previous, next) => {
   await openSettings();
   const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
@@ -221,23 +220,10 @@ it.each([
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('edits one shared weekly target inline and retains invalid drafts in the centralized error flow', async () => {
+it('keeps muscle targets and muscle setup off the Progress sub-page', async () => {
   await openSettings();
-  const id = 'settings-weekly-working-set-target';
-  expect(screen.getByLabelText('Target weekly working sets per muscle')).toHaveProp('value', '8');
-  expect(screen.getByLabelText('Progress period (weeks)')).toHaveProp('value', '4');
-  expect(screen.queryByText('Weekly muscle targets')).toBeNull();
-  editNumber(id, '12');
-  expect(values().weeklyWorkingSetTarget).toBe(12);
-  editNumber(id, '0');
-  expect(values().weeklyWorkingSetTarget).toBe(12);
-  expect(screen.getByTestId(id)).toHaveProp('value', '0');
-  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
-    .toHaveTextContent(/positive whole number/);
-  expect(within(screen.getByTestId('settings-progress-screen')).queryByText(/positive whole number/)).toBeNull();
-  editNumber(id, '8');
-  expect(values().weeklyWorkingSetTarget).toBe(8);
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+  expect(screen.queryByTestId('settings-weekly-working-set-target')).toBeNull();
+  expect(screen.queryByTestId('settings-muscles-row')).toBeNull();
 });
 
 it('keeps the effort choices on their own page, not under Progress', async () => {
