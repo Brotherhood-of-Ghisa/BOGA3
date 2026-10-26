@@ -8,6 +8,7 @@ export {
   type PlannedSessionInput,
   type PlanWeekDay,
   type RecoveryRow,
+  type RecoveryTargets,
   type TodayPlanWindow,
 } from './calculations';
 export {

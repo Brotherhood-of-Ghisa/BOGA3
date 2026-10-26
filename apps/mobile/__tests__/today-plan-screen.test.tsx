@@ -166,6 +166,17 @@ describe('Today: the Plan page over real data', () => {
     expect(rows).not.toContain('calves');
   });
 
+  it("measures each muscle against its own target in Per muscle mode ([[muscle.weekly-targets]])", async () => {
+    await bootLocalApp();
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
+    act(() => updatePreferences({ weeklyWorkingSetTarget: 10, muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 2 } } }));
+    await renderToday();
+
+    expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/2');
+    // Other muscles inherit the default.
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/10');
+  });
+
   it("opens a muscle's progress history from its row, and Progress from the card", async () => {
     await renderToday();
 
@@ -225,7 +236,7 @@ describe('Today: the Plan page over real data', () => {
   it('reports a failed read inline and retries it (a failed read)', async () => {
     await bootLocalApp();
     const loadPlan = jest.fn().mockRejectedValueOnce(new Error('database is locked'));
-    loadPlan.mockResolvedValue({ recoveryDays: [], muscles: [], weeklyTarget: 8, week: [], next: [] } satisfies TodayPlan);
+    loadPlan.mockResolvedValue({ recoveryDays: [], muscles: [], week: [], next: [] } satisfies TodayPlan);
     render(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={clock} />);
 
     await waitFor(() => expect(text('today-plan-error')).toBeTruthy());

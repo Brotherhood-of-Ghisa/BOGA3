@@ -29,11 +29,11 @@ const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
 const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
 
 // No sets that day reads as a rest day ([[copy.blank-history]]).
-const recoveryRowLabel = (row: RecoveryRow, days: Date[], target: number) =>
+const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
   [
     row.name,
     ...row.days.map((count, index) => `${spokenDate(days[index])}: ${count === null ? 'rest' : sets(count)}`),
-    `this week ${row.weekSets} of ${target} sets`,
+    `this week ${row.weekSets} of ${row.target} sets`,
   ].join(', ');
 
 function DayCell({ count, testID }: { count: number | null; testID: string }) {
@@ -46,13 +46,13 @@ function DayCell({ count, testID }: { count: number | null; testID: string }) {
   );
 }
 
-function RecoveryMuscleRow({ row, days, target, onPress }: { row: RecoveryRow; days: Date[]; target: number; onPress: () => void }) {
+function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Date[]; onPress: () => void }) {
   const testID = `today-plan-muscle-${row.muscleGroupId}`;
-  const met = row.weekSets >= target;
+  const met = row.weekSets >= row.target;
   return (
     <Pressable
       accessibilityHint="Opens its progress"
-      accessibilityLabel={recoveryRowLabel(row, days, target)}
+      accessibilityLabel={recoveryRowLabel(row, days)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
@@ -65,15 +65,15 @@ function RecoveryMuscleRow({ row, days, target, onPress }: { row: RecoveryRow; d
       ))}
       <Text allowFontScaling={false} style={styles.weekCell} testID={`${testID}-week`}>
         <Text allowFontScaling={false} style={[styles.weekFigure, met ? styles.weekFigureMet : null]}>{row.weekSets}</Text>
-        <Text allowFontScaling={false} style={styles.weekTarget}>{`/${target}`}</Text>
+        <Text allowFontScaling={false} style={styles.weekTarget}>{`/${row.target}`}</Text>
       </Text>
       <Icon color={uiRoles.inkGhost} name="chevron-right" size="sm" />
     </Pressable>
   );
 }
 
-// Each muscle's sets on the last three days and this week against the weekly
-// target, least trained first.
+// Each muscle's sets on the last three days and this week against its weekly
+// target ([[muscle.weekly-targets]]), least trained first.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan'>) {
   const label = [todayText.microLabel, todayText.microLabelFaint];
   const rows = plan.muscles.map((row) => (
@@ -82,7 +82,6 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
       key={row.muscleGroupId}
       onPress={() => onOpenMuscle(row.muscleGroupId)}
       row={row}
-      target={plan.weeklyTarget}
     />
   ));
   return (

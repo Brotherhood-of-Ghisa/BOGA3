@@ -19,6 +19,7 @@ import {
   todayPlanWindow,
   type PlanWeekDay,
   type RecoveryRow,
+  type RecoveryTargets,
 } from './calculations';
 
 export type NextPlannedSession = {
@@ -36,12 +37,11 @@ export type TodayPlan = {
   /** The recovery days, oldest first. */
   recoveryDays: Date[];
   muscles: RecoveryRow[];
-  weeklyTarget: number;
   week: PlanWeekDay[];
   next: NextPlannedSession[];
 };
 
-export type TodayPlanOptions = { weeklyTarget: number; countSecondary: boolean };
+export type TodayPlanOptions = RecoveryTargets & { countSecondary: boolean };
 
 export type TodayPlanDependencies = {
   computeMuscleDailySets: (options: ComputeMuscleDailySetsOptions) => Promise<MuscleDailySets>;
@@ -114,8 +114,7 @@ export const createTodayPlanRepository = (
     });
     return {
       recoveryDays: window.recoveryDays,
-      muscles: deriveRecoveryRows(daily, window),
-      weeklyTarget: options.weeklyTarget,
+      muscles: deriveRecoveryRows(daily, window, options),
       week: derivePlanWeek(window, daily.sessionDays, scheduled),
       next,
     };

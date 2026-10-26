@@ -18,6 +18,8 @@ const local = (year: number, month: number, day: number, hour = 0, minute = 0) =
 const NOW = local(2026, 10, 31, 15);
 const window = todayPlanWindow(NOW);
 
+const TARGETS = { weeklyTarget: 8, overrides: {} };
+
 const muscle = (id: string, sortOrder: number) => ({ id, displayName: id[0].toUpperCase() + id.slice(1), familyName: 'F', sortOrder });
 
 describe('todayPlanWindow', () => {
@@ -57,27 +59,33 @@ describe('deriveRecoveryRows', () => {
   };
 
   it('fills the recovery days oldest first, blank where a muscle got no sets', () => {
-    const rows = deriveRecoveryRows(daily, window);
+    const rows = deriveRecoveryRows(daily, window, TARGETS);
     expect(rows.find((row) => row.muscleGroupId === 'quads')?.days).toEqual([null, 9, null]);
     expect(rows.find((row) => row.muscleGroupId === 'biceps')?.days).toEqual([null, null, null]);
   });
 
   it("counts this week's sets, today included, and never last week's", () => {
     const withToday = { ...daily, sets: { ...daily.sets, calves: { ...daily.sets.calves, '2026-10-31': 2 } } };
-    const rows = deriveRecoveryRows(withToday, window);
+    const rows = deriveRecoveryRows(withToday, window, TARGETS);
     expect(rows.find((row) => row.muscleGroupId === 'calves')?.weekSets).toBe(3.5);
     expect(rows.find((row) => row.muscleGroupId === 'chest')?.weekSets).toBe(14);
   });
 
   it('puts the least trained over the recovery days first, then the fewest this week, then muscle order', () => {
-    const rows = deriveRecoveryRows(daily, window);
+    const rows = deriveRecoveryRows(daily, window, TARGETS);
     // biceps 0 (week 6) · calves 1.5 · chest 4 (week 14) and back 4 (week 14) by order · quads 9.
     expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'calves', 'chest', 'back', 'quads']);
   });
 
   it('shows an untrained muscle with every day blank', () => {
-    const rows = deriveRecoveryRows({ muscles: [muscle('core', 9)], sets: {}, sessionDays: [] }, window);
-    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], weekSets: 0 }]);
+    const rows = deriveRecoveryRows({ muscles: [muscle('core', 9)], sets: {}, sessionDays: [] }, window, TARGETS);
+    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], weekSets: 0, target: 8 }]);
+  });
+
+  it("takes a muscle's own target where one is set, else the default", () => {
+    const rows = deriveRecoveryRows(daily, window, { weeklyTarget: 8, overrides: { chest: 12 } });
+    expect(rows.find((row) => row.muscleGroupId === 'chest')?.target).toBe(12);
+    expect(rows.find((row) => row.muscleGroupId === 'back')?.target).toBe(8);
   });
 });
 

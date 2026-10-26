@@ -39,7 +39,12 @@ export type RecoveryRow = {
   days: (number | null)[];
   /** Sets this calendar week, today included. */
   weekSets: number;
+  /** The muscle's effective weekly target ([[muscle.weekly-targets]]). */
+  target: number;
 };
+
+/** The default weekly target, and the per-muscle overrides in force, by reported muscle id. */
+export type RecoveryTargets = { weeklyTarget: number; overrides: Readonly<Record<string, number>> };
 
 const sumDays = (byDay: Record<string, number>, keys: string[]) => keys.reduce((total, key) => total + (byDay[key] ?? 0), 0);
 
@@ -47,7 +52,7 @@ const sumDays = (byDay: Record<string, number>, keys: string[]) => keys.reduce((
  * One row per muscle, least trained over the recovery days first, then fewest
  * sets this week, then the muscles' own order.
  */
-export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWindow): RecoveryRow[] => {
+export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWindow, targets: RecoveryTargets): RecoveryRow[] => {
   const recoveryKeys = window.recoveryDays.map(localDateKey);
   const weekStartKey = localDateKey(window.week.start);
   const rows = daily.muscles.map((muscle, order) => {
@@ -61,6 +66,7 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
         name: muscle.displayName,
         days: recoveryKeys.map((key) => byDay[key] ?? null),
         weekSets: sumDays(byDay, weekKeys),
+        target: Object.hasOwn(targets.overrides, muscle.id) ? targets.overrides[muscle.id] : targets.weeklyTarget,
       },
     };
   });
