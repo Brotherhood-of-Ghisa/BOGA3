@@ -34,6 +34,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
   // `selection`: fixed black/white for Progress and history filters.
   selectedGround?: 'ink' | 'selection';
   hitSlop?: number;
+  // A selected period can reset a locally expanded view without changing selection.
+  onReselect?: (value: TValue) => void;
   // Every segment inert and faded, e.g. while the form it belongs to saves.
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -55,6 +57,7 @@ export function SegmentedControl<TValue extends string | number>({
   options,
   value,
   onChange,
+  onReselect,
   onNavigate,
   testIDPrefix,
   accessibilityLabel,
@@ -87,7 +90,8 @@ export function SegmentedControl<TValue extends string | number>({
             key={String(option.value)}
             onPress={event => {
               if (onNavigate) onNavigate(option.value, event?.currentTarget ?? null);
-              else if (!selected) onChange(option.value);
+              else if (selected) onReselect?.(option.value);
+              else onChange(option.value);
             }}
             style={[
               styles.segment,

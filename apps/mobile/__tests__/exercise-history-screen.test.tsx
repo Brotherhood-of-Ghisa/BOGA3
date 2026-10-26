@@ -55,6 +55,7 @@ import {
   type ExerciseHistoryScreenShellProps,
 } from '../app/exercise-history';
 import { localWeekWindow } from '@/src/utils/local-calendar';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { uiRoles } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
@@ -66,6 +67,7 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import { waitForGone } from './helpers/wait-for-gone';
 import {
   bootLocalApp,
   closeLocalData,
@@ -276,28 +278,62 @@ describe('ExerciseHistoryRoute over real data', () => {
     await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
     expect(sessionCards()).toHaveLength(10);
     expect(sessionCards().slice(0, initialCards.length)).toEqual(initialCards);
-    expect(screen.getByRole('tab', { name: 'Full exercise history' })).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByRole('tab', { name: 'History look-back, 1 weeks' })).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.queryByText('Full history')).toBeNull();
+    expect(screen.getByTestId('exercise-history-older-divider')).toHaveTextContent('Older sessions');
     expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
-    await screen.findByTestId('exercise-history-best-card');
     fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
     await screen.findByTestId('exercise-history-show-older');
     expect(sessionCards()).toEqual(initialCards);
   });
 
-  it('shows a failed expansion as an error and can return to the configured History', async () => {
-    await openHistory({ exerciseDefinitionId: SQUAT });
+  it('keeps recent cards after a failed expansion and Retry appends older sessions', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+    });
+    const initialCards = sessionCards();
     jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockRejectedValueOnce(new Error('Read failed'));
     fireEvent.press(screen.getByTestId('exercise-history-show-older'));
     expect(await screen.findByTestId('exercise-history-error-state')).toHaveTextContent(/Read failed/);
+    expect(sessionCards()).toEqual(initialCards);
     expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+    const visibleOrder = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-error-state|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    expect(visibleOrder.at(-1)).toBe('exercise-history-error-state');
 
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
-    await screen.findByTestId('exercise-history-best-card');
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
-    await screen.findByTestId('exercise-history-show-older');
-    expect(sessionCards().length).toBeGreaterThan(0);
+    fireEvent.press(screen.getByTestId('exercise-history-retry'));
+    await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
+    expect(sessionCards().slice(0, initialCards.length)).toEqual(initialCards);
+    expect(screen.getAllByTestId('exercise-history-older-divider')).toHaveLength(1);
+    expect(new Set(sessionCards()).size).toBe(sessionCards().length);
+  });
+
+  it('keeps recent cards visible during expansion and places the divider at the exact History boundary', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+    });
+    const initialCards = sessionCards();
+    const cutoff = historyWeekBounds(1).start;
+    const expanded = (await historyRepository.loadExercisePerformanceHistory({ exerciseDefinitionId: SQUAT,
+      period: { kind: 'all' } }))!;
+    let finishRead!: (summary: ExerciseHistorySummary) => void;
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockReturnValueOnce(
+      new Promise(resolve => { finishRead = resolve; })
+    );
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    expect(screen.getByRole('button', { name: 'Loading older sessions…' })).toBeDisabled();
+    expect(sessionCards()).toEqual(initialCards);
+    await act(async () => { finishRead(expanded); });
+
+    const firstOlder = expanded.sessions.find(entry => entry.completedAt < cutoff)!;
+    const order = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-older-divider|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    const boundary = order.indexOf('exercise-history-older-divider');
+    expect(order[boundary - 1]).toBe(`exercise-history-session-card-${initialCards.at(-1)}`);
+    expect(order[boundary + 1]).toBe(`exercise-history-session-card-${firstOlder.sessionExerciseId}`);
   });
 
   it('shows the all-time bests and one card per session in the period, newest first', async () => {
@@ -379,8 +415,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
 
     fireEvent.press(screen.getByTestId('exercise-history-show-older'));
-    await screen.findByRole('tab', { name: 'Full exercise history' });
-    await screen.findByTestId('exercise-history-best-card');
+    await waitForGone(() => screen.queryByTestId('exercise-history-show-older'));
     expect(sessionCards()).toEqual(['history_elsewhere_squat']);
     expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
 

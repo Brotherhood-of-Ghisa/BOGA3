@@ -5,7 +5,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
@@ -25,6 +25,7 @@ import {
   Stat,
   StatePanel,
   Tag,
+  uiBorder,
   uiFonts,
   uiGeometry,
   uiRoles,
@@ -43,6 +44,7 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
 import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { historyBlockRecord } from '@/src/session-recorder/exercise-history-view';
 import {
   cardRecordBand,
@@ -94,6 +96,8 @@ export type ExerciseHistoryScreenShellProps = {
   appliedGymId?: string | null;
   isLoading: boolean;
   errorMessage: string | null;
+  historyStart?: Date;
+  onRetry?: () => void;
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
   onSelectTag: (tagDefinitionId: string | null) => void;
   onPressSession: (sessionId: string) => void;
@@ -108,6 +112,8 @@ export function ExerciseHistoryScreenShell({
   appliedGymId,
   isLoading,
   errorMessage,
+  historyStart,
+  onRetry,
   onSelectPeriod,
   onSelectTag,
   onPressSession,
@@ -118,9 +124,7 @@ export function ExerciseHistoryScreenShell({
   const periodOptions = [
     { value: 'week' as const, label: 'This week' },
     { value: 'progress' as const, label: `Progress (${values.targetWindowWeeks}w)`, accessibilityLabel: `Progress period, ${values.targetWindowWeeks} weeks` },
-    period === 'all'
-      ? { value: 'all' as const, label: 'Full history', accessibilityLabel: 'Full exercise history' }
-      : { value: 'history' as const, label: `History (${values.historyLookbackWeeks}w)`, accessibilityLabel: `History look-back, ${values.historyLookbackWeeks} weeks` },
+    { value: 'history' as const, label: `History (${values.historyLookbackWeeks}w)`, accessibilityLabel: `History look-back, ${values.historyLookbackWeeks} weeks` },
   ];
   const tagOptions = useMemo(() => summary?.tagOptions ?? [], [summary]);
   const tagChips = useMemo<ChipOption<string>[]>(
@@ -146,9 +150,10 @@ export function ExerciseHistoryScreenShell({
           density="compact"
           layout="fit"
           onChange={onSelectPeriod}
+          onReselect={onSelectPeriod}
           options={periodOptions}
           testIDPrefix="exercise-history-period-chip"
-          value={period}
+          value={period === 'all' ? 'history' : period}
         />
 
         {summary && tagOptions.length > 0 ? (
@@ -169,18 +174,6 @@ export function ExerciseHistoryScreenShell({
               value={appliedTagDefinitionId ?? ALL_TAGS}
             />
           </ScrollView>
-        ) : null}
-
-        {errorMessage ? (
-          <Card>
-            <StatePanel
-              body={errorMessage}
-              fill={false}
-              kind="error"
-              testID="exercise-history-error-state"
-              title="Could not load history"
-            />
-          </Card>
         ) : null}
 
         {!errorMessage && isLoading && !summary ? (
@@ -216,18 +209,13 @@ export function ExerciseHistoryScreenShell({
                 />
               </Card>
             ) : (
-              summary.sessions.map((entry) => (
-                <SessionCard
-                  entry={entry}
-                  key={entry.sessionExerciseId}
-                  onPress={() => onPressSession(entry.sessionId)}
-                  tagOptions={tagOptions}
-                />
-              ))
+              <HistorySessionCards summary={summary} historyStart={period === 'all' ? historyStart : undefined}
+                onPressSession={onPressSession} />
             )}
-            {period === 'history' && !errorMessage ? (
+            {summary.period.kind === 'history' && !errorMessage ? (
               <ActionButton
-                label="Show older sessions"
+                disabled={isLoading}
+                label={isLoading ? 'Loading older sessions…' : 'Show older sessions'}
                 onPress={() => onSelectPeriod('all')}
                 testID="exercise-history-show-older"
                 variant="text"
@@ -235,11 +223,44 @@ export function ExerciseHistoryScreenShell({
             ) : null}
           </>
         ) : null}
+
+        {errorMessage ? (
+          <Card>
+            <StatePanel
+              body={errorMessage}
+              fill={false}
+              kind="error"
+              testID="exercise-history-error-state"
+              title="Could not load history"
+              action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'exercise-history-retry' } : undefined}
+            />
+          </Card>
+        ) : null}
       </ScreenScroll>
 
       <MainTabBar activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </Screen>
   );
+}
+
+function HistorySessionCards({ summary, historyStart, onPressSession }: {
+  summary: ExerciseHistorySummary;
+  historyStart?: Date;
+  onPressSession: (sessionId: string) => void;
+}) {
+  const firstOlder = historyStart ? summary.sessions.findIndex(entry => entry.completedAt < historyStart) : -1;
+  return summary.sessions.map((entry, index) => (
+    <Fragment key={entry.sessionExerciseId}>
+      {index === firstOlder ? (
+        <View style={styles.olderDivider} testID="exercise-history-older-divider">
+          <View style={styles.olderRule} />
+          <Text accessibilityRole="header" allowFontScaling={false} style={styles.olderLabel}>Older sessions</Text>
+          <View style={styles.olderRule} />
+        </View>
+      ) : null}
+      <SessionCard entry={entry} onPress={() => onPressSession(entry.sessionId)} tagOptions={summary.tagOptions} />
+    </Fragment>
+  ));
 }
 
 // The exercise's all-time bests: two rows that open the session holding each.
@@ -429,6 +450,7 @@ export default function ExerciseHistoryRoute() {
     initialTagDefinitionId
   );
   const [summary, setSummary] = useState<ExerciseHistorySummary | null>(null);
+  const [historyStart, setHistoryStart] = useState<Date>();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const readGeneration = useRef(0);
@@ -448,11 +470,16 @@ export default function ExerciseHistoryRoute() {
         return;
       }
       setIsLoading(true);
-      setSummary(null);
+      setSummary(current => nextPeriod === 'all' && current?.period.kind === 'history'
+        && current.exerciseDefinitionId === exerciseDefinitionId
+        && current.appliedTagDefinitionId === nextTagDefinitionId && current.appliedGymId === nextGymId
+        ? current : null);
       setErrorMessage(null);
+      const now = new Date();
       try {
         const next = await loadExercisePerformanceHistory({
           exerciseDefinitionId,
+          now,
           period: nextPeriod === 'all' ? { kind: 'all' } : { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
             kind: nextPeriod === 'history' ? 'history' : 'progress' },
           tagDefinitionId: nextTagDefinitionId,
@@ -463,6 +490,7 @@ export default function ExerciseHistoryRoute() {
           setSummary(null);
           setErrorMessage('Exercise not found.');
         } else {
+          setHistoryStart(historyWeekBounds(historyLookbackWeeks, now).start);
           setSummary(next);
         }
       } catch (error) {
@@ -529,6 +557,8 @@ export default function ExerciseHistoryRoute() {
         appliedGymId={appliedGymId}
         isLoading={isLoading}
         errorMessage={errorMessage}
+        historyStart={historyStart}
+        onRetry={() => { void loadSummary(period, appliedTagDefinitionId, appliedGymId); }}
         onSelectPeriod={setPeriod}
         onSelectTag={setAppliedTagDefinitionId}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
@@ -539,6 +569,20 @@ export default function ExerciseHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
+  olderDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
+  },
+  olderRule: { flex: 1, height: uiBorder.width, backgroundColor: uiRoles.rule },
+  olderLabel: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
   // A chip row is as tall as its chips: a ScrollView grows by default, and
   // inside the page's scroll that stretched them into circles.
   chipScroll: {
