@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ExerciseSetsCard } from '@/components/session-detail/exercise-sets-card';
@@ -7,16 +7,15 @@ import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
-it('keeps each percentage set on one line with units in aligned column headings', () => {
+it('keeps each percentage set on one line with the unit only in the exercise heading', () => {
   const normalized = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps' };
-  render(<ExerciseSetsCard name="Pull-Up" count="2 sets" percentageMetrics testID="card" rows={[
+  render(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
     normalized, { ...normalized, id: 'next', weightReps: '125.0 %BW × 999', oneRepMax: '1234.5 %BW', volume: '123456.7 %BW·reps' },
   ]} />);
 
-  const headings = within(screen.getByTestId('card-columns'));
-  expect(headings.getByText('Weight\n%BW × reps')).toBeTruthy();
-  expect(headings.getByText('1RM\n%BW')).toBeTruthy();
-  expect(headings.getByText('Vol\n%BW·reps')).toBeTruthy();
+  expect(screen.getByText('Bodyweight Bulgarian Split Squat (% BW)')).toHaveProp('ellipsizeMode', 'middle');
+  expect(screen.queryByTestId('card-columns')).toBeNull();
+  expect(screen.queryByText(/Weight|1RM|Vol/)).toBeNull();
 
   for (const [index, values] of [['100.0 × 8', '127.7', '800.0'], ['125.0 × 999', '1234.5', '123456.7']].entries()) {
     const id = `card-set-${index + 1}`;
@@ -32,7 +31,9 @@ it('keeps each percentage set on one line with units in aligned column headings'
 });
 
 it('keeps ordinary rows compact with inline metrics', () => {
-  render(<SetSummaryRow row={row} testID="ordinary" />);
+  render(<ExerciseSetsCard name="Bench Press" count="1 set" rows={[row]} testID="ordinary-card" rowTestID={() => 'ordinary'} />);
+  expect(screen.getByText('Bench Press')).toHaveProp('ellipsizeMode', 'tail');
+  expect(screen.queryByText(/% BW/)).toBeNull();
   expect(screen.getByTestId('ordinary')).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
   expect(screen.getByTestId('ordinary-1rm')).toHaveStyle({ flexDirection: 'row' });
   expect(screen.getByTestId('ordinary-vol')).toHaveStyle({ flexDirection: 'row' });
@@ -42,6 +43,7 @@ it('retains reps-only context when normalized metrics are undisclosed', () => {
   render(<ExerciseSetsCard name="Pull-Up" count="1 set" rows={[{ ...row, weightReps: '8 reps' }]}
     percentageMetrics hideDerivedMetrics testID="private" />);
   expect(screen.getByText('8 reps')).toBeTruthy();
+  expect(screen.getByText('Pull-Up (% BW)')).toBeTruthy();
   expect(screen.queryByTestId('private-columns')).toBeNull();
   expect(screen.queryByTestId('private-set-1-1rm')).toBeNull();
   expect(screen.queryByTestId('private-set-1-vol')).toBeNull();

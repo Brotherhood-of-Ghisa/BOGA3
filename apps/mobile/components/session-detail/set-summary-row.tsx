@@ -9,18 +9,6 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).
-// Percentage units live in aligned column headings so each set stays on one line.
-export function SetSummaryColumns({ testID }: { testID: string }) {
-  return (
-    <View style={[styles.setRow, styles.percentageRow]} testID={testID}>
-      <View style={styles.effortColumn} />
-      <Text allowFontScaling={false} style={[styles.weightReps, styles.legend]}>Weight{'\n'}%BW × reps</Text>
-      <Text allowFontScaling={false} style={[styles.metric, styles.oneRepMax, styles.legend]}>1RM{'\n'}%BW</Text>
-      <Text allowFontScaling={false} style={[styles.metric, styles.volume, styles.legend]}>Vol{'\n'}%BW·reps</Text>
-    </View>
-  );
-}
-
 export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percentageMetrics = false }:
   { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; percentageMetrics?: boolean }) {
   const state = row.done ? 'realised' : 'planned';
@@ -102,14 +90,6 @@ const styles = StyleSheet.create({
   },
   oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
   volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },
-  legend: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    color: uiRoles.inkFaint,
-    textTransform: 'uppercase',
-  },
   weightReps: {
     flex: 1,
     minWidth: 0,

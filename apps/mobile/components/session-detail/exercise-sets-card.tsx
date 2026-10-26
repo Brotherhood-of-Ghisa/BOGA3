@@ -7,7 +7,7 @@ import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 import { RecordBand } from './record-band';
-import { SetSummaryColumns, SetSummaryRow } from './set-summary-row';
+import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
   name: string;
@@ -72,8 +72,8 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
-          {name}
+        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
+          {name}{percentageMetrics ? ' (% BW)' : ''}
         </Text>
         <Text allowFontScaling={false} style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
           {count}
@@ -83,7 +83,6 @@ export function ExerciseSetsCard({
       {summary}
       {rows.length > 0 ? (
         <View style={styles.rows}>
-          {percentageMetrics && !hideDerivedMetrics ? <SetSummaryColumns testID={`${testID}-columns`} /> : null}
           {rows.map((row, index) => (
             <SetSummaryRow
               key={row.id}
