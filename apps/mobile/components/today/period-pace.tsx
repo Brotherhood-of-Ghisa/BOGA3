@@ -146,6 +146,17 @@ export function PeriodPace({
   const onAccessibilityAction = (event: AccessibilityActionEvent) =>
     select(figures.dayIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
   const label = formatPeriodDayLabel(figures);
+  const canCompareNewer = period.compareBack > 1;
+  const compareActions = onShowCompared
+    ? [
+        { name: 'older', label: 'Previous period' },
+        ...(canCompareNewer ? [{ name: 'newer', label: 'Next period' }] : []),
+      ]
+    : undefined;
+  const onCompareAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'older') onShowCompared?.(period.compareBack + 1);
+    if (event.nativeEvent.actionName === 'newer' && canCompareNewer) onShowCompared?.(period.compareBack - 1);
+  };
   const comparedRange = (
     <Text
       allowFontScaling={false}
@@ -158,7 +169,14 @@ export function PeriodPace({
 
   return (
     <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
-      <View accessible accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)} style={styles.figures}>
+      {/* One element when spoken: its arrows are offered as its actions. */}
+      <View
+        accessibilityActions={compareActions}
+        accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)}
+        accessible
+        onAccessibilityAction={onCompareAction}
+        style={styles.figures}
+        testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
           <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
             {formatPeriodRange(period.window)}
@@ -183,7 +201,7 @@ export function PeriodPace({
           {onShowCompared ? (
             <StepAround
               noun="period"
-              onNewer={period.compareBack > 1 ? () => onShowCompared(period.compareBack - 1) : null}
+              onNewer={canCompareNewer ? () => onShowCompared(period.compareBack - 1) : null}
               onOlder={() => onShowCompared(period.compareBack + 1)}
               testID="today-progress-period-compare">
               {comparedRange}

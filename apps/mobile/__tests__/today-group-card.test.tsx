@@ -9,6 +9,7 @@
  */
 
 import * as mockReact from 'react';
+import { ScrollView } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -474,6 +475,17 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
   });
   afterEach(() => {
     act(() => updatePreferences({ todayLayout: 'list' }));
+  });
+
+  it('lets the live card take the page and scroll its rows when it is the only sessions card', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary({ training_now: ['maria', 'sam', 'tom', 'kit'].map(live) }));
+    await renderToday();
+
+    await waitFor(() => expect(byId('today-group-live')).toBeTruthy());
+    expect(screen.queryByTestId('today-group-sessions')).toBeNull();
+    expect(byId('today-group-live')).toHaveStyle({ flex: 1 });
+    expect(within(byId('today-group-live')).UNSAFE_getAllByType(ScrollView)).toHaveLength(1);
   });
 
   it("names the group's card after it, and offers its switch only while that card shows", async () => {

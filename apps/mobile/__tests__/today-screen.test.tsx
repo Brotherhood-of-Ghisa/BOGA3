@@ -267,7 +267,7 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
     expect(body.props.accessibilityLabel).toBe(
       'Session on 15 Oct 26 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
-        + 'Barbell Bench Press, 3 sets, best 115 by 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100 by 5, 1RM 116.6',
+        + 'Barbell Bench Press, 3 sets, best 115.0 × 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100.0 × 5, 1RM 116.6',
     );
 
     fireEvent.press(body);
@@ -293,9 +293,19 @@ describe('Today: the Progress card over real data', () => {
     expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 2, sessionOffset: 0 });
 
     expect(text('today-progress-period-compare-newer')).toBeEnabled();
+    // Spoken, the figures are one element: its arrows are its actions.
+    expect(text('today-progress-period-figures').props.accessibilityActions).toEqual([
+      { name: 'older', label: 'Previous period' },
+      { name: 'newer', label: 'Next period' },
+    ]);
+    fireEvent(text('today-progress-period-figures'), 'accessibilityAction', { nativeEvent: { actionName: 'older' } });
+    await waitFor(() => expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 3, sessionOffset: 0 }));
+    fireEvent(text('today-progress-period-figures'), 'accessibilityAction', { nativeEvent: { actionName: 'newer' } });
+    await waitFor(() => expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 2, sessionOffset: 0 }));
     fireEvent.press(text('today-progress-period-compare-newer'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('7 Sep – 4 Oct 26'));
     expect(text('today-progress-period-compare-newer')).toBeDisabled();
+    expect(text('today-progress-period-figures').props.accessibilityActions).toEqual([{ name: 'older', label: 'Previous period' }]);
   });
 
   it("steps back through the completed sessions with the arrows around the session's start", async () => {
@@ -629,5 +639,7 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     await renderCards();
 
     expect(text('today-latest-session-rows')).toHaveStyle({ maxHeight: 4 * 32 });
+    // A page of cards scrolls as a whole on a phone too short for them, rather than clipping.
+    expect(within(text('today-progress-section')).getByTestId('today-progress-section-scroll')).toBeTruthy();
   });
 });

@@ -338,11 +338,12 @@ describe('the session card', () => {
 
   it('speaks when, what, where and its PRs, then each exercise', () => {
     expect(todaySessionAccessibilityLabel(latest({ exercises: lines }))).toBe(
-      'Session on 15 Oct 26 07:12; 4 exercises; 12 sets; 2 PRs; at Canal Street Gym; '
-        + 'Bench Press, 4 sets, best 100 by 5, 1RM 116.6, a 1RM PR; Cable Fly, 0 sets',
+      // The exercises are the rows' count, so the line and the table agree.
+      'Session on 15 Oct 26 07:12; 2 exercises; 12 sets; 2 PRs; at Canal Street Gym; '
+        + 'Bench Press, 4 sets, best 100.0 × 5, 1RM 116.6, a 1RM PR; Cable Fly, 0 sets',
     );
     expect(todaySessionAccessibilityLabel(latest({ gymName: ' ', records: [], exercises: [] }))).toBe(
-      'Session on 15 Oct 26 07:12; 4 exercises; 12 sets; 0 PRs',
+      'Session on 15 Oct 26 07:12; 0 exercises; 12 sets; 0 PRs',
     );
   });
 });

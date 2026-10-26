@@ -17,26 +17,36 @@ export type GroupRecentSessions = {
   failed: boolean;
 };
 
-type State = { key: string; sessions: GroupWeekLatestSession[]; failed: boolean };
+// `failedWith`: the week read a failure happened under; only a newer one tries again.
+// `loadedFor`: how many sessions the last good read was for (0: none yet).
+type State = { key: string; sessions: GroupWeekLatestSession[]; loadedFor: number; failed: boolean; failedWith?: unknown };
 
 /**
  * The group's latest completed sessions for Today's group card, read online
  * from its stream when the card has room for more than the week summary
  * carries (`wanted` above zero). A newer latest session (`latestSessionId`)
  * or another group reads again, so the card never misses what was shared since.
+ * A failed read is tried again when the group's week is read again
+ * (`refreshedWith` changes: Retry, pull to refresh, refocus).
  */
 export function useGroupRecentSessions(
   groupId: string,
   latestSessionId: string | null,
   wanted: number,
   loadPage: GroupStreamPageLoader = getCompetitionStream,
+  refreshedWith: unknown = null,
 ): GroupRecentSessions {
   const key = `${groupId} ${latestSessionId ?? ''}`;
-  const [state, setState] = useState<State>({ key, sessions: [], failed: false });
+  const [state, setState] = useState<State>({ key, sessions: [], loadedFor: 0, failed: false });
   const needsRead = wanted > 0;
+  const failed = state.key === key && state.failed;
+  // A good read covers any room up to what it was read for.
+  const loaded = state.key === key && state.loadedFor >= wanted;
+  // Only a failure reads again, and only under a newer week read; a good read stands until the key moves.
+  const retry = failed && state.failedWith !== refreshedWith ? refreshedWith : null;
 
   useEffect(() => {
-    if (!needsRead) return;
+    if (!needsRead || loaded || (failed && retry === null)) return;
     let cancelled = false;
     void (async () => {
       let items: CompetitionStreamItemWire[] = [];
@@ -50,15 +60,17 @@ export function useGroupRecentSessions(
           if (completedSessionsFromStream(items).length > wanted || !result.has_more || cursor === null) break;
         }
       } catch {
-        if (!cancelled) setState({ key, sessions: [], failed: true });
+        if (!cancelled) setState({ key, sessions: [], loadedFor: 0, failed: true, failedWith: refreshedWith });
         return;
       }
-      if (!cancelled) setState({ key, sessions: completedSessionsFromStream(items), failed: false });
+      if (!cancelled) setState({ key, sessions: completedSessionsFromStream(items), loadedFor: wanted, failed: false });
     })();
     return () => {
       cancelled = true;
     };
-  }, [groupId, key, loadPage, needsRead, wanted]);
+    // `refreshedWith` is read through `retry`, which changes only when a failure should read again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, key, loadPage, needsRead, wanted, retry]);
 
   return state.key === key ? { sessions: state.sessions, failed: state.failed } : { sessions: [], failed: false };
 }

@@ -297,7 +297,7 @@ const exerciseLineText = (line: SessionExerciseLine): string =>
   [
     line.name,
     plural(line.workingSets, 'set', 'sets'),
-    line.bestSet ? `best ${line.bestSet.weightKg} by ${line.bestSet.reps}, 1RM ${formatOneRepMax(line.bestSet.oneRepMaxKg)}` : null,
+    line.bestSet ? `best ${formatBestSet(line.bestSet)}, 1RM ${formatOneRepMax(line.bestSet.oneRepMaxKg)}` : null,
     line.oneRepMaxRecord ? 'a 1RM PR' : null,
   ]
     .filter((part): part is string => part !== null)
@@ -308,7 +308,7 @@ export const todaySessionAccessibilityLabel = (session: LatestSessionSummary): s
   const gym = session.gymName?.trim();
   return [
     `Session on ${formatCompactDateTime(session.startedAt.getTime())}`,
-    plural(session.exerciseCount, 'exercise', 'exercises'),
+    plural(session.exercises.length, 'exercise', 'exercises'),
     plural(session.workingSets, 'set', 'sets'),
     formatRecordCount(session.records.length),
     gym ? `at ${gym}` : null,

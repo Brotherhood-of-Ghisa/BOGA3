@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
@@ -213,7 +214,7 @@ export function TodayGroupCard({
   const range = formatPeriodRange(localWeekWindow(new Date(nowMs)));
   // The week summary carries one completed session; the stream fills the rest.
   const wanted = GROUP_SESSIONS_SHOWN - summary.training_now.length - (summary.latest_completed ? 1 : 0);
-  const recent = useGroupRecentSessions(selectedGroupId, summary.latest_completed?.session_id ?? null, wanted, loadStreamPage);
+  const recent = useGroupRecentSessions(selectedGroupId, summary.latest_completed?.session_id ?? null, wanted, loadStreamPage, summary);
   const sessions = buildGroupSessions(summary, recent.sessions, myUserId, nowMs);
   const openSession = (row: GroupSessionRowViewModel) => onOpenSession(row.memberUserId, row.sessionId, selectedGroupId);
   const empty = sessions.live.length === 0 && sessions.recent.length === 0;
@@ -241,24 +242,33 @@ export function TodayGroupCard({
       <WeekBoardCard board={board} onOpenGroup={() => onOpenGroup(selectedGroupId)} range={range} />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
-        <Card style={[styles.sessionsCard, fill && !showRecent ? styles.fill : null]} testID="today-group-live">
+        <SessionsCard fill={fill && !showRecent} testID="today-group-live">
           <View style={styles.sessionsBody}>
             <SessionsSection onOpenSession={openSession} rows={sessions.live} testID="today-group-training-now" title="Training now" />
           </View>
-        </Card>
+        </SessionsCard>
       ) : null}
       {showRecent ? (
-        <Card style={[styles.sessionsCard, fill ? styles.fill : null]} testID="today-group-sessions">
-          {fill ? (
-            <ScrollView alwaysBounceVertical={false} nestedScrollEnabled>
-              {recentBody}
-            </ScrollView>
-          ) : (
-            recentBody
-          )}
-        </Card>
+        <SessionsCard fill={fill} testID="today-group-sessions">
+          {recentBody}
+        </SessionsCard>
       ) : null}
     </View>
+  );
+}
+
+// A sessions card; filling the page, it takes the height left and scrolls its rows.
+function SessionsCard({ fill, testID, children }: { fill: boolean; testID: string; children: ReactNode }) {
+  return (
+    <Card style={[styles.sessionsCard, fill ? styles.fill : null]} testID={testID}>
+      {fill ? (
+        <ScrollView alwaysBounceVertical={false} nestedScrollEnabled>
+          {children}
+        </ScrollView>
+      ) : (
+        children
+      )}
+    </Card>
   );
 }
 
@@ -291,7 +301,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   board: {
-    gap: 2,
+    gap: 0,
   },
   columnLabels: {
     flexDirection: 'row',
@@ -391,7 +401,6 @@ const styles = StyleSheet.create({
   },
   sessionRow: {
     paddingVertical: uiSpace.sm,
-    gap: 1,
   },
   sessionTop: {
     flexDirection: 'row',

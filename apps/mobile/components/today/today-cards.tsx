@@ -114,8 +114,15 @@ export function TodayCards({ pages, testID }: { pages: TodayCardPage[]; testID: 
               </ScrollView>
             </Card>
           ) : (
+            // Its cards fill the page; on a phone too short for their floors the page scrolls rather than clips.
             <View key={candidate.key} style={{ width: cardWidth, height: cardHeight }} testID={candidate.testID}>
-              {candidate.content}
+              <ScrollView
+                alwaysBounceVertical={false}
+                contentContainerStyle={styles.body}
+                showsVerticalScrollIndicator={false}
+                testID={`${candidate.testID}-scroll`}>
+                {candidate.content}
+              </ScrollView>
             </View>
           ),
         )}

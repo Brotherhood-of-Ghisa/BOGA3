@@ -44,16 +44,6 @@ function Arrow({ direction, onPress, label, testID }: { direction: 'left' | 'rig
   );
 }
 
-/** `‹ ›`: older on the left, newer on the right, as time runs on Today's chart. */
-export function StepArrows({ onOlder, onNewer, noun, testID }: StepArrowsProps) {
-  return (
-    <View style={styles.row} testID={testID}>
-      <Arrow direction="left" label={`Previous ${noun}`} onPress={onOlder} testID={`${testID}-older`} />
-      <Arrow direction="right" label={`Next ${noun}`} onPress={onNewer} testID={`${testID}-newer`} />
-    </View>
-  );
-}
-
 /**
  * `‹ label ›`: the arrows either side of what they step (a date, a range),
  * older on the left. Each keeps its 44pt reach outward, away from the label.
@@ -78,11 +68,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     alignItems: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ARROW_GAP,
   },
   arrow: {
     width: ARROW_WIDTH,

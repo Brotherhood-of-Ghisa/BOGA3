@@ -57,10 +57,12 @@ function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number
 function SummaryLine({ session }: { session: LatestSessionSummary }) {
   const gym = session.gymName?.trim();
   const prs = session.records.length;
+  // The rows' count (one per exercise, however often it was logged), so the line and the table agree.
+  const exercises = session.exercises.length;
   return (
     <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summary} testID="today-latest-session-figures">
-      <Text allowFontScaling={false} style={styles.summaryFigure}>{session.exerciseCount}</Text>
-      {session.exerciseCount === 1 ? ' exercise' : ' exercises'}
+      <Text allowFontScaling={false} style={styles.summaryFigure}>{exercises}</Text>
+      {exercises === 1 ? ' exercise' : ' exercises'}
       <Text allowFontScaling={false} style={styles.separator}> · </Text>
       <Text allowFontScaling={false} style={styles.summaryFigure}>{session.workingSets}</Text>
       {session.workingSets === 1 ? ' set' : ' sets'}
