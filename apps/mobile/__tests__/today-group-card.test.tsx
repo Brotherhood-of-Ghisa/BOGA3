@@ -237,12 +237,12 @@ describe('Today: the group card', () => {
     // The count column is the working sets, labelled `Sets` like every set count.
     expect(within(byId('today-group-board')).getByText('Sets')).toBeTruthy();
 
-    // The board, View group and the heading all open the group's home page, At a glance.
+    // The board and the heading both open the group's home page, At a glance;
+    // the card carries no link of its own.
+    expect(screen.queryByTestId('today-view-group-button')).toBeNull();
     fireEvent.press(byId('today-group-board'));
-    fireEvent.press(byId('today-view-group-button'));
     fireEvent.press(byId('today-group-title'));
     expect(mockPush.mock.calls).toEqual([
-      ['/groups?groupId=g1&section=glance'],
       ['/groups?groupId=g1&section=glance'],
       ['/groups?groupId=g1&section=glance'],
     ]);
@@ -497,6 +497,7 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
     expect(byId('today-group-section-tab')).toHaveTextContent('Lunch Club');
     expect(screen.queryByTestId('today-group-switch')).toBeNull();
+    expect(screen.queryByTestId('today-group-open')).toBeNull();
 
     fireEvent.press(byId('today-group-section-tab'));
     fireEvent.press(byId('today-group-switch'));
@@ -509,8 +510,23 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     expect(within(byId('today-group-section')).getByTestId('today-group-sessions')).toBeTruthy();
     expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
 
-    // The board's View group opens the group At a glance, as the list layout's heading does.
-    fireEvent.press(byId('today-view-group-button'));
+    // The open-group icon beside the tabs opens the shown group At a glance, as
+    // the list layout's heading does; the board card has no link of its own.
+    expect(screen.queryByTestId('today-view-group-button')).toBeNull();
+    expect(byId('today-group-open')).toHaveProp('accessibilityLabel', 'Open group');
+    fireEvent.press(byId('today-group-open'));
+    expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
+  });
+
+  it('offers the open-group icon with one group, where there is no switch', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary());
+    await renderToday();
+
+    await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
+    fireEvent.press(byId('today-group-section-tab'));
+    expect(screen.queryByTestId('today-group-switch')).toBeNull();
+    fireEvent.press(byId('today-group-open'));
     expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
   });
 

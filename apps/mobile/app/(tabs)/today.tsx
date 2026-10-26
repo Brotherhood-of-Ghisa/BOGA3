@@ -3,9 +3,9 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   TodayCards,
+  TodayGroupActions,
   TodayGroupHeader,
   TodayGroupSection,
-  TodayGroupSwitch,
   TodayPanel,
   TodayProgressCard,
   useTodayGroup,
@@ -59,7 +59,7 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
   const groupHandlers = {
     nowMs: now().getTime(),
     onFindGroup: () => router.push('/group/mine'),
-    // `View group` and the board open the group's home page.
+    // The board opens the group's home page.
     onOpenGroup: (groupId: string) => openGroupHome(groupId),
     onOpenSession: (memberId: string, sessionId: string, groupId: string) =>
       router.push(`/group-session/${memberId}/${sessionId}?groupId=${encodeURIComponent(groupId)}`),
@@ -84,8 +84,9 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
             content: <TodayGroupSection {...groupHandlers} fill state={groupState} />,
             framed: !groupHasCards(groupState),
             accessory: group && groupState.status === 'available' ? (
-              <TodayGroupSwitch
+              <TodayGroupActions
                 groups={groupSwitchOptions(groupState)}
+                onOpenGroup={() => openGroupHome(group.group_id)}
                 onSelectGroup={groupState.selectGroup}
                 selectedGroupId={group.group_id}
               />

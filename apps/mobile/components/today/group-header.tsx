@@ -72,7 +72,37 @@ export function TodayGroupSwitch({ groups, selectedGroupId, onSelectGroup }: Tod
   );
 }
 
+export type TodayGroupActionsProps = TodayGroupSwitchProps & {
+  /** Opens the shown group on the Groups screen, At a glance. */
+  onOpenGroup: () => void;
+};
+
+/**
+ * The cards layout's controls beside the tabs while a group's page shows: the
+ * way to the group itself, then the switch (when there is more than one group).
+ */
+export function TodayGroupActions({ onOpenGroup, ...switchProps }: TodayGroupActionsProps) {
+  return (
+    <View style={styles.actions}>
+      <IconButton
+        accessibilityHint="Opens the group at a glance"
+        accessibilityLabel="Open group"
+        name="users"
+        onPress={onOpenGroup}
+        size="sm"
+        testID="today-group-open"
+        tone="muted"
+      />
+      <TodayGroupSwitch {...switchProps} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
