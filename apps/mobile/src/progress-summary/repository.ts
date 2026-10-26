@@ -2,20 +2,26 @@
 // the exercise session facts for PRs (every record kind), and one small query
 // for the completed session shown (the latest, or one stepped back to). Nothing here replays history.
 
-import { and, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
-import { loadFlaggedExerciseSessionFacts, type ExerciseSessionFactRow } from '@/src/data/exercise-session-facts';
+import {
+  loadFlaggedExerciseSessionFacts,
+  loadSessionExerciseFacts,
+  type ExerciseSessionFactRow,
+} from '@/src/data/exercise-session-facts';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
 import { createDrizzleStatsStore, type StatsStore } from '@/src/data/stats';
-import { parseSetReps } from '@/src/exercise-calculations/parse';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations/parse';
 import { sessionRecordKinds, type RecordKind } from '@/src/exercise-calculations/records';
 import { isInWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import {
+  buildSessionExerciseLines,
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
+  type SessionExerciseLine,
   type SessionPersonalRecord,
   type TodayProgress,
 } from './calculations';
@@ -42,6 +48,8 @@ export type ProgressSummaryStore = {
    * the latest `completed_at` (0 is the latest), and whether an older one exists.
    */
   loadCompletedSession(offset: number): Promise<{ session: LatestCompletedSessionRow; hasOlder: boolean } | null>;
+  /** The session's exercise lines, in session order. */
+  loadSessionExercises(sessionId: string): Promise<SessionExerciseLine[]>;
 };
 
 export const createDrizzleProgressSummaryStore = (
@@ -102,6 +110,24 @@ export const createDrizzleProgressSummaryStore = (
       .get();
     return { session: { ...row, completedAt: row.completedAt, exerciseCount: exercises?.value ?? 0 }, hasOlder: older !== undefined };
   },
+  async loadSessionExercises(sessionId) {
+    const facts = await loadSessionExerciseFacts(sessionId);
+    const database = await bootstrapLocalDataLayer();
+    const exercises = database
+      .select({ exerciseDefinitionId: sessionExercises.exerciseDefinitionId, name: sessionExercises.name })
+      .from(sessionExercises)
+      .where(and(eq(sessionExercises.sessionId, sessionId), isNull(sessionExercises.deletedAt)))
+      .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
+      .all();
+    const setIds = facts.flatMap((fact) => (fact.bestE1rmSetId ? [fact.bestE1rmSetId] : []));
+    const bestSets = new Map(setIds.length === 0 ? [] : database
+      .select({ id: exerciseSets.id, weightValue: exerciseSets.weightValue, repsValue: exerciseSets.repsValue })
+      .from(exerciseSets)
+      .where(inArray(exerciseSets.id, setIds))
+      .all()
+      .map((row) => [row.id, { weightKg: parseSetWeight(row.weightValue) ?? 0, reps: parseSetReps(row.repsValue) ?? 0 }]));
+    return buildSessionExerciseLines(exercises, facts, bestSets);
+  },
 });
 
 // A session's own PRs: on a split exercise, its gym's ([[gym.split]]).
@@ -141,10 +167,11 @@ export const createTodayProgressRepository = (
     const latest = found.session;
 
     const range = todayProgressLoadWindow(now, periodWeeks, compareBack);
-    const [aggregation, recordFacts] = await Promise.all([
+    const [aggregation, recordFacts, exercises] = await Promise.all([
       // The workout in progress counts in this week and month (§2).
       store.loadAggregationInput({ ...range, now }),
       store.loadRecordFacts(range),
+      store.loadSessionExercises(latest.id),
     ]);
     const sessionsInRange = workingSetsBySession(aggregation);
     // The shown session is nearly always inside the range; read it alone only when older.
@@ -166,6 +193,7 @@ export const createTodayProgressRepository = (
         ...latest,
         workingSets: latestSessions.find((session) => session.id === latest.id)?.workingSets ?? 0,
         records: latestRecordFacts.filter((fact) => fact.sessionId === latest.id).map(withoutPlacement),
+        exercises,
       },
     });
   },

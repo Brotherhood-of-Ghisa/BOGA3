@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
@@ -53,7 +54,31 @@ export function StepArrows({ onOlder, onNewer, noun, testID }: StepArrowsProps) 
   );
 }
 
+/**
+ * `‹ label ›`: the arrows either side of what they step (a date, a range),
+ * older on the left. Each keeps its 44pt reach outward, away from the label.
+ */
+export function StepAround({ onOlder, onNewer, noun, testID, children }: StepArrowsProps & { children: ReactNode }) {
+  return (
+    <View style={styles.around} testID={testID}>
+      <Arrow direction="left" label={`Previous ${noun}`} onPress={onOlder} testID={`${testID}-older`} />
+      <View style={styles.aroundLabel}>{children}</View>
+      <Arrow direction="right" label={`Next ${noun}`} onPress={onNewer} testID={`${testID}-newer`} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  around: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  aroundLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

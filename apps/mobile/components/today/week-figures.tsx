@@ -1,10 +1,9 @@
-import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 
-import { formatWeekRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
+import { formatPeriodRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
 import { todayText } from './text-styles';
 
 type ShareBarProps = { current: number; previous: number; testID?: string };
@@ -29,10 +28,12 @@ export function ShareBar({ current, previous, testID }: ShareBarProps) {
   );
 }
 
-/** How a figure names the week it is compared with: short on screen, spelled out when spoken. */
-export type PreviousWeekName = { short: string; spoken: string };
+/** How a figure names the week it is compared with: short on screen (none on Today), spelled out when spoken. */
+export type PreviousWeekName = { short: string | null; spoken: string };
 
 export const LAST_WEEK: PreviousWeekName = { short: 'last wk', spoken: 'last week' };
+// Today's heading already names the week, so its figures read `vs 4`.
+const TODAY_LAST_WEEK: PreviousWeekName = { short: null, spoken: 'last week' };
 
 type FigureProps = {
   label: string;
@@ -64,7 +65,7 @@ export function WeekFigure({ label, current, previous, record = false, previousW
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
       <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-previous`}>
-        vs {previous} {previousWeek.short}
+        {previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}
       </Text>
     </View>
   );
@@ -74,7 +75,6 @@ export function WeekFigure({ label, current, previous, record = false, previousW
 // over last week's whole total. No signed deltas: a part week against a whole
 // one says little.
 export function WeekFigures({ week }: { week: TodayProgressWeek }) {
-  const dateFormat = useDateFormat();
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>
@@ -85,7 +85,7 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
           allowFontScaling={false}
           style={[todayText.microLabel, todayText.microLabelFaint]}
           testID="today-progress-week-range">
-          {formatWeekRange(week.window, dateFormat)}
+          {formatPeriodRange(week.window)}
         </Text>
       </View>
       <View style={weekFigureStyles.figures}>
@@ -93,18 +93,21 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
           current={week.current.sessions}
           label="Sessions"
           previous={week.previous.sessions}
+          previousWeek={TODAY_LAST_WEEK}
           testID="today-progress-week-sessions"
         />
         <WeekFigure
           current={week.current.workingSets}
           label="Sets"
           previous={week.previous.workingSets}
+          previousWeek={TODAY_LAST_WEEK}
           testID="today-progress-week-working-sets"
         />
         <WeekFigure
           current={week.current.prs}
           label="PRs"
           previous={week.previous.prs}
+          previousWeek={TODAY_LAST_WEEK}
           record
           testID="today-progress-week-prs"
         />

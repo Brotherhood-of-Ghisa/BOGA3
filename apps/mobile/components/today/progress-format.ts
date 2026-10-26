@@ -1,7 +1,12 @@
 // The Progress card's words and chart geometry (pure). The figures come from
 // `src/progress-summary`; this file only says them.
 
-import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressPeriod } from '@/src/progress-summary';
+import type {
+  LatestSessionSummary,
+  SessionExerciseLine,
+  SessionPersonalRecord,
+  TodayProgressPeriod,
+} from '@/src/progress-summary';
 import type { LocalWindow } from '@/src/utils/local-calendar';
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
@@ -14,7 +19,13 @@ import {
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
-import { formatDayMonth, formatMonthDayTime, formatDateRange } from '@/src/utils/local-time';
+import {
+  formatCompactDate,
+  formatCompactDateRange,
+  formatCompactDateTime,
+  formatDateRange,
+  formatMonthDayTime,
+} from '@/src/utils/local-time';
 
 /** A window of whole weeks (a week, a period) as its Monday–Sunday range, in the selected date format. */
 export const formatWeekRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
@@ -33,10 +44,10 @@ export const formatSignedCount = (difference: number): string => {
 export const paceTone = (difference: number): ChangeTone =>
   difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
-/** A period by its Monday and Sunday: `Oct 5 to Nov 1`. */
-export const formatPeriodRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
+/** A window of whole weeks (a week, a period) by its Monday and Sunday, in Today's format: `5 Oct – 1 Nov 26`. */
+export const formatPeriodRange = (window: LocalWindow): string => {
   const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
-  return `${formatDayMonth(window.start, dateFormat)} to ${formatDayMonth(sunday, dateFormat)}`;
+  return formatCompactDateRange(window.start, sunday);
 };
 
 const dayOf = (window: LocalWindow, dayIndex: number) =>
@@ -86,16 +97,15 @@ export const periodDayFigures = (period: TodayProgressPeriod, dayIndex: number |
 };
 
 /**
- * `Today`, `Oct 9`. A projected day shows as its date alone (the hollow dot
- * on the chart marks it); spoken, it says so: `Oct 27 (projected)`.
+ * `Today`, `9 Oct 26`. A projected day shows as its date alone (the hollow
+ * dot on the chart marks it); spoken, it says so: `27 Oct 26 (projected)`.
  */
 export const formatPeriodDayLabel = (
   figures: PeriodDayFigures,
-  dateFormat: ExerciseDateFormat,
   { spoken = false }: { spoken?: boolean } = {}
 ): string => {
   if (figures.when === 'today') return 'Today';
-  const date = formatDayMonth(figures.date, dateFormat);
+  const date = formatCompactDate(figures.date);
   return spoken && figures.when === 'projected' ? `${date} (projected)` : date;
 };
 
@@ -125,16 +135,12 @@ export const comparedPeriodName = (period: Pick<TodayProgressPeriod, 'compareBac
   period.compareBack === 1 ? 'last period' : `period ${period.compareBack} back`;
 
 /** Both periods and the selected day's figures, spoken as one heading. */
-export const periodFiguresAccessibilityLabel = (
-  period: TodayProgressPeriod,
-  figures: PeriodDayFigures,
-  dateFormat: ExerciseDateFormat
-): string =>
+export const periodFiguresAccessibilityLabel = (period: TodayProgressPeriod, figures: PeriodDayFigures): string =>
   [
-    `${period.weeks}-week period, ${formatPeriodRange(period.window, dateFormat)}:`,
-    `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })} ${setCount(figures.workingSets)},`,
-    `against the ${comparedPeriodName(period)}, ${formatPeriodRange(period.previous.window, dateFormat)}:`,
-    `${setCount(figures.previousWorkingSets)} by ${formatDayMonth(figures.previousDate, dateFormat)},`,
+    `${period.weeks}-week period, ${formatPeriodRange(period.window)}:`,
+    `${formatPeriodDayLabel(figures, { spoken: true })} ${setCount(figures.workingSets)},`,
+    `against the ${comparedPeriodName(period)}, ${formatPeriodRange(period.previous.window)}:`,
+    `${setCount(figures.previousWorkingSets)} by ${formatCompactDate(figures.previousDate)},`,
     formatSignedCount(figures.difference),
   ].join(' ');
 
@@ -150,10 +156,9 @@ export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): stri
 /** The selected day, as the adjustable chart's value. */
 export const periodChartAccessibilityValue = (
   period: Pick<TodayProgressPeriod, 'compareBack'>,
-  figures: PeriodDayFigures,
-  dateFormat: ExerciseDateFormat
+  figures: PeriodDayFigures
 ): string =>
-  `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })}: ${setCount(figures.workingSets)}, ${comparedPeriodName(period)} ${figures.previousWorkingSets}`;
+  `${formatPeriodDayLabel(figures, { spoken: true })}: ${setCount(figures.workingSets)}, ${comparedPeriodName(period)} ${figures.previousWorkingSets}`;
 
 const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
 
@@ -227,8 +232,8 @@ export type PeriodChartGeometry = {
 export const CHART_RIGHT_GUTTER = 8;
 export const CHART_HEIGHT = 126;
 const PLOT_TOP = 6;
-// Below the plot: the week ticks and the `TODAY` axis label.
-export const CHART_AXIS_ROOM = 18;
+// Below the plot: the week ticks. The chart carries no axis labels.
+export const CHART_AXIS_ROOM = 6;
 
 /**
  * Day of the period on x (the first day at 0, the last at the plot's edge)
@@ -270,15 +275,6 @@ export const periodChartGeometry = (
   };
 };
 
-// `TODAY` this close to an edge of the plot is anchored to that edge.
-const AXIS_LABEL_CLEARANCE = 18;
-
-/** Where the `TODAY` axis label hangs from today's x: centred, or flush with a near edge. */
-export const todayLabelAnchor = (x: number, plotWidth: number): 'start' | 'middle' | 'end' => {
-  if (x < AXIS_LABEL_CLEARANCE) return 'start';
-  return plotWidth - x < AXIS_LABEL_CLEARANCE ? 'end' : 'middle';
-};
-
 /** The day under a touch at `x` across the plot: the nearest, within the period. */
 export const periodDayAtX = (x: number, plotWidth: number, daysInPeriod: number): number => {
   if (plotWidth <= 0 || daysInPeriod <= 1) return 0;
@@ -287,3 +283,37 @@ export const periodDayAtX = (x: number, plotWidth: number, daysInPeriod: number)
 
 export const toPolyline = (points: ChartPoint[]): string =>
   points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+
+// --- The session card ------------------------------------------------------
+
+/** `100.0 × 5`: a best set's Weight as entered and its reps. */
+export const formatBestSet = (bestSet: { weightKg: number; reps: number }): string =>
+  `${formatWeight(bestSet.weightKg)} × ${bestSet.reps}`;
+
+/** `1 PR`, `2 PRs`: the session's PRs, one per record kind ([[set.eligibility]]). */
+export const formatRecordCount = (count: number): string => plural(count, 'PR', 'PRs');
+
+const exerciseLineText = (line: SessionExerciseLine): string =>
+  [
+    line.name,
+    plural(line.workingSets, 'set', 'sets'),
+    line.bestSet ? `best ${line.bestSet.weightKg} by ${line.bestSet.reps}, 1RM ${formatOneRepMax(line.bestSet.oneRepMaxKg)}` : null,
+    line.oneRepMaxRecord ? 'a 1RM PR' : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(', ');
+
+/** The session card's body, spoken: when, what, where, its PRs, then each exercise. */
+export const todaySessionAccessibilityLabel = (session: LatestSessionSummary): string => {
+  const gym = session.gymName?.trim();
+  return [
+    `Session on ${formatCompactDateTime(session.startedAt.getTime())}`,
+    plural(session.exerciseCount, 'exercise', 'exercises'),
+    plural(session.workingSets, 'set', 'sets'),
+    formatRecordCount(session.records.length),
+    gym ? `at ${gym}` : null,
+    ...session.exercises.map(exerciseLineText),
+  ]
+    .filter((part): part is string => part !== null)
+    .join('; ');
+};

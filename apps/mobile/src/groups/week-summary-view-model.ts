@@ -1,23 +1,20 @@
 import { localDateKey } from '@/src/utils/calendar-weeks';
 // Today's group card, from one `group_competition_week_summary` read (contract):
-// the week's top three by working sets, the caller's own line when outside
-// them, and the latest activity row. Pure; the card only draws it.
+// the week's top five by working sets, the caller's own line when outside
+// them, and up to four sessions. Pure; the card only draws it.
 
-import { formatCompactDuration } from '@/src/data/session-list';
 import {
   buildSessionRecordLine,
   GROUP_RECORD_NOUN,
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
-import type { ExerciseDateFormat } from '@/src/preferences/model';
-import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
+import { formatClockTime, formatCompactDateTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { SHOWN_BOARD } from './competition-session-records-view-model';
 import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
-import type { GroupMemberRef } from './types';
 
 import type {
   CompetitionEventWire,
@@ -32,7 +29,7 @@ type GroupWeekTrainingSession = GroupWeekSummaryResult['training_now'][number];
 /** One current member's week: competition rank (equal working sets and group records share a rank). */
 export type GroupWeekBoardRow = GroupWeekSummaryResult['members'][number];
 
-export const WEEK_BOARD_SIZE = 3;
+export const WEEK_BOARD_SIZE = 5;
 
 export type WeekBoardRowViewModel = {
   userId: string;
@@ -68,8 +65,7 @@ const toBoardRow = (row: GroupWeekBoardRow, topWorkingSets: number, myUserId: st
 
 /**
  * The server ranks every current member (ties share a rank); the board keeps
- * its first `size` rows — three, or as many as Today's cards layout has room
- * for. The caller is found by user id, so a tie at the last row shown can
+ * its first `size` rows, five. The caller is found by user id, so a tie at the last row shown can
  * still put them on their own line, at that shared rank.
  */
 export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string, size = WEEK_BOARD_SIZE): WeekBoardViewModel => {
@@ -85,24 +81,12 @@ export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string, s
   };
 };
 
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
-
-/** `7 sets · 3 exercises`: the working sets (`training-metrics-contract.md` "Counted set"). */
-export const formatWeekSessionFigures = (session: { working_sets: number; exercise_count: number }): string =>
-  `${plural(session.working_sets, 'set', 'sets')} · ${formatExerciseCount(session.exercise_count)}`;
 
 const isSameLocalDay = (a: number, b: number): boolean => localDateKey(new Date(a)) === localDateKey(new Date(b));
 
-/** `Started 07:40` today; a formatted local date and time on an earlier day. */
-export const formatTrainingStart = (startedAtMs: number, nowMs: number, dateFormat: ExerciseDateFormat): string =>
-  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatMonthDayTime(startedAtMs, dateFormat)}`;
-
-const joinContext = (...parts: (string | null | undefined)[]): string =>
-  parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(' · ');
-
-/** `a`, `a and b`, `a, b and c`. */
-export const joinNames = (names: string[]): string =>
-  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+/** `Started 07:40` today; Today's compact date and time on an earlier day: `Started 25 Oct 26 23:10`. */
+export const formatTrainingStart = (startedAtMs: number, nowMs: number): string =>
+  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatCompactDateTime(startedAtMs)}`;
 
 /** One group record: a record event and one shown board it took #1 on. */
 type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistoryValueWire };
@@ -130,98 +114,69 @@ export const buildGroupRecordLine = (records: CompetitionEventWire[]): SessionRe
     GROUP_RECORD_NOUN,
   );
 
-/** One member's session, drawn by the shared session summary row. */
-type MemberSessionRow = {
+/** Today's group card shows this many sessions, the live ones first. */
+export const GROUP_SESSIONS_SHOWN = 4;
+
+/** One session on Today's group card: who and when, where, what, its group records. */
+export type GroupSessionRowViewModel = {
   memberUserId: string;
   sessionId: string;
   name: string;
-  /** `10/16 06:10`, or `Started 07:40` while training. */
-  stamp: string;
-  duration: string | null;
+  /** `Started 07:40` while training; `26 Oct 26 06:10` once completed. */
+  when: string;
+  live: boolean;
   gym: string | null;
+  /** `4 exercises · 16 sets`, `… sets so far` while training. */
   figures: string;
+  /** One group record named, several counted; none while training (records are awarded on completion). */
   record: SessionRecordLine | null;
   accessibilityLabel: string;
 };
 
-export type LatestActivityViewModel =
-  | ({ kind: 'training' } & MemberSessionRow)
-  | { kind: 'several'; count: number; names: string; gyms: string; accessibilityLabel: string }
-  | ({ kind: 'completed' } & MemberSessionRow);
+export type GroupSessionsViewModel = { live: GroupSessionRowViewModel[]; recent: GroupSessionRowViewModel[] };
 
-const personName = (member: GroupMemberRef, myUserId: string) => formatStreamPersonName(member, myUserId);
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+const sessionFigures = (session: { working_sets: number; exercise_count: number }, live: boolean): string =>
+  `${formatExerciseCount(session.exercise_count)} · ${plural(session.working_sets, 'set', 'sets')}${live ? ' so far' : ''}`;
 
 const sessionLabel = (parts: (string | null | undefined)[]): string =>
   parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(', ');
 
-const trainingRow = (
-  session: GroupWeekTrainingSession,
-  myUserId: string,
-  nowMs: number,
-  dateFormat: ExerciseDateFormat,
-): LatestActivityViewModel => {
-  const name = personName(session.member, myUserId);
-  const stamp = formatTrainingStart(session.started_at_ms, nowMs, dateFormat);
-  const figures = formatWeekSessionFigures(session);
+const liveRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: number): GroupSessionRowViewModel => {
+  const name = formatStreamPersonName(session.member, myUserId);
+  const when = formatTrainingStart(session.started_at_ms, nowMs);
+  const figures = sessionFigures(session, true);
   return {
-    kind: 'training',
     memberUserId: session.member.user_id,
     sessionId: session.session_id,
     name,
-    stamp,
-    duration: null,
+    when,
+    live: true,
     gym: session.gym_name,
     figures,
     record: null,
-    accessibilityLabel: sessionLabel([name, 'training now', stamp, session.gym_name && `at ${session.gym_name}`, figures]),
+    accessibilityLabel: sessionLabel([name, 'training now', when, session.gym_name && `at ${session.gym_name}`, figures]),
   };
 };
 
-const severalRow = (sessions: GroupWeekTrainingSession[], myUserId: string): LatestActivityViewModel => {
-  const names = joinNames(sessions.map((session) => personName(session.member, myUserId)));
-  const gyms = joinContext(...new Set(sessions.map((session) => session.gym_name?.trim() || null)));
-  return {
-    kind: 'several',
-    count: sessions.length,
-    names,
-    gyms,
-    accessibilityLabel: [`${sessions.length} training now: ${names}`, gyms].filter(Boolean).join(', '),
-  };
-};
-
-const completedDuration = (session: GroupWeekLatestSession): number | null => {
-  if (session.duration_sec !== null) return session.duration_sec;
-  if (session.completed_at_ms !== null && session.completed_at_ms >= session.started_at_ms) {
-    return Math.floor((session.completed_at_ms - session.started_at_ms) / 1000);
-  }
-  return null;
-};
-
-export const completedRow = (
-  session: GroupWeekLatestSession,
-  myUserId: string,
-  dateFormat: ExerciseDateFormat,
-): LatestActivityViewModel => {
-  const name = personName(session.member, myUserId);
-  const durationSec = completedDuration(session);
-  const stamp = formatMonthDayTime(session.started_at_ms, dateFormat);
-  const duration = durationSec === null ? null : formatCompactDuration(durationSec);
-  const figures = formatWeekSessionFigures(session);
+const recentRow = (session: GroupWeekLatestSession, myUserId: string): GroupSessionRowViewModel => {
+  const name = formatStreamPersonName(session.member, myUserId);
+  const when = formatCompactDateTime(session.started_at_ms);
+  const figures = sessionFigures(session, false);
   const record = buildGroupRecordLine(session.group_records);
   return {
-    kind: 'completed',
     memberUserId: session.member.user_id,
     sessionId: session.session_id,
     name,
-    stamp,
-    duration,
+    when,
+    live: false,
     gym: session.gym_name,
     figures,
     record,
     accessibilityLabel: sessionLabel([
       name,
-      `completed session on ${stamp}`,
-      duration,
+      `completed session on ${when}`,
       session.gym_name && `at ${session.gym_name}`,
       figures,
       sessionRecordLineText(record),
@@ -230,20 +185,29 @@ export const completedRow = (
 };
 
 /**
- * One member training now opens their session; several collapse into one row
- * that opens the group; otherwise the latest completed session, at any time.
- * Null when the group has neither.
+ * Up to `GROUP_SESSIONS_SHOWN` sessions, shared between the two kinds: every
+ * member training now first, then the latest completed sessions, newest
+ * first — the week summary's latest, then the loaded stream's (`recent`), each
+ * session once.
  */
-export const buildLatestActivity = (
+export const buildGroupSessions = (
   summary: Pick<GroupWeekSummaryResult, 'training_now' | 'latest_completed'>,
+  recent: GroupWeekLatestSession[],
   myUserId: string,
   nowMs: number,
-  dateFormat: ExerciseDateFormat,
-): LatestActivityViewModel | null => {
-  const [first, ...rest] = summary.training_now;
-  if (first && rest.length === 0) return trainingRow(first, myUserId, nowMs, dateFormat);
-  if (first) return severalRow(summary.training_now, myUserId);
-  return summary.latest_completed ? completedRow(summary.latest_completed, myUserId, dateFormat) : null;
+): GroupSessionsViewModel => {
+  const live = summary.training_now.slice(0, GROUP_SESSIONS_SHOWN).map((session) => liveRow(session, myUserId, nowMs));
+  const liveIds = new Set(summary.training_now.map((session) => session.session_id));
+  const seen = new Set<string>();
+  const completed = [...(summary.latest_completed ? [summary.latest_completed] : []), ...recent].filter((session) => {
+    if (liveIds.has(session.session_id) || seen.has(session.session_id)) return false;
+    seen.add(session.session_id);
+    return true;
+  });
+  return {
+    live,
+    recent: completed.slice(0, GROUP_SESSIONS_SHOWN - live.length).map((session) => recentRow(session, myUserId)),
+  };
 };
 
 /**

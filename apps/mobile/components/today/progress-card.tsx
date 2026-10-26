@@ -1,22 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
-import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
-import type { ExerciseDateFormat } from '@/src/preferences/model';
-import type { LatestSessionSummary, TodayProgress } from '@/src/progress-summary';
-import { formatMonthDayTime } from '@/src/utils/local-time';
+import type { TodayProgress } from '@/src/progress-summary';
 
 import { PeriodPace } from './period-pace';
-import {
-  formatSessionSummaryDuration,
-  formatSessionSummaryFigures,
-  sessionSummaryRecordLine,
-  sessionSummaryAccessibilityLabel,
-} from './progress-format';
-import { SessionSummaryRow } from './session-summary-row';
-import { StepArrows } from './step-arrows';
-import { todayText } from './text-styles';
+import { TodaySessionCard } from './session-card';
 import { WeekFigures } from './week-figures';
 
 type ReadyProgress = Extract<TodayProgress, { status: 'ready' }>;
@@ -24,114 +13,67 @@ type ReadyProgress = Extract<TodayProgress, { status: 'ready' }>;
 export type TodayProgressCardProps = {
   progress: ReadyProgress;
   onOpenSession: (sessionId: string) => void;
+  onOpenSessions: () => void;
   /** Compares the period against the one this many periods back. */
   onShowCompared?: (periodsBack: number) => void;
   /** Shows the completed session this many places before the latest. */
   onShowSession?: (offset: number) => void;
-  dateFormat?: ExerciseDateFormat;
-  /** The cards layout: no card of its own (the page is one), the chart taking the height left. */
+  /** The cards layout: the progress card takes the height the session card leaves, the chart filling it. */
   fill?: boolean;
 };
 
-// The most recent completed session as one link row. No in-progress state:
-// an active workout is reached from Train.
-function LatestSessionRow({
-  latest,
-  dateFormat,
-  onPress,
-}: {
-  latest: LatestSessionSummary;
-  dateFormat: ExerciseDateFormat;
-  onPress: () => void;
-}) {
-  return (
-    <SessionSummaryRow
-      accessibilityHint="Opens the completed session"
-      accessibilityLabel={sessionSummaryAccessibilityLabel(latest, dateFormat)}
-      duration={formatSessionSummaryDuration(latest)}
-      figures={formatSessionSummaryFigures(latest)}
-      gym={latest.gymName}
-      onPress={onPress}
-      record={sessionSummaryRecordLine(latest)}
-      stamp={formatMonthDayTime(latest.startedAt.getTime(), dateFormat)}
-      testID="today-latest-session"
-    />
-  );
-}
-
-// Today's Progress card: this week against last week, the period against the
-// previous period (or an earlier one) day by day, the latest session (or an
-// earlier one, stepped back to with the arrows).
+// Today's You page: the progress card (this week against last week, the
+// period against the previous period, or an earlier one, day by day) over
+// the session card (the latest session, or an earlier one stepped back to).
 export function TodayProgressCard({
   progress,
   onOpenSession,
+  onOpenSessions,
   onShowCompared,
   onShowSession,
-  dateFormat,
   fill = false,
 }: TodayProgressCardProps) {
-  const [listPreferences] = useExerciseListPreferences();
-  const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
-  const { latestOffset, hasOlderSession } = progress;
-  const body = (
-    <>
-      <WeekFigures week={progress.week} />
-      <View style={styles.divider} />
-      <PeriodPace fill={fill} onShowCompared={onShowCompared} period={progress.period} />
-      <View style={styles.divider} />
-      <View style={styles.latestHeading}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-latest-session-title">
-          {latestOffset === 0 ? 'Latest session' : 'Earlier session'}
-        </Text>
-        {onShowSession ? (
-          <StepArrows
-            noun="session"
-            onNewer={latestOffset > 0 ? () => onShowSession(latestOffset - 1) : null}
-            onOlder={hasOlderSession ? () => onShowSession(latestOffset + 1) : null}
-            testID="today-latest-session-step"
-          />
-        ) : null}
-      </View>
-      <LatestSessionRow
-        dateFormat={resolvedDateFormat}
-        latest={progress.latest}
-        onPress={() => onOpenSession(progress.latest.id)}
-      />
-    </>
-  );
-  if (fill) {
-    return (
-      <View style={[styles.card, styles.fill]} testID="today-progress-card">
-        {body}
-      </View>
-    );
-  }
   return (
-    <Card style={styles.card} testID="today-progress-card">
-      {body}
-    </Card>
+    <View style={[styles.stack, fill ? styles.fill : null]}>
+      <Card style={[styles.card, fill ? styles.fillProgress : null]} testID="today-progress-card">
+        <WeekFigures week={progress.week} />
+        <View style={styles.divider} />
+        <PeriodPace fill={fill} onShowCompared={onShowCompared} period={progress.period} />
+      </Card>
+      <TodaySessionCard
+        fill={fill}
+        hasOlderSession={progress.hasOlderSession}
+        offset={progress.latestOffset}
+        onOpenSession={onOpenSession}
+        onOpenSessions={onOpenSessions}
+        onShowSession={onShowSession}
+        session={progress.latest}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  stack: {
+    gap: uiSpace.sm,
+  },
   card: {
     padding: uiSpace.md,
     gap: uiSpace.md,
   },
   fill: {
     flex: 1,
+    minHeight: 0,
+  },
+  // Its own height (the chart at its floor) never shrinks; it grows into what the session card leaves.
+  fillProgress: {
+    flexGrow: 1,
+    flexShrink: 0,
   },
   // A `rule-soft` hairline across the card, edge to edge.
   divider: {
     height: 1,
     marginHorizontal: -uiSpace.md,
     backgroundColor: uiRoles.ruleSoft,
-  },
-  // The arrows are a little taller than the label; pull them into the card's rhythm.
-  latestHeading: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: -3,
   },
 });

@@ -7,15 +7,7 @@ import type { SessionRecordLine } from '@/src/session-insights/record-line';
 
 import { todayText } from './text-styles';
 
-export type SessionSummaryRowMember = {
-  name: string;
-  /** The `set-current` ring and `Training now`, beside the name. */
-  trainingNow: boolean;
-};
-
 export type SessionSummaryRowProps = {
-  /** Whose session: the Group card names its member; the Progress card's own session has none. */
-  member?: SessionSummaryRowMember | null;
   /** `10/16 06:10`, or `Started 07:40` for a session still in progress. */
   stamp: string;
   /** `1h 12m`; null while training. */
@@ -28,8 +20,6 @@ export type SessionSummaryRowProps = {
   accessibilityHint: string;
   onPress: () => void;
   testID: string;
-  /** The trailing chevron; Sessions' history rows leave it out. */
-  chevron?: boolean;
   /** Under the record line: Sessions' `Deleted` tag. */
   children?: ReactNode;
   /** The row's insets where its container gives none (a Sessions history row). */
@@ -42,30 +32,6 @@ export function TrainingNowMark({ children }: { children: ReactNode }) {
     <View style={styles.liveMark}>
       <Icon name="set-current" size="xs" />
       {children}
-    </View>
-  );
-}
-
-function MemberHeader({ member, testID }: { member: SessionSummaryRowMember; testID: string }) {
-  return (
-    <View style={styles.header}>
-      <Text
-        allowFontScaling={false}
-        ellipsizeMode="tail"
-        numberOfLines={1}
-        style={styles.member}
-        testID={`${testID}-member`}>
-        {member.name}
-      </Text>
-      {member.trainingNow ? (
-        <View testID={`${testID}-training-now`}>
-          <TrainingNowMark>
-            <Text allowFontScaling={false} style={styles.liveText}>
-              Training now
-            </Text>
-          </TrainingNowMark>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -84,14 +50,10 @@ function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string 
 }
 
 /**
- * One session as a link row, the same on both Today cards: the summary line
- * (stamp · duration @ gym), `sets · exercises`, then its PRs. The Group card
- * adds the member and the training-now mark above it. No group tags: the
- * server decides which groups a session was shared to (from membership
- * history), so the device cannot show them.
+ * One session as a link row, a Sessions history row: the summary line
+ * (stamp · duration @ gym), `sets · exercises`, then its PRs.
  */
 export function SessionSummaryRow({
-  member,
   stamp,
   duration,
   gym,
@@ -101,7 +63,6 @@ export function SessionSummaryRow({
   accessibilityHint,
   onPress,
   testID,
-  chevron = true,
   children,
   style,
 }: SessionSummaryRowProps) {
@@ -115,7 +76,6 @@ export function SessionSummaryRow({
       style={({ pressed }) => [styles.row, style, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.copy}>
-        {member ? <MemberHeader member={member} testID={testID} /> : null}
         <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summaryLine}>
           <Text allowFontScaling={false} style={styles.summaryFigure} testID={`${testID}-start`}>
             {stamp}
@@ -139,7 +99,6 @@ export function SessionSummaryRow({
         {record ? <RecordLine line={record} testID={testID} /> : null}
         {children}
       </View>
-      {chevron ? <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" /> : null}
     </Pressable>
   );
 }
@@ -160,31 +119,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  member: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
   liveMark: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  liveText: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
   summaryLine: {
     fontFamily: uiFonts.body.family,

@@ -228,7 +228,37 @@ describe('loadTodayProgress', () => {
         { kind: 'weight', exerciseName: 'Squat', value: 110, reps: 5 },
         { kind: 'volume', exerciseName: 'Squat', value: 550, reps: null },
       ],
+      // In session order, named as logged; a warm-up is not a working set, a
+      // removed exercise is gone, and one with no working set has no best set.
+      exercises: [
+        {
+          name: 'Back Squat',
+          workingSets: 1,
+          bestSet: { weightKg: 110, reps: 5, oneRepMaxKg: expect.closeTo(128.24, 2) },
+          oneRepMaxRecord: true,
+        },
+        {
+          name: 'Bench Press',
+          workingSets: 2,
+          bestSet: { weightKg: 95, reps: 5, oneRepMaxKg: expect.closeTo(110.75, 2) },
+          oneRepMaxRecord: true,
+        },
+        { name: 'Face Pull', workingSets: 0, bestSet: null, oneRepMaxRecord: false },
+      ],
     });
+  });
+
+  it("marks a best set's 1RM as a PR only when the session took the 1RM record", async () => {
+    insertSession('heavier', { completedAt: local(2026, 10, 6, 18) }, [bench('100', 1)]);
+    insertSession('lighter', { startedAt: local(2026, 10, 13, 17), completedAt: local(2026, 10, 13, 18) }, [
+      { definitionId: BENCH, name: 'Bench Press', sets: [['90', '5']] },
+    ]);
+
+    const { latest } = ready(await loadTodayProgress(NOW, 4));
+
+    expect(latest.exercises).toEqual([
+      { name: 'Bench Press', workingSets: 1, bestSet: { weightKg: 90, reps: 5, oneRepMaxKg: expect.any(Number) }, oneRepMaxRecord: false },
+    ]);
   });
 
   it('summarises a latest session older than both periods, with zero figures for the windows', async () => {

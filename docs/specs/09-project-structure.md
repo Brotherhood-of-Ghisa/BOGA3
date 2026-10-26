@@ -113,13 +113,13 @@ Define the canonical repository structure, path ownership, and placement convent
     backend API, or sync envelope.
 - `apps/mobile/src/progress-summary/`
   - owns Today's progress read (`loadTodayProgress`): the week and month
-    windows of [[comparison.window]], and the latest completed session.
+    windows of [[comparison.window]], and a completed session's exercises.
     Counted sessions and working sets come from the stats
     aggregation (`src/data/stats.ts`), PRs (one per record kind) from the
     exercise session facts;
     every figure places a session by its `completed_at`.
   - derived-only, like `session-insights`: no schema, no sync, no history replay.
-  - drawn by Today's Progress card, `apps/mobile/components/today/`.
+  - drawn by Today's You page, `apps/mobile/components/today/`.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.

@@ -77,6 +77,66 @@ export type LatestSessionSummary = {
   exerciseCount: number;
   /** Its PRs, one per record kind, in exercise then kind order; the count is the length. */
   records: SessionPersonalRecord[];
+  /** One line per exercise, in session order. */
+  exercises: SessionExerciseLine[];
+};
+
+/**
+ * One exercise of a session on Today: its working sets, its best set and that
+ * set's 1RM. The best set is the working set with the highest estimated 1RM
+ * (the exercise session facts' `best_e1rm_set_id`), not the heaviest: the 1RM
+ * puts weight and reps on one scale. No working set: no best set.
+ */
+export type SessionExerciseLine = {
+  name: string;
+  workingSets: number;
+  bestSet: { weightKg: number; reps: number; oneRepMaxKg: number } | null;
+  /** The best set's 1RM is the session's own 1RM PR on this exercise. */
+  oneRepMaxRecord: boolean;
+};
+
+/** A live session exercise, in session order. */
+export type SessionExerciseRef = { exerciseDefinitionId: string | null; name: string };
+
+/** The exercise session facts a line reads. */
+export type SessionExerciseFact = {
+  exerciseDefinitionId: string;
+  workingSets: number;
+  bestE1rmKg: number | null;
+  bestE1rmSetId: string | null;
+  ownPrE1rm: boolean;
+};
+
+/**
+ * The session's lines: one per exercise definition, where it first appears
+ * (the facts already combine a definition logged twice). A definition with no
+ * fact had no working or volume-included set.
+ */
+export const buildSessionExerciseLines = (
+  exercises: SessionExerciseRef[],
+  facts: SessionExerciseFact[],
+  bestSets: ReadonlyMap<string, { weightKg: number; reps: number }>,
+): SessionExerciseLine[] => {
+  const factsByDefinition = new Map(facts.map((fact) => [fact.exerciseDefinitionId, fact]));
+  const seen = new Set<string>();
+  return exercises.flatMap((exercise) => {
+    const definitionId = exercise.exerciseDefinitionId;
+    if (definitionId !== null) {
+      if (seen.has(definitionId)) return [];
+      seen.add(definitionId);
+    }
+    const fact = definitionId === null ? undefined : factsByDefinition.get(definitionId);
+    const set = fact?.bestE1rmSetId ? bestSets.get(fact.bestE1rmSetId) : undefined;
+    const bestSet = fact && fact.workingSets > 0 && set && fact.bestE1rmKg !== null
+      ? { ...set, oneRepMaxKg: fact.bestE1rmKg }
+      : null;
+    return [{
+      name: exercise.name.trim(),
+      workingSets: fact?.workingSets ?? 0,
+      bestSet,
+      oneRepMaxRecord: bestSet !== null && (fact?.ownPrE1rm ?? false),
+    }];
+  });
 };
 
 export type TodayProgress =
