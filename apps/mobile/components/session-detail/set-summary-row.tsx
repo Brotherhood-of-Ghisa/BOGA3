@@ -9,23 +9,23 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).
-// Group percentages wrap with stacked stats, leaving ordinary rows compact.
+// Group percentages get a separate, wrapping metrics line; ordinary rows stay compact.
 export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, stackedMetrics = false }:
   { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; stackedMetrics?: boolean }) {
   const state = row.done ? 'realised' : 'planned';
-  return (
-    <View style={[styles.setRow, stackedMetrics && styles.stackedRow]} testID={testID}>
+  const details = <>
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
         {row.typeLabel}
       </Text>
       <Text
         allowFontScaling={false}
         numberOfLines={1}
-        style={[styles.weightReps, stackedMetrics && styles.stackedWeight, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
+        style={[styles.weightReps, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
         testID={`${testID}-values`}>
         {row.weightReps}
       </Text>
-      {!hideDerivedMetrics ? <>
+  </>;
+  const metrics = !hideDerivedMetrics ? <>
       <Stat
         emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
         label="1RM"
@@ -43,14 +43,32 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, stacked
         testID={`${testID}-vol`}
         value={row.volume}
       />
-      </> : null}
+  </> : null;
+  return (
+    <View style={[styles.setRow, stackedMetrics && styles.stackedRow]} testID={testID}>
+      {stackedMetrics ? <View style={styles.details} testID={`${testID}-details`}>{details}</View> : details}
+      {stackedMetrics && metrics ? <View style={styles.metrics} testID={`${testID}-metrics`}>{metrics}</View> : metrics}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stackedRow: { flexWrap: 'wrap' },
-  stackedWeight: { flexBasis: '80%' },
+  stackedRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingVertical: uiSpace.sm,
+  },
+  details: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: uiSpace.sm,
+  },
+  metrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    gap: uiSpace.lg,
+  },
   setRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
