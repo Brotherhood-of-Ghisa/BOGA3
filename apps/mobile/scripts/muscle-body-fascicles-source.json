@@ -1,0 +1,313 @@
+{
+  "provenance": "BoGa standalone fascicle prototype, 2026-10-25; manually transcribed procedural directions and landmarks; no measured anatomy or images imported.",
+  "sources": {
+    "pec": {
+      "label": "Ganokroj 2022",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9502243/"
+    },
+    "fung": {
+      "label": "Fung 2009",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/19291757/"
+    },
+    "minor": {
+      "label": "Studio anatomico del piccolo pettorale",
+      "url": "https://www.sciencedirect.com/science/article/pii/S1015958416304602"
+    },
+    "serratus": {
+      "label": "Webb 2018",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27757809/"
+    },
+    "delts": {
+      "label": "Sakoma 2011",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3042752/"
+    },
+    "arm": {
+      "label": "Peterson & Rayan 2011",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/21527142/"
+    },
+    "cuff": {
+      "label": "Zhang 2024 · DTI",
+      "url": "https://doi.org/10.1111/joa.14050"
+    },
+    "lats": {
+      "label": "Gerling & Brown 2013",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3724205/"
+    },
+    "traps": {
+      "label": "Johnson 1994",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/23916077/"
+    },
+    "rhomboid": {
+      "label": "Yi et al. 2020: Intramuscular Neural Distribution of Rhomboid Muscles",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7291336/"
+    },
+    "spine": {
+      "label": "Stark 2013 · digitalizzazione 3D",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3632226/"
+    },
+    "forearm": {
+      "label": "Lieber 1992",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/1401782/"
+    },
+    "compartments": {
+      "label": "Compartimenti dell’avambraccio 2014",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4089342/"
+    },
+    "abs": {
+      "label": "Ng 1998",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/9532434/"
+    },
+    "intersections": {
+      "label": "Brown 2011",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3017737/"
+    },
+    "leg": {
+      "label": "Ward 2009",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2650051/"
+    },
+    "dti": {
+      "label": "Charles 2019 · DTI",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6793854/"
+    },
+    "hams": {
+      "label": "Woodley & Mercer 2005",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/15947463/"
+    },
+    "abductors": {
+      "label": "Flack 2014",
+      "url": "https://doi.org/10.1002/ca.22248"
+    },
+    "iliacus": {
+      "label": "Unat et al. 2019: Accessory iliopsoas bundles (anatomical context only)",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6324757/"
+    },
+    "tibialis": {
+      "label": "Kaur et al. 2023: Muscle Architecture of Leg Muscles",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10952421/"
+    }
+  },
+  "anatomy": {
+    "chest": {
+      "refs": [
+        "pec",
+        "fung",
+        "minor"
+      ],
+      "members": "Grande pettorale, porzioni clavicolare e sternocostale; piccolo pettorale aggiunto al prototipo su richiesta.",
+      "direction": "Ventaglio verso inserzioni omerali; piccolo verso il coracoide.",
+      "note": "Piccolo pettorale extra catalogo, sempre solidale al grande."
+    },
+    "serratus_anterior": {
+      "refs": [
+        "serratus"
+      ],
+      "members": "Dentato anteriore.",
+      "direction": "Digitazioni costali verso il margine mediale e l’angolo inferiore della scapola.",
+      "note": "La maschera BoGa mostra solo una piccola porzione laterale."
+    },
+    "delts_front": {
+      "refs": [
+        "delts",
+        "arm"
+      ],
+      "members": "Porzione anteriore del deltoide.",
+      "direction": "Dalla clavicola verso l’inserzione deltoidea.",
+      "note": "Setti e segmenti intramuscolari non ricostruiti."
+    },
+    "delts_lateral": {
+      "refs": [
+        "delts",
+        "arm"
+      ],
+      "members": "Porzione acromiale del deltoide.",
+      "direction": "Schema multipennato attorno ai setti intramuscolari.",
+      "note": "Setti schematici, senza angoli individuali misurati."
+    },
+    "delts_rear": {
+      "refs": [
+        "delts",
+        "arm"
+      ],
+      "members": "Porzione posteriore del deltoide.",
+      "direction": "Dalla spina scapolare verso l’inserzione deltoidea.",
+      "note": "Setti e segmenti intramuscolari non ricostruiti."
+    },
+    "rotator_cuff": {
+      "refs": [
+        "cuff",
+        "arm"
+      ],
+      "members": "Sovraspinato, sottospinato, piccolo rotondo, sottoscapolare.",
+      "direction": "Campi regionali verso le inserzioni sull’omero.",
+      "deep": true,
+      "note": "Maschera posteriore rappresentativa del gruppo: i quattro volumi, incluso il sottoscapolare anteriore, non sono separati."
+    },
+    "back_lats": {
+      "refs": [
+        "lats"
+      ],
+      "members": "Gran dorsale.",
+      "direction": "Ventaglio superolaterale verso l’ascella.",
+      "note": "La torsione del tendine omerale non è ricostruita."
+    },
+    "back_upper": {
+      "refs": [
+        "traps",
+        "rhomboid"
+      ],
+      "members": "Trapezio medio e romboidi.",
+      "direction": "Trapezio prevalentemente trasversale; romboidi obliqui verso la scapola.",
+      "note": "Due campi rappresentativi sovrapposti; romboidi profondi tratteggiati, senza un volume distinto."
+    },
+    "traps_upper": {
+      "refs": [
+        "traps"
+      ],
+      "members": "Porzione superiore del trapezio.",
+      "direction": "Fasci prevalentemente trasversali, con discesa verso la clavicola.",
+      "note": "Non un ventaglio verticale verso il collo."
+    },
+    "traps_lower": {
+      "refs": [
+        "traps"
+      ],
+      "members": "Porzione inferiore del trapezio.",
+      "direction": "Convergenza superolaterale verso la spina scapolare.",
+      "note": "Attacco scapolare adattato alla superficie."
+    },
+    "spinal_erectors": {
+      "refs": [
+        "spine"
+      ],
+      "members": "Erettori spinali; multifido escluso, come in BoGa.",
+      "direction": "Fasci prevalentemente longitudinali, con obliquità regionali.",
+      "note": "Spinale, lunghissimo e ileocostale non segmentati individualmente."
+    },
+    "biceps": {
+      "refs": [
+        "arm"
+      ],
+      "members": "Bicipite brachiale, capo lungo e breve.",
+      "direction": "Fasci prevalentemente longitudinali lungo il braccio.",
+      "note": "I due capi condividono la maschera BoGa."
+    },
+    "brachialis": {
+      "refs": [
+        "arm"
+      ],
+      "members": "Brachiale.",
+      "direction": "Fasci diretti distalmente verso l’ulna.",
+      "deep": true,
+      "note": "Proiezione sulla piccola maschera laterale; non un volume sotto il bicipite."
+    },
+    "triceps": {
+      "refs": [
+        "arm"
+      ],
+      "members": "Tricipite brachiale, capi lungo, laterale e mediale.",
+      "direction": "Campi longitudinali e pennati verso il tendine distale.",
+      "note": "Capi e aponeurosi rappresentativi, senza separazione volumetrica."
+    },
+    "forearms_grip": {
+      "refs": [
+        "forearm",
+        "compartments"
+      ],
+      "members": "Gruppi BoGa: brachioradiale, flessori ed estensori del carpo e delle dita, supinatore e pronatori; muscoli intrinseci della mano esclusi.",
+      "direction": "Fasci longitudinali, obliqui prossimali e trasversali distali.",
+      "note": "Campi rappresentativi: la maschera non identifica ciascun muscolo dell’avambraccio."
+    },
+    "abs_rectus": {
+      "refs": [
+        "abs",
+        "intersections"
+      ],
+      "members": "Retto addominale.",
+      "direction": "Quasi longitudinale, con piccole variazioni regionali.",
+      "note": "Linea alba e intersezioni tendinee in posizioni indicative."
+    },
+    "abs_obliques": {
+      "refs": [
+        "abs"
+      ],
+      "members": "Solo obliquo esterno; interno e trasverso esclusi, come in BoGa.",
+      "direction": "Discesa inferomediale dalla gabbia toracica.",
+      "note": "Margini muscolari e aponeurotici non separati nella maschera."
+    },
+    "quads": {
+      "refs": [
+        "leg",
+        "dti"
+      ],
+      "members": "Retto femorale e vasti laterale, intermedio e mediale.",
+      "direction": "Campi pennati regionali, orientati alle aponeurosi distali.",
+      "note": "Quattro muscoli in una maschera; il vasto intermedio profondo non ha un volume separato."
+    },
+    "hamstrings": {
+      "refs": [
+        "hams",
+        "leg",
+        "dti"
+      ],
+      "members": "Semitendinoso, semimembranoso, bicipite femorale lungo e breve.",
+      "direction": "Longitudinale mediale e pennato laterale, con tendini intramuscolari.",
+      "note": "Regioni rappresentative: i quattro muscoli e la loro profondità non sono segmentati."
+    },
+    "glutes_max": {
+      "refs": [
+        "leg"
+      ],
+      "members": "Grande gluteo.",
+      "direction": "Decorso obliquo inferolaterale verso femore e tratto ileotibiale.",
+      "note": "Non si assume un angolo di pennazione unico per tutto il muscolo."
+    },
+    "hip_abductors": {
+      "refs": [
+        "abductors",
+        "leg"
+      ],
+      "members": "Gluteo medio e minimo; tensore della fascia lata escluso, come in BoGa.",
+      "direction": "Ventaglio convergente verso il grande trocantere.",
+      "note": "Gluteo minimo profondo non separato; ventaglio rappresentativo del gruppo."
+    },
+    "adductors": {
+      "refs": [
+        "leg",
+        "dti"
+      ],
+      "members": "Breve, grande e lungo adduttore, gracile e pettineo.",
+      "direction": "Campi obliqui verso il femore e longitudinali per il gracile.",
+      "note": "Cinque muscoli in una maschera: fasci rappresentativi, non cinque volumi ricostruiti."
+    },
+    "hip_flexors": {
+      "refs": [
+        "spine",
+        "iliacus",
+        "leg"
+      ],
+      "members": "Ileopsoas: grande psoas e iliaco; sartorio e retto femorale esclusi.",
+      "direction": "Psoas prevalentemente longitudinale; iliaco convergente verso il tendine distale.",
+      "deep": true,
+      "note": "Piccola maschera inguinale: il decorso lombare interno non è ricostruito."
+    },
+    "calves": {
+      "refs": [
+        "leg",
+        "dti"
+      ],
+      "members": "Gastrocnemio mediale e laterale, soleo.",
+      "direction": "Campi pennati verso le aponeurosi del complesso achilleo.",
+      "note": "Soleo profondo e capi del gastrocnemio non hanno volumi distinti."
+    },
+    "tibialis_anterior": {
+      "refs": [
+        "tibialis",
+        "leg",
+        "dti"
+      ],
+      "members": "Tibiale anteriore.",
+      "direction": "Pennazione ai lati dell’aponeurosi centrale.",
+      "note": "Tendine distale e aponeurosi interna schematici."
+    }
+  }
+}
