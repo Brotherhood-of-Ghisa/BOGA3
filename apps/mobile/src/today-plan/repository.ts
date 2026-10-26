@@ -59,9 +59,10 @@ const loadCatalog = async (): Promise<ExerciseCatalogCacheSnapshot> => {
   return catalog;
 };
 
-const primaryMuscleNames = (plan: PlanDetailView, catalog: ExerciseCatalogCacheSnapshot): string[] => {
-  const exercisesById = new Map(catalog.exercises.map((exercise) => [exercise.id, exercise]));
-  const names: string[] = [];
+type CatalogExercises = Map<string, ExerciseCatalogCacheSnapshot['exercises'][number]>;
+
+const primaryMuscleNames = (plan: PlanDetailView, catalog: ExerciseCatalogCacheSnapshot, exercisesById: CatalogExercises): string[] => {
+  const names = new Set<string>();
   for (const block of plan.blocks) {
     const exercise = block.exerciseDefinitionId === null ? undefined : exercisesById.get(block.exerciseDefinitionId);
     if (!exercise) continue;
@@ -69,19 +70,21 @@ const primaryMuscleNames = (plan: PlanDetailView, catalog: ExerciseCatalogCacheS
       const name = muscle.role === 'primary'
         ? catalog.muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? catalog.muscleGroupsById[muscle.muscleGroupId]?.displayName
         : undefined;
-      if (name !== undefined && !names.includes(name)) names.push(name);
+      if (name !== undefined) names.add(name);
     }
   }
-  return names;
+  return [...names];
 };
 
-const toNextPlannedSession = (plan: PlanDetailView, scheduledFor: Date, catalog: ExerciseCatalogCacheSnapshot): NextPlannedSession => ({
+const toNextPlannedSession = (
+  plan: PlanDetailView, scheduledFor: Date, catalog: ExerciseCatalogCacheSnapshot, exercisesById: CatalogExercises,
+): NextPlannedSession => ({
   planId: plan.id,
   title: plan.title,
   scheduledFor,
   exerciseCount: plan.blocks.length,
   setCount: plan.blocks.reduce((total, block) => total + block.targets.length, 0),
-  muscles: primaryMuscleNames(plan, catalog),
+  muscles: primaryMuscleNames(plan, catalog, exercisesById),
 });
 
 export const createTodayPlanRepository = (
@@ -104,9 +107,10 @@ export const createTodayPlanRepository = (
           Promise.all(shown.map((plan) => dependencies.planQueries.loadPlanDetail(plan.planId))),
           dependencies.loadCatalog(),
         ]);
+    const exercisesById: CatalogExercises = new Map(catalog?.exercises.map((exercise) => [exercise.id, exercise]));
     const next = shown.flatMap((plan, index) => {
       const detail = details[index];
-      return detail && catalog ? [toNextPlannedSession(detail, plan.scheduledFor, catalog)] : [];
+      return detail && catalog ? [toNextPlannedSession(detail, plan.scheduledFor, catalog, exercisesById)] : [];
     });
     return {
       recoveryDays: window.recoveryDays,

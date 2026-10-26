@@ -25,6 +25,8 @@ const weekdayLetter = (date: Date) => WEEKDAYS[date.getDay()].charAt(0);
 const weekdayShort = (date: Date) => WEEKDAYS[date.getDay()].slice(0, 3);
 const spokenDate = (date: Date) => `${WEEKDAYS[date.getDay()]} ${formatCompactDate(date)}`;
 const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
+// A plan's rows are targets, never working sets ([[set.count-display]]).
+const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
 
 // No sets that day reads as a rest day ([[copy.blank-history]]).
 const recoveryRowLabel = (row: RecoveryRow, days: Date[], target: number) =>
@@ -95,7 +97,7 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
         <Text allowFontScaling={false} style={[...label, styles.muscleName]}>Muscle</Text>
         {plan.recoveryDays.map((day) => (
           <Text allowFontScaling={false} key={day.getTime()} style={[...label, styles.dayLabel]}>
-            {weekdayLetter(day)}
+            {weekdayShort(day)}
           </Text>
         ))}
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.weekCell]}>Week</Text>
@@ -135,13 +137,13 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
   const testID = `today-plan-next-${session.planId}`;
   const day = plannedDay(session, now);
   const time = formatClockTime(session.scheduledFor.getTime());
-  const figures = `${session.exerciseCount} ex · ${sets(session.setCount)}`;
+  const figures = `${session.exerciseCount} ex · ${targetSets(session.setCount)}`;
   const muscles = session.muscles.join(' · ');
   return (
     <Pressable
       accessibilityHint="Opens the plan"
       accessibilityLabel={[session.title, `${day === 'Today' ? 'today' : spokenDate(session.scheduledFor)} ${time}`,
-        `${session.exerciseCount} ${session.exerciseCount === 1 ? 'exercise' : 'exercises'}`, sets(session.setCount), ...session.muscles].join(', ')}
+        `${session.exerciseCount} ${session.exerciseCount === 1 ? 'exercise' : 'exercises'}`, targetSets(session.setCount), ...session.muscles].join(', ')}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
@@ -204,8 +206,8 @@ export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: D
   );
 }
 
-// The least trained rows that show in the cards layout before the rest scroll;
-// on a phone too short for them the card gives way first, so the plan card stays whole.
+// The least trained rows that show in the cards layout before the rest scroll,
+// leaving the plan card room below; a phone too short for both scrolls the page.
 export const VISIBLE_MUSCLE_ROWS = 10;
 const DAY_CELL = 30;
 const DAY_CELL_HEIGHT = 22;

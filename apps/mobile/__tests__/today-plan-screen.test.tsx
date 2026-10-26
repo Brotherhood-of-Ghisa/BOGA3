@@ -22,6 +22,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+import { setMuscleTracked } from '@/src/data/muscle-report-settings';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { planRepository, type PlanDraft } from '@/src/session-planner';
@@ -155,6 +156,16 @@ describe('Today: the Plan page over real data', () => {
     expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=chest&metric=sets&secondary=hidden');
   });
 
+  it("lists only the muscles the user tracks ([[muscle.untracked]])", async () => {
+    await bootLocalApp();
+    await setMuscleTracked(['calves'], false);
+    await renderToday();
+
+    const rows = muscleRows();
+    expect(rows).toContain('quads');
+    expect(rows).not.toContain('calves');
+  });
+
   it("opens a muscle's progress history from its row, and Progress from the card", async () => {
     await renderToday();
 
@@ -182,10 +193,10 @@ describe('Today: the Plan page over real data', () => {
 
     expect(plannedRows()).toEqual([`today-plan-next-${today}`, `today-plan-next-${sunday}`]);
     expect(text(`today-plan-next-${today}-day`)).toHaveTextContent('Today');
-    expect(text(`today-plan-next-${today}-figures`)).toHaveTextContent('1 ex · 3 sets');
+    expect(text(`today-plan-next-${today}-figures`)).toHaveTextContent('1 ex · 3 target sets');
     expect(text(`today-plan-next-${today}-muscles`)).toHaveTextContent('Pectoralis');
     expect(text(`today-plan-next-${sunday}-day`)).toHaveTextContent('Sun');
-    expect(text(`today-plan-next-${sunday}-figures`)).toHaveTextContent('2 ex · 6 sets');
+    expect(text(`today-plan-next-${sunday}-figures`)).toHaveTextContent('2 ex · 6 target sets');
     expect(text(`today-plan-next-${sunday}-muscles`)).toHaveTextContent('Quads · Pectoralis');
 
     fireEvent.press(text(`today-plan-next-${sunday}`));
