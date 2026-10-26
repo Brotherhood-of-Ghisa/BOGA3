@@ -119,8 +119,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   };
   const content = <>
     <View style={styles.date}>
-      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week.monday, dateFormat)}</Text>
-      {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
+      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week.monday, dateFormat).replace(' – ', ' –\n')}</Text>
     </View>
     <View style={styles.plot}>
       <View style={styles.track}>
@@ -191,7 +190,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
   date: { width: DATE_WIDTH },
   dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
-  note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },

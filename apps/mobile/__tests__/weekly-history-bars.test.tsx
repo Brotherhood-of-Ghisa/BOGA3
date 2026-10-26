@@ -36,6 +36,14 @@ it('shows training weeks newest first, compact week dates, aligned values and pr
 });
 
 const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
+
+it('shows both years for a week crossing New Year', () => {
+  render(chart(data([day('2025-12-31', 1750)], 52)));
+  expect(screen.getByText('29 Dec 2025 – 4 Jan 2026').props.children).toBe('29 Dec 2025 –\n4 Jan 2026');
+  expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
+    'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
+});
+
 const percentage = (id: string, property: 'left' | 'width') => Number.parseFloat(style(id)[property]);
 const renderValues = (values: number[], metric: CalendarHeatmapMetric) => render(<WeeklyHeatmap
   data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
@@ -186,7 +194,7 @@ it('opens a training week, holds no selection, and announces the current week', 
   expect(open).toHaveBeenCalledWith('2026-09-28');
   expect(style('bars-heatmap-bar-2026-09-28').borderWidth).toBeUndefined();
   expect(style('bars-heatmap-bar-2026-10-05')).not.toHaveProperty('borderWidth');
-  expect(screen.getByText('Current week')).toBeTruthy();
+  expect(screen.queryByText('Current week')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('Current week');
 });
 
@@ -244,7 +252,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
   render(chart(data(days)));
   expect(screen.queryByText('Current week is in progress.')).toBeNull();
   expect(screen.queryByText(/week average:/)).toBeNull();
-  expect(screen.queryByText('Current week') !== null).toBe(count > 0);
+  expect(screen.queryByText('Current week')).toBeNull();
   expect(screen.getByText('Intensity (per week)')).toBeTruthy();
   if (count >= 6) expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '9-week median 20');
   else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();

@@ -97,7 +97,7 @@ and routes; rest cells in Daily stay text.
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
-  follows [[copy.blank-history]]. Rest rows are omitted; zero/unavailable training and current-week wording remain.
+  follows [[copy.blank-history]]. Rest rows are omitted; zero/unavailable training remains, and the current week is announced accessibly.
   Compact week headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
@@ -123,7 +123,7 @@ short windows have no implicit 52-week minimum.
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
 - **No black outlines:** current tiles/bars have no black border.
-  Current-week wording remains beside its row.
+  Current-week wording is accessible only.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history page mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
