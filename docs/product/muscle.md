@@ -55,11 +55,12 @@ keep their own. Mode changes and disabling a muscle retain its overrides.
 Targets list only enabled reported muscles, including custom muscles. Clearing
 an override restores inheritance; targets are positive whole numbers.
 
-History Sets target grading and Progress Sets references use the effective
-target of each reported muscle, scaled to the period. Counting is unchanged.
+History Sets target grading, Progress Sets references and Today's Plan week
+column use the effective target of each reported muscle, scaled to the period.
+Counting is unchanged.
 
 Why: individual training goals without losing a shared fallback.
-Code: `apps/mobile/src/preferences/muscle-targets.ts`.
+Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`.
 
 ### muscle.no-breakdown · presentation · accepted
 

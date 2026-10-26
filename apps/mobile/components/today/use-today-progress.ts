@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { loadTodayProgress, type TodayProgress, type TodayProgressOptions } from '@/src/progress-summary';
-import { startOfLocalDay } from '@/src/utils/local-calendar';
+
+import { useDailyReread } from './use-daily-reread';
 
 /**
  * Reads Today's figures at `now`, the period being Settings' Progress period
@@ -64,36 +64,16 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
     );
   }, [context, periodWeeks, compareBack, sessionOffset]);
 
+  const readNow = useCallback(() => {
+    void read();
+  }, [read]);
+
   const retry = useCallback(() => {
     setResult({ context, state: { status: 'loading' } });
     return read();
   }, [read, context]);
 
-  useEffect(() => {
-    if (!isFocused) return;
-    void read();
-    let midnight: ReturnType<typeof setTimeout> | undefined;
-    const readAtMidnight = () => {
-      clearTimeout(midnight);
-      const current = nowRef.current();
-      midnight = setTimeout(() => {
-        void read();
-        readAtMidnight();
-      }, startOfLocalDay(current, 1).getTime() - current.getTime());
-    };
-    readAtMidnight();
-    // A suspended app's timer may not count the time away: aim it again on return.
-    const foreground = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
-      void read();
-      readAtMidnight();
-    });
-    return () => {
-      generationRef.current += 1;
-      foreground.remove();
-      clearTimeout(midnight);
-    };
-  }, [isFocused, read]);
+  useDailyReread(isFocused, readNow, nowRef, generationRef);
 
   const state: TodayProgressState = result.context === context ? result.state : { status: 'loading' };
   const showCompared = useCallback(

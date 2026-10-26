@@ -19,7 +19,8 @@ Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/m
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
-alternatives: one calendar week and Today’s periods. Comparisons
+alternatives: one calendar week, Today’s periods and the Plan page's three
+days before today. Comparisons
 default to Progress or Settings' This week; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 
@@ -30,7 +31,7 @@ Groups use calendar weeks only.
   explicit expansion of exercise session history beyond History look-back.
 
 Why: consistent periods.
-Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`.
+Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`; `todayPlanWindow` in `apps/mobile/src/today-plan/calculations.ts`.
 
 ### comparison.window · definition · accepted
 

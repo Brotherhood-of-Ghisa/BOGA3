@@ -564,6 +564,7 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(screen.getAllByText('Group activity')).toHaveLength(1);
     expect(within(text('today-group-section-tab')).getByText('Group activity')).toBeTruthy();
     expect(screen.getAllByRole('tab').map((tab) => tab.props.testID)).toEqual([
+      'today-plan-section-tab',
       'today-progress-section-tab',
       'today-group-section-tab',
     ]);
@@ -606,11 +607,13 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(selected('today-group-section-tab')).toBe(true);
     expect(selected('today-progress-section-tab')).toBe(false);
 
-    // A swipe back settles on the first card's offset.
+    // A swipe back settles on the first card's offset, the Plan page.
     fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
-    expect(selected('today-progress-section-tab')).toBe(true);
+    expect(selected('today-plan-section-tab')).toBe(true);
     // One card's step (345 + the 8pt gap) on.
     fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 353, y: 0 } } });
+    expect(selected('today-progress-section-tab')).toBe(true);
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 706, y: 0 } } });
     expect(selected('today-group-section-tab')).toBe(true);
 
     fireEvent.press(text('today-sessions-button'));

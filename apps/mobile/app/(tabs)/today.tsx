@@ -1,4 +1,4 @@
-import { useIsFocused, useRouter } from 'expo-router';
+import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -7,16 +7,20 @@ import {
   TodayGroupHeader,
   TodayGroupSection,
   TodayPanel,
+  TodayPlanCards,
   TodayProgressCard,
   useTodayGroup,
+  useTodayPlan,
   useTodayProgress,
   type TodayGroupState,
+  type TodayPlanLoader,
+  type TodayPlanState,
   type TodayProgressLoader,
   type TodayProgressState,
 } from '@/components/today';
 import { ScreenScroll, SectionHeader, StatePanel, uiSpace } from '@/components/ui';
 import { groupsStreamPath } from '@/src/groups';
-import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { SIGN_IN_ROUTE, progressHistoryHref } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { TodayLayout } from '@/src/preferences/model';
 
@@ -24,6 +28,8 @@ export type TodayScreenProps = {
   isFocused?: boolean;
   // The progress read and its clock; the route uses the device's.
   loadProgress?: TodayProgressLoader;
+  // The Plan page's read; the route uses the local data.
+  loadPlan?: TodayPlanLoader;
   now?: () => Date;
   groupState: TodayGroupState;
   // Settings' Today layout; the route reads it from preferences.
@@ -33,10 +39,22 @@ export type TodayScreenProps = {
 const systemNow = () => new Date();
 
 // Today has no title (the tab names the page) and no primary action, so no
-// `accent`: it opens on the Progress card, then the group activity — one
-// scrolling page, or in the Cards layout a full-height card each.
-export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
+// `accent`: the Plan page, the Progress card, then the group activity — one
+// scrolling page, or in the Cards layout a full-height card each, opening on You.
+export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
   const router = useRouter();
+  const { values: { progressCountSecondary } } = useAccountLocalPreferenceState();
+  const { state: planState, retry: retryPlan } = useTodayPlan({ isFocused, load: loadPlan, now });
+  const planHandlers = {
+    now: now(),
+    onOpenMuscle: (muscleGroupId: string) =>
+      router.push(progressHistoryHref({ muscleGroupId, countSecondary: progressCountSecondary }, 'workingSetCount')),
+    onOpenPlan: (planId: string) => router.push(`/session-plan/${encodeURIComponent(planId)}` as Href),
+    onOpenProgress: () => router.push('/progress'),
+    onRetry: () => {
+      void retryPlan();
+    },
+  };
   const { state: progressState, retry: retryProgress, showCompared, showSession } = useTodayProgress({
     isFocused,
     load: loadProgress,
@@ -70,7 +88,15 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
     const group = primaryGroup(groupState);
     return (
       <TodayCards
+        initialPage={1}
         pages={[
+          {
+            key: 'plan',
+            label: 'Plan',
+            content: <TodayPlanSection {...planHandlers} fill state={planState} />,
+            framed: planState.status !== 'loaded',
+            testID: 'today-plan-section',
+          },
           {
             key: 'progress',
             label: 'You',
@@ -104,6 +130,11 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="today-screen">
+      <View style={styles.section} testID="today-plan-section">
+        <SectionHeader title="Plan" />
+        <TodayPlanSection {...planHandlers} state={planState} />
+      </View>
+
       <View style={styles.section} testID="today-progress-section">
         <SectionHeader title="You" />
         <TodayProgressSection {...progressHandlers} state={progressState} />
@@ -172,6 +203,42 @@ function GroupSectionHeading({
       selectedGroupId={state.selectedGroupId}
     />
   );
+}
+
+function TodayPlanSection({
+  state,
+  onRetry,
+  fill = false,
+  ...handlers
+}: {
+  state: TodayPlanState;
+  now: Date;
+  onOpenMuscle: (muscleGroupId: string) => void;
+  onOpenPlan: (planId: string) => void;
+  onOpenProgress: () => void;
+  onRetry: () => void;
+  fill?: boolean;
+}) {
+  if (state.status === 'loading') {
+    return fill ? (
+      <TodayPanel fill kind="loading" testID="today-plan-loading" title="Loading your plan…" />
+    ) : (
+      <StatePanel fill={false} kind="loading" testID="today-plan-loading" title="Loading your plan…" />
+    );
+  }
+  if (state.status === 'error') {
+    return (
+      <TodayPanel
+        action={{ label: 'Retry', onPress: onRetry, testID: 'today-plan-error-retry' }}
+        body={state.message}
+        fill={fill}
+        kind="error"
+        testID="today-plan-error"
+        title="Couldn't load your plan"
+      />
+    );
+  }
+  return <TodayPlanCards {...handlers} fill={fill} plan={state.plan} />;
 }
 
 function TodayProgressSection({
