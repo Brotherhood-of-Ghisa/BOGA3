@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import { loadTodayPlan, type TodayPlan, type TodayPlanOptions } from '@/src/today-plan';
@@ -48,6 +48,7 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
     nowRef.current = now;
   });
 
+  // The overrides travel as their JSON, so a new object with the same targets never reads again.
   const read = useCallback(() => {
     const generation = generationRef.current + 1;
     generationRef.current = generation;
@@ -68,10 +69,11 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
     if (targetsReady) void read();
   }, [read, targetsReady]);
 
+  // A catalogue that failed is loaded again; once it is ready the targets change and the page reads.
   const retry = useCallback(() => {
     setResult({ context, state: { status: 'loading' } });
-    return read();
-  }, [read, context]);
+    return targetsReady ? read() : ensureExerciseCatalogLoaded();
+  }, [read, context, targetsReady]);
 
   useDailyReread(isFocused, readNow, nowRef, generationRef);
 

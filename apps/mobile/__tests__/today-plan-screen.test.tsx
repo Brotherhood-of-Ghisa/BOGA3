@@ -22,6 +22,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { setMuscleTracked } from '@/src/data/muscle-report-settings';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { updatePreferences } from '@/src/preferences/hooks';
@@ -175,6 +176,22 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/2');
     // Other muscles inherit the default.
     expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/10');
+
+    // A target changed while Today shows reads again.
+    act(() => updatePreferences({ muscleTargetOverrides: { detailed: { chest: 4, triceps: 3 } } }));
+    await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/4'));
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/3');
+  });
+
+  it('reports a failed catalogue in Per muscle mode, and Retry loads it again (a failed catalogue read)', async () => {
+    act(() => updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 2 } } }));
+    const groups = jest.spyOn(exerciseCatalogData, 'listExerciseCatalogMuscleGroups').mockRejectedValueOnce(new Error('database is locked'));
+    render(<TodayScreen groupState={signedOut} now={clock} />);
+
+    await waitFor(() => expect(text('today-plan-error')).toBeTruthy());
+    fireEvent.press(text('today-plan-error-retry'));
+    await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('0/2'));
+    expect(groups.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("opens a muscle's progress history from its row, and Progress from the card", async () => {
