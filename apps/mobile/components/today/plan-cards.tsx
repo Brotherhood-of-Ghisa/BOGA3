@@ -16,6 +16,8 @@ export type TodayPlanCardsProps = {
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
   onOpenPlan: (planId: string) => void;
+  /** Opens Train, where the planned sessions are listed. */
+  onOpenSessions: () => void;
   /** The cards layout: the recovery card shows its first rows and scrolls the rest. */
   fill?: boolean;
 };
@@ -28,17 +30,20 @@ const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
 // A plan's rows are targets, never working sets ([[set.count-display]]).
 const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
 
-// No sets that day reads as a rest day ([[copy.blank-history]]).
+// No sets that day reads as a rest day ([[copy.blank-history]]); none yet today, as none.
 const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
   [
     row.name,
     ...row.days.map((count, index) => `${spokenDate(days[index])}: ${count === null ? 'rest' : sets(count)}`),
+    `today: ${row.today === null ? 'none yet' : sets(row.today)}`,
     `this week ${row.weekSets} of ${row.target} sets`,
   ].join(', ');
 
-function DayCell({ count, testID }: { count: number | null; testID: string }) {
+function DayCell({ count, today = false, testID }: { count: number | null; today?: boolean; testID: string }) {
   return (
-    <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
+    <View
+      style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained, today ? styles.dayCellToday : null]}
+      testID={testID}>
       <Text allowFontScaling={false} style={styles.dayCellFigure}>
         {count === null ? '' : count}
       </Text>
@@ -63,6 +68,7 @@ function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Dat
       {row.days.map((count, index) => (
         <DayCell count={count} key={days[index].getTime()} testID={`${testID}-day-${index}`} />
       ))}
+      <DayCell count={row.today} testID={`${testID}-today`} today />
       <Text allowFontScaling={false} style={styles.weekCell} testID={`${testID}-week`}>
         <Text allowFontScaling={false} style={[styles.weekFigure, met ? styles.weekFigureMet : null]}>{row.weekSets}</Text>
         <Text allowFontScaling={false} style={styles.weekTarget}>{`/${row.target}`}</Text>
@@ -72,9 +78,9 @@ function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Dat
   );
 }
 
-// Each muscle's sets on the last three days and this week against its weekly
-// target ([[muscle.weekly-targets]]), least trained first.
-function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan'>) {
+// Each muscle's sets on the last three days, today so far, and this week
+// against its weekly target ([[muscle.weekly-targets]]), least trained first.
+function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
   const label = [todayText.microLabel, todayText.microLabelFaint];
   const rows = plan.muscles.map((row) => (
     <RecoveryMuscleRow
@@ -99,6 +105,9 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
             {weekdayShort(day)}
           </Text>
         ))}
+        <Text allowFontScaling={false} style={[...label, styles.dayLabel, styles.dayLabelToday]} testID="today-plan-recovery-today">
+          {weekdayShort(plan.today)}
+        </Text>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.weekCell]}>Week</Text>
         <View style={styles.chevronSpace} />
       </View>
@@ -166,14 +175,21 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
   );
 }
 
-// This week's trained and planned days, then the next planned sessions.
-function PlanWeekCard({ plan, now, onOpenPlan }: { plan: TodayPlan; now: Date; onOpenPlan: (planId: string) => void }) {
+// This week's trained and planned days, then the next planned sessions; the
+// Sessions link opens them all on Train.
+function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
+  plan: TodayPlan;
+  now: Date;
+  onOpenPlan: (planId: string) => void;
+  onOpenSessions: () => void;
+}) {
   return (
     <Card style={styles.card} testID="today-plan-week-card">
       <View style={styles.header}>
         <Text accessibilityRole="header" allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
           Plan
         </Text>
+        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="text" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (
@@ -200,7 +216,7 @@ export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: D
   return (
     <View style={[styles.stack, props.fill ? styles.fill : null]}>
       <RecoveryCard {...props} />
-      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} plan={props.plan} />
+      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenSessions={props.onOpenSessions} plan={props.plan} />
     </View>
   );
 }
@@ -294,6 +310,14 @@ const styles = StyleSheet.create({
   },
   dayCellTrained: {
     backgroundColor: uiRoles.viz2,
+  },
+  // Today's column takes the accent, as today does in the week strip.
+  dayCellToday: {
+    borderWidth: 1.5,
+    borderColor: uiRoles.accent,
+  },
+  dayLabelToday: {
+    color: uiRoles.accent,
   },
   dayCellFigure: {
     ...figure,

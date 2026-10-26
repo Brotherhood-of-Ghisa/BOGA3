@@ -4,10 +4,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GroupSwitchSheet } from '@/components/groups/group-switch-sheet';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type TodayGroupHeaderProps = {
-  /** The primary group's name; the section is named after it. */
+  /** The primary group's name. */
   groupName: string;
   /** Opens the group on the Groups screen, At a glance. */
   onOpenHome: () => void;
@@ -18,9 +18,9 @@ export type TodayGroupHeaderProps = {
 };
 
 /**
- * Today's group section heading: the primary group's name, which opens that
- * group At a glance, and the switch beside it that changes which group is
- * primary. One group needs no switch.
+ * The group board card's header row: the primary group's name, which opens
+ * that group At a glance, and the switch on the same row that changes which
+ * group is primary. One group needs no switch.
  */
 export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupId, onSelectGroup }: TodayGroupHeaderProps) {
   return (
@@ -72,44 +72,21 @@ export function TodayGroupSwitch({ groups, selectedGroupId, onSelectGroup }: Tod
   );
 }
 
-export type TodayGroupActionsProps = TodayGroupSwitchProps & {
-  /** Opens the shown group on the Groups screen, At a glance. */
-  onOpenGroup: () => void;
-};
-
-/**
- * The cards layout's controls beside the tabs while a group's page shows: the
- * way to the group itself, then the switch (when there is more than one group).
- */
-export function TodayGroupActions({ onOpenGroup, ...switchProps }: TodayGroupActionsProps) {
-  return (
-    <View style={styles.actions}>
-      <IconButton
-        accessibilityHint="Opens the group at a glance"
-        accessibilityLabel="Open group"
-        name="users"
-        onPress={onOpenGroup}
-        size="sm"
-        testID="today-group-open"
-        tone="muted"
-      />
-      <TodayGroupSwitch {...switchProps} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  // A tap-height row, ruled off from the board below it.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
+    minHeight: uiGeometry.tapTarget,
+    paddingLeft: uiSpace.md,
+    paddingRight: uiSpace.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: uiRoles.ruleSoft,
   },
   title: {
     flex: 1,
+    alignSelf: 'stretch',
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',

@@ -68,9 +68,16 @@ function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSessio
       missing
     );
   }
+  const groups = state.groups.map((candidate) => ({ groupId: candidate.group_id, name: candidate.name }));
+  // `useTodayGroup` picks the selection from `groups`, so it is always among them.
+  const selected = groups.find((candidate) => candidate.groupId === state.selectedGroupId);
+  if (!selected) throw new Error(`Today's selected group ${state.selectedGroupId} is not among My groups`);
   return (
     <TodayGroupCard
       fill={fill}
+      groupName={selected.name}
+      groups={groups}
+      onSelectGroup={state.selectGroup}
       myUserId={state.myUserId}
       nowMs={nowMs}
       onOpenGroup={onOpenGroup}
@@ -82,7 +89,7 @@ function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSessio
 }
 
 /**
- * The Group activity section's body: the account panels, then (signed in)
+ * The Groups section's body: the account panels, then (signed in)
  * the offline marker and an inline error above the cached card, the no-group
  * panel, or the missing-data states while nothing is cached.
  */

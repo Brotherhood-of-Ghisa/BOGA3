@@ -3,8 +3,6 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   TodayCards,
-  TodayGroupActions,
-  TodayGroupHeader,
   TodayGroupSection,
   TodayPanel,
   TodayPlanCards,
@@ -39,8 +37,8 @@ export type TodayScreenProps = {
 const systemNow = () => new Date();
 
 // Today has no title (the tab names the page) and no primary action, so no
-// `accent`: one scrolling page of the Progress card, the Plan page, then the
-// group activity; or in the Cards layout a full-height card each, Plan first,
+// `accent`: one scrolling page of the Progress card, the Plan page, then
+// Groups; or in the Cards layout a full-height card each, Plan first,
 // opening on You.
 export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
   const router = useRouter();
@@ -52,6 +50,8 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
       router.push(progressHistoryHref({ muscleGroupId, countSecondary: progressCountSecondary }, 'workingSetCount')),
     onOpenPlan: (planId: string) => router.push(`/session-plan/${encodeURIComponent(planId)}` as Href),
     onOpenProgress: () => router.push('/progress'),
+    // The planned sessions are listed on Train.
+    onOpenSessions: () => router.push('/train'),
     onRetry: () => {
       void retryPlan();
     },
@@ -86,7 +86,6 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
   };
 
   if (layout === 'cards') {
-    const group = primaryGroup(groupState);
     return (
       <TodayCards
         initialPage={1}
@@ -107,17 +106,9 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
           },
           {
             key: 'group',
-            label: group?.name ?? 'Group activity',
+            label: 'Groups',
             content: <TodayGroupSection {...groupHandlers} fill state={groupState} />,
             framed: !groupHasCards(groupState),
-            accessory: group && groupState.status === 'available' ? (
-              <TodayGroupActions
-                groups={groupSwitchOptions(groupState)}
-                onOpenGroup={() => openGroupHome(group.group_id)}
-                onSelectGroup={groupState.selectGroup}
-                selectedGroupId={group.group_id}
-              />
-            ) : undefined,
             testID: 'today-group-section',
           },
         ]}
@@ -142,14 +133,16 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
       </View>
 
       <View style={styles.section} testID="today-group-section">
-        <GroupSectionHeading onOpenHome={openGroupHome} onViewGroups={() => router.push(groupsPath)} state={groupState} />
+        {/* The board card names the group and owns the way to it and the switch; without one, `View groups`. */}
+        <SectionHeader
+          action={groupHasCards(groupState) ? undefined : { label: 'View groups', onPress: () => router.push(groupsPath), testID: 'today-view-groups-button' }}
+          title="Groups"
+        />
         <TodayGroupSection {...groupHandlers} state={groupState} />
       </View>
     </ScreenScroll>
   );
 }
-
-type Available = Extract<TodayGroupState, { status: 'available' }>;
 
 // Ready progress draws its own two cards; the loading, error and empty panels take the page's card.
 const progressHasCards = (state: TodayProgressState) => state.status === 'loaded' && state.progress.status === 'ready';
@@ -162,50 +155,6 @@ const groupHasCards = (state: TodayGroupState) =>
   state.selectedGroupId !== null &&
   state.summary !== null;
 
-// The primary group — the one Today shows — when there is one to name.
-const primaryGroup = (state: TodayGroupState) =>
-  state.status === 'available' && state.groups && state.selectedGroupId !== null
-    ? state.groups.find((candidate) => candidate.group_id === state.selectedGroupId)
-    : undefined;
-
-const groupSwitchOptions = (state: Available) =>
-  state.groups?.map((candidate) => ({ groupId: candidate.group_id, name: candidate.name })) ?? [];
-
-/**
- * The group section is named after the primary group — the one Today shows,
- * remembered across visits. The name opens that group's home page and the
- * switch beside it changes which group is primary; with no group to name
- * (signed out, no groups, nothing cached) the section keeps its own title.
- */
-function GroupSectionHeading({
-  state,
-  onOpenHome,
-  onViewGroups,
-}: {
-  state: TodayGroupState;
-  onOpenHome: (groupId: string) => void;
-  onViewGroups: () => void;
-}) {
-  const group = primaryGroup(state);
-  if (state.status !== 'available' || !group || state.selectedGroupId === null) {
-    return (
-      <SectionHeader
-        action={{ label: 'View groups', onPress: onViewGroups, testID: 'today-view-groups-button' }}
-        title="Group activity"
-      />
-    );
-  }
-  return (
-    <TodayGroupHeader
-      groupName={group.name}
-      groups={groupSwitchOptions(state)}
-      onOpenHome={() => onOpenHome(group.group_id)}
-      onSelectGroup={state.selectGroup}
-      selectedGroupId={state.selectedGroupId}
-    />
-  );
-}
-
 function TodayPlanSection({
   state,
   onRetry,
@@ -217,6 +166,7 @@ function TodayPlanSection({
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenPlan: (planId: string) => void;
   onOpenProgress: () => void;
+  onOpenSessions: () => void;
   onRetry: () => void;
   fill?: boolean;
 }) {

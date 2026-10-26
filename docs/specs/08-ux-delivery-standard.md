@@ -137,7 +137,7 @@ Use this section as the single source of truth for reusable UX patterns.
 15. Fit-to-height card pager pattern
    - Intent: show a few summaries one screen each, with nothing to scroll.
    - Usage: Today's Cards layout (`components/today/today-cards.tsx`).
-   - Rules: each page fills the height between its tabs and the tab bar, as its own cards (You: progress over session; a group: board over sessions) or, for a panel, one `Card`; the next page peeks at the edge and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each page has one elastic part that takes the height left (the chart, or the sessions list) above a fixed floor, and a list too long for its card scrolls inside it rather than clips; links are text buttons inside the cards (`Sessions`), never a chevron row; a control for one page shows beside the tabs only while that page does (a group's page: the `Open group` icon, then the switch).
+   - Rules: each page fills the height between its tabs and the tab bar, as its own cards (You: progress over session; a group: board over sessions) or, for a panel, one `Card`; the next page peeks at the edge and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each page has one elastic part that takes the height left (the chart, or the sessions list) above a fixed floor, and a list too long for its card scrolls inside it rather than clips; links are text buttons inside the cards (`Sessions`), never a chevron row; a page's own controls sit in its cards, never beside the tabs (the group's name and switch head its board card).
 
 ## Default appearance baseline (MVP)
 

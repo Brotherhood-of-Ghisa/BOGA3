@@ -36,6 +36,8 @@ export type NextPlannedSession = {
 export type TodayPlan = {
   /** The recovery days, oldest first. */
   recoveryDays: Date[];
+  /** Today's 00:00, the recovery card's last column. */
+  today: Date;
   muscles: RecoveryRow[];
   week: PlanWeekDay[];
   next: NextPlannedSession[];
@@ -114,6 +116,7 @@ export const createTodayPlanRepository = (
     });
     return {
       recoveryDays: window.recoveryDays,
+      today: window.today,
       muscles: deriveRecoveryRows(daily, window, options),
       week: derivePlanWeek(window, daily.sessionDays, scheduled),
       next,

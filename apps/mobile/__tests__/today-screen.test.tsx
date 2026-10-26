@@ -561,8 +561,8 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(within(text('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
     // The list layout's section headings give way to the tabs.
     expect(screen.getAllByText('You')).toHaveLength(1);
-    expect(screen.getAllByText('Group activity')).toHaveLength(1);
-    expect(within(text('today-group-section-tab')).getByText('Group activity')).toBeTruthy();
+    expect(screen.getAllByText('Groups')).toHaveLength(1);
+    expect(within(text('today-group-section-tab')).getByText('Groups')).toBeTruthy();
     expect(screen.getAllByRole('tab').map((tab) => tab.props.testID)).toEqual([
       'today-plan-section-tab',
       'today-progress-section-tab',
@@ -636,12 +636,14 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(screen.queryByTestId('today-session-card')).toBeNull();
   });
 
-  it('keeps four exercise rows in view and scrolls the rest inside the session card', async () => {
+  it('holds the session table at four rows tall, however many exercises, and scrolls the rest inside it', async () => {
     await bootLocalApp();
     await logHistory();
     await renderCards();
 
-    expect(text('today-latest-session-rows')).toHaveStyle({ maxHeight: 4 * 32 });
+    // A fixed height, not a cap: fewer exercises leave blank rows, so the card keeps its height between sessions.
+    expect(text('today-latest-session-rows')).toHaveStyle({ flexShrink: 1, height: 4 * 32 });
+    expect(text('today-latest-session-rows').props.style).not.toMatchObject({ maxHeight: expect.anything() });
     // A page of cards scrolls as a whole on a phone too short for them, rather than clipping.
     expect(within(text('today-progress-section')).getByTestId('today-progress-section-scroll')).toBeTruthy();
   });

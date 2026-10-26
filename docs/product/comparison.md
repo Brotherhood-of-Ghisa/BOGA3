@@ -20,7 +20,7 @@ Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/m
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
 alternatives: one calendar week, Today’s periods and the Plan page's three
-days before today. Comparisons
+days before today, plus today so far (it never reorders the rows). Comparisons
 default to Progress or Settings' This week; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 

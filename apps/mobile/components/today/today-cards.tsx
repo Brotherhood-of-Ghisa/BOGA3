@@ -17,14 +17,12 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 
 export type TodayCardPage = {
   key: string;
-  /** The page's tab label: `Progress`, or the group's name. */
+  /** The page's tab label: `Plan`, `You` or `Groups`. */
   label: string;
   /** The page's body. It draws its own cards, unless `framed`. */
   content: ReactNode;
   /** A panel (loading, empty, an error): the page draws one card around it, which scrolls only if it cannot fit. */
   framed: boolean;
-  /** Beside the tabs while this page shows (the group switch). */
-  accessory?: ReactNode;
   testID: string;
 };
 
@@ -78,7 +76,6 @@ export function TodayCards({ pages, initialPage = 0, testID }: { pages: TodayCar
     setPage(index);
     scroller.current?.scrollTo({ x: index * interval, animated: true });
   };
-  const accessory = pages[page]?.accessory;
 
   return (
     <View onLayout={onLayout} style={styles.screen} testID={testID}>
@@ -94,7 +91,6 @@ export function TodayCards({ pages, initialPage = 0, testID }: { pages: TodayCar
             />
           ))}
         </View>
-        <View style={styles.accessory}>{accessory}</View>
       </View>
       <ScrollView
         contentContainerStyle={styles.track}
@@ -166,7 +162,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: uiRoles.paper,
   },
-  // The tabs, then (outside the tab list) the showing page's own control.
   header: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -203,12 +198,6 @@ const styles = StyleSheet.create({
   },
   tabMarkSelected: {
     backgroundColor: uiRoles.ink,
-  },
-  accessory: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
   },
   pager: {
     flex: 1,
