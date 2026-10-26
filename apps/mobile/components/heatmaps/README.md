@@ -47,7 +47,7 @@ finite) instead of treating it as zero.
 Exercise history also carries all-time session-fact PR counts into the selected
 metric's cells; muscle history carries none.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
-against one shared weekly target, capped before group averaging and including
+against effective targets ([[muscle.weekly-targets]]), capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
 the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
 report each cell's share. Displayed metrics and

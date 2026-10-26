@@ -40,6 +40,8 @@ export type ProgressMuscleTickers = {
 };
 export type MuscleTickerOptions = {
   historyWeeks: number; rollingWeeks: number; weeklyTarget: number; now?: Date; gymId?: string | null;
+  /** Effective per-reported-muscle targets supplied by the preference boundary. */
+  weeklyTargets?: Readonly<Record<string, number>>;
   /** `false` counts primary work only ([[muscle.secondary-filter]]); unset counts it by [[muscle.set-count]]. */
   countSecondary?: boolean;
 };
@@ -114,7 +116,8 @@ export function aggregateProgressMuscleTickers(input: MuscleAnalyticsInput, opti
     };
     const volume = observations('totalVolume');
     muscles[id] = {
-      workingSetCount: { observations: observations('workingSetCount'), reference: options.weeklyTarget * options.rollingWeeks },
+      workingSetCount: { observations: observations('workingSetCount'), reference:
+        (options.weeklyTargets && Object.hasOwn(options.weeklyTargets, id) ? options.weeklyTargets[id] : options.weeklyTarget) * options.rollingWeeks },
       totalVolume: { observations: volume, reference: medianReference(volume) },
     };
   }

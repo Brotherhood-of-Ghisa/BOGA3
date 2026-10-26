@@ -112,7 +112,7 @@ folder rather than re-implementing its row, card or sheet.
 | `more/` | More's connected-agent read for `Connect an AI` |
 | `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview |
 | `notifications/` | Settings' scrollable notification controls and the group mute row; server-confirmed state comes from `src/notifications` |
-| `preferences/` | the Settings preference editors (rest timer, effort, Progress) and `NumberField` |
+| `preferences/` | Settings editors (rest timer, effort, Progress); full muscle setup/target pages and their numeric fields |
 | `profile/` | the Profile cards and their panel and form hooks |
 
 ## Where a new component belongs

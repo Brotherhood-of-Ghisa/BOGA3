@@ -14,6 +14,9 @@ export const BODY_WEIGHT_ROUTE = '/body-weight';
 export const SETTINGS_SUB_PAGES = {
   restTimer: '/settings-rest-timer',
   progress: '/settings-progress',
+  muscles: '/settings-muscles',
+  muscleTargets: '/settings-muscle-targets',
+  enabledMuscles: '/settings-enabled-muscles',
   effort: '/settings-effort',
   other: '/settings-other',
   experiments: '/settings-experiments',

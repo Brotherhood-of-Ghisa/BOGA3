@@ -95,6 +95,7 @@ const CARD_ORDER = [
   'settings-rest-timer-row',
   'settings-notifications-row',
   'settings-progress-row',
+  'settings-muscles-row',
   'settings-effort-row',
   'settings-developer-tools-row',
   'settings-data-sync-row',
@@ -142,6 +143,7 @@ describe('the Settings list', () => {
     ['settings-body-weight-row', '/body-weight'],
     ['settings-rest-timer-row', '/settings-rest-timer'],
     ['settings-progress-row', '/settings-progress'],
+    ['settings-muscles-row', '/settings-muscles'],
     ['settings-effort-row', '/settings-effort'],
     ['settings-developer-tools-row', '/settings-developer-tools'],
     ['settings-data-sync-row', '/settings-data-sync'],
@@ -164,6 +166,7 @@ describe('the Settings list', () => {
 
     expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 90 s · Auto-start on');
     expect(statusOf('settings-progress-row')).toBe('Progress, List · 4-week period');
+    expect(statusOf('settings-muscles-row')).toBe('Muscles, Single target');
     expect(statusOf('settings-effort-row')).toBe('Effort, Default');
     expect(statusOf('settings-other-row')).toBe('Other, DD-MM-YYYY');
     expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode off');
