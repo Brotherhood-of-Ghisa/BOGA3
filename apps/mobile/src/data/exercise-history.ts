@@ -32,7 +32,7 @@ import {
 import { calendarWeekBounds, historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { NO_GYM_LABEL, SELECTED_GYM_LABEL } from '@/src/utils/gym-scope-route';
 
-export type ExerciseHistoryPeriod = { weeks: number; kind: 'progress' | 'history' };
+export type ExerciseHistoryPeriod = { weeks: number; kind: 'progress' | 'history' } | { kind: 'all' };
 
 export type ExerciseHistorySetEntry = {
   setId: string;
@@ -221,7 +221,7 @@ export type ExerciseHistoryStore = {
 
 export type LoadExercisePerformanceHistoryOptions = {
   exerciseDefinitionId: string;
-  /** Screens pass the configured week window; omitted reads use one calendar week. */
+  /** Screens pass the configured window, or explicitly expand to all history. */
   period?: ExerciseHistoryPeriod;
   tagDefinitionId?: string | null;
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
@@ -645,7 +645,9 @@ export const createExerciseHistoryRepository = (
     });
     if (!exerciseDefinition) return null;
 
-    const { start, end } = (period.kind === 'history' ? historyWeekBounds : calendarWeekBounds)(period.weeks, now);
+    const { start, end } = period.kind === 'all'
+      ? { start: null, end: now }
+      : (period.kind === 'history' ? historyWeekBounds : calendarWeekBounds)(period.weeks, now);
 
     const [sessionsInPeriod, allTimeBest, appliedGymName] = await Promise.all([
       store.loadSessionsForExercise({

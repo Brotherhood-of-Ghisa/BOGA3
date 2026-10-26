@@ -261,6 +261,45 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-period-chip-progress')).toHaveProp('accessibilityState', { selected: true });
   });
 
+  it('opens on configured History with no gym or tag filter and extends beyond it only on request', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+      setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+      await logSquatElsewhere();
+    });
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('All gyms');
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    expect(sessionCards()).not.toContain('maestro_exercise_block_history_squat_6_a');
+    const initialCards = sessionCards();
+    fireEvent.press(screen.getByRole('button', { name: 'Show older sessions' }));
+
+    await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
+    expect(sessionCards()).toHaveLength(10);
+    expect(sessionCards().slice(0, initialCards.length)).toEqual(initialCards);
+    expect(screen.getByRole('tab', { name: 'Full exercise history' })).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
+    await screen.findByTestId('exercise-history-best-card');
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
+    await screen.findByTestId('exercise-history-show-older');
+    expect(sessionCards()).toEqual(initialCards);
+  });
+
+  it('shows a failed expansion as an error and can return to the configured History', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockRejectedValueOnce(new Error('Read failed'));
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    expect(await screen.findByTestId('exercise-history-error-state')).toHaveTextContent(/Read failed/);
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-week'));
+    await screen.findByTestId('exercise-history-best-card');
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
+    await screen.findByTestId('exercise-history-show-older');
+    expect(sessionCards().length).toBeGreaterThan(0);
+  });
+
   it('shows the all-time bests and one card per session in the period, newest first', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
@@ -338,6 +377,12 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Canal Street Gym');
     expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
     expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
+
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    await screen.findByRole('tab', { name: 'Full exercise history' });
+    await screen.findByTestId('exercise-history-best-card');
+    expect(sessionCards()).toEqual(['history_elsewhere_squat']);
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
 
     fireEvent.press(screen.getByTestId('exercise-history-gym'));
     fireEvent.press(screen.getByTestId('exercise-history-gym-option-all'));

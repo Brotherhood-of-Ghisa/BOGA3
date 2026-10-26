@@ -21,12 +21,13 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     back: jest.fn(),
     replace: mockReplace,
   }),
@@ -144,6 +145,7 @@ describe('ExerciseCatalogScreen', () => {
   beforeEach(() => {
     resetLocalData();
     mockReplace.mockReset();
+    mockPush.mockReset();
     mockSearchParams = {};
     __resetExerciseListPreferencesForTests();
     __resetBodyweightCalculationPreferenceForTests();
@@ -344,6 +346,16 @@ describe('ExerciseCatalogScreen', () => {
 
     expect(await screen.findByText('Exercise restored.')).toBeTruthy();
     expect(definitionNamed('Barbell Bench Press')?.deletedAt).toBeNull();
+  });
+
+  it('opens unfiltered exercise history from its actions and dismisses the menu', async () => {
+    await openCatalog();
+    await expandFamily('Chest');
+    fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+    fireEvent.press(await screen.findByRole('button', { name: 'View exercise history from actions' }));
+
+    expect(mockPush).toHaveBeenCalledWith(`/exercise-history?exerciseDefinitionId=${definitionNamed('Barbell Bench Press')!.id}`);
+    await waitForGone(() => screen.queryByTestId('exercise-catalog-actions-sheet'));
   });
 
   it('duplicates an exercise from its actions with prefilled data and (Copy) in name', async () => {

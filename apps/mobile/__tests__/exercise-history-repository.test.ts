@@ -522,12 +522,14 @@ describe('createExerciseHistoryRepository', () => {
   });
 
   it.each([
+    { kind: 'all' as const, start: null },
     { kind: 'history' as const, weeks: 3, start: new Date(2026, 3, 27) },
     { kind: 'progress' as const, weeks: 3, start: new Date(2026, 4, 4) },
   ])('reads the configured $kind calendar window', async ({ kind, weeks, start }) => {
     const store = buildStore();
     const now = new Date(2026, 4, 19, 16);
-    await createExerciseHistoryRepository(store).load({ exerciseDefinitionId: exerciseDefinition.id, period: { kind, weeks }, now });
+    await createExerciseHistoryRepository(store).load({ exerciseDefinitionId: exerciseDefinition.id,
+      period: kind === 'all' ? { kind } : { kind, weeks: weeks! }, now });
     expect(store.loadSessionsForExercise).toHaveBeenCalledWith({ exerciseDefinitionId: exerciseDefinition.id, start, end: now });
   });
 

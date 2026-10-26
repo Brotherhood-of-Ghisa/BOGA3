@@ -12,6 +12,7 @@ import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import {
+  ActionButton,
   Card,
   ChipGroup,
   Icon,
@@ -50,7 +51,7 @@ import {
   recordFlagsFor,
 } from '@/src/session-recorder/session-view-model';
 
-type ExerciseHistoryPeriod = 'week' | 'progress' | 'history';
+type ExerciseHistoryPeriod = 'week' | 'progress' | 'history' | 'all';
 
 // The tag filter's "no filter" chip. Tag ids are generated, never this.
 const ALL_TAGS = 'all';
@@ -77,6 +78,13 @@ const formatOptionalOneRepMax = (value: number | null) =>
 // A deleted tag still filters, and says so in words.
 const formatTagName = (tag: ExerciseHistoryTagOption) =>
   tag.deletedAt ? `${tag.name} (deleted)` : tag.name;
+
+const emptyHistoryMessage = (gymId: string | null | undefined, tagId: string | null) => {
+  if (gymId === null) return 'No completed sessions without a gym in this period.';
+  if (gymId !== undefined) return 'No completed sessions for this gym in this period.';
+  if (tagId) return 'No sessions in this period have the selected tag. Pick another tag or widen the period.';
+  return 'No completed sessions for this exercise in this period.';
+};
 
 export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
@@ -110,7 +118,9 @@ export function ExerciseHistoryScreenShell({
   const periodOptions = [
     { value: 'week' as const, label: 'This week' },
     { value: 'progress' as const, label: `Progress (${values.targetWindowWeeks}w)`, accessibilityLabel: `Progress period, ${values.targetWindowWeeks} weeks` },
-    { value: 'history' as const, label: `History (${values.historyLookbackWeeks}w)`, accessibilityLabel: `History look-back, ${values.historyLookbackWeeks} weeks` },
+    period === 'all'
+      ? { value: 'all' as const, label: 'Full history', accessibilityLabel: 'Full exercise history' }
+      : { value: 'history' as const, label: `History (${values.historyLookbackWeeks}w)`, accessibilityLabel: `History look-back, ${values.historyLookbackWeeks} weeks` },
   ];
   const tagOptions = useMemo(() => summary?.tagOptions ?? [], [summary]);
   const tagChips = useMemo<ChipOption<string>[]>(
@@ -199,15 +209,7 @@ export function ExerciseHistoryScreenShell({
             {summary.sessions.length === 0 ? (
               <Card>
                 <StatePanel
-                  body={
-                    appliedGymId === null
-                      ? 'No completed sessions without a gym in this period.'
-                      : appliedGymId !== undefined
-                      ? 'No completed sessions for this gym in this period.'
-                      : appliedTagDefinitionId
-                        ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
-                        : 'No completed sessions for this exercise in this period.'
-                  }
+                  body={emptyHistoryMessage(appliedGymId, appliedTagDefinitionId)}
                   fill={false}
                   testID="exercise-history-empty-state"
                   title="No sessions in this view"
@@ -223,6 +225,14 @@ export function ExerciseHistoryScreenShell({
                 />
               ))
             )}
+            {period === 'history' && !errorMessage ? (
+              <ActionButton
+                label="Show older sessions"
+                onPress={() => onSelectPeriod('all')}
+                testID="exercise-history-show-older"
+                variant="text"
+              />
+            ) : null}
           </>
         ) : null}
       </ScreenScroll>
@@ -443,7 +453,7 @@ export default function ExerciseHistoryRoute() {
       try {
         const next = await loadExercisePerformanceHistory({
           exerciseDefinitionId,
-          period: { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
+          period: nextPeriod === 'all' ? { kind: 'all' } : { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
             kind: nextPeriod === 'history' ? 'history' : 'progress' },
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),

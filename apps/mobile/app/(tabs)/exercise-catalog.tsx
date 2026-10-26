@@ -45,7 +45,7 @@ import {
 } from '@/src/exercise-share';
 import { listMyGroups, type GroupSummary } from '@/src/groups';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { exerciseLinkHref } from '@/src/navigation/routes';
+import { exerciseHistoryHref, exerciseLinkHref } from '@/src/navigation/routes';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -413,6 +413,16 @@ export default function ExerciseCatalogScreen() {
         testID="exercise-catalog-actions-sheet"
         title={actionTarget?.name}
         visible={actionTarget !== null}>
+        <ListRow
+          accessibilityLabel="View exercise history from actions"
+          label="History"
+          leading={<Icon color={uiRoles.ink} name="list" size="md" />}
+          onPress={() => {
+            setExerciseActionMenuTarget(null);
+            if (actionTarget) router.push(exerciseHistoryHref(actionTarget.id));
+          }}
+          testID="exercise-action-history"
+        />
         <ListRow
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
