@@ -39,8 +39,9 @@ export type TodayScreenProps = {
 const systemNow = () => new Date();
 
 // Today has no title (the tab names the page) and no primary action, so no
-// `accent`: the Plan page, the Progress card, then the group activity — one
-// scrolling page, or in the Cards layout a full-height card each, opening on You.
+// `accent`: one scrolling page of the Progress card, the Plan page, then the
+// group activity; or in the Cards layout a full-height card each, Plan first,
+// opening on You.
 export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
   const router = useRouter();
   const { values: { progressCountSecondary } } = useAccountLocalPreferenceState();
@@ -130,14 +131,14 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="today-screen">
-      <View style={styles.section} testID="today-plan-section">
-        <SectionHeader title="Plan" />
-        <TodayPlanSection {...planHandlers} state={planState} />
-      </View>
-
       <View style={styles.section} testID="today-progress-section">
         <SectionHeader title="You" />
         <TodayProgressSection {...progressHandlers} state={progressState} />
+      </View>
+
+      <View style={styles.section} testID="today-plan-section">
+        <SectionHeader title="Plan" />
+        <TodayPlanSection {...planHandlers} state={planState} />
       </View>
 
       <View style={styles.section} testID="today-group-section">

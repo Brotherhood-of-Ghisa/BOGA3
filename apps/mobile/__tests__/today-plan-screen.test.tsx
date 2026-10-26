@@ -108,11 +108,11 @@ afterEach(() => {
 });
 
 describe('Today: the Plan page over real data', () => {
-  it('comes before You in the list layout, as a recovery card and a plan card', async () => {
+  it('comes after You in the list layout, as a recovery card and a plan card', async () => {
     await renderToday();
 
     const sections = screen.getAllByTestId(/^today-(plan|progress|group)-section$/).map((section) => section.props.testID);
-    expect(sections).toEqual(['today-plan-section', 'today-progress-section', 'today-group-section']);
+    expect(sections).toEqual(['today-progress-section', 'today-plan-section', 'today-group-section']);
     expect(within(text('today-plan-recovery-card')).getByText('Recovery')).toBeTruthy();
     expect(within(text('today-plan-week-card')).getByText('Plan')).toBeTruthy();
   });
