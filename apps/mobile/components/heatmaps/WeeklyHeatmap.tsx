@@ -20,7 +20,7 @@ import { HEAT_RAMP, type CalendarHeatmapMetric } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
-import { weekRangeLabel } from './timeline';
+import { weekLabel } from './timeline';
 
 const DATE_WIDTH = 96;
 
@@ -119,7 +119,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   };
   const content = <>
     <View style={styles.date}>
-      <Text allowFontScaling={false} style={styles.dateText}>{weekRangeLabel(week.monday, dateFormat)}</Text>
+      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week.monday, dateFormat)}</Text>
       {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
     </View>
     <View style={styles.plot}>
@@ -141,9 +141,10 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
 
 export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatValue,
   formatReferenceValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
-  // The adapter is chronological; reverse only the displayed copy.
-  const weeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey).reverse(), [data.weekly, data.todayDateKey]);
-  const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
+  const windowWeeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey), [data.weekly, data.todayDateKey]);
+  // Keep zero and unavailable training; only rest rows disappear.
+  const weeks = useMemo(() => windowWeeks.filter(week => week.hasTraining ?? week.value > 0).reverse(), [windowWeeks]);
+  const trainingWeeks = windowWeeks.filter(isKnownTraining);
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   const max = values[values.length - 1] ?? 0;
   const { axisValues, position } = weeklyScale(values, metric);
@@ -168,7 +169,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
           position={position} formatValue={references.length ? formatReferenceValue : formatValue} testID={testID}>
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
-            accessibilityLabel={`${weeks.length}-week ${reference.label} ${reference.text}`}
+            accessibilityLabel={`${windowWeeks.length}-week ${reference.label} ${reference.text}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
         </WeeklyAxis>
         <View style={{ width: valueWidth }} />

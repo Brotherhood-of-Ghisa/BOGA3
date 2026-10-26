@@ -48,4 +48,7 @@ Complete dates displayed, spoken or edited use Date format, including ranges
 and shared images, preserving device-local days and stored instants. Month/day
 headings, relative and time-only labels keep their roles.
 
+Calendar-week headings may use a named month and shared year/day range in the
+selected order; accessibility retains complete numeric dates.
+
 Code: `apps/mobile/src/utils/local-time.ts`.

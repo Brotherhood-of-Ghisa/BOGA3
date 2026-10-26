@@ -10,7 +10,7 @@ import { competitionBoard, competitionExercise, competitionRow, competitionStrea
 import { __resetAccountLocalPreferencesForTests, initializeAccountLocalPreferences,
   ensureAccountLocalPreferencesLoaded, setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { useDateFormat } from '@/src/preferences/hooks';
-import { formatCalendarDate, formatCalendarWeek, formatLocalDateTime, formatShortDate,
+import { formatCalendarDate, formatCalendarWeek, formatCalendarWeekHeading, formatLocalDateTime, formatShortDate,
   parseSessionDateTime, reformatDateTime } from '@/src/utils/local-time';
 import { formatSessionTimes, resolveSessionTimes } from '@/src/session-recorder/session-times';
 import { resolveMeasurementDate } from '@/src/bodyweight/weight-entry';
@@ -100,4 +100,20 @@ test('presentation lint rejects native dates, manual labels and fixed format arg
     cwd: path.resolve(__dirname, '..'), encoding: 'utf8',
   }));
   expect(messages).toHaveLength(6);
+});
+
+
+test.each([
+  ['DD-MM-YYYY', '2026-10-19', '19–25 Oct 2026'],
+  ['MM-DD-YYYY', '2026-10-19', 'Oct 19–25 2026'],
+  ['YYYY-MM-DD', '2026-10-19', '2026 Oct 19–25'],
+  ['DD-MM-YYYY', '2026-09-28', '28 Sep – 4 Oct 2026'],
+  ['MM-DD-YYYY', '2026-09-28', 'Sep 28 – Oct 4 2026'],
+  ['YYYY-MM-DD', '2026-09-28', '2026 Sep 28 – Oct 4'],
+  ['DD-MM-YYYY', '2025-12-29', '29 Dec 2025 – 4 Jan 2026'],
+  ['MM-DD-YYYY', '2025-12-29', 'Dec 29 2025 – Jan 4 2026'],
+  ['YYYY-MM-DD', '2025-12-29', '2025 Dec 29 – 2026 Jan 4'],
+  ['DD-MM-YYYY', '2026-03-23', '23–29 Mar 2026'],
+] as const)('compact %s week heading preserves months, years and local days (%s)', (format, key, expected) => {
+  expect(formatCalendarWeekHeading(key, format)).toBe(expected);
 });

@@ -518,25 +518,24 @@ describe('The history page over real data', () => {
     } else expect(panel.queryByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`)).toBeNull();
   });
 
-  // The 104-week heatmap re-render trips the default ceiling when jest
-  // workers run alongside the fast aggregate's other lanes; this test alone
-  // needs ~18 s worst-case and the lane's load has cost it 40-90 s.
-  it('updates daily tiles when the saved history window is shortened: rest days read, training days open', async () => {
+  it('shortens the calendar window while collapsing rest months and keeping training days open', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
     await openHistory({ exerciseDefinitionId: SQUAT });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     const dateKey = localDateKey(new Date(Date.now() - 40 * DAY_MS));
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
+    expect(renderedDailySample().find(day => day.dateKey === dateKey)?.day?.hasTraining).toBe(false);
+    expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     act(() => updatePreferences({ historyLookbackWeeks: 52 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
+    expect(renderedDailySample().find(day => day.dateKey === dateKey)?.day?.hasTraining).toBe(false);
+    expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     act(() => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'), { timeout: 10_000 });
     // Today holds a Squat session, so it opens it.
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
       .toHaveProp('accessibilityRole', 'button');
-    expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
+    expect(renderedDailySample().some(day => day.dateKey === dateKey)).toBe(false);
   }, 120_000);
 
   it('titles a muscle page with its name and offers only the two muscle metrics', async () => {

@@ -63,7 +63,7 @@ Daily retains a neutral dashed rule.
 ## Props & opening
 
 A day or week with training opens its sessions: the host passes the openers
-and routes; a rest day or week stays text.
+and routes; rest cells in Daily stay text.
 
 ```tsx
 <DailyHeatmap
@@ -88,14 +88,17 @@ and routes; a rest day or week stays text.
 ```
 
 - **Daily** owns its calendar framing. `daily-calendar.ts` builds
-  the month/row framing without changing adapter values or colours. Tiles have no
+  the month/row framing without changing adapter values or colours. Months without
+  training retain only their heading; occupancy includes adjacent-month days
+  in their Monday-owned rows, including zero/unavailable training. Tiles have no
   selection or black outlines. Figure visibility follows
   [[copy.blank-history]]. Missing/future positions are empty spacers without
   accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
-  follows [[copy.blank-history]]. Rest/current semantics remain accessible.
+  follows [[copy.blank-history]]. Rest rows are omitted; zero/unavailable training and current-week wording remain.
+  Compact week headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.

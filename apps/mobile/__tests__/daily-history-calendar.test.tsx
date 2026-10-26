@@ -105,7 +105,7 @@ it('opens a day with sessions and a Week tile with training, and offers no rest 
 });
 
 it('leaves rest and unavailable figures blank, retains numeric zero and clips future weeks', () => {
-  draw('totalVolume', [sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
+  draw('totalVolume', [sample('2026-10-05', 0), sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01').props.accessibilityLabel).toContain('Rest');
   expect(screen.queryAllByText('Rest')).toEqual([]);
@@ -263,4 +263,28 @@ it('keeps the full window in the month list while mounting only the initial mont
   const older = list.props.data.at(-1);
   const oldMonth = render(list.props.renderItem({ item: older, index: 24 }));
   expect(oldMonth.getByTestId(`calendar-heatmap-month-title-${older.key}`)).toBeTruthy();
+});
+
+
+it.each([0, null])('collapses rest months to headings while retaining zero/unavailable training (%s)', value => {
+  const input = [{ ...sample('2026-10-05', 0), totalVolume: value }];
+  const { rerender } = draw('totalVolume', input);
+  expect(screen.getByTestId('calendar-heatmap-month-title-2026-09')).toHaveTextContent('September 2026');
+  expect(within(screen.getByTestId('calendar-heatmap-month-2026-09')).queryAllByText('Mon')).toEqual([]);
+  expect(screen.queryByTestId('calendar-heatmap-row-2026-09-28')).toBeNull();
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05').props.accessibilityLabel)
+    .toContain(value === null ? 'Volume unavailable' : 'Volume 0');
+  // Metric/window changes can make a previously collapsed month active.
+  const next = buildHeatmapData([sample('2026-10-01', 100)], 'totalVolume', { todayDateKey: today, weeks: 5 });
+  rerender(<DailyHeatmap data={next} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  expect(screen.getByTestId('calendar-heatmap-month-title-2026-10')).toBeTruthy();
+  expect(screen.queryByTestId('calendar-heatmap-row-2026-10-05')).toBeNull();
+  expect(within(screen.getByTestId('calendar-heatmap-month-2026-09')).getByTestId('calendar-heatmap-cell-2026-10-01'))
+    .toHaveProp('accessibilityLabel', '01-10-2026, Volume 100');
+});
+
+it('shows only month headings when the entire window has no training', () => {
+  draw('totalVolume', []);
+  expect(screen.getAllByTestId(/^calendar-heatmap-month-title-/)).toHaveLength(2);
+  expect(screen.queryAllByTestId(/^calendar-heatmap-row-/)).toEqual([]);
 });
