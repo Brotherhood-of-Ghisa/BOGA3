@@ -277,3 +277,103 @@ appId: com.dinoderek.mobile
     direction: DOWN
 - assertVisible: { id: "settings-track-tibialis_anterior", checked: false }
 - takeScreenshot: "20-first-run-roundtrip-muscles-restored"
+
+# === 4. Native destructive merge and stale-edit recovery ===
+# Proves menu -> page sheet -> native Alert ordering, keyboard dismissal,
+# Cancel writes nothing, confirmation conversion copy, and native review actions.
+# Jest cannot prove iOS modal/Alert presentation or the scheduler-to-review wiring.
+- runScript:
+    file: ../scripts/exercise-merge-device.js
+    env:
+      STEP: seed
+      SUPABASE_URL: ${MAESTRO_ROUNDTRIP_SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${MAESTRO_ROUNDTRIP_SUPABASE_ANON_KEY}
+      EMAIL: ${MAESTRO_ROUNDTRIP_EMAIL}
+      PASSWORD: ${MAESTRO_ROUNDTRIP_PASSWORD}
+- runScript:
+    file: ../scripts/exercise-merge-device.js
+    env: { STEP: invalid }
+- openLink: "boga3://settings-data-sync"
+- tapOn: { id: "settings-sync-status-refresh-button" }
+- extendedWaitUntil:
+    visible: { id: "settings-sync-status-dirty-count", text: "0" }
+    timeout: 60000
+- openLink: "boga3://exercise-catalog"
+- extendedWaitUntil:
+    visible: "Exercise filter input"
+    timeout: 30000
+- tapOn: "Exercise filter input"
+- inputText: "Maestro Merge Source"
+- extendedWaitUntil:
+    visible: "Exercise actions Maestro Merge Source"
+    timeout: 60000
+- tapOn: "Exercise actions Maestro Merge Source"
+- extendedWaitUntil:
+    visible: { id: "exercise-action-merge" }
+    timeout: 15000
+- takeScreenshot: "21-merge-danger-action"
+- tapOn: { id: "exercise-action-merge" }
+- extendedWaitUntil:
+    visible: { id: "exercise-merge-search" }
+    timeout: 15000
+- takeScreenshot: "22-merge-picker"
+- tapOn: { id: "exercise-merge-search" }
+- inputText: "Maestro Merge Destination"
+- tapOn: "Select exercise Maestro Merge Destination"
+- extendedWaitUntil:
+    visible: "Correct stored weights in the session on .* before merging."
+    timeout: 60000
+- takeScreenshot: "22a-merge-validation-error"
+- runScript:
+    file: ../scripts/exercise-merge-device.js
+    env: { STEP: repair }
+- tapOn: "Retry"
+- extendedWaitUntil:
+    visible: "Merge exercises?"
+    timeout: 60000
+- assertVisible: ".*Move 1 set from Maestro Merge Source to Maestro Merge Destination.*Weights will be halved.*"
+- takeScreenshot: "23-merge-confirmation"
+- tapOn: "Cancel"
+- assertVisible: "Exercise actions Maestro Merge Source"
+- tapOn: "Exercise actions Maestro Merge Source"
+- tapOn: { id: "exercise-action-merge" }
+- extendedWaitUntil:
+    visible: { id: "exercise-merge-search" }
+    timeout: 15000
+- tapOn: { id: "exercise-merge-search" }
+- inputText: "Maestro Merge Destination"
+- tapOn: "Select exercise Maestro Merge Destination"
+- extendedWaitUntil:
+    visible: "Merge exercises?"
+    timeout: 60000
+- tapOn: { text: "Merge", index: 0 }
+- extendedWaitUntil:
+    notVisible: "Exercise actions Maestro Merge Source"
+    timeout: 60000
+- assertNotVisible: "Exercise merged."
+- takeScreenshot: "24-merge-completed-catalogue"
+- runScript:
+    file: ../scripts/exercise-merge-device.js
+    env: { STEP: stale }
+- openLink: "boga3://settings-data-sync"
+- tapOn: { id: "settings-sync-status-refresh-button" }
+- extendedWaitUntil:
+    visible: { id: "settings-merge-review" }
+    timeout: 60000
+- takeScreenshot: "25-merge-pending-review"
+- tapOn: { id: "settings-merge-review" }
+- extendedWaitUntil:
+    visible: "Apply saved changes"
+    timeout: 30000
+- assertVisible: "Maestro Merge Destination"
+- assertVisible: "20"
+- assertVisible: "25"
+- takeScreenshot: "26-merge-review"
+- tapOn: "Apply saved changes"
+- extendedWaitUntil:
+    visible: "No changes need review."
+    timeout: 60000
+- takeScreenshot: "27-merge-review-resolved"
+- runScript:
+    file: ../scripts/exercise-merge-device.js
+    env: { STEP: verify }

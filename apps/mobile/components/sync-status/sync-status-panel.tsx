@@ -1,3 +1,4 @@
+import { ExerciseMergeReview } from './exercise-merge-review';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatLocalDateTime } from '@/src/utils/local-time';
@@ -87,6 +88,7 @@ function SyncStatusPanelContent({
 }: SyncStatusPanelProps) {
   const [status, setStatus] = useState<SyncStatusSnapshot | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [reviewVisible, setReviewVisible] = useState(false);
   const lifetimeRef = useRef({ active: true });
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -179,6 +181,10 @@ function SyncStatusPanelContent({
         <Text allowFontScaling={false} style={styles.label}>Error</Text>
       </ListRow> : null}
 
+      {isSignedIn && (status?.mergeReviewCount ?? 0) > 0 ? <ListRow label="Review changes"
+        onPress={() => setReviewVisible(true)} testID="settings-merge-review" /> : null}
+      <ExerciseMergeReview visible={reviewVisible} onDismiss={() => setReviewVisible(false)}
+        onChanged={() => { void refresh(); }} />
       {(isSignedIn || preferenceError) ? <View style={styles.actions}>
         <ActionButton
           accessibilityLabel={isRefreshing ? 'Refreshing data status…' : 'Refresh data and sync status'}

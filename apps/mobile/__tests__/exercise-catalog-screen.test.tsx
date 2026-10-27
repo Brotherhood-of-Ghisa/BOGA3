@@ -13,18 +13,27 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
-import { Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
+import { Alert, Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
+const mockPrepareMerge = jest.fn();
+const mockExecuteMerge = jest.fn();
+const mockNavigation = { addListener: jest.fn(() => () => undefined) };
+jest.mock('@/src/exercise-catalog/merge', () => ({
+  ...jest.requireActual('@/src/exercise-catalog/merge'),
+  prepareExerciseMerge: (...args: unknown[]) => mockPrepareMerge(...args),
+  executeExerciseMerge: (...args: unknown[]) => mockExecuteMerge(...args),
+}));
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
+  useNavigation: () => mockNavigation,
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: mockPush,
@@ -38,7 +47,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import ExerciseCatalogScreen from '../app/(tabs)/exercise-catalog';
-import { uiRoles } from '@/components/ui';
+import { Sheet, uiRoles } from '@/components/ui';
 import {
   __resetBodyweightCalculationPreferenceForTests,
   setBodyweightCalculationsEnabled,
@@ -147,6 +156,7 @@ describe('ExerciseCatalogScreen', () => {
     mockReplace.mockReset();
     mockPush.mockReset();
     mockSearchParams = {};
+    mockPrepareMerge.mockReset(); mockExecuteMerge.mockReset();
     __resetExerciseListPreferencesForTests();
     __resetBodyweightCalculationPreferenceForTests();
   });
@@ -318,6 +328,54 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.getByLabelText('Select secondary muscle Front Delts')).toBeTruthy();
   });
 
+  async function chooseMergeDestination() {
+    await openCatalog();
+    await expandFamily('Chest');
+    fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+    fireEvent.press(await screen.findByTestId('exercise-action-merge'));
+    act(() => screen.UNSAFE_getAllByType(Sheet).find(node => node.props.testID === 'exercise-catalog-actions-sheet')?.props.onDismissed());
+    await screen.findByTestId('exercise-merge-search');
+    fireEvent.changeText(screen.getByTestId('exercise-merge-search'), 'Cable Bench Press');
+    const pickerDismissed = screen.getByTestId('exercise-merge-sheet-modal').props.onDismiss;
+    fireEvent.press(await screen.findByLabelText('Select exercise Cable Bench Press'));
+    return pickerDismissed;
+  }
+
+  it('waits for the native picker dismissal before one destructive confirmation; Cancel writes nothing', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const preview = { sourceId: 'a', destinationId: 'b', sourceName: 'Barbell Bench Press', destinationName: 'Cable Bench Press',
+      setCount: 12, factor: 0.5, token: 'preview' };
+    mockPrepareMerge.mockResolvedValue(preview);
+    const pickerDismissed = await chooseMergeDestination();
+    await act(async () => { await Promise.resolve(); });
+    expect(alert).not.toHaveBeenCalled();
+    act(() => pickerDismissed());
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert.mock.calls[0][1]).toContain('Move 12 sets from Barbell Bench Press to Cable Bench Press');
+    expect(alert.mock.calls[0][1]).toContain('Weights will be halved.');
+    expect(alert.mock.calls[0][2]?.[1].style).toBe('destructive');
+    act(() => alert.mock.calls[0][2]?.[0].onPress?.());
+    expect(mockExecuteMerge).not.toHaveBeenCalled();
+    expect(definitionNamed('Barbell Bench Press')?.deletedAt).toBeNull();
+  });
+
+  it('retains a failed preparation for Retry and closes after Merge without a success message', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const preview = { sourceId: 'a', destinationId: 'b', sourceName: 'A', destinationName: 'B', setCount: 0, factor: 1, token: 'p' };
+    mockPrepareMerge.mockRejectedValueOnce(new Error('Connect to merge exercises.')).mockResolvedValue(preview);
+    mockExecuteMerge.mockResolvedValue(undefined);
+    const pickerDismissed = await chooseMergeDestination();
+    expect(await screen.findByText('Connect to merge exercises.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Retry'));
+    await act(async () => { await Promise.resolve(); });
+    act(() => pickerDismissed());
+    expect(alert.mock.calls[0][1]).not.toContain('Weights');
+    await act(async () => { alert.mock.calls[0][2]?.[1].onPress?.(); });
+    expect(mockExecuteMerge).toHaveBeenCalledWith(preview);
+    await waitForGone(() => screen.queryByTestId('exercise-merge-sheet'));
+    expect(screen.queryByText(/merged successfully|Exercise merged/i)).toBeNull();
+  });
+
   it('deletes an exercise from its actions, then shows and restores it from Manage', async () => {
     await openCatalog();
     await expandFamily('Chest');
@@ -341,6 +399,7 @@ describe('ExerciseCatalogScreen', () => {
     // A deleted exercise cannot be edited; Undelete replaces Delete.
     expect(screen.getByLabelText('Edit exercise from actions')).toBeDisabled();
     expect(screen.getByLabelText('Duplicate exercise from actions')).toBeDisabled();
+    expect(screen.getByTestId('exercise-action-merge')).toBeDisabled();
     expect(screen.queryByTestId('exercise-action-delete')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-action-undelete'));
 
@@ -431,6 +490,10 @@ describe('ExerciseCatalogScreen', () => {
       expect(screen.getByTestId('exercise-action-duplicate')).toBeTruthy();
       expect(screen.getByTestId('exercise-action-delete')).toBeTruthy();
       expect(screen.getByText('Delete')).toHaveStyle({ color: uiRoles.danger });
+      expect(screen.getByText('Merge into…')).toHaveStyle({ color: uiRoles.danger });
+      const rows = within(screen.getByTestId('exercise-catalog-actions-sheet')).getAllByRole('button');
+      const mergeIndex = rows.findIndex(row => row.props.testID === 'exercise-action-merge');
+      expect(rows[mergeIndex + 1].props.testID).toBe('exercise-action-delete');
       fireEvent.press(
         screen.getByLabelText('Dismiss exercise action menu overlay', { includeHiddenElements: true })
       );

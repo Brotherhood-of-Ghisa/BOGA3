@@ -1,3 +1,6 @@
+import { readMergeLocal, listMergeLocal } from '@/src/data/exercise-merge-store';
+import { readLocalDataOwner } from '@/src/data/local-wipe';
+import type { MergeReviewItem } from '@/src/exercise-core/merge-types';
 // The user-facing sync-status snapshot: a single read that tells a signed-in
 // user whether their data is syncing healthily. It composes three local
 // sources into one immutable shape — no server round-trip:
@@ -77,6 +80,7 @@ export interface SyncStatusSnapshot {
    * render even though the full repair UI is deferred.
    */
   blockedRowCount: number;
+  mergeReviewCount?: number;
 }
 
 /**
@@ -133,10 +137,14 @@ export const getSyncStatus = async (): Promise<SyncStatusSnapshot> => {
     countBlockedRows(database),
   ]);
 
+  const owner = readLocalDataOwner(database);
+  const mergeReviewCount = owner ? (readMergeLocal<MergeReviewItem[]>(database, owner, 'conflicts') ?? []).length +
+    listMergeLocal(database, owner, 'pending').length + listMergeLocal(database, owner, 'operation').length : 0;
   return {
+    ...(mergeReviewCount ? { mergeReviewCount } : {}),
     lastSuccessAtMs: schedulerStatus.lastSuccessAtMs,
     dirtyCount,
-    errorMessage: schedulerStatus.lastCycleError,
+    errorMessage: schedulerStatus.lastCycleError ?? (mergeReviewCount ? 'Saved changes need review.' : null),
     authRequired: getAuthRequiredSignal(),
     networkState: schedulerStatus.network,
     bootstrapCompleted,

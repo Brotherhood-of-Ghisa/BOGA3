@@ -261,6 +261,23 @@ export const copyLocalDatabaseTo = (path: string): Promise<void> =>
     await getSqliteDatabase().runAsync('VACUUM INTO ?', path);
   });
 
+/** Export omits recovery records belonging to other accounts, including freed pages. */
+export const copyLocalDatabaseForExport = (path: string, owner: string | null): Promise<void> =>
+  runExclusiveDataLayerOperation(async () => {
+    const source = getSqliteDatabase();
+    const localOwner = source.getFirstSync<{ account_user_id: string | null }>(
+      'SELECT account_user_id FROM sync_runtime_state WHERE id = ?', 'primary',
+    )?.account_user_id ?? null;
+    if (owner !== localOwner) throw new Error('Wait for your account to finish syncing before exporting.');
+    await source.runAsync('VACUUM INTO ?', path);
+    const slash = path.lastIndexOf('/');
+    const copy = openDatabaseSync(path.slice(slash + 1), {}, path.slice(0, slash));
+    try {
+      copy.runSync('DELETE FROM exercise_merge_local WHERE owner_user_id IS NOT ?', owner);
+      copy.execSync('VACUUM');
+    } finally { copy.closeSync(); }
+  });
+
 export const __resetLocalDataLayerForTests = () => {
   sqliteDatabase = null;
   localDatabase = null;

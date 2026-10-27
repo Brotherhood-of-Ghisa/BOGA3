@@ -7,6 +7,7 @@ load `docs/procedures/product-facts-authoring.md`.
 
 | File | Load when your task touches |
 | --- | --- |
+| `exercise.md` | merging definitions, history conversion, stale-edit recovery |
 | `set.md` | any set, set count, record, Volume or 1RM figure; set rows |
 | `copy.md` | any words on screen (every UI change); dates; blank history cells |
 | `comparison.md` | period or session comparisons, change figures (`+4`, `+12%`), history windows, reference lines |

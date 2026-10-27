@@ -19,6 +19,8 @@ import {
   snapshotTakenAtMs,
   type SnapshotDeps,
 } from '@/src/backup/snapshots';
+import { __resetLocalDataLayerForTests } from '@/src/data/bootstrap';
+import { Platform } from 'react-native';
 import { logEvent } from '@/src/logging/logEvent';
 
 // The real module (jest.setup.ts stubs it for every other suite), over a
@@ -27,6 +29,8 @@ jest.unmock('@/src/backup/database-backups');
 
 let mockDocuments = '';
 let mockDatabase: Database.Database;
+let mockOwner: string | null = null;
+let mockAfterExportCopy: (() => void) | null = null;
 
 // expo-file-system's Directory/File over node's fs, rooted at `mockDocuments`.
 jest.mock('expo-file-system', () => {
@@ -76,13 +80,26 @@ jest.mock('expo-file-system', () => {
   };
 });
 
-// `copyLocalDatabaseTo`'s statement over a real SQLite database (its lock is
-// `local-data-bootstrap.test.ts`).
-jest.mock('@/src/data/bootstrap', () => ({
-  copyLocalDatabaseTo: async (target: string) => {
-    mockDatabase.prepare('VACUUM INTO ?').run(target);
+// Exercise the production export SQL over real SQLite, including VACUUM's free-page cleanup.
+jest.mock('expo-sqlite', () => ({
+  openDatabaseSync: (name: string, _options: unknown, directory: string) => {
+    const Sqlite = jest.requireActual('better-sqlite3');
+    const db = name === 'scaffolding-local.db' ? mockDatabase : new Sqlite(require('node:path').join(directory, name));
+    return {
+      execSync: (sql: string) => db.exec(sql),
+      getFirstSync: (sql: string, ...params: unknown[]) => db.prepare(sql).get(...params),
+      runAsync: async (sql: string, ...params: unknown[]) => {
+        const result = db.prepare(sql).run(...params); mockAfterExportCopy?.(); return result;
+      },
+      runSync: (sql: string, ...params: unknown[]) => db.prepare(sql).run(...params),
+      closeSync: () => db.close(),
+    };
   },
 }));
+jest.mock('@/src/data/bootstrap', () => jest.requireActual('@/src/data/bootstrap'));
+jest.mock('@/src/auth/session-user', () => ({ getSignedInUserId: async () => mockOwner }));
+jest.mock('@/src/auth/supabase', () => ({ getMobileAuthRuntimeConfig: () => ({ isConfigured: true }) }));
+jest.mock('@/src/sync/account-wipe', () => ({ withLocalDataLock: async (run: () => Promise<unknown>) => run() }));
 
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: jest.fn() }));
 
@@ -128,12 +145,18 @@ beforeEach(() => {
   // A space in the path: the store must decode the URI SQLite writes to.
   mockDocuments = fs.mkdtempSync(path.join(os.tmpdir(), 'boga backups '));
   mockDatabase = new Database(':memory:');
-  mockDatabase.exec("CREATE TABLE sessions (id TEXT PRIMARY KEY); INSERT INTO sessions VALUES ('s1'), ('s2');");
+  __resetLocalDataLayerForTests();
+  mockOwner = null; mockAfterExportCopy = null;
+  mockDatabase.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY); INSERT INTO sessions VALUES ('s1'), ('s2');
+    CREATE TABLE sync_runtime_state(id TEXT PRIMARY KEY, account_user_id TEXT);
+    INSERT INTO sync_runtime_state VALUES('primary', null);
+    CREATE TABLE exercise_merge_local(owner_user_id TEXT, payload TEXT);`);
   clockMs = Date.UTC(2026, 9, 25, 14, 3, 9, 123);
   jest.clearAllMocks();
 });
 
 afterEach(() => {
+  jest.restoreAllMocks();
   mockDatabase.close();
   fs.rmSync(mockDocuments, { recursive: true, force: true });
 });
@@ -310,21 +333,85 @@ describe('the schedule', () => {
 });
 
 describe('export', () => {
-  it('shares a fresh snapshot as a SQLite file', async () => {
+  it('shares a temporary SQLite export and keeps the emergency snapshot', async () => {
     const share = shareClient();
     const backups = createDatabaseBackups(deviceDeps(), { share });
 
     await backups.exportDatabase();
 
     const [name] = files();
-    expect(share.shareAsync).toHaveBeenCalledWith(`file://${encodeURI(path.join(backupsDir(), name))}`, {
+    expect(share.shareAsync).toHaveBeenCalledWith(`file://${encodeURI(path.join(backupsDir(), name + '.export'))}`, {
       dialogTitle: 'Export BOGA database',
       mimeType: 'application/vnd.sqlite3',
       UTI: 'public.database',
     });
   });
 
-  it('fails without a snapshot when sharing is unavailable', async () => {
+  it('never shares another account recovery payload, even in freed pages, and preserves local recovery', async () => {
+    mockOwner = 'account-b';
+    mockDatabase.prepare('UPDATE sync_runtime_state SET account_user_id = ?').run(mockOwner);
+    const secret = 'ACCOUNT_A_PRIVATE_SAVED_EDIT_' + 'x'.repeat(9000);
+    mockDatabase.prepare('INSERT INTO exercise_merge_local VALUES(?,?)').run('account-a', secret);
+    mockDatabase.prepare('INSERT INTO exercise_merge_local VALUES(?,?)').run('account-b', 'B_SAVED_EDIT');
+    const share = shareClient();
+    share.shareAsync.mockImplementation(async (uri: string) => {
+      const target = decodeURI(uri.replace('file://', ''));
+      const exported = new Database(target);
+      expect(exported.prepare('SELECT * FROM exercise_merge_local').all()).toEqual([
+        { owner_user_id: 'account-b', payload: 'B_SAVED_EDIT' },
+      ]);
+      exported.close();
+      expect(fs.readFileSync(target).includes(Buffer.from('ACCOUNT_A_PRIVATE_SAVED_EDIT'))).toBe(false);
+    });
+    await createDatabaseBackups(deviceDeps(), { share }).exportDatabase();
+    expect(mockDatabase.prepare('SELECT count(*) AS n FROM exercise_merge_local').get()).toEqual({ n: 2 });
+    const snapshot = new Database(path.join(backupsDir(), files()[0]));
+    expect(snapshot.prepare('SELECT count(*) AS n FROM exercise_merge_local').get()).toEqual({ n: 2 });
+    snapshot.close();
+    expect(files()).toHaveLength(1);
+  });
+
+  it('refuses an export while the signed-in and local owners differ', async () => {
+    mockOwner = 'new-account';
+    const share = shareClient();
+    await expect(createDatabaseBackups(deviceDeps(), { share }).exportDatabase()).rejects.toThrow(/finish syncing/);
+    expect(share.shareAsync).not.toHaveBeenCalled();
+    expect(files()).toHaveLength(1);
+  });
+
+  it('removes the temporary file after share cancellation or failure', async () => {
+    const share = shareClient();
+    share.shareAsync.mockRejectedValue(new Error('cancelled'));
+    await expect(createDatabaseBackups(deviceDeps(), { share }).exportDatabase()).rejects.toThrow('cancelled');
+    expect(files()).toHaveLength(1);
+  });
+
+  it('does not share a prepared copy if the account changes before the share sheet opens', async () => {
+    mockOwner = 'a';
+    mockDatabase.prepare('UPDATE sync_runtime_state SET account_user_id = ?').run(mockOwner);
+    mockAfterExportCopy = () => { mockOwner = 'b'; };
+    const share = shareClient();
+    await expect(createDatabaseBackups(deviceDeps(), { share }).exportDatabase()).rejects.toThrow(/account changed/);
+    expect(share.shareAsync).not.toHaveBeenCalled();
+    expect(files().some(name => name.endsWith('.export'))).toBe(false);
+  });
+
+  it('keeps Android FileProvider exports readable after choosing a recipient and purges them after a day', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const share = shareClient();
+    const backups = createDatabaseBackups(deviceDeps(), { share });
+    await backups.exportDatabase();
+    const shared = decodeURI(share.shareAsync.mock.calls[0][0].replace('file://', ''));
+    expect(fs.existsSync(shared)).toBe(true);
+    const copy = new Database(shared);
+    expect(copy.prepare('SELECT count(*) AS n FROM sessions').get()).toEqual({ n: 2 });
+    copy.close();
+    clockMs += 24 * 60 * 60 * 1000 + 1;
+    const stop = backups.start(); await flush(); stop();
+    expect(fs.existsSync(shared)).toBe(false);
+  });
+
+  it('fails without a snapshot when sharing is unavailable' , async () => {
     const share = shareClient(false);
     const backups = createDatabaseBackups(deviceDeps(), { share });
 

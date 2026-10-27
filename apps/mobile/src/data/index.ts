@@ -67,6 +67,7 @@ export {
   type SessionDraftStore,
   type SessionGraphSnapshot,
   type SessionPersistenceRecord,
+  updateSessionMetadata,
 } from './session-drafts';
 export {
   formatSessionSetType,

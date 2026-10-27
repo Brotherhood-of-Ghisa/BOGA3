@@ -61,7 +61,7 @@ confirm() {
 }
 bounded_rpc() {
   http_call --max-time 12 -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $1" \
-    -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 4' -H 'Content-Type: application/json' \
+    -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 5' -H 'Content-Type: application/json' \
     -H 'Content-Profile: app_public' --data "$3" "${API_URL}/rest/v1/rpc/$2"
 }
 drain_eval() { eval_drain; expect_ok 'comparison evaluator'; }
@@ -964,7 +964,7 @@ while IFS= read -r line <&10; do [[ "${line}" != held ]] || break; done
 [[ "${line}" == held ]] || fail 'common-board holder did not acknowledge its lock'
 (
   trap - EXIT
-  http_call --max-time 20 -X POST -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 4' -H 'Content-Type: application/json' \
+  http_call --max-time 20 -X POST -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 5' -H 'Content-Type: application/json' \
     -H "x-group-eval-secret: ${EVAL_SECRET}" --data '{}' "${API_URL}/functions/v1/group-eval"
   printf '%s\n%s\n' "${STATUS}" "${BODY}" >"${RACE_DIR}/result"
 ) &

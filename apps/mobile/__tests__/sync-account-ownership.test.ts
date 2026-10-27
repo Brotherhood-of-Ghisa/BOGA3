@@ -52,8 +52,7 @@ const mockRpc = jest.fn();
 
 jest.mock('@/src/auth/supabase', () => ({
   getRequiredSupabaseMobileClient: jest.fn(() => ({
-    rpc: mockRpc,
-    schema: () => ({ rpc: mockRpc }),
+    ...jest.requireActual('./helpers/sync-cycle-mocks').syncRpcClient(mockRpc),
   })),
 }));
 
@@ -138,6 +137,7 @@ const installStubServer = (): void => {
     if (fn === 'sync_push') {
       return { data: { ok: true }, error: null };
     }
+    if (fn !== 'sync_pull') return { data: { session_ids: [], next_session_id: null }, error: null };
     const layer = args.layer ?? 0;
     pulls.push({ layer, user: serverUser, cursor: args.cursor ?? null });
     const entities = args.cursor ? [] : (SERVER_ROWS[serverUser][layer] ?? []);

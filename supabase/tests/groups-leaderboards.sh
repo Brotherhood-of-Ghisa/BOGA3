@@ -145,7 +145,7 @@ drain_ok() {
 # The drain as the pg_cron sweep starts it: same work, marked as the sweep's.
 sweep_drain_ok() {
   http_call -X POST -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${EVAL_SECRET}" \
     --data '{"source":"sweep"}' "${API_URL}/functions/v1/group-eval"
   expect_ok "group-eval sweep drain: $1"

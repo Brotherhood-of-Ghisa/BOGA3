@@ -61,9 +61,8 @@ const mockNotificationSession = jest.fn();
 // same spy so the existing call assertions are unaffected.
 jest.mock('@/src/auth/supabase', () => ({
   getRequiredSupabaseMobileClient: jest.fn(() => ({
+    ...jest.requireActual('./helpers/sync-cycle-mocks').syncRpcClient(mockRpc),
     auth: { getSession: mockNotificationSession },
-    rpc: mockRpc,
-    schema: () => ({ rpc: mockRpc }),
   })),
 }));
 
@@ -696,7 +695,7 @@ it('confirms only after quiet convergence, keeps the local-data lock, and ignore
   database.update(syncRuntimeState).set({ accountUserId: 'notification-user' }).where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).run();
   database.insert(sessions).values({ id: 'notify-completed', status: 'completed', startedAt: new Date(10), completedAt: new Date(20),
     localDirty: true, localUpdatedAtMs: 50 }).run();
-  jest.mocked(getSignedInUserId).mockResolvedValueOnce('notification-user');
+  jest.mocked(getSignedInUserId).mockResolvedValue('notification-user');
   mockNotificationSession.mockResolvedValue({ data: { session: { user: { id: 'notification-user' }, access_token: 'notification-bearer' } }, error: null });
   let release!: (value: unknown) => void;
   let started!: () => void;

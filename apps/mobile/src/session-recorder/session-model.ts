@@ -23,11 +23,13 @@ export function mapDraftSnapshotToSession(
   snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'>
 ): Session {
   return {
+    mergeRevisions: Object.fromEntries(snapshot.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
     dateTime: formatCurrentDateTime(snapshot.startedAt),
     locationId: snapshot.gymId,
     exercises: snapshot.exercises.map((exercise) => ({
       id: exercise.id,
       exerciseDefinitionId: exercise.exerciseDefinitionId,
+      mergeRevision: exercise.mergeRevision ?? 0,
       name: exercise.name,
       machineName: exercise.machineName ?? '',
       loadContext: exercise.loadContext,
@@ -51,6 +53,7 @@ export const toPersistDraftExercises = (session: Session) =>
   session.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
+    mergeRevision: exercise.mergeRevision ?? 0,
     name: exercise.name,
     machineName: exercise.machineName || null,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,

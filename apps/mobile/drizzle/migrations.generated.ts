@@ -157,6 +157,12 @@ export const generatedMigrationBundle = {
     tag: "0024_exercise_rest_timer_sec",
     breakpoints: true,
   },
+  {
+    idx: 25,
+    when: 1793119427841,
+    tag: "0025_absurd_ricochet",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -873,6 +879,19 @@ ALTER TABLE \`session_plan_sets\` ADD \`last_modified_by\` text DEFAULT 'human' 
 ALTER TABLE \`muscle_groups\` ADD \`tracked\` integer DEFAULT 1 NOT NULL CONSTRAINT "muscle_groups_tracked_boolean_guard" CHECK (\`tracked\` in (0, 1));
 `,
   m0024: `ALTER TABLE \`exercise_definitions\` ADD \`rest_timer_sec\` integer;`,
+  m0025: `CREATE TABLE \`exercise_merge_local\` (
+	\`owner_user_id\` text NOT NULL,
+	\`id\` text NOT NULL,
+	\`kind\` text NOT NULL,
+	\`payload\` text NOT NULL,
+	\`updated_at_ms\` integer NOT NULL,
+	PRIMARY KEY(\`owner_user_id\`, \`id\`)
+);
+--> statement-breakpoint
+CREATE INDEX \`exercise_merge_local_owner_kind_idx\` ON \`exercise_merge_local\` (\`owner_user_id\`,\`kind\`);--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE \`session_exercise_tags\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE \`session_exercises\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;`,
   },
 } as const;
 

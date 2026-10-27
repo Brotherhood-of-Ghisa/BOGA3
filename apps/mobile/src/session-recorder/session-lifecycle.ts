@@ -9,6 +9,7 @@ import {
   persistSessionDraftSnapshot,
   setSessionDeletedState,
   upsertLocalGym,
+  updateSessionMetadata,
   type ExerciseBlockHistorySuggestedPlan,
 } from '@/src/data';
 import { logEvent } from '@/src/logging';
@@ -41,6 +42,7 @@ export const completeActiveSession = async (input: {
     startedAt: input.startedAt,
     status: 'active',
     exercises: toPersistCompletedExercises(input.completedHistorySession),
+    mergeRevisions: input.completedHistorySession.mergeRevisions,
   });
 
   await completeSessionDraft(persisted.sessionId);
@@ -127,6 +129,7 @@ const persistSessionGraph = (
         startedAt: times?.startedAt ?? graph.startedAt,
         completedAt: times?.completedAt ?? graph.completedAt,
         exercises: toPersistDraftExercises(session),
+        mergeRevisions: session.mergeRevisions,
       })
     : persistSessionDraftSnapshot({
         sessionId: graph.sessionId,
@@ -134,6 +137,7 @@ const persistSessionGraph = (
         startedAt: graph.startedAt,
         status: 'active',
         exercises: toPersistDraftExercises(session),
+        mergeRevisions: session.mergeRevisions,
       });
 
 const requireEditableSessionGraph = async (sessionId: string): Promise<EditableSessionGraph> => {
@@ -158,11 +162,11 @@ const requireCompletedSessionGraph = async (sessionId: string) => {
  * session's `gymId` always names a local row.
  */
 export const setSessionGym = async (sessionId: string, gym: { id: string; name: string } | null): Promise<void> => {
-  const graph = await requireEditableSessionGraph(sessionId);
+  await requireEditableSessionGraph(sessionId);
   if (gym) {
     await upsertLocalGym({ id: gym.id, name: gym.name });
   }
-  await persistSessionGraph(graph, graph.session, { gymId: gym?.id ?? null });
+  await updateSessionMetadata(sessionId, { gymId: gym?.id ?? null });
 };
 
 /**
@@ -221,8 +225,8 @@ export const appendPlanToSession = async (
 
 /** Autosaves a completed session's edited Start/End; its rows are kept as persisted. */
 export const setCompletedSessionTimes = async (sessionId: string, times: SessionTimes): Promise<void> => {
-  const graph = await requireCompletedSessionGraph(sessionId);
-  await persistSessionGraph(graph, graph.session, { times });
+  await requireCompletedSessionGraph(sessionId);
+  await updateSessionMetadata(sessionId, { times });
 };
 
 /**
@@ -242,5 +246,6 @@ export const saveCompletedSessionEdit = async (input: {
     startedAt: input.times.startedAt,
     completedAt: input.times.completedAt,
     exercises: toPersistCompletedExercises(input.completedHistorySession),
+    mergeRevisions: input.completedHistorySession.mergeRevisions,
   });
 };

@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { validateMergeOutcomes } from '../../src/exercise-core/merge-sync-ack';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -297,6 +298,7 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
         id: sessionExerciseId,
         client_updated_at_ms: completedAtMs,
         fields: {
+          merge_revision: 0,
           session_id: sessionId,
           exercise_definition_id: generatedExerciseIdForDecision(pkg, decision),
           order_index: exercise.orderIndex,
@@ -314,6 +316,7 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
           id: generatedSetId(sessionExerciseId, set),
           client_updated_at_ms: completedAtMs,
           fields: {
+          merge_revision: 0,
             session_exercise_id: sessionExerciseId,
             order_index: set.orderIndex,
             weight_value: set.weightValue,
@@ -339,7 +342,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '4',
+      'x-boga-sync-protocol': '5',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -356,7 +359,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
-      'x-boga-sync-protocol': '4',
+      'x-boga-sync-protocol': '5',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -376,7 +379,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '4',
+      'x-boga-sync-protocol': '5',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',
@@ -389,6 +392,9 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const body = await response.text();
   if (!response.ok) {
     throw new Error(`sync_push failed: HTTP ${response.status} ${body}`);
+  }
+  if (validateMergeOutcomes(JSON.parse(body), batch)) {
+    throw new Error('Some imported changes were saved for review after an exercise merge. Earlier batches may have committed. Open Data & Sync before retrying.');
   }
 };
 

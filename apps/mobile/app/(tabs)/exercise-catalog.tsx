@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Keyboard, ScrollView, Share, StyleSheet, View } from 'react-native';
 
+import { ExerciseMerge } from '@/components/exercise-catalog/exercise-merge';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import {
@@ -80,6 +81,8 @@ export default function ExerciseCatalogScreen() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [didHandleInitialIntent, setDidHandleInitialIntent] = useState(false);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
+  const [queuedMerge, setQueuedMerge] = useState<ExerciseCatalogExercise | null>(null);
+  const [mergeSource, setMergeSource] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorPrefill, setEditorPrefill] = useState<ExerciseEditorPrefill | null>(null);
   const [editorModalTitle, setEditorModalTitle] = useState<string | undefined>(undefined);
@@ -356,6 +359,7 @@ export default function ExerciseCatalogScreen() {
           <GymPicker onChange={setGymId} options={gymOptions} testID="exercise-catalog-gym" value={gymId} />
         </ExerciseListPreferenceControls>
         {saveFeedback ? <Notice icon="success" live message={saveFeedback} testID="exercise-catalog-feedback" /> : null}
+        {mergeSource ? <ExerciseMerge key={mergeSource.id} source={mergeSource} onDismiss={() => setMergeSource(null)} /> : null}
         {saveError ? <Notice live message={saveError} testID="exercise-catalog-error" tone="danger" /> : null}
       </View>
 
@@ -410,6 +414,7 @@ export default function ExerciseCatalogScreen() {
       <Sheet
         dismissLabel="Dismiss exercise action menu overlay"
         onDismiss={() => setExerciseActionMenuTarget(null)}
+        onDismissed={() => { if (queuedMerge) { setMergeSource(queuedMerge); setQueuedMerge(null); } }}
         testID="exercise-catalog-actions-sheet"
         title={actionTarget?.name}
         visible={actionTarget !== null}>
@@ -479,6 +484,15 @@ export default function ExerciseCatalogScreen() {
             testID="exercise-action-share"
           />
         ) : null}
+        <ListRow accessibilityLabel="Merge exercise from actions" label="Merge into…"
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.danger} name="swap" size="md" />}
+          disabled={isActionTargetDeleted} tone="danger" testID="exercise-action-merge"
+          onPress={() => {
+            if (actionTarget && !actionTarget.deletedAt) {
+              setSaveError(null); setSaveFeedback(null);
+              setQueuedMerge(actionTarget); setExerciseActionMenuTarget(null);
+            }
+          }} />
         {isActionTargetDeleted ? (
           <ListRow
             accessibilityLabel="Undelete exercise from actions"
