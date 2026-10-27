@@ -50,8 +50,9 @@ Complete dates displayed, spoken or edited use Date format, including ranges
 and shared images, preserving device-local days and stored instants. Month/day
 headings, relative and time-only labels keep their roles.
 
-Calendar-week headings may use a named month and shared year/day range in the
-selected order; accessibility retains complete numeric dates.
+Calendar-week headings use a named month and shared day range in the selected
+order, with only the end date's year even across New Year; accessibility retains
+complete numeric dates.
 
 - **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
   whatever the setting. A range takes one dash and the year once, at its end:
