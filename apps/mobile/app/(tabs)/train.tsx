@@ -6,13 +6,12 @@ import { StartDisc } from '@/components/train';
 import {
   ActionButton,
   Card,
+  FigureText,
   ScreenScroll,
   StatePanel,
-  uiFonts,
-  uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
@@ -185,7 +184,7 @@ export function TrainScreen({
             testID="train-start-empty-button"
           />
           {launchError?.kind === 'empty' ? (
-            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-empty-launch-error">
+            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger, styles.errorText]} testID="train-empty-launch-error">
               {launchError.message}
             </Text>
           ) : null}
@@ -262,11 +261,15 @@ function TrainPlanning({
 
   return (
     <View style={styles.planning} testID="train-planning-section">
-      <Text allowFontScaling={false} style={styles.microLabel}>Planned</Text>
+      <Text allowFontScaling={false} style={uiText.label}>Planned</Text>
       <Card style={styles.planRow} testID="train-planned-session-card">
         <View style={styles.planCopy}>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.planTitle}>{planningState.title}</Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.planDetail}>{planningState.detail}</Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
+            <FigureText strong>{planningState.title}</FigureText>
+          </Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+            <FigureText>{planningState.detail}</FigureText>
+          </Text>
         </View>
         <ActionButton
           accessibilityLabel={`Start ${planningState.title}`}
@@ -277,7 +280,7 @@ function TrainPlanning({
         />
       </Card>
       {launchError ? (
-        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-planned-launch-error">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger, styles.errorText]} testID="train-planned-launch-error">
           {launchError}
         </Text>
       ) : null}
@@ -316,15 +319,6 @@ const styles = StyleSheet.create({
   planning: {
     gap: uiSpace.sm,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   planRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,29 +329,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  planTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  planDetail: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
   planningLink: {
     alignItems: 'center',
   },
   errorText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
     textAlign: 'center',
   },
 });

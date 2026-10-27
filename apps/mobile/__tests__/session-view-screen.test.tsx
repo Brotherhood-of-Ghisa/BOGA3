@@ -21,7 +21,7 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { eq, inArray } from 'drizzle-orm';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -81,7 +81,7 @@ import { AddExerciseScreen } from '../app/session/[sessionId]/add-exercise';
 import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
 import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
-import { uiRoles } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
 import { gyms, muscleGroups, sessions } from '@/src/data/schema';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -257,7 +257,7 @@ describe('Session view', () => {
     );
     // The title names the session by when it started and carries the elapsed time.
     const title = `${sessionTitleForStart(sessionRow(SESSION)!.startedAt)} · 47:`;
-    expect(screen.getByTestId('session-view-title').props.children).toMatch(new RegExp(`^${title}\\d{2}$`));
+    expect(screen.getByTestId('session-view-title')).toHaveTextContent(new RegExp(`^${title}\\d{2}$`));
     expect(screen.queryByTestId('session-view-summary-time')).toBeNull();
     // Every exercise on the session counts, the untouched Cable Flys included;
     // the legend reads `Ex`, spoken in full.
@@ -378,6 +378,23 @@ describe('Session view', () => {
     expect(sessionRow(SESSION)?.deletedAt).toBeInstanceOf(Date);
     expect(await sessionDrafts.loadLatestSessionDraftSnapshot()).toBeNull();
     expect(mockDismissTo).toHaveBeenCalledWith('/train');
+  });
+
+  it('states a failed abandon inline as a danger line, and stays on the session (a failed write)', async () => {
+    answerAlerts(() => 'Abandon');
+    jest.spyOn(sessionLifecycle, 'abandonActiveSession').mockRejectedValueOnce(new Error('disk full'));
+    await openSession();
+
+    fireEvent.press(screen.getByTestId('session-view-options-button'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-abandon'));
+    });
+    const notice = await screen.findByTestId('session-view-notice');
+    expect(notice).toHaveTextContent("Couldn't abandon this session. Try again.");
+    expect(StyleSheet.flatten(notice.props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger,
+    });
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it('stays on this workout when Train is pressed, and leaves for any other tab', async () => {

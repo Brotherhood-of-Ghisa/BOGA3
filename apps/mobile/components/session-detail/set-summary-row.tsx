@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Stat } from '@/components/ui/stat';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 // One read-only set: type · weight × reps · 1RM · VOL. No control column — a
@@ -14,25 +16,25 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
   const state = row.done ? 'realised' : 'planned';
   return (
     <View style={[styles.setRow, percentageMetrics && styles.percentageRow]} testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.effortColumn, styles.type, row.done ? null : styles.typePlanned]}>
-        {row.typeLabel}
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, row.done ? uiTextTone.ink : uiTextTone.faint, styles.effortColumn]}>
+        <FigureText>{row.typeLabel}</FigureText>
       </Text>
       <Text
         allowFontScaling={false}
         accessibilityLabel={percentageMetrics ? row.weightReps : undefined}
         numberOfLines={1}
-        style={[styles.weightReps, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
+        style={[uiText.figure, row.done ? (row.weightRecord ? uiTextTone.record : null) : uiTextTone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
         {percentageMetrics ? row.weightReps.replace(' %BW', '') : row.weightReps}
       </Text>
       {!hideDerivedMetrics ? percentageMetrics ? <>
         <Text allowFontScaling={false} numberOfLines={1}
           accessibilityLabel={`1RM ${row.oneRepMax}`}
-          style={[styles.metric, styles.oneRepMax, row.done ? (row.oneRepMaxRecord ? styles.valueRecord : null) : styles.valuePlanned]}
+          style={[uiText.figureSmall, row.done ? (row.oneRepMaxRecord ? uiTextTone.record : uiTextTone.ink) : uiTextTone.faint, styles.metric, styles.oneRepMax]}
           testID={`${testID}-1rm`}>{row.oneRepMax.replace(' %BW', '')}</Text>
         <Text allowFontScaling={false} numberOfLines={1}
           accessibilityLabel={`Vol ${row.volume}`}
-          style={[styles.metric, styles.volume, row.done ? null : styles.valuePlanned]}
+          style={[uiText.figureSmall, row.done ? uiTextTone.ink : uiTextTone.faint, styles.metric, styles.volume]}
           testID={`${testID}-vol`}>{row.volume.replace(' %BW·reps', '')}</Text>
       </> : <>
       <Stat
@@ -68,24 +70,7 @@ const styles = StyleSheet.create({
   effortColumn: {
     width: uiGeometry.tapTarget,
   },
-  type: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.ink,
-  },
-  typePlanned: {
-    color: uiRoles.inkGhost,
-  },
   metric: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
     textAlign: 'right',
   },
   oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
@@ -93,17 +78,5 @@ const styles = StyleSheet.create({
   weightReps: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  valuePlanned: {
-    color: uiRoles.inkFaint,
-  },
-  valueRecord: {
-    fontWeight: '700',
-    color: uiRoles.record,
   },
 });

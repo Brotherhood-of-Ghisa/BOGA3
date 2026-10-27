@@ -381,7 +381,6 @@ function SessionCard({
       accessibilityLabel={`Open session from ${date}`}
       count={`${entry.workingSetCount} ${entry.workingSetCount === 1 ? 'set' : 'sets'}`}
       name={date}
-      nameFace="figure"
       onPress={onPress}
       record={cardRecordBand(record, entry.sessionExerciseId)}
       rowTestID={(row) => `exercise-history-set-row-${row.id}`}

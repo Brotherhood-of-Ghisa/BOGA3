@@ -4,7 +4,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { formatLocalDateTime } from '@/src/utils/local-time';
@@ -28,11 +30,11 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
   const dateFormat = useDateFormat();
   return (
     <Card testID="exercise-picker-preselection-panel">
-      <Text allowFontScaling={false} style={styles.preselectionTitle}>{state.exercise.name}</Text>
+      <Text allowFontScaling={false} style={[uiText.title, styles.preselectionTitle]}>{state.exercise.name}</Text>
       {state.suggestion ? (
         <View style={styles.plan}>
-          <Text allowFontScaling={false} style={styles.planSource} testID="exercise-picker-plan-source">
-            From {formatLocalDateTime(state.suggestion.completedAt.getTime(), dateFormat)}
+          <Text allowFontScaling={false} style={uiText.label} testID="exercise-picker-plan-source">
+            <FigureText>{`From ${formatLocalDateTime(state.suggestion.completedAt.getTime(), dateFormat)}`}</FigureText>
           </Text>
           <ScrollView
             contentContainerStyle={styles.planRows}
@@ -86,25 +88,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
   plan: {
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
-  },
-  planSource: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   // Long plans scroll inside the card; the actions stay in view.
   planRowList: {

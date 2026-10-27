@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
@@ -11,9 +13,6 @@ import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
   name: string;
-  // `figure`: the name is a figure (exercise history's completion stamp), set
-  // in Plex Mono like every other figure.
-  nameFace?: 'display' | 'figure';
   // The header's count: `2/3` on the session view, `3 sets` on View Session.
   count: string;
   // Faded when nothing is done yet.
@@ -53,7 +52,6 @@ type ExerciseSetsCardProps = ExerciseSetsCardBaseProps &
 // view, View Session and the group session view all draw an exercise with it.
 export function ExerciseSetsCard({
   name,
-  nameFace = 'display',
   count,
   countMuted = false,
   rows,
@@ -72,11 +70,11 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
-          {name}{percentageMetrics ? ' (% BW)' : ''}
+        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[uiText.title, styles.name]}>
+          <FigureText strong>{`${name}${percentageMetrics ? ' (% BW)' : ''}`}</FigureText>
         </Text>
-        <Text allowFontScaling={false} style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
-          {count}
+        <Text allowFontScaling={false} style={[uiText.meta, countMuted ? uiTextTone.faint : null]} testID={`${testID}-count`}>
+          <FigureText>{count}</FigureText>
         </Text>
         {accessory}
       </View>
@@ -125,25 +123,6 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  nameFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-  },
-  count: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  countMuted: {
-    color: uiRoles.inkGhost,
   },
   rows: {
     paddingHorizontal: uiSpace.md,
