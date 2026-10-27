@@ -37,9 +37,9 @@ it('shows training weeks newest first, compact week dates, aligned values and pr
 
 const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
 
-it('shows both years for a week crossing New Year', () => {
+it('shows only the end year for a week crossing New Year', () => {
   render(chart(data([day('2025-12-31', 1750)], 52)));
-  expect(screen.getByText('29 Dec 2025 – 4 Jan 2026').props.children).toBe('29 Dec 2025 –\n4 Jan 2026');
+  expect(screen.getByText('29 Dec – 4 Jan 2026').props.children).toBe('29 Dec –\n4 Jan 2026');
   expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
     'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
 });
