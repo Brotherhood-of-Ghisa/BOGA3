@@ -3,7 +3,7 @@
  * link-status wording, the owner/admin action matrix, exercise write wording, and the standard-exercise search.
  */
 
-import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import {
   GroupApiError,
   NOT_LINKED_STATUS,
@@ -155,7 +155,7 @@ describe('searchStandardExercises', () => {
   });
 
   it('carries the seed id and load mode the create RPC needs', () => {
-    const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press');
+    const seed = STANDARD_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press');
     expect(seed).toBeDefined();
     const match = searchStandardExercises(seed!.name, EMPTY_MUSCLE_SETUP).options.find((option) => option.sourceExerciseId === seed!.id);
     expect(match).toEqual({ sourceExerciseId: seed!.id, name: seed!.name, loadInputMode: seed!.loadInputMode });
@@ -163,7 +163,7 @@ describe('searchStandardExercises', () => {
 
   it('caps the results but counts every match', () => {
     const all = searchStandardExercises('', EMPTY_MUSCLE_SETUP);
-    expect(all.total).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+    expect(all.total).toBe(STANDARD_EXERCISE_DEFINITION_SEEDS.length);
     expect(all.options).toHaveLength(Math.min(STANDARD_EXERCISE_RESULT_LIMIT, all.total));
   });
 

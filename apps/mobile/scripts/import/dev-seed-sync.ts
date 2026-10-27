@@ -4,8 +4,8 @@
 // server's triggers (the group share trigger included) see a normal client.
 
 import {
-  SYSTEM_EXERCISE_DEFINITION_SEEDS,
-  SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
+  STANDARD_EXERCISE_DEFINITION_SEEDS,
+  STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
 } from '../../src/data/exercise-catalog-seeds';
 
@@ -47,7 +47,7 @@ export const pushUnique = (entities: WireEntity[], seen: Set<string>, entity: Wi
 
 const timestamps = (atMs: number) => ({ created_at: atMs, updated_at: atMs, deleted_at: null });
 
-/** The starter catalog (muscle groups, exercises, mappings) as one user's rows. */
+/** The existing-account catalogue used by the deterministic history fixtures. */
 export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
   ...SYSTEM_MUSCLE_GROUP_SEEDS.map((muscleGroup): WireEntity => ({
     type: 'muscle_groups',
@@ -61,7 +61,7 @@ export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
       ...timestamps(atMs),
     },
   })),
-  ...SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise): WireEntity => ({
+  ...STANDARD_EXERCISE_DEFINITION_SEEDS.map((exercise): WireEntity => ({
     type: 'exercise_definitions',
     id: exercise.id,
     client_updated_at_ms: atMs,
@@ -73,7 +73,7 @@ export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
       ...timestamps(atMs),
     },
   })),
-  ...SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.map((mapping): WireEntity => ({
+  ...STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS.map((mapping): WireEntity => ({
     type: 'exercise_muscle_mappings',
     id: mapping.id,
     client_updated_at_ms: atMs,

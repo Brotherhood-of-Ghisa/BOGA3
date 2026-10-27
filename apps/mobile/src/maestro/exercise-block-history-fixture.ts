@@ -1,3 +1,4 @@
+import { seedStandardCatalogFixture } from './standard-catalog-fixture';
 import { inArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data';
@@ -467,6 +468,7 @@ export const seedExerciseBlockHistoryFixture = async ({
   includeTwoPrSession?: boolean;
 } = {}) => {
   const targetDatabase = database ?? (await bootstrapLocalDataLayer());
+  await seedStandardCatalogFixture(targetDatabase);
   const rows = buildExerciseBlockHistoryFixtureRows(now, { includeTwoPrSession });
   const sessionIds = rows.sessions.map((row) => row.id);
   const sessionExerciseIds = rows.sessionExercises.map((row) => row.id);
