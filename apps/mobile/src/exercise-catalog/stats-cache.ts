@@ -184,8 +184,6 @@ export type UseExerciseCatalogComparisonResult = {
   /** The period in force, and the one before it ([[comparison.window]]). */
   current: ExerciseCatalogStats;
   previous: ExerciseCatalogStats;
-  /** History-bounded totals used only by the overview colour scale. */
-  history: ExerciseCatalogStats;
   gymOptions: GymScopeOption[];
   lastError: string | null;
   reload: () => void;
@@ -227,7 +225,6 @@ export const useExerciseCatalogComparison = (
     return {
       current: aggregateExerciseCatalogStats(raw, windows.current, now, { gymId, historyStart }),
       previous: aggregateExerciseCatalogStats(raw, windows.previous, now, { gymId, historyStart }),
-      history: aggregateExerciseCatalogStats(raw, history, now, { gymId, historyStart }),
     };
   }, [raw, snapshot.loadedAt, weeks, gymId, historyLookbackWeeks]);
   const gymOptions = useGymOptions(raw);
@@ -236,7 +233,6 @@ export const useExerciseCatalogComparison = (
     status: snapshot.status,
     current: periods.current,
     previous: periods.previous,
-    history: periods.history,
     hasSnapshot: snapshot.rawHistory !== null && snapshot.contextRevision === getBodyWeightContextRevision(),
     gymOptions,
     lastError: snapshot.lastError,

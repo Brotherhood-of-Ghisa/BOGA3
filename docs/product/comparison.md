@@ -62,15 +62,17 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 ### comparison.colour-scale · presentation · accepted
 
-Progress legends precede their charts and run 0%–100%. Muscle Sets reads
-`% of target`, capped at the effective weekly muscle target in history
-and scaled to displayed Progress weeks in 3D; other legends read `% of max`, measured from zero. The maximum always comes
-from History look-back, using the plotted metric and aggregation: daily Grid
-values, summed weekly Sets/Volume or best weekly strength, and per-muscle
-History totals for 3D. Exercise 3D retains its filtered exercise aggregation.
-Empty or all-zero samples stay neutral. Numeric figures and all-time PRs keep
-their existing rules.
+Progress 3D colours each muscle by its change against [[comparison.window]],
+using the displayed change's direction: gain, loss or neutral. Both breakdowns
+follow their filtered comparisons; History look-back and weekly targets do not
+set 3D colours. The selected muscle shows its current, previous and change figures.
 
-Why: a colour has a stable zero and a reference window the user controls.
+History legends precede their charts and run 0%–100%. Muscle Sets reads
+`% of target`, capped at the effective weekly muscle target; other legends read
+`% of max`, measured from zero. The maximum comes from History look-back using
+the plotted aggregation: daily Grid values, summed weekly Sets/Volume or best
+weekly strength. Empty or all-zero samples stay neutral.
+
+Why: 3D shows period changes; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
 `apps/mobile/components/stats/muscle-body-projection.ts`.

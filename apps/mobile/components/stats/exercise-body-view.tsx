@@ -17,7 +17,6 @@ export function ExerciseBodyView({
   renderAll,
   renderDetail,
   report,
-  maximum,
 }: {
   muscles: readonly ProgressMuscleComparison[];
   metric: ProgressMetric;
@@ -27,10 +26,9 @@ export function ExerciseBodyView({
   renderAll: () => ReactNode;
   renderDetail: (entries: ExerciseContributionEntry[], secondary?: readonly ExerciseContributionEntry[]) => ReactNode;
   report?: MuscleReportAssignment;
-  maximum: number;
 }) {
   return <View style={styles.body}>
-    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} report={report} scale={{ maximum }} />
+    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} report={report} />
     {selectedMuscle ? <View testID="stats-exercise-body-detail" style={styles.detail}>
       <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>{selectedMuscle.displayName}</Text>
       {renderDetail(selectedMuscle.exercises, selectedMuscle.secondary)}

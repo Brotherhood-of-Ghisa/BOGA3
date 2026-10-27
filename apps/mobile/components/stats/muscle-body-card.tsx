@@ -3,7 +3,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 
-import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 import {
   Card,
   FigureText,
@@ -20,7 +19,7 @@ import {
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { comparisonFigures, metricUnit } from './comparison-columns';
+import { COLUMN_LABELS, ComparisonValues, comparisonFigures, metricUnit } from './comparison-columns';
 import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
@@ -30,7 +29,6 @@ import {
   normaliseBodyAngle,
   projectMuscleBody,
   type BodyOrientation,
-  type MuscleColourScale,
 } from './muscle-body-projection';
 
 type Props = {
@@ -40,7 +38,6 @@ type Props = {
   readonly onSelect: (id: string) => void;
   /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
   readonly report?: MuscleReportAssignment;
-  readonly scale?: MuscleColourScale;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -178,7 +175,7 @@ function MusclePickerSheet({
           return (
             <ListRow
               accessibilityHint="Selects this muscle on the 3D model"
-              accessibilityLabel={`${row.displayName}, ${figures.now} ${unit}.`}
+              accessibilityLabel={`${row.displayName}. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
               density="sheet"
               key={row.muscleGroupId}
               onPress={() => onSelectMuscle(row.muscleGroupId)}
@@ -216,7 +213,7 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
         return (
           <Pressable
             accessibilityHint="Selects muscle on the 3D body model."
-            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now} ${unit}.`}
+            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
             accessibilityRole="button"
             accessibilityState={{ selected, expanded: selected }}
             key={row.muscleGroupId}
@@ -232,11 +229,11 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
 
 /**
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
- * Colours each muscle group from the active theme's sequential `viz0..viz4` ramp
- * in CIE LCh, supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
+ * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
+ * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects/deselects a muscle group on tap.
  */
-export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, scale }: Props) {
+export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
@@ -250,7 +247,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
   const orientation = bodyOrientationForAngle(angleDeg);
-  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric, scale), [muscles, metric, scale]);
+  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric), [muscles, metric]);
   const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
   const projected = useMemo(
     () =>
@@ -333,7 +330,16 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
 
   return (
     <Card style={styles.card} testID="stats-muscle-body-card">
-      <HeatmapLegend target={!!scale && 'weeklyTarget' in scale} />
+      <View style={styles.legend} testID="stats-muscle-body-legend">
+        {[
+          { label: 'Decrease', color: uiRoles.loss },
+          { label: 'Unchanged', color: uiRoles.rule },
+          { label: 'Increase', color: uiRoles.gain },
+        ].map(({ label, color }) => <View key={label} style={styles.legendItem}>
+          <View style={[styles.swatch, { backgroundColor: color }]} />
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.muted]}>{label}</Text>
+        </View>)}
+      </View>
       <MuscleBodyHeader
         onNext={handleNextMuscle}
         onOpenPicker={() => setSheetVisible(true)}
@@ -400,6 +406,14 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
           </Svg>
         </View>
       </GestureDetector>
+      {selectedMuscle ? <View testID="stats-muscle-body-comparison">
+        <View style={styles.comparisonLabels}>
+          {COLUMN_LABELS.map(label => <Text key={label} allowFontScaling={false}
+            style={[uiText.label, uiTextTone.muted, { width: (viewportWidth - uiSpace.sm * 2) / 3, textAlign: 'right' }]}>{label}</Text>)}
+        </View>
+        <ComparisonValues row={selectedMuscle} metric={metric} prefix="stats-muscle-body-comparison"
+          layout={{ columns: Array(3).fill((viewportWidth - uiSpace.sm * 2) / 3), stacked: false }} />
+      </View> : null}
       <MuscleAccessibilityTargets
         metric={metric}
         muscles={muscles}
@@ -422,6 +436,10 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
 }
 
 const styles = StyleSheet.create({
+  legend: { flexDirection: 'row', justifyContent: 'space-between', gap: uiSpace.sm },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
+  swatch: { width: 12, height: 12 },
+  comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
   card: {
     padding: uiSpace.md,
     gap: uiSpace.sm,
