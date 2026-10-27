@@ -6,8 +6,8 @@ import { uiGeometry, uiRoles, type UiIconSizeToken } from '@/components/ui/token
 
 // `default`: an `ink` glyph (back, ⋮ in a top bar). `muted`: an `ink-muted`
 // glyph for a control inside a card. `danger`: a destructive control.
-// `accent`: the screen's one primary as an icon (an `accent` square), used only
-// where a text button does not fit.
+// `accent`: the screen's one primary as an icon (an `accent` square): the
+// session top bar's Finish tick.
 export type IconButtonTone = 'default' | 'muted' | 'danger' | 'accent';
 
 export type IconButtonProps = {
