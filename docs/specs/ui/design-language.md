@@ -219,7 +219,7 @@ additionally render faded ([[set.row-figures]], §6).
   Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
-- **A change carries its direction**, in colour as well as in its sign: an
+- **A numeric change carries its direction**, in colour as well as in its sign: an
   improvement is `gain`, a decrease `loss`, and no direction — level,
   unavailable — stays `ink`. A figure with no earlier value to fall from
   (`new`) is an improvement. This holds for a change against an earlier period
@@ -229,7 +229,8 @@ additionally render faded ([[set.row-figures]], §6).
   differ only in hue, so neither shouts. **Colour is never the only channel:**
   the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
   change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
-  it lives, and no screen picks a delta colour of its own.
+  it lives, and no screen picks a delta colour of its own. 3D muscle fills
+  follow [[comparison.colour-scale]].
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.
