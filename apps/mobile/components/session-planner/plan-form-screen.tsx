@@ -4,7 +4,7 @@ import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
@@ -243,12 +243,12 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           testID="plan-form-add-block"
         />
         {errors.get('exercises') ? (
-          <Text allowFontScaling={false} style={styles.error} testID="plan-form-blocks-error">
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.danger]} testID="plan-form-blocks-error">
             {errors.get('exercises')}
           </Text>
         ) : null}
         {form.blocks.length === 0 ? (
-          <Text allowFontScaling={false} style={styles.hint} testID="plan-form-blocks-empty">
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="plan-form-blocks-empty">
             A plan needs at least one exercise.
           </Text>
         ) : null}
@@ -298,19 +298,5 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: uiSpace.md,
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  error: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
   },
 });

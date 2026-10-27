@@ -7,16 +7,16 @@ import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   FormField,
   IconButton,
   ListRow,
   Notice,
   PageSheet,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanSetAddForm } from '@/components/session-planner/plan-set-add-form';
@@ -141,7 +141,7 @@ function ProgrammeChildPlanBlocks({
   return (
     <View style={styles.fieldBlock}>
       <View style={styles.blocksHeader}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.fieldLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
           Exercise blocks
         </Text>
         <ActionButton
@@ -173,7 +173,7 @@ function ProgrammeChildPlanBlocks({
         />
       ))}
       {blocks.length === 0 ? (
-        <Text allowFontScaling={false} style={styles.hint} testID="programme-child-plan-blocks-empty">
+        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="programme-child-plan-blocks-empty">
           A session needs at least one exercise.
         </Text>
       ) : null}
@@ -298,7 +298,7 @@ function ProgrammeSessionEditSheet({
           />
 
           <View style={styles.fieldBlock}>
-            <Text allowFontScaling={false} style={styles.fieldLabel}>
+            <Text allowFontScaling={false} style={uiText.label}>
               Schedule (optional)
             </Text>
             <Card>
@@ -314,7 +314,7 @@ function ProgrammeSessionEditSheet({
           </View>
 
           <View style={styles.fieldBlock}>
-            <Text allowFontScaling={false} style={styles.fieldLabel}>
+            <Text allowFontScaling={false} style={uiText.label}>
               Gym
             </Text>
             <Card>
@@ -481,11 +481,11 @@ function ProgrammeChildPlanCard({
     <Card style={[styles.planCard, hasError && styles.planCardError]} testID={testID}>
       <View style={styles.planCardTopRow}>
         <View style={styles.planCardInfo}>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardTitle}>
+          <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
             {name}
           </Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.planCardSummary}>
-            {scheduleSummary} · {blockCount} {blockCount === 1 ? 'block' : 'blocks'}
+          <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+            <FigureText>{`${scheduleSummary} · ${blockCount} ${blockCount === 1 ? 'block' : 'blocks'}`}</FigureText>
           </Text>
         </View>
 
@@ -535,7 +535,7 @@ function ProgrammeChildPlanCard({
       </View>
 
       {hasError ? (
-        <Text allowFontScaling={false} style={styles.planCardErrorText}>
+        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.danger, styles.planCardErrorText]}>
           Please review errors inside this session.
         </Text>
       ) : null}
@@ -621,7 +621,7 @@ export function ProgrammeFormScreen({
 
       <View style={styles.sessionsHeader}>
         <View style={styles.sessionsHeaderTitle}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
             Sessions ({form.plans.length})
           </Text>
         </View>
@@ -699,15 +699,6 @@ const styles = StyleSheet.create({
   sessionsHeaderTitle: {
     flex: 1,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   plansList: {
     gap: uiSpace.sm,
   },
@@ -728,20 +719,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: uiSpace.xs,
   },
-  planCardTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  planCardSummary: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
   reorderControls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -754,9 +731,6 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.xs,
   },
   planCardErrorText: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.xs,
-    color: uiRoles.danger,
     marginTop: uiSpace.xs,
   },
   saveSection: {
@@ -776,22 +750,9 @@ const styles = StyleSheet.create({
   fieldBlock: {
     gap: uiSpace.xs,
   },
-  fieldLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    color: uiRoles.ink,
-  },
   blocksHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

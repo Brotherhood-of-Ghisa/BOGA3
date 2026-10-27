@@ -8,7 +8,9 @@ import { useFocusEffect } from 'expo-router';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
 
 /**
@@ -53,7 +55,7 @@ export function PlanSection({
   }
   return (
     <View style={styles.section} testID={testID}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
         {label}
       </Text>
       <Card>
@@ -66,11 +68,11 @@ export function PlanSection({
             onPress={() => onOpenProgramme?.(programme.id)}
             testID={`${testID}-programme-${programme.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
                 {programme.name}
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
-                Programme · {programme.planCount} {programme.planCount === 1 ? 'session' : 'sessions'}
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}`}</FigureText>
               </Text>
             </View>
           </ListRow>
@@ -84,11 +86,11 @@ export function PlanSection({
             onPress={() => onOpenPlan(plan.id)}
             testID={`${testID}-row-${plan.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
                 {plan.title}
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
-                {planDetailLine(plan, dateFormat)}
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+                <FigureText>{planDetailLine(plan, dateFormat)}</FigureText>
               </Text>
             </View>
           </ListRow>
@@ -186,30 +188,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingBottom: uiSpace.md,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   rowText: {
     paddingVertical: uiSpace.sm,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  detail: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
 });
