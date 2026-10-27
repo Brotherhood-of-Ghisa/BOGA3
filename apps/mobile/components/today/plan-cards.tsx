@@ -4,7 +4,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { localDateKey } from '@/src/utils/calendar-weeks';
@@ -91,7 +90,6 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
         <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{row.weekSets}</Text>
         <Text allowFontScaling={false} style={uiTextTone.muted}>{`/${row.target}`}</Text>
       </Text>
-      <Icon color={uiRoles.inkGhost} name="chevron-right" size="sm" />
     </Pressable>
   );
 }
@@ -136,7 +134,6 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
           </Text>
         </RecoveryDayColumn>
         <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
-        <View style={styles.chevronSpace} />
       </View>
       {fill ? (
         <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-plan-recovery-rows">
@@ -356,9 +353,6 @@ const styles = StyleSheet.create({
     width: WEEK_WIDTH,
     marginLeft: uiSpace.xs,
     textAlign: 'right',
-  },
-  chevronSpace: {
-    width: 16,
   },
   week: {
     flexDirection: 'row',
