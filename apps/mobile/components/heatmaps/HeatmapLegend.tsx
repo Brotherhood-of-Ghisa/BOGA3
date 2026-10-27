@@ -3,19 +3,19 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 import { HEAT_RAMP } from './heatmap-metric';
-import { heatmapStyles } from './heatmap-style';
 
 export function HeatmapLegend({ target = false }: { target?: boolean }) {
   return (
     <View style={styles.legend}>
-      <Text allowFontScaling={false} style={heatmapStyles.legendText}>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
         {target ? '% of target' : '% of max'}
       </Text>
       <View style={styles.ramp}>
-        <Text allowFontScaling={false} style={heatmapStyles.legendText}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
           0%
         </Text>
         {HEAT_RAMP.map((color, i) => (
@@ -24,7 +24,7 @@ export function HeatmapLegend({ target = false }: { target?: boolean }) {
             style={[styles.swatch, { backgroundColor: color }, i === 0 ? styles.restSwatch : null]}
           />
         ))}
-        <Text allowFontScaling={false} style={heatmapStyles.legendText}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
           100%
         </Text>
       </View>

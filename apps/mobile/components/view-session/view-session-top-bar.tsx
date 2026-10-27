@@ -3,7 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 type ViewSessionTopBarProps = {
   onBack: () => void;
@@ -26,8 +28,8 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View
       <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
       {/* Shrinks to fit rather than truncate, as the active session's title does. */}
       <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
-        numberOfLines={1} style={styles.title} testID="completed-session-detail-title">
-        {title}
+        numberOfLines={1} style={[uiText.title, styles.title]} testID="completed-session-detail-title">
+        <FigureText strong>{title}</FigureText>
       </Text>
       {onOpenOptions ? (
         <IconButton
@@ -65,10 +67,5 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
 });

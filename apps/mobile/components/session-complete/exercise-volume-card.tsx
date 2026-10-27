@@ -4,7 +4,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { changeToneColour, type ChangeTone } from '@/components/ui/change-tone';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { hasVolumeReference, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 type ExerciseVolumeCardProps = {
@@ -100,19 +102,21 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
       <View accessibilityLabel={buildAccessibilityLabel(comparison)} accessible style={styles.body}>
         <View style={styles.headingRow} testID={testID ? `${testID}-heading` : undefined}>
-          <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
-            {comparison.exerciseName}
+          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.bodyStrong, styles.name]}>
+            <FigureText strong>{comparison.exerciseName}</FigureText>
           </Text>
-          <Text allowFontScaling={false} style={styles.counts}>{formatExerciseSetCount(comparison.workingSetCount)}</Text>
+          <Text allowFontScaling={false} style={uiText.meta}>
+            <FigureText>{formatExerciseSetCount(comparison.workingSetCount)}</FigureText>
+          </Text>
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>
-            <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
-            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Vol</Text>
+            <Text allowFontScaling={false} style={uiText.figureHero}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
           </View>
           {hasDistribution ? <Text allowFontScaling={false}
-            style={[styles.delta, { color: changeToneColour(exerciseVolumeTone(comparison)) }]}>
-            {formatExerciseVolumeComparison(comparison)}
+            style={[uiText.meta, uiTextEmphasis.strong, styles.delta, { color: changeToneColour(exerciseVolumeTone(comparison)) }]}>
+            <FigureText strong>{formatExerciseVolumeComparison(comparison)}</FigureText>
           </Text> : null}
         </View>
 
@@ -134,9 +138,11 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
                   transform: [{ translateX: reference.position / 100 * plotWidth - annotationWidths[index] / 2 }],
                   opacity: plotWidth > 0 && annotationWidths[index] > 0 && (index === 1 || showQuartileLabels) ? 1 : 0,
                 }]}>
-                <Text allowFontScaling={false} style={styles.microLabel}>{reference.label}</Text>
+                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+                  <FigureText>{reference.label}</FigureText>
+                </Text>
                 <View style={styles.annotationGap} />
-                <Text allowFontScaling={false} style={styles.legendValue}>{formatVolume(reference.value as number)}</Text>
+                <Text allowFontScaling={false} style={uiText.figureSmall}>{formatVolume(reference.value as number)}</Text>
               </View>
             ))}
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
@@ -175,18 +181,6 @@ const styles = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  counts: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   valueRow: {
     flexDirection: 'row',
@@ -200,39 +194,11 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: uiSpace.xs,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  volume: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  legendValue: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
   delta: {
     flexShrink: 1, textAlign: 'right',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
   distribution: {
-    height: uiTypography.lineHeight.xxs + uiSpace.xs * 2 + uiSpace.lg + uiTypography.lineHeight.xs,
+    height: uiTypography.lineHeight.xxs + uiSpace.xs * 2 + uiSpace.lg + uiTypography.lineHeight.sm,
     marginHorizontal: uiSpace.xs,
   },
   annotation: {

@@ -216,9 +216,10 @@ it.each([320, 375, 402, 448])('centres the Sun/Week separator in a wider gap at 
   expect(style('calendar-heatmap-week-2026-09-2026-09-28').marginLeft).toBe(uiSpace.sm);
   expect(style('calendar-heatmap-empty-week-2026-10-2026-10-05').marginLeft).toBe(uiSpace.sm);
   const date = style('calendar-heatmap-row-label-2026-10-05');
-  expect(date).toMatchObject({ width: uiSpace.xl, textAlign: 'right', fontSize: uiTypography.size.xxs, color: uiRoles.inkMuted });
+  expect(date).toMatchObject({ width: uiSpace.xl, textAlign: 'right', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted });
   expect(date.position).toBeUndefined();
-  expect(date.fontSize).toBeLessThan(style('calendar-heatmap-cell-2026-10-05-value').fontSize);
+  // Both are `figureSmall`: the date stays quieter than a tile's value by its muted colour.
+  expect(style('calendar-heatmap-cell-2026-10-05-value')).toMatchObject({ fontSize: date.fontSize, color: uiRoles.ink });
 });
 
 it('shows a cross-month total on Sunday with sampled rest days preceding the first workout', () => {

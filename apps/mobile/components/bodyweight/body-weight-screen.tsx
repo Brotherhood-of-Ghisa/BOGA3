@@ -3,7 +3,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles } from '@/components/ui';
+import { ActionButton, Card, FigureText, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles, uiText, uiTextTone } from '@/components/ui';
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
@@ -44,7 +44,7 @@ export function BodyWeightScreen() {
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
       <Card><BodyweightCalculationsRow /></Card>
-      <Text allowFontScaling={false} style={styles.body}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         Each session uses the latest reading on or before its start.
       </Text>
       {feedback ? <Notice live message={feedback} testID="body-weight-feedback" /> : null}
@@ -55,16 +55,16 @@ export function BodyWeightScreen() {
             <Stat label="Current body weight"
               value={currentValid ? displayKg(current.weightKg) : 'Unknown'} kind={currentValid ? 'figure' : 'text'}
               testID="body-weight-current" />
-            <Text allowFontScaling={false} style={styles.body}>
-              {currentValid ? `Measured ${formatLocalDateTime(current.measuredAt.getTime(), dateFormat)}` : current
-                ? 'Your latest reading needs review before it can be used.' : 'No weight recorded. Add your first reading below.'}
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+              <FigureText>{currentValid ? `Measured ${formatLocalDateTime(current.measuredAt.getTime(), dateFormat)}` : current
+                ? 'Your latest reading needs review before it can be used.' : 'No weight recorded. Add your first reading below.'}</FigureText>
             </Text>
           </View></Card>
           <ActionButton label="Add reading" variant="primary" testID="body-weight-add"
             onPress={() => openEditor({ reading: null, measuredAt: new Date() })} />
           <View style={styles.section}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={styles.label}>Weight history</Text>
-            {readings.length === 0 ? <Text allowFontScaling={false} style={styles.body} testID="body-weight-empty">
+            <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>Weight history</Text>
+            {readings.length === 0 ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="body-weight-empty">
               No readings yet. Weight is saved on this device even when you are offline.
             </Text> : <Card>{readings.map((reading, index) => <ListRow key={reading.id}
               divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
@@ -73,7 +73,7 @@ export function BodyWeightScreen() {
               trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
               <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)} value={displayKg(reading.weightKg)}
                 rank="secondary" />
-              {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={styles.body}>Needs review</Text> : null}
+              {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Needs review</Text> : null}
             </ListRow>)}</Card>}
           </View>
         </>}

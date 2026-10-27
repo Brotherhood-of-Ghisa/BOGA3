@@ -6,14 +6,15 @@ import Svg, { Path } from 'react-native-svg';
 import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 import {
   Card,
+  FigureText,
   Icon,
   ListRow,
   SegmentedControl,
   Sheet,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
   type SegmentedControlOption,
 } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
@@ -125,7 +126,7 @@ function MuscleBodyHeader({
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={styles.selectedName}
+            style={[uiText.label, uiTextTone.ink]}
             testID="stats-muscle-body-selected">
             {selectedMuscle?.displayName ?? 'Select'}
           </Text>
@@ -187,11 +188,11 @@ function MusclePickerSheet({
               <View style={styles.sheetRowContent}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.sheetRowName, isSelected && styles.sheetRowNameSelected]}>
+                  style={[uiText.bodyStrong, isSelected && uiTextTone.accent]}>
                   {row.displayName}
                 </Text>
-                <Text allowFontScaling={false} style={styles.sheetRowMeta}>
-                  {figures.now} {unit}
+                <Text allowFontScaling={false} style={uiText.meta}>
+                  <FigureText>{`${figures.now} ${unit}`}</FigureText>
                 </Text>
               </View>
             </ListRow>
@@ -452,13 +453,6 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
     maxWidth: 160,
   },
-  selectedName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
   sheetScroll: {
     maxHeight: 460,
   },
@@ -471,23 +465,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingRight: uiSpace.sm,
-  },
-  sheetRowName: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  sheetRowNameSelected: {
-    color: uiRoles.accent,
-  },
-  sheetRowMeta: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   viewport: {
     alignItems: 'center',

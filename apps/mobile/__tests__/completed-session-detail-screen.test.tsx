@@ -8,7 +8,8 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { BackHandler } from 'react-native';
+import { BackHandler, StyleSheet } from 'react-native';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
 
 import CompletedSessionDetailRoute, {
@@ -355,6 +356,13 @@ describe('CompletedSessionDetailScreenShell', () => {
         'Share is temporarily unavailable. Try again.'
       );
     });
+    // A share error is a strong meta line in `danger`.
+    expect(StyleSheet.flatten(screen.getByTestId('session-share-error').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, color: uiRoles.danger, textAlign: 'center',
+    });
+    expect(StyleSheet.flatten(screen.getByText('Nothing is shared until you choose an app.').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted, textAlign: 'center',
+    });
     expect(mockCaptureRef).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('session-share-image'));
@@ -574,6 +582,10 @@ describe('CompletedSessionDetailScreenShell', () => {
       resolveDelete?.();
     });
     expect(await screen.findByTestId('completed-session-detail-deleted-band')).toBeTruthy();
+    // The band's words are a muted micro-label.
+    expect(StyleSheet.flatten(screen.getByText('Deleted · hidden from history').props.style)).toMatchObject({
+      fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkMuted,
+    });
   });
 
   it('shows a failed delete inline and keeps the session as it was', async () => {
@@ -589,6 +601,9 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(await screen.findByTestId('completed-session-detail-error-notice')).toHaveTextContent(
       'Unable to update deleted state'
     );
+    expect(StyleSheet.flatten(screen.getByTestId('completed-session-detail-error-notice').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger,
+    });
     expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
   });

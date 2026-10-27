@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
@@ -38,7 +38,7 @@ export function CalendarTile(props: Props) {
   const target = cell?.targetAttainment;
   const prCount = cell?.prCount ?? 0;
   const content = <>
-    <Text allowFontScaling={false} style={styles.value} numberOfLines={1} testID={`${testID}-value`}>{value}</Text>
+    <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink, styles.value]} numberOfLines={1} testID={`${testID}-value`}>{value}</Text>
     {!weekly && !future && prCount > 0 ? <Svg accessible={false} accessibilityElementsHidden pointerEvents="none"
       width={uiSpace.sm} height={uiSpace.sm} viewBox="0 0 8 8" style={styles.pr} testID={`${testID}-pr`}>
       <Path d="M0 0H8V8Z" fill={uiRoles.record} />
@@ -62,6 +62,5 @@ const styles = StyleSheet.create({
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
     ...heatmapStyles.restCell, justifyContent: 'center' },
   unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: uiRoles.rule },
-  value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs, color: uiRoles.ink, textAlign: 'center' },
+  value: { textAlign: 'center' },
 });

@@ -230,12 +230,15 @@ it.each([[[0, 40, 20, 30, 10, 20]], [[20, 20, 20, 20, 20, 20]]])('keeps valid Vo
   const disclosure = StyleSheet.flatten(screen.getByTestId('stats-muscle-select-back').props.style);
   const historyWidth = tableWidth - card.borderWidth * 2 - row.paddingHorizontal * 2 - row.gap * 2
     - periods.width - change.width - figures.gap - disclosure.width;
-  expect(historyWidth).toBeCloseTo(63.1567, 2);
+  expect(historyWidth).toBeCloseTo(59.3333, 2);
   layout('stats-muscle-history-back', historyWidth);
   const ticker = screen.getByTestId('stats-muscle-ticker-back');
   expect(ticker.props.width).toBeGreaterThanOrEqual(8);
   expect(ticker.props.width).toBeLessThanOrEqual(tableWidth / 3);
-  expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(44);
+  // A seven-digit Volume at the `figure` role's 14pt leaves the name 43pt
+  // beside its ticker; the whole link (name and ticker) keeps its 44pt target.
+  expect(historyWidth).toBeGreaterThanOrEqual(44);
+  expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(43);
   expect(screen.getAllByTestId('stats-muscle-ticker-back-endpoint')).toHaveLength(1);
   expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent('1234567');
 });

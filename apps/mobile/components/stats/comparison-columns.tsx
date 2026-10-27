@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { changeToneColour, uiBorder, uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui';
+import { changeToneColour, FigureText, uiBorder, uiGeometry, uiIconSize, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ProgressExerciseMetric } from '@/src/preferences/model';
@@ -230,26 +230,33 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
     style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
     <StatsTableFigures testID={`${prefix}-values`}>
       {layout.pairedPeriods ? <>
-        {inlinePeriods(metric) ? <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: periodWidth }]}
+        {inlinePeriods(metric) ? <Text allowFontScaling={false} style={[uiText.figure, statsTableStyles.figure, { width: periodWidth }]}
           testID={`${prefix}-periods`}>
           <Text allowFontScaling={false} testID={`${prefix}-now`}>{figures.now}</Text>
-          <Text allowFontScaling={false} style={styles.previous}> (<Text allowFontScaling={false}
+          <Text allowFontScaling={false} style={uiTextTone.muted}> (<Text allowFontScaling={false}
             testID={`${prefix}-previous`}>{figures.previous}</Text>)</Text>
         </Text> : <View style={{ width: periodWidth }} testID={`${prefix}-periods`}>
-          <Text allowFontScaling={false} style={statsTableStyles.figure} testID={`${prefix}-now`}>{figures.now}</Text>
-          <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.previous]} testID={`${prefix}-previous`}>{figures.previous}</Text>
+          <Text allowFontScaling={false} style={[uiText.figure, statsTableStyles.figure]} testID={`${prefix}-now`}>{figures.now}</Text>
+          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, statsTableStyles.figure]} testID={`${prefix}-previous`}>{figures.previous}</Text>
         </View>}
-        <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: layout.columns[2] }, changeColour]}
-          testID={`${prefix}-change`}>{figures.change.text}</Text>
-      </> : texts.map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
-        style={[statsTableStyles.figure, { width: layout.columns[index] }, COLUMN_KEYS[index] === 'change' && changeColour]}
-        testID={`${prefix}-${COLUMN_KEYS[index]}`}>{value}</Text>)}
+        <ComparisonCell text={figures.change.text} width={layout.columns[2]} colour={changeColour} testID={`${prefix}-change`} />
+      </> : texts.map((value, index) => <ComparisonCell key={COLUMN_KEYS[index]} text={value} width={layout.columns[index]}
+        colour={COLUMN_KEYS[index] === 'change' ? changeColour : undefined} testID={`${prefix}-${COLUMN_KEYS[index]}`} />)}
     </StatsTableFigures>
   </View>;
 }
 
+// One figure column's cell. A change that reads as a word (`new`, `Increased`)
+// is a word, so it leaves the figure face (`design-language.md` §3).
+function ComparisonCell({ text, width, colour, testID }: {
+  text: string; width: number; colour?: { color: string }; testID: string;
+}) {
+  const word = /[A-Za-z]/.test(text);
+  return <Text allowFontScaling={false} style={[word ? uiText.body : uiText.figure, statsTableStyles.figure, { width }, colour]}
+    testID={testID}>{word ? <FigureText>{text}</FigureText> : text}</Text>;
+}
+
 const styles = StyleSheet.create({
-  previous: { color: uiRoles.inkMuted },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { alignItems: 'stretch' },
   stackedFigures: { alignSelf: 'stretch', width: '100%', justifyContent: 'flex-end', paddingBottom: uiSpace.xs },

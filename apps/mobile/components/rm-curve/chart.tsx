@@ -1,12 +1,19 @@
 import { useId, useRef, useState } from 'react';
 import { Platform, Pressable, Text, type ViewInstance } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, Line, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { ObservationUncertainty, RegimeCurve } from '@/src/strength-regimes/assessment';
 import { FIXED_REGIME_UNCERTAINTY } from '@/src/strength-regimes/fit';
 import type { RmCurveModel } from '@/src/rm-curve/model';
 import { axisLabel, curveGeometry, pointsAt, PLOT_HEIGHT } from './geometry';
-import { curveStyles as styles } from './styles';
+
+// An axis tick is a legend: the micro-label, faint, drawn by the SVG's own text
+// props (`design-language.md` §3).
+const TICK = {
+  fill: uiTextTone.faint.color, fontFamily: uiText.label.fontFamily, fontWeight: uiText.label.fontWeight,
+  fontSize: uiText.label.fontSize, letterSpacing: uiText.label.letterSpacing,
+};
 
 export const periodColour = (period: RegimeCurve['period']) => period === 'newer' ? uiRoles.regimeNewer : uiRoles.regimeOlder;
 
@@ -60,12 +67,11 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
         {[0, 1, 2, 3, 4].map(i => <Line key={i} x1={plot.x(0)} x2={plot.x(plot.maxReps)}
           y1={plot.y(plot.maxLoad * (i / 4))} y2={plot.y(plot.maxLoad * (i / 4))} stroke={uiRoles.ruleSoft} />)}
         {[0, 1, 2, 3, 4].map(i => <SvgText key={i} x={plot.x(0) - uiSpace.xs}
-          y={plot.y(plot.maxLoad * (i / 4)) + uiSpace.xs} textAnchor="end" fill={uiRoles.inkMuted}
-          fontFamily={uiFonts.figure.family} fontWeight="500" fontSize={uiTypography.size.xxs}>
+          y={plot.y(plot.maxLoad * (i / 4)) + uiSpace.xs} textAnchor="end" {...TICK}>
           {axisLabel(plot.maxLoad * (i / 4))}
         </SvgText>)}
         {[0, 1, 2, 3, 4].map(i => <SvgText key={i} x={plot.x(plot.maxReps * (i / 4))} y={PLOT_HEIGHT - uiSpace.xs}
-          textAnchor={i === 4 ? 'end' : 'middle'} fill={uiRoles.inkMuted} fontFamily={uiFonts.figure.family} fontWeight="500" fontSize={uiTypography.size.xxs}>
+          textAnchor={i === 4 ? 'end' : 'middle'} {...TICK}>
           {axisLabel(plot.maxReps * (i / 4))}
         </SvgText>)}
         {plot.lines.map(line => <Polyline key={line.period} testID={`rm-fit-${line.period}`} points={line.line} fill="none"
@@ -85,6 +91,6 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
           fill="none" stroke={uiRoles.ink} strokeWidth={2} />)}
       </Svg>
     </Pressable>
-    <Text allowFontScaling={false} style={styles.micro}>REPS + RIR</Text>
+    <Text allowFontScaling={false} style={uiText.label}>REPS + RIR</Text>
   </>;
 }

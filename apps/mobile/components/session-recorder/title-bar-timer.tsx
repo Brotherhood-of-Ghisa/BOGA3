@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
 
 export type TitleBarTimerProps = {
@@ -50,7 +51,7 @@ export function TitleBarTimer({ view, onPress, onLongPress, testID }: TitleBarTi
       ) : (
         <View style={[styles.pill, PILL_TONE[copy.tone]]} testID={`${testID}-pill`}>
           <Icon color={GLYPH_COLOR[copy.tone]} name={copy.tone === 'done' ? 'success' : 'timer'} size="sm" />
-          <Text allowFontScaling={false} style={[styles.countdown, { color: GLYPH_COLOR[copy.tone] }]}
+          <Text allowFontScaling={false} style={[uiText.figureLarge, { color: GLYPH_COLOR[copy.tone] }]}
             testID={`${testID}-countdown`}>
             {view.formatted}
           </Text>
@@ -146,13 +147,6 @@ const styles = StyleSheet.create({
   done: {
     borderColor: uiRoles.ink,
     backgroundColor: uiRoles.ink,
-  },
-  countdown: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    fontVariant: ['tabular-nums'],
   },
 });
 
