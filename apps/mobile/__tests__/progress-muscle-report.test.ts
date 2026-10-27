@@ -35,7 +35,7 @@ const exercise = (mappings: [string, 'primary' | 'secondary' | 'stabilizer'][]):
 });
 
 describe('3D body under the user’s muscles', () => {
-  const buckets = new Map([['back_lats', 4 as const], ['chest', 2 as const]]);
+  const buckets = new Map([['back_lats', 2 as const], ['chest', 1 as const]]);
   const project = (report?: typeof BROAD, angleDeg = 180) =>
     projectMuscleBody({ angleDeg, width: 300, height: 560, buckets, report });
   const palette = buildThemeShadePalette();
@@ -48,7 +48,7 @@ describe('3D body under the user’s muscles', () => {
     const back = broad.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
     expect(back).toHaveLength(memberTriangles.length);
     expect(new Set(back.map(tri => tri.fill)).size).toBeLessThanOrEqual(12);
-    expect(back.every(tri => palette.buckets[4].includes(tri.fill))).toBe(true);
+    expect(back.every(tri => palette.buckets[2].includes(tri.fill))).toBe(true);
     expect(broad.triangles.some(tri => MERGED_BACK.includes(tri.muscleGroupId))).toBe(false);
   });
 

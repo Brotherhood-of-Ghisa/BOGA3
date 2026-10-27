@@ -81,7 +81,7 @@ describe('Progress muscle views', () => {
   const muscles = [lats, muscle('quads', 'Quads', 4, 2)];
 
   it('labels the picker trigger as a control in ink, and names its sheet rows in bodyStrong with a meta figure line', () => {
-    render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="back_lats" onSelect={jest.fn()} scale={{ maximum: 4 }} />);
+    render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="back_lats" onSelect={jest.fn()} />);
     expect(style(screen.getByTestId('stats-muscle-body-selected'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
     fireEvent.press(screen.getByTestId('stats-muscle-body-picker-trigger'));
     const row = screen.getByTestId('stats-muscle-picker-row-back_lats');
@@ -93,7 +93,7 @@ describe('Progress muscle views', () => {
   });
 
   it('titles the selected muscle on the exercise body view', () => {
-    render(<ExerciseBodyView muscles={muscles} metric="workingSetCount" selectedMuscleId="back_lats" maximum={4}
+    render(<ExerciseBodyView muscles={muscles} metric="workingSetCount" selectedMuscleId="back_lats"
       selectedMuscle={{ muscleGroupId: 'back_lats', displayName: 'Lats', exercises: [], secondary: [] }}
       onSelectMuscle={jest.fn()} renderAll={() => null} renderDetail={() => null} />);
     expect(style(screen.getByRole('header', { name: 'Lats' }))).toMatchObject({ ...TITLE, color: uiRoles.ink });
@@ -101,7 +101,7 @@ describe('Progress muscle views', () => {
 
   it('titles the selected muscle on the muscle view', () => {
     render(<ProgressMuscleView muscles={muscles} metric="workingSetCount" selectedId="back_lats" muscleLayout="3d"
-      onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={jest.fn()} scale={{ maximum: 4 }} />);
+      onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={jest.fn()} />);
     expect(style(screen.getByRole('header', { name: 'Lats' }))).toMatchObject({ ...TITLE, flex: 1 });
   });
 });
