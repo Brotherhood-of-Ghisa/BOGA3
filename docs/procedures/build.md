@@ -1,8 +1,8 @@
 # Default build
 
-Load only when you were given no build protocol: no engine run, no task card
-and no user instruction on lanes or merging. If you were given one, follow it
-and do not load this.
+Load only when you were given no build protocol (engine run, task card, user
+instruction), or one silent on lanes or on merging. Follow your protocol where
+it speaks; apply the matching rule below only for the topic it leaves open.
 
 - **Lanes:** Jest always (`./boga test fast`). Before running any lane beyond
   it, propose a lane set to your reviewer agent: the path default from

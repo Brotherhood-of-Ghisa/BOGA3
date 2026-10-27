@@ -80,7 +80,7 @@ place each under `docs/specs/**`, routed from here.
        `npm run lint:deps:prune` after you fix one.
      - Meet a target by adding tests, splitting the function or moving the
        code to the layer a rule allows. Lowering a threshold or adding a
-       suppression or baseline entry needs the operator's agreement.
+       suppression or baseline entry needs the operator's (the human you are working with) agreement.
        Details: spec `02`, "Quality targets".
    - **The full sweep** (`./boga sweep --ref <ref>`, every lane in its own
      worktree) is required only before a release build. Otherwise suggest it to
@@ -151,7 +151,7 @@ never a spec of the result: what must outlive the build moves to its owner.
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
-| No build protocol given (no engine run, task card or user instruction on lanes or merging) | `docs/procedures/build.md` |
+| You have no build protocol (engine run, task card, user instruction), or yours is silent on lanes or on merging | `docs/procedures/build.md` |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
