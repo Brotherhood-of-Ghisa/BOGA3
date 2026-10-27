@@ -5,7 +5,7 @@ import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
   COLUMN_KEYS, COLUMN_NAMES, ComparisonHeaders, ComparisonValues, compareOptionalNumbers, comparisonSortValues,
-  hasComparisonMetric, metricUnit, pairedPeriodColumns, resolveComparisonLayout, type ComparisonColumnKey,
+  hasComparisonMetric, metricUnit, resolvePairedComparisonLayout, type ComparisonColumnKey,
   type ComparisonLayout,
 } from './comparison-columns';
 import { StatsTable, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
@@ -87,7 +87,7 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 };
 
 // Family headers carry no totals: overlapping muscle rows cannot be summed.
-// List rows pair Now with Previous under one `Now` header, with history beside the name. Only Now
+// List rows pair Now with Previous under one `Now (Prev)` header, with history beside the name. Only Now
 // sorts the paired periods; history and disclosure keep separate 44pt targets.
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
@@ -100,12 +100,8 @@ export function ProgressTables(props: ProgressTablesProps) {
     `${row.displayName} ${row.familyName}`.toLowerCase())), sortMode, metric, grouped, familyCounts);
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
-  const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const resolved = resolveComparisonLayout(tableWidth ? tableWidth + uiSpace.lg * 2 : width, [...rows, ...exercises], metric, true, true);
-  const layout: ComparisonLayout = {
-    ...resolved, columns: pairedPeriodColumns(resolved.columns, [...rows, ...exercises], metric),
-    stacked: false, pairedPeriods: true,
-  };
+  const layout = resolvePairedComparisonLayout(tableWidth ? tableWidth + uiSpace.lg * 2 : width,
+    [...rows, ...(selected?.exercises ?? [])]);
   return <View onLayout={event => setTableWidth(event.nativeEvent.layout.width)} testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
     <ComparisonHeaders layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
@@ -160,7 +156,7 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
   onSort: ProgressTablesProps['onSort']; width?: number;
 }) {
   const key = header === 'muscle' ? 'name' : header;
-  const named = header === 'muscle' ? 'Muscle' : `${COLUMN_NAMES[COLUMN_KEYS.indexOf(header)]}, ${metricUnit(metric)}`;
+  const named = header === 'muscle' ? 'Muscle' : `${header === 'now' ? 'Now and previous' : COLUMN_NAMES[COLUMN_KEYS.indexOf(header)]}, ${metricUnit(metric)}`;
   return <StatsTableSortHeader label={label} active={mode.startsWith(`${key}-`)} descending={mode.endsWith('-desc')}
     description={named} currentSort={describeMuscleSort(mode)} nextSort={describeMuscleSort(nextMuscleSortMode(mode, header))}
     onPress={() => onSort?.(header)} testID={`stats-muscle-sort-${header}`} numeric={header !== 'muscle'}

@@ -206,7 +206,7 @@ it('keeps history beside two-line names, caps the plot and preserves independent
   expect(within(screen.getByTestId('stats-muscle-row-back-periods')).getByTestId('stats-muscle-row-back-previous')).toHaveTextContent('1');
   expect(screen.getByTestId('stats-contribution-lift-periods')).toBeTruthy();
   expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
-  // One `Now` header over both periods; Sets read `now (previous)` on one line.
+  // One `Now (Prev)` header over both periods; Sets read `now (previous)` on one line.
   expect(screen.queryByRole('header', { name: 'Previous, working sets' })).toBeNull();
   expect(screen.getByTestId('stats-muscle-row-back-periods')).toHaveTextContent(/^\S+ \(1\)$/);
   expect(screen.queryByTestId('stats-muscle-ticker-lift')).toBeNull();
@@ -230,17 +230,62 @@ it.each([[[0, 40, 20, 30, 10, 20]], [[20, 20, 20, 20, 20, 20]]])('keeps valid Vo
   const disclosure = StyleSheet.flatten(screen.getByTestId('stats-muscle-select-back').props.style);
   const historyWidth = tableWidth - card.borderWidth * 2 - row.paddingHorizontal * 2 - row.gap * 2
     - periods.width - change.width - figures.gap - disclosure.width;
-  expect(historyWidth).toBeCloseTo(59.3333, 2);
+  expect(historyWidth).toBeCloseTo(60, 2);
   layout('stats-muscle-history-back', historyWidth);
   const ticker = screen.getByTestId('stats-muscle-ticker-back');
   expect(ticker.props.width).toBeGreaterThanOrEqual(8);
   expect(ticker.props.width).toBeLessThanOrEqual(tableWidth / 3);
-  // A seven-digit Volume at the `figure` role's 14pt leaves the name 43pt
-  // beside its ticker; the whole link (name and ticker) keeps its 44pt target.
+  // The name keeps a tap target beside even the smallest drawable ticker.
   expect(historyWidth).toBeGreaterThanOrEqual(44);
-  expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(43);
+  expect(historyWidth - ticker.props.width - 8).toBeGreaterThanOrEqual(44);
   expect(screen.getAllByTestId('stats-muscle-ticker-back-endpoint')).toHaveLength(1);
   expect(screen.getByTestId('stats-muscle-row-back-now')).toHaveTextContent('1234567');
+});
+
+it('keeps a readable name and a drawable history slot on a small phone', () => {
+  render(<ProgressTables {...rowProps} />);
+  layout('stats-muscle-table-container', 343);
+  const periodWidth = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-periods').props.style).width;
+  const changeWidth = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-change').props.style).width;
+  const historyWidth = 343 - 2 - 24 - 24 - periodWidth - changeWidth - 8 - 44;
+  layout('stats-muscle-history-back', historyWidth);
+  const tickerWidth = screen.getByTestId('stats-muscle-ticker-back').props.width;
+  expect(tickerWidth).toBeGreaterThanOrEqual(24);
+  expect(historyWidth - tickerWidth - 8).toBeGreaterThanOrEqual(60);
+});
+
+it.each([320, 430])('keeps the same chart slot across metrics and sorting at %ipt', width => {
+  const muscle = { ...muscleRow, current: { ...muscleRow.current, workingSetCount: 3.5, totalVolume: 1234567 },
+    previous: { ...muscleRow.previous, workingSetCount: 10.5 } };
+  const props = { ...rowProps, muscles: [muscle] };
+  const view = render(<ProgressTables {...props} />);
+  const tableWidth = width - 32;
+  layout('stats-muscle-table-container', tableWidth);
+  const allocation = () => {
+    const row = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back').props.style);
+    const card = StyleSheet.flatten(screen.getByTestId('stats-muscle-table').props.style);
+    const periods = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-periods').props.style).width;
+    const change = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-change').props.style).width;
+    const gap = StyleSheet.flatten(screen.getByTestId('stats-muscle-row-back-values').props.style).gap;
+    return { periods, change, history: tableWidth - card.borderWidth * 2 - row.paddingHorizontal * 2
+      - row.gap * 2 - periods - change - gap - 44 };
+  };
+  const sets = allocation();
+  layout('stats-muscle-history-back', sets.history);
+  const tickerWidth = screen.getByTestId('stats-muscle-ticker-back').props.width;
+  expect(sets.history - tickerWidth - 8).toBeGreaterThanOrEqual(44);
+  const heading = within(screen.getByTestId('stats-muscle-sort-now')).getByText(/Now\s+\(Prev\)/);
+  expect(heading.props.numberOfLines).toBe(2);
+  expect(screen.getByTestId('stats-muscle-sort-now').props.accessibilityLabel).toContain('Now and previous, working sets.');
+  expect(within(screen.getByTestId('stats-contributions-header')).getByText(/Now\s+\(Prev\)/)).toBeTruthy();
+  for (const metric of ['totalVolume', 'workingSetCount'] as const) {
+    view.rerender(<ProgressTables {...props} metric={metric} sortMode="change-asc" />);
+    expect(allocation()).toEqual(sets);
+    expect(screen.getByTestId('stats-muscle-ticker-back').props.width).toBe(tickerWidth);
+    expect(screen.getByTestId('stats-muscle-sort-now')).toHaveStyle({ width: sets.periods, flexDirection: 'row-reverse', justifyContent: 'flex-start' });
+    expect(screen.getByTestId('stats-muscle-sort-change')).toHaveStyle({ width: sets.change, flexDirection: 'row-reverse', justifyContent: 'flex-start' });
+    expect(screen.getByTestId('stats-contribution-lift-periods')).toHaveStyle({ width: sets.periods });
+  }
 });
 
 it.each(['workingSetCount', 'totalVolume'] as const)('leaves excluded %s plots blank and preserves figures, spoken history and actions', metric => {
@@ -297,6 +342,10 @@ it('keeps 3D contributors free of tickers even when ticker data is supplied', ()
   expect(screen.queryByTestId('stats-muscle-table-container')).toBeNull();
   expect(screen.queryByTestId('stats-muscle-ticker-back')).toBeNull();
   expect(screen.queryByTestId('stats-contribution-lift-periods')).toBeNull();
+  const header = within(screen.getByTestId('stats-contributions-header'));
+  expect(header.getByText('Now')).toBeTruthy();
+  expect(header.getByText('Prev')).toBeTruthy();
+  expect(header.queryByText(/Now\s+\(Prev\)/)).toBeNull();
 });
 
 
