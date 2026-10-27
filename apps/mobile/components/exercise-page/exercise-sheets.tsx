@@ -1,13 +1,15 @@
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles } from '@/components/ui/tokens';
 import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 import { EFFORT_CHOICES } from '@/src/exercise-calculations/effort-policy';
+import type { ExerciseSwitcherRow } from '@/src/session-recorder/exercise-switcher';
 
 type EffortSheetProps = {
   visible: boolean;
@@ -134,3 +136,63 @@ export function ExerciseOptionsSheet({
     </Sheet>
   );
 }
+
+type ExerciseSwitcherSheetProps = {
+  visible: boolean;
+  rows: readonly ExerciseSwitcherRow[];
+  onSelect: (sessionExerciseId: string) => void;
+  // Leaves for the session view, exactly as Back does.
+  onOpenSession: () => void;
+  onDismiss: () => void;
+};
+
+// The title's ▾: the session's exercises in order with their done / total
+// sets, the open one marked, then the way back to the whole session.
+export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, onDismiss }: ExerciseSwitcherSheetProps) {
+  const { height } = useWindowDimensions();
+  return (
+    <Sheet
+      dismissLabel="Dismiss exercise switcher"
+      onDismiss={onDismiss}
+      testID="exercise-switcher-sheet"
+      title="Exercises"
+      visible={visible}>
+      <ScrollView style={{ maxHeight: height * 0.55, flexGrow: 0 }}>
+        {rows.map((row) => (
+          <ListRow
+            accessibilityLabel={`${row.name}, ${row.doneCount} of ${row.totalCount} sets done${row.current ? ', current' : ''}`}
+            key={row.id}
+            label={row.name}
+            leading={
+              <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.position]}>
+                {row.position}
+              </Text>
+            }
+            meta={
+              <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted]} testID={`exercise-switcher-progress-${row.id}`}>
+                {`${row.doneCount}/${row.totalCount}`}
+              </Text>
+            }
+            onPress={() => onSelect(row.id)}
+            selected={row.current}
+            testID={`exercise-switcher-row-${row.id}`}
+            trailing={row.current ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+          />
+        ))}
+      </ScrollView>
+      <ListRow
+        divider
+        label="All exercises (session)"
+        leading={<Icon color={uiRoles.ink} name="chevron-left" />}
+        onPress={onOpenSession}
+        testID="exercise-switcher-session"
+      />
+    </Sheet>
+  );
+}
+
+const styles = StyleSheet.create({
+  position: {
+    textAlign: 'center',
+  },
+});

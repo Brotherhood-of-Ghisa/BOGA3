@@ -1143,6 +1143,116 @@ describe('ExercisePageScreen', () => {
   });
 });
 
+describe('exercise page title switcher', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetLocalData();
+    __resetExerciseListPreferencesForTests();
+    mockRouter.canGoBack.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    closeLocalData();
+  });
+
+  const openSwitcher = async () => {
+    fireEvent.press(screen.getByTestId('exercise-page-title'));
+    return screen.findByTestId('exercise-switcher-sheet');
+  };
+
+  it('lists the session exercises in order with done / total sets, the open one marked', async () => {
+    await openPage();
+
+    const sheet = await openSwitcher();
+
+    const rowIds = within(sheet)
+      .getAllByTestId(/^exercise-switcher-row-/)
+      .map((row) => row.props.testID);
+    expect(rowIds).toEqual([`exercise-switcher-row-${BENCH}`, `exercise-switcher-row-${SQUAT}`]);
+    expect(screen.getByTestId(`exercise-switcher-row-${BENCH}`)).toHaveTextContent('1Barbell Bench Press2/5');
+    expect(screen.getByTestId(`exercise-switcher-row-${SQUAT}`)).toHaveTextContent('2Barbell Back Squat1/1');
+    expect(screen.getByTestId(`exercise-switcher-row-${BENCH}`)).toBeSelected();
+    expect(screen.getByTestId(`exercise-switcher-row-${SQUAT}`)).not.toBeSelected();
+    expect(screen.getByTestId('exercise-switcher-session')).toHaveTextContent('All exercises (session)');
+  });
+
+  it('shows the open exercise\'s progress as just confirmed, before it is saved', async () => {
+    await openPage();
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+
+    await openSwitcher();
+
+    expect(screen.getByTestId(`exercise-switcher-progress-${BENCH}`)).toHaveTextContent('3/5');
+  });
+
+  it('replaces the page with the chosen exercise, never pushing, and writes nothing', async () => {
+    await seedPage();
+    const client: SessionExerciseDraftClient = {
+      ...defaultSessionExerciseDraftClient,
+      persistSessionDraftSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistSessionDraftSnapshot),
+      persistCompletedSessionSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistCompletedSessionSnapshot),
+    };
+    render(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${SQUAT}`);
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    expect(client.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+  });
+
+  it('closes without navigating when the open exercise is chosen', async () => {
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${BENCH}`));
+
+    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it('All exercises returns to the session as Back does', async () => {
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId('exercise-switcher-session'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('All exercises falls back to Train with no history, as Back does', async () => {
+    mockRouter.canGoBack.mockReturnValue(false);
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId('exercise-switcher-session'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/train');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('offers the switcher when editing a completed session too', async () => {
+    await seedPage();
+    const completedId = NEWER_HISTORY;
+    render(<ExercisePageScreen sessionExerciseId={`${completedId}_bench`} sessionId={completedId} />);
+    await screen.findByTestId('exercise-page');
+
+    await openSwitcher();
+
+    expect(screen.getByTestId(`exercise-switcher-row-${completedId}_bench`)).toBeSelected();
+  });
+});
+
 describe('exercise page route', () => {
   beforeEach(() => resetLocalData());
   afterEach(() => closeLocalData());
@@ -1151,6 +1261,7 @@ describe('exercise page route', () => {
     await seedPage();
     mockRouteParams = { sessionId: SESSION, sessionExerciseId: BENCH };
     render(<ExercisePageRoute />);
-    expect(await screen.findByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
+    // Loading draws a plain title; the loaded one is the switcher button.
+    await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press'));
   });
 });

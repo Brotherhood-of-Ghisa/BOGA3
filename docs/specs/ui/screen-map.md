@@ -140,8 +140,8 @@ addressable, each resolving to a canonical owner for tab selection.
   Both run the shared cleanup prompts, and invalid set values block them.
 - A completed session's records compare against **the completed sessions
   before it** — never itself, never later ones.
-- The exercise page is reachable only from the session view (plus the Maestro
-  teleport); with no screen to go back to, back goes to `/train`.
+- The exercise page opens from the session view, another exercise's title
+  switcher (`replace`) or the Maestro teleport; with no history, back goes to `/train`.
 - `presentation=completion` does **not** link to muscle analytics, its share
   image excludes gym and location, and optional historical enrichment can
   never block it.

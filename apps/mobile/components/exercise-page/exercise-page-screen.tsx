@@ -31,6 +31,7 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { resolveRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { exerciseHistoryHref, exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
 import { loadOwnBookGymId } from '@/src/data/exercise-session-facts';
 import { exerciseHistoryOpeningGym } from '@/src/session-recorder/exercise-history-view';
@@ -51,6 +52,7 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
+import { buildExerciseSwitcherRows } from '@/src/session-recorder/exercise-switcher';
 import { useSessionRestTimer } from '@/src/session-recorder/rest-timer';
 import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
@@ -59,7 +61,7 @@ import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 
-import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
+import { EffortSheet, ExerciseOptionsSheet, ExerciseSwitcherSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
@@ -74,7 +76,7 @@ type ExercisePageScreenProps = {
   loadRecords?: LoadExerciseRecords;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
+type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit' | 'switcher';
 
 const LOAD_ERROR_MESSAGES = {
   'missing-session': 'This session no longer exists.',
@@ -210,6 +212,14 @@ export function ExercisePageScreen({
     else router.replace(FALLBACK_BACK_ROUTE);
   }, [router]);
 
+  // Replace, never push: Back from any exercise reached this way returns to
+  // the session in one step. The switch itself writes nothing; leaving the
+  // page saves pending edits exactly as Back does.
+  const switchExercise = (targetId: string) => {
+    setOpenSheet('none');
+    if (targetId !== sessionExerciseId) router.replace(sessionExerciseHref(sessionId, targetId));
+  };
+
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
   const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
   const loadContext = personalCalculationContext(
@@ -225,6 +235,8 @@ export function ExercisePageScreen({
   const recordSession = exercise && draft.state.status === 'ready'
     ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
   const rows = buildSetRows(sets, baseline, loadContext, recordSession);
+  const switcherRows = exercise && draft.state.status === 'ready'
+    ? buildExerciseSwitcherRows(draft.state.sessionBlocks, exercise) : [];
   const recordLines = recordBandFor(sets, baseline, loadContext, recordSession);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
@@ -441,6 +453,7 @@ export function ExercisePageScreen({
       <ExerciseTopBar
         onBack={goBack}
         onOpenOptions={() => setOpenSheet('options')}
+        onOpenSwitcher={() => setOpenSheet('switcher')}
         onToggleRestTimer={restTimer.toggleForSession}
         restTimerActive={restTimer.isActive}
         titleBarTimer={timerHost.titleBarTimer}
@@ -568,6 +581,16 @@ export function ExercisePageScreen({
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}
+      />
+      <ExerciseSwitcherSheet
+        onDismiss={() => setOpenSheet('none')}
+        onOpenSession={() => {
+          setOpenSheet('none');
+          goBack();
+        }}
+        onSelect={switchExercise}
+        rows={switcherRows}
+        visible={openSheet === 'switcher'}
       />
       <ExerciseSwapSheet
         currentExerciseDefinitionId={exercise.exerciseDefinitionId}
