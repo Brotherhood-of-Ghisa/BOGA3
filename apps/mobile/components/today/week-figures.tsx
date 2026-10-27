@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
@@ -64,8 +65,8 @@ export function WeekFigure({ label, current, previous, record = false, previousW
         </Text>
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
-      <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-previous`}>
-        {previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}
+      <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-previous`}>
+        <FigureText>{previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}</FigureText>
       </Text>
     </View>
   );

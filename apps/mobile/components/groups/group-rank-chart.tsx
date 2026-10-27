@@ -102,9 +102,9 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
               line.ranks.map((rank, index) => (
                 <SvgText
                   fill={index === selectedIndex ? uiRoles.surface : uiRoles.inkMuted}
-                  fontFamily={uiFonts.figure.family}
+                  fontFamily={uiFonts.display.family}
                   fontSize={uiTypography.size.xxs}
-                  fontWeight="600"
+                  fontWeight="700"
                   key={`${line.userId}-${index}-initial`}
                   textAnchor="middle"
                   x={columnX(index, count, plotWidth)}

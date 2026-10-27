@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -92,8 +93,8 @@ export function SessionSummaryRow({
             </>
           ) : null}
         </Text>
-        <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-figures`}>
-          {figures}
+        <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}>
+          <FigureText>{figures}</FigureText>
         </Text>
         {record ? <RecordLine line={record} testID={testID} /> : null}
         {children}

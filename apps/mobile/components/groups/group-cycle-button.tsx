@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 
 export type GroupCycleOption<TValue extends string> = { value: TValue; label: string };
 
@@ -29,7 +29,7 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
       onPress={() => { if (next) onChange(next.value); }}
       style={({ pressed }) => [styles.pill, pressed ? styles.pressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.label}>{current?.label ?? ''}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>{current?.label ?? ''}</Text>
     </Pressable>
   );
 }
@@ -48,12 +48,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     backgroundColor: uiRoles.paper,
-  },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });

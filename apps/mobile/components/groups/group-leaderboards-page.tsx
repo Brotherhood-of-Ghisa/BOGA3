@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, SearchField, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, FigureText, SearchField, Tag, uiBorder, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
 import {
   groupBoardPath,
   type GroupApiError,
@@ -14,6 +14,7 @@ import {
 } from '@/src/groups';
 
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
+import { scoreStyle } from './score-style';
 
 type GroupLeaderboardsPageProps = {
   groupId: string;
@@ -88,7 +89,7 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
   return (
     <Card accessibilityLabel={card.accessibilityLabel} onPress={onPress} style={styles.card} testID={testID}>
       <View style={styles.titleRow}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.name} testID={`${testID}-name`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.name]} testID={`${testID}-name`}>
           {card.name}
         </Text>
         {card.archived ? (
@@ -98,23 +99,23 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
           </View>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={styles.view} testID={`${testID}-view`}>
+      <Text allowFontScaling={false} style={uiText.label} testID={`${testID}-view`}>
         {card.viewLabel}
       </Text>
       {card.rows.length > 0 ? (
         <View style={styles.rows}>
           {card.rows.map((row) => (
             <View key={row.key} style={styles.podiumRow} testID={`${testID}-row-${row.rank}`}>
-              <Text allowFontScaling={false} style={styles.rank}>
+              <Text allowFontScaling={false} style={[uiText.figure, styles.rank]}>
                 {String(row.rank)}
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={[styles.member, row.isMe ? styles.memberMine : null]}>
+              <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, row.isMe ? uiTextEmphasis.strong : null, styles.member]}>
                 {row.memberLabel}
               </Text>
-              <Text allowFontScaling={false} style={styles.value}>
+              <Text allowFontScaling={false} style={scoreStyle(row.valueLabel, 'base')}>
                 {row.valueLabel}
               </Text>
-              <Text allowFontScaling={false} style={styles.date}>
+              <Text allowFontScaling={false} style={[uiText.figureSmall, styles.date]}>
                 {row.dateLabel}
               </Text>
             </View>
@@ -122,13 +123,13 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
         </View>
       ) : null}
       {card.emptyLabel ? (
-        <Text allowFontScaling={false} style={styles.muted} testID={`${testID}-empty`}>
+        <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-empty`}>
           {card.emptyLabel}
         </Text>
       ) : null}
       {card.youLabel ? (
-        <Text allowFontScaling={false} style={styles.you} testID={`${testID}-you`}>
-          {card.youLabel}
+        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong]} testID={`${testID}-you`}>
+          <FigureText strong>{card.youLabel}</FigureText>
         </Text>
       ) : null}
     </Card>
@@ -151,20 +152,6 @@ const styles = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  view: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   rows: {
     marginTop: uiSpace.xs,
@@ -179,52 +166,13 @@ const styles = StyleSheet.create({
   },
   rank: {
     minWidth: 16,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   member: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  memberMine: {
-    fontWeight: '600',
-  },
-  value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   date: {
     minWidth: 52,
     textAlign: 'right',
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  you: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });

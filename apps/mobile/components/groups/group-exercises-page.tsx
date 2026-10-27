@@ -10,11 +10,9 @@ import {
   ActionButton,
   Card,
   Notice,
-  uiFonts,
   uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -211,7 +209,7 @@ export function GroupExercisesPage({
 
   const header = (
     <View style={styles.header}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel} testID="group-screen-exercises-title">
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
         Exercises
       </Text>
       {canManage ? (
@@ -355,12 +353,5 @@ const styles = StyleSheet.create({
   },
   microLabel: {
     flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
 });

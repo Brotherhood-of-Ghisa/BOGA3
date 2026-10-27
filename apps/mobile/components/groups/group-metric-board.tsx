@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
+import { ActionButton, SegmentedControl, uiSpace, uiText } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -14,7 +14,7 @@ import { GroupMetricRecordSheet } from './group-metric-record-sheet';
 import { GroupOfflineBanner } from './offline-banner';
 import { GroupPagesFooter } from './group-pages-footer';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from './group-state-view';
-import { groupScreenStyles, groupMetricTextStyles as textStyles } from './screen-styles';
+import { groupScreenStyles } from './screen-styles';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
 const selectItems = (page: GroupMetricBoardWire) => page.entries;
@@ -71,11 +71,11 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.md }}>
-      <Text allowFontScaling={false} style={[textStyles.heading, { flex: 1 }]}>{competitionViewLabel(metric,exercise.rules)}</Text>
+      <Text allowFontScaling={false} style={[uiText.title, { flex: 1 }]}>{competitionViewLabel(metric,exercise.rules)}</Text>
       <ActionButton label="History" variant="text" testID="group-board-history-button" onPress={() => router.push(
         `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}`)} />
     </View>
-    {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={textStyles.body} testID="group-board-archived">Archived · read-only</Text> : null}
+    {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={uiText.body} testID="group-board-archived">Archived · read-only</Text> : null}
     <SegmentedControl accessibilityLabel="Metric" options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}

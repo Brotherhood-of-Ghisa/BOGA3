@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, FigureText, Icon, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import { sessionRecordCertificationStatus, type SessionRecordCertification } from '@/src/groups/competition-session-records-view-model';
 import { buildMetricRecordSheetModel, metricCertificationEndConfirmation } from '@/src/groups/metric-record-sheet-view-model';
@@ -41,7 +41,7 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
       <View style={[styles.statusLine, align === 'end' ? styles.end : null]}>
         <View style={styles.status} accessible accessibilityLabel={status} testID={`${testID}-status`}>
           <Icon color={model.active ? uiRoles.ink : uiRoles.inkMuted} name={model.active ? 'check' : 'circle'} size="xs" />
-          <Text allowFontScaling={false} style={[styles.statusText, model.active ? styles.statusCertified : null]}>{status}</Text>
+          <Text allowFontScaling={false} style={[uiText.meta, model.active ? uiTextTone.ink : null, styles.statusText]}><FigureText>{status}</FigureText></Text>
         </View>
         {action ? (
           <ActionButton
@@ -65,9 +65,5 @@ const styles = StyleSheet.create({
   statusLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   end: { justifyContent: 'flex-end' },
   status: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs, flexShrink: 1 },
-  statusText: {
-    fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted,
-  },
-  statusCertified: { color: uiRoles.ink },
+  statusText: { flexShrink: 1 },
 });

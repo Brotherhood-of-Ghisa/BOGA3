@@ -291,7 +291,7 @@ describe('At a glance: the group total', () => {
 // body face, my own one step heavier; figures in Plex Mono; words never in it.
 describe('At a glance: text roles', () => {
   const body = { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
-  const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.sm };
+  const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.sm };
 
   it('titles the period and labels its range', () => {
     renderPage();

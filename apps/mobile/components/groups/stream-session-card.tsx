@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Card, Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, FigureText, Icon, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
 import type {
   CompetitionSessionCard as StreamSessionCardViewModel,
   CompetitionSessionRecordLine,
@@ -26,11 +26,12 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
       onPress={onPress}
       style={({ pressed }) => [styles.recordLine, pressed ? styles.recordPressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.recordExercise}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.recordExercise]}>
         {line.exercise}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.recordValue}>
-        {line.value}
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.record, styles.recordValue]} testID={`${testID}-value`}>
+        {/* The record line is drawn heavy; its figures keep a step of emphasis rather than dropping to 500. */}
+        <FigureText strong>{line.value}</FigureText>
       </Text>
     </Pressable>
   );
@@ -54,24 +55,24 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
       style={styles.card}
       testID={testID}>
       <View style={styles.headerRow}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.member} testID={`${testID}-member`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.member]} testID={`${testID}-member`}>
           {card.memberName}
         </Text>
         <View style={styles.status}>
           {card.isTrainingNow ? <Icon name="set-current" size="xs" /> : null}
           <Text
             allowFontScaling={false}
-            style={[styles.statusText, card.isTrainingNow ? styles.statusLive : null]}
+            style={[uiText.meta, card.isTrainingNow ? [uiTextTone.ink, uiTextEmphasis.strong] : null]}
             testID={`${testID}-status`}>
             {card.statusLabel}
           </Text>
         </View>
       </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.muted} testID={`${testID}-context`}>
-        {context}
+      <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID={`${testID}-context`}>
+        <FigureText>{context}</FigureText>
       </Text>
-      <Text allowFontScaling={false} style={styles.metrics} testID={`${testID}-metrics`}>
-        {`${card.setsLabel} · ${card.exercisesLabel}`}
+      <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-metrics`}>
+        <FigureText>{`${card.setsLabel} · ${card.exercisesLabel}`}</FigureText>
       </Text>
       {records.length > 0 ? (
         <View style={styles.records} testID={`${testID}-records`}>
@@ -86,7 +87,7 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
         </View>
       ) : null}
       {showGroupNames && card.groupNames.length > 0 ? (
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.muted} testID={`${testID}-groups`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID={`${testID}-groups`}>
           {card.groupNames.join(', ')}
         </Text>
       ) : null}
@@ -108,34 +109,11 @@ const styles = StyleSheet.create({
   member: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
   status: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  statusText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  statusLive: {
-    fontWeight: '600',
-    color: uiRoles.ink,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   // The records sit under the figures, behind a `rule-soft` hairline.
   records: {
@@ -156,25 +134,8 @@ const styles = StyleSheet.create({
   },
   recordExercise: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
   recordValue: {
     flexShrink: 1,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.record,
-  },
-  metrics: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });
