@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 
+jest.unmock('@/src/auth/session-user');
+
 /**
  * Outcome: TWO local devices sharing ONE real server converge under
  * last-write-wins, and the server's future-clock clamp is honoured end to end.

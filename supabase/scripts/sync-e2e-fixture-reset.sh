@@ -82,6 +82,17 @@ B_UID="$(jq -er '.user.id' <<<"${BODY}")"
 B_TOKEN="$(jq -er '.access_token' <<<"${BODY}")"
 REST="${API_URL}/rest/v1"
 
+# Merge recovery is private control state, deliberately unavailable through REST.
+# Reset it on this slot's local DB so an interrupted native review cannot poison a later run.
+[[ "${B_UID}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || fail "invalid local fixture user id"
+DB_CONTAINER="$(resolve_db_container)" || exit 1
+docker exec "${DB_CONTAINER}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q -c "
+  begin;
+  delete from public.exercise_merge_conflicts where user_id='${B_UID}';
+  delete from public.exercise_merge_contexts where user_id='${B_UID}';
+  delete from public.exercise_merge_operations where user_id='${B_UID}';
+  commit;" >/dev/null
+
 # 1. Sync v2 rows (service role), children before the rows they reference.
 sync_rows=0
 # The performed rows that carry a source-plan link (exercise_sets,
