@@ -174,7 +174,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/groups`, `/exercise-catalog?source=more`, `/gyms?source=more`, `/connected-agents`, `/settings?source=more` | hub rows; `Connect an AI` only with an agent connected |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
-| `/settings`, `/settings-muscles` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | cards (`push`), Back; enablement only in Detailed. Bodyweight always shown, never reached from workouts |
+| `/settings`, `/settings-muscles` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | cards (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never reached from workouts |
 | `/settings-developer-tools` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |

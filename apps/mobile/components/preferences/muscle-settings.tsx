@@ -63,6 +63,8 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
   const muscles = sections.flatMap(section => section.muscles);
   const enabled = muscles.filter(muscle => muscle.tracked);
   const overrides = scope ? current.muscleTargetOverrides[scope] : undefined;
+  const entries = setup.rows ?? [];
+  const trackedEntries = entries.filter(row => row.tracked === true || row.tracked === 1);
   const custom = enabled.filter(muscle => overrides && Object.hasOwn(overrides, muscle.id)).length;
   return <>
     <View style={styles.section}>
@@ -88,8 +90,8 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
             onChange={next => { if (next !== 'custom') void setup.change(() => setMuscleReportPreset(next)); }} />
           {scope === 'custom' ? <Text allowFontScaling={false} style={styles.label} testID="settings-muscle-custom">Custom</Text> : null}
         </View>
-        {scope === 'detailed' ? <Destination label="Enabled muscles" status={`${enabled.length} / ${muscles.length}`}
-          testID="settings-enabled-muscles-row" onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} /> : null}
+        <Destination label="Enabled muscles" status={setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…'}
+          testID="settings-enabled-muscles-row" onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} />
       </Card>
     </View>
   </>;
