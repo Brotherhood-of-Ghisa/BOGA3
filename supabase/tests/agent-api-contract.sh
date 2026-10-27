@@ -1796,6 +1796,51 @@ fi
   fail "concurrency race: attached block name was mutated"
 run_psql "delete from app_public.session_exercises where id = 'sx-race-${RUN_TAG}';"
 
+# Finding 3: Two-connection race: child block sync update vs agent block mutation
+PLAN_RACE_EDIT="agent-api-${RUN_TAG}-race-edit"
+BLOCK_RACE_EDIT="agent-api-${RUN_TAG}-blk-edit"
+run_psql "
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${PLAN_RACE_EDIT}', 'Race Edit Plan', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${BLOCK_RACE_EDIT}', '${PLAN_RACE_EDIT}', 0, 'Original Pending Block', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_sets (owner_user_id, id, session_plan_exercise_id, order_index, target_reps, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'sps-edit-${RUN_TAG}', '${BLOCK_RACE_EDIT}', 0, 5, 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+V_EDIT_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_EDIT}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+
+# Conn 1: Sync updates pending session_plan_exercises row directly under transaction (holding coordinate lock)
+docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+  begin;
+  select set_config('request.jwt.claim.sub', '${USER_A_UUID}', true);
+  update app_public.session_plan_exercises
+     set name = 'Phone Edited Block',
+         client_updated_at_ms = $((NOW_MS + 5000))
+   where owner_user_id = '${USER_A_UUID}'::uuid
+     and id = '${BLOCK_RACE_EDIT}';
+  select pg_sleep(1);
+  commit;
+" >/dev/null 2>&1 &
+CONN1_EDIT_PID=$!
+sleep 0.2
+
+# Conn 2: Agent tries to update block with stale base version while sync edit is in flight
+CONN2_EDIT_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-edit', '${MUT_HASH_1}',
+    '${PLAN_RACE_EDIT}', '${BLOCK_RACE_EDIT}', '${V_EDIT_BASE}',
+    '{\"name\": \"Stale Agent Block Name\"}'::jsonb
+  );
+" 2>&1 || true)"
+wait "${CONN1_EDIT_PID}"
+
+if [[ "${CONN2_EDIT_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
+  fail "concurrency race: agent mutation did not raise PLAN_CONCURRENT_MODIFICATION when racing child block sync update, got: ${CONN2_EDIT_OUT}"
+fi
+[[ "$(run_psql "select name from app_public.session_plan_exercises where id = '${BLOCK_RACE_EDIT}';")" == "Phone Edited Block" ]] ||
+  fail "concurrency race: phone-edited block name was overwritten by stale agent mutation"
+
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"
 agent_get "muscles"

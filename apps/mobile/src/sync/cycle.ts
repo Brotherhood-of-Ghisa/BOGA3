@@ -995,6 +995,42 @@ const ORDERED_TABLE_CONFIGS: Partial<Record<EntityTableName, OrderedTableConfig>
   },
 };
 
+export interface ProvisionalMove {
+  id: string;
+  table: typeof schema.gyms;
+}
+
+export interface PullDrainTracker {
+  provisionalMoves: Map<string, ProvisionalMove>;
+}
+
+export const createPullDrainTracker = (): PullDrainTracker => ({
+  provisionalMoves: new Map(),
+});
+
+export const finalizePullDrain = (
+  tx: Transaction,
+  tracker: PullDrainTracker,
+): number => {
+  if (tracker.provisionalMoves.size === 0) {
+    return 0;
+  }
+  let finalizedCount = 0;
+  for (const move of tracker.provisionalMoves.values()) {
+    const stamp = nowMonotonic(tx);
+    tx.update(move.table)
+      .set({
+        localDirty: true,
+        localUpdatedAtMs: stamp,
+      } as never)
+      .where(eq(move.table.id, move.id))
+      .run();
+    finalizedCount += 1;
+  }
+  tracker.provisionalMoves.clear();
+  return finalizedCount;
+};
+
 interface SiblingCandidate {
   id: string;
   isExisting: boolean;
@@ -1093,7 +1129,11 @@ const buildSiblingCandidates = (
   return candidates;
 };
 
-const resolveCandidateOrderSlots = (candidates: SiblingCandidate[]): void => {
+const resolveCandidateOrderSlots = (
+  candidates: SiblingCandidate[],
+  config: OrderedTableConfig,
+  tracker: PullDrainTracker,
+): void => {
   const bySlot = new Map<number, SiblingCandidate[]>();
   for (const cand of candidates) {
     const list = bySlot.get(cand.targetOrderIndex) ?? [];
@@ -1138,6 +1178,14 @@ const resolveCandidateOrderSlots = (candidates: SiblingCandidate[]): void => {
     // across split pages keep their clean status and existing timestamp.
     if (!cand.isExisting || Boolean(cand.existingRow?.localDirty) || !cand.isLocalWinner) {
       cand.needsConflictRepair = true;
+    } else if (
+      cand.existingRow &&
+      cand.targetOrderIndex !== Number(cand.existingRow.orderIndex)
+    ) {
+      tracker.provisionalMoves.set(cand.id, {
+        id: cand.id,
+        table: config.table,
+      });
     }
   }
 };
@@ -1219,7 +1267,12 @@ const applyOrderedPullPage = (
   entities: WireEntity[],
   type: EntityTableName,
   config: OrderedTableConfig,
+  tracker: PullDrainTracker,
 ): number => {
+  for (const envelope of entities) {
+    tracker.provisionalMoves.delete(envelope.id);
+  }
+
   const byParent = new Map<string, WireEntity[]>();
   const orphaned: WireEntity[] = [];
 
@@ -1246,7 +1299,7 @@ const applyOrderedPullPage = (
       .all() as unknown as SiblingEntityRow[];
 
     const candidates = buildSiblingCandidates(type, existingSiblings, incomingEnvelopes);
-    resolveCandidateOrderSlots(candidates);
+    resolveCandidateOrderSlots(candidates, config, tracker);
     changed += applySiblingWrites(tx, config, existingSiblings, candidates);
   }
 
@@ -1326,20 +1379,30 @@ export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
+  tracker?: PullDrainTracker,
 ): number => {
   let newestStamp = 0;
   for (const envelope of entities) {
     newestStamp = Math.max(newestStamp, envelope.client_updated_at_ms);
   }
 
+  // The next local edit or conflict repair of any pulled row must out-stamp it under LWW.
+  if (entities.length > 0) {
+    observeRemoteTimestamp(tx, newestStamp);
+  }
+
+  const activeTracker = tracker ?? createPullDrainTracker();
   const orderConfig = ORDERED_TABLE_CONFIGS[type];
   const changed = orderConfig
-    ? applyOrderedPullPage(tx, entities, type, orderConfig)
+    ? applyOrderedPullPage(tx, entities, type, orderConfig, activeTracker)
     : applyUnorderedPullPage(tx, entities, type);
 
-  // The next local edit of any pulled row must out-stamp it under LWW.
-  observeRemoteTimestamp(tx, newestStamp);
-  return changed;
+  let finalized = 0;
+  if (!tracker) {
+    finalized = finalizePullDrain(tx, activeTracker);
+  }
+
+  return changed + finalized;
 };
 
 // -----------------------------------------------------------------------------
@@ -1491,20 +1554,33 @@ const applyPageWithArbitrationRepair = async (
   page: PullResponse,
   layerTypes: readonly EntityTableName[],
   layer: number,
+  tracker?: PullDrainTracker,
 ): Promise<number> => {
-  const applyPage = (): number =>
-    database.transaction((tx) => {
-      const transaction = tx as Transaction;
-      let changed = 0;
-      for (const type of layerTypes) {
-        const forType = page.entities.filter((entity) => entity.type === type);
-        if (forType.length > 0) {
-          changed += applyPullPage(transaction, forType, type);
+  const applyPage = (): number => {
+    const trackerSnapshot = tracker
+      ? new Map(tracker.provisionalMoves)
+      : null;
+
+    try {
+      return database.transaction((tx) => {
+        const transaction = tx as Transaction;
+        let changed = 0;
+        for (const type of layerTypes) {
+          const forType = page.entities.filter((entity) => entity.type === type);
+          if (forType.length > 0) {
+            changed += applyPullPage(transaction, forType, type, tracker);
+          }
         }
+        writeCursorEntry(transaction, layer, page.next_cursor);
+        return changed;
+      });
+    } catch (error) {
+      if (tracker && trackerSnapshot) {
+        tracker.provisionalMoves = trackerSnapshot;
       }
-      writeCursorEntry(transaction, layer, page.next_cursor);
-      return changed;
-    });
+      throw error;
+    }
+  };
 
   try {
     return applyPage();
@@ -1540,6 +1616,7 @@ const runPullLeg = async (
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
     const layerTypes = TOPO_LAYERS[layer] as readonly EntityTableName[];
+    const tracker = createPullDrainTracker();
 
     for (;;) {
       const cursor = database.transaction(
@@ -1547,7 +1624,13 @@ const runPullLeg = async (
       );
       const page = await callSyncPull(layer, cursor);
 
-      const pageChanged = await applyPageWithArbitrationRepair(database, page, layerTypes, layer);
+      const pageChanged = await applyPageWithArbitrationRepair(
+        database,
+        page,
+        layerTypes,
+        layer,
+        tracker,
+      );
 
       // Notify after this page commits, even if a later pull/push fails.
       if (pageChanged > 0) {
@@ -1567,6 +1650,16 @@ const runPullLeg = async (
 
       if (!page.has_more) {
         break;
+      }
+    }
+
+    if (tracker.provisionalMoves.size > 0) {
+      const finalized = database.transaction((tx) =>
+        finalizePullDrain(tx as Transaction, tracker),
+      );
+      if (finalized > 0) {
+        invalidateExerciseCatalogCache();
+        changedTotal += finalized;
       }
     }
 

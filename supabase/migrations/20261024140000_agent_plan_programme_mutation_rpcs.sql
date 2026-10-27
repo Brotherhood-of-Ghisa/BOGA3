@@ -2,8 +2,97 @@
 -- Service-role-only atomic RPCs for connected coaching agent plan and programme mutations.
 
 -- -----------------------------------------------------------------------------
--- Coordinate sync provenance attachment writes with block/set row locking
+-- Coordinate sync provenance and child writes with plan/programme graph locking
 -- -----------------------------------------------------------------------------
+
+create or replace function app_public.coordinate_session_plan_exercise_sync_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _prog_id text;
+begin
+  if new.session_plan_id is not null then
+    select sp.programme_id
+      into _prog_id
+      from app_public.session_plans sp
+     where sp.owner_user_id = new.owner_user_id
+       and sp.id = new.session_plan_id;
+
+    if _prog_id is not null then
+      perform 1
+         from app_public.training_programmes tp
+        where tp.owner_user_id = new.owner_user_id
+          and tp.id = _prog_id
+          for update;
+    end if;
+
+    perform 1
+       from app_public.session_plans sp
+      where sp.owner_user_id = new.owner_user_id
+        and sp.id = new.session_plan_id
+        for update;
+  end if;
+  return new;
+end;
+$func$;
+
+drop trigger if exists session_plan_exercises_coordinate_sync_lock on app_public.session_plan_exercises;
+create trigger session_plan_exercises_coordinate_sync_lock
+  before insert or update on app_public.session_plan_exercises
+  for each row
+  execute function app_public.coordinate_session_plan_exercise_sync_lock();
+
+create or replace function app_public.coordinate_session_plan_set_sync_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _plan_id text;
+  _prog_id text;
+begin
+  if new.session_plan_exercise_id is not null then
+    select spe.session_plan_id
+      into _plan_id
+      from app_public.session_plan_exercises spe
+     where spe.owner_user_id = new.owner_user_id
+       and spe.id = new.session_plan_exercise_id;
+
+    if _plan_id is not null then
+      select sp.programme_id
+        into _prog_id
+        from app_public.session_plans sp
+       where sp.owner_user_id = new.owner_user_id
+         and sp.id = _plan_id;
+
+      if _prog_id is not null then
+        perform 1
+           from app_public.training_programmes tp
+          where tp.owner_user_id = new.owner_user_id
+            and tp.id = _prog_id
+            for update;
+      end if;
+
+      perform 1
+         from app_public.session_plans sp
+        where sp.owner_user_id = new.owner_user_id
+          and sp.id = _plan_id
+          for update;
+    end if;
+  end if;
+  return new;
+end;
+$func$;
+
+drop trigger if exists session_plan_sets_coordinate_sync_lock on app_public.session_plan_sets;
+create trigger session_plan_sets_coordinate_sync_lock
+  before insert or update on app_public.session_plan_sets
+  for each row
+  execute function app_public.coordinate_session_plan_set_sync_lock();
 
 create or replace function app_public.coordinate_session_exercise_provenance_lock()
 returns trigger
@@ -11,8 +100,39 @@ language plpgsql
 security definer
 set search_path = ''
 as $func$
+declare
+  _plan_id text;
+  _prog_id text;
 begin
   if new.source_plan_exercise_id is not null and new.deleted_at is null then
+    select spe.session_plan_id
+      into _plan_id
+      from app_public.session_plan_exercises spe
+     where spe.owner_user_id = new.owner_user_id
+       and spe.id = new.source_plan_exercise_id;
+
+    if _plan_id is not null then
+      select sp.programme_id
+        into _prog_id
+        from app_public.session_plans sp
+       where sp.owner_user_id = new.owner_user_id
+         and sp.id = _plan_id;
+
+      if _prog_id is not null then
+        perform 1
+           from app_public.training_programmes tp
+          where tp.owner_user_id = new.owner_user_id
+            and tp.id = _prog_id
+            for update;
+      end if;
+
+      perform 1
+         from app_public.session_plans sp
+        where sp.owner_user_id = new.owner_user_id
+          and sp.id = _plan_id
+          for update;
+    end if;
+
     perform 1
        from app_public.session_plan_exercises spe
       where spe.owner_user_id = new.owner_user_id
@@ -36,8 +156,54 @@ language plpgsql
 security definer
 set search_path = ''
 as $func$
+declare
+  _block_id text;
+  _plan_id  text;
+  _prog_id  text;
 begin
   if new.source_plan_set_id is not null and new.deleted_at is null then
+    select sps.session_plan_exercise_id
+      into _block_id
+      from app_public.session_plan_sets sps
+     where sps.owner_user_id = new.owner_user_id
+       and sps.id = new.source_plan_set_id;
+
+    if _block_id is not null then
+      select spe.session_plan_id
+        into _plan_id
+        from app_public.session_plan_exercises spe
+       where spe.owner_user_id = new.owner_user_id
+         and spe.id = _block_id;
+
+      if _plan_id is not null then
+        select sp.programme_id
+          into _prog_id
+          from app_public.session_plans sp
+         where sp.owner_user_id = new.owner_user_id
+           and sp.id = _plan_id;
+
+        if _prog_id is not null then
+          perform 1
+             from app_public.training_programmes tp
+            where tp.owner_user_id = new.owner_user_id
+              and tp.id = _prog_id
+              for update;
+        end if;
+
+        perform 1
+           from app_public.session_plans sp
+          where sp.owner_user_id = new.owner_user_id
+            and sp.id = _plan_id
+            for update;
+      end if;
+
+      perform 1
+         from app_public.session_plan_exercises spe
+        where spe.owner_user_id = new.owner_user_id
+          and spe.id = _block_id
+          for update;
+    end if;
+
     perform 1
        from app_public.session_plan_sets sps
       where sps.owner_user_id = new.owner_user_id

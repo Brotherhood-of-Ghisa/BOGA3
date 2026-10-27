@@ -10,7 +10,14 @@
 
 import { eq } from 'drizzle-orm';
 
-import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
+import {
+  applyPullPage,
+  createPullDrainTracker,
+  finalizePullDrain,
+  selectPushBatch,
+  BATCH_CAP,
+  type WireEntity,
+} from '@/src/sync/cycle';
 import {
   __resetClockForTests,
   nowMonotonic,
@@ -730,12 +737,15 @@ describe('applyPullPage collision-safe order application and tombstone parking',
       );
     });
 
+    const tracker = createPullDrainTracker();
+
     // Page 1 arrives with ONLY block-b moved to slot 0 at timestamp 200 (block-a split to next page)
     database.transaction((tx) => {
       applyPullPage(
         tx as Transaction,
         [blockWire('block-b', 'plan-1', 0, 200)],
         'session_plan_exercises',
+        tracker,
       );
     });
 
@@ -753,7 +763,9 @@ describe('applyPullPage collision-safe order application and tombstone parking',
         tx as Transaction,
         [blockWire('block-a', 'plan-1', 1, 200)],
         'session_plan_exercises',
+        tracker,
       );
+      finalizePullDrain(tx as Transaction, tracker);
     });
 
     const bFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
@@ -763,5 +775,120 @@ describe('applyPullPage collision-safe order application and tombstone parking',
     expect(aFinal?.orderIndex).toBe(1);
     expect(aFinal?.localDirty).toBeFalsy();
     expect(bFinal?.localDirty).toBeFalsy();
+  });
+
+  it('persists unresolved clean-sibling repair when displaced row is omitted from subsequent pages', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-0', 'plan-1', 0, 100),
+          blockWire('block-a', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const tracker = createPullDrainTracker();
+
+    // Page 1: incoming block-b claims slot 1 at timestamp 200 (displaces clean block-a)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+    });
+
+    const aMid = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aMid?.orderIndex).toBe(2);
+    // Still provisionally clean mid-drain
+    expect(aMid?.localDirty).toBeFalsy();
+    expect(aMid?.localUpdatedAtMs).toBe(100);
+
+    // Page 2: another block arrives; block-a is omitted from all later pages
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-c', 'plan-1', 3, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+    });
+
+    // Drain finishes: finalize unresolved repairs
+    database.transaction((tx) => {
+      finalizePullDrain(tx as Transaction, tracker);
+    });
+
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aFinal?.orderIndex).toBe(2);
+    expect(aFinal?.localDirty).toBeTruthy();
+    expect(Number(aFinal?.localUpdatedAtMs)).toBeGreaterThan(200);
+
+    // Push leg selection picks up the repaired row
+    const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
+    const pushedA = batch.find((entity) => entity.id === 'block-a');
+    expect(pushedA).toBeDefined();
+    expect(pushedA?.fields.order_index).toBe(2);
+    expect(pushedA?.client_updated_at_ms).toBe(Number(aFinal?.localUpdatedAtMs));
+  });
+
+  it('advances monotonic clock before ordered reconciliation so repairs beat future remote timestamps', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+    });
+
+    const futureStamp = Date.now() + 120_000;
+
+    // Two colliding incoming blocks at slot 0 with futureStamp
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-x', 'plan-1', 0, futureStamp),
+          blockWire('block-y', 'plan-1', 0, futureStamp),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const x = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-x')).get();
+    const y = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-y')).get();
+
+    const winner = x?.orderIndex === 0 ? x : y;
+    const loser = x?.orderIndex === 1 ? x : y;
+
+    expect(winner?.orderIndex).toBe(0);
+    expect(winner?.localDirty).toBeFalsy();
+    expect(winner?.localUpdatedAtMs).toBe(futureStamp);
+
+    expect(loser?.orderIndex).toBe(1);
+    expect(loser?.localDirty).toBeTruthy();
+    // Repair timestamp must strictly exceed the future incoming timestamp
+    expect(Number(loser?.localUpdatedAtMs)).toBeGreaterThan(futureStamp);
+
+    // Push batch assertion: the repaired losing row is selected with client_updated_at_ms > futureStamp
+    const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
+    const pushedLoser = batch.find((entity) => entity.id === loser?.id);
+    expect(pushedLoser).toBeDefined();
+    expect(pushedLoser?.fields.order_index).toBe(1);
+    expect(pushedLoser?.client_updated_at_ms).toBeGreaterThan(futureStamp);
+
+    // Pull assertion: a subsequent pull of the loser with the older futureStamp loses to local repair
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire(loser!.id, 'plan-1', 0, futureStamp)],
+        'session_plan_exercises',
+      );
+    });
+
+    const loserAfterPull = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, loser!.id)).get();
+    expect(loserAfterPull?.orderIndex).toBe(1);
+    expect(loserAfterPull?.localDirty).toBeTruthy();
+    expect(loserAfterPull?.localUpdatedAtMs).toBe(loser?.localUpdatedAtMs);
   });
 });
