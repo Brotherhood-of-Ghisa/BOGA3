@@ -33,7 +33,7 @@ afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
 it('keeps choices and the default on Muscles, opening full target and enablement pages', async () => {
   render(<MusclesRoute />);
-  await screen.findByTestId('settings-enabled-muscles-row');
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true }));
   expect(screen.queryByTestId('settings-muscle-targets-row')).toBeNull();
   expect(screen.queryByTestId('settings-muscles-sheet')).toBeNull();
   expect(screen.queryByTestId('settings-track-chest')).toBeNull();
@@ -45,7 +45,8 @@ it('keeps choices and the default on Muscles, opening full target and enablement
   edit('settings-weekly-working-set-target', '11');
   expect(values().weeklyWorkingSetTarget).toBe(11);
   fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
-  await waitForGone(() => screen.queryByTestId('settings-enabled-muscles-row'));
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: true }));
+  expect(screen.getByTestId('settings-enabled-muscles-row')).toBeTruthy();
   expect(screen.getByTestId('settings-weekly-working-set-target')).toHaveProp('value', '11');
 });
 
@@ -139,9 +140,11 @@ it('reports a load failure and retries without replacing the full page', async (
   const load = jest.spyOn(setup, 'listMuscleReportRows').mockRejectedValueOnce(Error('read failed'));
   render(<MusclesRoute />);
   await screen.findByTestId('settings-muscles-error');
+  fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
+  expect(mockPush).toHaveBeenLastCalledWith('/settings-enabled-muscles');
   load.mockRestore();
   fireEvent.press(screen.getByText('Retry'));
-  await screen.findByTestId('settings-enabled-muscles-row');
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true }));
   expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
 });
 
@@ -152,23 +155,25 @@ it('keeps Custom reporting unchanged until a preset is explicitly selected', asy
   await screen.findByTestId('settings-muscle-custom');
   expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: false });
   expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: false });
-  expect(screen.queryByTestId('settings-enabled-muscles-row')).toBeNull();
+  fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
+  expect(mockPush).toHaveBeenLastCalledWith('/settings-enabled-muscles');
   expect(setup.deriveMuscleReportPreset(await setup.listMuscleReportRows())).toBe('custom');
   fireEvent.press(screen.getByTestId('settings-muscle-preset-detailed'));
-  await screen.findByTestId('settings-enabled-muscles-row');
-  expect(screen.queryByTestId('settings-muscle-custom')).toBeNull();
+  await waitForGone(() => screen.queryByTestId('settings-muscle-custom'));
+  expect(screen.getByTestId('settings-enabled-muscles-row')).toBeTruthy();
 });
 
 it('retains the displayed preset on a failed database write and retries that choice', async () => {
   render(<MusclesRoute />);
-  await screen.findByTestId('settings-enabled-muscles-row');
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true }));
   const write = jest.spyOn(localDatabase(), 'transaction').mockImplementationOnce(() => { throw Error('disk full'); });
   fireEvent.press(screen.getByTestId('settings-muscle-preset-broad'));
   await screen.findByTestId('settings-muscles-error');
   expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true });
   write.mockRestore();
   fireEvent.press(screen.getByText('Retry'));
-  await waitForGone(() => screen.queryByTestId('settings-enabled-muscles-row'));
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: true }));
+  expect(screen.getByTestId('settings-enabled-muscles-row')).toBeTruthy();
   expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: true });
   expect(screen.queryByTestId('settings-muscles-error')).toBeNull();
 });
@@ -186,4 +191,30 @@ it('ignores a late setup read from the previous account', async () => {
   expect(screen.queryByTestId('settings-muscle-target-old-account')).toBeNull();
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '');
   read.mockRestore();
+});
+
+it.each(['detailed', 'broad'] as const)('keeps enablement counts and navigation independent of the %s breakdown', async preset => {
+  const rows = await setup.listMuscleReportRows();
+  await setup.setMuscleReportPreset(preset);
+  await setup.setMuscleTracked(['serratus_anterior'], false);
+  const page = render(<MusclesRoute />);
+  const label = `Enabled muscles, ${rows.length - 1} / ${rows.length}`;
+  await screen.findByLabelText(label);
+  fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
+  expect(mockPush).toHaveBeenLastCalledWith('/settings-enabled-muscles');
+  page.unmount();
+  const enabledPage = render(<EnabledRoute />);
+  await screen.findByTestId('settings-track-serratus_anterior');
+  expect(screen.getByTestId('settings-track-serratus_anterior')).toHaveProp('accessibilityState', { checked: false });
+  expect(screen.getByTestId('settings-track-chest')).toHaveProp('accessibilityState', { checked: true });
+  fireEvent.press(screen.getByTestId('settings-track-serratus_anterior'));
+  await waitFor(() => expect(screen.getByTestId('settings-track-serratus_anterior')).toHaveProp('accessibilityState', { checked: true }));
+  expect(setup.deriveMuscleReportPreset(await setup.listMuscleReportRows())).toBe(preset);
+  enabledPage.unmount();
+  render(<MusclesRoute />);
+  await screen.findByLabelText(`Enabled muscles, ${rows.length} / ${rows.length}`);
+  await act(async () => { await setup.setMuscleTracked(rows.map(row => row.id), false); });
+  await screen.findByLabelText(`Enabled muscles, 0 / ${rows.length}`);
+  fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
+  expect(mockPush).toHaveBeenLastCalledWith('/settings-enabled-muscles');
 });
