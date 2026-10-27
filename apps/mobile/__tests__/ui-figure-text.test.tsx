@@ -31,7 +31,7 @@ describe('FigureText', () => {
     expect(screen.getByTestId('line')).toHaveTextContent('+45 · 1.5/8');
   });
 
-  it('draws the figures of an emphasised line at its weight, not the figure face's own', () => {
+  it('draws the figures of an emphasised line at its weight, not the figure face weight', () => {
     render(
       <Text>
         <FigureText strong>Started 07:40</FigureText>
