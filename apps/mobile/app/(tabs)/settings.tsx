@@ -10,14 +10,15 @@ import { effortStatus, experimentsStatus, progressStatus, restTimerStatus, syncS
 import { useSyncStatusSnapshot } from '@/components/sync-status/use-sync-status';
 import {
   Card,
+  FigureText,
   Icon,
   ListRow,
   ScreenScroll,
   TitleBar,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
@@ -138,15 +139,15 @@ function AboutCard() {
         divider={false}
         leading={<Icon color={uiRoles.inkMuted} name="info" />}>
         <View style={styles.about}>
-          <Text allowFontScaling={false} style={styles.aboutLabel}>About</Text>
+          <Text allowFontScaling={false} style={uiText.title}>About</Text>
           {aboutLines.length > 0 ? (
             aboutLines.map((line) => (
-              <Text allowFontScaling={false} key={line.testID} style={styles.aboutLine} testID={line.testID}>
-                {line.text}
+              <Text allowFontScaling={false} key={line.testID} style={[uiText.body, uiTextTone.muted]} testID={line.testID}>
+                <FigureText>{line.text}</FigureText>
               </Text>
             ))
           ) : (
-            <Text allowFontScaling={false} style={styles.aboutLine}>Release information unavailable</Text>
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Release information unavailable</Text>
           )}
         </View>
       </ListRow>
@@ -161,19 +162,5 @@ const styles = StyleSheet.create({
   about: {
     flex: 1,
     paddingVertical: uiSpace.sm,
-  },
-  aboutLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  aboutLine: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

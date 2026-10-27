@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { SegmentedControl, uiSpace, uiText } from '@/components/ui';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 
@@ -34,7 +34,7 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
   return (
     <View style={styles.container} testID="settings-rest-timer">
       <View style={styles.preference}>
-        <Text allowFontScaling={false} style={styles.fieldLabel}>
+        <Text allowFontScaling={false} style={uiText.label}>
           Auto-start rest timer
         </Text>
         <SegmentedControl
@@ -67,12 +67,5 @@ const styles = StyleSheet.create({
   },
   preference: {
     gap: uiSpace.sm,
-  },
-  fieldLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
 });

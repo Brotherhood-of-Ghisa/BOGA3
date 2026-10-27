@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
   ActionButton, Icon, ListRow, Notice, Sheet, SwitchRow,
-  uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography,
+  uiBorder, uiRoles, uiSpace, uiText,
 } from '@/components/ui';
 import {
   disableNotifications, enableNotifications, getNotificationSnapshot, openNotificationSettings,
@@ -95,7 +95,7 @@ export function NotificationSettingsRow({ userId }: { userId: string | null }) {
           </View>
           {available && preferences ? (
             <View>
-              <Text accessibilityRole="header" allowFontScaling={false} style={styles.heading}>Categories</Text>
+              <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, styles.heading]}>Categories</Text>
               {CATEGORIES.map(({ key, label }) => (
                 <View key={key} style={styles.category}>
                   <SwitchRow disabled={state.busy} label={label} onValueChange={value => changeCategory(key, value)}
@@ -125,9 +125,6 @@ const styles = StyleSheet.create({
   actions: { paddingHorizontal: uiSpace.lg, gap: uiSpace.md, paddingBottom: uiSpace.lg },
   heading: {
     paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase', color: uiRoles.inkMuted,
   },
   category: { borderTopWidth: uiBorder.width, borderTopColor: uiRoles.ruleSoft },
 });

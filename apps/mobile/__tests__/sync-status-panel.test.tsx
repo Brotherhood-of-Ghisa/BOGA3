@@ -24,12 +24,13 @@ jest.mock('expo-router', () => {
   };
 });
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { StyleSheet } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { uiRoles } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 
 const baseStatus: SyncStatusSnapshot = {
@@ -154,6 +155,23 @@ describe('Settings sync-status panel', () => {
     expect(screen.getByTestId('settings-sync-status-dirty-count')).toBeTruthy();
     expect(screen.getByTestId('settings-sync-status-network')).toBeTruthy();
     expect(screen.getByTestId('settings-sync-status-error')).toBeTruthy();
+  });
+
+  it('draws the card on the text roles: words in meta, only the figures in Plex Mono', async () => {
+    renderPanel({ dirtyCount: 7, errorMessage: 'HTTP 503 from push' });
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('7');
+    });
+    expect(screen.getByText('Sync status')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+    expect(screen.getByText('Pending changes')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base });
+    const network = screen.getByTestId('settings-sync-status-network');
+    expect(network).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.ink });
+    const dirty = screen.getByTestId('settings-sync-status-dirty-count');
+    expect(dirty).toHaveStyle({ fontFamily: uiFonts.body.family });
+    expect(within(dirty).getByText('7')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    const error = screen.getByTestId('settings-sync-status-error');
+    expect(error).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.danger });
+    expect(within(error).getByText('503')).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });
 
   it('shows "Never" for last success and the dirty count from the source', async () => {

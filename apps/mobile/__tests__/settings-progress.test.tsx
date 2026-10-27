@@ -23,6 +23,7 @@ import {
 } from '@/components/settings/sub-pages';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
@@ -57,6 +58,27 @@ const editNumber = (id: string, value: string) => {
 };
 beforeEach(() => { mockUserId = 'A'; resetLocalData(); });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
+
+const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+
+it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
+  await openSettings();
+  for (const label of ['Progress view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric', 'Auto-start rest timer']) {
+    expect(screen.getByText(label)).toHaveStyle(LABEL);
+  }
+  const effort = within(screen.getByTestId('settings-effort-selections'));
+  expect(effort.getByText('Effort')).toHaveStyle(LABEL);
+  expect(effort.getByText('Volume')).toHaveStyle(LABEL);
+  expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+});
+
+it('labels the Other page controls as micro-labels', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<OtherSettingsScreen />);
+  expect(screen.getByText('Date format')).toHaveStyle(LABEL);
+  expect(screen.getByText('Past records gym filter')).toHaveStyle(LABEL);
+});
 
 const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');

@@ -37,6 +37,7 @@ import { Storage } from 'expo-sqlite/kv-store';
 
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
 import SettingsRoute from '../app/(tabs)/settings';
 
@@ -73,6 +74,13 @@ it('names the theme in use and lists every preset, the current one checked', () 
   expect(sheet.getByRole('radio', { name: 'Slate' }).props.accessibilityState).toEqual({ checked: false });
   // No sentence explains the restart (copy.no-inline-explanation): nothing is pending.
   expect(sheet.queryByText(/next/i)).toBeNull();
+});
+
+it('names each preset in bodyStrong, its details as meta', () => {
+  render(<SettingsRoute />);
+  const sheet = within(openSheet());
+  expect(sheet.getByText('Slate')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+  expect(sheet.getByText('Default')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
 });
 
 it('saves a choice at once and labels it as applying next launch', async () => {

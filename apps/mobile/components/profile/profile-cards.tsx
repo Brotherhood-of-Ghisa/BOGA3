@@ -7,10 +7,9 @@ import {
   Notice,
   Stat,
   uiBorder,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 
 import type { InlineFeedback } from './use-profile-panel';
@@ -40,7 +39,7 @@ export function SignedOutCard({ email, password, onChangeEmail, onChangePassword
 }) {
   return (
     <Card style={styles.formCard} testID="profile-signed-out-card">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.cardTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
         Sign in
       </Text>
 
@@ -230,13 +229,6 @@ const styles = StyleSheet.create({
   formCard: {
     padding: uiSpace.lg,
     gap: uiSpace.md,
-  },
-  cardTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
   valueRow: {
     paddingHorizontal: uiSpace.lg,

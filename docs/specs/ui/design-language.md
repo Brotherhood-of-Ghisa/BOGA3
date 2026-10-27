@@ -157,8 +157,9 @@ figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
 so it never outweighs the title. Today, Groups, Sessions, Progress, the
-session flow (recorder, session view, completion, View Session, Train) and the
-session planner take every text from the roles. Display art keeps its own type: the full-screen
+session flow (recorder, session view, completion, View Session, Train), the
+session planner and Settings (its pages, Appearance, Profile, Gyms) take every
+text from the roles. Display art keeps its own type: the full-screen
 repeating timer, the Train START disc and the share image. Screens not yet moved
 still hold their own styles, and each moves when next touched.
 

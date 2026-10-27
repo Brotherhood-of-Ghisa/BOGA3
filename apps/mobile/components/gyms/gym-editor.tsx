@@ -3,6 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   readGymCoordinates,
@@ -131,7 +132,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   if (pending) {
     locationActions = (
       <View style={styles.confirm} testID="gym-editor-confirm">
-        <Text allowFontScaling={false} style={styles.confirmText}>
+        <Text allowFontScaling={false} style={uiText.bodyStrong}>
           {pending === 'replace'
             ? 'Replace the saved location with where you are now?'
             : "Clear the saved location? This gym won't be suggested nearby."}
@@ -203,7 +204,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
   return (
     <View style={styles.editor} testID="gym-editor">
-      <Text allowFontScaling={false} style={styles.microLabel}>Name</Text>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Name</Text>
       <TextInput
         allowFontScaling={false}
         accessibilityLabel="Gym name"
@@ -217,21 +218,21 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
         value={name}
       />
 
-      <Text allowFontScaling={false} style={styles.microLabel}>Location</Text>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Location</Text>
       <View style={styles.status}>
         <Icon color={hasLocation ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />
-        <Text allowFontScaling={false} style={styles.statusText} testID="gym-editor-location-status">
+        <Text allowFontScaling={false} style={uiText.bodyStrong} testID="gym-editor-location-status">
           {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
         </Text>
       </View>
-      <Text allowFontScaling={false} style={styles.hint}>
+      <Text allowFontScaling={false} style={uiText.meta}>
         Private to you. A saved location lets the gym sheet suggest this gym when you are here.
       </Text>
       {feedback ? (
         <Text
           allowFontScaling={false}
           accessibilityLiveRegion="polite"
-          style={[styles.feedback, feedback.tone === 'error' ? styles.feedbackError : null]}
+          style={[uiText.meta, uiTextEmphasis.strong, feedback.tone === 'error' ? uiTextTone.danger : null]}
           testID="gym-editor-feedback">
           {feedback.message}
         </Text>
@@ -277,15 +278,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: uiSpace.xs,
     borderLeftColor: uiRoles.accent,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   input: {
     height: uiGeometry.fieldHeight,
     paddingHorizontal: uiSpace.sm,
@@ -303,39 +295,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-  statusText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  feedback: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  feedbackError: {
-    color: uiRoles.danger,
-  },
   confirm: {
     gap: uiSpace.sm,
-  },
-  confirmText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   buttonRow: {
     flexDirection: 'row',

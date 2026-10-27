@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { BackupPanel } from '@/components/settings/backup-panel';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import type { DatabaseBackups } from '@/src/backup/database-backups';
 import type { Snapshot } from '@/src/backup/snapshots';
 import { formatLocalDateTime } from '@/src/utils/local-time';
@@ -51,6 +52,26 @@ it('shows the newest snapshot in the date format and the count, updating after a
 
   expect(screen.getByTestId('settings-backup-last')).toHaveTextContent(formatLocalDateTime(later, 'DD-MM-YYYY'));
   expect(screen.getByTestId('settings-backup-count')).toHaveTextContent('3');
+});
+
+it('draws the card on the text roles: a label, body row names, values as meta with figures in Plex Mono', () => {
+  const newest = new Date(2026, 9, 25, 9, 30).getTime();
+  render(<BackupPanel backups={fakeBackups([snapshot(newest)]).backups} />);
+
+  expect(screen.getByText('Backups')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+  expect(screen.getByText('Last backup')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base });
+  const last = screen.getByTestId('settings-backup-last');
+  expect(last).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.ink });
+  expect(within(last).getByText('25-10-2026')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+});
+
+it('draws Unavailable as a word, not in the figure face', () => {
+  const { backups } = fakeBackups();
+  backups.list.mockImplementation(() => {
+    throw new Error('no access');
+  });
+  render(<BackupPanel backups={backups} />);
+  expect(screen.getByTestId('settings-backup-count')).toHaveStyle({ fontFamily: uiFonts.body.family });
 });
 
 it('shows Unavailable when the backups directory cannot be read', () => {
