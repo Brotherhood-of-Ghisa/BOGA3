@@ -2,9 +2,10 @@ import { StyleSheet } from 'react-native';
 
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui/tokens';
 
-// Type roles shared by Today's cards (`design-language.md` §3): micro-labels
-// Archivo 700 at `xxs`, headline figures Plex Mono 700, quiet figures Plex
-// Mono 500. A PR figure is `record`.
+// Superseded on Today by `uiText` (`components/ui/text-roles.ts`); still used
+// by Groups and Sessions until they move to it. Micro-labels Archivo 700 at
+// `xxs`, headline figures Plex Mono 700, quiet figures Plex Mono 500. A PR
+// figure is `record`.
 export const todayText = StyleSheet.create({
   microLabel: {
     fontFamily: uiFonts.display.family,

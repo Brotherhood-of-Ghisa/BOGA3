@@ -10,6 +10,7 @@ import {
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { changeToneColour } from '@/components/ui/change-tone';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
 
@@ -29,7 +30,6 @@ import {
   type PeriodChartGeometry,
 } from './progress-format';
 import { StepAround } from './step-arrows';
-import { todayText } from './text-styles';
 
 // Until the first layout pass reports the card's width (and in Jest, where
 // none runs): roughly a 390pt phone's card.
@@ -161,7 +161,7 @@ export function PeriodPace({
     <Text
       allowFontScaling={false}
       numberOfLines={1}
-      style={[todayText.microLabel, todayText.microLabelFaint]}
+      style={[uiText.label, uiTextTone.faint]}
       testID="today-progress-period-previous-range">
       {formatPeriodRange(period.previous.window)}
     </Text>
@@ -178,23 +178,23 @@ export function PeriodPace({
         style={styles.figures}
         testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]} testID="today-progress-period-range">
             {formatPeriodRange(period.window)}
           </Text>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={styles.currentRow} testID="today-progress-period-working-sets">
-            <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-progress-period-day">{label} </Text>
-            <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[todayText.headlineFigure, styles.currentFigure]}>
+            <Text allowFontScaling={false} style={uiText.figureSmall} testID="today-progress-period-day">{label} </Text>
+            <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[uiText.figureHero, styles.currentFigure]}>
               {figures.workingSets}
-              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.figureSmall}> sets</Text>
             </Text>
           </View>
         </View>
         {/* `vs` between the two periods, a rule above and below it. */}
         <View style={styles.versus}>
           <View style={styles.versusRule} />
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]}>vs</Text>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>vs</Text>
           <View style={styles.versusRule} />
         </View>
         <View style={[styles.column, styles.comparedColumn]}>
@@ -210,14 +210,14 @@ export function PeriodPace({
             comparedRange
           )}
           <View style={styles.previousRow}>
-            <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-sets">
+            <Text allowFontScaling={false} style={uiText.figureLarge} testID="today-progress-period-previous-sets">
               {figures.previousWorkingSets}
-              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.figureSmall}> sets</Text>
             </Text>
             {/* The difference takes its direction's colour, like every other
                 change figure (`design-language.md` §6). */}
             <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[todayText.differenceFigure, { color: changeToneColour(paceTone(figures.difference)) }]}>
+              style={[uiText.figureLarge, { color: changeToneColour(paceTone(figures.difference)) }]}>
               {formatSignedCount(figures.difference)}
             </Text>
           </View>

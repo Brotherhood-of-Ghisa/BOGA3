@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type TodayCardPage = {
   key: string;
@@ -145,7 +146,7 @@ function Tab({ label, selected, onPress, testID }: { label: string; selected: bo
         allowFontScaling={false}
         ellipsizeMode="tail"
         numberOfLines={1}
-        style={[styles.tabLabel, selected ? styles.tabLabelSelected : null]}>
+        style={[uiText.title, selected ? null : uiTextTone.faint]}>
         {label}
       </Text>
       <View style={[styles.tabMark, selected ? styles.tabMarkSelected : null]} />
@@ -181,16 +182,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: uiSpace.xs,
     paddingTop: uiSpace.sm,
-  },
-  tabLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.inkFaint,
-  },
-  tabLabelSelected: {
-    color: uiRoles.ink,
   },
   tabMark: {
     height: TAB_MARK,

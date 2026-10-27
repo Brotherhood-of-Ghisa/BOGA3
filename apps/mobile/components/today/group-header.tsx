@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GroupSwitchSheet } from '@/components/groups/group-switch-sheet';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type TodayGroupHeaderProps = {
   /** The primary group's name. */
@@ -32,7 +33,7 @@ export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupI
         onPress={onOpenHome}
         style={({ pressed }) => [styles.title, pressed ? styles.pressed : null]}
         testID="today-group-title">
-        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={styles.titleText}>
+        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={[uiText.title, styles.titleText]}>
           {groupName}
         </Text>
         <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
@@ -98,10 +99,5 @@ const styles = StyleSheet.create({
   },
   titleText: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });
