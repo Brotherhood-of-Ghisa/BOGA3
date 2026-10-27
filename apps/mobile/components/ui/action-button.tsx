@@ -1,8 +1,10 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
+import { Icon } from '@/components/ui/icon';
+import { uiText } from '@/components/ui/text-roles';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
-export type ActionButtonVariant = 'primary' | 'outline' | 'text';
+export type ActionButtonVariant = 'primary' | 'outline' | 'text' | 'link';
 export type ActionButtonTone = 'default' | 'danger';
 // `compact`: a 28-tall outline inside a list row (a group record's Certify),
 // its tap target kept at 44 by hit slop.
@@ -13,7 +15,9 @@ export type ActionButtonProps = {
   onPress: () => void;
   // `primary`: the screen's one `accent` action (Finish, Edit, Save). `outline`:
   // a secondary action (`+ Add exercise`, Retry). `text`: a plain caps label
-  // (Cancel, Archive, Show archived).
+  // (Cancel, Archive, Show archived). `link`: a heading's way into a fuller
+  // screen (a card's `Sessions`), drawn as its heading's micro-label, muted,
+  // with a chevron, so it never outweighs the title beside it.
   variant: ActionButtonVariant;
   // `danger` recolours an outline or text button; a primary is never danger.
   tone?: ActionButtonTone;
@@ -50,12 +54,13 @@ export function ActionButton({
       accessibilityRole="button"
       accessibilityState={checked === undefined ? { disabled } : { disabled, checked }}
       disabled={disabled}
-      hitSlop={size === 'compact' ? COMPACT_HIT_SLOP : undefined}
+      hitSlop={size === 'compact' || variant === 'link' ? COMPACT_HIT_SLOP : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
         size === 'compact' ? styles.compact : null,
         size === 'large' ? styles.large : null,
+        variant === 'link' ? styles.link : null,
         variant === 'primary' ? styles.primary : null,
         variant === 'outline' ? [styles.outline, danger ? styles.outlineDanger : null] : null,
         disabled && variant === 'primary' ? styles.primaryDisabled : null,
@@ -65,7 +70,7 @@ export function ActionButton({
       testID={testID}>
       <Text
         allowFontScaling={false}
-        style={[
+        style={variant === 'link' ? [uiText.label, disabled ? styles.labelDisabled : null] : [
           styles.label,
           size === 'compact' ? styles.labelCompact : null,
           size === 'large' ? styles.labelLarge : null,
@@ -75,6 +80,7 @@ export function ActionButton({
         ]}>
         {label}
       </Text>
+      {variant === 'link' ? <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name="chevron-right" size="xs" /> : null}
     </Pressable>
   );
 }
@@ -94,6 +100,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.sm,
   },
   large: { minHeight: uiGeometry.tapTarget + uiSpace.xl },
+  // Compact height, its tap target kept at 44 by hit slop; the chevron follows the label.
+  link: {
+    minHeight: uiGeometry.compactControlHeight,
+    paddingHorizontal: uiSpace.sm,
+    flexDirection: 'row',
+    gap: uiSpace.xs,
+  },
   primary: {
     backgroundColor: uiRoles.accent,
   },

@@ -141,7 +141,7 @@ export function TodaySessionCard({
         ) : (
           stamp
         )}
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="text" />
+        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
       </View>
       <Pressable
         accessibilityHint="Opens the completed session"

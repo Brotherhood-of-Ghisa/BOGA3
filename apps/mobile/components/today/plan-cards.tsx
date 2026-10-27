@@ -120,7 +120,7 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
         <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           Recovery
         </Text>
-        <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="text" />
+        <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="link" />
       </View>
       <View style={[styles.columns, styles.muscleRowLayout]}>
         <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Muscle</Text>
@@ -215,7 +215,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           Plan
         </Text>
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="text" />
+        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (

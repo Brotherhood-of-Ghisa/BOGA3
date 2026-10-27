@@ -519,6 +519,22 @@ describe('ActionButton', () => {
     expect(screen.getByTestId('compact').props.hitSlop).toBeUndefined();
   });
 
+  it('draws a link as a muted micro-label with a chevron, compact with a 44 tap target', () => {
+    const onPress = jest.fn();
+    render(<ActionButton label="Sessions" onPress={onPress} testID="link" variant="link" />);
+    const link = screen.getByTestId('link');
+    expect(flatStyle(screen.getByText('Sessions'))).toMatchObject({
+      fontSize: uiTypography.size.xxs,
+      textTransform: 'uppercase',
+      color: uiRoles.inkMuted,
+    });
+    expect(flatStyle(link).minHeight).toBe(uiGeometry.compactControlHeight);
+    expect(uiGeometry.compactControlHeight + 2 * link.props.hitSlop).toBe(uiGeometry.tapTarget);
+    expect(within(link).UNSAFE_getAllByType(Icon)).toHaveLength(1);
+    fireEvent.press(link);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
   it('fades when disabled and ignores presses', () => {
     const onPress = jest.fn();
     render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);
