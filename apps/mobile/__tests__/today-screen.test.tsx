@@ -13,7 +13,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
 import Svg from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -177,6 +177,12 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+18');
+    // Words leave Plex Mono, only figures keep it: the day and each `sets`
+    // take `meta`, in a full role so the hero's weight never reaches them.
+    const meta = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm };
+    expect(StyleSheet.flatten(text('today-progress-period-day').props.style)).toMatchObject(meta);
+    expect(StyleSheet.flatten(within(text('today-progress-period-working-sets')).getByText('sets').props.style)).toMatchObject(meta);
+    expect(StyleSheet.flatten(within(text('today-progress-period-previous-sets')).getByText('sets').props.style)).toMatchObject(meta);
     // Ahead is an improvement, in the one colour every change figure uses for
     // one (`design-language.md` §6).
     expect(text('today-progress-period-difference')).toHaveStyle({ color: uiRoles.gain });

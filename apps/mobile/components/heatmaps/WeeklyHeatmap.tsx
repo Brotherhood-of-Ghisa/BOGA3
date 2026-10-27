@@ -13,7 +13,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiFonts, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { FigureText, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -92,7 +92,7 @@ function WeeklyAxis({ values, position, formatValue, testID, children }: {
           const width = event.nativeEvent.layout.width;
           setLabelWidths(previous => previous[annotation.text] === width ? previous : { ...previous, [annotation.text]: width });
         }}
-        style={[styles.axisLabel, { maxWidth: plotWidth || undefined,
+        style={[uiText.label, uiTextTone.faint, styles.axisLabel, { maxWidth: plotWidth || undefined,
           transform: [{ translateX: annotation.left }], opacity: visible.includes(annotation) ? 1 : 0 }]}>{annotation.text}</Text>
     </React.Fragment>)}
     {children}
@@ -136,8 +136,8 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
         </View>
         {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
       </View>
-      <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
-      {prCount > 0 ? <Text allowFontScaling={false} style={styles.prs} testID={`${testID}-prs-${week.weekStartDateKey}`}>{prCount} PR{prCount === 1 ? '' : 's'}</Text> : null}
+      <Text allowFontScaling={false} style={[uiText.figure, styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+      {prCount > 0 ? <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.record, styles.prs]} testID={`${testID}-prs-${week.weekStartDateKey}`}><FigureText figureStyle={uiTextTone.record}>{`${prCount} PR${prCount === 1 ? '' : 's'}`}</FigureText></Text> : null}
     </View>
   </>;
   return onPress
@@ -196,7 +196,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
         const title = formatMonthYear(new Date(`${item.monthKey}-01T12:00:00`));
         return <View accessible accessibilityRole="text" accessibilityLabel={`${title}, No training`}
           style={styles.row} testID={`${testID}-empty-month-${item.monthKey}`}>
-          <Text allowFontScaling={false} style={styles.dateText}>{title}</Text>
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]}><FigureText>{title}</FigureText></Text>
           <View style={styles.monthRule} />
         </View>;
       }
@@ -215,21 +215,19 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
   date: { width: DATE_WIDTH },
   monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: uiRoles.rule },
-  dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
-  value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, textAlign: 'right' },
+  value: { textAlign: 'right' },
   // Keep the existing metric/bar axis when adding record counts.
   prs: { position: 'absolute', top: '50%', marginTop: uiSpace.sm + uiTypography.lineHeight.base / 2, right: 0,
-    fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.record, textAlign: 'right' },
+    textAlign: 'right' },
   reference: { position: 'absolute', top: -uiSpace.sm, bottom: -uiSpace.sm, width: 1, justifyContent: 'space-around' },
   dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axis: { flex: 1, height: uiTypography.lineHeight.xxs + uiSpace.sm },
-  axisLabel: { ...heatmapStyles.legendText, position: 'absolute', left: 0 },
+  axisLabel: { position: 'absolute', left: 0 },
 });
 
 export default WeeklyHeatmap;

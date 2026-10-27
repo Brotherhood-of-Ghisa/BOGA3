@@ -25,10 +25,9 @@ import {
 } from 'react-native';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 
-import { IconButton, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, IconButton, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
-import { heatmapStyles } from './heatmap-style';
 import type { HeatmapData } from './heatmapData';
 import {
   barPath,
@@ -59,8 +58,9 @@ const PLOT_HEIGHT = 160;
 // Until the first layout pass reports the plot's width (and in Jest, where
 // none runs): roughly a 390pt phone's plot beside its axis.
 const FALLBACK_PLOT_WIDTH = 300;
-// Plex Mono advances 0.6em per character.
-const TICK_CHAR_WIDTH = uiTypography.size.xxs * 0.6;
+// A tick is a micro-label: Archivo's digits advance about 0.6em, plus the
+// label's tracking.
+const TICK_CHAR_WIDTH = uiTypography.size.xxs * (0.6 + uiGeometry.microLabelTracking);
 
 const isSum = (metric: CalendarHeatmapMetric) => metric === 'totalVolume' || metric === 'workingSetCount';
 
@@ -95,15 +95,15 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
       <IconButton accessibilityLabel="Previous week" disabled={!hasPrevious} name="chevron-left"
         onPress={() => onStep(-1)} testID={`${testID}-previous-week`} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
-        <Text allowFontScaling={false} style={styles.readoutWeek}
-          testID={`${testID}-readout-week`}>{weekLabel(week.monday, dateFormat)}</Text>
+        <Text allowFontScaling={false} style={uiText.title}
+          testID={`${testID}-readout-week`}><FigureText>{weekLabel(week.monday, dateFormat)}</FigureText></Text>
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
     </View>
     <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
-      style={styles.readoutValue} testID={`${testID}-readout-value`}>
-      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={heatmapStyles.legendText}> {figure.unit}</Text> : null}
+      style={uiText.figureLarge} testID={`${testID}-readout-value`}>
+      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}> {figure.unit}</Text> : null}
     </Text>
   </View>;
 }
@@ -164,7 +164,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
     <View style={styles.chartRow}>
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[styles.axis, { width: axisWidth }]}>
         {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
-          style={[styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
+          style={[uiText.label, uiTextTone.faint, styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
           testID={`${testID}-tick-${tick.value}`}>{tickLabels[index]}</Text>)}
       </View>
       <View style={styles.plot} onLayout={onLayout}>
@@ -180,8 +180,8 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
             <TimelinePlot geometry={geometry} focusedIndex={focusedIndex} testID={testID} />
             <View pointerEvents="none" style={styles.months}>
               {geometry.months.map(month => <View key={month.index} style={[styles.month, { left: month.x }]}>
-                <Text allowFontScaling={false} style={heatmapStyles.legendText} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
-                {month.year === undefined ? null : <Text allowFontScaling={false} style={heatmapStyles.legendText}>{month.year}</Text>}
+                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
+                {month.year === undefined ? null : <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>{month.year}</Text>}
               </View>)}
             </View>
           </Pressable>
@@ -216,12 +216,9 @@ const styles = StyleSheet.create({
   // gutter, so the label leads the row.
   weekNav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: -uiSpace.md, flexShrink: 1 },
   weekColumn: { alignItems: 'flex-start', flexShrink: 1 },
-  readoutWeek: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg, color: uiRoles.ink },
-  readoutValue: { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },
   chartRow: { flexDirection: 'row', gap: uiSpace.sm },
   axis: { height: PLOT_HEIGHT },
-  tick: { position: 'absolute', right: 0, textAlign: 'right', fontFamily: uiFonts.figure.family, fontWeight: '500',
-    fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkFaint },
+  tick: { position: 'absolute', right: 0, textAlign: 'right' },
   plot: { flex: 1 },
   months: { height: uiTypography.lineHeight.xxs * 2 + uiSpace.xs, marginTop: uiSpace.xs },
   month: { position: 'absolute', top: 0 },

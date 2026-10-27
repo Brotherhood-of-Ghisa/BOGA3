@@ -10,6 +10,7 @@ import {
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { changeToneColour } from '@/components/ui/change-tone';
+import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
@@ -182,10 +183,10 @@ export function PeriodPace({
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={styles.currentRow} testID="today-progress-period-working-sets">
-            <Text allowFontScaling={false} style={uiText.figureSmall} testID="today-progress-period-day">{label} </Text>
+            <Text allowFontScaling={false} style={uiText.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
             <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[uiText.figureHero, styles.currentFigure]}>
               {figures.workingSets}
-              <Text allowFontScaling={false} style={uiText.figureSmall}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.meta}> sets</Text>
             </Text>
           </View>
         </View>
@@ -210,7 +211,7 @@ export function PeriodPace({
           <View style={styles.previousRow}>
             <Text allowFontScaling={false} style={uiText.figureLarge} testID="today-progress-period-previous-sets">
               {figures.previousWorkingSets}
-              <Text allowFontScaling={false} style={uiText.figureSmall}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.meta}> sets</Text>
             </Text>
             {/* The difference takes its direction's colour, like every other
                 change figure (`design-language.md` §6). */}

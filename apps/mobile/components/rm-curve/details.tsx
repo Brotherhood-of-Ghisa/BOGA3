@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { ActionButton, Card } from '@/components/ui';
+import { ActionButton, Card, FigureText, uiText, uiTextTone } from '@/components/ui';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { RmCurveModel, RmCurveObservation } from '@/src/rm-curve/model';
@@ -22,16 +22,16 @@ export function RmCurveDetails({ model, point, dateFormat, onSelect, period, per
   const index = model.observations.findIndex(p => p.setId === point.setId);
   const perSide = model.definition.loadInputMode === 'per_side_load';
   return <Card style={styles.card} testID="rm-curve-details">
-    <Text allowFontScaling={false} style={styles.micro}>SELECTED SET</Text>
-    {period && periodLabel ? <Text testID="rm-selected-period" allowFontScaling={false} style={[styles.figure, { color: periodColour(period) }]}>{periodLabel}</Text> : null}
-    <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(point.completedAt, dateFormat)} · block {point.blockOrder + 1}, set {point.setOrder + 1}</Text>
-    <Text allowFontScaling={false} style={styles.body}>{point.gymName ?? NO_GYM_LABEL}</Text>
+    <Text allowFontScaling={false} style={uiText.label}>SELECTED SET</Text>
+    {period && periodLabel ? <Text testID="rm-selected-period" allowFontScaling={false} style={[uiText.body, { color: periodColour(period) }]}><FigureText>{periodLabel}</FigureText></Text> : null}
+    <Text allowFontScaling={false} style={uiText.body}><FigureText>{`${formatShortDate(point.completedAt, dateFormat)} · block ${point.blockOrder + 1}, set ${point.setOrder + 1}`}</FigureText></Text>
+    <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{point.gymName ?? NO_GYM_LABEL}</Text>
     <View style={styles.metrics}>
-      <View style={styles.metric}><Text allowFontScaling={false} style={styles.micro}>REPS / RIR</Text><Text allowFontScaling={false} style={styles.figure}>{point.reps} / {point.rir}</Text></View>
-      <View style={styles.metric}><Text allowFontScaling={false} style={styles.micro}>{perSide ? 'WEIGHT / 1RM · PER SIDE' : 'WEIGHT / 1RM'}</Text>
-        <Text allowFontScaling={false} style={styles.figure}>{formatWeight(point.weightKg)} / {formatOneRepMax(point.existingOneRepMax)}</Text></View>
+      <View style={styles.metric}><Text allowFontScaling={false} style={uiText.label}>REPS / RIR</Text><Text allowFontScaling={false} style={uiText.figure}>{point.reps} / {point.rir}</Text></View>
+      <View style={styles.metric}><Text allowFontScaling={false} style={uiText.label}>{perSide ? 'WEIGHT / 1RM · PER SIDE' : 'WEIGHT / 1RM'}</Text>
+        <Text allowFontScaling={false} style={uiText.figure}>{formatWeight(point.weightKg)} / {formatOneRepMax(point.existingOneRepMax)}</Text></View>
     </View>
-    <Text allowFontScaling={false} style={styles.body}>Equivalent reps <Text allowFontScaling={false} style={styles.figure}>{point.equivalentReps}</Text> · Load <Text allowFontScaling={false} style={styles.figure}>{formatWeight(point.loadKg)}</Text>{perSide ? ' per side' : ''}</Text>
+    <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}><FigureText>{`Equivalent reps ${point.equivalentReps} · Load ${formatWeight(point.loadKg)}${perSide ? ' per side' : ''}`}</FigureText></Text>
     <View style={styles.actions}>
       <ActionButton label="Previous set" variant="outline" disabled={index === model.observations.length - 1}
         onPress={() => onSelect(model.observations[index + 1].setId)} />

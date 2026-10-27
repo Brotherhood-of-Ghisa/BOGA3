@@ -444,7 +444,8 @@ describe('The history page over real data', () => {
 
     // Nothing is selected yet, so the newest week is the focused one: marked in
     // the chart, named in the readout, and listed below.
-    const readout = () => screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true }).props.children;
+    // The heading's words wrap in `FigureText`, which holds the label as its text.
+    const readout = (): string => screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true }).props.children.props.children;
     expect(screen.getByTestId('stats-exercise-history-timeline-selected')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-timeline-next-week')).toBeDisabled();
     const newest = readout();
