@@ -156,8 +156,9 @@ roles; layout styles follow the role and set no type. A line mixing words and
 figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
-so it never outweighs the title. Screens not yet moved still hold their own
-styles; each moves when next touched.
+so it never outweighs the title. Today, Groups and Sessions take every text
+from the roles; screens not yet moved still hold their own styles, and each
+moves when next touched.
 
 ## 4. Surfaces
 
