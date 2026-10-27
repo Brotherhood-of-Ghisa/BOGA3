@@ -476,6 +476,28 @@ describe('The history page over real data', () => {
     expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength(2);
   });
 
+  it('retains older in-window Weekly training and limits Progress to the saved look-back without full-history expansion', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await logPulldown(450);
+    await logPulldown(.05);
+    act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'weekly' }));
+    await openHistory({ exerciseDefinitionId: PULLDOWN });
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    const oldWeek = localDateKey(calendarWeekBounds(1, new Date(Date.now() - 450 * DAY_MS)).start);
+    const rows = () => screen.UNSAFE_getAllByType(FlatList)
+      .find(node => node.props.testID === 'stats-exercise-history-heatmap')!.props.data as { weekStartDateKey?: string; value?: number }[];
+    expect(rows().find(row => row.weekStartDateKey === oldWeek)?.value).toBe(600);
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+
+    await act(async () => updatePreferences({ historyLookbackWeeks: 52 }));
+    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    expect(rows().some(row => row.weekStartDateKey === oldWeek)).toBe(false);
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-history-options-button'));
+    fireEvent.press(screen.getByRole('button', { name: 'History' }));
+    expect(mockPush).toHaveBeenLastCalledWith(`/exercise-history?exerciseDefinitionId=${PULLDOWN}`);
+  });
+
   it('shows no empty-history panel while the initial read or look-back reload is pending', async () => {
     await loadMaestroFixture('exercise-block-history');
     const initial = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseHistoryEffort>>>();

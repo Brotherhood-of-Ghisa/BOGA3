@@ -97,7 +97,7 @@ and routes; rest cells in Daily stay text.
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
-  follows [[copy.blank-history]]. Rest rows are omitted; zero/unavailable training remains, and the current week is announced accessibly.
+  follows [[copy.blank-history]]. Occupied Monday-owned months retain all weeks; empty months collapse to one labelled, non-interactive placeholder. Zero/unavailable training keeps a month expanded; the current week is announced accessibly.
   Compact week headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
@@ -145,7 +145,7 @@ short windows have no implicit 52-week minimum.
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
   retain the selected metric format. Axis marks announce the saved window, each
   reference and value accessibly, including coincident references; no visible
-  label stack is drawn. References and displayed weeks use the same look-back.
+  label stack is drawn.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
   subtitles and reference-name captions are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.

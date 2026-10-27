@@ -1,8 +1,9 @@
-import { formatCalendarDate } from '@/src/utils/local-time';
+import { formatCalendarDate, formatMonthYear } from '@/src/utils/local-time';
 import { useDateFormat } from '@/src/preferences/hooks';
 // Newest-first weekly rows over [[comparison.history-window]]; colour retains the
-// adapter's independent intensity/target meaning. Known training weeks (zeros included;
-// rest, future and unavailable excluded) supply the scale and reference lines: Sets and
+// adapter's independent intensity/target meaning. Empty Monday-owned months collapse
+// to one placeholder; occupied months retain rest weeks. Known training weeks
+// (zeros included; rest, future and unavailable excluded) supply the scale and reference lines: Sets and
 // Volume run zero to the window maximum, strength is symmetric around the median.
 // Figure visibility follows [[copy.blank-history]].
 // Numeric labels follow the reference values when available, otherwise the scale.
@@ -37,6 +38,8 @@ interface Props {
   // Inline history states share the list's scroll, never a nested ScrollView.
   header?: ReactNode;
 }
+
+type WeeklyHistoryRow = WeekCell | { monthKey: string };
 
 type Reference = { id: string; label: string; value: number; text: string; position: number };
 const REFERENCE_PERCENTILES = [['p25', '25th percentile', .25], ['median', 'median', .5], ['p75', '75th percentile', .75]] as const;
@@ -141,8 +144,17 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
 export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatValue,
   formatReferenceValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
   const windowWeeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey), [data.weekly, data.todayDateKey]);
-  // Keep zero and unavailable training; only rest rows disappear.
-  const weeks = useMemo(() => windowWeeks.filter(week => week.hasTraining ?? week.value > 0).reverse(), [windowWeeks]);
+  const rows = useMemo(() => {
+    const months = new Map<string, WeekCell[]>();
+    for (const week of [...windowWeeks].reverse()) {
+      const monthKey = week.weekStartDateKey.slice(0, 7);
+      const weeks = months.get(monthKey) ?? [];
+      weeks.push(week);
+      months.set(monthKey, weeks);
+    }
+    return [...months].flatMap<WeeklyHistoryRow>(([monthKey, weeks]) =>
+      weeks.some(week => week.hasTraining ?? week.value > 0) ? weeks : [{ monthKey }]);
+  }, [windowWeeks]);
   const trainingWeeks = windowWeeks.filter(isKnownTraining);
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   const max = values[values.length - 1] ?? 0;
@@ -153,12 +165,12 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
       const value = calculateLinearPercentile(values, percentile);
       return { id, label, value, text: formatReferenceValue(value), position: position(value) };
     }) : [];
-  const valueWidth = Math.min(96, Math.max(36, ...weeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));
+  const valueWidth = Math.min(96, Math.max(36, ...windowWeeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));
   const testID = `${testIDPrefix}-heatmap`;
 
-  return <FlatList
+  return <FlatList<WeeklyHistoryRow>
     testID={testID} style={styles.list} contentContainerStyle={styles.content}
-    data={weeks} keyExtractor={week => week.weekStartDateKey}
+    data={rows} keyExtractor={item => 'monthKey' in item ? item.monthKey : item.weekStartDateKey}
     initialNumToRender={12} windowSize={5} showsVerticalScrollIndicator={false}
     ListHeaderComponent={<View>{header}<>
       {/* No view title: the page's selectors say which view and metric this is. */}
@@ -174,10 +186,20 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
         <View style={{ width: valueWidth }} />
       </View>
     </></View>}
-    renderItem={({ item }) => <WeeklyRow week={item}
-      onPress={onOpenWeek && item.hasTraining ? () => onOpenWeek(item.weekStartDateKey) : undefined}
-      formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
-      position={position} references={references} valueWidth={valueWidth} testID={testID} />}
+    renderItem={({ item }) => {
+      if ('monthKey' in item) {
+        const title = formatMonthYear(new Date(`${item.monthKey}-01T12:00:00`));
+        return <View accessible accessibilityRole="text" accessibilityLabel={`${title}, No training`}
+          style={styles.row} testID={`${testID}-empty-month-${item.monthKey}`}>
+          <Text allowFontScaling={false} style={styles.dateText}>{title}</Text>
+          <View style={styles.monthRule} />
+        </View>;
+      }
+      return <WeeklyRow week={item}
+        onPress={onOpenWeek && item.hasTraining ? () => onOpenWeek(item.weekStartDateKey) : undefined}
+        formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
+        position={position} references={references} valueWidth={valueWidth} testID={testID} />;
+    }}
     ListFooterComponent={<View style={styles.footer}>
       <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
     </View>}
@@ -189,6 +211,7 @@ const styles = StyleSheet.create({
   content: { padding: uiSpace.lg },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
   date: { width: DATE_WIDTH },
+  monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: uiRoles.rule },
   dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
