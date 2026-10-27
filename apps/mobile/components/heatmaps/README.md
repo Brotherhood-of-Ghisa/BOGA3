@@ -96,7 +96,7 @@ and routes; rest cells in Daily stay text.
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
-  follows [[copy.blank-history]]. Occupied Monday-owned months retain all weeks; empty months collapse to one labelled, non-interactive placeholder. Zero/unavailable training keeps a month expanded; the current week is announced accessibly.
+  follows [[copy.blank-history]]. Occupied Monday-owned months retain all weeks; empty months collapse to one labelled, non-interactive placeholder, except the current week always remains visible with an unfilled track until activity. Zero/unavailable training keeps a month expanded; the current week is announced accessibly.
   Compact week headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
@@ -133,18 +133,13 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- Weekly numeric annotations label the references when present, using `formatReferenceValue`; otherwise they label the scale.
-  They centre on their ticks using measured text and plot widths; edge labels
-  stay inside the plot. On overlap the middle label wins, then the lower, then
-  the upper. A label wider than the plot is ellipsized; full formatted values
-  stay on accessible ticks. Labels remeasure on metric changes; ticks and
-  references retain exact coordinates even if text is hidden.
-- Weekly references use discrete vertical dashes on the same scale
-  as the bars. Accessible values use whole
-  Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
-  retain the selected metric format. Axis marks announce the saved window, each
-  reference and value accessibly, including coincident references; no visible
-  label stack is drawn.
+- Weekly percentile names and formatted values belong only to the current
+  week's bar; older rows carry no reference rules. `formatReferenceValue`
+  formats them. Before the history minimum, a numeric scale stays above the list.
+  Labels centre on their exact ticks and stay within the measured plot;
+  collisions favour Median, then P25, then P75. Full reference names, values
+  and the saved window remain in the current row's accessible description,
+  including coincident ticks. Sets retains only its median.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
-  subtitles and reference-name captions are omitted. Selected metric controls
+  subtitles are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.
