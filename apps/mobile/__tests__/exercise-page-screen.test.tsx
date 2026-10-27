@@ -1175,6 +1175,9 @@ describe('exercise page title switcher', () => {
     expect(screen.getByTestId(`exercise-switcher-row-${BENCH}`)).toBeSelected();
     expect(screen.getByTestId(`exercise-switcher-row-${SQUAT}`)).not.toBeSelected();
     expect(screen.getByTestId('exercise-switcher-session')).toHaveTextContent('All exercises (session)');
+    // A tick means finished, not open: Squat's only set is done, Bench has planned ones.
+    expect(screen.getByTestId(`exercise-switcher-finished-${SQUAT}`, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId(`exercise-switcher-finished-${BENCH}`, { includeHiddenElements: true })).toBeNull();
   });
 
   it('shows the open exercise\'s progress as just confirmed, before it is saved', async () => {
@@ -1188,7 +1191,7 @@ describe('exercise page title switcher', () => {
     expect(screen.getByTestId(`exercise-switcher-progress-${BENCH}`)).toHaveTextContent('3/5');
   });
 
-  it('replaces the page with the chosen exercise, never pushing, and writes nothing', async () => {
+  it('replaces the page with the chosen exercise, never pushing, and writes nothing — even with an unsaved edit', async () => {
     await seedPage();
     const client: SessionExerciseDraftClient = {
       ...defaultSessionExerciseDraftClient,
@@ -1197,9 +1200,15 @@ describe('exercise page title switcher', () => {
     };
     render(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
     await screen.findByTestId('exercise-page');
+    // Dirty but inside the autosave debounce: only leaving the page saves it.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
     await openSwitcher();
 
     fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+    // Let any write the switch started settle (well inside the autosave debounce).
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
 
     expect(mockRouter.replace).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${SQUAT}`);
     expect(mockRouter.push).not.toHaveBeenCalled();

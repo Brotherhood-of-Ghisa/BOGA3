@@ -137,6 +137,8 @@ export function ExerciseOptionsSheet({
   );
 }
 
+const isFinished = (row: ExerciseSwitcherRow) => row.totalCount > 0 && row.doneCount === row.totalCount;
+
 type ExerciseSwitcherSheetProps = {
   visible: boolean;
   rows: readonly ExerciseSwitcherRow[];
@@ -147,7 +149,8 @@ type ExerciseSwitcherSheetProps = {
 };
 
 // The title's ▾: the session's exercises in order with their done / total
-// sets, the open one marked, then the way back to the whole session.
+// sets — the open one highlighted, a finished one ticked — then the way back
+// to the whole session.
 export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, onDismiss }: ExerciseSwitcherSheetProps) {
   const { height } = useWindowDimensions();
   return (
@@ -160,7 +163,7 @@ export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, 
       <ScrollView style={{ maxHeight: height * 0.55, flexGrow: 0 }}>
         {rows.map((row) => (
           <ListRow
-            accessibilityLabel={`${row.name}, ${row.doneCount} of ${row.totalCount} sets done${row.current ? ', current' : ''}`}
+            accessibilityLabel={`${row.name}, ${row.doneCount} of ${row.totalCount} sets done`}
             key={row.id}
             label={row.name}
             leading={
@@ -176,7 +179,7 @@ export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, 
             onPress={() => onSelect(row.id)}
             selected={row.current}
             testID={`exercise-switcher-row-${row.id}`}
-            trailing={row.current ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+            trailing={isFinished(row) ? <Icon color={uiRoles.inkMuted} name="check" testID={`exercise-switcher-finished-${row.id}`} /> : undefined}
           />
         ))}
       </ScrollView>
