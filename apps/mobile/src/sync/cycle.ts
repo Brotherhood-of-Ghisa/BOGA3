@@ -19,7 +19,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq, isNotNull, isNull, ne, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
 import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
@@ -31,7 +31,7 @@ import { runBootstrapper } from '@/src/sync/bootstrapper';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
-import { observeRemoteTimestamp, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { nowMonotonic, observeRemoteTimestamp, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
@@ -961,93 +961,344 @@ const findProvenanceClearSplitCards = (tx: Transaction, selected: WireEntity[]):
  * back together; a per-row insert failure (e.g. an FK violation) aborts the
  * whole page.
  */
-const PULL_SCRATCH_BASE = 5_000_000;
-let pullScratchOffset = 0;
+type OrderedTableConfig = {
+  table: typeof schema.gyms;
+  parentField: string;
+  parentCol: (table: typeof schema.gyms) => unknown;
+  orderColName: string;
+};
 
-const liftCollidingOrderSlot = (
-  tx: Transaction,
+const ORDERED_TABLE_CONFIGS: Partial<Record<EntityTableName, OrderedTableConfig>> = {
+  session_plan_exercises: {
+    table: schema.sessionPlanExercises as unknown as typeof schema.gyms,
+    parentField: 'sessionPlanId',
+    parentCol: () => schema.sessionPlanExercises.sessionPlanId,
+    orderColName: 'orderIndex',
+  },
+  session_plan_sets: {
+    table: schema.sessionPlanSets as unknown as typeof schema.gyms,
+    parentField: 'sessionPlanExerciseId',
+    parentCol: () => schema.sessionPlanSets.sessionPlanExerciseId,
+    orderColName: 'orderIndex',
+  },
+  session_exercises: {
+    table: schema.sessionExercises as unknown as typeof schema.gyms,
+    parentField: 'sessionId',
+    parentCol: () => schema.sessionExercises.sessionId,
+    orderColName: 'orderIndex',
+  },
+  exercise_sets: {
+    table: schema.exerciseSets as unknown as typeof schema.gyms,
+    parentField: 'sessionExerciseId',
+    parentCol: () => schema.exerciseSets.sessionExerciseId,
+    orderColName: 'orderIndex',
+  },
+};
+
+interface SiblingCandidate {
+  id: string;
+  isExisting: boolean;
+  existingRow?: EntityRow;
+  targetValues: Record<string, unknown>;
+  targetOrderIndex: number;
+  effectiveTimestamp: number;
+  isLocalWinner: boolean;
+  needsConflictRepair: boolean;
+  isIncomingNew: boolean;
+}
+
+type SiblingEntityRow = EntityRow & {
+  id: string;
+  orderIndex: number;
+  localDirty: boolean | number;
+  localUpdatedAtMs: number;
+};
+
+const buildSiblingCandidates = (
   type: EntityTableName,
-  values: Record<string, unknown>,
-  envelopeId: string,
-): void => {
-  if (typeof values.orderIndex !== 'number') {
-    return;
+  existingSiblings: SiblingEntityRow[],
+  incomingEnvelopes: WireEntity[],
+): SiblingCandidate[] => {
+  const existingById = new Map<string, SiblingEntityRow>();
+  for (const row of existingSiblings) {
+    existingById.set(row.id, row);
   }
-  const scratchSlot = PULL_SCRATCH_BASE + (pullScratchOffset++ % 1_000_000);
 
-  if (type === 'session_plan_exercises' && typeof values.sessionPlanId === 'string') {
-    const colliding = tx
-      .select({ id: schema.sessionPlanExercises.id })
-      .from(schema.sessionPlanExercises)
-      .where(
-        and(
-          eq(schema.sessionPlanExercises.sessionPlanId, values.sessionPlanId),
-          eq(schema.sessionPlanExercises.orderIndex, values.orderIndex),
-          ne(schema.sessionPlanExercises.id, envelopeId),
-        ),
-      )
-      .get();
-    if (colliding) {
-      tx.update(schema.sessionPlanExercises)
-        .set({ orderIndex: scratchSlot } as never)
-        .where(eq(schema.sessionPlanExercises.id, colliding.id))
-        .run();
-    }
-  } else if (type === 'session_plan_sets' && typeof values.sessionPlanExerciseId === 'string') {
-    const colliding = tx
-      .select({ id: schema.sessionPlanSets.id })
-      .from(schema.sessionPlanSets)
-      .where(
-        and(
-          eq(schema.sessionPlanSets.sessionPlanExerciseId, values.sessionPlanExerciseId),
-          eq(schema.sessionPlanSets.orderIndex, values.orderIndex),
-          ne(schema.sessionPlanSets.id, envelopeId),
-        ),
-      )
-      .get();
-    if (colliding) {
-      tx.update(schema.sessionPlanSets)
-        .set({ orderIndex: scratchSlot } as never)
-        .where(eq(schema.sessionPlanSets.id, colliding.id))
-        .run();
-    }
-  } else if (type === 'session_exercises' && typeof values.sessionId === 'string') {
-    const colliding = tx
-      .select({ id: schema.sessionExercises.id })
-      .from(schema.sessionExercises)
-      .where(
-        and(
-          eq(schema.sessionExercises.sessionId, values.sessionId),
-          eq(schema.sessionExercises.orderIndex, values.orderIndex),
-          ne(schema.sessionExercises.id, envelopeId),
-        ),
-      )
-      .get();
-    if (colliding) {
-      tx.update(schema.sessionExercises)
-        .set({ orderIndex: scratchSlot } as never)
-        .where(eq(schema.sessionExercises.id, colliding.id))
-        .run();
-    }
-  } else if (type === 'exercise_sets' && typeof values.sessionExerciseId === 'string') {
-    const colliding = tx
-      .select({ id: schema.exerciseSets.id })
-      .from(schema.exerciseSets)
-      .where(
-        and(
-          eq(schema.exerciseSets.sessionExerciseId, values.sessionExerciseId),
-          eq(schema.exerciseSets.orderIndex, values.orderIndex),
-          ne(schema.exerciseSets.id, envelopeId),
-        ),
-      )
-      .get();
-    if (colliding) {
-      tx.update(schema.exerciseSets)
-        .set({ orderIndex: scratchSlot } as never)
-        .where(eq(schema.exerciseSets.id, colliding.id))
-        .run();
+  const incomingById = new Map<string, WireEntity>();
+  for (const env of incomingEnvelopes) {
+    incomingById.set(env.id, env);
+  }
+
+  const candidates: SiblingCandidate[] = [];
+  const allIds = new Set<string>([...existingById.keys(), ...incomingById.keys()]);
+
+  for (const id of allIds) {
+    const incoming = incomingById.get(id);
+    const existing = existingById.get(id);
+
+    if (incoming && !existing) {
+      const values = wireToEntity(incoming, type) as Record<string, unknown>;
+      candidates.push({
+        id,
+        isExisting: false,
+        targetValues: values,
+        targetOrderIndex: Number(values.orderIndex ?? 0),
+        effectiveTimestamp: incoming.client_updated_at_ms,
+        isLocalWinner: false,
+        needsConflictRepair: false,
+        isIncomingNew: true,
+      });
+    } else if (incoming && existing) {
+      const values = wireToEntity(incoming, type) as Record<string, unknown>;
+      if (incoming.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+        candidates.push({
+          id,
+          isExisting: true,
+          existingRow: existing,
+          targetValues: values,
+          targetOrderIndex: Number(values.orderIndex ?? 0),
+          effectiveTimestamp: incoming.client_updated_at_ms,
+          isLocalWinner: false,
+          needsConflictRepair: false,
+          isIncomingNew: false,
+        });
+      } else {
+        candidates.push({
+          id,
+          isExisting: true,
+          existingRow: existing,
+          targetValues: existing as unknown as Record<string, unknown>,
+          targetOrderIndex: Number(existing.orderIndex),
+          effectiveTimestamp: Number(existing.localUpdatedAtMs),
+          isLocalWinner: true,
+          needsConflictRepair: false,
+          isIncomingNew: false,
+        });
+      }
+    } else if (!incoming && existing) {
+      candidates.push({
+        id,
+        isExisting: true,
+        existingRow: existing,
+        targetValues: existing as unknown as Record<string, unknown>,
+        targetOrderIndex: Number(existing.orderIndex),
+        effectiveTimestamp: Number(existing.localUpdatedAtMs),
+        isLocalWinner: true,
+        needsConflictRepair: false,
+        isIncomingNew: false,
+      });
     }
   }
+
+  return candidates;
+};
+
+const resolveCandidateOrderSlots = (candidates: SiblingCandidate[]): void => {
+  const bySlot = new Map<number, SiblingCandidate[]>();
+  for (const cand of candidates) {
+    const list = bySlot.get(cand.targetOrderIndex) ?? [];
+    list.push(cand);
+    bySlot.set(cand.targetOrderIndex, list);
+  }
+
+  const occupiedSlots = new Set<number>();
+  const unassigned: SiblingCandidate[] = [];
+
+  for (const [slot, claimants] of bySlot.entries()) {
+    if (claimants.length === 1) {
+      occupiedSlots.add(slot);
+      continue;
+    }
+
+    claimants.sort((a, b) => {
+      if (a.effectiveTimestamp !== b.effectiveTimestamp) {
+        return b.effectiveTimestamp - a.effectiveTimestamp;
+      }
+      if (a.isLocalWinner !== b.isLocalWinner) {
+        return a.isLocalWinner ? -1 : 1;
+      }
+      return a.id.localeCompare(b.id);
+    });
+
+    occupiedSlots.add(slot);
+    for (let i = 1; i < claimants.length; i++) {
+      unassigned.push(claimants[i]);
+    }
+  }
+
+  for (const cand of unassigned) {
+    let nextSlot = cand.targetOrderIndex >= 2_000_000 ? 2_000_000 : 0;
+    while (occupiedSlots.has(nextSlot)) {
+      nextSlot++;
+    }
+    occupiedSlots.add(nextSlot);
+    cand.targetOrderIndex = nextSlot;
+    // An intentional conflict repair write is needed if an incoming envelope was modified,
+    // or if a dirty local row had to be relocated. Clean local rows temporarily shifted
+    // across split pages keep their clean status and existing timestamp.
+    if (!cand.isExisting || Boolean(cand.existingRow?.localDirty) || !cand.isLocalWinner) {
+      cand.needsConflictRepair = true;
+    }
+  }
+};
+
+const PULL_SCRATCH_BASE = 10_000_000;
+
+const writeSiblingCandidate = (
+  tx: Transaction,
+  config: OrderedTableConfig,
+  cand: SiblingCandidate,
+): number => {
+  if (cand.isIncomingNew) {
+    const dirty = cand.needsConflictRepair;
+    const stamp = dirty ? nowMonotonic(tx) : cand.effectiveTimestamp;
+    tx.insert(config.table)
+      .values({
+        ...cand.targetValues,
+        orderIndex: cand.targetOrderIndex,
+        localDirty: dirty,
+        localUpdatedAtMs: stamp,
+      } as never)
+      .run();
+    return 1;
+  }
+
+  if (!cand.isExisting) {
+    return 0;
+  }
+
+  if (cand.isLocalWinner && !cand.needsConflictRepair) {
+    tx.update(config.table)
+      .set({ [config.orderColName]: cand.targetOrderIndex } as never)
+      .where(eq(config.table.id, cand.id))
+      .run();
+    return 0;
+  }
+
+  const dirty = cand.needsConflictRepair ? true : Boolean(cand.existingRow?.localDirty);
+  const stamp = cand.needsConflictRepair
+    ? nowMonotonic(tx)
+    : (cand.isLocalWinner ? Number(cand.existingRow?.localUpdatedAtMs) : cand.effectiveTimestamp);
+  tx.update(config.table)
+    .set({
+      ...cand.targetValues,
+      orderIndex: cand.targetOrderIndex,
+      localDirty: dirty,
+      localUpdatedAtMs: stamp,
+    } as never)
+    .where(eq(config.table.id, cand.id))
+    .run();
+  return 1;
+};
+
+const applySiblingWrites = (
+  tx: Transaction,
+  config: OrderedTableConfig,
+  existingSiblings: SiblingEntityRow[],
+  candidates: SiblingCandidate[],
+): number => {
+  let changed = 0;
+
+  for (let i = 0; i < existingSiblings.length; i++) {
+    const row = existingSiblings[i];
+    tx.update(config.table)
+      .set({ [config.orderColName]: PULL_SCRATCH_BASE + i } as never)
+      .where(eq(config.table.id, row.id))
+      .run();
+  }
+
+  for (const cand of candidates) {
+    changed += writeSiblingCandidate(tx, config, cand);
+  }
+
+  return changed;
+};
+
+const applyOrderedPullPage = (
+  tx: Transaction,
+  entities: WireEntity[],
+  type: EntityTableName,
+  config: OrderedTableConfig,
+): number => {
+  const byParent = new Map<string, WireEntity[]>();
+  const orphaned: WireEntity[] = [];
+
+  for (const envelope of entities) {
+    const values = wireToEntity(envelope, type) as Record<string, unknown>;
+    const parentId = values[config.parentField];
+    if (typeof parentId === 'string' && parentId.length > 0) {
+      const list = byParent.get(parentId) ?? [];
+      list.push(envelope);
+      byParent.set(parentId, list);
+    } else {
+      orphaned.push(envelope);
+    }
+  }
+
+  let changed = 0;
+
+  for (const [parentId, incomingEnvelopes] of byParent.entries()) {
+    const parentCol = config.parentCol(config.table) as never;
+    const existingSiblings = tx
+      .select()
+      .from(config.table)
+      .where(eq(parentCol, parentId))
+      .all() as unknown as SiblingEntityRow[];
+
+    const candidates = buildSiblingCandidates(type, existingSiblings, incomingEnvelopes);
+    resolveCandidateOrderSlots(candidates);
+    changed += applySiblingWrites(tx, config, existingSiblings, candidates);
+  }
+
+  for (const envelope of orphaned) {
+    const existing = tx
+      .select()
+      .from(config.table)
+      .where(eq(config.table.id, envelope.id))
+      .get() as EntityRow | undefined;
+    const values = wireToEntity(envelope, type);
+    if (!existing) {
+      tx.insert(config.table).values(values as never).run();
+      changed += 1;
+    } else if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+      tx.update(config.table).set(values as never).where(eq(config.table.id, envelope.id)).run();
+      changed += 1;
+    }
+  }
+
+  return changed;
+};
+
+const applyUnorderedPullPage = (
+  tx: Transaction,
+  entities: WireEntity[],
+  type: EntityTableName,
+): number => {
+  const table = ENTITY_TABLES[type] as typeof schema.gyms;
+  let changed = 0;
+
+  for (const envelope of entities) {
+    const existing = tx
+      .select()
+      .from(table)
+      .where(eq(table.id, envelope.id))
+      .get() as EntityRow | undefined;
+
+    const values = wireToEntity(envelope, type);
+
+    if (!existing) {
+      tx.insert(table).values(values as never).run();
+      changed += 1;
+      continue;
+    }
+
+    if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+      tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
+      changed += 1;
+    }
+  }
+
+  return changed;
 };
 
 /**
@@ -1063,8 +1314,9 @@ const liftCollidingOrderSlot = (
  *  - Known id locally and `incoming.client_updated_at_ms <= local.local_updated_at_ms`:
  *    ignore the incoming row entirely; keep the local row untouched (its local
  *    dirty bit and timestamp survive so it wins on the next push leg).
- *  - Reordering pulls lift colliding existing order slots into a scratch band
- *    so permutation and tombstone order shifts do not violate unique indexes.
+ *  - Reordering pulls on ordered entities reconcile siblings holistically,
+ *    preserving local winners, conflict-repairing slot collisions, and ensuring
+ *    scratch slots never leak outside the transaction.
  *
  * Runs inside the caller's transaction so the whole page either lands or rolls
  * back together; a per-row insert failure (e.g. an FK violation) aborts the
@@ -1075,34 +1327,15 @@ export const applyPullPage = (
   entities: WireEntity[],
   type: EntityTableName,
 ): number => {
-  const table = ENTITY_TABLES[type] as typeof schema.gyms;
-  let changed = 0;
   let newestStamp = 0;
-
   for (const envelope of entities) {
     newestStamp = Math.max(newestStamp, envelope.client_updated_at_ms);
-    const existing = tx
-      .select()
-      .from(table)
-      .where(eq(table.id, envelope.id))
-      .get() as EntityRow | undefined;
-
-    const values = wireToEntity(envelope, type);
-
-    if (!existing) {
-      liftCollidingOrderSlot(tx, type, values as Record<string, unknown>, envelope.id);
-      tx.insert(table).values(values as never).run();
-      changed += 1;
-      continue;
-    }
-
-    if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
-      liftCollidingOrderSlot(tx, type, values as Record<string, unknown>, envelope.id);
-      tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
-      changed += 1;
-    }
-    // Otherwise the known local row is newer-or-equal: keep it untouched.
   }
+
+  const orderConfig = ORDERED_TABLE_CONFIGS[type];
+  const changed = orderConfig
+    ? applyOrderedPullPage(tx, entities, type, orderConfig)
+    : applyUnorderedPullPage(tx, entities, type);
 
   // The next local edit of any pulled row must out-stamp it under LWW.
   observeRemoteTimestamp(tx, newestStamp);

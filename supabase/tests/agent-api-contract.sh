@@ -394,6 +394,7 @@ USER_B_UUID="$(run_psql "select subject_uuid from public.dev_fixture_principals 
 [[ -n "${USER_A_UUID}" && -n "${USER_B_UUID}" ]] ||
   fail "fixture users are not provisioned"
 trap cleanup_with_status EXIT
+cleanup
 
 GYM_A="agent-api-${RUN_TAG}-gym-a"
 EXERCISE_A="agent-api-${RUN_TAG}-exercise-a"
@@ -1747,6 +1748,53 @@ if [[ "${CONN2_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
 fi
 [[ "$(run_psql "select title from app_public.session_plans where id = '${V_RACE_PLAN}';")" == "Race Winner 1" ]] ||
   fail "concurrency race: winning title was not preserved"
+
+# Finding 2: Two-connection race: mobile sync attachment vs agent block mutation
+PLAN_RACE_ATTACH="agent-api-${RUN_TAG}-race-attach"
+BLOCK_RACE_ATTACH="agent-api-${RUN_TAG}-blk-attach"
+run_psql "
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${PLAN_RACE_ATTACH}', 'Race Attach Plan', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${BLOCK_RACE_ATTACH}', '${PLAN_RACE_ATTACH}', 0, 'Original Unattached Block', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_sets (owner_user_id, id, session_plan_exercise_id, order_index, target_reps, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'sps-race-${RUN_TAG}', '${BLOCK_RACE_ATTACH}', 0, 5, 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+V_ATTACH_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_ATTACH}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+
+# Conn 1: Sync materialization attaches session_exercises referencing BLOCK_RACE_ATTACH under transaction
+docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+  begin;
+  insert into app_public.session_exercises (
+    owner_user_id, id, session_id, exercise_definition_id, source_plan_exercise_id,
+    order_index, name, created_at, updated_at, client_updated_at_ms
+  ) values (
+    '${USER_A_UUID}'::uuid, 'sx-race-${RUN_TAG}', '${SESSION_A}', '${EXERCISE_A}', '${BLOCK_RACE_ATTACH}',
+    0, 'Attached Session Exercise', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}
+  );
+  select pg_sleep(1);
+  commit;
+" >/dev/null 2>&1 &
+CONN1_ATTACH_PID=$!
+sleep 0.2
+
+# Conn 2: Agent tries to update block name while sync attachment is in flight
+CONN2_ATTACH_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-attach', '${MUT_HASH_1}',
+    '${PLAN_RACE_ATTACH}', '${BLOCK_RACE_ATTACH}', '${V_ATTACH_BASE}',
+    '{\"name\": \"Mutated Block Name\"}'::jsonb
+  );
+" 2>&1 || true)"
+wait "${CONN1_ATTACH_PID}"
+
+if [[ "${CONN2_ATTACH_OUT}" != *"IMMUTABLE_BLOCK_MUTATION"* ]]; then
+  fail "concurrency race: agent mutation did not raise IMMUTABLE_BLOCK_MUTATION when racing sync attachment, got: ${CONN2_ATTACH_OUT}"
+fi
+[[ "$(run_psql "select name from app_public.session_plan_exercises where id = '${BLOCK_RACE_ATTACH}';")" == "Original Unattached Block" ]] ||
+  fail "concurrency race: attached block name was mutated"
+run_psql "delete from app_public.session_exercises where id = 'sx-race-${RUN_TAG}';"
 
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"

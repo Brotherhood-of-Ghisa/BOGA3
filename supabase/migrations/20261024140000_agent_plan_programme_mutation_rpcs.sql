@@ -2,6 +2,60 @@
 -- Service-role-only atomic RPCs for connected coaching agent plan and programme mutations.
 
 -- -----------------------------------------------------------------------------
+-- Coordinate sync provenance attachment writes with block/set row locking
+-- -----------------------------------------------------------------------------
+
+create or replace function app_public.coordinate_session_exercise_provenance_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+begin
+  if new.source_plan_exercise_id is not null and new.deleted_at is null then
+    perform 1
+       from app_public.session_plan_exercises spe
+      where spe.owner_user_id = new.owner_user_id
+        and spe.id = new.source_plan_exercise_id
+        for update;
+  end if;
+  return new;
+end;
+$func$;
+
+drop trigger if exists session_exercises_coordinate_provenance_lock on app_public.session_exercises;
+create trigger session_exercises_coordinate_provenance_lock
+  before insert or update of source_plan_exercise_id, deleted_at on app_public.session_exercises
+  for each row
+  when (new.source_plan_exercise_id is not null and new.deleted_at is null)
+  execute function app_public.coordinate_session_exercise_provenance_lock();
+
+create or replace function app_public.coordinate_exercise_set_provenance_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+begin
+  if new.source_plan_set_id is not null and new.deleted_at is null then
+    perform 1
+       from app_public.session_plan_sets sps
+      where sps.owner_user_id = new.owner_user_id
+        and sps.id = new.source_plan_set_id
+        for update;
+  end if;
+  return new;
+end;
+$func$;
+
+drop trigger if exists exercise_sets_coordinate_provenance_lock on app_public.exercise_sets;
+create trigger exercise_sets_coordinate_provenance_lock
+  before insert or update of source_plan_set_id, deleted_at on app_public.exercise_sets
+  for each row
+  when (new.source_plan_set_id is not null and new.deleted_at is null)
+  execute function app_public.coordinate_exercise_set_provenance_lock();
+
+-- -----------------------------------------------------------------------------
 -- 1. Receipt claim and store helpers for plan operations
 -- -----------------------------------------------------------------------------
 
@@ -486,6 +540,13 @@ begin
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
 
+  perform 1
+     from app_public.session_plan_exercises spe
+    where spe.owner_user_id = p_owner
+      and spe.session_plan_id = p_plan_id
+    order by spe.order_index, spe.id
+      for update;
+
   select count(*)
     into _block_count
     from app_public.session_plan_exercises spe
@@ -636,11 +697,19 @@ begin
    where spe.owner_user_id = p_owner
      and spe.id = p_exercise_id
      and spe.session_plan_id = p_plan_id
-     and spe.deleted_at is null;
+     and spe.deleted_at is null
+     for update;
 
   if not found then
     raise exception 'FOREIGN_RESOURCE_REFERENCE' using errcode = 'P0001';
   end if;
+
+  perform 1
+     from app_public.session_plan_sets sps
+    where sps.owner_user_id = p_owner
+      and sps.session_plan_exercise_id = p_exercise_id
+    order by sps.order_index, sps.id
+      for update;
 
   if app_public.agent_block_is_immutable(p_owner, p_exercise_id) then
     raise exception 'IMMUTABLE_BLOCK_MUTATION' using errcode = 'P0001';
@@ -815,6 +884,14 @@ begin
   end if;
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
+
+  -- Lock all blocks of this plan FOR UPDATE before checking immutability or reading order
+  perform 1
+     from app_public.session_plan_exercises spe
+    where spe.owner_user_id = p_owner
+      and spe.session_plan_id = p_plan_id
+    order by spe.order_index, spe.id
+      for update;
 
   -- Finding 4: reject reorder if any block in the plan is consumed/immutable
   if exists (
@@ -1009,12 +1086,24 @@ begin
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
 
-  if not exists (
-    select 1 from app_public.session_plan_exercises
-     where owner_user_id = p_owner and id = p_exercise_id and session_plan_id = p_plan_id and deleted_at is null
-  ) then
+  perform 1
+     from app_public.session_plan_exercises spe
+    where spe.owner_user_id = p_owner
+      and spe.id = p_exercise_id
+      and spe.session_plan_id = p_plan_id
+      and spe.deleted_at is null
+      for update;
+
+  if not found then
     raise exception 'FOREIGN_RESOURCE_REFERENCE' using errcode = 'P0001';
   end if;
+
+  perform 1
+     from app_public.session_plan_sets sps
+    where sps.owner_user_id = p_owner
+      and sps.session_plan_exercise_id = p_exercise_id
+    order by sps.order_index, sps.id
+      for update;
 
   if app_public.agent_block_is_immutable(p_owner, p_exercise_id) then
     raise exception 'IMMUTABLE_BLOCK_MUTATION' using errcode = 'P0001';
@@ -1117,6 +1206,21 @@ begin
   end if;
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
+
+  -- Lock all blocks of this plan and the target block's sets FOR UPDATE before checking immutability
+  perform 1
+     from app_public.session_plan_exercises spe
+    where spe.owner_user_id = p_owner
+      and spe.session_plan_id = p_plan_id
+    order by spe.order_index, spe.id
+      for update;
+
+  perform 1
+     from app_public.session_plan_sets sps
+    where sps.owner_user_id = p_owner
+      and sps.session_plan_exercise_id = p_exercise_id
+    order by sps.order_index, sps.id
+      for update;
 
   select spe.order_index
     into _target_order
@@ -1368,6 +1472,24 @@ begin
   end if;
 
   perform app_public.agent_check_plan_version(p_owner, p_plan_id, p_base_version);
+
+  -- Lock all child blocks and sets of this plan FOR UPDATE before checking immutability
+  perform 1
+     from app_public.session_plan_exercises spe
+    where spe.owner_user_id = p_owner
+      and spe.session_plan_id = p_plan_id
+    order by spe.order_index, spe.id
+      for update;
+
+  perform 1
+     from app_public.session_plan_sets sps
+     join app_public.session_plan_exercises spe
+       on spe.id = sps.session_plan_exercise_id
+      and spe.owner_user_id = p_owner
+    where sps.owner_user_id = p_owner
+      and spe.session_plan_id = p_plan_id
+    order by sps.order_index, sps.id
+      for update;
 
   if exists (
     select 1

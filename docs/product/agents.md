@@ -4,9 +4,10 @@
 
 A connected coaching agent reads training data, muscle setup included. Two
 per-agent switches govern changes: **Allow this coach to make changes**
-(`plan_access_enabled`, default off) lets it create plans and programmes, and
-create, edit (name, load mode, bodyweight contribution, [[gym.split]], muscles),
-soft delete and restore exercises; **Allow plan edits** (`plan_edit_enabled`,
+(`plan_access_enabled`, default off; on for agents that already had plan
+creation) lets it create plans and programmes, and create, edit (name, load mode,
+bodyweight contribution, [[gym.split]], [[timer.rest-default]], muscles), soft
+delete and restore exercises; **Allow plan edits** (`plan_edit_enabled`,
 default off) lets it mutate or delete pending authored plans and programmes via
 atomic versioned RPCs. It never mutates performed workouts, cards, sets, or
 muscle setup.

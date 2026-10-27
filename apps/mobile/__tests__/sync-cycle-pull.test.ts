@@ -22,7 +22,6 @@ import {
   gyms,
   muscleGroups,
   sessionPlanExercises,
-  sessionPlans,
   sessionPlanSets,
   sessions,
   syncRuntimeState,
@@ -628,5 +627,141 @@ describe('applyPullPage collision-safe order application and tombstone parking',
     const s1Dead = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-1')).get();
     expect(s1Dead?.orderIndex).toBe(2_000_000);
     expect(s1Dead?.deletedAt).not.toBeNull();
+  });
+
+  it('preserves local newer dirty row and repairs colliding incoming slot with monotonic timestamp', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Simulate local dirty edit on block-a at timestamp 300
+    database
+      .update(sessionPlanExercises)
+      .set({ localDirty: true, localUpdatedAtMs: 300, name: 'Local Edited Squat' })
+      .where(eq(sessionPlanExercises.id, 'block-a'))
+      .run();
+
+    // Server sends reorder generated at timestamp 200: B -> 0, A -> 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 1, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+
+    // Local winner A must retain its slot 0, dirty bit, and timestamp 300
+    expect(a?.orderIndex).toBe(0);
+    expect(a?.localDirty).toBeTruthy();
+    expect(a?.localUpdatedAtMs).toBe(300);
+    expect(a?.name).toBe('Local Edited Squat');
+
+    // Colliding incoming B must be conflict-repaired to slot 1 with dirty bit and fresh monotonic clock
+    expect(b?.orderIndex).toBe(1);
+    expect(b?.localDirty).toBeTruthy();
+    expect(Number(b?.localUpdatedAtMs)).toBeGreaterThan(300);
+
+    // No rows left in scratch band
+    const all = database.select().from(sessionPlanExercises).all();
+    for (const row of all) {
+      expect(row.orderIndex).toBeLessThan(5_000_000);
+    }
+  });
+
+  it('preserves local equal row on slot collision and conflict-repairs incoming row', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    // Local block-a is at slot 0 with timestamp 200
+    database
+      .update(sessionPlanExercises)
+      .set({ localDirty: true, localUpdatedAtMs: 200 })
+      .where(eq(sessionPlanExercises.id, 'block-a'))
+      .run();
+
+    // Incoming new block-b also arrives claiming slot 0 with equal timestamp 200
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+
+    expect(a?.orderIndex).toBe(0);
+    expect(b?.orderIndex).toBe(1);
+    expect(b?.localDirty).toBeTruthy();
+    expect(Number(b?.localUpdatedAtMs)).toBeGreaterThan(200);
+  });
+
+  it('handles split-page pull without leaving temporary scratch slots across cycles', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Page 1 arrives with ONLY block-b moved to slot 0 at timestamp 200 (block-a split to next page)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    const bAfterPage1 = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const aAfterPage1 = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+
+    // B took slot 0; displaced A is at safe non-colliding slot 1 (NOT in scratch)
+    expect(bAfterPage1?.orderIndex).toBe(0);
+    expect(aAfterPage1?.orderIndex).toBe(1);
+    expect(aAfterPage1?.orderIndex).toBeLessThan(5_000_000);
+
+    // Page 2 arrives with block-a at slot 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    const bFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+
+    expect(bFinal?.orderIndex).toBe(0);
+    expect(aFinal?.orderIndex).toBe(1);
+    expect(aFinal?.localDirty).toBeFalsy();
+    expect(bFinal?.localDirty).toBeFalsy();
   });
 });
