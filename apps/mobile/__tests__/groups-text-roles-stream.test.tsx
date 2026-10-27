@@ -105,7 +105,9 @@ describe('stream session card', () => {
     const line = screen.getByTestId('group-stream-session-card-k-record-r');
     expect(part(line, 'Bench Press')).toHaveStyle({ fontFamily: BODY, fontWeight: '600', color: uiRoles.ink });
     expect(screen.getByTestId('group-stream-session-card-k-record-r-value')).toHaveStyle({ fontFamily: BODY, color: uiRoles.record });
-    expect(part(line, '120.0')).toHaveStyle({ fontFamily: FIGURE });
+    // The figure is as heavy as the record line's words, and `1RM` stays a word.
+    expect(part(line, '120.0')).toHaveStyle({ fontFamily: FIGURE, fontWeight: '700', color: uiRoles.record });
+    expect(within(screen.getByTestId('group-stream-session-card-k-record-r-value')).queryByText('1')).toBeNull();
   });
 });
 
@@ -169,6 +171,6 @@ describe('certification status', () => {
   it('draws the date in a status line in Plex Mono, at the line weight', () => {
     render(<GroupCertificationStatus label="Certified by sam · 12-10-2026" status="certified" testID="c" />);
     const status = screen.getByTestId('c');
-    expect(part(status, '12-10-2026'.split('-')[0])).toHaveStyle({ fontFamily: FIGURE, fontWeight: '600' });
+    expect(part(status, '12-10-2026')).toHaveStyle({ fontFamily: FIGURE, fontWeight: '600' });
   });
 });

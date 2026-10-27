@@ -146,7 +146,7 @@ had grown for nine jobs.
 | `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
 | `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |
 | `figureHero` | Plex Mono 700 · `xxl` | a block's one headline number |
-| `figureLarge` | Plex Mono 600 · `lg` | a second headline number; a date heading a card |
+| `figureLarge` | Plex Mono 600 · `lg` | a second headline number |
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
 

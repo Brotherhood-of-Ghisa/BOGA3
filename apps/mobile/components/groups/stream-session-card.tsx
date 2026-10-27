@@ -30,8 +30,8 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
         {line.exercise}
       </Text>
       <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.record, styles.recordValue]} testID={`${testID}-value`}>
-        {/* The record line is drawn heavy; its figures keep a step of emphasis rather than dropping to 500. */}
-        <FigureText strong>{line.value}</FigureText>
+        {/* The record line is drawn heavy, its figures as heavy as its words. */}
+        <FigureText figureStyle={uiTextTone.record}>{line.value}</FigureText>
       </Text>
     </Pressable>
   );
