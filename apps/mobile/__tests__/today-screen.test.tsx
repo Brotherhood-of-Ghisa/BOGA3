@@ -28,7 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
-import { uiGeometry, uiRoles } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -259,8 +259,13 @@ describe('Today: the Progress card over real data', () => {
 
     const body = text('today-latest-session');
     expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12');
-    // The time sits one weight under the date, and muted.
-    expect(within(text('today-latest-session-start')).getByText(' 07:12')).toHaveStyle({ fontWeight: '500', color: uiRoles.inkMuted });
+    // The start reads as a Sessions row: a body line, ink, only its figures in the figure face.
+    expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
+    expect(within(text('today-latest-session-start')).getByText('07:12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    // Sets are ink like the other figure columns, not muted.
+    expect(text('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
+    // The figure columns sit a clear step apart.
+    expect(text('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
     expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
