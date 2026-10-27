@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { FlatList, ScrollView, StyleSheet } from 'react-native';
 
 import { WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
@@ -104,14 +104,14 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
     for (const [index, date] of [DATES[0], DATES[2], TODAY].entries()) {
       expect(percentage(`bars-heatmap-bar-${date}`, 'width')).toBeCloseTo(expected[index]);
     }
-    const axis = metric === 'workingSetCount' ? [105] : [101.25, 105, 108.75];
-    for (const [index, value] of axis.entries()) {
-      const coordinate = strength ? 37.5 + index * 12.5 : value / 110 * 100;
-      expect(percentage(`bars-heatmap-axis-tick-${value}`, 'left')).toBeCloseTo(coordinate);
+    const axis = metric === 'workingSetCount' ? [['median', 105] as const] : [['p25', 101.25], ['median', 105], ['p75', 108.75]] as const;
+    for (const [id, value] of axis) {
+      const coordinate = strength ? 50 + (value - 105) / 15 * 50 : value / 110 * 100;
+      expect(percentage(`bars-heatmap-${id}`, 'left')).toBeCloseTo(coordinate);
     }
+    expect(screen.queryByTestId('bars-heatmap-axis')).toBeNull();
     const median = strength ? 50 : 105 / 110 * 100;
     expect(percentage('bars-heatmap-median', 'left')).toBeCloseTo(median);
-    expect(percentage(`bars-heatmap-reference-median-${TODAY}`, 'left')).toBeCloseTo(median);
     expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '9-week median 105');
     if (metric === 'workingSetCount') {
       expect(screen.queryByTestId('bars-heatmap-p25')).toBeNull();
@@ -222,10 +222,10 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
       const strength = metric === 'estimatedRM1' || metric === 'highestWeight';
       if (positive && values.length >= 6) expect(style('bars-heatmap-median').left).toBe(strength ? '50%' : '100%');
       else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
-      const ticks = screen.getAllByTestId(/^bars-heatmap-axis-tick-/);
-      expect(ticks).toHaveLength(!positive || strength || values.length >= 6 ? 1 : 3);
+      const ticks = screen.queryAllByTestId(/^bars-heatmap-axis-tick-/);
+      expect(ticks).toHaveLength(positive && values.length >= 6 ? 0 : !positive || strength ? 1 : 3);
       if (!positive) expect(style('bars-heatmap-axis-tick-0').left).toBe('0%');
-      else if (strength) expect(style(`bars-heatmap-axis-tick-${values[0]}`).left).toBe('50%');
+      else if (strength && values.length < 6) expect(style(`bars-heatmap-axis-tick-${values[0]}`).left).toBe('50%');
       unmount();
     }
   });
@@ -361,20 +361,20 @@ it('formats fractional Top weight references to one decimal without floating-poi
   expect(style('stats-exercise-history-heatmap-median').left).toBe('50%');
 });
 
-it('retains coincident reference positions and accessible values without visible labels', () => {
+it('retains coincident reference positions and announces all their values on the current week', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
   render(chart(data(dates.map(date => day(date, 20)))));
   for (const [id, description] of [['p25', '25th percentile'], ['median', 'median'], ['p75', '75th percentile']]) {
     expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `9-week ${description} 20`);
     expect(style(`bars-heatmap-${id}`).left).toBe('100%');
-    expect(style(`bars-heatmap-reference-${id}-${TODAY}`).left).toBe('100%');
+    expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain(`${description} 20`);
   }
   expect(screen.queryByText(/P\d+|Median/)).toBeNull();
   expect(screen.queryByTestId('bars-heatmap-average')).toBeNull();
   expect(screen.queryByText(/Volume.*per week/)).toBeNull();
 });
 
-it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s history with no captions', kind => {
+it.each(['muscle', 'exercise'] as const)('shows only the current-week Sets median for %s history', kind => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
   render(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="workingSetCount" onSelectMetric={jest.fn()}
@@ -467,8 +467,16 @@ const layoutAxis = (plotWidth: number, labels: [number, number][]) => {
   }
 };
 
+const layoutReferences = (plotWidth: number, labels: [string, number][]) => {
+  const layout = (width: number) => ({ nativeEvent: { layout: { width, height: 56, x: 0, y: 0 } } });
+  fireEvent(screen.getByTestId('bars-heatmap-annotations'), 'layout', layout(plotWidth));
+  for (const [id, width] of labels) {
+    fireEvent(screen.getByTestId(`bars-heatmap-annotation-${id}`, { includeHiddenElements: true }), 'layout', layout(width));
+  }
+};
+
 it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
-  'labels %s reference lines with their own formatted values, instead of scale bounds', metric => {
+  'labels only the current %s bar with percentile names and formatted values', metric => {
     const values = [10, 20, 30, 40, 50, 60];
     render(<WeeklyHeatmap
       data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
@@ -476,27 +484,32 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
       formatReferenceValue={value => value.toFixed(1)} />);
     const references = metric === 'workingSetCount' ? [['median', 35] as const]
       : [['p25', 22.5], ['median', 35], ['p75', 47.5]] as const;
-    layoutAxis(240, references.map(([, value]) => [value, 24]));
-    expect(screen.getAllByTestId(/^bars-heatmap-axis-value-/, { includeHiddenElements: true })).toHaveLength(references.length);
+    layoutReferences(240, references.map(([id]) => [id, 24]));
+    expect(screen.queryByTestId('bars-heatmap-axis')).toBeNull();
+    const current = screen.getByTestId(`bars-heatmap-cell-${TODAY}`);
     for (const [id, value] of references) {
-      const labelID = `bars-heatmap-axis-value-${value}`;
-      const coordinate = percentage(`bars-heatmap-reference-${id}-${TODAY}`, 'left');
-      expect(screen.getByTestId(labelID, { includeHiddenElements: true })).toHaveTextContent(value.toFixed(1));
+      const labelID = `bars-heatmap-annotation-${id}`;
+      const coordinate = percentage(`bars-heatmap-${id}`, 'left');
+      const annotation = within(current).getByTestId(labelID, { includeHiddenElements: true });
+      expect(annotation).toHaveTextContent(`${id === 'median' ? 'Median' : id.toUpperCase()}${value.toFixed(1)}`);
       expect(style(labelID).opacity).toBe(1);
       expect(style(labelID).transform[0].translateX + 12).toBeCloseTo(coordinate / 100 * 240);
-      expect(percentage(`bars-heatmap-axis-tick-${value}`, 'left')).toBeCloseTo(coordinate);
+      expect(current.props.accessibilityLabel).toContain(value.toFixed(1));
+      for (const date of DATES.slice(0, -1)) {
+        expect(within(screen.getByTestId(`bars-heatmap-cell-${date}`)).queryByTestId(`bars-heatmap-${id}`)).toBeNull();
+      }
     }
     expect(screen.getByTestId(`bars-heatmap-value-${TODAY}`)).toHaveTextContent('row 60');
   });
 
-it('keeps the median number when quartile labels overlap, preserving every reference line', () => {
+it('keeps the median label when quartile labels overlap, preserving every exact tick and spoken value', () => {
   renderValues([10, 20, 30, 40, 50, 60], 'estimatedRM1');
-  layoutAxis(60, [[22.5, 24], [35, 24], [47.5, 24]]);
-  expect(style('bars-heatmap-axis-value-35').opacity).toBe(1);
+  layoutReferences(60, [['p25', 24], ['median', 24], ['p75', 24]]);
+  expect(style('bars-heatmap-annotation-median').opacity).toBe(1);
   for (const [id, value] of [['p25', 22.5], ['p75', 47.5]] as const) {
-    expect(style(`bars-heatmap-axis-value-${value}`).opacity).toBe(0);
-    expect(screen.getByTestId(`bars-heatmap-reference-${id}-${TODAY}`)).toBeTruthy();
-    expect(screen.getByTestId(`bars-heatmap-${id}`).props.accessibilityLabel).toContain(String(value));
+    expect(style(`bars-heatmap-annotation-${id}`).opacity).toBe(0);
+    expect(screen.getByTestId(`bars-heatmap-${id}`)).toBeTruthy();
+    expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain(String(value));
   }
 });
 
@@ -560,17 +573,28 @@ it('remeasures annotations when switching between strength and Volume, with no s
   expect(style('bars-heatmap-axis-value-110')).toMatchObject({ opacity: 1, transform: [{ translateX: 85 }] });
 });
 
-it.each(['estimatedRM1', 'highestWeight'] as const)('centres a single constant %s annotation with coincident accessible quartiles', metric => {
+it.each(['estimatedRM1', 'highestWeight'] as const)('centres constant %s references, showing only the median label', metric => {
   renderValues(Array(6).fill(100), metric);
-  expect(screen.getAllByTestId(/^bars-heatmap-axis-tick-/)).toHaveLength(1);
-  layoutAxis(100, [[100, 24]]);
-  expect(style('bars-heatmap-axis-value-100')).toMatchObject({ opacity: 1, transform: [{ translateX: 38 }] });
+  layoutReferences(100, [['p25', 24], ['median', 24], ['p75', 24]]);
+  expect(style('bars-heatmap-annotation-median')).toMatchObject({ opacity: 1, transform: [{ translateX: 38 }] });
   for (const [id, label] of [['p25', '25th percentile'], ['median', 'median'], ['p75', '75th percentile']]) {
     expect(style(`bars-heatmap-${id}`).left).toBe('50%');
-    expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `9-week ${label} 100`);
+    expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain(`9-week ${label} 100`);
+    if (id !== 'median') expect(style(`bars-heatmap-annotation-${id}`).opacity).toBe(0);
   }
 });
 
+it('bounds long percentile labels inside the plot without moving their ticks', () => {
+  render(<WeeklyHeatmap data={data(DATES.map((date, index) => day(date, index * 100)))} metric="totalVolume"
+    testIDPrefix={PREFIX} formatValue={String} formatReferenceValue={value => `${value}000000000000000000000000000000`} />);
+  layoutReferences(40, [['p25', 40], ['median', 40], ['p75', 40]]);
+  for (const id of ['p25', 'median', 'p75']) {
+    expect(style(`bars-heatmap-annotation-${id}`)).toMatchObject({ maxWidth: 40, transform: [{ translateX: 0 }] });
+  }
+  expect(style('bars-heatmap-annotation-median').opacity).toBe(1);
+  expect(style('bars-heatmap-p25').left).toBe('25%');
+  expect(style('bars-heatmap-p75').left).toBe('75%');
+});
 
 it('collapses each empty month to one accessible row between occupied months', () => {
   const open = jest.fn();
@@ -599,17 +623,46 @@ it.each([0, null])('keeps a Monday-owned month expanded for cross-month zero/una
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-07')).toBeTruthy();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel)
     .toContain(value === null ? 'Volume unavailable' : 'Volume 0');
-  expect(screen.getByTestId('bars-heatmap-empty-month-2026-10')).toBeTruthy();
+  expect(screen.queryByTestId('bars-heatmap-empty-month-2026-10')).toBeNull();
+  expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`)).toBeTruthy();
   rerender(chart(data([])));
   expect(screen.queryByTestId('bars-heatmap-cell-2026-09-28')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-empty-month-2026-09')).toBeTruthy();
 });
 
-it('shows only month placeholders for an entirely empty window, including its partial edge months', () => {
+it('keeps the blank current week visible in an entirely empty window and collapses older months', () => {
   render(chart(data([])));
-  expect(screen.queryAllByTestId(/^bars-heatmap-cell-/)).toEqual([]);
+  expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual([`bars-heatmap-cell-${TODAY}`]);
+  expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`)).toHaveProp('accessibilityRole', 'text');
+  expect(screen.getByTestId(`bars-heatmap-value-${TODAY}`)).toHaveTextContent('', { exact: true });
+  expect(style(`bars-heatmap-bar-${TODAY}`).width).toBe('0%');
   expect(screen.getAllByTestId(/^bars-heatmap-empty-month-/).map(row => row.props.testID)).toEqual([
-    'bars-heatmap-empty-month-2026-10', 'bars-heatmap-empty-month-2026-09', 'bars-heatmap-empty-month-2026-08',
+    'bars-heatmap-empty-month-2026-09', 'bars-heatmap-empty-month-2026-08',
   ]);
   expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
+});
+
+it.each(['muscle', 'exercise'] as const)('keeps an untrained current %s week with references and fills it only after activity', kind => {
+  const priorDates = ['2026-08-24', ...DATES.slice(0, -1)];
+  const prior = priorDates.map((date, index) => day(date, (index + 1) * 10));
+  const open = jest.fn();
+  const view = (days: DailyEffortMetrics[]) => <HistoryView timeline={TIMELINE} kind={kind} subject="Training"
+    metricOptions={kind === 'muscle' ? MUSCLE_HISTORY_METRIC_OPTIONS : EXERCISE_HISTORY_METRIC_OPTIONS}
+    metric="totalVolume" onSelectMetric={jest.fn()} view="weekly" onSelectView={jest.fn()}
+    lookbackWeeks={8} isLoading={false} errorMessage={null} todayDateKey={TODAY}
+    dailyMetrics={days} weeklyEffort={[]} onOpenWeek={open} />;
+  const { rerender } = render(view(prior));
+  const prefix = `stats-${kind}-history-heatmap`;
+  expect(screen.getByTestId(`${prefix}-cell-${TODAY}`)).toHaveProp('accessibilityRole', 'text');
+  expect(screen.getByTestId(`${prefix}-cell-${TODAY}`).props.accessibilityLabel).toContain('Rest week, Current week');
+  expect(screen.getByTestId(`${prefix}-value-${TODAY}`)).toHaveTextContent('', { exact: true });
+  expect(style(`${prefix}-bar-${TODAY}`)).toMatchObject({ width: '0%', backgroundColor: 'transparent' });
+  for (const id of ['p25', 'median', 'p75']) expect(screen.getByTestId(`${prefix}-${id}`)).toBeTruthy();
+  fireEvent.press(screen.getByTestId(`${prefix}-cell-${TODAY}`));
+  expect(open).not.toHaveBeenCalled();
+  rerender(view([...prior, day(TODAY, 30)]));
+  expect(screen.getByTestId(`${prefix}-value-${TODAY}`)).toHaveTextContent('30');
+  expect(style(`${prefix}-bar-${TODAY}`).width).toBe('50%');
+  fireEvent.press(screen.getByTestId(`${prefix}-cell-${TODAY}`));
+  expect(open).toHaveBeenCalledWith(TODAY);
 });
