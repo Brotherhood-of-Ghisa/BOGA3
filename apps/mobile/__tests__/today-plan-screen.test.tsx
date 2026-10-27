@@ -211,11 +211,11 @@ describe('Today: the Plan page over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/progress-history?muscleGroupId=quads&metric=sets'], ['/progress']]);
   });
 
-  it('opens Train, where the planned sessions are listed, from the plan card', async () => {
+  it('opens Sessions, where sessions are planned, from the plan card', async () => {
     await renderToday();
 
     fireEvent.press(within(text('today-plan-week-card')).getByText('Sessions'));
-    expect(mockPush).toHaveBeenCalledWith('/train');
+    expect(mockPush).toHaveBeenCalledWith('/sessions');
   });
 
   it('marks the trained and planned days and lists the next planned sessions, each opening its plan', async () => {
