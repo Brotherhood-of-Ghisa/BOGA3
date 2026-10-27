@@ -22,6 +22,7 @@ import {
   usePullToRefresh,
   type GroupsSection,
 } from '@/components/groups';
+import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { IconButton, ScreenScroll } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
@@ -52,12 +53,18 @@ const toSection = (value: string | null): GroupsSection | null =>
  * (join, create, the group page) lives behind My groups. `?groupId=`
  * preselects a group and `?section=` its view.
  */
-export default function GroupsTabRoute() {
+export default function GroupsRoute() {
   const { isConfigured, user } = useAuth();
-  if (!isConfigured || !user) {
-    return <GroupsSignInRequired isConfigured={isConfigured} />;
-  }
-  return <GroupsTabContent userId={user.id} />;
+  // A root-stack page under the native "Groups" header, keeping the tab bar (More).
+  return (
+    <TabOwnedPage>
+      {!isConfigured || !user ? (
+        <GroupsSignInRequired isConfigured={isConfigured} />
+      ) : (
+        <GroupsTabContent userId={user.id} />
+      )}
+    </TabOwnedPage>
+  );
 }
 
 function GroupsTabContent({ userId }: { userId: string }) {

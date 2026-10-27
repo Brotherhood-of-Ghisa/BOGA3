@@ -2,7 +2,6 @@ import { useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -31,7 +30,7 @@ export type GymsScreenProps = {
  * The Gyms screen (`/gyms`): every gym with whether it has a saved location,
  * `+ Add gym`, and archived gyms behind `Show archived`. A row opens its
  * editor in place. Reached from the session view's gym sheet (`Manage gyms`)
- * and from More → Tools (`source=more`, with `Back to More`).
+ * and from More; the native header's back returns to either.
  */
 export function GymsScreen({ readPosition }: GymsScreenProps) {
   const [directory, setDirectory] = useState<DirectoryState>({ status: 'loading' });
@@ -155,7 +154,6 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       testID="gyms-screen">
-      <MoreHubBackButton returnBy="dismiss" />
       {body}
     </ScreenScroll>
   );

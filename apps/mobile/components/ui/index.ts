@@ -13,6 +13,17 @@ export {
   type ChipOption,
 } from '@/components/ui/chip-group';
 export { FigureText } from '@/components/ui/figure-text';
+export {
+  ChoiceRow,
+  FormActionRow,
+  FormError,
+  FormSection,
+  InputRow,
+  type ChoiceRowProps,
+  type FormActionRowProps,
+  type FormSectionProps,
+  type InputRowProps,
+} from '@/components/ui/form-section';
 export { FormField, type FormFieldFace, type FormFieldProps } from '@/components/ui/form-field';
 export { Icon, type IconName, type IconProps } from '@/components/ui/icon';
 export { IconButton, type IconButtonProps, type IconButtonTone } from '@/components/ui/icon-button';
@@ -24,7 +35,7 @@ export {
   type ListRowTone,
 } from '@/components/ui/list-row';
 export { Notice, type NoticeProps, type NoticeTone } from '@/components/ui/notice';
-export { PageHeader, SectionHeader, TitleBar } from '@/components/ui/page-header';
+export { PageHeader, SectionHeader } from '@/components/ui/page-header';
 export {
   PageSheet,
   PageSheetHeader,

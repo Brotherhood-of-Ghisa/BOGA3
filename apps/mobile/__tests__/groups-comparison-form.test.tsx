@@ -4,6 +4,8 @@ import { competitionExercise } from './helpers/competition-fixtures';
 const existing = { ...competitionExercise,group_exercise_id: 'exercise' };
 const props = { existing, bodyweightCalculationsEnabled: true,
   submitLabel: 'Save changes', pendingLabel: 'Saving…', pending: false, errorMessage: null };
+/** A zero contribution hides the share behind `Uses bodyweight`; switching it on reveals the field. */
+const turnOnBodyweight = () => fireEvent(screen.getByTestId('group-exercise-form-uses-bodyweight'), 'valueChange', true);
 
 describe('group comparison rule editor', () => {
   it('submits a calculation change in one press, with the rules and the original revision', () => {
@@ -64,9 +66,19 @@ describe('group comparison rule editor', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props}
       existing={{ ...existing,rules: { ...existing.rules,bodyweight_calculations_enabled: false,bodyweight_contribution: 0 } }} onSubmit={onSubmit} />);
+    turnOnBodyweight();
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightCalculationsEnabled: true, bodyweightContribution: 1 }), 2);
+  });
+  it('saves 0 when Uses bodyweight is switched off over a stored contribution', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: 0.7 } }} onSubmit={onSubmit} />);
+    expect(screen.getByTestId('group-exercise-form-uses-bodyweight').props.accessibilityState).toMatchObject({ checked: true });
+    fireEvent(screen.getByTestId('group-exercise-form-uses-bodyweight'), 'valueChange', false);
+    expect(screen.queryByTestId('group-exercise-form-bodyweight-percentage')).toBeNull();
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 0 }), 2);
   });
   it('keeps dirty inputs when a fresher revision arrives until explicit Reload', () => {
     const onSubmit = jest.fn();
@@ -86,6 +98,7 @@ describe('group comparison rule editor', () => {
   it('applies a contribution change with no preview text or review label', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: 0 } }} onSubmit={onSubmit} />);
+    turnOnBodyweight();
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 1 }), 2);
@@ -113,6 +126,9 @@ describe('group comparison rule editor: creating and edge inputs', () => {
     render(<GroupComparisonForm {...createProps} onSubmit={onSubmit} />);
     expect(screen.queryByTestId('group-rules-revision')).toBeNull();
     expect(screen.getByTestId('group-exercise-form-name-input')).toHaveProp('value', '');
+    expect(screen.getByTestId('group-exercise-form-uses-bodyweight').props.accessibilityState).toMatchObject({ checked: false });
+    expect(screen.queryByTestId('group-exercise-form-bodyweight-percentage')).toBeNull();
+    turnOnBodyweight();
     expect(screen.getByTestId('group-exercise-form-bodyweight-percentage')).toHaveProp('value', '0');
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Dips');
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '90');

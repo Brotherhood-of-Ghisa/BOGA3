@@ -41,7 +41,7 @@ import { __setNotificationNativeAdapterForTests } from '@/src/notifications/nati
 import type { NotificationNativeAdapter, NotificationPreferences } from '@/src/notifications/types';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { ensurePreferencesLoaded } from '@/src/preferences/hooks';
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import { fakeNotificationNative } from './helpers/notification-native';
 import { waitForGone } from './helpers/wait-for-gone';

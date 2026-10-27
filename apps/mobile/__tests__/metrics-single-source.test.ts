@@ -106,7 +106,7 @@ describe('training-metric rules have one implementation', () => {
       // into a bucket.
       'apps/mobile/src/data/exercise-catalog.ts',
       'apps/mobile/src/exercise-catalog/editor-model.ts',
-      'apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx',
+      'apps/mobile/components/exercise-catalog/exercise-editor-screen.tsx',
       'apps/mobile/components/exercise-catalog/use-exercise-editor-form.ts',
       // Coaching reads the flag over SQL rows; its bucket keys are
       // `agent-api/gym-buckets.ts` and its tool text describes them.

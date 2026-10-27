@@ -125,7 +125,7 @@ export function ProgrammeNewScreen({ fromProgrammeId, editProgrammeId }: Program
         <ProgrammeFormScreen
           initialForm={initialForm}
           onSave={onSave}
-          saveLabel={isEdit ? 'Save changes' : 'Save programme'}
+          saveLabel={isEdit ? 'Save' : 'Add programme'}
         />
       )}
     </ScreenScroll>

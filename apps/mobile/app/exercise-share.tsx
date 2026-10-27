@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import { useOpenExerciseEditor } from '@/components/exercise-catalog/exercise-editor-request';
 import {
   GroupMissingDataState,
   GroupStateView,
@@ -100,7 +100,7 @@ function ExerciseShareContent({
     evictGroupIdOnNotFound: groupId,
   });
 
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const openExerciseEditor = useOpenExerciseEditor();
   const [savePending, setSavePending] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -191,7 +191,6 @@ function ExerciseShareContent({
   };
 
   const handleEditorSaved = (exercise: ExerciseCatalogExercise) => {
-    setIsEditorOpen(false);
     setSavedExercise(exercise);
     setSaveFeedback(`"${exercise.name}" was added to your exercises.`);
   };
@@ -225,7 +224,7 @@ function ExerciseShareContent({
             <ActionButton
               accessibilityLabel="View in catalog"
               label="View in catalog"
-              onPress={() => router.replace('/(tabs)/exercise-catalog')}
+              onPress={() => router.replace('/exercise-catalog')}
               testID="exercise-share-view-catalog-btn"
               variant="primary"
             />
@@ -243,7 +242,7 @@ function ExerciseShareContent({
                 accessibilityLabel="Customize and add"
                 disabled={savePending}
                 label="Customize and add…"
-                onPress={() => setIsEditorOpen(true)}
+                onPress={() => openExerciseEditor({ prefill: editorPrefill, title: 'Customize shared exercise', onSaved: handleEditorSaved })}
                 testID="exercise-share-customize-btn"
                 variant="outline"
               />
@@ -252,14 +251,6 @@ function ExerciseShareContent({
         </View>
       </ScreenScroll>
 
-      <ExerciseEditorModal
-        editingExercise={null}
-        onRequestClose={() => setIsEditorOpen(false)}
-        onSaved={handleEditorSaved}
-        prefill={editorPrefill}
-        title="Customize shared exercise"
-        visible={isEditorOpen}
-      />
     </>
   );
 }

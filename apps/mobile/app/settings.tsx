@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
-import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { effortStatus, experimentsStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
@@ -13,7 +13,6 @@ import {
   Icon,
   ListRow,
   ScreenScroll,
-  TitleBar,
   uiFonts,
   uiRoles,
   uiSpace,
@@ -24,9 +23,18 @@ import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
+// A root-stack page under the native header, keeping the tab bar (More).
+export default function SettingsRoute() {
+  return (
+    <TabOwnedPage>
+      <SettingsScreen />
+    </TabOwnedPage>
+  );
+}
+
 // A list of cards, each an icon, a label and what is set now. Every setting
 // lives on a sub page.
-export default function SettingsScreen() {
+function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const preferences = useAccountLocalPreferenceState();
@@ -38,8 +46,6 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="settings-screen">
-      <TitleBar back={<MoreHubBackButton />} title="Settings" />
-
       <SettingsCard
         accessibilityHint="Opens your account screen"
         icon="user"

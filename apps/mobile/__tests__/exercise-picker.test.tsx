@@ -6,7 +6,8 @@
  * catalog stats, the suggested-plan read, the group-linking hook and the link
  * writes run over the migrated in-memory SQLite database (helpers/local-data.ts).
  * Everything the host does with a pick is asserted on the callback props; every
- * write is read back from the database.
+ * write is read back from the database. The exercise editor the picker opens
+ * is the real page over it (helpers/exercise-editor-page.tsx).
  *
  * Each suite starts from an empty catalogue (a sync-configured install before
  * its first pull) and creates its exercises through the catalogue's own write
@@ -22,7 +23,7 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
-import { Keyboard, StyleSheet, type ViewStyle } from 'react-native';
+import { Keyboard, StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -30,13 +31,16 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
   useLocalSearchParams: () => ({}),
-  useNavigation: () => ({ addListener: jest.fn(() => () => undefined), dispatch: jest.fn() }),
-  useRouter: () => ({ replace: jest.fn(), push: mockPush }),
+  // `getState`: the exercise editor page reads the stack beneath it.
+  useNavigation: () => ({ addListener: jest.fn(() => () => undefined), dispatch: jest.fn(), getState: () => ({ routes: [] }), isFocused: () => true }),
+  useRouter: () => ({ replace: jest.fn(), push: mockPush, back: mockBack }),
 }));
 
 let mockUserId: string | null = 'user-1';
@@ -87,6 +91,8 @@ import {
   resetLocalData,
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { exerciseEditorHrefs, exerciseEditorPage, exerciseEditorParams, WithExerciseEditorPage } from './helpers/exercise-editor-page';
+import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -247,7 +253,7 @@ const renderPicker = async (
     onAddPlanBlock: jest.fn(),
     onOpenManage: jest.fn(),
   };
-  const result = render(<ExercisePicker {...callbacks} {...props} />);
+  const result = render(<WithExerciseEditorPage><ExercisePicker {...callbacks} {...props} /></WithExerciseEditorPage>);
   unmountPicker = result.unmount;
   await act(async () => {});
   if (expandFamilies) {
@@ -279,7 +285,9 @@ const toggleGroups = () => fireEvent.press(screen.getByTestId('exercise-picker-g
 beforeEach(() => {
   resetLocalData();
   __resetExerciseListPreferencesForTests();
-  mockPush.mockReset();
+  mockPush.mockReset().mockImplementation((href: unknown) => exerciseEditorPage.push(href));
+  mockBack.mockReset().mockImplementation(() => exerciseEditorPage.back());
+  exerciseEditorPage.reset();
   mockUserId = 'user-1';
   mockConnected = true;
   api.listMyGroups.mockReset().mockResolvedValue(MINE);
@@ -458,10 +466,15 @@ describe('pick sheet (E0.2)', () => {
     fireEvent.press(await screen.findByTestId('group-pick-sheet-option-add-new'));
     fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
 
+    // The editor page opens over the picker, to create (no id), titled for the pick.
+    const [href] = exerciseEditorHrefs(mockPush);
+    expect(exerciseEditorParams(href).exerciseDefinitionId).toBeNull();
+    expect(readExerciseEditorRequest(exerciseEditorParams(href).request)?.title).toBe('Add as new exercise');
     expect(await screen.findByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bench Press');
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
     });
+    expect(exerciseEditorPage.isOpen()).toBe(false);
 
     // A second Bench Press, linked; mine stays unlinked.
     const created = liveExercisesNamed('Bench Press').find((row) => row.id !== 'seed_barbell_bench_press');
@@ -680,15 +693,18 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     await screen.findByLabelText('Select exercise Barbell Squat');
 
     fireEvent.press(screen.getByLabelText('Open inline exercise create'));
-    expect(mockPush).not.toHaveBeenCalled();
-    expect(await screen.findByText('Create Exercise')).toBeTruthy();
+    // The editor page opens over the picker, creating a blank exercise.
+    expect(exerciseEditorHrefs(mockPush)).toHaveLength(1);
+    expect(exerciseEditorParams(exerciseEditorHrefs(mockPush)[0]).exerciseDefinitionId).toBeNull();
+    expect(await screen.findByTestId('exercise-editor-save')).toHaveTextContent('Add exercise', { exact: false });
 
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Custom Press');
-    fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+    fireEvent.press(screen.getByTestId('exercise-editor-primary-muscle-trigger'));
     fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
     });
+    expect(exerciseEditorPage.isOpen()).toBe(false);
 
     const [created] = liveExercisesNamed('Custom Press');
     expect(created).toMatchObject({ loadInputMode: 'total_load' });

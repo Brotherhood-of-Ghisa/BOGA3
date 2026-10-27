@@ -60,7 +60,7 @@ import {
 import * as syncStatusSource from '@/src/sync/sync-status';
 import ProfileRoute from '../app/profile';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 import { DataSyncSettingsScreen, OtherSettingsScreen } from '@/components/settings/sub-pages';
 
 type MockUseAuthValue = {
@@ -142,15 +142,18 @@ describe('settings and profile routes', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 
-  it('returns explicitly to More when settings was launched from the hub', async () => {
+  it('keeps the tab bar with More selected and draws no title or back of its own (the native header has them)', async () => {
     mockSearchParams = { source: 'more' };
     // The preferences card reads its store on mount; load it first so the read lands in the test.
     await ensureExerciseListPreferencesLoaded();
     render(<SettingsRoute />);
 
-    fireEvent.press(screen.getByTestId('back-to-more-button'));
-
-    expect(mockReplace).toHaveBeenCalledWith('/more');
+    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
+    expect(screen.queryByRole('header', { name: 'Settings' })).toBeNull();
+    expect(screen.getByTestId('top-level-tab-more')).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ selected: true })
+    );
   });
 
   it('reports a failed date-format save only under Data & Sync and retries it through Refresh', async () => {

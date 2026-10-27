@@ -38,7 +38,7 @@ import { Storage } from 'expo-sqlite/kv-store';
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 
 // This suite launches in the default theme (nothing stored at import).
 

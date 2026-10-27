@@ -27,9 +27,7 @@ export function RestTimerSettingsScreen() {
   const preferences = useAccountLocalPreferenceState();
   return (
     <SubPage testID="settings-rest-timer-screen">
-      <Card style={styles.cardBody}>
-        <RestTimerSettings state={preferences} />
-      </Card>
+      <RestTimerSettings state={preferences} />
     </SubPage>
   );
 }
@@ -93,6 +91,7 @@ export function ExperimentsSettingsScreen() {
     <SubPage testID="settings-experiments-screen">
       <Card>
         <SwitchRow
+          density="list"
           label="Timer in title bar"
           onValueChange={(timerInTitleBar) => updatePreferences({ timerInTitleBar })}
           testID="settings-timer-in-title-bar"

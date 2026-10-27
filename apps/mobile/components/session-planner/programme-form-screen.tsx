@@ -7,10 +7,12 @@ import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  ChoiceRow,
   FigureText,
+  FormError,
   FormField,
+  FormSection,
   IconButton,
-  ListRow,
   Notice,
   PageSheet,
   uiRoles,
@@ -229,7 +231,7 @@ function ProgrammeSessionEditSheet({
   };
 
   const selectedGymName =
-    plan.gymId === null ? 'No gym' : gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
+    gyms?.find((g) => g.id === plan.gymId)?.name ?? 'Gym chosen';
   const childScheduleSummary =
     planScheduleLabel(plan.scheduleText, dateFormat);
 
@@ -290,6 +292,7 @@ function ProgrammeSessionEditSheet({
           <FormField
             accessibilityLabel="Session title"
             error={errors.get(`${prefix}.title`)}
+            face="text"
             label="Session title"
             onChangeText={(text) => onUpdatePlan(planIndex, { title: text })}
             placeholder="e.g. Day 1: Squat"
@@ -297,37 +300,23 @@ function ProgrammeSessionEditSheet({
             value={plan.title}
           />
 
-          <View style={styles.fieldBlock}>
-            <Text allowFontScaling={false} style={uiText.label}>
-              Schedule (optional)
-            </Text>
-            <Card>
-              <ListRow
-                accessibilityLabel={`Schedule: ${childScheduleSummary}`}
-                density="list"
-                divider={false}
-                label={childScheduleSummary}
-                onPress={() => setScheduleSheetVisible(true)}
-                testID="programme-child-plan-schedule-row"
-              />
-            </Card>
-          </View>
-
-          <View style={styles.fieldBlock}>
-            <Text allowFontScaling={false} style={uiText.label}>
-              Gym
-            </Text>
-            <Card>
-              <ListRow
-                accessibilityLabel={`Gym: ${selectedGymName}`}
-                density="list"
-                divider={false}
-                label={selectedGymName}
-                onPress={openGymPicker}
-                testID="programme-child-plan-gym-row"
-              />
-            </Card>
-          </View>
+          <FormSection title="When and where">
+            <ChoiceRow
+              label="Schedule"
+              onPress={() => setScheduleSheetVisible(true)}
+              placeholder="Unscheduled"
+              testID="programme-child-plan-schedule-row"
+              value={plan.scheduleText.trim() ? childScheduleSummary : null}
+            />
+            <ChoiceRow
+              divider
+              label="Gym"
+              onPress={() => void openGymPicker()}
+              placeholder="No gym"
+              testID="programme-child-plan-gym-row"
+              value={plan.gymId === null ? null : selectedGymName}
+            />
+          </FormSection>
 
           <ProgrammeChildPlanBlocks
             blocks={plan.blocks}
@@ -596,28 +585,28 @@ export function ProgrammeFormScreen({
         />
       ) : null}
 
-      <Card style={styles.sectionCard}>
-        <FormField
-          accessibilityLabel="Programme name"
-          error={errors.get('name')}
-          label="Programme name"
-          onChangeText={(text) => setForm((c) => ({ ...c, name: text }))}
-          placeholder="e.g. 6-week wave, Upper/Lower split"
-          testID="programme-form-name"
-          value={form.name}
-        />
+      <FormField
+        accessibilityLabel="Programme name"
+        error={errors.get('name')}
+        face="text"
+        label="Programme name"
+        onChangeText={(text) => setForm((c) => ({ ...c, name: text }))}
+        placeholder="e.g. 6-week wave, Upper/Lower split"
+        testID="programme-form-name"
+        value={form.name}
+      />
 
-        <FormField
-          accessibilityLabel="Programme description"
-          error={errors.get('description')}
-          label="Description (optional)"
-          multiline
-          onChangeText={(text) => setForm((c) => ({ ...c, description: text }))}
-          placeholder="Progression notes, frequency, wave structure"
-          testID="programme-form-description"
-          value={form.description}
-        />
-      </Card>
+      <FormField
+        accessibilityLabel="Programme description"
+        error={errors.get('description')}
+        face="text"
+        label="Description (optional)"
+        multiline
+        onChangeText={(text) => setForm((c) => ({ ...c, description: text }))}
+        placeholder="Progression notes, frequency, wave structure"
+        testID="programme-form-description"
+        value={form.description}
+      />
 
       <View style={styles.sessionsHeader}>
         <View style={styles.sessionsHeaderTitle}>
@@ -634,13 +623,7 @@ export function ProgrammeFormScreen({
         />
       </View>
 
-      {errors.get('plans') ? (
-        <Notice
-          message={errors.get('plans')!}
-          testID="programme-form-plans-error"
-          tone="danger"
-        />
-      ) : null}
+      <FormError message={errors.get('plans')} testID="programme-form-plans-error" />
 
       <View style={styles.plansList}>
         {form.plans.map((plan, index) => (
@@ -685,10 +668,6 @@ const styles = StyleSheet.create({
   container: {
     gap: uiSpace.md,
     paddingVertical: uiSpace.md,
-  },
-  sectionCard: {
-    gap: uiSpace.md,
-    padding: uiSpace.md,
   },
   sessionsHeader: {
     flexDirection: 'row',

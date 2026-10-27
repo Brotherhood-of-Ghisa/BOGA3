@@ -10,9 +10,9 @@ import {
   Notice,
   ScreenScroll,
   uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
+  uiText,
   uiTypography,
 } from '@/components/ui';
 import {
@@ -159,7 +159,7 @@ function DeveloperTools() {
     <Card style={styles.cardBody} testID="settings-dev-tools-card">
       <View style={styles.devHeader}>
         <Icon color={uiRoles.inkMuted} name="warning" size="sm" />
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
           Developer tools
         </Text>
       </View>
@@ -243,15 +243,6 @@ const styles = StyleSheet.create({
   cardBody: {
     padding: uiSpace.md,
     gap: uiSpace.md,
-  },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   bodyMuted: {
     fontFamily: uiFonts.body.family,

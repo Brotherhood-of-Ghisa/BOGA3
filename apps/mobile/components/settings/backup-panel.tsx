@@ -7,9 +7,9 @@ import {
   ListRow,
   uiBorder,
   uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
+  uiText,
   uiTypography,
 } from '@/components/ui';
 import { getDatabaseBackups, type DatabaseBackups } from '@/src/backup/database-backups';
@@ -54,7 +54,7 @@ export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps
   const newest = snapshots?.[0];
   return (
     <Card testID="settings-backup-card">
-      <Text allowFontScaling={false} style={styles.cardLabel}>Backups</Text>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.cardLabel]}>Backups</Text>
       <ListRow
         density="list"
         divider={false}
@@ -107,13 +107,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   label: {
     fontFamily: uiFonts.body.family,

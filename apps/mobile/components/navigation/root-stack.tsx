@@ -13,10 +13,11 @@ import { useRootRouteAccess } from '@/src/navigation/root-route-access';
  */
 const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
-  // One header style on every stack route, as the design-language top bars
-  // draw it (`navigation-contract.md` "Header titles"):
-  // `surface` over the page, an Archivo 700 `ink` title, an `ink` back arrow.
-  headerStyle: { backgroundColor: uiRoles.surface },
+  // One header style on every stack route (`navigation-contract.md` "Header
+  // titles"): the page's own `paper` ground with no shadow line, so header and
+  // page read as one surface, an Archivo 700 `ink` title, an `ink` back arrow.
+  headerStyle: { backgroundColor: uiRoles.paper },
+  headerShadowVisible: false,
   headerTitleStyle: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -55,6 +56,10 @@ export function RootStack() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
         <Stack.Screen name="exercise-history" />
+        {/* More's destinations that keep the tab bar (`TabOwnedPage`). */}
+        <Stack.Screen name="exercise-catalog" options={{ title: 'Exercises' }} />
+        <Stack.Screen name="groups" options={{ title: 'Groups' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         {/* The subject's name replaces this title once it resolves. */}
         <Stack.Screen name="progress-history" options={{ title: 'History' }} />
         <Stack.Screen name="rm-curve" options={{ title: 'RM curve' }} />
@@ -71,6 +76,8 @@ export function RootStack() {
           options={{ title: 'Connected agents' }}
         />
         <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
+        {/* The editor replaces this title with `Edit "<name>"` or its caller's once loaded. */}
+        <Stack.Screen name="exercise-edit" options={{ title: 'Edit exercise' }} />
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="exercise-share" options={{ title: 'Shared exercise' }} />
         <Stack.Screen name="body-weight" options={{ title: 'Bodyweight' }} />

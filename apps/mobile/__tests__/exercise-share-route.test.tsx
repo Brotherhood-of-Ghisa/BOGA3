@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -30,6 +30,8 @@ const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  // The exercise editor page reads the stack beneath it.
+  useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -37,7 +39,12 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockUseAuth = jest.fn();
-jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
+jest.mock('@/src/auth', () => ({
+  useAuth: () => mockUseAuth(),
+  // The editor page reads the auth store for its Groups section (create only here, so never shown).
+  getAuthSnapshot: () => mockUseAuth(),
+  subscribeToAuthState: () => () => undefined,
+}));
 
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
@@ -50,7 +57,14 @@ import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import type { LocalDatabase } from '@/src/data/bootstrap';
+import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 import ExerciseShareRoute from '../app/exercise-share';
+import {
+  exerciseEditorHrefs,
+  exerciseEditorPage,
+  exerciseEditorParams,
+  WithExerciseEditorPage,
+} from './helpers/exercise-editor-page';
 
 const SAMPLE_PAYLOAD: ExerciseSharePayload = {
   v: 1,
@@ -87,6 +101,9 @@ beforeEach(() => {
     payload: encodeExerciseSharePayload(SAMPLE_PAYLOAD),
   };
   jest.clearAllMocks();
+  mockRouter.push.mockReset();
+  mockRouter.back.mockReset();
+  exerciseEditorPage.reset();
 });
 
 afterEach(() => {
@@ -159,7 +176,7 @@ describe('ExerciseShareRoute', () => {
     expect(screen.getByTestId('exercise-share-view-catalog-btn')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('exercise-share-view-catalog-btn'));
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)/exercise-catalog');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/exercise-catalog');
   });
 
   it('resets import state when link parameters change', async () => {
@@ -270,15 +287,32 @@ describe('ExerciseShareRoute', () => {
     expect(screen.getByTestId('exercise-share-save-btn')).toHaveTextContent('Add to my exercises');
   });
 
-  it('opens customize modal when "Customize and add…" is pressed', async () => {
-    render(<ExerciseShareRoute />);
+  it('opens the prefilled editor page from "Customize and add…", and its save reports the added exercise', async () => {
+    mockRouter.push.mockImplementation((href: unknown) => exerciseEditorPage.push(href));
+    mockRouter.back.mockImplementation(() => exerciseEditorPage.back());
+    render(<WithExerciseEditorPage><ExerciseShareRoute /></WithExerciseEditorPage>);
 
     expect(await screen.findByTestId('exercise-share-customize-btn')).toBeTruthy();
-
     await act(async () => {
       fireEvent.press(screen.getByTestId('exercise-share-customize-btn'));
     });
 
-    expect(screen.getByTestId('exercise-editor-name-input')).toBeTruthy();
+    const [href] = exerciseEditorHrefs(mockRouter.push);
+    const { exerciseDefinitionId, request } = exerciseEditorParams(href);
+    expect(exerciseDefinitionId).toBeNull();
+    expect(readExerciseEditorRequest(request)?.title).toBe('Customize shared exercise');
+    expect(await screen.findByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bulgarian Split Squat');
+
+    fireEvent.changeText(screen.getByTestId('exercise-editor-name-input'), 'Split Squat (mine)');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    });
+
+    expect(await screen.findByTestId('exercise-share-feedback')).toHaveTextContent(
+      '"Split Squat (mine)" was added to your exercises.'
+    );
+    expect(exerciseEditorPage.isOpen()).toBe(false);
+    const saved = (await exerciseCatalogData.listExerciseCatalogExercises()).find((exercise) => exercise.name === 'Split Squat (mine)');
+    expect(saved).toMatchObject({ loadInputMode: 'per_side_load', bodyweightContribution: 0.5 });
   });
 });

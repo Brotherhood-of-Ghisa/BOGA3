@@ -127,6 +127,8 @@ type ExerciseListContentProps = {
   onPressExercise: (exercise: ExerciseListItem) => void;
   getExerciseAccessibilityLabel?: (exercise: ExerciseListItem) => string;
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
+  /** My exercises linked to a group exercise: a `link` glyph after the name (the catalogue). */
+  linkedExerciseIds?: ReadonlySet<string>;
 };
 
 // The exercise list the catalogue, the session's exercise picker and the
@@ -142,6 +144,7 @@ export function ExerciseListContent({
   onPressExercise,
   getExerciseAccessibilityLabel,
   renderActions,
+  linkedExerciseIds,
 }: ExerciseListContentProps) {
   if (historyStatus === 'error') {
     return <StatePanel body="Unable to load exercise history." fill={false} kind="error"
@@ -159,6 +162,7 @@ export function ExerciseListContent({
       onPressExercise={onPressExercise}
       getAccessibilityLabel={getExerciseAccessibilityLabel}
       renderActions={renderActions}
+      linked={linkedExerciseIds?.has(exercise.id) ?? false}
     />
   );
 
@@ -198,6 +202,7 @@ export function ExerciseListContent({
 
 type ExerciseListRowProps = {
   exercise: ExerciseListItem;
+  linked?: boolean;
   divider: boolean;
   onPressExercise: (exercise: ExerciseListItem) => void;
   getAccessibilityLabel?: (exercise: ExerciseListItem) => string;
@@ -208,6 +213,7 @@ type ExerciseListRowProps = {
 // `Deleted` tag and faint text, never a warning hue.
 const ExerciseListRow = memo(function ExerciseListRow({
   exercise,
+  linked = false,
   divider,
   onPressExercise,
   getAccessibilityLabel,
@@ -215,7 +221,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
 }: ExerciseListRowProps) {
   const deleted = Boolean(exercise.deletedAt);
   const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
-  const accessibilityHint = `${exercise.muscleSummary}. ${exercise.statsSummary}.`;
+  const accessibilityHint = `${linked ? 'Linked to a group exercise. ' : ''}${exercise.muscleSummary}. ${exercise.statsSummary}.`;
   const text = (
     <View style={styles.rowText}>
       <View style={styles.titleRow}>
@@ -227,6 +233,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
           style={[styles.name, deleted ? styles.faded : null]}>
           {exercise.name}
         </Text>
+        {linked ? <Icon color={uiRoles.inkMuted} name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
       <Text allowFontScaling={false}

@@ -173,16 +173,29 @@ describe('Gyms screen over real data', () => {
     expect(locationOf('synced-strength-house')).toEqual({ latitude: 51.5, longitude: -0.12, accuracyM: 12 });
   });
 
-  it('cancels an edit without writing', async () => {
+  it('closes an edit from its header row without writing (forms have no Cancel)', async () => {
     await renderScreen();
 
     await openEditor('Downtown Iron Temple');
+    expect(screen.queryByText('Cancel')).toBeNull();
     fireEvent.changeText(screen.getByDisplayValue('Downtown Iron Temple'), 'Something Else');
-    fireEvent.press(screen.getByTestId('gym-editor-cancel'));
+    fireEvent.press(screen.getByLabelText('Close editor for gym Downtown Iron Temple'));
 
     expect(screen.queryByTestId('gym-editor')).toBeNull();
     expect(screen.getByLabelText('Edit gym Downtown Iron Temple')).toBeTruthy();
     expect(gymRow('downtown-iron-temple')).toBeUndefined();
+  });
+
+  it('closes a new gym from its header row, adding nothing', async () => {
+    await renderScreen();
+
+    fireEvent.press(screen.getByTestId('gyms-add'));
+    fireEvent.changeText(screen.getByTestId('gym-editor-name'), 'Never Added');
+    fireEvent.press(screen.getByLabelText('Close editor for new gym'));
+
+    expect(screen.queryByTestId('gym-editor')).toBeNull();
+    expect(screen.getByTestId('gyms-add')).toBeTruthy();
+    expect(allGymRows().map((row) => row.name)).not.toContain('Never Added');
   });
 
   it('saves the current location from the editor, keeping it open', async () => {
@@ -308,19 +321,15 @@ describe('Gyms screen over real data', () => {
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveTextContent('No location saved');
   });
 
-  it('shows Back to More only when opened from More, and returns without stacking the tabs', async () => {
+  it('draws no back of its own: the native header is the one way back, from More or a session', async () => {
     await seed();
-    render(<GymsRoute />);
-    await screen.findByTestId('gyms-list');
-    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
-    screen.unmount();
-
     mockSearchParams = { source: 'more' };
     render(<GymsRoute />);
     await screen.findByTestId('gyms-list');
-    fireEvent.press(screen.getByTestId('back-to-more-button'));
 
-    expect(mockDismissTo).toHaveBeenCalledWith('/more');
+    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
+    expect(screen.queryByLabelText('Back to More')).toBeNull();
+    expect(mockDismissTo).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 

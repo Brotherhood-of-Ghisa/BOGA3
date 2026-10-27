@@ -29,17 +29,17 @@ draws the same fixed bar on every screen that shows tabs.
 | `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; both breakdowns use Settings' saved layout (`List`/`3D`, default `List`) and [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle pairs periods under `Now` (Sets `12 (10)`) and sorts name / Now / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise 3D scopes the list to the tapped muscle, with aligned Primary effort / Secondary effort sections; 1RM uses List. Muscle List places compact Sets/Volume tickers beside names; names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four. Two untitled cards: Groups, Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
 
-### Preserved tab roots
+### Preserved tab root and More's tab-owned pages
 
-Registered with `href: null`: not visible in the bar, still directly
-addressable, each resolving to a canonical owner for tab selection.
+`/stats-history` stays a hidden tab. The rest are root-stack pages keeping
+the tab bar (`TabOwnedPage`), owned by More.
 
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
-| `/exercise-catalog` | Catalogue create/edit/delete/restore and catalogue-only ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Definition fields and gym-scoped stats; shared browser ([[muscle.no-breakdown]]) | `(tabs)/exercise-catalog.tsx` |
-| `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
-| `/settings` | Destination cards show current settings; About is last and unpressable. Appearance and Notifications use sheets; other destinations use sub-pages | `(tabs)/settings.tsx`, `components/settings/` |
+| `/exercise-catalog` | Catalogue create/edit/delete/restore; ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Gym-scoped stats; linked rows marked; shared browser ([[muscle.no-breakdown]]) | `exercise-catalog.tsx` |
+| `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `groups.tsx`, `components/groups/` |
+| `/settings` | Destination cards show current settings; About is last and unpressable. Appearance and Notifications open sheets, the rest pages | `settings.tsx`, `components/settings/` |
 
 ## Sessions
 
@@ -70,6 +70,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view and periods; the effort table; date format, gym filter; title-bar timer; sync and Backups; Developer mode, dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown cards link to full target/enablement pages ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
+| `/exercise-edit` | The exercise editor; `?exerciseDefinitionId=` edits, else creates; `?request=` carries a caller's callbacks | `exercise-edit.tsx`, `components/exercise-catalog/exercise-editor-screen.tsx` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 
 ## Groups
@@ -124,11 +125,11 @@ addressable, each resolving to a canonical owner for tab selection.
 - Detail screens use the native **minimal** back-button display mode (arrow,
   no text label), which also keeps the internal `(tabs)` group name off screen.
 - Screens whose header title is the name of a thing (`exercise-history`,
-  `exercise-link`, `progress-history`, `group/[groupId]`, a leaderboard) set
+  `exercise-edit`, `exercise-link`, `progress-history`, `group/[groupId]`, a leaderboard) set
   that title inside the route file once the entity resolves; session-view, exercise-page, the
   exercise picker and every `completed-session` presentation hide the native
-  header and draw their own top bar; `/settings` and `/exercise-catalog` keep
-  the tab bar, so draw `TitleBar` (back, title, ⋮).
+  header and draw their own top bar; `/exercise-catalog`, `/groups` and
+  `/settings` keep the tab bar, except the catalogue from a workout.
 
 ## Screen rules a route file will not tell you
 
@@ -184,13 +185,13 @@ addressable, each resolving to a canonical owner for tab selection.
 ## Overlays on existing routes (not destinations)
 
 - **Personal bodyweight calculations** (Settings On/Off): while enabled, the
-  personal exercise editor adds only `Bodyweight contribution (%)`. Session and
+  exercise editor adds `Uses bodyweight` and its share. Session and
   exercise routes keep ordinary Weight / 1RM / Volume labels ([[copy.no-weight-unit]]) and never show
   bodyweight context or entry actions. Reading or deletion changes recalculate
   affected projections silently.
 - **Group bodyweight calculations** (admin-only group toggle): while enabled,
-  add/edit group exercise shows only the group's own independent
-  `Bodyweight contribution (%)`; linking never changes personal settings or
+  the group exercise form adds the group's own `Uses bodyweight` and share;
+  linking never changes personal settings or
   contribution, and expected-revision conflicts retain edits. Group Volume/1RM
   boards and podiums follow [[copy.no-weight-unit]]; record detail and history
   retain public witness state and original wire units. Normalized rows follow
