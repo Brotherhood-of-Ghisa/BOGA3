@@ -47,9 +47,8 @@ const mockGetSession = jest.fn();
 
 jest.mock('@/src/auth/supabase', () => ({
   getRequiredSupabaseMobileClient: jest.fn(() => ({
+    ...jest.requireActual('./helpers/sync-cycle-mocks').syncRpcClient(mockRpc),
     auth: { getSession: mockGetSession },
-    rpc: mockRpc,
-    schema: () => ({ rpc: mockRpc }),
   })),
 }));
 

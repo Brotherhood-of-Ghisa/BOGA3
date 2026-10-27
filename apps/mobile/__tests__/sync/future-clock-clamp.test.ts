@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 
+jest.unmock('@/src/auth/session-user');
+
 /**
  * Outcome: a future-dated write is silently clamped by the server, and the
  * client reconciles the clamped value cleanly — it clears the dirty bit against

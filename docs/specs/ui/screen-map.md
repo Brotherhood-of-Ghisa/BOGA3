@@ -37,7 +37,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
-| `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings in the user's muscles ([[muscle.no-breakdown]]); a gym pill scopes the row stats. A one-line title bar (back, `Exercises`, ⋮ for Manage), then search beside a labelled `Add`. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
+| `/exercise-catalog` | Catalogue create/edit/delete/restore and catalogue-only ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Definition fields and gym-scoped stats; shared browser ([[muscle.no-breakdown]]) | `(tabs)/exercise-catalog.tsx` |
 | `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
 | `/settings` | Destination cards show current settings; About is last and unpressable. Appearance and Notifications use sheets; other destinations use sub-pages | `(tabs)/settings.tsx`, `components/settings/` |
 

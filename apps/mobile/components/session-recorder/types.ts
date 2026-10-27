@@ -27,6 +27,7 @@ export type SessionSet = {
 };
 
 export type SessionExercise = {
+  mergeRevision?: number;
   loadContext?: LoadContext;
   id: string;
   exerciseDefinitionId: string;
@@ -38,6 +39,7 @@ export type SessionExercise = {
 };
 
 export type Session = {
+  mergeRevisions?: Record<string, number>;
   dateTime: string;
   locationId: string | null;
   exercises: SessionExercise[];

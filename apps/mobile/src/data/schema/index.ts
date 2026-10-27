@@ -1,3 +1,4 @@
+export { exerciseMergeLocal } from './exercise-merge-local';
 export { bodyWeightMeasurements, type BodyWeightMeasurement, type NewBodyWeightMeasurement } from './body-weight-measurements';
 export {
   exerciseDefinitions,

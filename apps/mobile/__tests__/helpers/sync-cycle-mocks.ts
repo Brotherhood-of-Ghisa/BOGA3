@@ -81,6 +81,30 @@ export const supabaseClientMockFactory = <TClient = unknown>(
     if (!client) {
       throw new Error('Test supabase client not initialised');
     }
-    return client;
+    const typed = client as unknown as { auth?: unknown; schema: (name: string) => { rpc: (name: string, args?: unknown) => unknown } };
+    return { ...typed, auth: typed.auth ?? syncRpcClient(() => undefined).auth, schema: (schema: string) => ({
+      rpc: (name: string, args?: unknown) => {
+        const request = typed.schema(schema).rpc(name, args);
+        if (request && typeof (request as { setHeader?: unknown }).setHeader === 'function') return request;
+        const result = Promise.resolve(request);
+        return Object.assign(result, { setHeader: () => result });
+      },
+    }) };
   }),
+});
+
+/** PostgREST is a thenable builder: header binding precedes awaiting its result. */
+export const syncRpcClient = (rpc: (name: string, args?: unknown) => unknown) => ({
+  rpc,
+  auth: { getSession: async () => {
+    const owner = await jest.requireMock('@/src/auth/session-user').getSignedInUserId();
+    return { data: { session: owner ? { user: { id: owner }, access_token: 'fixture-' + owner } : null } };
+  } },
+  schema: () => ({ rpc: (name: string, args?: unknown) => {
+    const request = rpc(name, args);
+    if (request && typeof (request as { abortSignal?: unknown }).abortSignal === 'function') return request;
+    const result = Promise.resolve(request);
+    const builder = Object.assign(result, { setHeader: () => result, abortSignal: () => builder });
+    return builder;
+  } }),
 });
