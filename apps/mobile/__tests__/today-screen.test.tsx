@@ -258,10 +258,12 @@ describe('Today: the Progress card over real data', () => {
     await renderToday();
 
     const body = text('today-latest-session');
-    expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12');
+    expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 · 07:12');
     // The start reads as a Sessions row: a body line, ink, only its figures in the figure face.
     expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
     expect(within(text('today-latest-session-start')).getByText('07:12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    // A faint separator holds the date and the time apart.
+    expect(within(text('today-latest-session-start')).getByText(' · ')).toHaveStyle({ color: uiRoles.inkFaint });
     // Sets are ink like the other figure columns, not muted.
     expect(text('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
     // The figure columns sit a clear step apart.
@@ -324,7 +326,7 @@ describe('Today: the Progress card over real data', () => {
 
     expect(text('today-latest-session-step-newer')).toBeDisabled();
     fireEvent.press(text('today-latest-session-step-older'));
-    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('8 Oct 26 09:00'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('8 Oct 26 · 09:00'));
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3110.0 × 5128.2');
     // The figures above it stay on this week and period.
@@ -334,14 +336,14 @@ describe('Today: the Progress card over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/completed-session/oct-08');
 
     // Back to the oldest: no older one.
-    for (const start of ['6 Oct 26 09:00', '20 Sep 26 09:00', '3 Sep 26 09:00']) {
+    for (const start of ['6 Oct 26 · 09:00', '20 Sep 26 · 09:00', '3 Sep 26 · 09:00']) {
       fireEvent.press(text('today-latest-session-step-older'));
       await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent(start));
     }
     expect(text('today-latest-session-step-older')).toBeDisabled();
 
     fireEvent.press(text('today-latest-session-step-newer'));
-    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('20 Sep 26 09:00'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('20 Sep 26 · 09:00'));
   });
 
   it("writes every Today date in Today's own format, whatever the Date format setting", async () => {
@@ -353,7 +355,7 @@ describe('Today: the Progress card over real data', () => {
       await act(async () => {
         setExerciseListPreferences({ dateFormat });
       });
-      expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12');
+      expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 · 07:12');
       expect(text('today-progress-week-range')).toHaveTextContent('12 – 18 Oct 26');
       expect(text('today-progress-period-range')).toHaveTextContent('5 Oct – 1 Nov 26');
     }
@@ -370,14 +372,14 @@ describe('Today: the Progress card over real data', () => {
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     expect(screen.queryByTestId('today-progress-loading')).toBeNull();
     await waitFor(() => expect(text('today-progress-week-sessions-value')).toHaveTextContent('2'));
-    expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 08:00');
+    expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 · 08:00');
 
     await act(async () => {
       await setSessionDeletedState('oct-16', true);
     });
     screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
-    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 · 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
     expect(loadProgress).toHaveBeenLastCalledWith(NOW, 4, { compareBack: 1, sessionOffset: 0 });
   });
@@ -473,7 +475,7 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
     // 7 sessions of 9 sets, and this morning's 9 more, by day 12 against 4 (8, 11, 14 and 17 Sep).
     expect(text('today-progress-period-difference')).toHaveTextContent('+36');
-    expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 07:00');
+    expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 · 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 exercises · 18 sets · 3 PRs @ Canal Street Gym');
     // More exercises than the card shows without scrolling.
     expect(text('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');

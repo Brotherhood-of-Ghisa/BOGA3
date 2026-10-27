@@ -125,7 +125,9 @@ export function TodaySessionCard({
   const stamp = (
     // The start reads as a Sessions row's does: a body line, its figures in the figure face.
     <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID="today-latest-session-start">
-      <FigureText>{`${formatCompactDate(session.startedAt)} ${formatClockTime(session.startedAt.getTime())}`}</FigureText>
+      <FigureText>{formatCompactDate(session.startedAt)}</FigureText>
+      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+      <FigureText>{formatClockTime(session.startedAt.getTime())}</FigureText>
     </Text>
   );
   return (
