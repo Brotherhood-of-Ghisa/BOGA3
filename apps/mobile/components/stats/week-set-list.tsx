@@ -4,7 +4,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
-import { IconButton, StatePanel, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, IconButton, StatePanel, uiGeometry, uiSpace, uiText, uiTypography } from '@/components/ui';
 
 import type { WeekSetGroup, WeekSetsState } from './week-sets';
 
@@ -30,7 +30,7 @@ export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLin
   }
   if (loading) return <StatePanel body="Loading sets..." fill={false} kind="loading" testID={`${testID}-loading`} />;
   if (groups.length === 0) {
-    return <Text allowFontScaling={false} style={styles.empty} testID={`${testID}-empty`}>No sets this week</Text>;
+    return <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-empty`}>No sets this week</Text>;
   }
   return <View style={styles.list} testID={testID}>
     {groups.map((group) => <WeekSetCard key={group.key} exerciseLink={exerciseLink} group={group}
@@ -63,7 +63,7 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID }: {
     count={`${group.workingSetCount} ${group.workingSetCount === 1 ? 'set' : 'sets'}`}
     name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}
     summary={<View style={styles.summary}>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>{group.detail}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}><FigureText>{group.detail}</FigureText></Text>
     </View>}
     testID={testID} />;
 }
@@ -78,6 +78,4 @@ const styles = StyleSheet.create({
   },
   // As Exercise History's session cards.
   summary: { paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.sm },
-  detail: { fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
-  empty: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
 });

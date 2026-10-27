@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { bodyweightStatus } from '@/components/settings/statuses';
-import { ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ListRow, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { readCurrentBodyWeight } from '@/src/data/bodyweight';
 import {
@@ -72,7 +72,7 @@ export function BodyweightCalculationsRow() {
               pressed ? styles.stateButtonPressed : null,
             ]}
             testID="settings-bodyweight-calculations-toggle">
-            <Text allowFontScaling={false} style={[styles.stateLabel, enabled ? styles.stateLabelOn : null]}>
+            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, enabled ? styles.stateLabelOn : null]}>
               {enabled ? 'On' : 'Off'}
             </Text>
           </Pressable>
@@ -83,7 +83,7 @@ export function BodyweightCalculationsRow() {
           accessibilityLiveRegion="polite"
           accessibilityRole="alert"
           allowFontScaling={false}
-          style={styles.preferenceError}
+          style={[uiText.meta, styles.danger, styles.preferenceError]}
           testID="settings-bodyweight-calculations-error">
           {preferenceError}
         </Text>
@@ -93,11 +93,9 @@ export function BodyweightCalculationsRow() {
 }
 
 const styles = StyleSheet.create({
+  // `danger` is no tone of the roles: an error's colour, kept beside its role.
+  danger: { color: uiRoles.danger },
   preferenceError: {
-    color: uiRoles.danger,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
     paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
   },
@@ -119,13 +117,7 @@ const styles = StyleSheet.create({
   stateButtonPressed: {
     opacity: 0.72,
   },
-  stateLabel: {
-    color: uiRoles.ink,
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    lineHeight: uiTypography.lineHeight.sm,
-  },
+  // The label on the accent fill.
   stateLabelOn: {
     color: uiRoles.surface,
   },

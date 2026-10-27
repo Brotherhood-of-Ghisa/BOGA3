@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, FlatList, Platform, Text, View, type ViewInstance } from 'react-native';
-import { Card, Icon, ListRow, ScreenScroll, SegmentedControl, Sheet, StatePanel } from '@/components/ui';
+import { Card, FigureText, Icon, ListRow, ScreenScroll, SegmentedControl, Sheet, StatePanel, uiText, uiTextTone } from '@/components/ui';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CurveMode, UncertaintyMethod } from '@/src/strength-regimes/assessment';
 import type { RmCurveModel, RmCurveRange } from '@/src/rm-curve/model';
@@ -63,7 +63,7 @@ export function RmCurveContent({ read, scope, onScope, dateFormat, historyWeeks,
   const filter = (kind: Picker, label: string, full = false) => <Card style={full ? styles.full : styles.filter} key={kind}>
     <ListRow ref={node => { refs.current[kind] = node; }} density="list" divider={false} onPress={() => open(kind)}
       accessibilityLabel={`${kind}: ${label}`} trailing={<Icon name="chevron-down" />}>
-      <Text allowFontScaling={false} style={styles.filterLabel}>{label}</Text>
+      <Text allowFontScaling={false} style={uiText.bodyStrong}>{label}</Text>
     </ListRow>
   </Card>;
   const choices: Record<Picker, Choice[]> = {
@@ -106,7 +106,7 @@ function CurveChoices({ picker, choices, close, restoreFocus }: {
       <FlatList data={choices} keyExtractor={choice => choice.id} renderItem={({ item: choice }) => <ListRow checked={choice.checked}
           onPress={choice.choose} accessibilityLabel={choice.label}
           leading={choice.checked !== undefined ? <Icon name={choice.checked ? 'radio-on' : 'radio-off'} /> : undefined}>
-          <Text allowFontScaling={false} style={styles.body}>{choice.label}</Text>
+          <Text allowFontScaling={false} style={uiText.body}>{choice.label}</Text>
         </ListRow>} />
     </Sheet>;
 }
@@ -126,17 +126,17 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
   const factor = model.definition.loadInputMode === 'per_side_load' ? 2 : 1;
   const sessionsCount = new Set(points.map(p => p.sessionId)).size;
   return <>
-    <Text allowFontScaling={false} style={styles.figure}>{points.length} {points.length === 1 ? 'set' : 'sets'} · {sessionsCount} {sessionsCount === 1 ? 'session' : 'sessions'}</Text>
+    <Text allowFontScaling={false} style={uiText.body}><FigureText>{`${points.length} ${points.length === 1 ? 'set' : 'sets'} · ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'}`}</FigureText></Text>
     <Card style={styles.card}>
       <RmCurveHelp />
-      <Text allowFontScaling={false} style={styles.micro}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>
+      <Text allowFontScaling={false} style={uiText.label}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>
       <RmRegimes result={result} method={method} dateFormat={dateFormat} model={model} selectedId={pointId} onPick={onPick} />
-      <View style={styles.dates}><Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>
-        <Text allowFontScaling={false} style={styles.figure}>{formatShortDate(points[0].completedAt, dateFormat)}</Text></View>
+      <View style={styles.dates}><Text allowFontScaling={false} style={[uiText.figure, styles.shrink]}>{formatShortDate(points.at(-1)!.completedAt, dateFormat)}</Text>
+        <Text allowFontScaling={false} style={[uiText.figure, styles.shrink]}>{formatShortDate(points[0].completedAt, dateFormat)}</Text></View>
 
     </Card>
     {point ? <RmCurveDetails period={period} periodLabel={period ? periodLabel(period, result?.data?.boundary ?? null, dateFormat) : undefined} model={model} point={point} dateFormat={dateFormat} onSelect={onSelect} />
       : null}
-    {excludedMessage(model) ? <Text allowFontScaling={false} style={styles.body}>{excludedMessage(model)}</Text> : null}
+    {excludedMessage(model) ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{excludedMessage(model)}</Text> : null}
   </>;
 }
