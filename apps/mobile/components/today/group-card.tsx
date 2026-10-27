@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
@@ -157,13 +158,13 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
         </Text>
         {row.live ? (
           <TrainingNowMark>
-            <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextEmphasis.strong, uiTextTone.ink]} testID={`${testID}-when`}>
-              {row.when}
+            <Text allowFontScaling={false} style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.ink]} testID={`${testID}-when`}>
+              <FigureText>{row.when}</FigureText>
             </Text>
           </TrainingNowMark>
         ) : (
-          <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-when`}>
-            {row.when}
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-when`}>
+            <FigureText>{row.when}</FigureText>
           </Text>
         )}
       </View>
@@ -172,8 +173,8 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
           {row.gym.trim()}
         </Text>
       ) : null}
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.figureSmall, uiTextTone.ink]} testID={`${testID}-figures`}>
-        {row.figures}
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-figures`}>
+        <FigureText>{row.figures}</FigureText>
         {record ? (
           <>
             <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>

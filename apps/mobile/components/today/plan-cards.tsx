@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -183,13 +184,13 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
       style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.plannedWhen}>
-        <Text allowFontScaling={false} style={uiText.figure} testID={`${testID}-day`}>{day}</Text>
+        <Text allowFontScaling={false} style={uiText.bodyStrong} testID={`${testID}-day`}>{day}</Text>
         <Text allowFontScaling={false} style={uiText.figureSmall}>{time}</Text>
       </View>
       <View style={styles.plannedBody}>
         <View style={styles.plannedTop}>
           <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.bodyStrong, styles.plannedTitle]}>{session.title}</Text>
-          <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-figures`}>{figures}</Text>
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}><FigureText>{figures}</FigureText></Text>
         </View>
         {muscles ? (
           <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.meta} testID={`${testID}-muscles`}>
