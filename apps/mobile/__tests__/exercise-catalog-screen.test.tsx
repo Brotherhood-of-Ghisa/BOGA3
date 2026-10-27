@@ -330,6 +330,26 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.getByLabelText('Select secondary muscle Front Delts')).toBeTruthy();
   });
 
+  it('keeps the cached search available for typing during a background refresh', async () => {
+    await openCatalog();
+    const readCatalog = catalogRepository.listExerciseCatalogExercises;
+    let finishReload!: () => void;
+    const heldReload = new Promise<void>(resolve => { finishReload = resolve; });
+    jest.spyOn(catalogRepository, 'listExerciseCatalogExercises').mockImplementationOnce(async options => {
+      await heldReload;
+      return readCatalog(options);
+    });
+    act(() => { invalidateExerciseCatalogCache(); });
+    try {
+      const input = await screen.findByLabelText('Exercise filter input');
+      fireEvent.changeText(input, 'Barbell');
+      expect(screen.getByDisplayValue('Barbell')).toBeTruthy();
+    } finally {
+      await act(async () => { finishReload(); });
+    }
+    expect(screen.getByDisplayValue('Barbell')).toBeTruthy();
+  });
+
   async function chooseMergeDestination() {
     await openCatalog();
     await expandFamily('Chest');
