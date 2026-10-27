@@ -200,6 +200,19 @@ begin
 end $$;
 revoke all on function app_public.exercise_merge_weight(text,numeric) from public,anon,authenticated;
 
+-- A destination tag is one membership, even when older assignments used different IDs.
+create function app_public.exercise_merge_coalesce_tag(p_block text,p_tag text)
+returns void language plpgsql security definer set search_path=app_public,pg_temp as $$
+declare u uuid:=app_public.exercise_merge_user();
+begin
+  delete from app_public.session_exercise_tags t where t.owner_user_id=u
+    and t.session_exercise_id=p_block and t.exercise_tag_definition_id=p_tag and t.id<>(
+      select s.id from app_public.session_exercise_tags s where s.owner_user_id=u
+        and s.session_exercise_id=p_block and s.exercise_tag_definition_id=p_tag
+      order by (s.deleted_at is null) desc,s.id limit 1);
+end $$;
+revoke all on function app_public.exercise_merge_coalesce_tag(text,text) from public,anon,authenticated,service_role;
+
 create function app_public.exercise_merge_preview(p_source text,p_destination text)
 returns jsonb language plpgsql security definer set search_path=app_public,pg_temp as $$
 declare u uuid:=app_public.exercise_merge_user(); a app_public.exercise_definitions;
@@ -306,16 +319,10 @@ begin
       join app_public.exercise_tag_definitions td on td.owner_user_id=st.owner_user_id and td.id=st.exercise_tag_definition_id
       where st.owner_user_id=u and st.session_exercise_id=b.id
     loop
-      select id into target_tag from app_public.exercise_tag_definitions
-        where owner_user_id=u and exercise_definition_id=p_destination and normalized_name=tag.normalized_name order by id limit 1;
-      if target_tag is null then
-        target_tag:='merge_tag_'||gen_random_uuid()::text;
-        insert into app_public.exercise_tag_definitions(owner_user_id,id,exercise_definition_id,name,normalized_name,
-          created_at,updated_at,deleted_at,client_updated_at_ms)
-          values(u,target_tag,p_destination,tag.name,tag.normalized_name,clock_now,clock_now,tag.deleted_at,stamp);
-      end if;
+      target_tag:=app_public.exercise_merge_destination_tag(tag.id,p_destination,stamp);
       update app_public.session_exercise_tags set exercise_tag_definition_id=target_tag,merge_revision=b.merge_revision+1,
         client_updated_at_ms=stamp where owner_user_id=u and session_exercise_id=b.id and exercise_tag_definition_id=tag.id;
+      perform app_public.exercise_merge_coalesce_tag(b.id,target_tag);
     end loop;
     end if;
     update app_public.session_exercises set
@@ -536,6 +543,11 @@ begin
       where owner_user_id=u and id=c.saved->>'exercise_tag_definition_id';
     select id into target_tag from app_public.exercise_tag_definitions where owner_user_id=u
       and exercise_definition_id=b.exercise_definition_id and normalized_name=source_tag.normalized_name order by id limit 1;
+    if current_row is null and target_tag is not null then
+      select to_jsonb(x) into current_row from app_public.session_exercise_tags x where x.owner_user_id=u
+        and x.session_exercise_id=b.id and x.exercise_tag_definition_id=target_tag
+      order by (x.deleted_at is null) desc,x.id limit 1;
+    end if;
     saved_row:=saved_row||jsonb_build_object('exercise_tag_definition_id',coalesce(target_tag,source_tag.id),
       'tag_name',source_tag.name);
     current_row:=current_row||jsonb_build_object('tag_name',(select name from app_public.exercise_tag_definitions
@@ -549,6 +561,9 @@ begin
     coalesce((select jsonb_agg(to_jsonb(x) order by x.id)::text from app_public.session_exercises x
       where x.owner_user_id=u and x.session_id=b.session_id),'[]')||
     coalesce((select jsonb_agg(to_jsonb(x) order by x.id)::text from app_public.exercise_sets x
+      where x.owner_user_id=u and x.session_exercise_id in(select id from app_public.session_exercises
+        where owner_user_id=u and session_id=b.session_id)),'[]')||
+    coalesce((select jsonb_agg(to_jsonb(x) order by x.id)::text from app_public.session_exercise_tags x
       where x.owner_user_id=u and x.session_exercise_id in(select id from app_public.session_exercises
         where owner_user_id=u and session_id=b.session_id)),'[]'));
   return jsonb_build_object('id',c.id,'type',c.entity_type,'entityId',c.entity_id,'blockId',b.id,
@@ -660,7 +675,9 @@ begin
         when 'exercise_sets' then array['weight_value','reps_value','planned_weight_value','planned_reps_value',
           'planned_set_type','set_type','performance_status','order_index','deleted_at']
         else array['exercise_tag_definition_id','deleted_at'] end)),'{}'::jsonb)||
-      jsonb_build_object('id',c.entity_id,'owner_user_id',u,'client_updated_at_ms',stamp,
+      jsonb_build_object('id',case when c.entity_type='session_exercise_tags'
+        then coalesce(item->'current'->>'id',c.entity_id) else c.entity_id end,
+        'owner_user_id',u,'client_updated_at_ms',stamp,
         'server_received_at',now(),'merge_revision',b.merge_revision);
     if c.entity_type='session_exercises' then
       candidate:=candidate||jsonb_build_object('session_id',b.session_id,'exercise_definition_id',b.exercise_definition_id,'name',b.name);
@@ -684,6 +701,9 @@ begin
         and attnum>0 and not attisdropped;
     execute format('insert into app_public.%1$I(%2$s) select %2$s from jsonb_populate_record(null::app_public.%1$I,$1)
       on conflict(owner_user_id,id) do update set %3$s',c.entity_type,columns,updates) using candidate;
+    if c.entity_type='session_exercise_tags' then
+      perform app_public.exercise_merge_coalesce_tag(b.id,candidate->>'exercise_tag_definition_id');
+    end if;
     perform set_config('boga.exercise_merge_internal','',true);
   end if;
   update public.exercise_merge_conflicts set resolved_at=now(),saved='{}',

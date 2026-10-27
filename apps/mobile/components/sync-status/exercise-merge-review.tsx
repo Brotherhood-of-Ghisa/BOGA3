@@ -16,6 +16,7 @@ const SET_FIELDS = [
   ['order_index', 'Position'],
 ] as const;
 function display(value: MergeValue | undefined, key: string): string {
+  if (value === undefined) return 'Empty';
   if (key === 'set_type' || key === 'planned_set_type') return formatSessionSetType(value) ?? 'Unspecified';
   if (key === 'order_index') return String(Number(value) + 1);
   if (key === 'performance_status') return value === null ? 'Performed' : String(value);

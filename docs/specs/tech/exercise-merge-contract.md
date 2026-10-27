@@ -37,10 +37,12 @@ including membership, raw values, tombstones, tags, mappings and links. Execute 
 a same-count edit is stale too. Conversion validation precedes mutation. A required conversion with an
 invalid/overflowing nonblank weight aborts the whole merge.
 
-Execute retains IDs/provenance, remaps referenced tags by normalized destination name, converts actual
+Execute retains session/block/set IDs and provenance, remaps tags by normalized destination name, converts actual
 and planned weights exactly, advances context revisions, soft-deletes the source and commits a receipt.
 It has no sync-batch row limit. Same-mode text remains verbatim; tombstoned sets in moved live blocks
 are converted without revival. Deleted destination tags are reused without revival.
+Mapped tag memberships coalesce by block/tag: a live assignment wins, otherwise the lowest ID stays deleted.
+Redundant assignment aliases are removed; tag definitions and memberships outside moved blocks remain unchanged.
 
 The context fence covers every block in an affected completed session, including unchanged siblings.
 Only selected live source blocks move; sibling factors are one. This protects shared ordering slots:

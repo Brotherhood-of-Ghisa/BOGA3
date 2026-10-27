@@ -119,21 +119,20 @@ export const loadEditableSessionGraph = async (sessionId: string): Promise<Edita
  */
 const persistSessionGraph = (
   graph: EditableSessionGraph,
-  session: Session,
-  { gymId = graph.gymId, times }: { gymId?: string | null; times?: SessionTimes } = {}
+  session: Session
 ) =>
   graph.status === 'completed'
     ? persistCompletedSessionSnapshot({
         sessionId: graph.sessionId,
-        gymId,
-        startedAt: times?.startedAt ?? graph.startedAt,
-        completedAt: times?.completedAt ?? graph.completedAt,
+        gymId: graph.gymId,
+        startedAt: graph.startedAt,
+        completedAt: graph.completedAt,
         exercises: toPersistDraftExercises(session),
         mergeRevisions: session.mergeRevisions,
       })
     : persistSessionDraftSnapshot({
         sessionId: graph.sessionId,
-        gymId,
+        gymId: graph.gymId,
         startedAt: graph.startedAt,
         status: 'active',
         exercises: toPersistDraftExercises(session),
@@ -144,14 +143,6 @@ const requireEditableSessionGraph = async (sessionId: string): Promise<EditableS
   const graph = await loadEditableSessionGraph(sessionId);
   if (!graph) {
     throw new Error('This session can no longer be edited.');
-  }
-  return graph;
-};
-
-const requireCompletedSessionGraph = async (sessionId: string) => {
-  const graph = await requireEditableSessionGraph(sessionId);
-  if (graph.status !== 'completed') {
-    throw new Error('This session is not completed.');
   }
   return graph;
 };
@@ -225,7 +216,6 @@ export const appendPlanToSession = async (
 
 /** Autosaves a completed session's edited Start/End; its rows are kept as persisted. */
 export const setCompletedSessionTimes = async (sessionId: string, times: SessionTimes): Promise<void> => {
-  await requireCompletedSessionGraph(sessionId);
   await updateSessionMetadata(sessionId, { times });
 };
 

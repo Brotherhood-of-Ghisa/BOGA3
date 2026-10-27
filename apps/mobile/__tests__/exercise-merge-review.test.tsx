@@ -42,3 +42,13 @@ it('retains invalid saved values for reading while permitting only Keep current'
   expect(screen.getByTestId('exercise-merge-apply-saved')).toBeDisabled();
   expect(screen.getByTestId('exercise-merge-keep-saved')).not.toBeDisabled();
 });
+
+it('describes an absent current set without NaN or undefined values', async () => {
+  mockLoad.mockResolvedValue({ items: [{ ...item, current: null,
+    saved: { weight_value: '25', order_index: 0, performance_status: null, deleted_at: null } }],
+    pending: 0, operation: false, error: null });
+  render(<ExerciseMergeReview visible onDismiss={jest.fn()} onChanged={jest.fn()} />);
+  expect(await screen.findByLabelText('Position: current Empty, saved 1')).toBeTruthy();
+  expect(screen.getByLabelText('State: current Empty, saved Performed')).toBeTruthy();
+  expect(screen.getByText('Absent')).toBeTruthy();
+});

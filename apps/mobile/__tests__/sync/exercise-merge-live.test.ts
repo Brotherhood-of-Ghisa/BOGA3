@@ -1,4 +1,8 @@
 import { createHmac } from 'node:crypto';
+import { createInMemoryDatabase } from '../helpers/in-memory-db';
+import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
+import type { Transaction } from '@/src/data/clock';
+import type { EntityTableName } from '@/src/sync/topo-order';
 
 import {
   createAuthedTestClient, readSyncTestEndpoint, USER_E, type AuthedTestClient,
@@ -433,4 +437,73 @@ it.each(['exercise_sets', 'session_exercise_tags'])('deduplicates a retried stal
   expect(copies[0].entityId).not.toBe(originalId);
   expect(copies[0].saved.session_exercise_id).toBe(c.block);
   expect(await row(type, originalId)).toEqual(original);
+});
+
+it.each([false, true])('coalesces mapped tag pairs without revival (all deleted: %s), installs them, and reviews alias edits', async allDeleted => {
+  const c = await chain();
+  const at = Date.now();
+  const tagA = c.id + '-tag-a', tagB = c.id + '-tag-b';
+  const assignmentA = c.id + '-assignment-a', assignmentB = c.id + '-assignment-b';
+  const definition = (id: string, exercise: string): Entity => ({ type: 'exercise_tag_definitions', id,
+    client_updated_at_ms: at, fields: { exercise_definition_id: exercise, name: 'Grip', normalized_name: 'grip', ...times(at) } });
+  const assignment = (id: string, tag: string, deleted: number | null): Entity => ({ type: 'session_exercise_tags', id,
+    client_updated_at_ms: at, fields: { session_exercise_id: c.block, exercise_tag_definition_id: tag,
+      merge_revision: 0, created_at: at, deleted_at: deleted } });
+  await push([definition(tagA, c.source), definition(tagB, c.destination),
+    assignment(assignmentA, tagA, allDeleted ? at : null), assignment(assignmentB, tagB, at)]);
+  const { receipt } = await merge(c);
+  const install = async () => {
+    const snapshot = await rpc<{ rows: Entity[]; hasMore: boolean }>('exercise_merge_snapshot', { p_after: receipt.sequence - 1 });
+    expect(snapshot.hasMore).toBe(false);
+    const local = createInMemoryDatabase();
+    try {
+      local.database.transaction(tx => {
+        for (const entity of snapshot.rows) applyPullPage(tx as unknown as Transaction,
+          [entity as WireEntity], entity.type as EntityTableName, true);
+      });
+      return local.client.prepare('select id, deleted_at from session_exercise_tags where session_exercise_id=? order by id')
+        .all(c.block) as { id: string; deleted_at: number | null }[];
+    } finally { local.close(); }
+  };
+  expect(await install()).toEqual([{ id: assignmentA, deleted_at: allDeleted ? at : null }]);
+  const late = assignment(c.id + '-late-add', tagA, null);
+  expect((await push([late])).outcomes[0].outcome).toBe('preserved');
+  const addition = (await reviews()).find(item => item.entityId === late.id)!;
+  expect(addition.current).toMatchObject({ id: assignmentA, exercise_tag_definition_id: tagB });
+  await rpc('exercise_merge_resolve', { p_id: addition.id, p_keep: false, p_token: addition.token });
+  await rpc('exercise_merge_resolve', { p_id: addition.id, p_keep: false, p_token: addition.token });
+  expect(await install()).toEqual([{ id: assignmentA, deleted_at: null }]);
+  // A later current-context retarget must remain visible, even beside the saved destination pair.
+  await push([assignment(assignmentA, tagA, null)]);
+  const current = (await row('session_exercise_tags', assignmentA))!;
+  const road = c.id + '-road', duplicate = c.id + '-new-grip';
+  const revision = Number(current.merge_revision), stamp = Number(current.client_updated_at_ms) + 1;
+  await push([{ ...definition(road, c.destination), fields: {
+    ...definition(road, c.destination).fields, name: 'Road', normalized_name: 'road' } },
+    { ...assignment(assignmentA, road, null), client_updated_at_ms: stamp,
+      fields: { ...assignment(assignmentA, road, null).fields, merge_revision: revision } },
+    { ...assignment(duplicate, tagB, null), client_updated_at_ms: stamp,
+      fields: { ...assignment(duplicate, tagB, null).fields, merge_revision: revision } }]);
+  const retarget = (await reviews()).find(item => item.entityId === assignmentA)!;
+  expect(retarget.current).toMatchObject({ id: assignmentA, tag_name: 'Road' });
+  expect(retarget.saved).toMatchObject({ tag_name: 'Grip' });
+  await push([{ ...assignment(duplicate, tagB, at + 2), client_updated_at_ms: stamp + 1,
+    fields: { ...assignment(duplicate, tagB, at + 2).fields, merge_revision: revision } }]);
+  await expect(rpc('exercise_merge_resolve', { p_id: retarget.id, p_keep: false, p_token: retarget.token }))
+    .rejects.toThrow(/MERGE_STALE/);
+  const refreshed = (await reviews()).find(item => item.id === retarget.id)!;
+  await rpc('exercise_merge_resolve', { p_id: refreshed.id, p_keep: false, p_token: refreshed.token });
+  expect(await install()).toEqual([{ id: assignmentA, deleted_at: null }]);
+  const removal = assignment(assignmentB, tagB, at + 1);
+  await push([removal]);
+  const removed = (await reviews()).find(item => item.entityId === assignmentB)!;
+  expect(removed.current).toMatchObject({ id: assignmentA, deleted_at: null });
+  await rpc('exercise_merge_resolve', { p_id: removed.id, p_keep: false, p_token: removed.token });
+  await rpc('exercise_merge_resolve', { p_id: removed.id, p_keep: false, p_token: removed.token });
+  expect(await install()).toEqual([{ id: assignmentA, deleted_at: at + 1 }]);
+});
+
+it('denies direct access to tag reconciliation', async () => {
+  await expect(rpc('exercise_merge_coalesce_tag', { p_block: 'untrusted', p_tag: 'untrusted' }))
+    .rejects.toThrow(/permission denied|Could not find/i);
 });
