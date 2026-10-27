@@ -75,7 +75,7 @@ describe('Dev logs screen', () => {
     expect(line).toHaveTextContent(new Date('2026-10-27T10:05:12.000Z').toLocaleTimeString());
 
     expect(line).toHaveStyle(role('meta'));
-    const digits = line.findAll((node) => node.type === 'Text' && node !== line);
+    const digits = line.findAll((node) => String(node.type) === 'Text' && node !== line);
     expect(digits.length).toBeGreaterThan(0);
     for (const digit of digits) expect(digit).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });

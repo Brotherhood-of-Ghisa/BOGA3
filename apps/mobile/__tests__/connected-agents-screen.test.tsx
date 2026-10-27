@@ -67,7 +67,7 @@ describe('Connected agents screen', () => {
     // A date's words stay in the line's face; only its digits take Plex Mono.
     const granted = screen.getByTestId('connected-agent-granted-client-a');
     expect(granted).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
-    const digits = granted.findAll((node) => node.type === 'Text' && node !== granted && /^\d/.test(String(node.props.children)));
+    const digits = granted.findAll((node) => String(node.type) === 'Text' && node !== granted && /^\d/.test(String(node.props.children)));
     expect(digits.length).toBeGreaterThan(0);
     for (const digit of digits) expect(digit).toHaveStyle({ fontFamily: uiFonts.figure.family });
     const never = screen.getByTestId('connected-agent-last-access-client-a');
