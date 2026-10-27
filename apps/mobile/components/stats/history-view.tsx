@@ -188,7 +188,6 @@ function HistoryHeatmap({
         testIDPrefix={testIDPrefix}
         metricLabel={metricLabel}
         formatValue={formatDailyValue}
-        legendLabel={`${metricLabel} per day`}
         header={status}
         onOpenDay={onOpenDay}
         onOpenWeek={onOpenWeek}

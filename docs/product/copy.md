@@ -23,7 +23,7 @@ tutorials or rule provenance (`Rules N · …`).
 - **Incomplete figures:** plain `Volume`, even when excluding uncalculable
   loads or kg a group cannot see.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
-- **Good:** `Weekly target` ramp: `0%`…`100%`.
+- **Good:** `% of target` ramp: `0%`…`100%` ([[comparison.colour-scale]]).
 
 ### copy.blank-history · presentation · accepted
 

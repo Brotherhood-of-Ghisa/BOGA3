@@ -136,20 +136,10 @@ const eachDay = (start: Date, end: Date): Date[] => {
   return days;
 };
 
-/** Min/max of the positive values (min 0 when there are none). */
-const positiveRange = (values: number[]): { min: number; max: number } => {
-  const positive = values.filter((value) => value > 0);
-  if (positive.length === 0) return { min: 0, max: 0 };
-  return { min: positive.reduce((a, b) => Math.min(a, b)), max: positive.reduce((a, b) => Math.max(a, b)) };
-};
-
-/**
- * Buckets each cell onto the heat ramp, calibrated across the observed range of
- * positive values in its series (see getCalendarHeatmapBucket).
- */
+/** Daily and weekly series each use their own History-window maximum. */
 const withLevels = <T extends { value: number }>(cells: T[]): (T & { level: CalendarHeatmapBucket })[] => {
-  const { min, max } = positiveRange(cells.map((cell) => cell.value));
-  return cells.map((cell) => ({ ...cell, level: getCalendarHeatmapBucket(cell.value, min, max) }));
+  const max = cells.reduce((highest, cell) => Number.isFinite(cell.value) ? Math.max(highest, cell.value) : highest, 0);
+  return cells.map((cell) => ({ ...cell, level: getCalendarHeatmapBucket(cell.value, max) }));
 };
 
 const toDayCell = (

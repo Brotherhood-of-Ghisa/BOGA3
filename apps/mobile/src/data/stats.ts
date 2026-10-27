@@ -43,7 +43,7 @@ import {
   userSettings,
 } from './schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
-import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, historyWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 import { aggregateProgressComparisons, type ProgressMuscleComparison } from './progress-comparisons';
 import { buildMuscleReportAssignment } from './muscle-report-presets';
 
@@ -86,7 +86,11 @@ export type StatsSummary = {
   previous: { period: StatsPeriodBounds; totals: StatsTotals };
 };
 
-export type ProgressComparisons = StatsSummary & { muscles: ProgressMuscleComparison[] };
+export type ProgressComparisons = StatsSummary & {
+  muscles: ProgressMuscleComparison[];
+  /** Bounded History totals for the overview colour reference, when requested. */
+  historyMuscles?: ProgressMuscleComparison[];
+};
 
 export type StatsAggregationInput = MuscleAnalyticsInput & {
   /** By anatomy entry id, as read; `inputInScope` re-keys it to the user's muscles. */
@@ -497,17 +501,22 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const scoped = inputInScope(input, options);
     return aggregateProgressMuscleTickers(scoped, clocked, scoped.muscleTrainingStarts ?? {});
   },
-  async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
+  async computeProgressComparisons(options: ComputeStatsSummaryOptions & { historyWeeks?: number }): Promise<ProgressComparisons> {
     const periods = comparisonPeriods(options);
+    const history = options.historyWeeks === undefined ? null : historyWeekBounds(options.historyWeeks, periods.now);
     // One awaited read, then synchronous derivation: edits, mappings, dated
     // weight context and the active durable effort policy cannot split periods.
     const input = inputInScope(await store.loadAggregationInput({
-      start: periods.previous.start, end: periods.current.end, now: periods.now,
+      start: history && history.start < periods.previous.start ? history.start : periods.previous.start,
+      end: periods.current.end, now: periods.now,
     }), options);
     return {
       current: { period: periods.current, totals: aggregateStats(inputInPeriod(input, periods.current)) },
       previous: { period: periods.previous, totals: aggregateStats(inputInPeriod(input, periods.previous)) },
       muscles: aggregateProgressComparisons(input, periods),
+      ...(history ? { historyMuscles: aggregateProgressComparisons(input, {
+        current: history, previous: { start: history.start, end: history.start },
+      }) } : {}),
     };
   },
   /** Each of the user's muscles' working sets per local day, under their muscle setup. */

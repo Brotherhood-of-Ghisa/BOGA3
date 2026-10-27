@@ -68,6 +68,9 @@ import type { MuscleTickerStatus } from '@/components/stats/muscle-ticker';
 import { useMuscleTickers } from '@/components/stats/use-muscle-tickers';
 import type { ProgressMuscleTickers } from '@/src/data/progress-muscle-tickers';
 import { useStatsSummary } from '@/components/stats/use-summary';
+import { muscleHistoryMaximum, progressMuscleScale, type MuscleColourScale } from '@/components/stats/muscle-body-projection';
+import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
+import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
@@ -230,6 +233,8 @@ export type StatsScreenShellProps = {
   exerciseMetric: ProgressExerciseMetric;
   onSelectExerciseMetric: (metric: ProgressExerciseMetric) => void;
   exerciseListItems: ExerciseListItem[];
+  historyExerciseListItems?: ExerciseListItem[];
+  muscleTargets?: Omit<Extract<MuscleColourScale, { weeklyTarget: number }>, 'weeks'>;
   /** Catalogue search haystacks by exercise id (name + muscle groups). */
   exerciseSearchIndex: ReadonlyMap<string, string>;
   exerciseFamilies?: ReadonlyMap<string, string>;
@@ -304,6 +309,8 @@ export function StatsScreenShell({
   exerciseMetric,
   onSelectExerciseMetric,
   exerciseListItems,
+  historyExerciseListItems = [],
+  muscleTargets,
   exerciseSearchIndex,
   exerciseFamilies,
   exerciseMappings = [],
@@ -459,8 +466,10 @@ export function StatsScreenShell({
         {viewMode === 'exercise' ? <ExerciseBreakdown metric={exerciseMetric} muscleLayout={muscleLayout} ready={bodyReady}
           exercises={exerciseMappings} muscles={summary?.muscles ?? []} countSecondary={countSecondary} report={muscleReport}
           items={filteredExerciseListItems}
+          historyItems={historyExerciseListItems.filter(item => exerciseSearchTextMatches(normalizeExerciseSearchWords(searchQuery), exerciseSearchIndex.get(item.id) ?? item.name))}
           selectedMuscleId={effectiveContributionId} onSelectMuscle={showContributions} renderList={exerciseList} /> : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
           tickers={muscleTickers} tickerStatus={muscleTickerStatus} tickerWeeks={targetWindowWeeks} report={muscleReport}
+          scale={progressMuscleScale(tableMetric, summary.historyMuscles ?? [], muscleTargets, period === 'this-week' ? 1 : targetWindowWeeks)}
           grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
@@ -487,6 +496,7 @@ function progressPresentationState({ bodyActive, summary, isLoading, errorMessag
 
 function ExerciseBreakdown({
   metric, muscleLayout, ready, exercises, muscles, items, countSecondary, report,
+  historyItems,
   selectedMuscleId, onSelectMuscle, renderList,
 }: {
   metric: ProgressExerciseMetric; muscleLayout: ProgressMuscleLayout; ready: boolean; countSecondary: boolean;
@@ -494,6 +504,7 @@ function ExerciseBreakdown({
   exercises: readonly Pick<ExerciseCatalogExercise, 'id' | 'mappings'>[];
   muscles: readonly ProgressMuscleComparison[];
   items: ExerciseListItem[];
+  historyItems: ExerciseListItem[];
   selectedMuscleId: string | null; onSelectMuscle: (id: string) => void;
   renderList: (items: ExerciseListItem[], splitByEffort?: boolean, secondary?: readonly ExerciseContributionEntry[], emptyOverride?: string) => ReactNode;
 }) {
@@ -505,10 +516,15 @@ function ExerciseBreakdown({
     () => buildExerciseBodyMuscle({ muscleGroupId: selectedMuscleId, items, exercises, muscles, countSecondary, report }),
     [selectedMuscleId, items, exercises, muscles, countSecondary, report]
   );
+  const historyMuscles = useMemo(
+    () => buildExerciseBodyMuscles({ items: historyItems, exercises, muscles, countSecondary, report }),
+    [historyItems, exercises, muscles, countSecondary, report]
+  );
   if (muscleLayout === 'list') return renderList(items);
   if (metric === 'estimatedOneRepMax') return renderList(items);
   if (!ready) return null;
   return <ExerciseBodyView muscles={bodyMuscles} metric={metric}
+    maximum={muscleHistoryMaximum(historyMuscles, metric)}
     selectedMuscleId={selectedMuscle?.muscleGroupId ?? null} selectedMuscle={selectedMuscle} onSelectMuscle={onSelectMuscle} report={report}
     renderAll={() => renderList(items)}
     renderDetail={(entries, secondary) => renderList(entries.map(entry => entry.item),
@@ -676,13 +692,14 @@ function StatsContent() {
   // The tables' gym ([[gym.view-filter]]); this visit's choice only.
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
   const { countSecondary } = filters;
-  const { current: thisPeriod, previous: lastPeriod, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
+  const { current: thisPeriod, previous: lastPeriod, history, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
   const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
   // Exercise 3D shades from the exercise rows and reads only the muscle list
   // here, so the choice re-reads the summary for the Muscle breakdown alone.
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload,
-    { gymId: summaryGymId, countSecondary: filters.breakdown === 'muscle' ? countSecondary : true });
+    { gymId: summaryGymId, countSecondary: filters.breakdown === 'muscle' ? countSecondary : true,
+      historyWeeks: values.progressMuscleLayout === '3d' && filters.breakdown === 'muscle' ? values.historyLookbackWeeks : undefined });
   const tickers = useMuscleTickers(filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list', summaryGymId, countSecondary);
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
@@ -697,6 +714,12 @@ function StatsContent() {
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
+  const historyExerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
+    .filter(item => history.aggregatesById.has(item.id))
+    .map(item => ({ id: item.id, name: item.name, current: periodFigures(history.aggregatesById.get(item.id)),
+      previous: periodFigures(undefined), lastCompletedAt: history.lastCompletedAtById.get(item.id) ?? null })),
+  [catalog.exercises, history]);
+  const weeklyTargets = effectiveMuscleTargetOverrides(values, deriveMuscleReportPreset(catalog.muscleGroups));
   const muscleFamilyCounts = useMemo(
     () => catalog.status === 'ready' && catalog.muscleSetup
       ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,
@@ -722,7 +745,9 @@ function StatsContent() {
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
-    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
+    exerciseListItems={exerciseListItems} historyExerciseListItems={historyExerciseListItems}
+    muscleTargets={{ weeklyTarget: values.weeklyWorkingSetTarget, weeklyTargets }}
+    searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
     gymId={gymId} gymOptions={gymOptions} onSelectGym={setGymId}
     countSecondary={countSecondary} onChangeCountSecondary={filters.selectCountSecondary}
     defaultCountSecondary={values.progressCountSecondary} defaultGrouped={values.progressGrouped} />;

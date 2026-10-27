@@ -169,11 +169,11 @@ it('preserves muscle target grading on daily and weekly tiles', () => {
   expect(style('calendar-heatmap-cell-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
   expect(style('calendar-heatmap-week-2026-10-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
   expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-05').props.accessibilityLabel).toContain('30% of weekly muscle target');
-  for (const text of ['Weekly target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  for (const text of ['% of target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
   expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
-it('announces a grouped muscle target as averaged, and keeps Less…More for other metrics', () => {
+it('announces grouped target attainment and labels other metrics as a maximum share', () => {
   const sets = [{ ...sample('2026-10-05', 1), workingSetCount: 3, workingSetCountsByMuscle: { chest: 3 } }];
   const grouped = buildHeatmapData(sets, 'workingSetCount',
     { todayDateKey: today, weeks: 1, muscleTargets: { muscleIds: ['chest', 'triceps'], weeklyTarget: 10 } });
@@ -183,9 +183,9 @@ it('announces a grouped muscle target as averaged, and keeps Less…More for oth
   unmount();
 
   render(<DailyHeatmap data={buildHeatmapData(sets, 'totalVolume', { todayDateKey: today, weeks: 1 })}
-    testIDPrefix={prefix} metricLabel="Volume" formatValue={String} legendLabel="Volume per day" />);
-  for (const text of ['Volume per day', 'Less', 'More']) expect(screen.getByText(text)).toBeTruthy();
-  expect(screen.queryByText('Weekly target')).toBeNull();
+    testIDPrefix={prefix} metricLabel="Volume" formatValue={String} />);
+  for (const text of ['% of max', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  expect(screen.queryByText('% of target')).toBeNull();
 });
 
 it('updates the displayed history when its metric or look-back window changes', () => {

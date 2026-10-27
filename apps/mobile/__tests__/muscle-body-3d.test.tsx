@@ -63,6 +63,19 @@ describe('normaliseBodyAngle & bodyOrientationForAngle', () => {
 });
 
 describe('computeMuscleBuckets', () => {
+  it('uses the supplied History maximum, never the current muscle maximum', () => {
+    const muscles = [makeMuscle('chest', 'Chest', 20), makeMuscle('quads', 'Quads', 100)];
+    expect([...computeMuscleBuckets(muscles, 'workingSetCount', { maximum: 200 }).values()]).toEqual([1, 2]);
+    expect([...computeMuscleBuckets(muscles, 'workingSetCount', { maximum: 100 }).values()]).toEqual([1, 4]);
+    expect([...computeMuscleBuckets(muscles, 'workingSetCount').values()]).toEqual([0, 0]);
+  });
+
+  it('caps each muscle at its effective target, scaled to the displayed period', () => {
+    const muscles = [makeMuscle('chest', 'Chest', 20), makeMuscle('quads', 'Quads', 100)];
+    const buckets = computeMuscleBuckets(muscles, 'workingSetCount', { weeklyTarget: 20, weeks: 4, weeklyTargets: { chest: 10 } });
+    expect(buckets.get('chest')).toBe(2);
+    expect(buckets.get('quads')).toBe(4);
+  });
   it('assigns 0..4 buckets for workingSetCount and totalVolume and normalises legacy delt IDs', () => {
     const muscles = [
       makeMuscle('chest', 'Chest', 12, 4000),
@@ -72,14 +85,14 @@ describe('computeMuscleBuckets', () => {
       makeMuscle('calves', 'Calves', 0, 0),
     ];
 
-    const setBuckets = computeMuscleBuckets(muscles, 'workingSetCount');
+    const setBuckets = computeMuscleBuckets(muscles, 'workingSetCount', { maximum: 12 });
     expect(setBuckets.get('chest')).toBe(4);
     expect(setBuckets.get('quads')).toBe(3);
     expect(setBuckets.get('delts_front')).toBe(2);
     expect(setBuckets.get('delts_rear')).toBe(1);
     expect(setBuckets.get('calves')).toBe(0);
 
-    const volumeBuckets = computeMuscleBuckets(muscles, 'totalVolume');
+    const volumeBuckets = computeMuscleBuckets(muscles, 'totalVolume', { maximum: 4000 });
     expect(volumeBuckets.get('chest')).toBe(4);
     expect(volumeBuckets.get('delts_front')).toBe(2);
     expect(volumeBuckets.get('delts_rear')).toBe(1);
@@ -209,6 +222,16 @@ describe('MuscleBodyCard', () => {
     makeMuscle('back_lats', 'Lats', 6, 2400),
     makeMuscle('quads', 'Quads', 4, 1600),
   ];
+
+  it('puts its scale legend before the model for both maximum and target grading', () => {
+    const props = { metric: 'workingSetCount' as const, muscles, selectedId: null, onSelect: jest.fn() };
+    const view = render(<MuscleBodyCard {...props} scale={{ maximum: 100 }} />);
+    expect(screen.getByText('% of max')).toBeTruthy();
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('% of max')).toBeLessThan(tree.indexOf('stats-muscle-body-viewport'));
+    view.rerender(<MuscleBodyCard {...props} scale={{ weeklyTarget: 10, weeks: 1, weeklyTargets: {} }} />);
+    expect(screen.getByText('% of target')).toBeTruthy();
+  });
 
   it('switches orientation via Front/Back control and accessibility actions, and selects muscles via both touch hit-testing and accessible buttons', () => {
     const onSelect = jest.fn();
