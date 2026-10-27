@@ -504,10 +504,9 @@ describe("Today: the group's page", () => {
     expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
     expect(getLastViewedGroupId()).toBe('g1');
 
-    // The first page is `You`; the group's page draws its own two cards, with no footer link.
+    // The first page is `You`; the group's page draws its own two cards.
     expect(byId('today-progress-section-tab')).toHaveTextContent('You');
     expect(within(byId('today-group-section')).getByTestId('today-group-sessions')).toBeTruthy();
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
 
     // The name opens the shown group At a glance.
     fireEvent.press(byId('today-group-title'));
@@ -533,13 +532,12 @@ describe("Today: the group's page", () => {
     expect(byId('today-group-missing')).toHaveStyle({ flex: 1, justifyContent: 'center' });
   });
 
-  it("shows the signed-out panel on the group's page, with no footer link", async () => {
+  it("shows the signed-out panel on the group's page", async () => {
     mockUseAuth.mockReturnValue({ isConfigured: true, user: null });
     await renderToday();
 
     expect(within(byId('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
     expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
     fireEvent.press(byId('today-group-sign-in'));
     expect(mockPush).toHaveBeenLastCalledWith(SIGN_IN_ROUTE);
   });

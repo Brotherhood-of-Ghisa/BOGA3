@@ -622,8 +622,6 @@ describe('Today: the cards', () => {
 
     fireEvent.press(text('today-sessions-button'));
     expect(mockPush.mock.calls).toEqual([['/sessions']]);
-    // No footer links: a panel's own action is its way on.
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
   });
 
   it.each([

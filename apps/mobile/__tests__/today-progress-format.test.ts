@@ -240,7 +240,7 @@ describe('the period chart geometry', () => {
     expect(geometry.previous[6].x).toBeCloseTo(plotWidth);
   });
 
-  it('fits the plot to a given height, keeping room for the week ticks under it (the cards layout)', () => {
+  it('fits the plot to a given height, keeping room for the week ticks under it', () => {
     const input = period({ now, cumulative: [0, 10], previousCumulative: days(28, (index) => index), projected: 20 });
     expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 120 });
     const tall = periodChartGeometry(input, width, 240);
