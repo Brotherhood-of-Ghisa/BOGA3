@@ -16,7 +16,7 @@ export type TodayPlanCardsProps = {
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
   onOpenPlan: (planId: string) => void;
-  /** Opens Train, where the planned sessions are listed. */
+  /** Opens Sessions, where sessions are planned and the plans listed. */
   onOpenSessions: () => void;
   /** The cards layout: the recovery card shows its first rows and scrolls the rest. */
   fill?: boolean;
@@ -176,7 +176,7 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
 }
 
 // This week's trained and planned days, then the next planned sessions; the
-// Sessions link opens them all on Train.
+// Sessions link opens them all, where they are planned.
 function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
   plan: TodayPlan;
   now: Date;

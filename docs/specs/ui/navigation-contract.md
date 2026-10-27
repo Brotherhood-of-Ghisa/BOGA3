@@ -168,7 +168,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
 | `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
 | `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
-| `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's `Sessions`, the latest-session row (or the session its arrows stepped to), Plan's `Sessions`, the empty panel's `Open Train` (`push`) |
+| `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's and Plan's `Sessions`, the latest-session row (or the session its arrows stepped to), the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
