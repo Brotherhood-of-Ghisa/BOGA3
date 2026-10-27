@@ -34,7 +34,8 @@ Two standing rules:
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
-| The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
+| The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action; `variant="link"` for a heading's link | `ActionButton` (`action-button.tsx`) |
+| A line of words with figures in it (`2 exercises · 3 sets`) | `FigureText` (`figure-text.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
 | An on-demand explanation, optionally beside a heading | `Information` (`information.tsx`) — owns the info trigger, prose and standard `Sheet` |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |

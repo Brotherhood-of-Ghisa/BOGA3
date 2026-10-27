@@ -133,6 +133,32 @@ are Plex Mono **500**; a `record` figure is **700**. Sheet option labels are
 Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
 micro-labels Archivo 700, sheet titles Archivo 800.
 
+**Text roles.** A screen names what its text does and takes face, weight, size
+and line-height from `uiText` (`apps/mobile/components/ui/text-roles.ts`); it
+never assembles them itself. Decided 2026-10-27 on Today, where twenty mixes
+had grown for nine jobs.
+
+| Role | Face | For |
+| --- | --- | --- |
+| `title` | Archivo 700 · `lg` | a card, section or tab title |
+| `label` | Archivo 700 · `xxs` caps, tracked | a block's heading, a column header, a legend, a unit |
+| `body` | Source Sans 400 · `base` | a row's name, a line of prose |
+| `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
+| `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |
+| `figureHero` | Plex Mono 700 · `xxl` | a block's one headline number |
+| `figureLarge` | Plex Mono 600 · `lg` | a second headline number; a date heading a card |
+| `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
+| `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
+
+Colour (`uiTextTone`: ink, muted, faint, accent, gain, record) and one step of
+emphasis (`uiTextEmphasis.strong`: mine, live, the gym) are modifiers, never new
+roles; layout styles follow the role and set no type. A line mixing words and
+figures keeps its word role and draws only the figures in Plex Mono 500
+(`FigureText`). A heading's link into a fuller screen is
+`ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
+so it never outweighs the title. Screens not yet moved still hold their own
+styles; each moves when next touched.
+
 ## 4. Surfaces
 
 - **No shadows.** Depth is a hairline plus a ground-colour change, never an
