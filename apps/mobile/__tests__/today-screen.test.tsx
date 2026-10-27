@@ -259,6 +259,8 @@ describe('Today: the Progress card over real data', () => {
 
     const body = text('today-latest-session');
     expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12');
+    // The time sits one weight under the date, and muted.
+    expect(within(text('today-latest-session-start')).getByText(' 07:12')).toHaveStyle({ fontWeight: '500', color: uiRoles.inkMuted });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
     expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');

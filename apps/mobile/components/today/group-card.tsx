@@ -159,7 +159,7 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
         {row.live ? (
           <TrainingNowMark>
             <Text allowFontScaling={false} style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.ink]} testID={`${testID}-when`}>
-              <FigureText>{row.when}</FigureText>
+              <FigureText strong>{row.when}</FigureText>
             </Text>
           </TrainingNowMark>
         ) : (

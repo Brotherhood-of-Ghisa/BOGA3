@@ -124,7 +124,7 @@ export function TodaySessionCard({
   const stamp = (
     <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureLarge} testID="today-latest-session-start">
       {formatCompactDate(session.startedAt)}
-      <Text allowFontScaling={false} style={uiTextTone.muted}>{` ${formatClockTime(session.startedAt.getTime())}`}</Text>
+      <Text allowFontScaling={false} style={[uiText.inlineFigure, uiTextTone.muted]}>{` ${formatClockTime(session.startedAt.getTime())}`}</Text>
     </Text>
   );
   return (
