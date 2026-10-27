@@ -2,9 +2,9 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { todayText } from '@/components/today/text-styles';
 import { Card } from '@/components/ui/card';
 import { SectionHeader } from '@/components/ui/page-header';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
@@ -152,7 +152,7 @@ export function GroupGlancePage({
           <SectionHeader title="Rankings" />
           <Card testID="group-position-card">
             <View style={styles.card}>
-              <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+              <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
                 {`Last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} · ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
               </Text>
               <GroupRankChart

@@ -9,8 +9,7 @@ import {
   type SessionSummaryFigures,
 } from '@/components/today/progress-format';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
-import { todayText } from '@/components/today/text-styles';
-import { Card, StatePanel, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, StatePanel, Tag, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
@@ -184,17 +183,17 @@ function WeekHeading({ section, dateFormat }: { section: HistoryWeekSection; dat
       {section.emptyWeeksBefore > 0 ? (
         <View style={styles.gap} testID={`completed-history-gap-${section.key}`}>
           <View style={styles.gapRule} />
-          <Text allowFontScaling={false} style={styles.gapLabel}>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
             {formatEmptyWeeks(section.emptyWeeksBefore)}
           </Text>
           <View style={styles.gapRule} />
         </View>
       ) : null}
       <View accessibilityRole="header" accessible style={styles.weekTitleRow}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           {heading.title}
         </Text>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
           {heading.detail}
         </Text>
       </View>
@@ -325,15 +324,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.rule,
-  },
-  gapLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
   },
   // A week's rows read as one `Card`: each cell draws its share of the
   // border, so the list can recycle rows one by one.
