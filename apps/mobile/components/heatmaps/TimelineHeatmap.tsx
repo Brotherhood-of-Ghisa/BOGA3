@@ -83,6 +83,9 @@ const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string
   return `Week of ${range}, ${metricLabel} ${figure.value}${unit}${week.isCurrentWeek ? ', Current week' : ''}`;
 };
 
+// A title's figures are as heavy as its words.
+const TITLE_FIGURE = { fontWeight: uiText.title.fontWeight };
+
 // The focused week, its figure, and the two steps away from it. The label is
 // read by neither arrow nor plot: the plot's adjustable value speaks for it.
 function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
@@ -96,7 +99,7 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
         onPress={() => onStep(-1)} testID={`${testID}-previous-week`} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
         <Text allowFontScaling={false} style={uiText.title}
-          testID={`${testID}-readout-week`}><FigureText>{weekLabel(week.monday, dateFormat)}</FigureText></Text>
+          testID={`${testID}-readout-week`}><FigureText figureStyle={TITLE_FIGURE}>{weekLabel(week.monday, dateFormat)}</FigureText></Text>
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />

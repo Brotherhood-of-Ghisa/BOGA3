@@ -76,7 +76,7 @@ describe('Timeline', () => {
       formatValue={String} metricLabel="Volume" unitLabel={() => 'volume'} />);
     const week = hidden('t-timeline-readout-week');
     expect(style(week)).toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
-    expect(style(within(week).getByText('5', { includeHiddenElements: true }))).toMatchObject(PLEX);
+    expect(style(within(week).getByText('5', { includeHiddenElements: true }))).toMatchObject({ ...PLEX, fontWeight: '700' });
     const value = hidden('t-timeline-readout-value');
     expect(style(value)).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.lg });
     expect(style(within(value).getByText('volume', { includeHiddenElements: true }))).toMatchObject(FAINT_LABEL);
