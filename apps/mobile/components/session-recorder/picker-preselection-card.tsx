@@ -30,7 +30,9 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
   const dateFormat = useDateFormat();
   return (
     <Card testID="exercise-picker-preselection-panel">
-      <Text allowFontScaling={false} style={[uiText.title, styles.preselectionTitle]}>{state.exercise.name}</Text>
+      <Text allowFontScaling={false} style={[uiText.title, styles.preselectionTitle]}>
+        <FigureText strong>{state.exercise.name}</FigureText>
+      </Text>
       {state.suggestion ? (
         <View style={styles.plan}>
           <Text allowFontScaling={false} style={uiText.label} testID="exercise-picker-plan-source">

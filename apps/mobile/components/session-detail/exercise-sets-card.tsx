@@ -4,7 +4,7 @@ import { StyleSheet, Text, View, type AccessibilityActionEvent, type Accessibili
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 

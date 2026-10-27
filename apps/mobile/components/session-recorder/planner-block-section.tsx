@@ -85,7 +85,7 @@ export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
             testID={`exercise-picker-planner-block-${row.block.id}`}>
             <View style={styles.rowText}>
               <Text allowFontScaling={false} numberOfLines={2} style={uiText.bodyStrong}>
-                {row.block.name}
+                <FigureText strong>{row.block.name}</FigureText>
               </Text>
               <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
                 <FigureText>{`${row.planTitle} · Block ${row.block.orderIndex + 1} of ${row.planBlockCount}`}</FigureText>
