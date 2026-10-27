@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
@@ -5,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { localDateKey } from '@/src/utils/calendar-weeks';
+import { localWeekWindow } from '@/src/utils/local-calendar';
 import type { NextPlannedSession, PlanWeekDay, RecoveryRow, TodayPlan } from '@/src/today-plan';
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
 
@@ -39,19 +41,35 @@ const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
     `this week ${row.weekSets} of ${row.target} sets`,
   ].join(', ');
 
-function DayCell({ count, today = false, testID }: { count: number | null; today?: boolean; testID: string }) {
+// A wider gutter only at the Monday boundary; the line stays centred in it.
+function RecoveryDayColumn({ children, weekStart = false, heading = false }: { children: ReactNode; weekStart?: boolean; heading?: boolean }) {
   return (
-    <View
-      style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained, today ? styles.dayCellToday : null]}
-      testID={testID}>
-      <Text allowFontScaling={false} style={styles.dayCellFigure}>
-        {count === null ? '' : count}
-      </Text>
+    <View style={[styles.dayColumn, weekStart ? styles.weekStartColumn : null]}>
+      {children}
+      {weekStart ? (
+        <View
+          pointerEvents="none"
+          style={[styles.weekDivider, heading ? styles.weekDividerHeading : null]}
+          testID={heading ? 'today-plan-recovery-week-boundary' : undefined}
+        />
+      ) : null}
     </View>
   );
 }
 
-function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Date[]; onPress: () => void }) {
+function DayCell({ count, weekStart, testID }: { count: number | null; weekStart: boolean; testID: string }) {
+  return (
+    <RecoveryDayColumn weekStart={weekStart}>
+      <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
+        <Text allowFontScaling={false} style={styles.dayCellFigure}>
+          {count === null ? '' : count}
+        </Text>
+      </View>
+    </RecoveryDayColumn>
+  );
+}
+
+function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: RecoveryRow; days: Date[]; weekStartIndex: number; onPress: () => void }) {
   const testID = `today-plan-muscle-${row.muscleGroupId}`;
   const met = row.weekSets >= row.target;
   return (
@@ -66,9 +84,9 @@ function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Dat
         {row.name}
       </Text>
       {row.days.map((count, index) => (
-        <DayCell count={count} key={days[index].getTime()} testID={`${testID}-day-${index}`} />
+        <DayCell count={count} key={days[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />
       ))}
-      <DayCell count={row.today} testID={`${testID}-today`} today />
+      <DayCell count={row.today} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} />
       <Text allowFontScaling={false} style={styles.weekCell} testID={`${testID}-week`}>
         <Text allowFontScaling={false} style={[styles.weekFigure, met ? styles.weekFigureMet : null]}>{row.weekSets}</Text>
         <Text allowFontScaling={false} style={styles.weekTarget}>{`/${row.target}`}</Text>
@@ -79,12 +97,19 @@ function RecoveryMuscleRow({ row, days, onPress }: { row: RecoveryRow; days: Dat
 }
 
 // Each muscle's sets on the last three days, today so far, and this week
-// against its weekly target ([[muscle.weekly-targets]]), least trained first.
+// against its weekly Target ([[muscle.weekly-targets]]), least trained first.
+// A neutral gutter divides last week's days from this week's, only when both
+// appear. Today has an accent label and border-free cells. At/above-target
+// totals turn green; the numeric ratio also communicates whether it is met.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
   const label = [todayText.microLabel, todayText.microLabelFaint];
+  const weekStart = localWeekWindow(plan.today).start;
+  const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
+  const weekStartIndex = firstCurrentDay > 0 ? firstCurrentDay : -1;
   const rows = plan.muscles.map((row) => (
     <RecoveryMuscleRow
       days={plan.recoveryDays}
+      weekStartIndex={weekStartIndex}
       key={row.muscleGroupId}
       onPress={() => onOpenMuscle(row.muscleGroupId)}
       row={row}
@@ -100,15 +125,17 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
       </View>
       <View style={[styles.columns, styles.muscleRowLayout]}>
         <Text allowFontScaling={false} style={[...label, styles.muscleName]}>Muscle</Text>
-        {plan.recoveryDays.map((day) => (
-          <Text allowFontScaling={false} key={day.getTime()} style={[...label, styles.dayLabel]}>
-            {weekdayShort(day)}
-          </Text>
+        {plan.recoveryDays.map((day, index) => (
+          <RecoveryDayColumn heading key={day.getTime()} weekStart={index === weekStartIndex}>
+            <Text allowFontScaling={false} style={[...label, styles.dayLabel]}>{weekdayShort(day)}</Text>
+          </RecoveryDayColumn>
         ))}
-        <Text allowFontScaling={false} style={[...label, styles.dayLabel, styles.dayLabelToday]} testID="today-plan-recovery-today">
-          {weekdayShort(plan.today)}
-        </Text>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.weekCell]}>Week</Text>
+        <RecoveryDayColumn heading weekStart={plan.recoveryDays.length === weekStartIndex}>
+          <Text allowFontScaling={false} style={[...label, styles.dayLabel, styles.dayLabelToday]} testID="today-plan-recovery-today">
+            {weekdayShort(plan.today)}
+          </Text>
+        </RecoveryDayColumn>
+        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.weekCell]}>Target</Text>
         <View style={styles.chevronSpace} />
       </View>
       {fill ? (
@@ -226,7 +253,7 @@ export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: D
 export const VISIBLE_MUSCLE_ROWS = 10;
 const DAY_CELL = 30;
 const DAY_CELL_HEIGHT = 22;
-const WEEK_WIDTH = 56;
+const WEEK_WIDTH = 64;
 const ROW_HEIGHT = 32;
 const MARK = 8;
 const PLANNED_WHEN_WIDTH = 52;
@@ -294,6 +321,25 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
   },
+  dayColumn: {
+    width: DAY_CELL,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  weekStartColumn: {
+    marginLeft: uiSpace.sm,
+  },
+  weekDivider: {
+    position: 'absolute',
+    left: -(uiSpace.sm + uiSpace.xs) / 2,
+    top: -1,
+    bottom: 0,
+    width: 1,
+    backgroundColor: uiRoles.rule,
+  },
+  weekDividerHeading: {
+    bottom: -uiSpace.xs,
+  },
   dayLabel: {
     width: DAY_CELL,
     textAlign: 'center',
@@ -311,11 +357,6 @@ const styles = StyleSheet.create({
   dayCellTrained: {
     backgroundColor: uiRoles.viz2,
   },
-  // Today's column takes the accent, as today does in the week strip.
-  dayCellToday: {
-    borderWidth: 1.5,
-    borderColor: uiRoles.accent,
-  },
   dayLabelToday: {
     color: uiRoles.accent,
   },
@@ -327,21 +368,22 @@ const styles = StyleSheet.create({
   },
   weekCell: {
     width: WEEK_WIDTH,
+    marginLeft: uiSpace.xs,
     textAlign: 'right',
   },
   weekFigure: {
     ...figure,
     fontWeight: '700',
     fontSize: uiTypography.size.base,
-    color: uiRoles.inkMuted,
+    color: uiRoles.ink,
   },
   weekFigureMet: {
-    color: uiRoles.ink,
+    color: uiRoles.gain,
   },
   weekTarget: {
     ...figure,
     fontSize: uiTypography.size.base,
-    color: uiRoles.inkFaint,
+    color: uiRoles.inkMuted,
   },
   chevronSpace: {
     width: 16,
