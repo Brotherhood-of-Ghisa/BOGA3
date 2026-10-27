@@ -86,6 +86,7 @@ begin
   if p_row ? 'owner_user_id' and p_row->>'owner_user_id' is distinct from u::text then
     raise exception 'NOT_FOUND';
   end if;
+  p_row:=p_row-'owner_user_id'-'server_received_at';
   -- The LWW clamp changes on retry; recovery identity keeps the original editor clock.
   if current_setting('boga.exercise_merge_sync',true)='on'
     and nullif(current_setting('boga.exercise_merge_client_clock',true),'') is not null then
@@ -105,7 +106,6 @@ begin
       p_row:=p_row||jsonb_build_object('merge_original_id',p_row->>'id','id','merge_review_'||md5(p_type||p_row::text));
     end if;
   end if;
-  p_row:=p_row-'owner_user_id'-'server_received_at';
   k:=md5(p_type||':'||p_row::text);
   insert into public.exercise_merge_conflicts(user_id,id,block_id,entity_type,entity_id,revision,saved)
     values(u,k,b,p_type,p_row->>'id',r,p_row) on conflict do nothing;

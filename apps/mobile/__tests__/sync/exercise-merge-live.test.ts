@@ -408,3 +408,29 @@ it('accepts normal post-merge block, set and tag edits when they echo the loaded
   expect(await row('exercise_sets', c.sets[0].id)).toMatchObject({ merge_revision: 1, weight_value: '19' });
   expect(await row('session_exercise_tags', useId)).toMatchObject({ merge_revision: 1, deleted_at: at + 1 });
 });
+
+it.each(['exercise_sets', 'session_exercise_tags'])('deduplicates a retried stale %s ID collision without changing the other block', async type => {
+  const c = await chain(), otherBlock = await chain();
+  const at = Date.now();
+  let originalId = otherBlock.sets[0].id;
+  let fields = c.sets[0].fields;
+  if (type === 'session_exercise_tags') {
+    const tag = (id: string, exercise: string): Entity => ({ type: 'exercise_tag_definitions', id,
+      client_updated_at_ms: at, fields: { exercise_definition_id: exercise, name: 'Grip', normalized_name: 'grip', ...times(at) } });
+    const sourceTag = tag(c.id + '-tag', c.source), otherTag = tag(otherBlock.id + '-tag', otherBlock.source);
+    originalId = otherBlock.id + '-assignment';
+    const assignment = { session_exercise_id: otherBlock.block, exercise_tag_definition_id: otherTag.id,
+      merge_revision: 0, created_at: at, deleted_at: null };
+    await push([sourceTag, otherTag, { type, id: originalId, client_updated_at_ms: at, fields: assignment }]);
+    fields = { ...assignment, session_exercise_id: c.block, exercise_tag_definition_id: sourceTag.id };
+  }
+  await merge(c);
+  const original = await row(type, originalId);
+  const stale: Entity = { type, id: originalId, client_updated_at_ms: Date.now() + 60 * 60000, fields };
+  await push([stale]); await push([stale]);
+  const copies = (await reviews()).filter(item => item.saved.merge_original_id === originalId);
+  expect(copies).toHaveLength(1);
+  expect(copies[0].entityId).not.toBe(originalId);
+  expect(copies[0].saved.session_exercise_id).toBe(c.block);
+  expect(await row(type, originalId)).toEqual(original);
+});
