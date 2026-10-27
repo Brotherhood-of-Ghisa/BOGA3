@@ -47,6 +47,8 @@ jest.mock('expo-router', () => ({
 }));
 
 import ExerciseCatalogScreen from '../app/(tabs)/exercise-catalog';
+import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { Sheet, uiRoles } from '@/components/ui';
 import {
   __resetBodyweightCalculationPreferenceForTests,
@@ -359,15 +361,34 @@ describe('ExerciseCatalogScreen', () => {
     expect(definitionNamed('Barbell Bench Press')?.deletedAt).toBeNull();
   });
 
-  it('retains a failed preparation for Retry and closes after Merge without a success message', async () => {
+  it.each(['ready', 'error'])('retains Retry through a catalogue reload ending %s and closes silently after Merge', async reloadResult => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const preview = { sourceId: 'a', destinationId: 'b', sourceName: 'A', destinationName: 'B', setCount: 0, factor: 1, token: 'p' };
-    mockPrepareMerge.mockRejectedValueOnce(new Error('Connect to merge exercises.')).mockResolvedValue(preview);
+    mockPrepareMerge.mockRejectedValueOnce(new Error('Connect to merge exercises.'));
     mockExecuteMerge.mockResolvedValue(undefined);
     const pickerDismissed = await chooseMergeDestination();
     expect(await screen.findByText('Connect to merge exercises.')).toBeTruthy();
+    const readCatalog = catalogRepository.listExerciseCatalogExercises;
+    let finishReload!: () => void;
+    const heldReload = new Promise<void>(resolve => { finishReload = resolve; });
+    jest.spyOn(catalogRepository, 'listExerciseCatalogExercises').mockImplementationOnce(async options => {
+      await heldReload;
+      if (reloadResult === 'error') throw new Error('Catalogue refresh failed.');
+      return readCatalog(options);
+    });
+    mockPrepareMerge.mockImplementationOnce(async () => {
+      invalidateExerciseCatalogCache();
+      await ensureExerciseCatalogLoaded();
+      return preview;
+    });
     fireEvent.press(screen.getByText('Retry'));
-    await act(async () => { await Promise.resolve(); });
+    try {
+      expect(await screen.findByText('Preparing merge…')).toBeTruthy();
+      expect(screen.getByTestId('exercise-merge-search')).toBeTruthy();
+    } finally {
+      await act(async () => { finishReload(); });
+    }
+    await waitForGone(() => screen.queryByText('Preparing merge…'));
     act(() => pickerDismissed());
     expect(alert.mock.calls[0][1]).not.toContain('Weights');
     await act(async () => { alert.mock.calls[0][2]?.[1].onPress?.(); });

@@ -305,7 +305,7 @@ export default function ExerciseCatalogScreen() {
   const actionTarget = exerciseActionMenuTarget;
   const isActionTargetDeleted = Boolean(actionTarget?.deletedAt);
 
-  if (isLoading) {
+  if (isLoading && !mergeSource) {
     return (
       <Screen testID="exercise-catalog-screen">
         <StatePanel body="Loading exercise catalog…" kind="loading" />
@@ -313,7 +313,7 @@ export default function ExerciseCatalogScreen() {
     );
   }
 
-  if (loadError) {
+  if (loadError && !mergeSource) {
     return (
       <Screen testID="exercise-catalog-screen">
         <StatePanel body={loadError} kind="error" />
