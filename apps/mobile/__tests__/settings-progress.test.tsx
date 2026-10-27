@@ -327,20 +327,6 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
 
-it('switches Today between List and Cards on Experiments, saved per account', async () => {
-  setAccountLocalPreferenceAccount('A', true);
-  await ensureAccountLocalPreferencesLoaded();
-  render(<ExperimentsSettingsScreen />);
-  const selector = within(screen.getByTestId('settings-today-layout-row'));
-  expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['Show Today as a list', 'Show Today as cards']);
-  expect(values().todayLayout).toBe('list');
-  fireEvent.press(screen.getByTestId('settings-today-layout-cards'));
-  expect(values().todayLayout).toBe('cards');
-  expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout')).toBe('cards');
-  fireEvent.press(screen.getByTestId('settings-today-layout-list'));
-  expect(values().todayLayout).toBe('list');
-});
-
 it('turns the title-bar timer on and off on Experiments, off by default and saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
@@ -355,10 +341,15 @@ it('turns the title-bar timer on and off on Experiments, off by default and save
   expect(values().timerInTitleBar).toBe(false);
 });
 
-it('keeps Today layout off Other, which now holds only the date and gym filters', async () => {
+// Today is always cards, so neither page offers a Today layout.
+it('offers no Today layout on Experiments or Other', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
+  render(<ExperimentsSettingsScreen />);
+  expect(screen.getByTestId('settings-timer-in-title-bar')).toBeTruthy();
+  expect(screen.queryByText('Today layout')).toBeNull();
+  screen.unmount();
   render(<OtherSettingsScreen />);
   expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
-  expect(screen.queryByTestId('settings-today-layout-row')).toBeNull();
+  expect(screen.queryByText('Today layout')).toBeNull();
 });

@@ -112,15 +112,13 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // the projection's) against the previous period's at the same day, and their
 // difference ([[comparison.change-display]]); then the cumulative lines by day.
 // The arrows either side of the compared range step to an earlier or later
-// period, never later than the previous one. `fill` lets the chart take the height the block is
-// given (Today's cards layout) instead of its own.
+// period, never later than the previous one. The chart takes the height the
+// block is given.
 export function PeriodPace({
   period,
-  fill = false,
   onShowCompared,
 }: {
   period: TodayProgressPeriod;
-  fill?: boolean;
   /** Compares against the period this many periods back. */
   onShowCompared?: (periodsBack: number) => void;
 }) {
@@ -135,7 +133,7 @@ export function PeriodPace({
 
   const onLayout = (event: LayoutChangeEvent) => {
     const measuredWidth = Math.round(event.nativeEvent.layout.width);
-    const measuredHeight = fill ? Math.round(event.nativeEvent.layout.height) : CHART_HEIGHT;
+    const measuredHeight = Math.round(event.nativeEvent.layout.height);
     if (measuredWidth > 0 && measuredHeight > 0 && (measuredWidth !== width || measuredHeight !== height)) {
       setSize({ width: measuredWidth, height: measuredHeight });
     }
@@ -168,7 +166,7 @@ export function PeriodPace({
   );
 
   return (
-    <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
+    <View style={[styles.block, styles.fill]} testID="today-progress-period">
       {/* One element when spoken: its arrows are offered as its actions. */}
       <View
         accessibilityActions={compareActions}
@@ -223,10 +221,9 @@ export function PeriodPace({
           </View>
         </View>
       </View>
-      {/* Lifting a finger off the chart selects the day under it, and in the
-          list layout so does dragging across it; a drag the scroller takes
-          (the screen's scroll, the cards' swipe) selects nothing. The Svg
-          takes no touches, so `locationX` is across this view. */}
+      {/* Lifting a finger off the chart selects the day under it; a drag the
+          scroller takes (the cards' swipe) selects nothing. The Svg takes no
+          touches, so `locationX` is across this view. */}
       <View
         accessible
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
@@ -235,15 +232,14 @@ export function PeriodPace({
         accessibilityValue={{ text: periodChartAccessibilityValue(period, figures) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
-        onResponderMove={fill ? undefined : onTouch}
         onResponderRelease={onTouch}
         onStartShouldSetResponder={() => true}
-        style={fill ? styles.fillChart : null}
+        style={styles.fillChart}
         testID="today-progress-chart">
-        {/* Filling, the drawing sits over the box rather than in it, so the
-            last measured height never props the box up: the box takes only
-            the height the card leaves it. */}
-        <View pointerEvents="none" style={fill ? StyleSheet.absoluteFill : null}>
+        {/* The drawing sits over the box rather than in it, so the last
+            measured height never props the box up: the box takes only the
+            height the card leaves it. */}
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Svg height={height} style={styles.chart} width={width}>
             <PeriodChart geometry={geometry} />
           </Svg>

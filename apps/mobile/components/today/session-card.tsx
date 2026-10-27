@@ -20,11 +20,9 @@ export type TodaySessionCardProps = {
   onOpenSessions: () => void;
   /** Shows the completed session this many places before the latest. */
   onShowSession?: (offset: number) => void;
-  /** The cards layout: the table is four rows tall, and more exercises scroll inside it. */
-  fill?: boolean;
 };
 
-// The cards layout's table is always four exercise rows tall, so the card
+// The table is always four exercise rows tall, so the card
 // keeps one height from session to session: fewer exercises leave blank rows,
 // more scroll. On a phone too short for them the card gives way first,
 // scrolling sooner, so the progress card's chart keeps its floor.
@@ -82,26 +80,22 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
-// Exercise, sets, best set, 1RM; in the cards layout four rows tall, the rest scrolling.
-function ExerciseTable({ lines, fill }: { lines: SessionExerciseLine[]; fill: boolean }) {
+// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling.
+function ExerciseTable({ lines }: { lines: SessionExerciseLine[] }) {
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
   const label = [uiText.label, uiTextTone.faint];
   return (
-    <View style={fill ? styles.fillTable : null}>
+    <View style={styles.fillTable}>
       <View style={[styles.row, styles.tableHeader]}>
         <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Exercise</Text>
         <Text allowFontScaling={false} style={[...label, styles.sets]}>Sets</Text>
         <Text allowFontScaling={false} style={[...label, styles.best]}>Best set</Text>
         <Text allowFontScaling={false} style={[...label, styles.oneRepMax]}>1RM</Text>
       </View>
-      {fill ? (
-        <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-latest-session-rows">
-          {rows}
-        </ScrollView>
-      ) : (
-        rows
-      )}
+      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-latest-session-rows">
+        {rows}
+      </ScrollView>
     </View>
   );
 }
@@ -119,7 +113,6 @@ export function TodaySessionCard({
   onOpenSession,
   onOpenSessions,
   onShowSession,
-  fill = false,
 }: TodaySessionCardProps) {
   const stamp = (
     <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureLarge} testID="today-latest-session-start">
@@ -128,7 +121,7 @@ export function TodaySessionCard({
     </Text>
   );
   return (
-    <Card style={[styles.card, fill ? styles.fillCard : null]} testID="today-session-card">
+    <Card style={[styles.card, styles.fillCard]} testID="today-session-card">
       <View style={styles.header} testID="today-latest-session-header">
         {onShowSession ? (
           <StepAround
@@ -148,10 +141,10 @@ export function TodaySessionCard({
         accessibilityLabel={todaySessionAccessibilityLabel(session)}
         accessibilityRole="button"
         onPress={() => onOpenSession(session.id)}
-        style={({ pressed }) => [styles.body, fill ? styles.fillBody : null, pressed ? styles.pressed : null]}
+        style={({ pressed }) => [styles.body, styles.fillBody, pressed ? styles.pressed : null]}
         testID="today-latest-session">
         <SummaryLine session={session} />
-        <ExerciseTable fill={fill} lines={session.exercises} />
+        <ExerciseTable lines={session.exercises} />
       </Pressable>
     </Card>
   );

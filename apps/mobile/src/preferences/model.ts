@@ -20,9 +20,6 @@ export type ProgressMetric = 'workingSetCount' | 'totalVolume';
 // exercise has, so the Muscle table never shows it. Each breakdown has its own
 // metric, so switching back finds the figure you left on.
 export type ProgressExerciseMetric = ProgressMetric | 'estimatedOneRepMax';
-// Today as one scrolling page (`list`), or as two full-height cards, Progress
-// and the group, swiped between (`cards`).
-export type TodayLayout = 'list' | 'cards';
 // Settings › Experiments. `timerInTitleBar`: the session and exercise title
 // bars show the running timer as a countdown pill; tap starts or stops it,
 // long press opens the timer card (`components/session-recorder/title-bar-timer.tsx`).
@@ -55,7 +52,6 @@ export type AccountLocalPreferences = {
   restTimerAutoStart: boolean;
   restTimerDurationSec: number;
   repeatingTimerIntervalSec: number;
-  todayLayout: TodayLayout;
   timerInTitleBar: boolean;
   developerMode: boolean;
 };
@@ -89,7 +85,6 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   restTimerAutoStart: true,
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
   repeatingTimerIntervalSec: DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS,
-  todayLayout: 'list',
   timerInTitleBar: false,
   developerMode: false,
 };
@@ -99,7 +94,6 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
   ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressPeriod', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
-  'todayLayout',
   'muscleTargetMode',
 ];
 // Stored as `true` / `false`.
@@ -134,7 +128,6 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: REST_TIMER_RANGE_MESSAGE,
-  todayLayout: 'Choose List or Cards for Today.',
   timerInTitleBar: 'Choose whether the timer runs in the title bar.',
   developerMode: 'Choose whether to show developer tools.',
   repeatingTimerIntervalSec: `Repeating interval must be a whole number of seconds from ${MIN_REPEATING_TIMER_INTERVAL_SECONDS} to ${MAX_REPEATING_TIMER_INTERVAL_SECONDS}.`,
@@ -165,7 +158,6 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressPeriod': return value === 'window' || value === 'this-week';
     case 'progressMuscleLayout': return value === 'list' || value === '3d';
-    case 'todayLayout': return value === 'list' || value === 'cards';
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
