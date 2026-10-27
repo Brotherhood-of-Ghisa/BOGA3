@@ -48,9 +48,9 @@ cannot run their gates there). Never merge a PR yourself unless asked.
 | Open | From the main checkout: `./boga worktree create <branch>` (e.g. `m<n>-t<nn>-<slug>`); `./boga worktree start` inside a harness-made worktree. |
 | Load | The card, its milestone, and the AGENTS.md load list for the areas touched; check assumptions against `origin/main`. |
 | Design | UI: pin the accepted design target per `docs/specs/ui/ai-design-policy.md`. |
-| Build | `./boga test for` lists the default gates; agree the lane set with the reviewer agent, then run it to green (AGENTS.md rule 3). Durable decisions go in `docs/specs/**`. |
+| Build | `./boga test for` lists the default gates; agree the lane set with the reviewer agent, then run it to green (spec `02`, "Choosing lanes"). Durable decisions go in `docs/specs/**`. |
 | Review | `/code-review` and `docs/procedures/product-review.md` on the branch diff; add `/security-review` for auth/RLS/API changes. |
-| PR | Delete the card, mark it `completed` in the milestone (last task: delete the milestone). Body per `.github/pull_request_template.md` (lanes run, agreed with the reviewer agent; product changes highlighted). Then `./boga db down`. Optional: `./boga pr wait` in the background to notice the merge. |
+| PR | Delete the card, mark it `completed` in the milestone (last task: delete the milestone). Body per `.github/pull_request_template.md` (lanes run, `Lane agreement:` reviewer agent; product changes highlighted). Then `./boga db down`. Optional: `./boga pr wait` in the background to notice the merge. |
 | User review | Fix, re-run affected gates, push, `./boga db down`; or reply why not. |
 | Merged | Confirm on GitHub (or `pr wait` exit 0), `git fetch origin main`, read the milestone at `origin/main`, offer ready cards as `Execute docs/plans/tasks/<task-id>.md with /task-protocol.` |
 | Cleanup | Stop Metro/dev servers, then `./boga worktree release` from the task worktree (removes the slot's Supabase containers/volumes/networks, the lease, the worktree); confirm with `./boga worktree ls`. Closed unmerged: ask, then `release --force`. Never delete lease files by hand. Other sessions' leftovers: `docs/procedures/worktree-cleanup.md`. |

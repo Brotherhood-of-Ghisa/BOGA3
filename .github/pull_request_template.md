@@ -9,8 +9,7 @@ Link CI runs / artifacts / prior threads — do not paste them.
 
 ## Tests
 
-<!-- The lanes that ran, agreed with your reviewer agent before running anything beyond `./boga test fast`
-     (docs/specs/02-quality-and-test-gates.md, "Choosing lanes"). One row per lane or gate, with evidence.
+<!-- The lanes that ran (docs/specs/02-quality-and-test-gates.md, "Choosing lanes"). One row per lane or gate, with evidence.
      "CI green" alone is not enough. Note any default lane (`./boga test for`) you skipped and why. -->
 
 | Lane / gate | Result | Evidence |
@@ -20,7 +19,7 @@ Link CI runs / artifacts / prior threads — do not paste them.
 | `./boga test complexity` | | |
 | `./boga test dependencies` | | |
 
-Agreed with reviewer agent: <!-- yes, plus anything lowered or raised and why; note any operator override -->
+Lane agreement: <!-- who agreed the set, plus anything lowered or raised and why | n/a -->
 
 Product facts: <!-- **highlight** each id added, changed or decided (`set.eligibility`, …) | none --> — product review: <!-- verdict of docs/procedures/product-review.md on this diff -->
 

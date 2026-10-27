@@ -656,11 +656,16 @@ export function useSessionRestTimer(
     }
   }, [defaultDurationSec, isActiveSession, now, sessionId]);
 
+  // Ticking a set restarts the rest timer. With auto-start off it only
+  // restarts one already showing (started by hand), never starts one.
   const onSetConfirmed = useCallback(() => {
-    if (!isActiveSession || !sessionId || !autoStart) return;
-    if (isRestTimerAutoStartSuppressed(sessionId)) return;
+    if (!isActiveSession || !sessionId) return;
     const current = getRestTimerEntry();
-    if (current && current.sessionId === sessionId && current.mode === 'repeating') {
+    const isForSession = current?.sessionId === sessionId;
+    if (isForSession && current.mode === 'repeating') return;
+    if (!autoStart) {
+      if (!isForSession) return;
+    } else if (isRestTimerAutoStartSuppressed(sessionId)) {
       return;
     }
     startRestTimer(sessionId, defaultDurationSec, now());

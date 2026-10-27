@@ -1,7 +1,7 @@
 # BOGA path-trigger registry — machine-readable form of "which lanes a change
 # runs by default" (the human table lives in AGENTS.md; keep both in sync in the same
 # change — docs-check validates that the lanes cited here exist). The result is
-# a default the agent proposes and its reviewer agent agrees, not a requirement
+# a default the agent settles per its build protocol, not a requirement
 # (spec 02, "Choosing lanes").
 #
 # Consumed by `./boga test for [--diff <range>] [paths...]`.
