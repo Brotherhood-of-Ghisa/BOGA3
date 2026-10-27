@@ -19,12 +19,12 @@ const data = (days: DailyEffortMetrics[], weeks = 8) => buildHeatmapData(days, '
 const chart = (loaded: ReturnType<typeof data>, onOpenWeek: (key: string) => void = jest.fn()) =>
   <WeeklyHeatmap data={loaded} metric="totalVolume" onOpenWeek={onOpenWeek} testIDPrefix={PREFIX} formatValue={String} metricLabel="Volume" />;
 
-it('shows training weeks newest first, compact week dates, aligned values and proportional Volume lengths', () => {
+it('shows occupied months with rest weeks newest first, compact week dates, aligned values and proportional Volume lengths', () => {
   const loaded = data([day(TODAY, 12), day('2026-09-28', 54), day('2026-09-14', 60)]);
   const chronological = loaded.weekly.map(week => week.weekStartDateKey);
   render(chart(loaded));
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual(
-    ['2026-10-05', '2026-09-28', '2026-09-14'].map(key => `bars-heatmap-cell-${key}`));
+    ['2026-10-05', '2026-09-28', '2026-09-21', '2026-09-14', '2026-09-07'].map(key => `bars-heatmap-cell-${key}`));
   expect(loaded.weekly.map(week => week.weekStartDateKey)).toEqual(chronological);
   expect(screen.getByText('28 Sep – 4 Oct 2026')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('20%');
@@ -137,14 +137,14 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
     day('2026-09-21', null), day('2026-09-28', 100), day(TODAY, 200),
   ];
   const { rerender } = render(chart(data(days, weeks)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(8);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks === 15 ? 16 : 27);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks + 1}-week median 30`);
   expect(style('bars-heatmap-median').left).toBe('3%');
   expect(Number.parseFloat(style('bars-heatmap-p25').left)).toBeCloseTo(1.5);
   expect(Number.parseFloat(style('bars-heatmap-p75').left)).toBeCloseTo(15);
 
   rerender(chart(data(days, 12)));
-  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(7);
+  expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(13);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '13-week median 25');
   expect(style('bars-heatmap-median').left).toBe('12.5%');
   expect(style('bars-heatmap-p25').left).toBe('6.25%');
@@ -198,15 +198,17 @@ it('opens a training week, holds no selection, and announces the current week', 
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('Current week');
 });
 
-it('hides rest weeks while retaining known zero and unavailable training with their openers', () => {
+it('retains blank, non-interactive rest weeks alongside zero and unavailable training', () => {
   const open = jest.fn();
   render(chart(data([day(TODAY, 0), day('2026-09-28', null)]), open));
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('0%');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('', { exact: true });
-  expect(screen.queryByTestId('bars-heatmap-value-2026-09-21')).toBeNull();
+  expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('', { exact: true });
   expect(screen.queryByText('Rest')).toBeNull();
-  expect(screen.queryByTestId('bars-heatmap-cell-2026-09-21')).toBeNull();
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21')).toHaveProp('accessibilityLabel', 'Week of 21-09-2026, Rest week');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21')).toHaveProp('accessibilityRole', 'text');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21').props.onPress).toBeUndefined();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 28-09-2026, Volume unavailable');
   expect(screen.queryByText(/\?/)).toBeNull();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
@@ -520,4 +522,47 @@ it.each(['estimatedRM1', 'highestWeight'] as const)('centres a single constant %
     expect(style(`bars-heatmap-${id}`).left).toBe('50%');
     expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `9-week ${label} 100`);
   }
+});
+
+
+it('collapses each empty month to one accessible row between occupied months', () => {
+  const open = jest.fn();
+  render(chart(data([day('2026-10-05', 20), day('2026-07-20', 10)], 16), open));
+  expect(screen.getAllByTestId(/^bars-heatmap-empty-month-/).map(row => row.props.testID)).toEqual([
+    'bars-heatmap-empty-month-2026-09', 'bars-heatmap-empty-month-2026-08', 'bars-heatmap-empty-month-2026-06',
+  ]);
+  const september = screen.getByTestId('bars-heatmap-empty-month-2026-09');
+  expect(september).toHaveProp('accessibilityLabel', 'September 2026, No training');
+  expect(september).toHaveProp('accessibilityRole', 'text');
+  expect(september.props.onPress).toBeUndefined();
+  expect(screen.queryByTestId('bars-heatmap-cell-2026-09-28')).toBeNull();
+  expect(screen.queryByTestId('bars-heatmap-value-2026-09-28')).toBeNull();
+  const rows = screen.UNSAFE_getByType(FlatList).props.data;
+  expect(rows.map((row: { monthKey?: string; weekStartDateKey?: string }) => row.monthKey ?? row.weekStartDateKey)).toEqual([
+    '2026-10-05', '2026-09', '2026-08', '2026-07-27', '2026-07-20', '2026-07-13', '2026-07-06', '2026-06',
+  ]);
+  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-07-20'));
+  expect(open).toHaveBeenCalledWith('2026-07-20');
+});
+
+it.each([0, null])('keeps a Monday-owned month expanded for cross-month zero/unavailable training (%s)', value => {
+  const loaded = data([day('2026-10-01', value)]);
+  const { rerender } = render(chart(loaded));
+  expect(screen.queryByTestId('bars-heatmap-empty-month-2026-09')).toBeNull();
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-07')).toBeTruthy();
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel)
+    .toContain(value === null ? 'Volume unavailable' : 'Volume 0');
+  expect(screen.getByTestId('bars-heatmap-empty-month-2026-10')).toBeTruthy();
+  rerender(chart(data([])));
+  expect(screen.queryByTestId('bars-heatmap-cell-2026-09-28')).toBeNull();
+  expect(screen.getByTestId('bars-heatmap-empty-month-2026-09')).toBeTruthy();
+});
+
+it('shows only month placeholders for an entirely empty window, including its partial edge months', () => {
+  render(chart(data([])));
+  expect(screen.queryAllByTestId(/^bars-heatmap-cell-/)).toEqual([]);
+  expect(screen.getAllByTestId(/^bars-heatmap-empty-month-/).map(row => row.props.testID)).toEqual([
+    'bars-heatmap-empty-month-2026-10', 'bars-heatmap-empty-month-2026-09', 'bars-heatmap-empty-month-2026-08',
+  ]);
+  expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });

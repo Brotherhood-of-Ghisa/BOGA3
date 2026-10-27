@@ -52,8 +52,9 @@ Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calen
 Settings' History look-back selects N complete
 Monday–Sunday weeks through today. On Monday–Saturday start on the Monday N
 weeks before this week's Monday; on Sunday, N − 1 weeks before it. The current
-partial week follows them. History views may omit rest rows without shortening
-this window or the Weekly reference sample.
+partial week follows them. History display compaction never shortens this
+window or the Weekly reference sample. Progress history remains bounded by it; only explicit exercise session
+history expansion reads beyond it.
 
 Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;

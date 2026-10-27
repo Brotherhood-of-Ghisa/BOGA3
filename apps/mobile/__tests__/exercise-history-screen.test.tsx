@@ -273,6 +273,10 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(sessionCards()).toContain('history_elsewhere_squat');
     expect(sessionCards()).not.toContain('maestro_exercise_block_history_squat_6_a');
     const initialCards = sessionCards();
+    const initialOrder = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-show-older|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    expect(initialOrder.at(-1)).toBe('exercise-history-show-older');
     fireEvent.press(screen.getByRole('button', { name: 'Show older sessions' }));
 
     await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
