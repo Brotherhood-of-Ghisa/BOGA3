@@ -238,6 +238,9 @@ describe('ExerciseShareRoute', () => {
   });
 
   it('displays duplicate notice without explanatory text and uses "Add another exercise" label', async () => {
+    await exerciseCatalogData.saveExerciseCatalogExercise({
+      name: SAMPLE_PAYLOAD.name, loadInputMode: SAMPLE_PAYLOAD.loadInputMode, mappings: SAMPLE_PAYLOAD.mappings,
+    });
     render(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-exists-notice')).toHaveTextContent(

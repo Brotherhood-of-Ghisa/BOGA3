@@ -1,3 +1,4 @@
+import { seedStandardCatalogFixture } from './standard-catalog-fixture';
 import {
   completeSessionDraft,
   persistSessionDraftSnapshot,
@@ -83,6 +84,7 @@ const HISTORY: { id: string; daysAgo: number; sets: FixtureSet[] }[] = [
 ];
 
 export const seedExercisePageFixture = async (now: Date = new Date()): Promise<void> => {
+  await seedStandardCatalogFixture();
   for (const session of HISTORY) {
     const completedAt = new Date(now.getTime() - session.daysAgo * DAY_MS);
     await persistSessionDraftSnapshot(

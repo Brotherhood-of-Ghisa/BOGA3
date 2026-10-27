@@ -557,7 +557,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(await screen.findByLabelText('Edit exercise definition Lat Pulldown')).toHaveTextContent(/Primary: Back/);
       fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
       expect(await screen.findByLabelText('Edit exercise definition Barbell Back Squat')).toHaveTextContent(
-        /Primary: Quads\s+Secondary: Glutes & HamsNever done/
+        /Primary: Glutes & Hams · QuadsNever done/
       );
     });
 

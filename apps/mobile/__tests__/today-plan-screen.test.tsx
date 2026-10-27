@@ -142,8 +142,8 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-muscle-quads-day-1')).toHaveTextContent('3');
 
     const order = muscleRows();
-    // Untrained muscles first; triceps (1) before chest (2), then quads (3) last.
-    expect(order.slice(-2)).toEqual(['chest', 'quads']);
+    // Untrained muscles first; triceps (1), chest (2), then squat's primary quads and glutes (3).
+    expect(order.slice(-3)).toEqual(['chest', 'quads', 'glutes_max']);
     expect(order.indexOf('triceps')).toBeLessThan(order.indexOf('chest'));
     expect(order.indexOf('biceps')).toBeLessThan(order.indexOf('triceps'));
     expect(text('today-plan-muscle-chest').props.accessibilityLabel).toBe(
@@ -280,7 +280,7 @@ describe('Today: the Plan page over real data', () => {
     expect(text(`today-plan-next-${today}-muscles`)).toHaveTextContent('Pectoralis');
     expect(text(`today-plan-next-${sunday}-day`)).toHaveTextContent('Sun');
     expect(text(`today-plan-next-${sunday}-figures`)).toHaveTextContent('2 ex · 6 target sets');
-    expect(text(`today-plan-next-${sunday}-muscles`)).toHaveTextContent('Quads · Pectoralis');
+    expect(text(`today-plan-next-${sunday}-muscles`)).toHaveTextContent('Glute Max · Quads · Pectoralis');
 
     fireEvent.press(text(`today-plan-next-${sunday}`));
     expect(mockPush).toHaveBeenCalledWith(`/session-plan/${sunday}`);

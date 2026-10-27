@@ -29,12 +29,12 @@ it('accepts only a finite bodyweight contribution from zero through one', () => 
     .toEqual(['seed_chin-ups', 'seed_parallel_bar_dips', 'seed_pull_up', 'seed_push_up']);
 });
 
-it('seeds only the four reviewed exercise identities with a contribution', () => {
+it('seeds only Push-Up and Pull-Up with a contribution in the fresh catalogue', () => {
   const db = mockFixture.database;
   seedSystemExerciseCatalog(db as unknown as LocalDatabase);
   const configured = db.select().from(exerciseDefinitions).all()
     .filter(row => row.bodyweightContribution > 0);
-  expect(configured.map(row => row.id).sort()).toEqual(Object.keys(BODYWEIGHT_SEED_CONTRIBUTIONS).sort());
+  expect(configured.map(row => row.id).sort()).toEqual(['seed_pull_up', 'seed_push_up']);
   for (const exercise of configured) {
     expect(exercise.bodyweightContribution).toBe(BODYWEIGHT_SEED_CONTRIBUTIONS[exercise.id]);
   }

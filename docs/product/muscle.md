@@ -6,7 +6,7 @@ Every screen counts working sets per muscle as **primary 1, secondary ½**.
 Decided 2026-10-09.
 
 A muscle counts a set once, at the strongest role any of its entries has
-([[muscle.report-groups]]): squat × 3 under Broad is Quads 3, Glutes & Hams 1.5.
+([[muscle.report-groups]]).
 Totals use half-steps (`1.5`), unlike the session's physical `Sets`
 ([[set.count-display]]). Whether to show secondaries is separate
 ([[muscle.secondary-filter]]).

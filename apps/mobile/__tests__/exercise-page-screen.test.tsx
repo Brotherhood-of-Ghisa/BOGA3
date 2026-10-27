@@ -1118,7 +1118,8 @@ describe('ExercisePageScreen', () => {
     __resetRestTimerForTests();
     jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     await seedPage(async () => {
-      localDatabase().update(exerciseDefinitions).set({ restTimerSec: 45 }).where(eq(exerciseDefinitions.id, BENCH_DEF)).run();
+      await saveExerciseCatalogExercise({ id: BENCH_DEF, name: 'Barbell Bench Press', loadInputMode: 'total_load',
+        restTimerSec: 45, mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }] });
     });
     await renderPage();
 
