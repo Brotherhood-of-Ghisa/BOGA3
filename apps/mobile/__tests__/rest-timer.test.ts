@@ -644,6 +644,43 @@ describe('rest-timer store and pure rules', () => {
     expect(() => triggerRestCompletionCue()).not.toThrow();
   });
 
+  it('with auto-start off, a set tick restarts a showing rest timer, leaves repeating alone and starts nothing after a dismiss', () => {
+    jest.setSystemTime(1_000);
+    const now = () => Date.now();
+    const { result } = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 90,
+        defaultRepeatingIntervalSec: 60,
+        autoStart: false,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    // Completed hand-started timer: the tick restarts it.
+    act(() => result.current.start());
+    act(() => {
+      jest.advanceTimersByTime(95_000);
+    });
+    expect(result.current.view).toMatchObject({ mode: 'rest', status: 'completed' });
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toMatchObject({ mode: 'rest', status: 'running', remainingSec: 90 });
+
+    // After a dismiss the tick starts nothing.
+    act(() => result.current.dismiss());
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toEqual({ status: 'idle' });
+
+    // A repeating timer is left alone.
+    act(() => result.current.switchMode('repeating'));
+    act(() => {
+      jest.advanceTimersByTime(40_000);
+    });
+    const before = result.current.view;
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toEqual(before);
+  });
+
   it('isolates set logging from repeating mode: onSetConfirmed neither restarts nor interrupts repeating timer', () => {
     jest.setSystemTime(1_000);
     const now = () => Date.now();
@@ -1023,7 +1060,7 @@ describe('rest-timer store and pure rules', () => {
 
     // Advance clock past expiration
     act(() => {
-      nowMs = 61_000;
+      nowMs = 31_000;
       jest.advanceTimersByTime(31_000);
     });
     expect(hook.result.current.view).toMatchObject({ status: 'completed' });
