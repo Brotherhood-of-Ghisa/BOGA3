@@ -146,7 +146,7 @@ had grown for nine jobs.
 | `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
 | `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |
 | `figureHero` | Plex Mono 700 · `xxl` | a block's one headline number |
-| `figureLarge` | Plex Mono 600 · `lg` | a second headline number; a date heading a card |
+| `figureLarge` | Plex Mono 600 · `lg` | a second headline number |
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
 
@@ -156,8 +156,9 @@ roles; layout styles follow the role and set no type. A line mixing words and
 figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
-so it never outweighs the title. Screens not yet moved still hold their own
-styles; each moves when next touched.
+so it never outweighs the title. Today, Groups and Sessions take every text
+from the roles; screens not yet moved still hold their own styles, and each
+moves when next touched.
 
 ## 4. Surfaces
 

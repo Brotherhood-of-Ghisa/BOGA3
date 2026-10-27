@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, uiBorder, uiRoles, uiSpace, uiText } from '@/components/ui';
 import type { BoardHistoryItemViewModel } from '@/src/groups';
 
 import { cardListItemStyles } from './screen-styles';
@@ -22,11 +22,11 @@ export function GroupBoardHistoryItem({ item, testID, index, count }: GroupBoard
         accessible
         style={[styles.item, index > 0 ? styles.divider : null]}
         testID={testID}>
-        <Text allowFontScaling={false} style={styles.date} testID={`${testID}-date`}>
+        <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-date`}>
           {item.dateLabel}
         </Text>
-        <Text allowFontScaling={false} style={styles.sentence} testID={`${testID}-sentence`}>
-          {item.sentence}
+        <Text allowFontScaling={false} style={uiText.body} testID={`${testID}-sentence`}>
+          <FigureText>{item.sentence}</FigureText>
         </Text>
       </View>
     </View>
@@ -42,19 +42,5 @@ const styles = StyleSheet.create({
   divider: {
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
-  },
-  date: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    color: uiRoles.inkMuted,
-  },
-  sentence: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
 });

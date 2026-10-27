@@ -1,10 +1,11 @@
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import type { SessionRecordRow } from '@/src/groups/competition-session-records-view-model';
 
+import { scoreHasFigure, scoreStyle } from './score-style';
 import { GroupSetCertification } from './set-certification';
 
 type CardProps = {
@@ -28,8 +29,8 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   return (
     <View style={styles.card} testID="group-session-records">
       <View style={styles.header}>
-        <Text allowFontScaling={false} style={styles.headerLabel}>Group records</Text>
-        <Text allowFontScaling={false} style={styles.headerCount} testID="group-session-records-count">{rows.length}</Text>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.record]}>Group records</Text>
+        <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.record]} testID="group-session-records-count">{rows.length}</Text>
       </View>
       {rows.map(row => <RecordRow key={row.key} row={row} {...rest} />)}
     </View>
@@ -53,10 +54,10 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
         testID={`${testID}-link`}>
         <View style={styles.rowBody}>
           <View style={styles.titleLine}>
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>{row.title}</Text>
-            <Text allowFontScaling={false} style={styles.value} testID={`${testID}-value`}>{row.value}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>{row.title}</Text>
+            <Text allowFontScaling={false} style={[scoreStyle(row.value, 'base'), scoreHasFigure(row.value) ? uiTextTone.record : null]} testID={`${testID}-value`}>{row.value}</Text>
           </View>
-          <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>{row.detail}</Text>
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-detail`}><FigureText>{row.detail}</FigureText></Text>
         </View>
       </Pressable>
       {row.certification ? <GroupSetCertification certification={row.certification} testID={testID}
@@ -80,22 +81,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     backgroundColor: uiRoles.recordWash,
-  },
-  headerLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
-  },
-  headerCount: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.record,
   },
   row: {
     gap: uiSpace.xs,
@@ -125,24 +110,5 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.record,
-  },
-  detail: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

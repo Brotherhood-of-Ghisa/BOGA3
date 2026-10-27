@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { todayText } from '@/components/today/text-styles';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   GROUP_HOME_METRIC_COLUMN,
   type GroupHomeBoard,
@@ -14,7 +15,7 @@ const VALUE_WIDTH = 40;
 function BoardValue({ record, testID, value }: { record: boolean; testID: string; value: string }) {
   return (
     <View style={[styles.valueCell, { width: VALUE_WIDTH }]}>
-      <Text allowFontScaling={false} style={[styles.value, record ? todayText.record : null]} testID={testID}>
+      <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink, record ? uiTextTone.record : null, styles.value]} testID={testID}>
         {value}
       </Text>
     </View>
@@ -25,14 +26,14 @@ function BoardRow({ metric, row }: { metric: GroupHomeMetric; row: GroupHomeBoar
   const testID = `group-home-board-row-${row.userId}`;
   return (
     <View style={[styles.row, row.isMe ? styles.rowMine : null]} testID={testID}>
-      <Text allowFontScaling={false} style={styles.rank} testID={`${testID}-rank`}>
+      <Text allowFontScaling={false} style={[uiText.figureSmall, styles.rank]} testID={`${testID}-rank`}>
         {row.rank}
       </Text>
       <Text
         allowFontScaling={false}
         ellipsizeMode="tail"
         numberOfLines={1}
-        style={[styles.name, row.isMe ? styles.nameMine : null]}
+        style={[uiText.body, row.isMe ? uiTextEmphasis.strong : null, styles.name]}
         testID={`${testID}-name`}>
         {row.name}
       </Text>
@@ -55,12 +56,12 @@ export function GroupHomeBoard({ board, metric }: { board: GroupHomeBoard; metri
   return (
     <View accessible accessibilityLabel={board.accessibilityLabel} style={styles.board} testID="group-home-board">
       <View style={styles.heading}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.headingTitle]}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, styles.headingTitle]}>
           Top {board.rows.length}
         </Text>
         <Text
           allowFontScaling={false}
-          style={[todayText.microLabel, todayText.microLabelFaint, styles.headingValue, { width: VALUE_WIDTH }]}>
+          style={[uiText.label, uiTextTone.faint, styles.headingValue, { width: VALUE_WIDTH }]}>
           {GROUP_HOME_METRIC_COLUMN[metric]}
         </Text>
       </View>
@@ -69,11 +70,14 @@ export function GroupHomeBoard({ board, metric }: { board: GroupHomeBoard; metri
       ))}
       {board.me ? (
         <View style={styles.meLine} testID="group-home-board-me">
-          <Text allowFontScaling={false} style={styles.meText}>
-            <Text allowFontScaling={false} style={styles.nameMine}>
+          <Text allowFontScaling={false} style={[uiText.body, styles.meText]} testID="group-home-board-me-label">
+            <Text allowFontScaling={false} style={uiTextEmphasis.strong}>
               You
             </Text>
-            <Text allowFontScaling={false} style={styles.muted}>{` · ${board.me.rankLabel}`}</Text>
+            <Text allowFontScaling={false} style={uiTextTone.muted}>
+              {' · '}
+              <FigureText>{board.me.rankLabel}</FigureText>
+            </Text>
           </Text>
           <BoardValue record={false} testID="group-home-board-me-value" value={board.me.valueLabel} />
         </View>
@@ -116,23 +120,9 @@ const styles = StyleSheet.create({
   },
   rank: {
     width: RANK_WIDTH,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   name: {
     width: NAME_WIDTH,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  nameMine: {
-    fontWeight: '600',
-    color: uiRoles.ink,
   },
   track: {
     flex: 1,
@@ -155,11 +145,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
     textAlign: 'right',
   },
   meLine: {
@@ -174,12 +159,5 @@ const styles = StyleSheet.create({
   meText: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  muted: {
-    color: uiRoles.inkMuted,
   },
 });

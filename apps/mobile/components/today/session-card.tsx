@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -36,7 +37,7 @@ function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.nameCell]}>
         {line.name}
       </Text>
-      <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.sets]} testID={`${testID}-sets`}>
+      <Text allowFontScaling={false} style={[uiText.figure, styles.sets]} testID={`${testID}-sets`}>
         {line.workingSets}
       </Text>
       {/* No working set: the best-set cells stay blank ([[copy.blank-history]]). */}
@@ -115,9 +116,11 @@ export function TodaySessionCard({
   onShowSession,
 }: TodaySessionCardProps) {
   const stamp = (
-    <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureLarge} testID="today-latest-session-start">
-      {formatCompactDate(session.startedAt)}
-      <Text allowFontScaling={false} style={[uiText.inlineFigure, uiTextTone.muted]}>{` ${formatClockTime(session.startedAt.getTime())}`}</Text>
+    // The start reads as a Sessions row's does: a body line, its figures in the figure face.
+    <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID="today-latest-session-start">
+      <FigureText>{formatCompactDate(session.startedAt)}</FigureText>
+      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+      <FigureText>{formatClockTime(session.startedAt.getTime())}</FigureText>
     </Text>
   );
   return (
@@ -192,10 +195,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     height: VISIBLE_EXERCISE_ROWS * ROW_HEIGHT,
   },
+  // The figure columns sit a clear step apart.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.md,
   },
   tableHeader: {
     paddingBottom: uiSpace.xs,

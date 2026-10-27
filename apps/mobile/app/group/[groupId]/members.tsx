@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import {
   GroupHeaderCard,
@@ -16,7 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { ActionButton, Card, uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { ActionButton, Card, uiText, uiTextTone } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   OWNER_LEAVE_NOTICE,
@@ -206,7 +206,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
           variant="outline"
         />
       ) : (
-        <Text allowFontScaling={false} style={styles.note} testID="group-members-owner-leave-notice">
+        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-members-owner-leave-notice">
           {`${OWNER_LEAVE_NOTICE}. Open a member to make them the owner.`}
         </Text>
       )}
@@ -219,13 +219,3 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  note: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-});

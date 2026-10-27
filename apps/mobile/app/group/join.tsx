@@ -13,11 +13,11 @@ import {
   ActionButton,
   Card,
   FormField,
+  FigureText,
   ScreenScroll,
-  uiFonts,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -149,13 +149,15 @@ function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode
           </View>
           {preview ? (
             <Card style={styles.preview} testID="group-join-preview">
-              <Text allowFontScaling={false} accessibilityRole="header" style={styles.name} testID="group-join-preview-name">
+              <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="group-join-preview-name">
                 {preview.name}
               </Text>
-              <Text allowFontScaling={false} style={styles.meta} testID="group-join-preview-meta">
-                {preview.already_member
-                  ? `${formatMemberCount(preview.member_count)} · You're already a member`
-                  : formatMemberCount(preview.member_count)}
+              <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-join-preview-meta">
+                <FigureText>
+                  {preview.already_member
+                    ? `${formatMemberCount(preview.member_count)} · You're already a member`
+                    : formatMemberCount(preview.member_count)}
+                </FigureText>
               </Text>
               <View style={styles.previewAction}>
                 <ActionButton
@@ -181,20 +183,6 @@ const styles = StyleSheet.create({
   preview: {
     padding: uiSpace.md,
     gap: uiSpace.xs,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  meta: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   previewAction: {
     marginTop: uiSpace.sm,

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextEmphasis } from '@/components/ui/text-roles';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 
 describe('FigureText', () => {
   it('draws each figure in the figure face and leaves the words to the line', () => {
@@ -39,6 +39,39 @@ describe('FigureText', () => {
     );
 
     expect(screen.getByText('07:40')).toHaveStyle({ ...uiText.inlineFigure, ...uiTextEmphasis.strong });
+  });
+
+  it('draws a hyphenated date as one figure', () => {
+    render(
+      <Text>
+        <FigureText>{'Certified by sam · 12-10-2026'}</FigureText>
+      </Text>,
+    );
+
+    expect(screen.getByText('12-10-2026')).toHaveStyle(uiText.inlineFigure);
+  });
+
+  it('leaves a name that starts with a digit, like 1RM, in the words', () => {
+    render(
+      <Text testID="line">
+        <FigureText>{'1RM 213.3 · 10RM 80'}</FigureText>
+      </Text>,
+    );
+
+    expect(screen.getByText('213.3')).toHaveStyle(uiText.inlineFigure);
+    expect(screen.getByText('80')).toHaveStyle(uiText.inlineFigure);
+    expect(screen.queryByText('1')).toBeNull();
+    expect(screen.getByTestId('line')).toHaveTextContent('1RM 213.3 · 10RM 80');
+  });
+
+  it("draws the figures in a toned line's own weight", () => {
+    render(
+      <Text>
+        <FigureText figureStyle={uiTextTone.record}>1RM 120.0</FigureText>
+      </Text>,
+    );
+
+    expect(screen.getByText('120.0')).toHaveStyle({ fontFamily: uiText.inlineFigure.fontFamily, fontWeight: '700' });
   });
 
   it('adds nothing to a line without figures', () => {

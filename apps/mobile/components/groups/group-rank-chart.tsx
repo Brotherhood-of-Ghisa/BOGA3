@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
-import { todayText } from '@/components/today/text-styles';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { GroupRankSeries } from '@/src/groups/home-view-model';
 
@@ -52,7 +52,7 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
       <View style={styles.plotRow}>
         <View style={[styles.axis, { height }]}>
           {Array.from({ length: series.depth }, (_, index) => (
-            <Text allowFontScaling={false} key={index} style={[todayText.microLabel, todayText.microLabelFaint, styles.axisLabel]}>
+            <Text allowFontScaling={false} key={index} style={[uiText.label, uiTextTone.faint, styles.axisLabel]}>
               {index + 1}
             </Text>
           ))}
@@ -102,9 +102,9 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
               line.ranks.map((rank, index) => (
                 <SvgText
                   fill={index === selectedIndex ? uiRoles.surface : uiRoles.inkMuted}
-                  fontFamily={uiFonts.figure.family}
+                  fontFamily={uiFonts.display.family}
                   fontSize={uiTypography.size.xxs}
-                  fontWeight="600"
+                  fontWeight="700"
                   key={`${line.userId}-${index}-initial`}
                   textAnchor="middle"
                   x={columnX(index, count, plotWidth)}
@@ -129,8 +129,8 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
             <Text
               allowFontScaling={false}
               style={[
-                todayText.microLabel,
-                index === selectedIndex ? todayText.microLabelStrong : todayText.microLabelFaint,
+                uiText.label,
+                index === selectedIndex ? uiTextTone.ink : uiTextTone.faint,
                 styles.columnLabelText,
               ]}>
               {label}

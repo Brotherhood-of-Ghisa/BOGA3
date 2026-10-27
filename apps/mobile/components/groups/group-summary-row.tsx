@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, ListRow, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatMemberCount, formatMyRole, type GroupSummary } from '@/src/groups';
 
 type GroupSummaryRowProps = {
@@ -11,7 +11,7 @@ type GroupSummaryRowProps = {
 };
 
 /**
- * A My groups row, one `ListRow` in the list's `Card`: the name in Archivo, the
+ * A My groups row, one `ListRow` in the list's `Card`: the name, the
  * description in `ink-muted`, the member count and my role as a micro-label,
  * and a chevron. A tap opens the group.
  */
@@ -26,15 +26,15 @@ export function GroupSummaryRow({ group, onPress, divider }: GroupSummaryRowProp
       testID={`group-summary-row-${group.group_id}`}
       trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
       <View style={styles.content}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.name}>
+        <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
           {group.name}
         </Text>
         {group.description ? (
-          <Text allowFontScaling={false} numberOfLines={2} style={styles.description}>
+          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.body, uiTextTone.muted]}>
             {group.description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={styles.meta}>
+        <Text allowFontScaling={false} style={uiText.label}>
           {meta}
         </Text>
       </View>
@@ -46,28 +46,5 @@ const styles = StyleSheet.create({
   content: {
     gap: uiSpace.xs,
     paddingVertical: uiSpace.sm,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  description: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  meta: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
 });

@@ -62,7 +62,7 @@ export const uiText = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxl,
     color: uiRoles.ink,
   },
-  // A second headline number beside the hero; a date heading a card.
+  // A second headline number beside the hero.
   figureLarge: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '600',

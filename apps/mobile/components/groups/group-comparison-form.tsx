@@ -1,14 +1,13 @@
 import { Text } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
-import { ActionButton, Card, SegmentedControl, uiSpace } from '@/components/ui';
+import { ActionButton, Card, FigureText, SegmentedControl, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { deriveComparisonFormStatus, validateCompetitionFormRules } from '@/src/groups/comparison-form-model';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS, type CompetitionRules as GroupExerciseRules, type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 
 import { useComparisonDraft } from './use-comparison-draft';
 import { GroupWriteNotice } from './write-notice';
-import { groupMetricTextStyles as textStyles } from './screen-styles';
 
 type Props = {
   bodyweightCalculationsEnabled: boolean;
@@ -60,7 +59,7 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
   };
   return (
     <Card style={{ padding: uiSpace.md, gap: uiSpace.md }} testID="group-exercise-form">
-      {draft.baseline.revision !== null ? <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-revision">Rules revision {draft.baseline.revision}</Text> : null}
+      {draft.baseline.revision !== null ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-rules-revision">Rules revision <FigureText>{String(draft.baseline.revision)}</FigureText></Text> : null}
       <ExerciseCoreFields editable={!pending} name={draft.name} loadInputMode={draft.loadInputMode}
         nameError={status.nameError}
         onChangeName={draft.changeName}
@@ -71,7 +70,7 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
           onChange: draft.changeContribution,
           error: status.rulesError,
         } : undefined} />
-      <Text allowFontScaling={false} style={textStyles.muted}>Default ranking</Text>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Default ranking</Text>
       <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={draft.defaultMetric} layout="fit"
         options={METRIC_OPTIONS} onChange={draft.changeDefaultMetric} testIDPrefix="group-exercise-default-metric" />
       {status.stale ? <StaleRulesNotice onReload={draft.reload} pending={pending} /> : null}

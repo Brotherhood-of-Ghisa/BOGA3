@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { StreamMembershipViewModel } from '@/src/groups';
 
 type GroupStreamMembershipItemProps = {
@@ -15,11 +15,11 @@ export function GroupStreamMembershipItem({ item, showGroupName, onPress }: Grou
   const testID = `group-stream-membership-${item.key}`;
   const content = (
     <View style={streamRowStyles.row}>
-      <Text allowFontScaling={false} style={streamRowStyles.sentence}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         {item.sentence}
       </Text>
       {showGroupName ? (
-        <Text allowFontScaling={false} numberOfLines={1} style={streamRowStyles.group}>
+        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
           {item.groupName}
         </Text>
       ) : null}
@@ -55,19 +55,5 @@ const streamRowStyles = StyleSheet.create({
   },
   pressed: {
     backgroundColor: uiRoles.paper,
-  },
-  sentence: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  group: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

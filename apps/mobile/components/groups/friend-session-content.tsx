@@ -4,7 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { GroupRole } from '@/src/groups';
 import {
   buildSessionRecordBands,
@@ -62,7 +63,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
         // A ring marks "current" in the design language (§5).
         <View style={styles.status} testID="group-session-status-row">
           {session.status === 'active' ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
-          <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">{STATUS_LABELS[session.status]}</Text>
+          <Text allowFontScaling={false} style={[uiText.bodyStrong, uiTextTone.muted]} testID="group-session-status">{STATUS_LABELS[session.status]}</Text>
         </View>
       )}
       <SessionFactsCard
@@ -81,7 +82,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
       />
       <GroupSessionRecordsCard groupId={groupId} myRole={myRole} onChanged={onRecordsChanged} online={online} rows={rows} userId={userId} />
       {model.cards.length === 0 ? (
-        <Text allowFontScaling={false} style={styles.empty} testID="group-session-no-sets">
+        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-session-no-sets">
           No performed sets yet.
         </Text>
       ) : (
@@ -109,19 +110,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  statusText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  empty: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });
