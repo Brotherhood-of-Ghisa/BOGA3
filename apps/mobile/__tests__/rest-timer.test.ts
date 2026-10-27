@@ -828,7 +828,7 @@ describe('rest-timer store and pure rules', () => {
     });
     expect(result.current.view).toEqual({ status: 'idle' });
 
-    // With autoStart = false, onSetConfirmed does nothing, but manual toggle still starts.
+    // With autoStart = false, onSetConfirmed starts nothing, but manual toggle still starts.
     rerender({ isActiveSession: true, autoStart: false, defaultDurationSec: 75 });
     act(() => {
       result.current.onSetConfirmed();
@@ -844,6 +844,17 @@ describe('rest-timer store and pure rules', () => {
       remainingSec: 75,
       formatted: '1:15',
     });
+
+    // A manually started timer restarts when a set is ticked, even with autoStart off.
+    act(() => {
+      nowMs = 61_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 60 });
+    act(() => {
+      result.current.onSetConfirmed();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 75 });
 
     // Completed session edit suppresses the view and toggleForSession.
     rerender({ isActiveSession: false, autoStart: true, defaultDurationSec: 75 });
@@ -1012,7 +1023,7 @@ describe('rest-timer store and pure rules', () => {
 
     // Advance clock past expiration
     act(() => {
-      nowMs = 31_000;
+      nowMs = 61_000;
       jest.advanceTimersByTime(31_000);
     });
     expect(hook.result.current.view).toMatchObject({ status: 'completed' });
