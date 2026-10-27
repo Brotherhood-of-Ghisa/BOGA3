@@ -48,7 +48,7 @@ export function ProgrammePlanList({
   return (
     <View style={styles.container} testID="programme-plan-list">
       <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
-        <FigureText>{`Sessions (${plans.length})`}</FigureText>
+        Sessions ({plans.length})
       </Text>
 
       <Card>

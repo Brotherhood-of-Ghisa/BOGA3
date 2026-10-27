@@ -7,11 +7,11 @@ import { Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   FormField,
   IconButton,
   ListRow,
   Notice,
-  FigureText,
   PageSheet,
   uiRoles,
   uiSpace,
@@ -622,7 +622,7 @@ export function ProgrammeFormScreen({
       <View style={styles.sessionsHeader}>
         <View style={styles.sessionsHeaderTitle}>
           <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
-            <FigureText>{`Sessions (${form.plans.length})`}</FigureText>
+            Sessions ({form.plans.length})
           </Text>
         </View>
         <ActionButton

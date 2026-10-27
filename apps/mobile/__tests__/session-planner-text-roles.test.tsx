@@ -1,3 +1,4 @@
+/* eslint-disable import/first */
 /**
  * The session planner and programmes on the shared text roles
  * (`design-language.md` §3, "Text roles"): titles are `title`, row names
@@ -5,7 +6,7 @@
  * `meta` in `danger`; words never take Plex Mono, only the figures inside them
  * do (`FigureText`).
  */
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 jest.mock('expo-router', () => ({
@@ -131,9 +132,10 @@ describe('Programme detail', () => {
 
   it('lists sessions under a faint label, names in bodyStrong, status in label, detail in meta', () => {
     render(<ProgrammePlanList onOpenPlan={jest.fn()} plans={[plan()]} />);
-    const heading = screen.getByText(/^Sessions/);
+    // A micro-label's count stays in the label's own face: Plex Mono 500 would sit lighter than its caps.
+    const heading = screen.getByText('Sessions (1)');
     expect(style(heading)).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
-    expect(style(within(heading).getByText('1'))).toMatchObject(FIGURE);
+    expect(within(heading).queryAllByText('1')).toHaveLength(0);
     expect(style(screen.getByText('Heavy day'))).toMatchObject({ ...BODY_STRONG, flex: 1 });
     expect(style(screen.getByText('Planned'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
     expectFigureInWords(screen.getByText(/· 3 blocks$/), '28-10-2026');
@@ -196,14 +198,15 @@ describe('Plan and programme forms', () => {
     expect(style(screen.getByTestId('plan-form-block-1-set-1-reps-error'))).toMatchObject({ ...META, color: uiRoles.danger });
   });
 
-  it('draws the plan form\'s blocks error in meta, danger and its hint in muted body', () => {
+  it('draws the plan form\'s blocks error in meta, danger and its hint in muted body', async () => {
     render(<PlanFormScreen initialForm={{ title: '', scheduleText: '', gymId: null, blocks: [] }} onSave={jest.fn()} saveLabel="Save plan" />);
-    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await act(async () => {});
+    await act(async () => fireEvent.press(screen.getByTestId('plan-form-save')));
     expect(style(screen.getByTestId('plan-form-blocks-error'))).toMatchObject({ ...META, color: uiRoles.danger });
     expect(style(screen.getByTestId('plan-form-blocks-empty'))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });
   });
 
-  it('heads the programme\'s sessions in a faint label, names each in bodyStrong, its error in meta, danger', () => {
+  it('heads the programme\'s sessions in a faint label, names each in bodyStrong, its error in meta, danger', async () => {
     render(
       <ProgrammeFormScreen
         initialForm={{ name: 'Strength block', description: '', plans: [{ id: 'cp1', sourcePlanId: null, title: 'Week 1', scheduleText: '', gymId: null, blocks: [] }] }}
@@ -211,16 +214,17 @@ describe('Plan and programme forms', () => {
         saveLabel="Save programme"
       />,
     );
-    const heading = screen.getByText(/^Sessions \(/);
+    await act(async () => {});
+    const heading = screen.getByText('Sessions (1)');
     expect(style(heading)).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
-    expect(style(within(heading).getByText('1'))).toMatchObject(FIGURE);
+    expect(within(heading).queryAllByText('1')).toHaveLength(0);
     expect(style(screen.getByText('Week 1'))).toMatchObject(BODY_STRONG);
     expectFigureInWords(screen.getByText(/· 0 blocks$/), '0');
-    fireEvent.press(screen.getByTestId('programme-form-save'));
+    await act(async () => fireEvent.press(screen.getByTestId('programme-form-save')));
     expect(style(screen.getByText('Please review errors inside this session.'))).toMatchObject({ ...META, color: uiRoles.danger });
   });
 
-  it('heads the child session editor\'s fields in label, its empty-blocks hint in muted body', () => {
+  it('heads the child session editor\'s fields in label, its empty-blocks hint in muted body', async () => {
     render(
       <ProgrammeFormScreen
         initialForm={{ name: 'Strength block', description: '', plans: [{ id: 'cp1', sourcePlanId: null, title: 'Week 1', scheduleText: '', gymId: null, blocks: [] }] }}
@@ -228,7 +232,8 @@ describe('Plan and programme forms', () => {
         saveLabel="Save programme"
       />,
     );
-    fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+    await act(async () => {});
+    await act(async () => fireEvent.press(screen.getByTestId('programme-form-plan-1-edit')));
     ['Exercise blocks', 'Schedule (optional)', 'Gym'].forEach((text) =>
       expect(style(screen.getByText(text))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted }),
     );
