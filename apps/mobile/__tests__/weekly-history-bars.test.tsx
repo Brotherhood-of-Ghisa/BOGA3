@@ -1,11 +1,12 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { FlatList, ScrollView, StyleSheet } from 'react-native';
 
 import { WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { HistoryView, EXERCISE_HISTORY_METRIC_OPTIONS, MUSCLE_HISTORY_METRIC_OPTIONS } from '@/components/stats/history-view';
-import { uiGeometry, uiRoles } from '@/components/ui';
+import { uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { ensureAccountLocalPreferencesLoaded, initializeAccountLocalPreferences, setAccountLocalPreferences } from '@/src/preferences/account-local';
 
 const TODAY = '2026-10-05';
 const PREFIX = 'bars';
@@ -39,9 +40,55 @@ const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-
 
 it('shows only the end year for a week crossing New Year', () => {
   render(chart(data([day('2025-12-31', 1750)], 52)));
-  expect(screen.getByText('29 Dec – 4 Jan 2026').props.children).toBe('29 Dec –\n4 Jan 2026');
+  expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent('29 Dec – 4 Jan 2026');
   expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
     'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
+});
+
+it.each([
+  ['2026-10-19', '19–25 Oct 2026'],
+  ['2026-10-26', '26 Oct – 1 Nov 2026'],
+  ['2026-09-28', '28 Sep – 4 Oct 2026'],
+  ['2026-03-30', '30 Mar – 5 Apr 2026'],
+  ['2025-12-29', '29 Dec – 4 Jan 2026'],
+])('places the complete %s caption above the unchanged horizontal plot', (key, caption) => {
+  const loaded = buildHeatmapData([day(key, 12345)], 'totalVolume', { todayDateKey: key, weeks: 1 });
+  render(chart(loaded));
+  const date = screen.getByTestId(`bars-heatmap-date-${key}`);
+  expect(date).toHaveTextContent(caption);
+  expect(date).toHaveProp('numberOfLines', 1);
+  expect(date).toHaveProp('allowFontScaling', false);
+  expect(StyleSheet.flatten(date.props.style)).toMatchObject({ fontSize: uiTypography.size.sm, color: uiRoles.ink });
+  expect(screen.getByTestId(`bars-heatmap-date-year-${key}`)).toHaveStyle({ color: uiRoles.inkMuted });
+  expect(screen.getAllByTestId(new RegExp(`^bars-heatmap-(date|plot-row)-${key}$`)).map(node => node.props.testID))
+    .toEqual([`bars-heatmap-date-${key}`, `bars-heatmap-plot-row-${key}`]);
+  expect(style(`bars-heatmap-plot-row-${key}`)).toMatchObject({
+    flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget,
+    gap: uiSpace.sm, paddingVertical: uiSpace.sm,
+  });
+  expect(style(`bars-heatmap-date-gutter-${key}`)).toEqual({ width: 96 });
+  expect(style(`bars-heatmap-plot-${key}`)).toMatchObject({ flex: 1, alignSelf: 'stretch', justifyContent: 'center' });
+  expect(style(`bars-heatmap-track-${key}`).height).toBe(uiSpace.lg);
+  expect(style(`bars-heatmap-bar-${key}`)).toMatchObject({ width: '100%', height: '100%' });
+  expect(style(`bars-heatmap-value-${key}`)).toMatchObject({ width: 42, textAlign: 'right' });
+});
+
+it('keeps the quieter year in its selected position when the Date format changes on a mounted chart', async () => {
+  initializeAccountLocalPreferences(false);
+  await ensureAccountLocalPreferencesLoaded();
+  const loaded = buildHeatmapData([day('2025-12-29', 1750)], 'totalVolume', { todayDateKey: '2026-01-04', weeks: 1 });
+  render(chart(loaded));
+  for (const [dateFormat, caption, spoken] of [
+    ['MM-DD-YYYY', 'Dec 29 – Jan 4 2026', '12-29-2025'],
+    ['YYYY-MM-DD', '2026 Dec 29 – Jan 4', '2025-12-29'],
+    ['DD-MM-YYYY', '29 Dec – 4 Jan 2026', '29-12-2025'],
+  ] as const) {
+    act(() => setAccountLocalPreferences({ dateFormat }));
+    expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent(caption);
+    expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveTextContent('2026');
+    expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveStyle({ color: uiRoles.inkMuted });
+    expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp('accessibilityLabel', `Week of ${spoken}, Volume 1750, Current week`);
+  }
 });
 
 const percentage = (id: string, property: 'left' | 'width') => Number.parseFloat(style(id)[property]);
