@@ -1,6 +1,4 @@
 import { useIsFocused, useRouter, type Href } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-
 import {
   TodayCards,
   TodayGroupSection,
@@ -16,11 +14,9 @@ import {
   type TodayProgressLoader,
   type TodayProgressState,
 } from '@/components/today';
-import { ScreenScroll, SectionHeader, StatePanel, uiSpace } from '@/components/ui';
 import { groupsStreamPath } from '@/src/groups';
 import { SIGN_IN_ROUTE, progressHistoryHref } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import type { TodayLayout } from '@/src/preferences/model';
 
 export type TodayScreenProps = {
   isFocused?: boolean;
@@ -30,17 +26,14 @@ export type TodayScreenProps = {
   loadPlan?: TodayPlanLoader;
   now?: () => Date;
   groupState: TodayGroupState;
-  // Settings' Today layout; the route reads it from preferences.
-  layout?: TodayLayout;
 };
 
 const systemNow = () => new Date();
 
 // Today has no title (the tab names the page) and no primary action, so no
-// `accent`: one scrolling page of the Progress card, the Plan page, then
-// Groups; or in the Cards layout a full-height card each, Plan first,
+// `accent`: a full-height card each for Plan, You and Groups, swiped between,
 // opening on You.
-export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState, layout = 'list' }: TodayScreenProps) {
+export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = systemNow, groupState }: TodayScreenProps) {
   const router = useRouter();
   const { values: { progressCountSecondary } } = useAccountLocalPreferenceState();
   const { state: planState, retry: retryPlan } = useTodayPlan({ isFocused, load: loadPlan, now });
@@ -61,9 +54,6 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
     load: loadProgress,
     now,
   });
-  // `View groups` opens the Groups screen on the group the card shows.
-  const selectedGroupId = groupState.status === 'available' ? groupState.selectedGroupId : null;
-  const groupsPath = selectedGroupId ? groupsStreamPath(selectedGroupId) : '/groups';
   const progressHandlers = {
     onOpenSession: (sessionId: string) => router.push(`/completed-session/${sessionId}`),
     onOpenTrain: () => router.push('/train'),
@@ -85,62 +75,34 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
     onSignIn: () => router.push(SIGN_IN_ROUTE),
   };
 
-  if (layout === 'cards') {
-    return (
-      <TodayCards
-        initialPage={1}
-        pages={[
-          {
-            key: 'plan',
-            label: 'Plan',
-            content: <TodayPlanSection {...planHandlers} fill state={planState} />,
-            framed: planState.status !== 'loaded',
-            testID: 'today-plan-section',
-          },
-          {
-            key: 'progress',
-            label: 'You',
-            content: <TodayProgressSection {...progressHandlers} fill state={progressState} />,
-            framed: !progressHasCards(progressState),
-            testID: 'today-progress-section',
-          },
-          {
-            key: 'group',
-            label: 'Groups',
-            content: <TodayGroupSection {...groupHandlers} fill state={groupState} />,
-            framed: !groupHasCards(groupState),
-            testID: 'today-group-section',
-          },
-        ]}
-        testID="today-screen"
-      />
-    );
-  }
-
   return (
-    <ScreenScroll
-      contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic"
-      testID="today-screen">
-      <View style={styles.section} testID="today-progress-section">
-        <SectionHeader title="You" />
-        <TodayProgressSection {...progressHandlers} state={progressState} />
-      </View>
-
-      <View style={styles.section} testID="today-plan-section">
-        <SectionHeader title="Plan" />
-        <TodayPlanSection {...planHandlers} state={planState} />
-      </View>
-
-      <View style={styles.section} testID="today-group-section">
-        {/* The board card names the group and owns the way to it and the switch; without one, `View groups`. */}
-        <SectionHeader
-          action={groupHasCards(groupState) ? undefined : { label: 'View groups', onPress: () => router.push(groupsPath), testID: 'today-view-groups-button' }}
-          title="Groups"
-        />
-        <TodayGroupSection {...groupHandlers} state={groupState} />
-      </View>
-    </ScreenScroll>
+    <TodayCards
+      initialPage={1}
+      pages={[
+        {
+          key: 'plan',
+          label: 'Plan',
+          content: <TodayPlanSection {...planHandlers} state={planState} />,
+          framed: planState.status !== 'loaded',
+          testID: 'today-plan-section',
+        },
+        {
+          key: 'progress',
+          label: 'You',
+          content: <TodayProgressSection {...progressHandlers} state={progressState} />,
+          framed: !progressHasCards(progressState),
+          testID: 'today-progress-section',
+        },
+        {
+          key: 'group',
+          label: 'Groups',
+          content: <TodayGroupSection {...groupHandlers} state={groupState} />,
+          framed: !groupHasCards(groupState),
+          testID: 'today-group-section',
+        },
+      ]}
+      testID="today-screen"
+    />
   );
 }
 
@@ -158,7 +120,6 @@ const groupHasCards = (state: TodayGroupState) =>
 function TodayPlanSection({
   state,
   onRetry,
-  fill = false,
   ...handlers
 }: {
   state: TodayPlanState;
@@ -168,28 +129,22 @@ function TodayPlanSection({
   onOpenProgress: () => void;
   onOpenSessions: () => void;
   onRetry: () => void;
-  fill?: boolean;
 }) {
   if (state.status === 'loading') {
-    return fill ? (
-      <TodayPanel fill kind="loading" testID="today-plan-loading" title="Loading your plan…" />
-    ) : (
-      <StatePanel fill={false} kind="loading" testID="today-plan-loading" title="Loading your plan…" />
-    );
+    return <TodayPanel kind="loading" testID="today-plan-loading" title="Loading your plan…" />;
   }
   if (state.status === 'error') {
     return (
       <TodayPanel
         action={{ label: 'Retry', onPress: onRetry, testID: 'today-plan-error-retry' }}
         body={state.message}
-        fill={fill}
         kind="error"
         testID="today-plan-error"
         title="Couldn't load your plan"
       />
     );
   }
-  return <TodayPlanCards {...handlers} fill={fill} plan={state.plan} />;
+  return <TodayPlanCards {...handlers} plan={state.plan} />;
 }
 
 function TodayProgressSection({
@@ -200,7 +155,6 @@ function TodayProgressSection({
   onShowCompared,
   onShowSession,
   state,
-  fill = false,
 }: {
   onOpenSession: (sessionId: string) => void;
   onOpenSessions: () => void;
@@ -209,15 +163,9 @@ function TodayProgressSection({
   onShowCompared: (periodsBack: number) => void;
   onShowSession: (offset: number) => void;
   state: TodayProgressState;
-  fill?: boolean;
 }) {
   if (state.status === 'loading') {
-    // Loading draws no card in the list layout.
-    return fill ? (
-      <TodayPanel fill kind="loading" testID="today-progress-loading" title="Loading your progress…" />
-    ) : (
-      <StatePanel fill={false} kind="loading" testID="today-progress-loading" title="Loading your progress…" />
-    );
+    return <TodayPanel kind="loading" testID="today-progress-loading" title="Loading your progress…" />;
   }
 
   if (state.status === 'error') {
@@ -225,7 +173,6 @@ function TodayProgressSection({
       <TodayPanel
         action={{ label: 'Retry', onPress: onRetry, testID: 'today-progress-error-retry' }}
         body={state.message}
-        fill={fill}
         kind="error"
         testID="today-progress-error"
         title="Couldn't load your progress"
@@ -238,7 +185,6 @@ function TodayProgressSection({
       <TodayPanel
         action={{ label: 'Open Train', onPress: onOpenTrain, testID: 'today-empty-open-train' }}
         body="Log a workout and your sessions, working sets and PRs show up here, against your last period."
-        fill={fill}
         testID="today-progress-empty"
         title="Your week starts here"
       />
@@ -247,7 +193,6 @@ function TodayProgressSection({
 
   return (
     <TodayProgressCard
-      fill={fill}
       onOpenSession={onOpenSession}
       onOpenSessions={onOpenSessions}
       onShowCompared={onShowCompared}
@@ -260,16 +205,5 @@ function TodayProgressSection({
 export default function TodayRoute() {
   const isFocused = useIsFocused();
   const groupState = useTodayGroup();
-  const { values } = useAccountLocalPreferenceState();
-  return <TodayScreen groupState={groupState} isFocused={isFocused} layout={values.todayLayout} />;
+  return <TodayScreen groupState={groupState} isFocused={isFocused} />;
 }
-
-const styles = StyleSheet.create({
-  // Sections sit a step further apart than the cards inside them.
-  content: {
-    gap: uiSpace.xl,
-  },
-  section: {
-    gap: uiSpace.md,
-  },
-});

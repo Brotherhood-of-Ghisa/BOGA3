@@ -1,4 +1,4 @@
-import { formatCalendarDate, formatMonthYear } from '@/src/utils/local-time';
+import { formatCalendarDate, formatCalendarWeekHeading, formatMonthYear } from '@/src/utils/local-time';
 import { useDateFormat } from '@/src/preferences/hooks';
 // Newest-first weekly rows over [[comparison.history-window]]; colour retains the
 // adapter's independent intensity/target meaning. Empty Monday-owned months collapse
@@ -9,10 +9,11 @@ import { useDateFormat } from '@/src/preferences/hooks';
 // Numeric labels follow the reference values when available, otherwise the scale.
 // They use measured widths, centre on their ticks within the plot,
 // and yield to the centre label on overlap; all ticks and spoken values remain.
+// Date captions sit above the plot row; its existing date gutter stays reserved.
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, uiFonts, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -21,7 +22,6 @@ import { HEAT_RAMP, type CalendarHeatmapMetric } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
-import { weekLabel } from './timeline';
 
 const DATE_WIDTH = 96;
 
@@ -111,32 +111,38 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; testID: string;
 }) {
   const dateFormat = useDateFormat();
+  const [beforeYear, year, afterYear] = formatCalendarWeekHeading(week.weekStartDateKey, dateFormat).split(/(\d{4})/);
   const value = weekValue(week, formatValue);
   const prCount = week.prCount ?? 0;
   const description = week.unavailable ? `${metricLabel} unavailable` : !isKnownTraining(week) ? 'Rest week' : `${metricLabel} ${value}`;
   const shared = {
     accessibilityLabel: `Week of ${formatCalendarDate(week.weekStartDateKey, dateFormat)}, ${description}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID: `${testID}-cell-${week.weekStartDateKey}`,
-    style: styles.row,
+    style: styles.week,
   };
   const content = <>
-    <View style={styles.date}>
-      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week.monday, dateFormat).replace(' – ', ' –\n')}</Text>
-    </View>
-    <View style={styles.plot}>
-      <View style={styles.track}>
-        <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
-          { width: `${isKnownTraining(week) && week.value > 0 ? position(week.value) : 0}%`,
-            backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
+    <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-date-${week.weekStartDateKey}`}>
+      <FigureText>{beforeYear}</FigureText>
+      <Text allowFontScaling={false} style={uiTextTone.muted} testID={`${testID}-date-year-${week.weekStartDateKey}`}><FigureText>{year}</FigureText></Text>
+      <FigureText>{afterYear}</FigureText>
+    </Text>
+    <View style={styles.row} testID={`${testID}-plot-row-${week.weekStartDateKey}`}>
+      <View style={styles.date} testID={`${testID}-date-gutter-${week.weekStartDateKey}`} />
+      <View style={styles.plot} testID={`${testID}-plot-${week.weekStartDateKey}`}>
+        <View style={styles.track} testID={`${testID}-track-${week.weekStartDateKey}`}>
+          <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
+            { width: `${isKnownTraining(week) && week.value > 0 ? position(week.value) : 0}%`,
+              backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
+        </View>
+        {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
       </View>
-      {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
+      <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+      {prCount > 0 ? <Text allowFontScaling={false} style={styles.prs} testID={`${testID}-prs-${week.weekStartDateKey}`}>{prCount} PR{prCount === 1 ? '' : 's'}</Text> : null}
     </View>
-    <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
-    {prCount > 0 ? <Text allowFontScaling={false} style={styles.prs} testID={`${testID}-prs-${week.weekStartDateKey}`}>{prCount} PR{prCount === 1 ? '' : 's'}</Text> : null}
   </>;
   return onPress
     ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}
-      style={({ pressed }) => [styles.row, pressed ? heatmapStyles.pressed : null]}>{content}</Pressable>
+      style={({ pressed }) => [styles.week, pressed ? heatmapStyles.pressed : null]}>{content}</Pressable>
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 
@@ -205,6 +211,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: uiSpace.lg },
+  week: { minHeight: uiGeometry.tapTarget },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
   date: { width: DATE_WIDTH },
   monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: uiRoles.rule },

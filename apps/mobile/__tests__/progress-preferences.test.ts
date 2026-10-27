@@ -298,23 +298,10 @@ it.each([[2, 8, 167, '2026-03-02T05:00:00.000Z'], [10, 1, 169, '2026-10-26T04:00
   expect(measured).toEqual([12, 12, elapsedHours, monday]);
 });
 
-it.each(['list', 'cards'] as const)('remembers the %s Today layout per account, List by default', async layout => {
+// Today is always cards; a layout saved by the retired setting is never read back.
+it.each(['list', 'cards'])('ignores a Today layout %s the retired setting saved', async raw => {
+  Storage.setItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout', raw);
   await account();
-  expect(values().todayLayout).toBe('list');
-  setAccountLocalPreferences({ todayLayout: layout });
-  expect(Storage.getItemSync(preferenceKey('account:A', 'todayLayout'))).toBe(layout);
-  __resetAccountLocalPreferencesForTests();
-  await account();
-  expect(values().todayLayout).toBe(layout);
-  await account('B');
-  expect(values().todayLayout).toBe('list');
-});
-
-it.each(['grid', '"cards"', ''])('falls back to List for an invalid Today layout %s', async raw => {
-  Storage.setItemSync(preferenceKey('account:A', 'todayLayout'), raw);
-  await account();
-  expect(values().todayLayout).toBe('list');
-  expect(isPreferenceValue('todayLayout', raw)).toBe(false);
-  setAccountLocalPreferences({ todayLayout: 'grid' as never });
-  expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages.todayLayout);
+  expect(values()).not.toHaveProperty('todayLayout');
+  expect(getAccountLocalPreferenceState().error).toBeNull();
 });

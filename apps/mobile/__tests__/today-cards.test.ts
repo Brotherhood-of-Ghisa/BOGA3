@@ -1,4 +1,4 @@
-/** Today's cards layout: which page a swipe settles on (`TodayCards`). */
+/** Today's pager: which page a swipe settles on (`TodayCards`). */
 
 import { pageAtOffset } from '@/components/today';
 

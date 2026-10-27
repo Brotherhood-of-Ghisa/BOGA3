@@ -195,20 +195,20 @@ describe('Today: the Progress card over real data', () => {
     await renderToday();
     const chart = text('today-progress-chart');
     // The fallback 326pt chart's plot is 318pt across 28 days.
-    const touchDay = (event: 'responderRelease' | 'responderMove', dayIndex: number) =>
-      fireEvent(chart, event, { nativeEvent: { locationX: (dayIndex / 27) * 318 } });
+    const touchDay = (dayIndex: number) =>
+      fireEvent(chart, 'responderRelease', { nativeEvent: { locationX: (dayIndex / 27) * 318 } });
 
     // Wed 7 Oct, day 3: 6 Oct's 6 sets against none by 9 Sep.
-    touchDay('responderRelease', 2);
+    touchDay(2);
     expect(text('today-progress-period-working-sets')).toHaveTextContent('7 Oct 26 6 sets');
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+6');
     expect(text('today-progress-chart-selection')).toBeTruthy();
     expect(text('today-progress-chart-today')).toBeTruthy();
 
-    // Sunday, day 14: 18 sets over 12 days projects 21; the previous period had 20 Sep's 6, so dragging there.
+    // Sunday, day 14: 18 sets over 12 days projects 21; the previous period had 20 Sep's 6.
     // A projected day shows as its date alone; only the spoken value says it is projected.
-    touchDay('responderMove', 13);
+    touchDay(13);
     expect(text('today-progress-period-working-sets')).toHaveTextContent('18 Oct 26 21 sets');
     expect(screen.queryByText(/projected/)).toBeNull();
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('6 sets');
@@ -220,7 +220,7 @@ describe('Today: the Progress card over real data', () => {
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(chart).toHaveProp('accessibilityValue', { text: '19 Oct 26 (projected): 23 sets, last period 6' });
-    touchDay('responderRelease', 11);
+    touchDay(11);
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
     expect(screen.queryByTestId('today-progress-chart-selection')).toBeNull();
     expect(screen.queryByTestId('today-progress-chart-today')).toBeNull();
@@ -544,12 +544,12 @@ describe('Today: the share bar', () => {
   });
 });
 
-describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
+describe('Today: the cards', () => {
   const layout = (testID: string, size: { width: number; height: number }) =>
     fireEvent(text(testID), 'layout', { nativeEvent: { layout: { x: 0, y: 0, ...size } } });
 
   const renderCards = async (props: Partial<TodayScreenProps> = {}) => {
-    const view = await renderToday({ layout: 'cards', ...props });
+    const view = await renderToday(props);
     // A 393pt-wide phone; the pager between the tabs and the tab bar is 700pt tall.
     layout('today-screen', { width: 393, height: 760 });
     layout('today-screen-pager', { width: 393, height: 700 });
@@ -570,7 +570,7 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     expect(within(text('today-progress-section')).getByTestId('today-progress-card')).toBeTruthy();
     expect(within(text('today-progress-section')).getByTestId('today-session-card')).toBeTruthy();
     expect(within(text('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
-    // The list layout's section headings give way to the tabs.
+    // The tabs name the pages; no section headings.
     expect(screen.getAllByText('You')).toHaveLength(1);
     expect(screen.getAllByText('Groups')).toHaveLength(1);
     expect(within(text('today-group-section-tab')).getByText('Groups')).toBeTruthy();
@@ -629,8 +629,6 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
 
     fireEvent.press(text('today-sessions-button'));
     expect(mockPush.mock.calls).toEqual([['/sessions']]);
-    // No footer links: a panel's own action is its way on.
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
   });
 
   it.each([
@@ -639,7 +637,7 @@ describe("Today: the cards layout (Settings' Today layout: Cards)", () => {
     ['no completed session', () => Promise.resolve({ status: 'empty' } as const), 'today-progress-empty'],
   ])("fills the You page's card with its panel for %s", async (_state, loadProgress, panel) => {
     await bootLocalApp();
-    render(<TodayScreen groupState={signedOut} layout="cards" loadProgress={loadProgress} now={clock} />);
+    render(<TodayScreen groupState={signedOut} loadProgress={loadProgress} now={clock} />);
 
     await waitFor(() => expect(within(text('today-progress-section')).getByTestId(panel)).toBeTruthy());
     // Centred in the card's whole body rather than drawn in a card of its own.

@@ -4,7 +4,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { localDateKey } from '@/src/utils/calendar-weeks';
@@ -20,8 +19,6 @@ export type TodayPlanCardsProps = {
   onOpenPlan: (planId: string) => void;
   /** Opens Sessions, where sessions are planned and the plans listed. */
   onOpenSessions: () => void;
-  /** The cards layout: the recovery card shows its first rows and scrolls the rest. */
-  fill?: boolean;
 };
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -91,7 +88,6 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
         <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{row.weekSets}</Text>
         <Text allowFontScaling={false} style={uiTextTone.muted}>{`/${row.target}`}</Text>
       </Text>
-      <Icon color={uiRoles.inkGhost} name="chevron-right" size="sm" />
     </Pressable>
   );
 }
@@ -101,7 +97,8 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
 // A neutral gutter divides last week's days from this week's, only when both
 // appear. Today has an accent label and border-free cells. At/above-target
 // totals turn green; the numeric ratio also communicates whether it is met.
-function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
+// The first rows show and the rest scroll.
+function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
   const label = [uiText.label, uiTextTone.faint];
   const weekStart = localWeekWindow(plan.today).start;
   const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
@@ -116,7 +113,7 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
     />
   ));
   return (
-    <Card style={[styles.card, fill ? styles.fillCard : null]} testID="today-plan-recovery-card">
+    <Card style={[styles.card, styles.fillCard]} testID="today-plan-recovery-card">
       <View style={styles.header}>
         <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           Recovery
@@ -136,15 +133,10 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
           </Text>
         </RecoveryDayColumn>
         <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
-        <View style={styles.chevronSpace} />
       </View>
-      {fill ? (
-        <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-plan-recovery-rows">
-          {rows}
-        </ScrollView>
-      ) : (
-        rows
-      )}
+      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-plan-recovery-rows">
+        {rows}
+      </ScrollView>
     </Card>
   );
 }
@@ -241,14 +233,14 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
 /** Today's Plan page: the recovery card over the week's plan. */
 export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: Date }) {
   return (
-    <View style={[styles.stack, props.fill ? styles.fill : null]}>
+    <View style={[styles.stack, styles.fill]}>
       <RecoveryCard {...props} />
       <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenSessions={props.onOpenSessions} plan={props.plan} />
     </View>
   );
 }
 
-// The least trained rows that show in the cards layout before the rest scroll,
+// The least trained rows that show before the rest scroll,
 // leaving the plan card room below; a phone too short for both scrolls the page.
 export const VISIBLE_MUSCLE_ROWS = 10;
 const DAY_CELL = 30;
@@ -356,9 +348,6 @@ const styles = StyleSheet.create({
     width: WEEK_WIDTH,
     marginLeft: uiSpace.xs,
     textAlign: 'right',
-  },
-  chevronSpace: {
-    width: 16,
   },
   week: {
     flexDirection: 'row',
