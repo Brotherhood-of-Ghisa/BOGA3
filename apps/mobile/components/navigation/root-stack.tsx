@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles } from '@/components/ui/tokens';
 import { useAuth } from '@/src/auth';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
 
@@ -11,17 +12,18 @@ import { useRootRouteAccess } from '@/src/navigation/root-route-access';
  * hidden back label (still read by VoiceOver) is the previous screen's title,
  * so the headerless `(tabs)` group is titled "Back" rather than "(tabs)".
  */
-const ROOT_STACK_SCREEN_OPTIONS = {
+export const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
   // One header style on every stack route, as the design-language top bars
   // draw it (`navigation-contract.md` "Header titles"):
-  // `surface` over the page, an Archivo 700 `ink` title, an `ink` back arrow.
+  // `surface` over the page, the `title` role, an `ink` back arrow. The header
+  // takes no line height, so only the role's face, weight, size and colour.
   headerStyle: { backgroundColor: uiRoles.surface },
   headerTitleStyle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    color: uiRoles.ink,
+    fontFamily: uiText.title.fontFamily,
+    fontWeight: uiText.title.fontWeight,
+    fontSize: uiText.title.fontSize,
+    color: uiText.title.color,
   },
   headerTintColor: uiRoles.ink,
 } as const;

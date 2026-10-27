@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
+import { uiText } from '@/components/ui/text-roles';
 import { uiRoles } from '@/components/ui/tokens';
 
 jest.mock('expo-router', () => ({
@@ -126,13 +127,14 @@ describe('MainTabs presentation', () => {
     expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(['train', 'progress', 'more']);
   });
 
-  it('marks the active tab in ink by weight and an underline, never accent', () => {
+  it('draws each tab as a micro-label, the active one in ink over an underline, never accent', () => {
     render(<MainTabs activeTab="progress" onSelect={jest.fn()} />);
 
     const active = StyleSheet.flatten(screen.getByText('Progress').props.style);
     const idle = StyleSheet.flatten(screen.getByText('Today').props.style);
-    expect(active).toMatchObject({ color: uiRoles.ink, fontWeight: '700', fontFamily: 'Archivo' });
-    expect(idle).toMatchObject({ color: uiRoles.inkMuted, fontWeight: '600' });
+    expect(active).toEqual({ ...StyleSheet.flatten(uiText.label), color: uiRoles.ink });
+    expect(idle).toEqual(StyleSheet.flatten(uiText.label));
+    expect(idle).toMatchObject({ color: uiRoles.inkMuted, textTransform: 'uppercase' });
 
     const underlines = MAIN_TAB_DEFINITIONS.map(
       (tab) => StyleSheet.flatten(screen.getByTestId(`${tab.testID}-indicator`).props.style).backgroundColor,
