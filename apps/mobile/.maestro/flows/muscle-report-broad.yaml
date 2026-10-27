@@ -91,7 +91,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
+    visible: { id: "settings-muscle-preset-detailed", selected: true }
     timeout: 15000
 - tapOn: { id: "settings-enabled-muscles-row" }
 - extendedWaitUntil:
@@ -148,7 +148,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "settings-muscle-preset-broad", selected: true }
     timeout: 15000
-- assertNotVisible: { id: "settings-enabled-muscles-row" }
+- assertVisible: { id: "settings-enabled-muscles-row" }
 - takeScreenshot: "muscles-settings-page"
 - openLink: "boga3://progress?breakdown=muscle"
 # Chest merges Serratus, so it is one muscle and its family has no header.
@@ -258,7 +258,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
+    visible: { id: "settings-muscle-preset-detailed", selected: true }
     timeout: 15000
 - tapOn: { id: "settings-enabled-muscles-row" }
 - extendedWaitUntil:
