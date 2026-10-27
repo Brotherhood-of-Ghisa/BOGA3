@@ -106,7 +106,7 @@ describe('Exercise page: a set row', () => {
   });
 
   it('fades a planned set', () => {
-    renderRow({ kind: 'planned' });
+    renderRow({ kind: 'pending' });
     expect(style(screen.getByText('RIR 2'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
     expect(style(screen.getByTestId('exercise-set-1-values'))).toMatchObject({ ...FIGURE, color: uiRoles.inkFaint });
   });
