@@ -157,8 +157,9 @@ figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
 so it never outweighs the title. Today, Groups, Sessions, Progress, the
-session flow (recorder, session view, completion, View Session, Train) and the
-session planner and the app shell (tab bar, stack header, More, connected
+session flow (recorder, session view, completion, View Session, Train), the
+session planner, the exercise screens (page, catalogue, editor, history, link,
+shared exercise) and the app shell (tab bar, stack header, More, connected
 agents, logs) take every text from the roles. Display art keeps its own type: the full-screen
 repeating timer, the Train START disc and the share image; the log viewer's
 context dump, being code, stays wholly in Plex Mono (`figureSmall`). Screens not yet moved
