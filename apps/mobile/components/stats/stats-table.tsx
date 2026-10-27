@@ -16,7 +16,7 @@ import { Card, Icon, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone,
 const FIGURE_ADVANCE = 0.61;
 // Archivo 700 is proportional, so this is a safe upper bound for an uppercase
 // micro-label with its 0.1em tracking (`W` is the widest glyph at 1.0em),
-// measured on the simulator: a header label is never truncated or wrapped.
+// measured on the simulator; the paired heading can use two lines on a phone.
 const MICRO_LABEL_ADVANCE = 0.95;
 
 /**
@@ -50,8 +50,9 @@ export function StatsTableFigures({ children, style, testID }: {
 
 /** One header column: the micro-label, plus any sort indicator as children. */
 export function StatsTableHeaderLabel({ label, active = false }: { label: string; active?: boolean }) {
-  return <Text allowFontScaling={false} numberOfLines={1}
-    style={[uiText.label, active && uiTextTone.ink]}>{label}</Text>;
+  const multiline = label.includes('\n');
+  return <Text allowFontScaling={false} numberOfLines={multiline ? 2 : 1}
+    style={[uiText.label, active && uiTextTone.ink, multiline && styles.pairedLabel]}>{label}</Text>;
 }
 
 /** Shared sortable header; the caller names its ordering and next action. */
@@ -65,7 +66,7 @@ export function StatsTableSortHeader({ label, active, descending, description, c
     accessibilityLabel={`${description}.${active ? ` Current sort: ${currentSort}.` : ''} Activate to sort ${nextSort}.`}
     onPress={onPress} testID={testID}
     style={({ pressed }) => [statsTableStyles.headerCell, style,
-      numeric && statsTableStyles.headerCellNumeric, pressed && styles.pressed]}>
+      numeric && styles.numericSortHeader, pressed && styles.pressed]}>
     <StatsTableHeaderLabel active={active} label={label} />
     <View accessible={false} testID={`${testID}-indicator`}
       style={[styles.indicator, recent && styles.recency, !active && styles.hidden]}>
@@ -92,6 +93,8 @@ export const statsTableStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
+  pairedLabel: { textAlign: 'right' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
   pressed: { backgroundColor: uiRoles.paper },

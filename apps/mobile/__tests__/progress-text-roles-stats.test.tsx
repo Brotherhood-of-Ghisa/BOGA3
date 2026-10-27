@@ -53,7 +53,7 @@ describe('Progress tables', () => {
   it('heads its family and columns with the micro-label, the sorted column in ink', () => {
     render(<ProgressTables {...tableProps} sortMode="now-desc" />);
     expect(style(screen.getByTestId('stats-family-header-back'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText('Now'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText(/Now\s+\(Prev\)/))).toMatchObject({ ...LABEL, color: uiRoles.ink });
     expect(style(within(screen.getByTestId('stats-muscle-sort-muscle')).getByText('Muscle'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
   });
 

@@ -632,7 +632,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       'Activate to sort Most recent exercise.'
     );
     expect(screen.getByTestId('stats-exercise-sort-now')).toHaveStyle({
-      flexDirection: 'row',
+      flexDirection: 'row-reverse',
       minHeight: uiGeometry.tapTarget,
     });
     expect(header.getByText('Now').props.numberOfLines).toBe(1);
