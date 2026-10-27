@@ -57,13 +57,15 @@ appId: com.dinoderek.mobile
 - launchApp:
     clearState: true
     clearKeychain: true
+# On small phones Continue is below the intro fold; at its scroll end it
+# is fully visible above chrome but cannot move to the viewport centre.
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
     commands:
-      - extendedWaitUntil:
-          visible:
-            text: "Continue"
+      - scrollUntilVisible:
+          element: { text: "Continue" }
+          direction: DOWN
           timeout: 30000
 # Settle the sheet, then retry each dismissal tap. iOS 26 can return
 # `kAXErrorInvalidUIElement` during the post-clearState reload; retrying the
@@ -200,13 +202,15 @@ appId: com.dinoderek.mobile
 - launchApp:
     clearState: true
     clearKeychain: true
+# On small phones Continue is below the intro fold; at its scroll end it
+# is fully visible above chrome but cannot move to the viewport centre.
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - retry:
     maxRetries: 3
     commands:
-      - extendedWaitUntil:
-          visible:
-            text: "Continue"
+      - scrollUntilVisible:
+          element: { text: "Continue" }
+          direction: DOWN
           timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
