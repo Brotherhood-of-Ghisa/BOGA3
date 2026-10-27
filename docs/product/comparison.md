@@ -59,3 +59,18 @@ history expansion reads beyond it.
 Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
+
+### comparison.colour-scale · presentation · accepted
+
+Progress legends precede their charts and run 0%–100%. Muscle Sets reads
+`% of target`, capped at the effective weekly muscle target in history
+and scaled to displayed Progress weeks in 3D; other legends read `% of max`, measured from zero. The maximum always comes
+from History look-back, using the plotted metric and aggregation: daily Grid
+values, summed weekly Sets/Volume or best weekly strength, and per-muscle
+History totals for 3D. Exercise 3D retains its filtered exercise aggregation.
+Empty or all-zero samples stay neutral. Numeric figures and all-time PRs keep
+their existing rules.
+
+Why: a colour has a stable zero and a reference window the user controls.
+Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
+`apps/mobile/components/stats/muscle-body-projection.ts`.

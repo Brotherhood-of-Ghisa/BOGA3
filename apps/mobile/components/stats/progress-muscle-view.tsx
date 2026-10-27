@@ -3,12 +3,13 @@ import { SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/com
 import { hasComparisonMetric, resolveComparisonLayout } from './comparison-columns';
 import { StatsTable } from './stats-table';
 import { MuscleBodyCard } from './muscle-body-card';
+import type { MuscleColourScale } from './muscle-body-projection';
 import { HISTORY_VIEW_OPTIONS } from './history-view';
 import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } from './progress-tables';
 
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMuscleLayout } from '@/src/preferences/model';
-type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; report?: MuscleReportAssignment };
+type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; report?: MuscleReportAssignment; scale?: MuscleColourScale };
 
 // Settings chooses the layout; both share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
@@ -19,7 +20,7 @@ export function ProgressMuscleView(props: Props) {
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, exercises, metric);
   return <View style={styles.body}>
-    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} />
+    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} scale={props.scale} />
     {selected ? <StatsTable testID="stats-contributions">
       <View style={styles.contributionHeader}>
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selected.displayName}</Text>

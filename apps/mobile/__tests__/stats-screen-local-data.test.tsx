@@ -65,6 +65,7 @@ import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import StatsRoute from '../app/(tabs)/stats-history';
+import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import * as statsRepository from '@/src/data/stats';
@@ -219,6 +220,58 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
+  it.each(['Sets', 'Volume'] as const)('refreshes the Exercise 3D %s History scale, preserving figures and respecting search, gym and secondary filters', async metric => {
+    await loadMaestroFixture('exercise-block-history');
+    await logPulldown(40);
+    await logPulldown(.05);
+    const db = localDataClient();
+    db.prepare("UPDATE exercise_sets SET weight_value = '6000' WHERE id = 'stats_pulldown_40_set'").run();
+    db.prepare("UPDATE sessions SET gym_id = ? WHERE id = 'stats_pulldown_40'").run(EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
+    db.prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('pulldown_biceps', ?, 'biceps', 0.5, 'secondary') ON CONFLICT (exercise_definition_id, muscle_group_id) DO UPDATE SET weight = 0.5, role = 'secondary'").run(PULLDOWN);
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1, progressMuscleLayout: '3d',
+      progressExerciseMetric: metric === 'Sets' ? 'workingSetCount' : 'totalVolume' }));
+    await renderStats();
+    await screen.findByTestId('stats-muscle-body-card');
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Lat Pulldown');
+    const body = () => screen.UNSAFE_getByType(MuscleBodyCard).props;
+    const shortMax = metric === 'Sets' ? 1 : 600;
+    expect(body().scale.maximum).toBe(shortMax);
+    const current = body().muscles.map((row: { current: unknown }) => row.current);
+    expect(screen.getByTestId(`stats-exercise-row-${PULLDOWN}-now`)).toHaveTextContent(String(shortMax));
+    await act(async () => updatePreferences({ historyLookbackWeeks: 8 }));
+    expect(body().scale.maximum).toBe(metric === 'Sets' ? 2 : 60600);
+    expect(body().muscles.map((row: { current: unknown }) => row.current)).toEqual(current);
+    chooseGym('no-gym');
+    expect(body().scale.maximum).toBe(shortMax);
+    chooseGym('all');
+    expect(body().scale.maximum).toBe(metric === 'Sets' ? 2 : 60600);
+    expect(body().muscles.find((row: { muscleGroupId: string }) => row.muscleGroupId === 'biceps').current.workingSetCount).toBe(.5);
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    expect(body().muscles.find((row: { muscleGroupId: string }) => row.muscleGroupId === 'biceps').current.workingSetCount).toBe(0);
+    expect(body().scale.maximum).toBe(metric === 'Sets' ? 2 : 60600);
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
+    expect(body().scale.maximum).toBe(shortMax);
+  });
+
+  it('refreshes the Muscle 3D Volume History maximum independently of displayed Progress totals', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await logPulldown(40);
+    localDataClient().prepare("UPDATE exercise_sets SET weight_value = '6000' WHERE id = 'stats_pulldown_40_set'").run();
+    mockSearchParams = { breakdown: 'muscle' };
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1, progressMuscleLayout: '3d', progressMetric: 'totalVolume' }));
+    await renderStats();
+    await screen.findByTestId('stats-muscle-body-card');
+    const body = () => screen.UNSAFE_getByType(MuscleBodyCard).props;
+    const shortMax = body().scale.maximum;
+    const current = body().muscles.map((row: { current: unknown }) => row.current);
+    expect(shortMax).toBeGreaterThan(0);
+    await act(async () => updatePreferences({ historyLookbackWeeks: 8 }));
+    await waitFor(() => expect(body().scale.maximum).toBeGreaterThan(shortMax));
+    expect(body().muscles.map((row: { current: unknown }) => row.current)).toEqual(current);
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
+    await waitFor(() => expect(body().scale.maximum).toBe(shortMax));
+  });
+
   it('holds Group by and Gym in the Filters sheet, whose compact button fills while either is changed', async () => {
     await renderSeededStats();
     const button = () => screen.getByTestId('stats-filters');

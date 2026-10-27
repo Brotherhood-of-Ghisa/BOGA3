@@ -62,6 +62,19 @@ beforeEach(async () => {
 });
 afterEach(() => mockFixture.close());
 
+it('bounds the overview colour reference by History even when the Progress period includes older, larger work', async () => {
+  const db = mockFixture.database;
+  db.update(sessions).set({ completedAt: new Date('2026-05-06T10:00:00Z') }).where(eq(sessions.id, 'prev')).run();
+  db.update(exerciseSets).set({ weightValue: '1000' }).where(eq(exerciseSets.id, 'prev-set')).run();
+  const short = await computeProgressComparisons({ ...options, periodWeeks: 4, historyWeeks: 1 });
+  expect(short.muscles[0].current.totalVolume).toBe(2700);
+  expect(short.historyMuscles?.[0].current.totalVolume).toBe(200);
+  const long = await computeProgressComparisons({ ...options, periodWeeks: 4, historyWeeks: 2 });
+  expect(long.historyMuscles?.[0].current.totalVolume).toBe(2700);
+  const primary = await computeProgressComparisons({ ...options, historyWeeks: 1, countSecondary: false });
+  expect(primary.historyMuscles?.[0].current.totalVolume).toBe(0);
+});
+
 const readAndReconcile = async () => {
   const result = await computeProgressComparisons(options);
   const oracle = await computeStatsSummary(options);

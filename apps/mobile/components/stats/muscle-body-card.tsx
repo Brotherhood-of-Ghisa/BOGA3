@@ -29,6 +29,7 @@ import {
   normaliseBodyAngle,
   projectMuscleBody,
   type BodyOrientation,
+  type MuscleColourScale,
 } from './muscle-body-projection';
 
 type Props = {
@@ -38,6 +39,7 @@ type Props = {
   readonly onSelect: (id: string) => void;
   /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
   readonly report?: MuscleReportAssignment;
+  readonly scale?: MuscleColourScale;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -233,7 +235,7 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * in CIE LCh, supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects/deselects a muscle group on tap.
  */
-export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
+export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, scale }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
@@ -247,7 +249,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
   const orientation = bodyOrientationForAngle(angleDeg);
-  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric), [muscles, metric]);
+  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric, scale), [muscles, metric, scale]);
   const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
   const projected = useMemo(
     () =>
@@ -330,6 +332,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
 
   return (
     <Card style={styles.card} testID="stats-muscle-body-card">
+      <HeatmapLegend target={!!scale && 'weeklyTarget' in scale} />
       <MuscleBodyHeader
         onNext={handleNextMuscle}
         onOpenPicker={() => setSheetVisible(true)}
@@ -413,7 +416,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         selectedId={selectedId}
         visible={sheetVisible}
       />
-      <HeatmapLegend label={metric === 'workingSetCount' ? 'Sets per muscle' : 'Volume per muscle'} />
     </Card>
   );
 }

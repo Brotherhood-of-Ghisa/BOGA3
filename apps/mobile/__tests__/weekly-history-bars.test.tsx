@@ -231,7 +231,7 @@ it('retains target colour independently of length and bounds long formatted valu
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).not.toContain('averaged');
   // The ramp names the target and its ends; no sentence explains the colour.
-  for (const text of ['Weekly target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  for (const text of ['% of target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
   expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
@@ -255,7 +255,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
   expect(screen.queryByText('Current week is in progress.')).toBeNull();
   expect(screen.queryByText(/week average:/)).toBeNull();
   expect(screen.queryByText('Current week')).toBeNull();
-  expect(screen.getByText('Intensity (per week)')).toBeTruthy();
+  expect(screen.getByText('% of max')).toBeTruthy();
   if (count >= 6) expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '9-week median 20');
   else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });

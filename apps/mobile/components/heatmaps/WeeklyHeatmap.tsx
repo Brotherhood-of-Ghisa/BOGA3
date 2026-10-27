@@ -34,7 +34,6 @@ interface Props {
   formatValue: (value: number) => string;
   formatReferenceValue?: (value: number) => string;
   metricLabel?: string;
-  legendLabel?: string;
   // Inline history states share the list's scroll, never a nested ScrollView.
   header?: ReactNode;
 }
@@ -142,7 +141,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
 }
 
 export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatValue,
-  formatReferenceValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
+  formatReferenceValue = formatValue, metricLabel = 'Value', header }: Props) {
   const windowWeeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey), [data.weekly, data.todayDateKey]);
   const rows = useMemo(() => {
     const months = new Map<string, WeekCell[]>();
@@ -172,7 +171,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
     testID={testID} style={styles.list} contentContainerStyle={styles.content}
     data={rows} keyExtractor={item => 'monthKey' in item ? item.monthKey : item.weekStartDateKey}
     initialNumToRender={12} windowSize={5} showsVerticalScrollIndicator={false}
-    ListHeaderComponent={<View>{header}<>
+    ListHeaderComponent={<View>{header}<HeatmapLegend target={!!data.targetGrading} /><>
       {/* No view title: the page's selectors say which view and metric this is. */}
       <View style={styles.axisRow}>
         <View style={styles.date} />
@@ -200,9 +199,6 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
         formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
         position={position} references={references} valueWidth={valueWidth} testID={testID} />;
     }}
-    ListFooterComponent={<View style={styles.footer}>
-      <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
-    </View>}
   />;
 }
 
@@ -227,7 +223,6 @@ const styles = StyleSheet.create({
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axis: { flex: 1, height: uiTypography.lineHeight.xxs + uiSpace.sm },
   axisLabel: { ...heatmapStyles.legendText, position: 'absolute', left: 0 },
-  footer: { gap: uiSpace.xs, paddingTop: uiSpace.lg },
 });
 
 export default WeeklyHeatmap;

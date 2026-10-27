@@ -133,28 +133,34 @@ const readMetricValue = (
   return raw !== null && Number.isFinite(raw) && raw > 0 ? raw : 0;
 };
 
-/**
- * Maps each muscle group to its 0..4 sequential intensity bucket relative to
- * the highest-trained muscle in the current period for `metric`.
- */
+export type MuscleColourScale = { maximum: number } | {
+  weeklyTarget: number; weeks: number; weeklyTargets: Readonly<Record<string, number>>;
+};
+
+/** The host supplies a History maximum or the displayed period's muscle targets. */
 export function computeMuscleBuckets(
   muscles: readonly ProgressMuscleComparison[],
-  metric: ProgressMetric
+  metric: ProgressMetric,
+  scale: MuscleColourScale = { maximum: 0 },
 ): ReadonlyMap<string, CalendarHeatmapBucket> {
-  let maxValue = 0;
-  for (const row of muscles) {
-    const val = readMetricValue(row, metric);
-    if (val > maxValue) maxValue = val;
-  }
   const buckets = new Map<string, CalendarHeatmapBucket>();
   for (const row of muscles) {
     const val = readMetricValue(row, metric);
-    const bucket = getCalendarHeatmapBucket(val, 0, maxValue);
+    const maximum = 'maximum' in scale ? scale.maximum
+      : (Object.hasOwn(scale.weeklyTargets, row.muscleGroupId) ? scale.weeklyTargets[row.muscleGroupId] : scale.weeklyTarget) * scale.weeks;
+    const bucket = getCalendarHeatmapBucket(val, maximum);
     buckets.set(row.muscleGroupId, bucket);
     buckets.set(canonicalMuscleId(row.muscleGroupId), bucket);
   }
   return buckets;
 }
+
+export const muscleHistoryMaximum = (muscles: readonly ProgressMuscleComparison[], metric: ProgressMetric): number =>
+  muscles.reduce((maximum, row) => Math.max(maximum, readMetricValue(row, metric)), 0);
+
+export const progressMuscleScale = (metric: ProgressMetric, historyMuscles: readonly ProgressMuscleComparison[],
+  targets: Omit<Extract<MuscleColourScale, { weeklyTarget: number }>, 'weeks'> | undefined, weeks: number): MuscleColourScale =>
+  metric === 'workingSetCount' && targets ? { ...targets, weeks } : { maximum: muscleHistoryMaximum(historyMuscles, metric) };
 
 const buildShadeRamp = (
   baseHex: string,

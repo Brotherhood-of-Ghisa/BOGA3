@@ -20,7 +20,6 @@ interface Props {
   testIDPrefix: string;
   metricLabel: string;
   formatValue: (value: number) => string;
-  legendLabel?: string;
   header?: ReactNode;
   /** Opens a day's sessions. */
   onOpenDay?: (day: DayCell) => void;
@@ -84,7 +83,7 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
   </View>;
 }
 
-export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day', header, onOpenDay, onOpenWeek }: Props) {
+export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, header, onOpenDay, onOpenWeek }: Props) {
   const [width, setWidth] = useState(0);
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
@@ -102,8 +101,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       testID={`${testIDPrefix}-scroll`}
-      ListHeaderComponent={<View style={styles.header}>{header}</View>}
-      ListFooterComponent={<HeatmapLegend label={legendLabel} target={!!data.targetGrading} />}
+      ListHeaderComponent={<View style={styles.header}>{header}<HeatmapLegend target={!!data.targetGrading} /></View>}
     />
   </View>;
 }

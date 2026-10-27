@@ -9,7 +9,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
-| `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
+| `HeatmapLegend.tsx` | The percentage reference and 0%…100% ramp above each chart. |
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → the columns and where each month label sits; `weekLabel` → a week's name on screen. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with the focused week between its previous / next arrows, y axis, month axis, the focused column in `ink` on a `ruleSoft` band; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`, a column wide enough to tap; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection and is told which week is focused (`FocusedTimelineWeek`), for the page's ⋮. |
@@ -39,8 +39,8 @@ Muscle history offers per-side, role-weighted `totalVolume`, and
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
 raw entered kg, and every exercise uses the same labels.
 
-**Exercise metrics and Volume buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
-smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
+**Exercise metrics and Volume buckets** follow [[comparison.colour-scale]]
+(`getCalendarHeatmapBucket`); zero or an empty scale is bucket 0.
 `hasTraining` distinguishes a known zero from rest in tiles and accessibility;
 `unavailable` marks a figure that cannot be shown (a Volume sum that is not
 finite) instead of treating it as zero.
@@ -49,7 +49,7 @@ metric's cells; muscle history carries none.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
 against effective targets ([[muscle.weekly-targets]]), capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
-the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
+the legend then reads `% of target`, `0%` to `100%`, and accessible labels
 report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
@@ -71,7 +71,6 @@ and routes; rest cells in Daily stay text.
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap", "<prefix>-heatmap-cell-<dateKey>"
   metricLabel="Volume"                  // tile accessibility
   formatValue={(v) => String(v)}
-  legendLabel="Volume per day"
   onOpenDay={onOpenDay}                 // (day: DayCell) => void; day.sessionIds names its sessions
   onOpenWeek={onOpenWeek}               // (weekStartDateKey) => void; the Week tiles
 />
