@@ -76,7 +76,8 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { upsertLocalGym } from '@/src/data/local-gyms';
-import { uiRoles } from '@/components/ui/tokens';
+import { StyleSheet } from 'react-native';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { exerciseDefinitions, exerciseSets, muscleGroups, sessions } from '@/src/data/schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -827,6 +828,9 @@ describe('a session written through the app', () => {
     expect(screen.getByTestId('completed-session-detail-no-exercises')).toHaveTextContent(
       'No exercises logged in this session.'
     );
+    expect(StyleSheet.flatten(screen.getByTestId('completed-session-detail-no-exercises').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
+    });
   });
 
   it('Edit opens the session view; back returns, or goes to Progress when there is nowhere to return', async () => {

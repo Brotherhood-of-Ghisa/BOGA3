@@ -3,7 +3,8 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native'
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { SessionGpsPanel, type SessionGpsPanelProps } from './session-gps-panel';
 import type { SessionGymOption } from '@/src/session-recorder/gym-options';
 
@@ -67,7 +68,7 @@ export function SessionGymSheet({
       ) : null}
       <ScrollView style={{ maxHeight: height * LIST_SHARE_OF_SCREEN }} testID="session-view-gym-list">
         {options === null ? (
-          <Text allowFontScaling={false} style={styles.message}>Loading gyms…</Text>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]}>Loading gyms…</Text>
         ) : (
           <>
             {nearby.map((gym, index) => (
@@ -92,28 +93,15 @@ export function SessionGymSheet({
         onPress={onManage}
         testID="session-view-gym-manage"
         trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text allowFontScaling={false} style={styles.manage}>Manage gyms</Text>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Manage gyms</Text>
       </ListRow>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  manage: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.ink,
-  },
   message: {
     paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

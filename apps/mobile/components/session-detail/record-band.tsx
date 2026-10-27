@@ -1,6 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 
 type RecordBandProps = {
@@ -20,9 +22,11 @@ export function RecordBand({ lines, placement, testID }: RecordBandProps) {
     <View style={[styles.band, placement === 'footer' ? styles.footer : styles.header]} testID={testID}>
       {lines.map((line, index) => (
         <View key={line.key} style={[styles.line, index > 0 ? styles.lineRuled : null]} testID={`${testID}-${index + 1}`}>
-          <Text allowFontScaling={false} style={styles.label}>{line.label}</Text>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.record, styles.label]}>
+            <FigureText figureStyle={uiTextTone.record}>{line.label}</FigureText>
+          </Text>
           {line.set ? (
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.set}>{line.set}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.figureSmall, uiTextTone.record, styles.set]}>{line.set}</Text>
           ) : null}
         </View>
       ))}
@@ -55,22 +59,10 @@ const styles = StyleSheet.create({
   },
   label: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
   },
-  // The set a line names, right-aligned in the figure face.
+  // The set a line names, right-aligned.
   set: {
     flexShrink: 0,
     marginLeft: 'auto',
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.record,
   },
 });

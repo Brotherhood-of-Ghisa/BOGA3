@@ -2,7 +2,8 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FormField } from '@/components/ui/form-field';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import type { SessionTimesText, SessionTimesValidation } from '@/src/session-recorder/session-times';
 
 export type SessionTimesFieldsProps = {
@@ -86,7 +87,7 @@ export function SessionTimesFields({
         />
       </View>
       {notice ? (
-        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-times-notice">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={uiText.meta} testID="session-view-times-notice">
           {notice}
         </Text>
       ) : null}
@@ -108,12 +109,5 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
     minWidth: 0,
-  },
-  notice: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

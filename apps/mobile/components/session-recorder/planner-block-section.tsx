@@ -5,7 +5,9 @@ import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { listAvailablePlanBlocks, type AvailablePlanBlockView } from '@/src/session-planner/available-blocks';
 
 /**
@@ -69,7 +71,7 @@ export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
 
   return (
     <View style={styles.section} testID="exercise-picker-planner-section">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         From planner
       </Text>
       <Card>
@@ -82,11 +84,11 @@ export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
             onPress={() => onPickBlock(row.block.id)}
             testID={`exercise-picker-planner-block-${row.block.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
-                {row.block.name}
+              <Text allowFontScaling={false} numberOfLines={2} style={uiText.bodyStrong}>
+                <FigureText strong>{row.block.name}</FigureText>
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.source}>
-                {row.planTitle} · Block {row.block.orderIndex + 1} of {row.planBlockCount}
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+                <FigureText>{`${row.planTitle} · Block ${row.block.orderIndex + 1} of ${row.planBlockCount}`}</FigureText>
               </Text>
             </View>
           </ListRow>
@@ -100,30 +102,7 @@ const styles = StyleSheet.create({
   section: {
     gap: uiSpace.sm,
   },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   rowText: {
     paddingVertical: uiSpace.sm,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  source: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
 });

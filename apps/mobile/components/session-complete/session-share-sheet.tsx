@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChang
 
 import { ActionButton } from '@/components/ui/action-button';
 import { PageSheet } from '@/components/ui/page-sheet';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   captureSessionShareImage,
@@ -225,9 +226,9 @@ export function SessionShareSheet({
         </View>
       </ScrollView>
       <View style={styles.footer}>
-        <Text allowFontScaling={false} style={styles.privacy}>Nothing is shared until you choose an app.</Text>
+        <Text allowFontScaling={false} style={[uiText.meta, styles.centered]}>Nothing is shared until you choose an app.</Text>
         {shareError ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.error} testID="session-share-error">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.danger, styles.centered]} testID="session-share-error">
             {shareError}
           </Text>
         ) : null}
@@ -270,21 +271,8 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.sm,
     gap: uiSpace.sm,
   },
-  privacy: {
+  centered: {
     textAlign: 'center',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  error: {
-    textAlign: 'center',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
   // The captured image: `paper` so it reads as the app does, cards on top.
   shareCard: {

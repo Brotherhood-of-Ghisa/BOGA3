@@ -150,15 +150,17 @@ had grown for nine jobs.
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
 
-Colour (`uiTextTone`: ink, muted, faint, accent, gain, record) and one step of
+Colour (`uiTextTone`: ink, muted, faint, accent, gain, danger, record) and one step of
 emphasis (`uiTextEmphasis.strong`: mine, live, the gym) are modifiers, never new
 roles; layout styles follow the role and set no type. A line mixing words and
 figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
-so it never outweighs the title. Today, Groups and Sessions take every text
-from the roles; screens not yet moved still hold their own styles, and each
-moves when next touched.
+so it never outweighs the title. Today, Groups, Sessions and the session flow
+(recorder, session view, completion, View Session, Train) take every text from
+the roles. Display art keeps its own type: the full-screen repeating timer, the
+Train START disc and the share image. Screens not yet moved still hold their
+own styles, and each moves when next touched.
 
 ## 4. Surfaces
 

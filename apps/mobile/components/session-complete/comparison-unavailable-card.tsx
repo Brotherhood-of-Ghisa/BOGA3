@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 // One statement: what is missing, and what it takes. The cutoff counts the
@@ -26,10 +28,12 @@ export function ComparisonUnavailableCard({ names, testID }: ComparisonUnavailab
   return (
     <Card testID={testID}>
       <View accessibilityLabel={`${STATEMENT}. ${names.join(', ')}.`} accessible style={styles.body}>
-        <Text allowFontScaling={false} style={styles.statement}>{STATEMENT}</Text>
+        <Text allowFontScaling={false} style={uiText.bodyStrong}>
+          <FigureText strong>{STATEMENT}</FigureText>
+        </Text>
         <View style={styles.names}>
           {names.map((name, index) => (
-            <Text allowFontScaling={false} key={`${index}-${name}`} style={styles.name}>{name}</Text>
+            <Text allowFontScaling={false} key={`${index}-${name}`} style={uiText.bodyStrong}>{name}</Text>
           ))}
         </View>
       </View>
@@ -43,23 +47,8 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
   },
-  // The card's own line, a step below the section heading (`design-language.md` §3).
-  statement: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
   names: {
     paddingTop: uiSpace.xs,
     gap: uiSpace.xs,
-  },
-  name: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });
