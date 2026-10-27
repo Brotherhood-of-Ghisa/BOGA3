@@ -22,6 +22,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { setMuscleTracked } from '@/src/data/muscle-report-settings';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -151,6 +152,46 @@ describe('Today: the Plan page over real data', () => {
       'Pectoralis, Wednesday 28 Oct 26: rest, Thursday 29 Oct 26: rest, Friday 30 Oct 26: 2 sets, today: none yet, this week 6 of 8 sets',
     );
     expect(text('today-plan-muscle-quads').props.accessibilityLabel).toContain('Friday 30 Oct 26: rest, today: 5 sets, this week 8 of 8 sets');
+  });
+
+  it.each([
+    ['Monday', local(2026, 10, 26), true],
+    ['Tuesday', local(2026, 10, 27), true],
+    ['Wednesday', local(2026, 10, 28), true],
+    ['Thursday', local(2026, 10, 29), false],
+    ['Friday', local(2026, 10, 30), false],
+    ['Saturday', local(2026, 10, 31), false],
+    ['Sunday', local(2026, 11, 1), false],
+  ] as const)('separates previous-week days from Monday only when needed on %s', async (_day, now, hasBoundary) => {
+    await renderToday({ now: () => now });
+
+    const card = within(text('today-plan-recovery-card'));
+    expect(card.getByText('Target')).toBeTruthy();
+    expect(card.queryByText('Week')).toBeNull();
+    const boundary = screen.queryByTestId('today-plan-recovery-week-boundary');
+    if (hasBoundary) {
+      expect(boundary).toBeTruthy();
+      // The first current-week column is Monday, even when it is today.
+      expect(boundary!.parent!.parent).toHaveTextContent('Mon');
+      expect(boundary!.parent!.parent).toHaveStyle({ marginLeft: uiSpace.sm });
+    } else {
+      expect(boundary).toBeNull();
+    }
+    expect(text('today-plan-muscle-quads-today')).not.toHaveStyle({ borderColor: uiRoles.accent });
+  });
+
+  it.each([
+    ['below', 15, uiRoles.ink],
+    ['at', 16, uiRoles.gain],
+    ['above', 17, uiRoles.gain],
+  ])('colours the weekly total %s target while retaining fractional secondary sets', async (_state, count, color) => {
+    await bootLocalApp();
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count }]);
+    await renderToday();
+
+    const week = within(text('today-plan-muscle-triceps-week'));
+    expect(week.getByText(String(count / 2))).toHaveStyle({ color });
+    expect(week.getByText('/8')).toHaveStyle({ color: uiRoles.inkMuted });
   });
 
   it("takes the target from Settings and counts secondary sets as Settings' Progress default says", async () => {
