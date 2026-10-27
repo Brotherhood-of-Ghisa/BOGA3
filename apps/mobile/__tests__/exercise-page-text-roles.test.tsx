@@ -77,7 +77,8 @@ describe('Exercise page: the logger', () => {
     renderLogger();
     const preview = screen.getByTestId('exercise-set-logger-preview');
     expectWordsWithFigures(preview, '99.3');
-    expect(style(within(preview).getByText(/VOL/))).not.toHaveProperty('fontFamily', uiFonts.figure.family);
+    // Only the figures are runs of their own; the words (`1RM`, `VOL`) stay in the line's face.
+    expect(within(preview).getAllByText(/./).filter((node) => node !== preview).map((node) => node.props.children)).toEqual(['99.3', '495']);
   });
 });
 
