@@ -12,7 +12,7 @@ import { useRootRouteAccess } from '@/src/navigation/root-route-access';
  * hidden back label (still read by VoiceOver) is the previous screen's title,
  * so the headerless `(tabs)` group is titled "Back" rather than "(tabs)".
  */
-export const ROOT_STACK_SCREEN_OPTIONS = {
+const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
   // One header style on every stack route, as the design-language top bars
   // draw it (`navigation-contract.md` "Header titles"):
