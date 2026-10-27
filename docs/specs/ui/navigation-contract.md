@@ -22,14 +22,13 @@ For the route inventory and owning files, load `screen-map.md`.
   preserved roots `/stats-history`, `/exercise-catalog`, `/groups` and
   `/settings` stay addressable and each maps to a canonical owner
   (`resolveMainTab`), so every recognised root keeps exactly one tab selected
-  and an unrecognised one selects none. A tab root registered in
+  and an unrecognised one selects none. A tab root in
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
   destination or as a preserved root with an owner, or it renders with no tab
   selected.
 - Train is the only tab whose destination is computed: with a workout in
   progress it opens that session directly (`mainTabDestination`,
-  `useOpenMainTab`), and a failed lookup opens `/train` rather than assuming
-  there is no workout. Train is also the only way into an active workout —
+  `useOpenMainTab`); a failed lookup opens `/train`. Train is also the only way into an active workout —
   nothing on Today opens `/session/<id>`.
 - Sync cadence is route-independent: the scheduler
   (`apps/mobile/src/sync/scheduler.ts`) never reads the active route, and a
@@ -141,11 +140,11 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
 | `/today` ↔ `/train` ↔ `/progress` ↔ `/more` | | `MainTabBar` |
 | any tab strip | `/session/<sessionId>` | the Train tab with a workout in progress: `push` from the tab bar and `exercise-history`, `dismissTo` from a completed session view, and nothing on that session's own view |
-| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for an existing draft first and `apps/mobile/src/session-entry/coordinator.ts` serialises simultaneous requests, so two drafts cannot appear |
+| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for a draft and `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
 | `/session/<id>` | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`replace`) |
 | `/session/<id>` | `/train` or another tab | Abandon after its confirmation, or the bottom bar (`dismissTo`, so the tab below is reused rather than stacked) |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
-| `/session/<id>` | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise` and `Remove from session` return `back()`, or `replace('/train')` with no history |
+| `/session/<id>` | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows `replace`, so Back still returns here |
 | `/session/<id>` | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
 | `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
