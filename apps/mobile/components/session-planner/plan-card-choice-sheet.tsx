@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Icon, ListRow, Sheet, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, FigureText, Icon, ListRow, Sheet, uiRoles, uiSpace, uiText } from '@/components/ui';
 
 export type PlanCardChoice = {
   /** The candidate card's `sessionExerciseId`. */
@@ -65,7 +65,7 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
       testID="plan-card-choice-sheet"
       title={blockName}
       visible>
-      <Text allowFontScaling={false} style={styles.prompt}>
+      <Text allowFontScaling={false} style={[uiText.body, styles.prompt]}>
         Which {blockName} card?
       </Text>
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
@@ -82,11 +82,11 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
               onPress={() => setSelectedId(candidate.id)}
               testID={`plan-card-choice-${candidate.id}`}>
               <View style={styles.choiceText}>
-                <Text allowFontScaling={false} style={styles.optionLabel}>
+                <Text allowFontScaling={false} style={uiText.bodyStrong}>
                   {candidate.exerciseName}
                 </Text>
-                <Text allowFontScaling={false} style={styles.detail}>
-                  {candidate.setCount} {candidate.setCount === 1 ? 'set' : 'sets'}
+                <Text allowFontScaling={false} style={uiText.meta}>
+                  <FigureText>{`${candidate.setCount} ${candidate.setCount === 1 ? 'set' : 'sets'}`}</FigureText>
                 </Text>
               </View>
             </ListRow>
@@ -111,31 +111,12 @@ const styles = StyleSheet.create({
   prompt: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
   },
   list: {
     flexShrink: 1,
   },
   choiceText: {
     paddingVertical: uiSpace.sm,
-  },
-  optionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  detail: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   footer: {
     gap: uiSpace.sm,

@@ -100,6 +100,8 @@ export const uiTextTone = StyleSheet.create({
   faint: { color: uiRoles.inkFaint },
   accent: { color: uiRoles.accent },
   gain: { color: uiRoles.gain },
+  // An inline error under a field or a block.
+  danger: { color: uiRoles.danger },
   // A PR: the record colour, drawn heavy (§3 "Weight per figure").
   record: { color: uiRoles.record, fontWeight: '700' },
 });

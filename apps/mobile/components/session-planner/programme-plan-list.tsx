@@ -3,7 +3,7 @@ import { formatLocalDateTime } from '@/src/utils/local-time';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, IconButton, ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, FigureText, IconButton, ListRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
 
 export type ProgrammePlanListProps = {
@@ -47,8 +47,8 @@ export function ProgrammePlanList({
 
   return (
     <View style={styles.container} testID="programme-plan-list">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
-        Sessions ({plans.length})
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+        <FigureText>{`Sessions (${plans.length})`}</FigureText>
       </Text>
 
       <Card>
@@ -91,15 +91,15 @@ export function ProgrammePlanList({
               }>
               <View style={styles.rowText}>
                 <View style={styles.rowTitleLine}>
-                  <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>
+                  <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
                     {plan.title}
                   </Text>
-                  <Text allowFontScaling={false} style={styles.badgeText}>
+                  <Text allowFontScaling={false} style={uiText.label}>
                     {planProgressWord(plan.progress)}
                   </Text>
                 </View>
-                <Text allowFontScaling={false} numberOfLines={1} style={styles.detail}>
-                  {formatSchedule(plan.scheduledFor, dateFormat)} · {totalBlocks} {totalBlocks === 1 ? 'block' : 'blocks'}
+                <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+                  <FigureText>{`${formatSchedule(plan.scheduledFor, dateFormat)} · ${totalBlocks} ${totalBlocks === 1 ? 'block' : 'blocks'}`}</FigureText>
                 </Text>
               </View>
             </ListRow>
@@ -114,15 +114,6 @@ const styles = StyleSheet.create({
   container: {
     gap: uiSpace.sm,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   rowText: {
     flex: 1,
     paddingVertical: uiSpace.xs,
@@ -135,26 +126,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
     flex: 1,
-  },
-  badgeText: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.xxs,
-    color: uiRoles.inkMuted,
-    textTransform: 'uppercase',
-  },
-  detail: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   reorderActions: {
     flexDirection: 'row',
