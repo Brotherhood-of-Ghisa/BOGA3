@@ -158,8 +158,13 @@ it('serializes a racing edit and merge without mixing an identity with old weigh
 it('preserves future-clock stale edits and makes explicit resolution input-idempotent', async () => {
   const c = await chain();
   await merge(c);
-  const ack = await push([{ ...c.sets[0], client_updated_at_ms: Date.now() + 60 * 60000,
-    fields: { ...c.sets[0].fields, weight_value: '50' } }]);
+  const stale = { ...c.sets[0], client_updated_at_ms: Date.now() + 60 * 60000,
+    fields: { ...c.sets[0].fields, weight_value: '50' } };
+  const ack = await push([stale]);
+  await push([stale]); // A lost acknowledgement retries the exact far-future editor snapshot.
+  const savedCopies = (await reviews()).filter(value => value.entityId === c.sets[0].id);
+  expect(savedCopies).toHaveLength(1);
+  expect(savedCopies[0].saved.client_updated_at_ms).toBe(stale.client_updated_at_ms);
   expect(ack.outcomes).toContainEqual({ type: 'exercise_sets', id: c.sets[0].id, outcome: 'preserved' });
   expect((await row('exercise_sets', c.sets[0].id))?.weight_value).toBe('5.0625');
   const item = (await reviews()).find(value => value.entityId === c.sets[0].id)!;

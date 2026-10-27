@@ -59,6 +59,7 @@ This code change does not deploy the migration or authorize activation.
 each sent row must appear exactly once as accepted or preserved. A compact `{ok:true}` still means
 all accepted. Invalid/incomplete acknowledgements never clear dirty rows.
 Preserved payloads enter owner-private review before an obsolete row is acknowledged.
+Their original editor clock precedes LWW clamping, so lost-acknowledgement retries deduplicate.
 
 `sync_pull` includes committed `merge_sequence` and `merge_conflict_count`.
 Sequence discovery avoids the ordinary timestamp cursor's commit-order race.

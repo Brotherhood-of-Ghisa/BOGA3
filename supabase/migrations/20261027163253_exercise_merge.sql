@@ -86,6 +86,11 @@ begin
   if p_row ? 'owner_user_id' and p_row->>'owner_user_id' is distinct from u::text then
     raise exception 'NOT_FOUND';
   end if;
+  -- The LWW clamp changes on retry; recovery identity keeps the original editor clock.
+  if current_setting('boga.exercise_merge_sync',true)='on'
+    and nullif(current_setting('boga.exercise_merge_client_clock',true),'') is not null then
+    p_row:=p_row||jsonb_build_object('client_updated_at_ms',current_setting('boga.exercise_merge_client_clock')::bigint);
+  end if;
   b:=case when p_type='session_exercises' then p_row->>'id' else p_row->>'session_exercise_id' end;
   r:=coalesce((p_row->>'merge_revision')::bigint,0);
   if not exists(select 1 from public.exercise_merge_contexts
@@ -381,8 +386,12 @@ begin
   end loop;
   definition:=replace(definition,'for _idx in 0 .. _len - 1 loop',
     E'perform pg_advisory_xact_lock(hashtextextended(''exercise-merge:''||auth.uid()::text,0));\n  perform set_config(''boga.exercise_merge_sync'',''on'',true);\n  for _idx in 0 .. _len - 1 loop');
+  revised:=replace(definition,'_fields := _entity -> ''fields'';',
+    E'_fields := _entity -> ''fields'';\n    perform set_config(''boga.exercise_merge_client_clock'',_entity->>''client_updated_at_ms'',true);');
+  if revised=definition then raise exception 'Cannot preserve original merge editor clock'; end if;
+  definition:=revised;
   definition:=replace(definition,'return _ok_payload;',
-    E'perform set_config(''boga.exercise_merge_sync'','''',true);\n  return _ok_payload || app_public.exercise_merge_push_outcomes(_entities);');
+    E'perform set_config(''boga.exercise_merge_client_clock'','''',true);\n  perform set_config(''boga.exercise_merge_sync'','''',true);\n  return _ok_payload || app_public.exercise_merge_push_outcomes(_entities);');
   execute definition;
 end $migration$;
 
