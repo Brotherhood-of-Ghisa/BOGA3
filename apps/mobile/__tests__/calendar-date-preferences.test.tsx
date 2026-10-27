@@ -110,10 +110,12 @@ test.each([
   ['DD-MM-YYYY', '2026-09-28', '28 Sep – 4 Oct 2026'],
   ['MM-DD-YYYY', '2026-09-28', 'Sep 28 – Oct 4 2026'],
   ['YYYY-MM-DD', '2026-09-28', '2026 Sep 28 – Oct 4'],
-  ['DD-MM-YYYY', '2025-12-29', '29 Dec 2025 – 4 Jan 2026'],
-  ['MM-DD-YYYY', '2025-12-29', 'Dec 29 2025 – Jan 4 2026'],
-  ['YYYY-MM-DD', '2025-12-29', '2025 Dec 29 – 2026 Jan 4'],
+  ['DD-MM-YYYY', '2025-12-29', '29 Dec – 4 Jan 2026'],
+  ['MM-DD-YYYY', '2025-12-29', 'Dec 29 – Jan 4 2026'],
+  ['YYYY-MM-DD', '2025-12-29', '2026 Dec 29 – Jan 4'],
+  ['DD-MM-YYYY', '2025-03-31', '31 Mar – 6 Apr 2025'],
+  ['DD-MM-YYYY', '2025-02-03', '3–9 Feb 2025'],
   ['DD-MM-YYYY', '2026-03-23', '23–29 Mar 2026'],
-] as const)('compact %s week heading preserves months, years and local days (%s)', (format, key, expected) => {
+] as const)('compact %s week heading uses only the end year and preserves local days (%s)', (format, key, expected) => {
   expect(formatCalendarWeekHeading(key, format)).toBe(expected);
 });
