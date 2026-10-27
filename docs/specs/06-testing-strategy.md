@@ -94,8 +94,8 @@ the real path only where the path itself is under test.
   SQL stay where a query has many edge cases of its own (sync, tombstones);
   otherwise the screen test covers the query.
 - Run a targeted test or lane after each meaningful change, then
-  `./boga test fast` before closeout. Simulator and Docker lanes run as agreed
-  with your reviewer agent, from the path default (`02`, "Choosing lanes").
+  `./boga test fast` before closeout. Simulator and Docker lanes run as chosen
+  from the path default (`02`, "Choosing lanes").
 - Fixtures and mechanics — the shared in-memory database, device SQLite parity,
   the pinned time zone, hang safety, Maestro flow rules — are in
   `docs/specs/writing-tests.md`. **Load it when you are writing a test.**
