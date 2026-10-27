@@ -28,7 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
-import { uiRoles } from '@/components/ui/tokens';
+import { uiGeometry, uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -275,6 +275,8 @@ describe('Today: the Progress card over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions']]);
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
+    // The header row keeps a tap height of its own: the compact link no longer holds it open.
+    expect(text('today-latest-session-header')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
   });
 
   it('compares against an earlier period with the arrows around its range, never later than the previous one', async () => {

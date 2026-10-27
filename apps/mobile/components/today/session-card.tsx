@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
@@ -129,7 +129,7 @@ export function TodaySessionCard({
   );
   return (
     <Card style={[styles.card, fill ? styles.fillCard : null]} testID="today-session-card">
-      <View style={styles.header}>
+      <View style={styles.header} testID="today-latest-session-header">
         {onShowSession ? (
           <StepAround
             noun="session"
@@ -168,8 +168,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minHeight: 0,
   },
-  // The stepped start and the Sessions link share one tap-height row.
+  // The stepped start and the Sessions link share one tap-height row; the
+  // compact link no longer holds it open, so the row does.
   header: {
+    minHeight: uiGeometry.tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
