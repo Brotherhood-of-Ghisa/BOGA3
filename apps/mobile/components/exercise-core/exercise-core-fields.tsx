@@ -2,7 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { LOAD_INPUT_MODES, LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
 export type BodyweightContributionFieldValue = {
@@ -69,7 +70,7 @@ export function ExerciseCoreFields({
       />
 
       <View style={styles.group}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
           Weight entry
         </Text>
         <SegmentedControl
@@ -94,7 +95,7 @@ export function ExerciseCoreFields({
             value={bodyweightContribution.value.percentage}
           />
           {bodyweightContribution.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
-            style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{bodyweightContribution.error}</Text> : null}
+            style={[uiText.meta, uiTextTone.danger]} testID={`${testIDPrefix}-bodyweight-error`}>{bodyweightContribution.error}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -108,23 +109,8 @@ const styles = StyleSheet.create({
   group: {
     gap: uiSpace.sm,
   },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   // The segments carry micro-labels, so the frame sets a field-like height.
   loadMode: {
     minHeight: uiGeometry.tapTarget,
-  },
-  errorText: {
-    color: uiRoles.danger,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
   },
 });

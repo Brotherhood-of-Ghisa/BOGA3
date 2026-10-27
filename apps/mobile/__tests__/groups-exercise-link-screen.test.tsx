@@ -8,7 +8,7 @@
  */
 
 import * as mockReact from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, type TextStyle } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 
@@ -70,6 +70,7 @@ import type { CompetitionExerciseWire as GroupExercise,CompetitionExerciseListWi
 import * as groupsApi from '@/src/groups/api';
 
 import ExerciseLinkRoute from '../app/exercise-link';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -389,4 +390,36 @@ describe('Link screen', () => {
     expect(screen.queryByTestId('exercise-link-link-gx-bench')).toBeNull();
   });
 
+  it('takes every text from the shared text roles', async () => {
+    await renderScreen();
+    const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as TextStyle;
+    const suggested = within(await screen.findByTestId('exercise-link-row-gx-bench'));
+
+    expect(styleOf(screen.getByText('Suggested'))).toMatchObject({
+      fontFamily: uiFonts.display.family,
+      fontSize: uiTypography.size.xxs,
+      textTransform: 'uppercase',
+      color: uiRoles.inkMuted,
+    });
+    expect(styleOf(screen.getByText('Iron Brotherhood'))).toMatchObject({
+      fontFamily: uiFonts.display.family,
+      fontWeight: '700',
+      fontSize: uiTypography.size.lg,
+    });
+    // The name is a row name; its group a full muted body role, so the name's 600 never leaks in.
+    const name = suggested.getAllByText(/^Bench Press/)[0];
+    expect(styleOf(name)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+    const group = suggested.getAllByText(/Iron Brotherhood/).at(-1)!;
+    expect(styleOf(group)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: uiRoles.inkMuted });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-link-link-gx-bench'));
+    });
+    expect(styleOf(within(screen.getByTestId('exercise-link-row-gx-deadlift')).getByText('already linked in Iron Brotherhood'))).toMatchObject({
+      fontFamily: uiFonts.body.family,
+      fontWeight: '400',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.inkMuted,
+    });
+  });
 });

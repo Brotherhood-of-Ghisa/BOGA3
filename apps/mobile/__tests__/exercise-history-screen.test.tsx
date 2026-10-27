@@ -15,7 +15,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type TextStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -57,7 +57,7 @@ import {
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { updatePreferences } from '@/src/preferences/hooks';
-import { uiRoles } from '@/components/ui';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
 import * as historyRepository from '@/src/data/exercise-history';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -737,6 +737,42 @@ describe('ExerciseHistoryScreenShell — design language', () => {
     expect(screen.queryByText('W/sets')).toBeNull();
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/Westside Barbell Club/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toHaveTextContent(/No gym/);
+  });
+
+  it('takes every text from the shared text roles', () => {
+    renderShell({ period: 'all', historyStart: new Date('2026-05-15T00:00:00.000Z') });
+    const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as TextStyle;
+    const meta = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm };
+
+    expect(styleOf(screen.getByTestId('exercise-history-best-label'))).toMatchObject({
+      fontFamily: uiFonts.display.family,
+      fontSize: uiTypography.size.xxs,
+      textTransform: 'uppercase',
+      color: uiRoles.inkFaint,
+    });
+    // A best is the large figure, drawn heavy in record.
+    expect(styleOf(screen.getByTestId('exercise-history-best-est-1rm-value'))).toMatchObject({
+      fontFamily: uiFonts.figure.family,
+      fontSize: uiTypography.size.lg,
+      fontWeight: '700',
+      color: uiRoles.record,
+    });
+    // Its date is a line of words, the figures in the figure face.
+    const date = within(screen.getByTestId('exercise-history-best-est-1rm')).getByText(/^18-05-2026 \d/);
+    expect(styleOf(date)).toMatchObject(meta);
+    expect(styleOf(within(date).getByText('18-05-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family });
+    expect(styleOf(screen.getByText('Westside Barbell Club'))).toMatchObject({ ...meta, fontWeight: '600', color: uiRoles.inkMuted });
+    expect(styleOf(screen.getByText('Older sessions'))).toMatchObject({ ...meta, color: uiRoles.inkMuted });
+  });
+
+  it('draws a missing best as the large figure, faint', () => {
+    renderShell({ summary: buildSummary({ allTimeBest: { estimatedOneRepMax: null, topWeight: null } }) });
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-history-best-est-1rm-value').props.style)).toMatchObject({
+      fontFamily: uiFonts.figure.family,
+      fontWeight: '600',
+      fontSize: uiTypography.size.lg,
+      color: uiRoles.inkFaint,
+    });
   });
 
   it('selects the period in a segmented control', () => {
