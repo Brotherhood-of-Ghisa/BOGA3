@@ -330,16 +330,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
 
   return (
     <Card style={styles.card} testID="stats-muscle-body-card">
-      <View style={styles.legend} testID="stats-muscle-body-legend">
-        {[
-          { label: 'Decrease', color: uiRoles.loss },
-          { label: 'Unchanged', color: uiRoles.rule },
-          { label: 'Increase', color: uiRoles.gain },
-        ].map(({ label, color }) => <View key={label} style={styles.legendItem}>
-          <View style={[styles.swatch, { backgroundColor: color }]} />
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.muted]}>{label}</Text>
-        </View>)}
-      </View>
       <MuscleBodyHeader
         onNext={handleNextMuscle}
         onOpenPicker={() => setSheetVisible(true)}
@@ -436,9 +426,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
 }
 
 const styles = StyleSheet.create({
-  legend: { flexDirection: 'row', justifyContent: 'space-between', gap: uiSpace.sm },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
-  swatch: { width: 12, height: 12 },
   comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
   card: {
     padding: uiSpace.md,

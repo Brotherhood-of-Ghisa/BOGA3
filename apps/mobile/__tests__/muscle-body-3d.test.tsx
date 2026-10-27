@@ -64,7 +64,8 @@ describe('normaliseBodyAngle & bodyOrientationForAngle', () => {
 
 describe('computeMuscleBuckets', () => {
   it.each([
-    [12, 8, 2], [8, 12, 1], [8, 8, 0], [0, 8, 1], [8, 0, 2], [0, 0, 0],
+    [12, 8, 3], [8, 12, 1], [8, 8, 2], [0, 8, 1], [8, 0, 3], [0, 0, 0],
+    [Number.NaN, 8, 0], [8, Infinity, 0],
   ])('compares %s sets with %s previous sets (bucket %s)', (now, previous, expected) => {
     const row = makeMuscle('front_delts', 'Front delts', now);
     row.previous.workingSetCount = previous;
@@ -74,9 +75,9 @@ describe('computeMuscleBuckets', () => {
   });
 
   it.each([
-    [1200, 1000, 2], [800, 1000, 1], [1000, 1000, 0],
-    [0, 1000, 1], [1000, 0, 2], [0, 0, 0],
-    [1004, 1000, 0], [996, 1000, 0],
+    [1200, 1000, 3], [800, 1000, 1], [1000, 1000, 2],
+    [0, 1000, 1], [1000, 0, 3], [0, 0, 0],
+    [1004, 1000, 2], [996, 1000, 2],
     [null, 1000, 0], [1000, null, 0], [Infinity, 1000, 0],
   ])('uses the displayed Volume direction for %s versus %s (bucket %s)', (now, previous, expected) => {
     const row = makeMuscle('chest', 'Chest', 1, now);
@@ -89,35 +90,40 @@ describe('computeMuscleBuckets', () => {
     small.previous.workingSetCount = 1;
     const large = makeMuscle('quads', 'Quads', 100);
     large.previous.workingSetCount = 200;
-    expect([...computeMuscleBuckets([small, large], 'workingSetCount').values()]).toEqual([2, 1]);
+    expect([...computeMuscleBuckets([small, large], 'workingSetCount').values()]).toEqual([3, 1]);
   });
 });
 
 describe('buildThemeShadePalette', () => {
-  it.each(themePresets)('keeps gain/loss hues and neutral anatomy in the $id theme', preset => {
+  it.each(themePresets)('uses light, middle and dark theme shades with neutral empty anatomy in $id', preset => {
     const roles = generateRoles(preset.seeds);
     const palette = buildThemeShadePalette(roles);
     expect(palette.neutral).toHaveLength(SHADE_STEPS);
-    expect(palette.buckets).toHaveLength(3);
+    expect(palette.buckets).toHaveLength(4);
     expect(palette.buckets[0]).toEqual(palette.neutral);
     expect(palette.selectedStroke).toBe(roles.ink);
-    for (const [bucket, seed] of [[1, roles.loss], [2, roles.gain]] as const) {
+    for (const [bucket, seed] of [[1, roles.viz1], [2, roles.viz2], [3, roles.viz4]] as const) {
       expect(palette.buckets[bucket]).toHaveLength(SHADE_STEPS);
-      expect(hexToLch(palette.buckets[bucket][6]).hue).toBeCloseTo(hexToLch(seed).hue, 0);
+      const hueDifference = Math.abs(hexToLch(palette.buckets[bucket][6]).hue - hexToLch(seed).hue);
+      expect(Math.min(hueDifference, 360 - hueDifference)).toBeLessThan(3);
+    }
+    for (let step = 0; step < SHADE_STEPS; step += 1) {
+      expect(hexToLch(palette.buckets[1][step]).lightness).toBeGreaterThan(hexToLch(palette.buckets[2][step]).lightness);
+      expect(hexToLch(palette.buckets[2][step]).lightness).toBeGreaterThan(hexToLch(palette.buckets[3][step]).lightness);
     }
   });
 });
 
 describe('projectMuscleBody & hitTestProjectedMuscle', () => {
-  it('projects gain, loss and neutral fills and preserves them when selected', () => {
-    const muscles = [makeMuscle('chest', 'Chest', 8), makeMuscle('quads', 'Quads', 4), makeMuscle('delts_front', 'Front delts', 6)];
+  it.each(themePresets)('projects the $id theme shades and preserves them when selected', preset => {
+    const muscles = [makeMuscle('chest', 'Chest', 8), makeMuscle('quads', 'Quads', 4), makeMuscle('delts_front', 'Front delts', 6), makeMuscle('biceps', 'Biceps', 0)];
     muscles[1].previous.workingSetCount = 8;
     muscles[2].previous.workingSetCount = 6;
     const buckets = computeMuscleBuckets(muscles, 'workingSetCount');
-    const palette = buildThemeShadePalette();
+    const palette = buildThemeShadePalette(generateRoles(preset.seeds));
     for (const selectedId of [null, 'quads']) {
-      const projected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, buckets, selectedId });
-      for (const [id, bucket] of [['chest', 2], ['quads', 1], ['delts_front', 0]] as const) {
+      const projected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, buckets, selectedId, palette });
+      for (const [id, bucket] of [['chest', 3], ['quads', 1], ['delts_front', 2], ['biceps', 0]] as const) {
         const facets = projected.triangles.filter(triangle => triangle.muscleGroupId === id);
         expect(facets.length).toBeGreaterThan(0);
         expect(facets.every(triangle => palette.buckets[bucket].includes(triangle.fill))).toBe(true);
@@ -227,13 +233,14 @@ describe('MuscleBodyCard', () => {
     makeMuscle('quads', 'Quads', 4, 1600),
   ];
 
-  it('shows the direction legend and the selected muscle’s signed comparison', () => {
+  it('omits the legend and keeps the selected muscle’s signed comparison', () => {
     render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);
-    expect(screen.getByTestId('stats-muscle-body-legend')).toHaveTextContent('DecreaseUnchangedIncrease');
+    expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
+    expect(screen.queryByText('Decrease')).toBeNull();
+    expect(screen.queryByText('Unchanged')).toBeNull();
+    expect(screen.queryByText('Increase')).toBeNull();
     expect(screen.queryByText('% of max')).toBeNull();
     expect(screen.queryByText('% of target')).toBeNull();
-    const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('stats-muscle-body-legend')).toBeLessThan(tree.indexOf('stats-muscle-body-viewport'));
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^0$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-change')).toHaveTextContent(/^\+8$/);
