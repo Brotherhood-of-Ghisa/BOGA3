@@ -28,7 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
-import { uiRoles } from '@/components/ui/tokens';
+import { uiGeometry, uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -259,6 +259,8 @@ describe('Today: the Progress card over real data', () => {
 
     const body = text('today-latest-session');
     expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 07:12');
+    // The time sits one weight under the date, and muted.
+    expect(within(text('today-latest-session-start')).getByText(' 07:12')).toHaveStyle({ fontWeight: '500', color: uiRoles.inkMuted });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
     expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
@@ -275,6 +277,8 @@ describe('Today: the Progress card over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions']]);
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
+    // The header row keeps a tap height of its own: the compact link no longer holds it open.
+    expect(text('today-latest-session-header')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
   });
 
   it('compares against an earlier period with the arrows around its range, never later than the previous one', async () => {

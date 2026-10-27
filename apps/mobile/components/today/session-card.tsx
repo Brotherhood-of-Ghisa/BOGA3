@@ -2,14 +2,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
 
 import { formatBestSet, todaySessionAccessibilityLabel } from './progress-format';
 import { StepAround } from './step-arrows';
-import { todayText } from './text-styles';
 
 export type TodaySessionCardProps = {
   session: LatestSessionSummary;
@@ -35,19 +35,19 @@ function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number
   const testID = `today-latest-session-exercise-${index}`;
   return (
     <View style={[styles.row, styles.exerciseRow]} testID={testID}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.name}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.nameCell]}>
         {line.name}
       </Text>
-      <Text allowFontScaling={false} style={[styles.figure, styles.sets, styles.muted]} testID={`${testID}-sets`}>
+      <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.sets]} testID={`${testID}-sets`}>
         {line.workingSets}
       </Text>
       {/* No working set: the best-set cells stay blank ([[copy.blank-history]]). */}
-      <Text allowFontScaling={false} style={[styles.figure, styles.best]} testID={`${testID}-best`}>
+      <Text allowFontScaling={false} style={[uiText.figure, styles.best]} testID={`${testID}-best`}>
         {line.bestSet ? formatBestSet(line.bestSet) : ''}
       </Text>
       <Text
         allowFontScaling={false}
-        style={[styles.figure, styles.oneRepMax, line.oneRepMaxRecord ? styles.record : null]}
+        style={[uiText.figure, styles.oneRepMax, line.oneRepMaxRecord ? uiTextTone.record : null]}
         testID={`${testID}-1rm`}>
         {line.bestSet ? formatOneRepMax(line.bestSet.oneRepMaxKg) : ''}
       </Text>
@@ -61,21 +61,21 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   // The rows' count (one per exercise, however often it was logged), so the line and the table agree.
   const exercises = session.exercises.length;
   return (
-    <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summary} testID="today-latest-session-figures">
-      <Text allowFontScaling={false} style={styles.summaryFigure}>{exercises}</Text>
+    <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.body} testID="today-latest-session-figures">
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{exercises}</Text>
       {exercises === 1 ? ' exercise' : ' exercises'}
-      <Text allowFontScaling={false} style={styles.separator}> · </Text>
-      <Text allowFontScaling={false} style={styles.summaryFigure}>{session.workingSets}</Text>
+      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{session.workingSets}</Text>
       {session.workingSets === 1 ? ' set' : ' sets'}
-      <Text allowFontScaling={false} style={styles.separator}> · </Text>
-      <Text allowFontScaling={false} style={prs > 0 ? styles.recordLabel : null} testID="today-latest-session-prs">
-        <Text allowFontScaling={false} style={styles.summaryFigure}>{prs}</Text>
+      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+      <Text allowFontScaling={false} style={prs > 0 ? uiTextTone.record : null} testID="today-latest-session-prs">
+        <Text allowFontScaling={false} style={uiText.inlineFigure}>{prs}</Text>
         {prs === 1 ? ' PR' : ' PRs'}
       </Text>
       {gym ? (
         <>
-          <Text allowFontScaling={false} style={styles.separator}> @ </Text>
-          <Text allowFontScaling={false} style={styles.gym}>{gym}</Text>
+          <Text allowFontScaling={false} style={uiTextTone.faint}> @ </Text>
+          <Text allowFontScaling={false} style={uiTextEmphasis.strong}>{gym}</Text>
         </>
       ) : null}
     </Text>
@@ -86,7 +86,7 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
 function ExerciseTable({ lines, fill }: { lines: SessionExerciseLine[]; fill: boolean }) {
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
-  const label = [todayText.microLabel, todayText.microLabelFaint];
+  const label = [uiText.label, uiTextTone.faint];
   return (
     <View style={fill ? styles.fillTable : null}>
       <View style={[styles.row, styles.tableHeader]}>
@@ -122,14 +122,14 @@ export function TodaySessionCard({
   fill = false,
 }: TodaySessionCardProps) {
   const stamp = (
-    <Text allowFontScaling={false} numberOfLines={1} style={styles.stamp} testID="today-latest-session-start">
+    <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureLarge} testID="today-latest-session-start">
       {formatCompactDate(session.startedAt)}
-      <Text allowFontScaling={false} style={styles.time}>{` ${formatClockTime(session.startedAt.getTime())}`}</Text>
+      <Text allowFontScaling={false} style={[uiText.inlineFigure, uiTextTone.muted]}>{` ${formatClockTime(session.startedAt.getTime())}`}</Text>
     </Text>
   );
   return (
     <Card style={[styles.card, fill ? styles.fillCard : null]} testID="today-session-card">
-      <View style={styles.header}>
+      <View style={styles.header} testID="today-latest-session-header">
         {onShowSession ? (
           <StepAround
             noun="session"
@@ -141,7 +141,7 @@ export function TodaySessionCard({
         ) : (
           stamp
         )}
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="text" />
+        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
       </View>
       <Pressable
         accessibilityHint="Opens the completed session"
@@ -157,8 +157,6 @@ export function TodaySessionCard({
   );
 }
 
-const figure = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const };
-
 const styles = StyleSheet.create({
   // Three sections, a clear step apart: the stepped start, the summary, the exercises.
   card: {
@@ -170,25 +168,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minHeight: 0,
   },
-  // The stepped start and the Sessions link share one tap-height row.
+  // The stepped start and the Sessions link share one tap-height row; the
+  // compact link no longer holds it open, so the row does.
   header: {
+    minHeight: uiGeometry.tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
     marginLeft: -uiSpace.sm,
     marginRight: -uiSpace.sm,
-  },
-  stamp: {
-    ...figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  time: {
-    fontWeight: '500',
-    color: uiRoles.inkMuted,
   },
   body: {
     gap: uiSpace.lg,
@@ -198,22 +187,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  summary: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  summaryFigure: figure,
-  separator: {
-    color: uiRoles.inkFaint,
-  },
-  gym: {
-    fontWeight: '600',
-  },
-  recordLabel: {
-    color: uiRoles.record,
   },
   nameCell: {
     flex: 1,
@@ -239,25 +212,6 @@ const styles = StyleSheet.create({
     height: ROW_HEIGHT,
     borderTopWidth: 1,
     borderTopColor: uiRoles.ruleSoft,
-  },
-  name: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    color: uiRoles.ink,
-  },
-  figure: {
-    ...figure,
-    fontSize: uiTypography.size.md,
-    color: uiRoles.ink,
-  },
-  muted: {
-    color: uiRoles.inkMuted,
-  },
-  record: {
-    fontWeight: '700',
-    color: uiRoles.record,
   },
   sets: {
     width: 32,

@@ -326,6 +326,8 @@ describe('Today: the group card', () => {
 
       // Live: today's start time and the figures so far, no record.
       expect(byId('today-group-session-maria-live-when')).toHaveTextContent('Started 11:30');
+      // The live time keeps the line's emphasis: its figure is no lighter than `Started`.
+      expect(within(byId('today-group-session-maria-live-when')).getByText('11:30')).toHaveStyle({ fontWeight: '600' });
       expect(byId('today-group-session-maria-live-figures')).toHaveTextContent('3 exercises · 7 sets so far');
       expect(screen.queryByTestId('today-group-session-maria-live-record')).toBeNull();
       // Completed: Today's compact date and time, then the session's figures.

@@ -3,14 +3,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import type { NextPlannedSession, PlanWeekDay, RecoveryRow, TodayPlan } from '@/src/today-plan';
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
-
-import { todayText } from './text-styles';
 
 export type TodayPlanCardsProps = {
   plan: TodayPlan;
@@ -61,7 +61,7 @@ function DayCell({ count, weekStart, testID }: { count: number | null; weekStart
   return (
     <RecoveryDayColumn weekStart={weekStart}>
       <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
-        <Text allowFontScaling={false} style={styles.dayCellFigure}>
+        <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink]}>
           {count === null ? '' : count}
         </Text>
       </View>
@@ -80,16 +80,16 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
       onPress={onPress}
       style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.muscleName}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.nameCell]}>
         {row.name}
       </Text>
       {row.days.map((count, index) => (
         <DayCell count={count} key={days[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />
       ))}
       <DayCell count={row.today} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} />
-      <Text allowFontScaling={false} style={styles.weekCell} testID={`${testID}-week`}>
-        <Text allowFontScaling={false} style={[styles.weekFigure, met ? styles.weekFigureMet : null]}>{row.weekSets}</Text>
-        <Text allowFontScaling={false} style={styles.weekTarget}>{`/${row.target}`}</Text>
+      <Text allowFontScaling={false} style={[uiText.figure, styles.weekCell]} testID={`${testID}-week`}>
+        <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{row.weekSets}</Text>
+        <Text allowFontScaling={false} style={uiTextTone.muted}>{`/${row.target}`}</Text>
       </Text>
       <Icon color={uiRoles.inkGhost} name="chevron-right" size="sm" />
     </Pressable>
@@ -102,7 +102,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
 // appear. Today has an accent label and border-free cells. At/above-target
 // totals turn green; the numeric ratio also communicates whether it is met.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
-  const label = [todayText.microLabel, todayText.microLabelFaint];
+  const label = [uiText.label, uiTextTone.faint];
   const weekStart = localWeekWindow(plan.today).start;
   const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
   const weekStartIndex = firstCurrentDay > 0 ? firstCurrentDay : -1;
@@ -118,24 +118,24 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress, fill }: Omit<TodayPl
   return (
     <Card style={[styles.card, fill ? styles.fillCard : null]} testID="today-plan-recovery-card">
       <View style={styles.header}>
-        <Text accessibilityRole="header" allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           Recovery
         </Text>
-        <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="text" />
+        <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="link" />
       </View>
       <View style={[styles.columns, styles.muscleRowLayout]}>
-        <Text allowFontScaling={false} style={[...label, styles.muscleName]}>Muscle</Text>
+        <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Muscle</Text>
         {plan.recoveryDays.map((day, index) => (
           <RecoveryDayColumn heading key={day.getTime()} weekStart={index === weekStartIndex}>
             <Text allowFontScaling={false} style={[...label, styles.dayLabel]}>{weekdayShort(day)}</Text>
           </RecoveryDayColumn>
         ))}
         <RecoveryDayColumn heading weekStart={plan.recoveryDays.length === weekStartIndex}>
-          <Text allowFontScaling={false} style={[...label, styles.dayLabel, styles.dayLabelToday]} testID="today-plan-recovery-today">
+          <Text allowFontScaling={false} style={[...label, styles.dayLabel, uiTextTone.accent]} testID="today-plan-recovery-today">
             {weekdayShort(plan.today)}
           </Text>
         </RecoveryDayColumn>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.weekCell]}>Target</Text>
+        <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
         <View style={styles.chevronSpace} />
       </View>
       {fill ? (
@@ -154,10 +154,10 @@ function WeekDayCell({ day }: { day: PlanWeekDay }) {
   const spoken = `${spokenDate(day.date)}${day.isToday ? ', today' : ''}: ${day.trained ? 'trained' : day.planned ? 'planned' : 'nothing'}`;
   return (
     <View accessibilityLabel={spoken} accessible style={[styles.weekDay, day.isToday ? styles.weekDayToday : null]} testID={`today-plan-week-day-${day.date.getDay()}`}>
-      <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]}>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
         {weekdayLetter(day.date)}
       </Text>
-      <Text allowFontScaling={false} style={[styles.weekDate, day.isToday ? styles.weekDateToday : null]}>
+      <Text allowFontScaling={false} style={[uiText.figure, day.isToday ? uiTextTone.accent : null]}>
         {day.date.getDate()}
       </Text>
       <View style={[styles.mark, markStyles[state]]} testID={`today-plan-week-day-${day.date.getDay()}-${state}`} />
@@ -184,16 +184,16 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
       style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.plannedWhen}>
-        <Text allowFontScaling={false} style={styles.plannedDay} testID={`${testID}-day`}>{day}</Text>
-        <Text allowFontScaling={false} style={styles.plannedTime}>{time}</Text>
+        <Text allowFontScaling={false} style={uiText.bodyStrong} testID={`${testID}-day`}>{day}</Text>
+        <Text allowFontScaling={false} style={uiText.figureSmall}>{time}</Text>
       </View>
       <View style={styles.plannedBody}>
         <View style={styles.plannedTop}>
-          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.plannedTitle}>{session.title}</Text>
-          <Text allowFontScaling={false} style={styles.plannedFigures} testID={`${testID}-figures`}>{figures}</Text>
+          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.bodyStrong, styles.plannedTitle]}>{session.title}</Text>
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}><FigureText>{figures}</FigureText></Text>
         </View>
         {muscles ? (
-          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.plannedMuscles} testID={`${testID}-muscles`}>
+          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.meta} testID={`${testID}-muscles`}>
             {muscles}
           </Text>
         ) : null}
@@ -213,10 +213,10 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
   return (
     <Card style={styles.card} testID="today-plan-week-card">
       <View style={styles.header}>
-        <Text accessibilityRole="header" allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           Plan
         </Text>
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="text" />
+        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (
@@ -224,7 +224,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         ))}
       </View>
       {plan.next.length === 0 ? (
-        <Text allowFontScaling={false} style={[todayText.mutedLine, styles.empty]} testID="today-plan-next-empty">
+        <Text allowFontScaling={false} style={[uiText.meta, styles.empty]} testID="today-plan-next-empty">
           Nothing planned this week.
         </Text>
       ) : (
@@ -257,7 +257,6 @@ const WEEK_WIDTH = 64;
 const ROW_HEIGHT = 32;
 const MARK = 8;
 const PLANNED_WHEN_WIDTH = 52;
-const figure = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const };
 
 const markStyles = StyleSheet.create({
   trained: { backgroundColor: uiRoles.ink },
@@ -313,13 +312,9 @@ const styles = StyleSheet.create({
   pressed: {
     backgroundColor: uiRoles.paper,
   },
-  muscleName: {
+  nameCell: {
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   dayColumn: {
     width: DAY_CELL,
@@ -357,33 +352,10 @@ const styles = StyleSheet.create({
   dayCellTrained: {
     backgroundColor: uiRoles.viz2,
   },
-  dayLabelToday: {
-    color: uiRoles.accent,
-  },
-  dayCellFigure: {
-    ...figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    color: uiRoles.ink,
-  },
   weekCell: {
     width: WEEK_WIDTH,
     marginLeft: uiSpace.xs,
     textAlign: 'right',
-  },
-  weekFigure: {
-    ...figure,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    color: uiRoles.ink,
-  },
-  weekFigureMet: {
-    color: uiRoles.gain,
-  },
-  weekTarget: {
-    ...figure,
-    fontSize: uiTypography.size.base,
-    color: uiRoles.inkMuted,
   },
   chevronSpace: {
     width: 16,
@@ -401,16 +373,6 @@ const styles = StyleSheet.create({
   },
   weekDayToday: {
     backgroundColor: uiRoles.accentWash,
-  },
-  weekDate: {
-    ...figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  weekDateToday: {
-    color: uiRoles.accent,
   },
   mark: {
     width: MARK,
@@ -433,19 +395,6 @@ const styles = StyleSheet.create({
   plannedWhen: {
     width: PLANNED_WHEN_WIDTH,
   },
-  plannedDay: {
-    ...figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  plannedTime: {
-    ...figure,
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
   plannedBody: {
     flex: 1,
     minWidth: 0,
@@ -457,22 +406,5 @@ const styles = StyleSheet.create({
   },
   plannedTitle: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  plannedFigures: {
-    ...figure,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  plannedMuscles: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

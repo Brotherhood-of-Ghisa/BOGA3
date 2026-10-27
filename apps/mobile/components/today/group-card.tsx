@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   GROUP_SESSIONS_SHOWN,
   buildGroupSessions,
@@ -17,7 +19,6 @@ import { localWeekWindow } from '@/src/utils/local-calendar';
 import { TodayGroupHeader } from './group-header';
 import { formatPeriodRange } from './progress-format';
 import { TrainingNowMark } from './session-summary-row';
-import { todayText } from './text-styles';
 import { useGroupRecentSessions, type GroupStreamPageLoader } from './use-group-recent-sessions';
 
 export type TodayGroupCardProps = {
@@ -44,7 +45,7 @@ function BoardFigure({ value, record = false, testID }: { value: number; record?
   const showRecord = record && value > 0;
   return (
     <View style={styles.figureCell}>
-      <Text allowFontScaling={false} style={[styles.boardFigure, showRecord ? todayText.record : null]} testID={testID}>
+      <Text allowFontScaling={false} style={[uiText.figure, styles.boardFigure, showRecord ? uiTextTone.record : null]} testID={testID}>
         {value}
       </Text>
     </View>
@@ -55,14 +56,14 @@ function BoardRow({ row }: { row: WeekBoardRowViewModel }) {
   const testID = `today-group-board-row-${row.userId}`;
   return (
     <View style={[styles.boardRow, row.isMe ? styles.boardRowMine : null]} testID={testID}>
-      <Text allowFontScaling={false} style={styles.rank} testID={`${testID}-rank`}>
+      <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.rank]} testID={`${testID}-rank`}>
         {row.rank}
       </Text>
       <Text
         allowFontScaling={false}
         ellipsizeMode="tail"
         numberOfLines={1}
-        style={[styles.memberName, row.isMe ? styles.memberNameMine : null]}
+        style={[uiText.body, styles.memberName, row.isMe ? uiTextEmphasis.strong : null]}
         testID={`${testID}-name`}>
         {row.name}
       </Text>
@@ -100,9 +101,9 @@ function WeekBoardCard({ board, range, onOpenGroup, header }: {
     <Card style={styles.boardCard} testID="today-group-card">
       {header}
       <View style={styles.boardHeading}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>
           This week
-          <Text allowFontScaling={false} style={todayText.microLabelFaint} testID="today-group-board-range">{`  ${range}`}</Text>
+          <Text allowFontScaling={false} style={uiTextTone.faint} testID="today-group-board-range">{`  ${range}`}</Text>
         </Text>
       </View>
       <Pressable
@@ -113,10 +114,10 @@ function WeekBoardCard({ board, range, onOpenGroup, header }: {
         style={({ pressed }) => [styles.board, pressed ? styles.pressed : null]}
         testID="today-group-board">
         <View style={styles.columnLabels}>
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.columnLabel]}>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.columnLabel]}>
             Sets
           </Text>
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.columnLabel]}>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.columnLabel]}>
             PRs
           </Text>
         </View>
@@ -125,10 +126,10 @@ function WeekBoardCard({ board, range, onOpenGroup, header }: {
         ))}
         {board.me ? (
           <View style={[styles.boardRow, styles.meLine]} testID="today-group-board-me">
-            <Text allowFontScaling={false} style={styles.rank} testID="today-group-board-me-rank">
+            <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.rank]} testID="today-group-board-me-rank">
               {board.me.rankLabel}
             </Text>
-            <Text allowFontScaling={false} style={[styles.memberName, styles.memberNameMine, styles.meName]}>
+            <Text allowFontScaling={false} style={[uiText.body, uiTextEmphasis.strong, styles.memberName, styles.meName]}>
               You
             </Text>
             <BoardFigure testID="today-group-board-me-working-sets" value={board.me.workingSets} />
@@ -152,32 +153,32 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
       style={({ pressed }) => [styles.sessionRow, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.sessionTop}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.who} testID={`${testID}-member`}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.bodyStrong, styles.who]} testID={`${testID}-member`}>
           {row.name}
         </Text>
         {row.live ? (
           <TrainingNowMark>
-            <Text allowFontScaling={false} style={[styles.when, styles.whenLive]} testID={`${testID}-when`}>
-              {row.when}
+            <Text allowFontScaling={false} style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.ink]} testID={`${testID}-when`}>
+              <FigureText strong>{row.when}</FigureText>
             </Text>
           </TrainingNowMark>
         ) : (
-          <Text allowFontScaling={false} style={styles.when} testID={`${testID}-when`}>
-            {row.when}
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-when`}>
+            <FigureText>{row.when}</FigureText>
           </Text>
         )}
       </View>
       {row.gym?.trim() ? (
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.where}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.meta}>
           {row.gym.trim()}
         </Text>
       ) : null}
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.figures} testID={`${testID}-figures`}>
-        {row.figures}
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-figures`}>
+        <FigureText>{row.figures}</FigureText>
         {record ? (
           <>
-            <Text allowFontScaling={false} style={styles.separator}> · </Text>
-            <Text allowFontScaling={false} style={styles.recordText} testID={`${testID}-record`}>
+            <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+            <Text allowFontScaling={false} style={uiTextTone.record} testID={`${testID}-record`}>
               {record.kind === 'one' ? record.lead : record.count}
             </Text>
           </>
@@ -196,7 +197,7 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
   if (rows.length === 0) return null;
   return (
     <View testID={testID}>
-      <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong, styles.sectionLabel]}>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, styles.sectionLabel]}>
         {title}
       </Text>
       {rows.map((row, index) => (
@@ -239,12 +240,12 @@ export function TodayGroupCard({
     <View style={styles.sessionsBody}>
       <SessionsSection onOpenSession={openSession} rows={sessions.recent} testID="today-group-recent" title="Recent" />
       {empty ? (
-        <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-group-latest-empty">
+        <Text allowFontScaling={false} style={uiText.meta} testID="today-group-latest-empty">
           No sessions shared to this group yet.
         </Text>
       ) : null}
       {recent.failed ? (
-        <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-group-recent-failed">
+        <Text allowFontScaling={false} style={uiText.meta} testID="today-group-recent-failed">
           {"Couldn't load earlier sessions."}
         </Text>
       ) : null}
@@ -357,22 +358,9 @@ const styles = StyleSheet.create({
   },
   rank: {
     width: RANK_WIDTH,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   memberName: {
     width: NAME_WIDTH,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  memberNameMine: {
-    fontWeight: '600',
   },
   track: {
     flex: 1,
@@ -396,11 +384,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   boardFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
     textAlign: 'right',
   },
   // A pressed row takes the `paper` ground, as `ListRow` does.
@@ -432,40 +415,5 @@ const styles = StyleSheet.create({
   },
   who: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  when: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  whenLive: {
-    fontWeight: '600',
-    color: uiRoles.ink,
-  },
-  where: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  figures: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  separator: {
-    color: uiRoles.inkFaint,
-  },
-  recordText: {
-    fontWeight: '600',
-    color: uiRoles.record,
   },
 });

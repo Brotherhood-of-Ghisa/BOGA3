@@ -2,10 +2,9 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { SessionRecordLine } from '@/src/session-insights/record-line';
-
-import { todayText } from './text-styles';
 
 export type SessionSummaryRowProps = {
   /** `10/16 06:10`, or `Started 07:40` for a session still in progress. */
@@ -39,11 +38,11 @@ export function TrainingNowMark({ children }: { children: ReactNode }) {
 function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string }) {
   return (
     <View style={styles.recordLine} testID={`${testID}-record`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.recordText}>
-        <Text allowFontScaling={false} style={todayText.record}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, styles.recordText]}>
+        <Text allowFontScaling={false} style={uiTextTone.record}>
           {line.kind === 'one' ? line.lead : line.count}
         </Text>
-        {line.kind === 'one' ? <Text allowFontScaling={false} style={styles.muted}>{` · ${line.note}`}</Text> : null}
+        {line.kind === 'one' ? <Text allowFontScaling={false} style={uiTextTone.muted}>{` · ${line.note}`}</Text> : null}
       </Text>
     </View>
   );
@@ -76,24 +75,24 @@ export function SessionSummaryRow({
       style={({ pressed }) => [styles.row, style, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.copy}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summaryLine}>
-          <Text allowFontScaling={false} style={styles.summaryFigure} testID={`${testID}-start`}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.body}>
+          <Text allowFontScaling={false} style={uiText.inlineFigure} testID={`${testID}-start`}>
             {stamp}
           </Text>
           {duration ? (
             <>
-              <Text allowFontScaling={false} style={styles.separator}> · </Text>
-              <Text allowFontScaling={false} style={styles.summaryFigure}>{duration}</Text>
+              <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+              <Text allowFontScaling={false} style={uiText.inlineFigure}>{duration}</Text>
             </>
           ) : null}
           {gymName ? (
             <>
-              <Text allowFontScaling={false} style={styles.separator}> @ </Text>
-              <Text allowFontScaling={false} style={styles.gym}>{gymName}</Text>
+              <Text allowFontScaling={false} style={uiTextTone.faint}> @ </Text>
+              <Text allowFontScaling={false} style={uiTextEmphasis.strong}>{gymName}</Text>
             </>
           ) : null}
         </Text>
-        <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-figures`}>
+        <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-figures`}>
           {figures}
         </Text>
         {record ? <RecordLine line={record} testID={testID} /> : null}
@@ -124,33 +123,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-  summaryLine: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  summaryFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-  },
-  separator: {
-    color: uiRoles.inkFaint,
-  },
-  gym: {
-    fontWeight: '600',
-  },
   recordLine: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   recordText: {
     flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-  },
-  muted: {
-    color: uiRoles.inkMuted,
   },
 });
