@@ -45,7 +45,7 @@ addressable, each resolving to a canonical owner for tab selection.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/session/[sessionId]` | The session view: the active session, read-only and navigational (summary card, one card per exercise, `Finish`). Also the completed-session editor, with editable Start/End | `session/[sessionId]/index.tsx`, `components/session-view/` |
+| `/session/[sessionId]` | The session view: the active session, read-only and navigational (summary card, one card per exercise, a `Finish` tick). Also the completed-session editor, with editable Start/End | `session/[sessionId]/index.tsx`, `components/session-view/` |
 | `/session/[sessionId]/exercise/[sessionExerciseId]` | One exercise of that session: records panel, ordered set list with the in-place logger, `Complete exercise` | `session/[sessionId]/exercise/[sessionExerciseId].tsx`, `components/exercise-page/`, `apps/mobile/src/session-recorder/` |
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |

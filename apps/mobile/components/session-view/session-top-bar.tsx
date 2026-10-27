@@ -69,7 +69,7 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
   );
 }
 
-// `<Time of day> training · <elapsed>` · ⋮ · Finish;
+// `<Time of day> training · <elapsed>` · ⋮ · ✓ (Finish);
 // `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
@@ -109,7 +109,17 @@ export function SessionTopBar(props: SessionTopBarProps) {
           testID="session-view-options-button"
         />
       ) : null}
-      {onPrimary ? (
+      {onPrimary && props.mode === 'active' ? (
+        // Finish is a tick, the screen's one `accent` action as an icon.
+        <IconButton
+          accessibilityLabel={copy.a11y}
+          disabled={disabled}
+          name="check"
+          onPress={onPrimary}
+          testID={copy.testID}
+          tone="accent"
+        />
+      ) : onPrimary ? (
         <ActionButton
           accessibilityLabel={copy.a11y}
           disabled={disabled}
