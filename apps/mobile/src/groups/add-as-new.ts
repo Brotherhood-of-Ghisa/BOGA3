@@ -5,7 +5,7 @@
 // from a bundled standard exercise (`source_exercise_id` = `seed_<slug>`), that
 // seed's muscle mappings are prefilled too.
 
-import { SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import type { LoadInputMode } from '@/src/exercise-core';
 
 import { groupExerciseCore } from './api';
@@ -21,7 +21,7 @@ export const buildAddAsNewPrefill = (groupExercise: GroupExercise): AddAsNewPref
   const { name, loadInputMode } = groupExerciseCore(groupExercise);
   const sourceId = groupExercise.source_exercise_id;
   const mappings = sourceId
-    ? SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.filter((mapping) => mapping.exerciseDefinitionId === sourceId).map(
+    ? STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS.filter((mapping) => mapping.exerciseDefinitionId === sourceId).map(
         ({ muscleGroupId, weight, role }) => ({ muscleGroupId, weight, role }),
       )
     : [];

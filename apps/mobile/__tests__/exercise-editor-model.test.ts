@@ -215,6 +215,25 @@ describe('exercise-editor-model', () => {
       ]);
     });
 
+    it.each([broad, detailed])('keeps multiple primary muscles when saving a name-only edit', (assignment) => {
+      const squat = exerciseMapped([primary('glutes_max'), primary('quads'), secondary('spinal_erectors')]);
+      const selection = editorOpenState(squat, null, assignment);
+      const saved = validateEditorInput({ name: 'My Squat', loadInputMode: 'total_load',
+        primaryMuscleGroupId: selection.primaryMuscleGroupId,
+        secondaryMuscleRows: selection.secondaryMuscleRows, openedMappings: squat.mappings, assignment });
+      expect(saved.mappings).toEqual([primary('glutes_max'), primary('quads'), secondary('spinal_erectors')]);
+    });
+
+    it.each([broad, detailed])('saves an extra primary as secondary when explicitly removed and re-added', (assignment) => {
+      const squat = exerciseMapped([primary('glutes_max'), primary('quads')]);
+      const selection = editorOpenState(squat, null, assignment);
+      const saved = validateEditorInput({ name: squat.name, loadInputMode: 'total_load',
+        primaryMuscleGroupId: selection.primaryMuscleGroupId,
+        secondaryMuscleRows: [{ rowId: 'new-secondary-row', muscleGroupId: 'quads' }],
+        openedMappings: squat.mappings, assignment });
+      expect(saved.mappings).toEqual([primary('glutes_max'), secondary('quads')]);
+    });
+
     it('rewrites every Glute Max, Hamstrings and Hip Abductors mapping when Glutes & Hams turns secondary, and removes them all', () => {
       const deadlift = exerciseMapped([primary('glutes_max'), primary('hamstrings'), secondary('hip_abductors'), secondary('quads')]);
       expect(saveUnderBroad(deadlift, 'quads', ['glutes_max']).mappings).toEqual([

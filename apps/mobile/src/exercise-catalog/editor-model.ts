@@ -68,7 +68,7 @@ export const createBlankValidationState = (): EditorValidationState => ({
 
 const NO_ASSIGNMENT: MuscleReportAssignment = new Map();
 
-type SavedMapping = Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>;
+type SavedMapping = Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'> & { id?: string };
 
 const pickPrimaryMapping = (mappings: ExerciseCatalogExercise['mappings']) =>
   mappings.find((mapping) => mapping.role === 'primary') ??
@@ -280,13 +280,23 @@ export const validateEditorInput = ({
   } else if (!untrackedMappings(openedMappings, assignment).some((mapping) => mapping.role === 'primary')) {
     validation.primaryMuscleError = 'Select a primary muscle before saving.';
   }
+  const visibleMappings = reportedMappings(openedMappings, assignment);
+  const originalPrimary = visibleMappings.find((mapping) => mapping.role === 'primary')?.muscleGroupId;
   for (const row of secondaryMuscleRows) {
     if (seenMuscleIds.has(row.muscleGroupId)) {
       validation.secondaryMusclesError = 'Duplicate secondary muscle.';
       continue;
     }
     seenMuscleIds.add(row.muscleGroupId);
-    mappings.push({ muscleGroupId: row.muscleGroupId, weight: SECONDARY_MUSCLE_WEIGHT, role: 'secondary' });
+    // Extra primaries appear as secondary rows; preserve only an untouched row.
+    const originalRow = visibleMappings.find((mapping) =>
+      (mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`) === row.rowId);
+    const keepsPrimary = primaryMuscleGroupId === originalPrimary
+      && originalRow?.muscleGroupId === row.muscleGroupId
+      && visibleMappings.some((mapping) => mapping.muscleGroupId === row.muscleGroupId && mapping.role === 'primary');
+    mappings.push({ muscleGroupId: row.muscleGroupId,
+      weight: keepsPrimary ? PRIMARY_MUSCLE_WEIGHT : SECONDARY_MUSCLE_WEIGHT,
+      role: keepsPrimary ? 'primary' : 'secondary' });
   }
   const hasErrors = Object.values(validation).some((error) => error !== null);
   return { validation, mappings: hasErrors ? null : resolveEditorMappings(mappings, openedMappings, assignment) };

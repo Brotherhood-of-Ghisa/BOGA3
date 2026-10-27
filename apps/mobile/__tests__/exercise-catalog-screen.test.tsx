@@ -351,7 +351,7 @@ describe('ExerciseCatalogScreen', () => {
   });
 
   async function chooseMergeDestination() {
-    await openCatalog();
+    await openCatalog({ fixture: 'exercise-browser' });
     await expandFamily('Chest');
     fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
     fireEvent.press(await screen.findByTestId('exercise-action-merge'));
@@ -661,7 +661,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(await screen.findByLabelText('Edit exercise definition Lat Pulldown')).toHaveTextContent(/Primary: Back/);
       fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
       expect(await screen.findByLabelText('Edit exercise definition Barbell Back Squat')).toHaveTextContent(
-        /Primary: Quads\s+Secondary: Glutes & HamsNever done/
+        /Primary: Glutes & Hams · QuadsNever done/
       );
     });
 

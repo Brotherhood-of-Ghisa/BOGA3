@@ -6,7 +6,7 @@ Every screen counts working sets per muscle as **primary 1, secondary ½**.
 Decided 2026-10-09.
 
 A muscle counts a set once, at the strongest role any of its entries has
-([[muscle.report-groups]]): squat × 3 under Broad is Quads 3, Glutes & Hams 1.5.
+([[muscle.report-groups]]).
 Totals use half-steps (`1.5`), unlike the session's physical `Sets`
 ([[set.count-display]]). Whether to show secondaries is separate
 ([[muscle.secondary-filter]]).
@@ -36,8 +36,9 @@ Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 ### muscle.report-groups · definition · accepted
 
 Settings → Muscles offers **Detailed** (default: one muscle per
-anatomy entry) or **Broad**, per account, synced. Detailed's Enabled muscles
-page holds the switches. A preset changes merging, never a switch; merges
+anatomy entry) or **Broad**, per account, synced. Enabled muscles is always
+available, with individual anatomy switches and their enabled/total count,
+regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
 A merged muscle is enabled while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family.

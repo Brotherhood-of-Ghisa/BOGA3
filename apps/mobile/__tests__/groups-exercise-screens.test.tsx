@@ -75,7 +75,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
 }));
 
 import { uiRoles } from '@/components/ui';
-import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
 import { createExerciseWithGroupLink } from '@/src/data/exercise-group-links';
@@ -405,7 +405,7 @@ describe('Add exercise route', () => {
   };
 
   it('copies a standard exercise: its seed id, name, and weight entry', async () => {
-    const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
+    const seed = STANDARD_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
     api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
     await renderNew();
     expect(screen.queryByTestId('group-exercise-form')).toBeNull();
