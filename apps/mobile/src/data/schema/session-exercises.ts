@@ -21,6 +21,7 @@ export const sessionExercises = sqliteTable(
     sourcePlanExerciseId: text('source_plan_exercise_id').references(() => sessionPlanExercises.id, {
       onDelete: 'set null',
     }),
+    mergeRevision: integer('merge_revision').notNull().default(0),
     orderIndex: integer('order_index').notNull(),
     name: text('name').notNull(),
     machineName: text('machine_name'),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseListContent, ExerciseListPreferenceControls, useFamilyExpansion } from '@/components/exercise-catalog/exercise-list-controls';
@@ -13,6 +13,11 @@ import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
 type ExerciseSwapSheetProps = {
   visible: boolean;
+  title?: string;
+  testIDPrefix?: string;
+  onDismissed?: () => void;
+  dismissDisabled?: boolean;
+  notice?: ReactNode;
   currentExerciseDefinitionId: string;
   onSelect: (exercise: ExerciseListItem) => void;
   onDismiss: () => void;
@@ -20,7 +25,7 @@ type ExerciseSwapSheetProps = {
 
 // The same browser as Add and the catalogue, excluding the current exercise, in
 // the picker's page sheet: swipe down or X to leave without swapping.
-export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSelect, onDismiss }: ExerciseSwapSheetProps) {
+export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSelect, onDismiss, title = 'Swap exercise', testIDPrefix = 'exercise-swap', onDismissed, dismissDisabled, notice }: ExerciseSwapSheetProps) {
   const [query, setQuery] = useState('');
   const [preferences, setPreferences] = useExerciseListPreferences();
   const catalog = useExerciseCatalog();
@@ -36,13 +41,14 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
   const dismiss = () => { setQuery(''); onDismiss(); };
 
   return (
-    <PageSheet closeLabel="Close swap exercise" onDismiss={dismiss} testID="exercise-swap-sheet" title="Swap exercise" visible={visible}>
+    <PageSheet closeLabel={"Close " + title.toLowerCase()} onDismiss={dismiss} onDismissed={onDismissed} dismissDisabled={dismissDisabled} testID={testIDPrefix + "-sheet"} title={title} visible={visible}>
       <View style={styles.body}>
+        {notice}
         <View style={styles.controls}>
-          <SearchField accessibilityLabel="Search exercises" onChangeText={setQuery} placeholder="Search exercises or muscles" testID="exercise-swap-search" value={query} />
+          <SearchField accessibilityLabel="Search exercises" onChangeText={setQuery} placeholder="Search exercises or muscles" testID={testIDPrefix + "-search"} value={query} />
           <ExerciseListPreferenceControls preferences={preferences} onChangePreferences={setPreferences} />
         </View>
-        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.list} testID="exercise-swap-list">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.list} testID={testIDPrefix + "-list"}>
           {catalog.status === 'error' ? (
             <StatePanel body={catalog.lastError ?? 'Unable to load exercises.'} fill={false} kind="error" action={{ label: 'Retry', onPress: () => { void ensureExerciseCatalogLoaded(); } }} />
           ) : catalog.status !== 'ready' || !model ? (

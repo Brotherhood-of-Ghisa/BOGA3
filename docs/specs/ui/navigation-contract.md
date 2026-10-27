@@ -195,9 +195,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 Progress filters stay in-route; Sessions last. Tapping a muscle in Exercise 3D discloses contributions;
 their links open history within [[comparison.history-window]] at the selected metric/gym. Exercise 1RM always uses List; layout switches reset scroll.
 
-Not route transitions, and must not become them: every modal, sheet and `Alert`
-is in-route state. That includes the picker's `Add new` editor, group-pick sheet
-and `Add as new` editor, the exercise page's effort / options / swap sheets and
+Modals, sheets and `Alert` stay in-route. That includes the picker's `Add new` editor, group-pick sheet
+and `Add as new` editor, catalogue merge picker/confirmation and Data & Sync review, the exercise page's effort / options / swap sheets and
 its shared exercise editor, the Sessions row and active-session menus, and the
 record set row detail sheet on the Stream and the full board. A back *gesture* is disabled rather than handled where leaving
 would be wrong: the session view of a workout in progress and the completion

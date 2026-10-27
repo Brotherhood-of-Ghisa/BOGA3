@@ -29,7 +29,7 @@ export type CallRecord = { fn: string; counters: Counters; error: string | null 
 const NULL_RESULT = '<<perf:null>>';
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 
-const SYNC_HEADERS = JSON.stringify({ 'x-boga-sync-protocol': '4', 'x-boga-group-contract': '4' });
+const SYNC_HEADERS = JSON.stringify({ 'x-boga-sync-protocol': '5', 'x-boga-group-contract': '4' });
 
 const TABLE_SNAPSHOT_SQL = `select schemaname||'.'||relname as t, n_tup_ins::bigint as ins, n_tup_upd::bigint as upd,
   n_tup_del::bigint as del, coalesce(seq_scan,0)::bigint as seq, coalesce(idx_scan,0)::bigint as idx,

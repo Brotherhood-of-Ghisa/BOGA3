@@ -424,7 +424,7 @@ export class Tier2Run {
     const response = await fetch(`${this.options.apiUrl}/rest/v1/rpc/sync_push`, {
       method: 'POST',
       headers: { apikey: this.options.anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
-        'Content-Profile': 'app_public', 'x-boga-sync-protocol': '4' },
+        'Content-Profile': 'app_public', 'x-boga-sync-protocol': '5' },
       body: JSON.stringify({ entities }),
     });
     const body = (await response.json().catch(() => null)) as { ok?: boolean } | null;

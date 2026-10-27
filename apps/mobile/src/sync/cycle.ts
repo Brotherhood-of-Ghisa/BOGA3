@@ -21,6 +21,8 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 
 import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
+import { mergePullCanApply, syncExerciseMerges, validateMergeOutcomes } from './exercise-merge';
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
@@ -102,6 +104,8 @@ interface PullResponse {
   entities: WireEntity[];
   next_cursor: PullCursor;
   has_more: boolean;
+  merge_sequence?: number;
+  merge_conflict_count?: number;
 }
 
 /** Structured error envelope a successful-status RPC body can carry. */
@@ -689,6 +693,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   session_exercises: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_id', 'sessionId'),
     SC('exercise_definition_id', 'exerciseDefinitionId'),
     SC('source_plan_exercise_id', 'sourcePlanExerciseId'),
@@ -700,6 +705,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   exercise_sets: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('source_plan_set_id', 'sourcePlanSetId'),
     SC('order_index', 'orderIndex'),
@@ -715,6 +721,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   session_exercise_tags: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('exercise_tag_definition_id', 'exerciseTagDefinitionId'),
     TS('created_at', 'createdAt'),
@@ -967,6 +974,7 @@ export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
+  force = false,
 ): number => {
   const table = ENTITY_TABLES[type] as typeof schema.gyms;
   let changed = 0;
@@ -980,6 +988,7 @@ export const applyPullPage = (
       .where(eq(table.id, envelope.id))
       .get() as EntityRow | undefined;
 
+    if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
     const values = wireToEntity(envelope, type);
 
     if (!existing) {
@@ -988,7 +997,7 @@ export const applyPullPage = (
       continue;
     }
 
-    if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+    if (force || envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
       changed += 1;
     }
@@ -1003,6 +1012,18 @@ export const applyPullPage = (
 // -----------------------------------------------------------------------------
 // Pull cursor persistence
 // -----------------------------------------------------------------------------
+
+const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
+  if (rows.some(row => !ENTITY_ORDER.includes(row.type as EntityTableName))) {
+    throw new Error('Invalid exercise history entity.');
+  }
+  let changed = 0;
+  for (const type of ENTITY_ORDER) {
+    const entities = rows.filter(row => row.type === type) as WireEntity[];
+    if (entities.length) changed += applyPullPage(tx, entities, type, force);
+  }
+  return changed;
+};
 
 const readCursorMap = (tx: Transaction): PullCursorMap => {
   const row = tx
@@ -1048,11 +1069,23 @@ type RpcResult = { data: unknown; error: { message?: string } | null };
  * { entities: [...] } straight onto the RPC argument. Throws SyncCycleError on
  * any recognised failure so the caller can branch per error code.
  */
-const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
+// Pin the bearer and check both ends of each request while an account wipe waits for this cycle.
+const callOwnerSyncRpc = async (database: LocalDatabase, name: string, args: Record<string, unknown>): Promise<RpcResult> => {
+  const owner = database.select().from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId ?? null;
+  if (await getSignedInUserId() !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client
-    .schema(SYNC_RPC_SCHEMA)
-    .rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
+  const session = owner ? (await client.auth.getSession()).data.session : null;
+  if (owner && session?.user.id !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
+  const result = await client.schema(SYNC_RPC_SCHEMA).rpc(name, args)
+    .setHeader('Authorization', session ? 'Bearer ' + session.access_token : 'Bearer ');
+  if (await getSignedInUserId() !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
+  if (!owner && result.error?.code === 'PGRST301') throw new SyncCycleError('AUTH_REQUIRED', 'Sign in to sync.');
+  return result as RpcResult;
+};
+
+const callSyncPush = async (database: LocalDatabase, entities: WireEntity[]): Promise<void> => {
+  const { data, error } = await callOwnerSyncRpc(database, SYNC_PUSH_RPC, { entities });
   const code = classifyRpcResult(error, data);
   if (code) {
     const message = error?.message ?? `sync push failed: ${code}`;
@@ -1064,6 +1097,7 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
     }
     throw new SyncCycleError(code, message);
   }
+  validateMergeOutcomes(data, entities);
 };
 
 /**
@@ -1071,13 +1105,8 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
  * argument, so the whole body is the argument value. Throws SyncCycleError on a
  * recognised failure; otherwise returns the typed page.
  */
-const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResponse> => {
-  const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PULL_RPC, {
-    layer,
-    cursor,
-    limit: BATCH_CAP,
-  })) as RpcResult;
+const callSyncPull = async (database: LocalDatabase, layer: number, cursor: PullCursor): Promise<PullResponse> => {
+  const { data, error } = await callOwnerSyncRpc(database, SYNC_PULL_RPC, { layer, cursor, limit: BATCH_CAP });
 
   const code = classifyRpcResult(error, data);
   if (code) {
@@ -1085,10 +1114,17 @@ const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResp
   }
 
   const page = (data ?? {}) as Partial<PullResponse>;
+  for (const value of [page.merge_sequence, page.merge_conflict_count]) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      throw new SyncCycleError('INTERNAL', 'Invalid merge sync state.');
+    }
+  }
   return {
     entities: page.entities ?? [],
     next_cursor: page.next_cursor ?? null,
     has_more: page.has_more ?? false,
+    merge_sequence: page.merge_sequence ?? 0,
+    merge_conflict_count: page.merge_conflict_count ?? 0,
   };
 };
 
@@ -1195,6 +1231,8 @@ const runPullLeg = async (
 ): Promise<PullLegResult> => {
   let receivedTotal = 0;
   let changedTotal = 0;
+  let remoteMergeSequence = 0;
+  let conflictCount = 0;
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
     const layerTypes = TOPO_LAYERS[layer] as readonly EntityTableName[];
@@ -1203,7 +1241,9 @@ const runPullLeg = async (
       const cursor = database.transaction(
         (tx) => readCursorMap(tx as Transaction)[String(layer)] ?? null,
       );
-      const page = await callSyncPull(layer, cursor);
+      const page = await callSyncPull(database, layer, cursor);
+      remoteMergeSequence = Math.max(remoteMergeSequence, page.merge_sequence ?? 0);
+      conflictCount = Math.max(conflictCount, page.merge_conflict_count ?? 0);
 
       const pageChanged = await applyPageWithArbitrationRepair(database, page, layerTypes, layer);
 
@@ -1231,6 +1271,19 @@ const runPullLeg = async (
     reporter?.onLayerDrained?.(layer + 1);
   }
 
+  const owner = database.select().from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
+  if (owner) {
+    const changed = await syncExerciseMerges({
+      database, owner, remoteSequence: remoteMergeSequence, conflictCount,
+      adapter: {
+        toWire: (row, type) => entityToWire(row as EntityRow, type as EntityTableName),
+        apply: applyMergeRows,
+      },
+    });
+    changedTotal += changed;
+    if (changed) { invalidateExerciseCatalogCache(); invalidateBodyWeightContext(); }
+  }
   return { received: receivedTotal, changed: changedTotal };
 };
 
@@ -1370,7 +1423,7 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
       attempted.add(rowKey(entity.type, entity.id));
     }
 
-    await callSyncPush(batch);
+    await callSyncPush(database, batch);
 
     // Clear the dirty bit one row at a time, each in its own transaction, so a
     // concurrent local edit on a different row is never clobbered and a row

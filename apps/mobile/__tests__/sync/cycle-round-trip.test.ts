@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 
+jest.unmock('@/src/auth/session-user');
+
 /**
  * Outcome: the full sync cycle converges local and server state over a real
  * push -> server-side last-write-wins -> pull -> local last-write-wins loop.
@@ -159,7 +161,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     schema: (name: string) => {
       const scoped = client.schema(name);
       return {
-        rpc: async (fn: string, args?: unknown) => {
+        rpc: (fn: string, args?: unknown) => {
           if (fn === 'sync_push' && beforePushHook) {
             beforePushHook();
           }

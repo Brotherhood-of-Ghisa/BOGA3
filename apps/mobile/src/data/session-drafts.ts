@@ -14,6 +14,7 @@ import {
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
+import { guardSessionMergeEdit } from './exercise-merge-store';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
@@ -34,6 +35,7 @@ export type SessionDraftSetInput = {
 export type SessionDraftExerciseInput = {
   id?: string;
   exerciseDefinitionId: string;
+  mergeRevision?: number;
   name: string;
   machineName?: string | null;
   sets: SessionDraftSetInput[];
@@ -48,6 +50,7 @@ export type PersistSessionDraftInput = {
   status?: SessionDraftStatus;
   /** Whole-plan-start provenance. Undefined preserves the stored value. */
   sourcePlanId?: string | null;
+  mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
 };
 
@@ -60,6 +63,7 @@ export type PersistCompletedSessionInput = {
   gymId: string | null;
   startedAt: Date;
   completedAt: Date;
+  mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
 };
 
@@ -85,6 +89,7 @@ export type SessionDraftExerciseSnapshot = {
   loadContext?: LoadContext;
   id: string;
   exerciseDefinitionId: string;
+  mergeRevision?: number;
   name: string;
   machineName: string | null;
   sourcePlanExerciseId?: string | null;
@@ -188,6 +193,7 @@ type StoredDraftExerciseRecord = {
   id: string;
   sessionId: string;
   exerciseDefinitionId: string;
+  mergeRevision?: number;
   orderIndex: number;
   name: string;
   machineName: string | null;
@@ -214,6 +220,7 @@ type SaveDraftGraphInput = {
   status: SessionDraftStatus;
   startedAt: Date;
   sourcePlanId?: string | null;
+  mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
   now: Date;
 };
@@ -224,6 +231,7 @@ type SaveCompletedSessionGraphInput = {
   startedAt: Date;
   completedAt: Date;
   durationSec: number;
+  mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
   now: Date;
 };
@@ -339,6 +347,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
+    mergeRevision: exercise.mergeRevision ?? 0,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
@@ -379,6 +388,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
+    mergeRevision: exercise.mergeRevision ?? 0,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
@@ -479,6 +489,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         id: exercise.id,
         sessionId: exercise.sessionId,
         exerciseDefinitionId: exercise.exerciseDefinitionId,
+        mergeRevision: exercise.mergeRevision ?? 0,
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
@@ -578,7 +589,7 @@ const replaceSessionExerciseGraph = (
             createdAt: sessionExerciseTags.createdAt,
           })
           .from(sessionExerciseTags)
-          .where(inArray(sessionExerciseTags.sessionExerciseId, existingExerciseIds))
+          .where(and(inArray(sessionExerciseTags.sessionExerciseId, existingExerciseIds), isNull(sessionExerciseTags.deletedAt)))
           .all() as StoredSessionExerciseTagRecord[])
       : [];
   const existingTagsByExerciseId = existingTagRows.reduce<Map<string, StoredSessionExerciseTagRecord[]>>(
@@ -644,6 +655,7 @@ const replaceSessionExerciseGraph = (
       tx.update(sessionExercises)
         .set({
           exerciseDefinitionId,
+          mergeRevision: exercise.mergeRevision ?? 0,
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
@@ -664,6 +676,7 @@ const replaceSessionExerciseGraph = (
           id: sessionExerciseId,
           sessionId: input.sessionId,
           exerciseDefinitionId,
+          mergeRevision: exercise.mergeRevision ?? 0,
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
@@ -690,6 +703,7 @@ const replaceSessionExerciseGraph = (
         tx.update(sessionExerciseTags)
           .set({
             deletedAt: null,
+            mergeRevision: exercise.mergeRevision ?? 0,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
           })
@@ -745,6 +759,7 @@ const replaceSessionExerciseGraph = (
           .set({
             sessionExerciseId,
             orderIndex: setIndex,
+            mergeRevision: exercise.mergeRevision ?? 0,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             setType: nextSetType,
@@ -771,6 +786,7 @@ const replaceSessionExerciseGraph = (
             id: setId,
             sessionExerciseId,
             orderIndex: setIndex,
+            mergeRevision: exercise.mergeRevision ?? 0,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             setType: nextSetType,
@@ -1054,11 +1070,62 @@ export const reviveSessionRow = async (sessionId: string, now: Date = new Date()
   return revived;
 };
 
+// Header edits are independent of exercise identity/weight revisions.
+export const updateSessionMetadata = async (sessionId: string, input: {
+  gymId?: string | null; times?: { startedAt: Date; completedAt: Date };
+}): Promise<void> => {
+  if (input.times) assertCompletedSessionTiming(input.times.startedAt, input.times.completedAt);
+  const database = await bootstrapLocalDataLayer();
+  let startChanged = false;
+  database.transaction(tx => {
+    const row = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+    if (!row || row.deletedAt) throw new Error('This session is unavailable.');
+    if (input.times && row.status !== 'completed') throw new Error('This session is not completed.');
+    startChanged = !!input.times && row.startedAt.getTime() !== input.times.startedAt.getTime();
+    tx.update(sessions).set({
+      ...(input.gymId !== undefined ? { gymId: input.gymId } : {}),
+      ...(input.times ? { startedAt: input.times.startedAt, completedAt: input.times.completedAt,
+        durationSec: calculateSessionDurationSec(input.times.startedAt, input.times.completedAt) } : {}),
+      localDirty: true, localUpdatedAtMs: nowMonotonic(tx), updatedAt: new Date(),
+    }).where(eq(sessions.id, sessionId)).run();
+  });
+  notifyLocalWrite();
+  if (startChanged) invalidateBodyWeightContext();
+};
+
+const guardSessionGraphMerge = (database: LocalDatabase, input: SaveCompletedSessionGraphInput | SaveDraftGraphInput) => {
+  if (!guardSessionMergeEdit(database, input) || !input.sessionId) return;
+  database.transaction(tx => {
+    tx.update(sessions).set({ gymId: input.gymId, startedAt: input.startedAt,
+      ...('completedAt' in input ? { completedAt: input.completedAt, durationSec: input.durationSec } : {}),
+      localDirty: true, localUpdatedAtMs: nowMonotonic(tx), updatedAt: input.now,
+    }).where(eq(sessions.id, input.sessionId!)).run();
+  });
+  invalidateBodyWeightContext();
+  notifyLocalWrite();
+  const knownIds = new Set(database.select({ id: sessionExercises.id }).from(sessionExercises)
+    .where(eq(sessionExercises.sessionId, input.sessionId)).all().map(row => row.id));
+  const additions = input.exercises.filter(block => !block.id || !knownIds.has(block.id));
+  if (additions.length) {
+    const canonical = loadDraftGraphBySessionId(database, input.sessionId);
+    if (!canonical) throw new Error('Refresh this session before saving.');
+    database.transaction(tx => replaceSessionExerciseGraph(tx, {
+      sessionId: input.sessionId!, exercises: [...canonical.exercises, ...additions],
+      now: input.now, localUpdatedAtMs: nowMonotonic(tx),
+    }));
+    notifyLocalWrite();
+  }
+  throw new Error('This exercise was merged on another device. Your changes are saved for review in Data & Sync.');
+};
+
 export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async saveDraftGraph(input) {
     const database = await bootstrapLocalDataLayer();
     const sessionId = input.sessionId?.trim() || createLocalEntityId('session');
 
+    const existingSession = database.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+    if (existingSession?.status === 'completed') throw new Error(`Cannot modify completed session ${sessionId}`);
+    guardSessionGraphMerge(database, input);
     let startChanged = false;
     database.transaction((tx) => {
       // One monotonic last-write-wins timestamp for every row written in this
@@ -1069,11 +1136,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       // is synchronous within this transaction.
       const localUpdatedAtMs = nowMonotonic(tx);
 
-      const existingSession = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
       startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
-      if (existingSession?.status === 'completed') {
-        throw new Error(`Cannot modify completed session ${sessionId}`);
-      }
 
       if (!existingSession) {
         tx.insert(sessions)
@@ -1128,6 +1191,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async saveCompletedSessionGraph(input) {
     const database = await bootstrapLocalDataLayer();
 
+    const existingSession = database.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
+    if (!existingSession) throw new Error(`Session ${input.sessionId} does not exist`);
+    if (existingSession.status !== 'completed') throw new Error(`Cannot update non-completed session ${input.sessionId}`);
+    guardSessionGraphMerge(database, input);
     let startChanged = false;
     database.transaction((tx) => {
       // Single monotonic last-write-wins timestamp for the completed-session
@@ -1135,14 +1202,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       // this transaction so the persist is atomic with the row writes.
       const localUpdatedAtMs = nowMonotonic(tx);
 
-      const existingSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
       startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
-      if (!existingSession) {
-        throw new Error(`Session ${input.sessionId} does not exist`);
-      }
-      if (existingSession.status !== 'completed') {
-        throw new Error(`Cannot update non-completed session ${input.sessionId}`);
-      }
 
       tx.update(sessions)
         .set({
@@ -1285,6 +1345,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       status: normalizeDraftStatus(input.status),
       sourcePlanId: input.sourcePlanId,
       exercises: input.exercises,
+      mergeRevisions: input.mergeRevisions,
       now,
     });
   },
@@ -1324,6 +1385,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       completedAt: input.completedAt,
       durationSec,
       exercises: input.exercises,
+      mergeRevisions: input.mergeRevisions,
       now,
     });
 

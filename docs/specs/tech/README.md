@@ -4,6 +4,8 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
+- `exercise-merge-contract.md`: load for merge transactions, protocol-5 history revisions, staged apply and private recovery.
+
 - `strength-regimes-contract.md`: experimental RM fitting, session sampling,
   numerical abstention, asynchronous lifecycle and calibration boundaries.
 

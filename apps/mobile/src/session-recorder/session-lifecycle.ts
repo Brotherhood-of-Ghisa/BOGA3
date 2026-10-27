@@ -9,6 +9,7 @@ import {
   persistSessionDraftSnapshot,
   setSessionDeletedState,
   upsertLocalGym,
+  updateSessionMetadata,
   type ExerciseBlockHistorySuggestedPlan,
 } from '@/src/data';
 import { logEvent } from '@/src/logging';
@@ -41,6 +42,7 @@ export const completeActiveSession = async (input: {
     startedAt: input.startedAt,
     status: 'active',
     exercises: toPersistCompletedExercises(input.completedHistorySession),
+    mergeRevisions: input.completedHistorySession.mergeRevisions,
   });
 
   await completeSessionDraft(persisted.sessionId);
@@ -117,23 +119,24 @@ export const loadEditableSessionGraph = async (sessionId: string): Promise<Edita
  */
 const persistSessionGraph = (
   graph: EditableSessionGraph,
-  session: Session,
-  { gymId = graph.gymId, times }: { gymId?: string | null; times?: SessionTimes } = {}
+  session: Session
 ) =>
   graph.status === 'completed'
     ? persistCompletedSessionSnapshot({
         sessionId: graph.sessionId,
-        gymId,
-        startedAt: times?.startedAt ?? graph.startedAt,
-        completedAt: times?.completedAt ?? graph.completedAt,
+        gymId: graph.gymId,
+        startedAt: graph.startedAt,
+        completedAt: graph.completedAt,
         exercises: toPersistDraftExercises(session),
+        mergeRevisions: session.mergeRevisions,
       })
     : persistSessionDraftSnapshot({
         sessionId: graph.sessionId,
-        gymId,
+        gymId: graph.gymId,
         startedAt: graph.startedAt,
         status: 'active',
         exercises: toPersistDraftExercises(session),
+        mergeRevisions: session.mergeRevisions,
       });
 
 const requireEditableSessionGraph = async (sessionId: string): Promise<EditableSessionGraph> => {
@@ -144,25 +147,17 @@ const requireEditableSessionGraph = async (sessionId: string): Promise<EditableS
   return graph;
 };
 
-const requireCompletedSessionGraph = async (sessionId: string) => {
-  const graph = await requireEditableSessionGraph(sessionId);
-  if (graph.status !== 'completed') {
-    throw new Error('This session is not completed.');
-  }
-  return graph;
-};
-
 /**
  * Sets the session's gym, or clears it with `null`. A seeded gym is written to
  * the local `gyms` table first, as the recorder's autosave does, so the
  * session's `gymId` always names a local row.
  */
 export const setSessionGym = async (sessionId: string, gym: { id: string; name: string } | null): Promise<void> => {
-  const graph = await requireEditableSessionGraph(sessionId);
+  await requireEditableSessionGraph(sessionId);
   if (gym) {
     await upsertLocalGym({ id: gym.id, name: gym.name });
   }
-  await persistSessionGraph(graph, graph.session, { gymId: gym?.id ?? null });
+  await updateSessionMetadata(sessionId, { gymId: gym?.id ?? null });
 };
 
 /**
@@ -221,8 +216,7 @@ export const appendPlanToSession = async (
 
 /** Autosaves a completed session's edited Start/End; its rows are kept as persisted. */
 export const setCompletedSessionTimes = async (sessionId: string, times: SessionTimes): Promise<void> => {
-  const graph = await requireCompletedSessionGraph(sessionId);
-  await persistSessionGraph(graph, graph.session, { times });
+  await updateSessionMetadata(sessionId, { times });
 };
 
 /**
@@ -242,5 +236,6 @@ export const saveCompletedSessionEdit = async (input: {
     startedAt: input.times.startedAt,
     completedAt: input.times.completedAt,
     exercises: toPersistCompletedExercises(input.completedHistorySession),
+    mergeRevisions: input.completedHistorySession.mergeRevisions,
   });
 };

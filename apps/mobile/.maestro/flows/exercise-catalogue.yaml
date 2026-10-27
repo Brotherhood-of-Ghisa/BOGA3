@@ -57,3 +57,25 @@ appId: com.dinoderek.mobile
       text: "Exercise created."
     timeout: 10000
 - takeScreenshot: "catalogue-created-notice"
+
+# Native error/Retry stays in the picker; an unsigned infra-free install cannot merge.
+# Why device: action-sheet dismissal and a keyboard-up picker must remain interactive.
+- tapOn: "Exercise filter input"
+- inputText: "Barbell Bench Press"
+- extendedWaitUntil:
+    visible: "Exercise actions Barbell Bench Press"
+    timeout: 15000
+- tapOn: "Exercise actions Barbell Bench Press"
+- tapOn: { id: "exercise-action-merge" }
+- extendedWaitUntil:
+    visible: { id: "exercise-merge-search" }
+    timeout: 15000
+- tapOn: { id: "exercise-merge-search" }
+- inputText: "Cable Bench Press"
+- tapOn: "Select exercise Cable Bench Press"
+- extendedWaitUntil:
+    visible: "Sign in to merge exercises."
+    timeout: 15000
+- takeScreenshot: "merge-picker-sign-in-error"
+- tapOn: { id: "exercise-merge-sheet-close" }
+- assertVisible: "Exercise actions Barbell Bench Press"
