@@ -34,8 +34,6 @@ export type TodayGroupCardProps = {
   /** The group's home page. */
   onOpenGroup: (groupId: string) => void;
   onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
-  /** The cards layout: the sessions card takes the height the board leaves, and scrolls inside it. */
-  fill?: boolean;
   /** Reads the group's stream for its recent sessions; online by default. */
   loadStreamPage?: GroupStreamPageLoader;
 };
@@ -222,7 +220,6 @@ export function TodayGroupCard({
   nowMs,
   onOpenGroup,
   onOpenSession,
-  fill = false,
   loadStreamPage,
 }: TodayGroupCardProps) {
   const board = buildWeekBoard(summary.members, myUserId);
@@ -253,7 +250,7 @@ export function TodayGroupCard({
   );
 
   return (
-    <View style={[styles.stack, fill ? styles.fill : null]}>
+    <View style={[styles.stack, styles.fill]}>
       <WeekBoardCard
         board={board}
         header={
@@ -270,14 +267,14 @@ export function TodayGroupCard({
       />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
-        <SessionsCard fill={fill && !showRecent} testID="today-group-live">
+        <SessionsCard fill={!showRecent} testID="today-group-live">
           <View style={styles.sessionsBody}>
             <SessionsSection onOpenSession={openSession} rows={sessions.live} testID="today-group-training-now" title="Training now" />
           </View>
         </SessionsCard>
       ) : null}
       {showRecent ? (
-        <SessionsCard fill={fill} testID="today-group-sessions">
+        <SessionsCard fill testID="today-group-sessions">
           {recentBody}
         </SessionsCard>
       ) : null}
@@ -285,7 +282,7 @@ export function TodayGroupCard({
   );
 }
 
-// A sessions card; filling the page, it takes the height left and scrolls its rows.
+// A sessions card; the last one fills the page, taking the height the board leaves and scrolling its rows.
 function SessionsCard({ fill, testID, children }: { fill: boolean; testID: string; children: ReactNode }) {
   return (
     <Card style={[styles.sessionsCard, fill ? styles.fill : null]} testID={testID}>

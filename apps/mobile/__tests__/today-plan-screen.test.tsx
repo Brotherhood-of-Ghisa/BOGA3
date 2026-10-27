@@ -109,11 +109,9 @@ afterEach(() => {
 });
 
 describe('Today: the Plan page over real data', () => {
-  it('comes after You in the list layout, as a recovery card and a plan card', async () => {
+  it('is a recovery card and a plan card', async () => {
     await renderToday();
 
-    const sections = screen.getAllByTestId(/^today-(plan|progress|group)-section$/).map((section) => section.props.testID);
-    expect(sections).toEqual(['today-progress-section', 'today-plan-section', 'today-group-section']);
     expect(within(text('today-plan-recovery-card')).getByText('Recovery')).toBeTruthy();
     expect(within(text('today-plan-week-card')).getByText('Plan')).toBeTruthy();
   });
@@ -321,11 +319,11 @@ describe('Today: the Plan page over real data', () => {
   });
 });
 
-describe("Today: the Plan page in the cards layout (Settings' Today layout: Cards)", () => {
+describe('Today: the Plan page among the cards', () => {
   const selected = (testID: string) => text(testID).props.accessibilityState?.selected;
 
   it('puts Plan first among the tabs and opens on You', async () => {
-    await renderToday({ layout: 'cards' });
+    await renderToday();
 
     expect(screen.getAllByRole('tab').map((tab) => tab.props.testID)).toEqual([
       'today-plan-section-tab',
@@ -347,7 +345,7 @@ describe("Today: the Plan page in the cards layout (Settings' Today layout: Card
 
   it("fills the Plan page's card with its panel for a failed read", async () => {
     await bootLocalApp();
-    render(<TodayScreen groupState={signedOut} layout="cards" loadPlan={() => Promise.reject(new Error('locked'))} now={clock} />);
+    render(<TodayScreen groupState={signedOut} loadPlan={() => Promise.reject(new Error('locked'))} now={clock} />);
 
     await waitFor(() => expect(within(text('today-plan-section')).getByTestId('today-plan-error')).toBeTruthy());
     expect(text('today-plan-error')).toHaveStyle({ flex: 1, justifyContent: 'center' });

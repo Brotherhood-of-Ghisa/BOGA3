@@ -180,7 +180,6 @@ describe('the Settings list', () => {
         targetWindowWeeks: 6,
         displayEfforts: ['rir_0'],
         dateFormat: 'YYYY-MM-DD',
-        todayLayout: 'cards',
         timerInTitleBar: true,
       });
       expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 120 s · Auto-start off');
@@ -188,7 +187,7 @@ describe('the Settings list', () => {
     expect(statusOf('settings-progress-row')).toBe('Progress, 3D · 6-week period');
     expect(statusOf('settings-effort-row')).toBe('Effort, Custom');
     expect(statusOf('settings-other-row')).toBe('Other, YYYY-MM-DD');
-    expect(statusOf('settings-experiments-row')).toBe('Experiments, Today cards · Title-bar timer');
+    expect(statusOf('settings-experiments-row')).toBe('Experiments, Title-bar timer');
   });
 
   it('keeps the Developer mode switch off the list, naming its state on Developer tools', async () => {
