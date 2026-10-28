@@ -44,6 +44,7 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import DeveloperToolsRoute from '../app/settings-developer-tools';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import * as devReset from '@/src/data/dev-reset';
 import * as devAffordances from '@/src/sync/dev-affordances';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
@@ -98,6 +99,14 @@ describe('settings developer data affordances', () => {
     expect(screen.queryByTestId('settings-dev-reset-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
+  });
+
+  it('heads the tools with a micro-label and explains each in muted body', async () => {
+    await openSettings();
+    expect(screen.getByText('Developer tools')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+    expect(screen.getByText(/^Drop the local database/)).toHaveStyle({
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
+    });
   });
 
   it('switches Developer mode on the page in every build', async () => {

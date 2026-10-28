@@ -55,6 +55,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import SettingsRoute from '../app/(tabs)/settings';
 import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import {
   __resetExerciseListPreferencesForTests,
   ensureExerciseListPreferencesLoaded,
@@ -153,6 +154,16 @@ describe('the Settings list', () => {
     await renderSettings();
     fireEvent.press(screen.getByTestId(testID));
     expect(mockPush).toHaveBeenCalledWith(route);
+  });
+
+  it('titles the About card and draws its lines as muted body, the version figures in Plex Mono', async () => {
+    await renderSettings();
+    const about = within(screen.getByTestId('settings-about-card'));
+    expect(about.getByText('About')).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
+    const version = screen.getByTestId('settings-about-version');
+    expect(version).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', color: uiRoles.inkMuted });
+    expect(within(version).getByText('1.2.3')).toHaveStyle({ fontFamily: uiFonts.figure.family });
+    expect(within(version).getByText('45')).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });
 
   it('presses nothing from the About card', async () => {

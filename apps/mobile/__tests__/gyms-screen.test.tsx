@@ -34,6 +34,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { GymsScreen } from '@/components/gyms';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import GymsRoute from '../app/gyms';
 import * as localGyms from '@/src/data/local-gyms';
 import { gyms } from '@/src/data/schema';
@@ -107,6 +108,33 @@ describe('Gyms screen over real data', () => {
     // Latitude and longitude stay private: the list shows presence only.
     expect(screen.queryByText(/51\.5/)).toBeNull();
     expect(screen.queryByTestId('gyms-toggle-archived')).toBeNull();
+  });
+
+  it('draws the list and the editor on the text roles', async () => {
+    await renderScreen();
+    expect(screen.getByText('Downtown Iron Temple')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+    expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm });
+
+    await openEditor('Synced Strength House');
+    for (const heading of ['Name', 'Location']) {
+      expect(screen.getByText(heading)).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
+    }
+    expect(screen.getByTestId('gym-editor-location-status')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+    expect(screen.getByText(/^Private to you/)).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
+    fireEvent.press(screen.getByLabelText('Replace location for gym Synced Strength House'));
+    expect(screen.getByText('Replace the saved location with where you are now?')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600' });
+  });
+
+  it('draws a failed location write as a strong meta line in danger', async () => {
+    readPosition.mockResolvedValue({ status: 'read_failure', error: new Error('gps') });
+    await renderScreen();
+    await openEditor('Downtown Iron Temple');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+    });
+    expect(screen.getByTestId('gym-editor-feedback')).toHaveStyle({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, color: uiRoles.danger,
+    });
   });
 
   it('adds a gym under a new custom id, without reading the location unless asked', async () => {
@@ -297,6 +325,7 @@ describe('Gyms screen over real data', () => {
     fireEvent.press(screen.getByTestId('gyms-toggle-archived'));
     expect(screen.getByTestId('gyms-toggle-archived')).toHaveTextContent('Hide archived');
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveTextContent('Archived');
+    expect(screen.getAllByText('Archived').find((node) => node.props.testID === undefined)).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
 
     await openEditor('Downtown Iron Temple');
     await act(async () => {
@@ -329,7 +358,10 @@ describe('Gyms screen over real data', () => {
     await seed();
     render(<GymsScreen readPosition={readPosition} />);
 
-    fireEvent.press(await screen.findByTestId('gyms-retry'));
+    expect(await screen.findByText("Couldn't load your gyms.")).toHaveStyle({
+      fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
+    });
+    fireEvent.press(screen.getByTestId('gyms-retry'));
     expect(await screen.findByTestId('gyms-list')).toBeTruthy();
     expect(screen.getByLabelText('Edit gym Synced Strength House')).toBeTruthy();
   });

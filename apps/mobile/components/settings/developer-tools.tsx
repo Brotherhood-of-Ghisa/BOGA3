@@ -9,11 +9,10 @@ import {
   Icon,
   Notice,
   ScreenScroll,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import {
   resetAndReseedLocalData,
@@ -159,12 +158,12 @@ function DeveloperTools() {
     <Card style={styles.cardBody} testID="settings-dev-tools-card">
       <View style={styles.devHeader}>
         <Icon color={uiRoles.inkMuted} name="warning" size="sm" />
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
           Developer tools
         </Text>
       </View>
 
-      <Text allowFontScaling={false} style={styles.bodyMuted}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         View the in-app logs captured this session (all levels). Errors and warnings also
         sync to the backend once signed in.
       </Text>
@@ -176,7 +175,7 @@ function DeveloperTools() {
         variant="outline"
       />
 
-      <Text allowFontScaling={false} style={styles.bodyMuted}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         Wipe every local table and re-run the exercise catalog seeder. Available only in
         development builds — does nothing in release.
       </Text>
@@ -190,7 +189,7 @@ function DeveloperTools() {
       />
       <DevFeedbackNotice feedback={resetFeedback} testID="settings-dev-reset-feedback" />
 
-      <Text allowFontScaling={false} style={styles.bodyMuted}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         Drop the local database and re-bootstrap. Sync re-pulls your server state into a
         clean local store.
       </Text>
@@ -206,7 +205,7 @@ function DeveloperTools() {
       />
       <DevFeedbackNotice feedback={wipeLocalFeedback} testID="settings-dev-wipe-local-feedback" />
 
-      <Text allowFontScaling={false} style={styles.bodyMuted}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
         Delete every row on the server owned by your account, then wipe local. Useful for
         testing the bootstrap flow against an empty server.
       </Text>
@@ -243,22 +242,6 @@ const styles = StyleSheet.create({
   cardBody: {
     padding: uiSpace.md,
     gap: uiSpace.md,
-  },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  bodyMuted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   devHeader: {
     flexDirection: 'row',
