@@ -8,6 +8,12 @@ export const userSettings = sqliteTable(
     bodyweightCalculationsEnabled: integer('bodyweight_calculations_enabled', { mode: 'boolean' })
       .notNull()
       .default(false),
+    // Synced weekly muscle targets and the count-secondary switch. Null until a
+    // device uploads or adopts them; a write always sets the four together.
+    weeklyWorkingSetTarget: integer('weekly_working_set_target'),
+    muscleTargetMode: text('muscle_target_mode'),
+    muscleTargetOverrides: text('muscle_target_overrides'),
+    countSecondaryMuscles: integer('count_secondary_muscles', { mode: 'boolean' }),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),

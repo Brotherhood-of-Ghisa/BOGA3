@@ -183,6 +183,13 @@
       "when": 1793119427841,
       "tag": "0025_absurd_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1793196301787,
+      "tag": "0026_user_settings_muscle_targets",
+      "breakpoints": true
     }
   ]
 }

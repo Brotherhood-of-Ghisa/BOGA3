@@ -325,11 +325,13 @@ for entity in "${ENTITIES[@]}"; do
   expected=""
   if [[ "${entity}" == "exercise_definitions" ]]; then
     expected="exercise_definitions_load_input_mode_valid"
+  elif [[ "${entity}" == "user_settings" ]]; then
+    expected="user_settings_muscle_target_overrides_valid"
   fi
   if [[ "${names}" != "${expected}" ]]; then
     fail "app_public.${entity} CHECK constraints '${names}'; expected '${expected}' per docs/specs/tech/sync-v2-server-contract.md (Ground rules)"
   fi
 done
-pass "only the load-input-mode CHECK is present across v2 entity tables"
+pass "only the load-input-mode and target-overrides CHECKs are present across v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"

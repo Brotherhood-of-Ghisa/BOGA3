@@ -6,14 +6,18 @@ jest.mock('@/src/data/bootstrap', () =>
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Storage } from 'expo-sqlite/kv-store';
 import { eq } from 'drizzle-orm';
 import MusclesRoute from '../app/settings-muscles';
 import TargetsRoute from '../app/settings-muscle-targets';
 import EnabledRoute from '../app/settings-enabled-muscles';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { muscleGroups } from '@/src/data/schema';
+import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as setup from '@/src/data/muscle-report-settings';
+import * as userSettingsData from '@/src/data/user-settings';
+import '@/src/sync/synced-preferences-store';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { Storage } from 'expo-sqlite/kv-store';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState,
   setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
@@ -124,13 +128,16 @@ it.each(['0', '-1', '1.5', 'bad', '9007199254740992'])('keeps invalid target dra
 });
 
 it('retains and retries failed saves, then clears drafts on account change', async () => {
+  // A synced store belongs to one account; account B never reads A's settings row.
+  stampLocalDataOwner(localDatabase(), 'A');
+  Storage.setItemSync(syncedTargetsAdoptedKey('account:A'), 'true');
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
-  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('full'); });
+  const write = jest.spyOn(userSettingsData, 'writeMuscleTargetSettings').mockRejectedValueOnce(Error('full'));
   edit('settings-muscle-target-chest', '12');
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '12');
+  expect(await screen.findByTestId('settings-muscle-preferences-error')).toHaveTextContent(/could not be saved/);
   expect(values().muscleTargetOverrides).toEqual({});
-  expect(screen.getByTestId('settings-muscle-preferences-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByText('Retry'));
   await waitForGone(() => screen.queryByTestId('settings-muscle-preferences-error'));

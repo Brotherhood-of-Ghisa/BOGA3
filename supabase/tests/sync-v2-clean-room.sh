@@ -246,6 +246,8 @@ for entity in "${ENTITIES[@]}"; do
   expected=""
   if [[ "${entity}" == "exercise_definitions" ]]; then
     expected="exercise_definitions_load_input_mode_valid"
+  elif [[ "${entity}" == "user_settings" ]]; then
+    expected="user_settings_muscle_target_overrides_valid"
   fi
   if [[ "${names}" != "${expected}" ]]; then
     fail "${entity}: CHECK constraints '${names}'; expected '${expected}'"

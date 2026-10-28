@@ -21,7 +21,7 @@ it('extends existing scoped browsing choices and restores all five settings afte
   Storage.setItemSync(preferenceKey('account:A', 'dateFormat'), 'MM-DD-YYYY');
   await account();
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY' });
-  const choices = { weeklyWorkingSetTarget: 12, displayEfforts: ['warm_up', 'unspecified', 'rir_2', 'rir_0'] as import('@/src/exercise-calculations/effort-policy').EffortChoice[],
+  const choices = { progressMetric: 'totalVolume' as const, displayEfforts: ['warm_up', 'unspecified', 'rir_2', 'rir_0'] as import('@/src/exercise-calculations/effort-policy').EffortChoice[],
     targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'weekly' as const };
   setAccountLocalPreferences(choices);
   __resetAccountLocalPreferencesForTests();
@@ -29,7 +29,7 @@ it('extends existing scoped browsing choices and restores all five settings afte
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY', ...choices });
   await account('B'); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   await account(null); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
-  await account('A'); expect(values().weeklyWorkingSetTarget).toBe(12);
+  await account('A'); expect(values().progressMetric).toBe('totalVolume');
   await account(null, false); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   setAccountLocalPreferences({ heatmapView: 'daily' });
   await account('A'); expect(values().historyLookbackWeeks).toBe(104);
@@ -132,17 +132,23 @@ it('restores the Progress defaults after relaunch, per account, as plain text', 
   expect(values().progressMetric).toBe('totalVolume');
 });
 
-it('stores the period as text and grouping and secondary sets as booleans', async () => {
+it('stores the period as text and grouping as a boolean', async () => {
   await account();
-  setAccountLocalPreferences({ progressPeriod: 'this-week', progressGrouped: false, progressCountSecondary: false });
+  setAccountLocalPreferences({ progressPeriod: 'this-week', progressGrouped: false });
   expect(Storage.getItemSync(preferenceKey('account:A', 'progressPeriod'))).toBe('this-week');
   expect(Storage.getItemSync(preferenceKey('account:A', 'progressGrouped'))).toBe('false');
-  expect(Storage.getItemSync(preferenceKey('account:A', 'progressCountSecondary'))).toBe('false');
   __resetAccountLocalPreferencesForTests();
   await account();
-  expect(values()).toMatchObject({ progressPeriod: 'this-week', progressGrouped: false, progressCountSecondary: false });
+  expect(values()).toMatchObject({ progressPeriod: 'this-week', progressGrouped: false });
   await account('B');
-  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true, progressCountSecondary: true });
+  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true });
+});
+
+it('still reads a count-secondary choice an earlier version stored as a kv boolean', async () => {
+  // Synced on the settings row now; the kv copy is the fallback until sync moves it.
+  Storage.setItemSync(preferenceKey('account:A', 'progressCountSecondary'), 'false');
+  await account();
+  expect(values().progressCountSecondary).toBe(false);
 });
 
 it.each([

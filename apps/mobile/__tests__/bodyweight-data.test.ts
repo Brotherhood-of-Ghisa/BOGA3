@@ -189,8 +189,11 @@ it('puts only the final preference and contribution fields on the sync wire', ()
     id: 'settings', bodyweightCalculationsEnabled: true, deletedAt: null,
     createdAt: new Date(1000), updatedAt: new Date(1000), localDirty: true, localUpdatedAtMs: 100,
   }, 'user_settings');
+  // A row only the bodyweight switch wrote sends null targets, which the server keeps.
   expect(settings.fields).toEqual({
     bodyweight_calculations_enabled: true, deleted_at: null, created_at: 1000, updated_at: 1000,
+    weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
+    count_secondary_muscles: null,
   });
   const definition = entityToWire({
     id: 'definition', name: 'Pull-Up', loadInputMode: 'total_load', bodyweightContribution: 0.7,

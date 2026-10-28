@@ -29,7 +29,7 @@ Signature: `primary + ½ secondary`
 
 Progress and muscle history Filters offer `Count secondary sets` per visit:
 Progress opens on Settings' default, history on Progress's. Off counts primary
-work only.
+work only. The default is per account, synced like [[muscle.weekly-targets]].
 
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 
@@ -49,10 +49,12 @@ Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; 
 
 ### muscle.weekly-targets · definition · accepted
 
-Weekly working-set targets repeat until changed, per account on this device.
-Single uses the default for every muscle; Per muscle uses an override or the
-live default. Broad and Detailed remember separate overrides; Custom setups
-keep their own. Mode changes and disabling a muscle retain its overrides.
+Weekly working-set targets repeat until changed, per account, synced: a
+change reaches every signed-in device on its next sync. On upgrade the first
+device to sync uploads its targets (of two at once, the later wins); a device
+finding them adopts them, replacing its own. Single uses the default for
+every muscle; Per muscle uses an override or the live default. Broad and
+Detailed remember separate overrides; Custom setups keep their own. Mode changes and disabling a muscle retain its overrides.
 Targets list only enabled reported muscles, including custom muscles. Clearing
 an override restores inheritance; targets are positive whole numbers.
 
@@ -61,7 +63,7 @@ target of each reported muscle, scaled to the period.
 Counting is unchanged.
 
 Why: individual training goals without losing a shared fallback.
-Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`.
+Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`; `apps/mobile/src/sync/muscle-target-adoption.ts`.
 
 ### muscle.no-breakdown · presentation · accepted
 

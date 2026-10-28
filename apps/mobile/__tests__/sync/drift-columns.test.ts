@@ -122,6 +122,11 @@ describe('sync drift column rules', () => {
     expect(isTypeCompatible('integer', 'bool', 'user_settings', 'other_flag')).toBe(false);
     expect(isTypeCompatible('integer', 'bool', 'gyms', 'bodyweight_calculations_enabled')).toBe(false);
     expect(isTypeCompatible('integer', 'bool', 'gyms', 'split_by_gym')).toBe(false);
+    expect(isTypeCompatible('integer', 'bool', 'user_settings', 'count_secondary_muscles')).toBe(true);
+    // The overrides map is the one JSON value: text on the client, jsonb on the server.
+    expect(isTypeCompatible('text', 'jsonb', 'user_settings', 'muscle_target_overrides')).toBe(true);
+    expect(isTypeCompatible('text', 'jsonb', 'user_settings', 'muscle_target_mode')).toBe(false);
+    expect(isTypeCompatible('text', 'jsonb', 'gyms', 'muscle_target_overrides')).toBe(false);
     expect(isTypeCompatible('text', 'uuid', 'gyms', 'id')).toBe(false);
     expect(isTypeCompatible('real', 'int8', 'gyms', 'n')).toBe(false);
   });

@@ -141,8 +141,9 @@ describe('domain schema and runtime migrations', () => {
     // the facts' reporting bucket with the triggers that keep it fresh, and
     // m0022 adds last_modified_by across the four authored plan tables, and
     // m0023 adds the muscle report group and tracked flag, and m0024 adds the
-    // exercise rest timer default; m0025 adds merge revisions and account-private recovery.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(26);
+    // exercise rest timer default; m0025 adds merge revisions and account-private recovery;
+    // m0026 adds the synced muscle targets to the settings row.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(27);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -198,6 +199,20 @@ describe('domain schema and runtime migrations', () => {
       'm0023',
       'm0024',
       'm0025',
+      'm0026',
+    ]);
+  });
+
+  it('adds the nullable synced muscle targets to the settings row in m0026', () => {
+    // Synced, so they pair with app_public.user_settings (spec 05, "Client
+    // schema drift rule"). Nullable with no default or CHECK: null means this
+    // device has not uploaded or adopted the targets yet, so the kv values stay
+    // the fallback until sync moves them.
+    expect(localRuntimeMigrations.migrations.m0026.split('--> statement-breakpoint').map(line => line.trim())).toEqual([
+      'ALTER TABLE `user_settings` ADD `weekly_working_set_target` integer;',
+      'ALTER TABLE `user_settings` ADD `muscle_target_mode` text;',
+      'ALTER TABLE `user_settings` ADD `muscle_target_overrides` text;',
+      'ALTER TABLE `user_settings` ADD `count_secondary_muscles` integer;',
     ]);
   });
 
