@@ -235,6 +235,71 @@ describe('StreamSharedExerciseCard', () => {
     expect(screen.queryByText('Quads')).toBeNull();
     expect(screen.queryByText('quads')).toBeNull();
   });
+
+  it('renders no actions and no redundant status tag when viewer is the author', async () => {
+    // Save matching exercise in catalog as it naturally exists for the author
+    await saveExerciseCatalogExercise({
+      name: 'Paused Bench Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+
+    render(
+      <StreamSharedExerciseCard
+        item={SAMPLE_SHARED_ITEM}
+        onAdded={jest.fn()}
+        showGroupName={false}
+        userId="user-other" // Same as SAMPLE_SHARED_ITEM.shared_by.user_id
+      />,
+    );
+
+    expect(screen.getByText('You shared an exercise')).toBeTruthy();
+    expect(screen.getByText('Paused Bench Press')).toBeTruthy();
+
+    // Author should see NO actions
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-add-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-add-new-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-link-existing-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-customize-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-status-exists')).toBeNull();
+  });
+
+  it('shows Already in your exercises and no Add button when matching exercise exists and there is no leaderboard', async () => {
+    await saveExerciseCatalogExercise({
+      name: 'Standalone Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+
+    const itemWithoutLeaderboard: CompetitionStreamSharedExerciseWire = {
+      ...SAMPLE_SHARED_ITEM,
+      id: 'shared-standalone-1',
+      exercise: {
+        ...SAMPLE_SHARED_ITEM.exercise,
+        name: 'Standalone Press',
+        group_exercise_id: null,
+        group_exercise_name: null,
+      },
+    };
+
+    render(
+      <StreamSharedExerciseCard
+        item={itemWithoutLeaderboard}
+        onAdded={jest.fn()}
+        showGroupName={false}
+        userId="user-me"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('group-stream-shared-exercise-shared-standalone-1-status-exists')).toBeTruthy();
+    });
+
+    // Should NOT offer "Add another" or "Add as new" or "Add to my exercises"
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-standalone-1-add-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-standalone-1-add-new-btn')).toBeNull();
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-standalone-1-add-another-btn')).toBeNull();
+  });
 });
 
 describe('GroupSharedExercisesList', () => {
@@ -364,5 +429,85 @@ describe('GroupSharedExercisesList', () => {
     const created = exercises.find((e) => e.id !== saved.id && e.name === 'Paused Bench Press');
     expect(created).toBeDefined();
     expect(links.some((l) => l.exerciseDefinitionId === created?.id && l.groupExerciseId === 'ge-1')).toBe(true);
+  });
+
+  it('renders no actions and allows delete when viewer is the author', async () => {
+    // Save matching exercise in catalog as it naturally exists for the author
+    await saveExerciseCatalogExercise({
+      name: 'Paused Bench Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+
+    render(
+      <GroupSharedExercisesList
+        groupId="group-1"
+        groupName="Powerlifting Club"
+        myRole="member"
+        offline={false}
+        userId="user-other" // Same as itemWire.shared_by.user_id
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Paused Bench Press')).toBeTruthy();
+    });
+
+    // Header should say "You · ..."
+    expect(screen.getByText(/You ·/)).toBeTruthy();
+
+    // Author should see delete button (author can delete their own share)
+    expect(screen.getByTestId('group-shared-exercise-shared-ex-1-delete-btn')).toBeTruthy();
+
+    // Author should NOT see any import/add/link action buttons
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-add-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-add-new-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-link-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-customize-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-status-exists')).toBeNull();
+  });
+
+  it('shows Already in your exercises and no Add button when matching exercise exists and there is no leaderboard', async () => {
+    await saveExerciseCatalogExercise({
+      name: 'Standalone Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+
+    const standaloneWire: GroupSharedExerciseItemWire = {
+      ...itemWire,
+      id: 'shared-standalone-1',
+      exercise: {
+        ...itemWire.exercise,
+        name: 'Standalone Press',
+        group_exercise_id: null,
+        group_exercise_name: null,
+      },
+    };
+
+    (groupsApi.listGroupSharedExercises as jest.Mock).mockResolvedValue({
+      contract_version: 4,
+      group_id: 'group-1',
+      shared_exercises: [standaloneWire],
+    });
+
+    render(
+      <GroupSharedExercisesList
+        groupId="group-1"
+        groupName="Powerlifting Club"
+        myRole="member"
+        offline={false}
+        userId="user-me"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('group-shared-exercise-shared-standalone-1-status-exists')).toBeTruthy();
+    });
+
+    // Should NOT offer "Add another" or "Add as new" or "Add to my exercises"
+    expect(screen.queryByTestId('group-shared-exercise-shared-standalone-1-add-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-standalone-1-add-new-btn')).toBeNull();
+    expect(screen.queryByTestId('group-shared-exercise-shared-standalone-1-add-another-btn')).toBeNull();
   });
 });

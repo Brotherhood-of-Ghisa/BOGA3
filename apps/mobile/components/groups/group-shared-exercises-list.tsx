@@ -88,7 +88,8 @@ function GroupSharedExerciseCard({
   onDirectAdd,
   onCustomize,
 }: GroupSharedExerciseCardProps) {
-  const who = item.shared_by.user_id === userId ? 'You' : formatMemberName(item.shared_by.username);
+  const isAuthor = item.shared_by.user_id === userId;
+  const who = isAuthor ? 'You' : formatMemberName(item.shared_by.username);
   const date = formatBoardDate(item.exercise.created_at_ms, dateFormat);
   const matching = catalog.exercises.find(
     (e) => !e.deletedAt && e.name.trim().toLowerCase() === item.exercise.name.trim().toLowerCase(),
@@ -109,6 +110,96 @@ function GroupSharedExerciseCard({
   );
   const canLinkExisting = Boolean(matching && item.exercise.group_exercise_id && isUnlinkedInGroup);
   const itemTestID = `group-shared-exercise-${item.id}`;
+
+  const statusTag = useMemo(() => {
+    if (isAuthor) return null;
+    if (isItemLinked) {
+      return <Tag label="In your exercises (Linked)" testID={`${itemTestID}-status-linked`} tone="neutral" />;
+    }
+    if (matching && (!item.exercise.group_exercise_id || !canLinkExisting)) {
+      return <Tag label="Already in your exercises" testID={`${itemTestID}-status-exists`} tone="neutral" />;
+    }
+    return null;
+  }, [canLinkExisting, isAuthor, isItemLinked, item.exercise.group_exercise_id, itemTestID, matching]);
+
+  const actions = useMemo(() => {
+    if (isAuthor || isItemLinked) {
+      return null;
+    }
+    if (canLinkExisting && matching) {
+      return (
+        <>
+          <ActionButton
+            accessibilityLabel={`Link ${matching.name} to leaderboard`}
+            disabled={isPending}
+            label="Link to leaderboard"
+            onPress={() => void onLinkExisting(item, matching.id)}
+            size="compact"
+            testID={`${itemTestID}-link-btn`}
+            variant="primary"
+          />
+          <ActionButton
+            accessibilityLabel="Add as new exercise"
+            disabled={isPending}
+            label="Add as new"
+            onPress={() => void onDirectAdd(item)}
+            size="compact"
+            testID={`${itemTestID}-add-new-btn`}
+            variant="outline"
+          />
+        </>
+      );
+    }
+    if (matching) {
+      if (item.exercise.group_exercise_id && !canLinkExisting) {
+        return (
+          <ActionButton
+            accessibilityLabel="Add as new exercise"
+            disabled={isPending}
+            label="Add as new"
+            onPress={() => void onDirectAdd(item)}
+            size="compact"
+            testID={`${itemTestID}-add-new-btn`}
+            variant="outline"
+          />
+        );
+      }
+      return null;
+    }
+    return (
+      <>
+        <ActionButton
+          accessibilityLabel={`Add ${item.exercise.name} to my exercises`}
+          disabled={isPending}
+          label="Add to my exercises"
+          onPress={() => void onDirectAdd(item)}
+          size="compact"
+          testID={`${itemTestID}-add-btn`}
+          variant="primary"
+        />
+        <ActionButton
+          accessibilityLabel="Customize exercise before adding"
+          disabled={isPending}
+          label="Customize…"
+          onPress={() => onCustomize(item)}
+          size="compact"
+          testID={`${itemTestID}-customize-btn`}
+          variant="outline"
+        />
+      </>
+    );
+  }, [
+    canLinkExisting,
+    isAuthor,
+    isItemLinked,
+    isPending,
+    item,
+    itemTestID,
+    matching,
+    onCustomize,
+    onDirectAdd,
+    onLinkExisting,
+  ]);
 
   return (
     <Card key={item.id} style={styles.card} testID={itemTestID}>
@@ -136,62 +227,9 @@ function GroupSharedExerciseCard({
         {item.exercise.group_exercise_name ? (
           <Tag label={`Leaderboard: ${item.exercise.group_exercise_name}`} tone="neutral" />
         ) : null}
+        {statusTag}
       </View>
-      <View style={styles.cardActions}>
-        {isItemLinked ? (
-          <Tag label="In your exercises (Linked)" testID={`${itemTestID}-status-linked`} tone="neutral" />
-        ) : canLinkExisting && matching ? (
-          <>
-            <ActionButton
-              accessibilityLabel={`Link ${matching.name} to leaderboard`}
-              disabled={isPending}
-              label="Link to leaderboard"
-              onPress={() => void onLinkExisting(item, matching.id)}
-              testID={`${itemTestID}-link-btn`}
-              variant="primary"
-            />
-            <ActionButton
-              accessibilityLabel="Add as new exercise"
-              disabled={isPending}
-              label="Add as new"
-              onPress={() => void onDirectAdd(item)}
-              testID={`${itemTestID}-add-new-btn`}
-              variant="outline"
-            />
-          </>
-        ) : matching ? (
-          <>
-            <Tag label="Already in your exercises" testID={`${itemTestID}-status-exists`} tone="neutral" />
-            <ActionButton
-              accessibilityLabel={item.exercise.group_exercise_id ? 'Add as new exercise' : 'Add another copy'}
-              disabled={isPending}
-              label={item.exercise.group_exercise_id ? 'Add as new' : 'Add another'}
-              onPress={() => void onDirectAdd(item)}
-              testID={item.exercise.group_exercise_id ? `${itemTestID}-add-new-btn` : `${itemTestID}-add-another-btn`}
-              variant="outline"
-            />
-          </>
-        ) : (
-          <>
-            <ActionButton
-              accessibilityLabel={`Add ${item.exercise.name} to my exercises`}
-              disabled={isPending}
-              label="Add to my exercises"
-              onPress={() => void onDirectAdd(item)}
-              testID={`${itemTestID}-add-btn`}
-              variant="primary"
-            />
-            <ActionButton
-              accessibilityLabel="Customize exercise before adding"
-              disabled={isPending}
-              label="Customize…"
-              onPress={() => onCustomize(item)}
-              testID={`${itemTestID}-customize-btn`}
-              variant="outline"
-            />
-          </>
-        )}
-      </View>
+      {actions ? <View style={styles.cardActions}>{actions}</View> : null}
     </Card>
   );
 }

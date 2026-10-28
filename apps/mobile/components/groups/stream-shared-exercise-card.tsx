@@ -39,6 +39,7 @@ type Props = {
 
 type ActionsProps = {
   testID: string;
+  isAuthor: boolean;
   isTargetLinked: boolean;
   matchingExercise?: ExerciseCatalogExercise;
   groupExerciseId?: string | null;
@@ -52,6 +53,7 @@ type ActionsProps = {
 
 function StreamSharedExerciseCardActions({
   testID,
+  isAuthor,
   isTargetLinked,
   matchingExercise,
   groupExerciseId,
@@ -62,8 +64,8 @@ function StreamSharedExerciseCardActions({
   onDirectAdd,
   onOpenCustomizer,
 }: ActionsProps) {
-  if (isTargetLinked) {
-    return <Tag label="In your exercises (Linked)" testID={`${testID}-status-linked`} tone="neutral" />;
+  if (isAuthor || isTargetLinked) {
+    return null;
   }
 
   if (canLinkExisting && matchingExercise) {
@@ -74,6 +76,7 @@ function StreamSharedExerciseCardActions({
           disabled={pending}
           label="Link to leaderboard"
           onPress={onLinkExisting}
+          size="compact"
           testID={`${testID}-link-existing-btn`}
           variant="primary"
         />
@@ -82,6 +85,7 @@ function StreamSharedExerciseCardActions({
           disabled={pending}
           label="Add as new"
           onPress={onDirectAdd}
+          size="compact"
           testID={`${testID}-add-new-btn`}
           variant="outline"
         />
@@ -90,19 +94,20 @@ function StreamSharedExerciseCardActions({
   }
 
   if (matchingExercise) {
-    return (
-      <>
-        <Tag label="Already in your exercises" testID={`${testID}-status-exists`} tone="neutral" />
+    if (groupExerciseId && !canLinkExisting) {
+      return (
         <ActionButton
-          accessibilityLabel={groupExerciseId ? 'Add as new exercise' : 'Add another copy'}
+          accessibilityLabel="Add as new exercise"
           disabled={pending}
-          label={groupExerciseId ? 'Add as new' : 'Add another'}
+          label="Add as new"
           onPress={onDirectAdd}
-          testID={groupExerciseId ? `${testID}-add-new-btn` : `${testID}-add-another-btn`}
+          size="compact"
+          testID={`${testID}-add-new-btn`}
           variant="outline"
         />
-      </>
-    );
+      );
+    }
+    return null;
   }
 
   return (
@@ -112,6 +117,7 @@ function StreamSharedExerciseCardActions({
         disabled={pending}
         label="Add to my exercises"
         onPress={onDirectAdd}
+        size="compact"
         testID={`${testID}-add-btn`}
         variant="primary"
       />
@@ -120,6 +126,7 @@ function StreamSharedExerciseCardActions({
         disabled={pending}
         label="Customize…"
         onPress={onOpenCustomizer}
+        size="compact"
         testID={`${testID}-customize-btn`}
         variant="outline"
       />
@@ -137,7 +144,8 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const who = item.shared_by.user_id === userId ? 'You' : formatMemberName(item.shared_by.username);
+  const isAuthor = item.shared_by.user_id === userId;
+  const who = isAuthor ? 'You' : formatMemberName(item.shared_by.username);
   const date = formatBoardDate(item.sort_at_ms, dateFormat);
 
   const matchingExercise = useMemo(() => {
@@ -159,6 +167,26 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
     if (!matchingExercise || !item.exercise.group_exercise_id || links.links === null) return false;
     return !links.links.some((l) => l.exerciseDefinitionId === matchingExercise.id);
   }, [matchingExercise, item.exercise.group_exercise_id, links.links]);
+
+  const testID = `group-stream-shared-exercise-${item.id}`;
+
+  const statusTag = useMemo(() => {
+    if (isAuthor) return null;
+    if (isTargetLinked) {
+      return <Tag label="In your exercises (Linked)" testID={`${testID}-status-linked`} tone="neutral" />;
+    }
+    if (matchingExercise && (!item.exercise.group_exercise_id || !canLinkExisting)) {
+      return <Tag label="Already in your exercises" testID={`${testID}-status-exists`} tone="neutral" />;
+    }
+    return null;
+  }, [canLinkExisting, isAuthor, isTargetLinked, item.exercise.group_exercise_id, matchingExercise, testID]);
+
+  const hasActions = useMemo(() => {
+    if (isAuthor || isTargetLinked) return false;
+    if (canLinkExisting && matchingExercise) return true;
+    if (matchingExercise) return Boolean(item.exercise.group_exercise_id && !canLinkExisting);
+    return true;
+  }, [canLinkExisting, isAuthor, isTargetLinked, item.exercise.group_exercise_id, matchingExercise]);
 
   const muscleNames = useMemo(() => {
     const exerciseForReport = {
@@ -265,8 +293,6 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
     });
   };
 
-  const testID = `group-stream-shared-exercise-${item.id}`;
-
   return (
     <Card accessibilityLabel={`${who} shared ${item.exercise.name}`} style={styles.card} testID={testID}>
       {showGroupName ? <Text allowFontScaling={false} style={styles.muted}>{item.group_id}</Text> : null}
@@ -281,6 +307,7 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
         {item.exercise.group_exercise_name ? (
           <Tag label={`Leaderboard: ${item.exercise.group_exercise_name}`} tone="neutral" />
         ) : null}
+        {statusTag}
       </View>
       {muscleNames.length > 0 ? (
         <View style={styles.musclePillsRow}>
@@ -292,12 +319,13 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
       {error ? <Notice live message={error} testID={`${testID}-error`} tone="danger" /> : null}
       {feedback ? (
         <GroupWriteNotice message={feedback} testID={`${testID}-feedback`} tone="success" />
-      ) : (
+      ) : hasActions ? (
         <View style={styles.actionsRow}>
           <StreamSharedExerciseCardActions
             canLinkExisting={canLinkExisting}
             exerciseName={item.exercise.name}
             groupExerciseId={item.exercise.group_exercise_id}
+            isAuthor={isAuthor}
             isTargetLinked={isTargetLinked}
             matchingExercise={matchingExercise}
             onDirectAdd={() => void handleDirectAdd()}
@@ -307,7 +335,7 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
             testID={testID}
           />
         </View>
-      )}
+      ) : null}
       <Text allowFontScaling={false} style={styles.muted}>
         {date}
       </Text>
