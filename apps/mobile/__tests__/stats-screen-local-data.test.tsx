@@ -314,7 +314,7 @@ describe('Stats over real data', () => {
     expect(groupChecked()).toBe(false);
   });
 
-  it('pairs Sets periods on one line under Now alone and toggles Now, Muscle and Change sorts over real data', async () => {
+  it('shows separate Sets columns and toggles Now, Previous, Muscle and Change sorts over real data', async () => {
     await renderSeededStats();
     chooseFilter('view-mode', 'Muscle');
     toggleGroup();
@@ -325,13 +325,11 @@ describe('Stats over real data', () => {
       expect(numbers).toEqual([...numbers].sort((left, right) => descending ? right - left : left - right));
     };
     expectSorted('now', true);
-    expect(screen.queryByTestId('stats-muscle-sort-previous')).toBeNull();
-    // No `Prev` header: each row reads `now (previous)` on one line.
-    expect(screen.queryByRole('header', { name: 'Previous, working sets' })).toBeNull();
-    expect(screen.queryByText('Prev')).toBeNull();
-    for (const periods of screen.getAllByTestId(/^stats-muscle-row-.*-periods$/)) {
-      expect(periods).toHaveTextContent(/^[\d.]+ \([\d.]+\)$/);
-    }
+    expect(screen.getByTestId('stats-muscle-sort-previous')).toHaveProp('accessibilityState', { selected: false });
+    expect(within(screen.getByTestId('stats-muscle-sort-now')).getByText('Now')).toBeTruthy();
+    expect(within(screen.getByTestId('stats-muscle-sort-previous')).getByText('Prev')).toBeTruthy();
+    expect(screen.queryAllByTestId(/^stats-muscle-row-.*-periods$/)).toHaveLength(0);
+    expect(screen.queryAllByTestId(/^stats-muscle-ticker-/)).toHaveLength(0);
     expect(screen.getByTestId('stats-muscle-sort-now')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
     fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
     expectSorted('now', false);
@@ -339,6 +337,11 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-sort-now'));
     expectSorted('now', true);
     expect(screen.getByTestId('stats-muscle-sort-now-indicator-down', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-previous'));
+    expectSorted('previous', true);
+    fireEvent.press(screen.getByTestId('stats-muscle-sort-previous'));
+    expectSorted('previous', false);
+    expect(screen.getByTestId('stats-muscle-sort-previous-indicator-up', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByTestId('stats-muscle-sort-muscle'));
     const names = () => screen.getAllByRole('link').map(row => row.props.accessibilityLabel);
     expect(names()).toEqual([...names()].sort((left, right) => left.localeCompare(right)));
@@ -350,6 +353,12 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-sort-change'));
     expectSorted('change', false);
     expect(screen.getByTestId('stats-muscle-sort-change-indicator-up', { includeHiddenElements: true })).toBeTruthy();
+    chooseFilter('metric', 'Volume');
+    for (const [column, label] of [['now', 'Now'], ['previous', 'Prev'], ['change', 'Change']]) {
+      expect(within(screen.getByTestId(`stats-muscle-sort-${column}`)).getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryAllByTestId(/^stats-muscle-row-.*-periods$/)).toHaveLength(0);
+    expect(screen.queryAllByTestId(/^stats-muscle-ticker-/)).toHaveLength(0);
   });
 
   it('counts secondary sets at ½ across Muscle and its history, without changing Exercise totals', async () => {
@@ -357,7 +366,6 @@ describe('Stats over real data', () => {
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
     await act(async () => invalidateExerciseCatalogCache());
-    const tickers = jest.spyOn(statsRepository, 'computeProgressMuscleTickers');
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     chooseFilter('view-mode', 'Muscle');
@@ -372,8 +380,6 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^1$/));
     expect(secondaryOn()).toBe(false);
     expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
-    // The tickers follow the same choice.
-    expect(tickers).toHaveBeenLastCalledWith(expect.objectContaining({ countSecondary: false }));
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
     expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets&secondary=hidden');
 
@@ -1176,27 +1182,4 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-change`)).toHaveTextContent('—');
   });
 
-});
-
-
-it('keeps ticker reads independent of This week and metric, refreshes settings, and excludes Exercise/3D', async () => {
-  const tickerRead = jest.spyOn(statsRepository, 'computeProgressMuscleTickers');
-  await renderSeededStats();
-  expect(tickerRead).not.toHaveBeenCalled();
-  chooseFilter('view-mode', 'Muscle');
-  await waitFor(() => expect(tickerRead).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(screen.getByTestId('stats-muscle-history-quads').props.accessibilityHint).not.toContain('loading'));
-  const count = tickerRead.mock.calls.length;
-  chooseFilter('period', '4 weeks');
-  chooseFilter('period', 'This week');
-  chooseFilter('metric', 'Volume');
-  expect(tickerRead).toHaveBeenCalledTimes(count);
-  expect(screen.getByTestId('stats-muscle-history-quads').props.accessibilityHint).toContain('rolling 4 weeks');
-  await act(async () => { updatePreferences({ historyLookbackWeeks: 26, weeklyWorkingSetTarget: 12 }); });
-  await waitFor(() => expect(tickerRead).toHaveBeenLastCalledWith(expect.objectContaining({ historyWeeks: 26, rollingWeeks: 4, weeklyTarget: 12 })));
-  const changedCount = tickerRead.mock.calls.length;
-  await act(async () => { updatePreferences({ progressMuscleLayout: '3d' }); });
-  await screen.findByTestId('stats-muscle-body-card');
-  chooseFilter('view-mode', 'Exercise');
-  expect(tickerRead).toHaveBeenCalledTimes(changedCount);
 });

@@ -10,6 +10,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
 import { Modal, StyleSheet } from 'react-native';
+import type { ReactTestInstance } from 'react-test-renderer';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
 import {
@@ -494,7 +495,7 @@ describe('StatsScreenShell', () => {
     renderStatsScreenShell({ muscleLayout: 'list', summary, tableMetric: 'totalVolume' });
     expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('100000000000');
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+9999999999900%');
-    expect(screen.getByTestId('stats-muscle-row-chest-periods')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-row-chest-figures')).toHaveStyle({ alignSelf: 'stretch', width: '100%' });
     act(() => ReactNative.Dimensions.set({ window: dimensions }));
   });
 
@@ -1100,14 +1101,20 @@ it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt'
   renderStatsScreenShell({ summary, tableMetric: 'totalVolume' });
   const tile = screen.getByTestId('stats-muscle-select-chest');
   expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('188271603422374');
+  expect(StyleSheet.flatten((screen.getByTestId('stats-muscle-table-header').children[0] as ReactTestInstance).props.style)).toMatchObject({ flexDirection: 'column', alignItems: 'stretch' });
+  expect(screen.getByTestId('stats-muscle-row-chest-values')).toHaveStyle({ flexDirection: 'row', justifyContent: 'flex-end' });
   const bounds = StyleSheet.flatten(tile.props.style);
   fireEvent.press(tile);
   expect(StyleSheet.flatten(tile.props.style)).toEqual(bounds);
   expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
   expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
-  expect(screen.getByTestId('stats-contribution-bench-periods')).toHaveStyle(
-    StyleSheet.flatten(screen.getByTestId('stats-muscle-row-chest-periods').props.style));
-  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: uiRoles.inkMuted });
+  expect(StyleSheet.flatten((screen.getByTestId('stats-contributions-header').children[0] as ReactTestInstance).props.style)).toMatchObject({ flexDirection: 'column', alignItems: 'stretch' });
+  expect(screen.getByTestId('stats-contribution-bench-values')).toHaveStyle({ flexDirection: 'row', justifyContent: 'flex-end' });
+  for (const column of ['now', 'previous', 'change']) {
+    expect(screen.getByTestId(`stats-contribution-bench-${column}`)).toHaveStyle(
+      { width: StyleSheet.flatten(screen.getByTestId(`stats-muscle-row-chest-${column}`).props.style).width });
+  }
+  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: uiRoles.ink });
   expect(screen.getByRole('link', { name: 'Open Long exercise name history' })).toBeTruthy();
   expect(within(screen.getByTestId('stats-contributions-header')).getByText('Change')).toBeTruthy();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));

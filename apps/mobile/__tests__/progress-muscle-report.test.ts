@@ -11,7 +11,6 @@ import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
 import type { ProgressMuscleComparison } from '@/src/data/progress-comparisons';
-import { reportMuscleTrainingStarts } from '@/src/data/progress-muscle-tickers';
 import { createStatsRepository, type StatsAggregationInput, type StatsStore } from '@/src/data/stats';
 import {
   NO_MUSCLE_REPORT, reportedExerciseMuscles, reportedMuscleName, reportedPrimaryFamilyName,
@@ -158,26 +157,6 @@ describe('family headers follow the user’s muscles', () => {
   });
 });
 
-describe('training starts under the user’s muscles', () => {
-  const at = (day: number) => new Date(Date.UTC(2026, 0, day));
-
-  it('starts a muscle when its earliest entry did and drops untracked entries', () => {
-    const starts = {
-      back_lats: { workingSetCount: at(9), totalVolume: undefined },
-      back_upper: { workingSetCount: at(3), totalVolume: at(5) },
-      traps_lower: { workingSetCount: at(20), totalVolume: at(2) },
-      forearms_grip: { workingSetCount: at(1) },
-      quads: { workingSetCount: at(7) },
-    };
-    expect(reportMuscleTrainingStarts(starts, BROAD)).toEqual({
-      back_lats: { workingSetCount: at(3), totalVolume: at(2) },
-      quads: { workingSetCount: at(7) },
-    });
-    expect(reportMuscleTrainingStarts(undefined, BROAD)).toBeUndefined();
-    expect(reportMuscleTrainingStarts(starts, NO_MUSCLE_REPORT)).toEqual(starts);
-  });
-});
-
 describe('Progress reads under the user’s muscles', () => {
   const NOW = new Date('2026-10-14T12:00:00Z');
   const baseInput = (): StatsAggregationInput => ({
@@ -192,11 +171,6 @@ describe('Progress reads under the user’s muscles', () => {
     ],
     muscleGroups: SYSTEM_MUSCLE_GROUP_SEEDS.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
     muscleReport: BROAD,
-    muscleTrainingStarts: {
-      back_upper: { workingSetCount: new Date('2026-09-01T00:00:00Z') },
-      back_lats: { workingSetCount: new Date('2026-08-01T00:00:00Z') },
-      forearms_grip: { workingSetCount: new Date('2026-07-01T00:00:00Z') },
-    },
   });
   const repository = (input = baseInput()) => {
     const store: StatsStore = { loadAggregationInput: jest.fn().mockResolvedValue(input), loadMuscleGroupTaxonomy: jest.fn() };
@@ -227,7 +201,7 @@ describe('Progress reads under the user’s muscles', () => {
     expect(muscles.find(row => row.muscleGroupId === 'back_upper')!.current.workingSetCount).toBe(1);
   });
 
-  it('reads a muscle’s history across its entries and its ticker from the earliest entry start', async () => {
+  it('reads a muscle’s history across its entries', async () => {
     const { repo } = repository();
     const daily = await repo.computeSelectedMuscleHistoryEffort({
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC',
@@ -237,13 +211,5 @@ describe('Progress reads under the user’s muscles', () => {
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC', countSecondary: false,
     });
     expect(noSecondary.daily.map(day => day.workingSetCount)).toEqual([1]);
-
-    // Only the merged-away entry has a training start: the muscle still gets its ticker values.
-    const merged = baseInput();
-    delete merged.muscleTrainingStarts!.back_lats;
-    const { repo: mergedRepo } = repository(merged);
-    const tickers = await mergedRepo.computeMuscleTickers({ historyWeeks: 1, rollingWeeks: 1, weeklyTarget: 10, now: NOW });
-    expect(Object.keys(tickers.muscles)).toEqual(['back_lats']);
-    expect(tickers.muscles.back_lats.workingSetCount.observations.map(row => row.value)).toEqual([1]);
   });
 });

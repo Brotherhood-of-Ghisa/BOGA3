@@ -190,6 +190,5 @@ export {
   type LoadSuggestedExercisePlanOptions,
 } from './exercise-block-history';
 
-export { computeProgressMuscleTickers, computeMuscleDailySets, type ComputeMuscleDailySetsOptions } from './stats';
+export { computeMuscleDailySets, type ComputeMuscleDailySetsOptions } from './stats';
 export { aggregateMuscleDailySets, type MuscleDailySets } from './muscle-daily-sets';
-export type { ProgressMuscleTickers, MuscleTickerSeries } from './progress-muscle-tickers';

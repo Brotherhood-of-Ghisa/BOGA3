@@ -6,7 +6,7 @@
  * over the migrated in-memory SQLite database, with Broad (Calves off) written
  * onto the `muscle_groups` rows as the Settings choice does. The pure
  * transform is `muscle-report.test.ts`; the 3D projection, helpers and
- * ticker re-keying are `progress-muscle-report.test.ts`. This suite proves
+ * report re-keying are `progress-muscle-report.test.ts`. This suite proves
  * the user's setup reaches each Progress surface.
  */
 
