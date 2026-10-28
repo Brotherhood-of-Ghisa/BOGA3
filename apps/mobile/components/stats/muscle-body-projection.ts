@@ -15,14 +15,15 @@ export type BodyOrientation = 'front' | 'back';
 
 export type ThemeShadeRoles = Pick<
   typeof uiRoles,
-  'paper' | 'rule' | 'ink' | 'gain' | 'loss'
+  'paper' | 'rule' | 'ink' | 'viz1' | 'viz2' | 'viz4'
 >;
 
-export type MuscleChangeBucket = 0 | 1 | 2;
+export type MuscleChangeBucket = 0 | 1 | 2 | 3;
 
 export type ThemeShadePalette = {
   readonly neutral: readonly string[];
   readonly buckets: readonly [
+    readonly string[],
     readonly string[],
     readonly string[],
     readonly string[],
@@ -115,17 +116,21 @@ export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
 
-/** Follows the displayed comparison's direction ([[comparison.change-display]]). */
+/** Follows [[comparison.colour-scale]] and the displayed change's rounding. */
 export function computeMuscleBuckets(
   muscles: readonly ProgressMuscleComparison[],
   metric: ProgressMetric,
 ): ReadonlyMap<string, MuscleChangeBucket> {
   const buckets = new Map<string, MuscleChangeBucket>();
   for (const row of muscles) {
+    const current = row.current[metric];
+    const previous = row.previous[metric];
+    const comparable = current !== null && previous !== null
+      && Number.isFinite(current) && Number.isFinite(previous) && (current > 0 || previous > 0);
     const { tone } = metric === 'workingSetCount'
       ? formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount)
       : formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume);
-    const bucket = tone === 'negative' ? 1 : tone === 'neutral' ? 0 : 2;
+    const bucket = !comparable ? 0 : tone === 'negative' ? 1 : tone === 'neutral' ? 2 : 3;
     buckets.set(row.muscleGroupId, bucket);
     buckets.set(canonicalMuscleId(row.muscleGroupId), bucket);
   }
@@ -149,7 +154,7 @@ const buildShadeRamp = (
 };
 
 /**
- * Keeps anatomical lighting while the muscle hue carries gain/loss/neutral.
+ * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]).
  */
 export function buildThemeShadePalette(
   roles: ThemeShadeRoles = uiRoles
@@ -167,8 +172,9 @@ export function buildThemeShadePalette(
     neutral,
     buckets: [
       neutral,
-      buildShadeRamp(roles.loss, 22),
-      buildShadeRamp(roles.gain, 22),
+      buildShadeRamp(roles.viz1, 22),
+      buildShadeRamp(roles.viz2, 22),
+      buildShadeRamp(roles.viz4, 22),
     ],
     selectedStroke: roles.ink,
   };

@@ -45,7 +45,7 @@ the configured calendar bounds instead of introducing another duration.
    primary: a `danger` row in a sheet, a `danger` outline, or the destructive
    style of a native `Alert`.
 4. **Tabs are navigation, not actions.** `MainTabs` uses tab semantics, marks
-   the active tab by weight and an `ink` underline, and never uses `accent`.
+   the active tab in `ink` (the others muted) over an `ink` underline, and never uses `accent`.
    There are exactly four tabs (Today, Train, Progress, More); Settings is a
    row under More, and More and Settings work while signed out.
 5. **A workout in progress is never offered as a Resume button.** Train opens
