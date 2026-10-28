@@ -151,7 +151,7 @@ never a spec of the result: what must outlive the build moves to its owner.
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
-| You were given no build process (no skill such as engine or the task protocol, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it entirely) |
+| You were given no build process (no skill such as engine or the task protocol, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it, the test gates still apply) |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
