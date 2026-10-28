@@ -13,10 +13,11 @@
 -- passes the row's client_updated_at_ms as get_training_status read it, so an
 -- agent never overwrites a change it did not see.
 --
--- It refuses (TARGETS_NOT_SYNCED) until a device has uploaded the person's
--- targets: a device that finds server targets adopts them and drops its own,
--- so a coach writing first would replace values the person set on a device that
--- has not synced yet.
+-- A row no device has uploaded targets to (missing, deleted, or with null
+-- targets) is built from the app's defaults (8 sets, single mode, secondary sets
+-- counted) plus what the call sets, so the four columns are always written
+-- together, as the app writes them. The first writer wins, as between devices:
+-- a device that finds server targets adopts them and drops its own.
 --
 -- Authoritative references:
 --   docs/specs/10-api-authn-authz-guidelines.md ("Agent writes")
@@ -61,6 +62,8 @@ declare
   _operation text := 'set_muscle_targets';
   _replay    jsonb;
   _row       app_public.user_settings;
+  _uploaded  boolean;
+  _revision  bigint;
   _stamp     bigint;
   _target    bigint;
   _mode      text;
@@ -88,16 +91,17 @@ begin
     from app_public.user_settings s
    where s.owner_user_id = p_owner and s.id = 'settings'
    for update;
-  if not found or _row.deleted_at is not null or _row.weekly_working_set_target is null then
-    raise exception 'TARGETS_NOT_SYNCED' using errcode = 'P0001';
-  end if;
-  if p_expected_revision is distinct from _row.client_updated_at_ms then
+  -- What get_training_status reads: no live row, or null targets, is "not uploaded".
+  _uploaded := found and _row.deleted_at is null and _row.weekly_working_set_target is not null;
+  _revision := case when found and _row.deleted_at is null then _row.client_updated_at_ms else 0 end;
+  if p_expected_revision is distinct from _revision then
     raise exception 'REVISION_CONFLICT' using errcode = 'P0001';
   end if;
 
-  _target := coalesce((p_changes ->> 'default_weekly_sets')::bigint, _row.weekly_working_set_target);
-  _mode := coalesce(p_changes ->> 'mode', _row.muscle_target_mode, 'single');
-  _overrides := coalesce(_row.muscle_target_overrides, '{}'::jsonb);
+  _target := coalesce((p_changes ->> 'default_weekly_sets')::bigint,
+                      case when _uploaded then _row.weekly_working_set_target end, 8);
+  _mode := coalesce(p_changes ->> 'mode', case when _uploaded then _row.muscle_target_mode end, 'single');
+  _overrides := case when _uploaded then coalesce(_row.muscle_target_overrides, '{}'::jsonb) else '{}'::jsonb end;
   _scoped := coalesce(_overrides -> p_scope, '{}'::jsonb);
   for _entry in select e.key, e.value from jsonb_each(coalesce(p_changes -> 'overrides', '{}'::jsonb)) e loop
     if jsonb_typeof(_entry.value) = 'null' then
@@ -111,15 +115,24 @@ begin
 
   _stamp := greatest(
     (extract(epoch from clock_timestamp()) * 1000)::bigint,
-    _row.client_updated_at_ms + 1
+    coalesce(_row.client_updated_at_ms + 1, 0)
   );
-  update app_public.user_settings s
-     set weekly_working_set_target = _target,
-         muscle_target_mode = _mode,
-         muscle_target_overrides = _overrides,
-         updated_at = _stamp,
-         client_updated_at_ms = _stamp
-   where s.owner_user_id = p_owner and s.id = 'settings';
+  insert into app_public.user_settings (
+    owner_user_id, id, weekly_working_set_target, muscle_target_mode, muscle_target_overrides,
+    count_secondary_muscles, created_at, updated_at, deleted_at, client_updated_at_ms, server_received_at
+  ) values (
+    p_owner, 'settings', _target, _mode, _overrides,
+    case when _uploaded then coalesce(_row.count_secondary_muscles, true) else true end,
+    _stamp, _stamp, null, _stamp, now()
+  )
+  on conflict (owner_user_id, id) do update
+    set weekly_working_set_target = excluded.weekly_working_set_target,
+        muscle_target_mode = excluded.muscle_target_mode,
+        muscle_target_overrides = excluded.muscle_target_overrides,
+        count_secondary_muscles = excluded.count_secondary_muscles,
+        updated_at = excluded.updated_at,
+        deleted_at = null,
+        client_updated_at_ms = excluded.client_updated_at_ms;
 
   _result := jsonb_build_object(
     'scope', p_scope,

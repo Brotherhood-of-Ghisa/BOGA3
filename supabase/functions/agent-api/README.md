@@ -369,7 +369,7 @@ returns one bounded object; days and Monday-start weeks are the profile
 `training-status.ts` derives the muscles with Today's Plan's own functions,
 under coaching's working-set rule and completed workouts only. Favourites are
 a coach-only order: most sessions with a working set in 28 days, then latest
-done, then name. `revision` is the settings row's `client_updated_at_ms` (0
+done, then name; never the app's recency-weighted Favourites sort. `revision` is the settings row's `client_updated_at_ms` (0
 with no row); `uploaded: false` shows app defaults. Sets older than 56 days are
 not read, except each favourite's own history, which dates its records;
 `record_history_complete: false` when it hit the exercise-context cap (500
@@ -378,17 +378,18 @@ muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 
 ## Muscle targets
 
-`PUT /v1/agent/muscle-targets` needs write access and an `Idempotency-Key`, and
-has its own 30-per-minute window. Strict JSON naming at least one of
-`default_weekly_sets`, `mode` (`single` | `per_muscle`) and `overrides`
-(`{muscle_id: n | null}`, null clears), plus `expected_revision`
-(`targets.revision` above). Targets are positive whole numbers and ids
-are muscles the user's setup reports (`400 VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a
-stale revision is `409 REVISION_CONFLICT`, and `uploaded: false` `409
-TARGETS_NOT_SYNCED` (an adopting device would drop the person's own). `muscle-targets.ts` derives the setup
-scope as the app does; `agent_set_muscle_targets` merges into that scope, keeps
-the others and the count-secondary switch, and stamps the row past the wall
-clock so devices pull it. It returns `scope`, its `overrides`, `targets`, `idempotent_replay`.
+`PUT /v1/agent/muscle-targets` needs write access and an `Idempotency-Key`
+(own window, 30 per minute). Strict JSON: `expected_revision`
+(`targets.revision` above) and at least one of `default_weekly_sets`, `mode`
+(`single` | `per_muscle`), `overrides` (`{muscle_id: n | null}`, null clears).
+Targets are positive whole numbers, ids muscles the user's setup reports (`400
+VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a stale revision
+is `409 REVISION_CONFLICT`. The setup scope is derived as the app does
+(`muscle-targets.ts`); `agent_set_muscle_targets` merges into it, keeps the
+other scopes and the count-secondary switch, and stamps the row past the wall
+clock so devices pull it. While `uploaded` is false it builds on app defaults
+(first writer wins). It returns `scope`, `overrides`, `targets`,
+`idempotent_replay`.
 
 ## Working sets only
 
@@ -560,8 +561,8 @@ FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
 `expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
 EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.
 
-The service-role-only `agent_*_exercise` RPCs stamp each touched row past the
-wall clock and every stamp the exercise holds, so devices pull it under LWW. A
+The service-role-only `agent_*_exercise` RPCs stamp each touched row at or past the
+wall clock and past every stamp the exercise holds, so devices pull it under LWW. A
 re-added muscle revives its row, a new one takes the id
 `map_<exercise>__<muscle>`, a dropped one is tombstoned, and a `load_input_mode`
 change re-scores linked group exercises. The response is the RPC result
@@ -575,7 +576,7 @@ change re-scores linked group exercises. The response is the RPC result
 - `403` write access missing, disabled or bound to a stale grant.
 - `404` unknown route or inaccessible/nonexistent exercise.
 - `405` unsupported method for the route (`PUT` only for muscle targets).
-- `409` idempotency conflict, stale revision, unsynced targets, or edit of a deleted exercise.
+- `409` idempotency conflict, stale revision, or edit of a deleted exercise.
 - `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.

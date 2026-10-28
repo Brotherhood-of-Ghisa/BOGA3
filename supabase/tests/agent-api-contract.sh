@@ -2317,28 +2317,52 @@ RATE_BODY="$(jq -nc --argjson rev "$(printf '%s' "${RESPONSE_BODY}" | jq -er '.d
     and tool_name = 'set_muscle_targets' and http_status = 200;")" -ge 3 ]] ||
   fail "muscle targets writes were not audited under their tool name"
 
-echo "[agent-api-test] verifying the coach cannot write before a device uploads targets"
+echo "[agent-api-test] verifying a coach write before any device uploaded targets builds on the app defaults"
+# A row with null targets, a deleted row with stale targets and no row at all
+# are all "not uploaded" to the status; the write fills the app's defaults for
+# what it omits and ignores what the stale row holds.
+assert_defaults_after_first_write() {
+  local label="$1"
+  [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles
+      || ',' || muscle_target_overrides::text || ',' || coalesce(deleted_at::text, 'live')
+    from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
+    '8,per_muscle,true,{},live' ]] || fail "${label}: the first write did not build on the app defaults"
+}
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
       count_secondary_muscles = null, client_updated_at_ms = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_get "training-status"
+printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" \
+  '.data.targets.uploaded == false and .data.targets.revision == $rev' >/dev/null ||
+  fail "training status did not report the unuploaded row"
 agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{mode:"per_muscle",expected_revision:$rev}')" "${TARGETS_KEY}-first"
-assert_status "409" "write before any device uploaded targets"
-[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "TARGETS_NOT_SYNCED" ]] ||
-  fail "a write before upload did not return TARGETS_NOT_SYNCED"
-[[ "$(run_psql "select coalesce(weekly_working_set_target::text, 'none') || ',' || coalesce(muscle_target_mode, 'none')
-  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "none,none" ]] ||
-  fail "a refused write before upload changed the settings row"
+assert_status "200" "write before any device uploaded targets"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.targets.uploaded == true and .data.targets.default_weekly_sets == 8 and .data.targets.mode == "per_muscle"' \
+  >/dev/null || fail "the first write did not return the defaults it built on"
+assert_defaults_after_first_write "null targets"
+
 update_training_fixture "update app_public.user_settings
-  set weekly_working_set_target = 6, muscle_target_mode = 'single', muscle_target_overrides = null,
-      count_secondary_muscles = true, deleted_at = ${NOW_MS}
+  set weekly_working_set_target = 6, muscle_target_mode = 'single',
+      muscle_target_overrides = '{\"broad\":{\"agent-api-stale\":3}}'::jsonb,
+      count_secondary_muscles = false, deleted_at = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
-agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{mode:"per_muscle",expected_revision:$rev}')" "${TARGETS_KEY}-deleted"
-assert_status "409" "write against a deleted settings row"
-[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "TARGETS_NOT_SYNCED" ]] ||
-  fail "a write against a deleted settings row did not return TARGETS_NOT_SYNCED"
-update_training_fixture "update app_public.user_settings set deleted_at = null
-  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_put "muscle-targets" "$(jq -nc '{mode:"per_muscle",expected_revision:0}')" "${TARGETS_KEY}-deleted"
+assert_status "200" "write against a deleted settings row at revision 0"
+assert_defaults_after_first_write "deleted row"
+
+update_training_fixture "delete from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_get "training-status"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.targets.uploaded == false and .data.targets.revision == 0' >/dev/null ||
+  fail "training status did not report the missing row as not uploaded at revision 0"
+agent_put "muscle-targets" "$(jq -nc '{mode:"per_muscle",expected_revision:1}')" "${TARGETS_KEY}-missing-stale"
+assert_status "409" "write against a missing row quoting another revision"
+agent_put "muscle-targets" "$(jq -nc '{mode:"per_muscle",expected_revision:0}')" "${TARGETS_KEY}-missing"
+assert_status "200" "write against a missing settings row"
+assert_defaults_after_first_write "missing row"
+[[ "$(run_psql "select bodyweight_calculations_enabled from app_public.user_settings
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "f" ]] ||
+  fail "a created settings row did not default the bodyweight switch to off"
 
 echo "[agent-api-test] verifying the targets route is PUT-only and PUT reaches no other route"
 PLANS_BEFORE_PUT="$(run_psql "select count(*) from app_public.session_plans where owner_user_id = '${USER_A_UUID}'::uuid;")"
