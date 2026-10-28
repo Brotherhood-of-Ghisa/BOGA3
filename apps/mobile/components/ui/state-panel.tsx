@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type StatePanelKind = 'loading' | 'message' | 'error';
 
@@ -74,18 +75,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
+    ...uiText.title,
     textAlign: 'center',
   },
   body: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    ...uiText.body,
     color: uiRoles.inkMuted,
     textAlign: 'center',
   },

@@ -5,10 +5,9 @@ import {
   Card,
   Notice,
   Screen,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
@@ -195,11 +194,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.xl,
   },
   heading: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
+    ...uiText.title,
     textAlign: 'center',
   },
   body: {
@@ -207,11 +202,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   phaseLabel: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
+    ...uiText.bodyStrong,
     textAlign: 'center',
   },
   activityRow: {
@@ -220,29 +211,18 @@ const styles = StyleSheet.create({
   },
   // `Layer K of N · M items`: counters, so Plex Mono.
   activityDetail: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
+    ...uiText.figureSmall,
     textAlign: 'center',
   },
   // The failure's code + sanitized exception text: diagnostic, so Plex Mono and
   // muted like the activity counters; selectable so it can be copied.
   errorDetail: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
+    ...uiText.figureSmall,
     textAlign: 'center',
   },
   // An error, so `danger`, beside the one `accent` Retry.
   errorMessage: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    ...uiText.bodyStrong,
     color: uiRoles.danger,
     textAlign: 'center',
   },

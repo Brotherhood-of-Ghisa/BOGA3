@@ -13,7 +13,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/icon-button';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type PageSheetHeaderProps = {
   title: string;
@@ -65,7 +66,7 @@ export function PageSheetHeader({
         {leading}
         <View style={styles.titleBlock}>
           {eyebrow ? (
-            <Text allowFontScaling={false} style={styles.eyebrow}>
+            <Text allowFontScaling={false} style={uiText.label}>
               {eyebrow}
             </Text>
           ) : null}
@@ -74,7 +75,7 @@ export function PageSheetHeader({
             allowFontScaling={false}
             accessibilityRole="header"
             numberOfLines={2}
-            style={styles.title}
+            style={uiText.sheetTitle}
             testID={titleTestID}>
             {title}
           </Text>
@@ -269,21 +270,5 @@ const styles = StyleSheet.create({
   titleBlock: {
     flex: 1,
     gap: uiSpace.xs,
-  },
-  eyebrow: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
 });

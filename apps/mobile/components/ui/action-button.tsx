@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type ActionButtonVariant = 'primary' | 'outline' | 'text' | 'link';
 export type ActionButtonTone = 'default' | 'danger';
@@ -71,8 +71,8 @@ export function ActionButton({
       <Text
         allowFontScaling={false}
         style={variant === 'link' ? [uiText.label, disabled ? styles.labelDisabled : null] : [
-          styles.label,
-          size === 'compact' ? styles.labelCompact : null,
+          uiText.button,
+          size === 'compact' ? [uiText.label, uiTextTone.ink] : null,
           size === 'large' ? styles.labelLarge : null,
           variant === 'primary' ? styles.labelPrimary : null,
           danger ? styles.labelDanger : null,
@@ -133,20 +133,8 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.paper,
     opacity: 0.7,
   },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.ink,
-  },
-  labelCompact: {
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  },
+  // The full-screen repeating timer's controls: display art, so off the roles
+  // (`design-language.md` §3).
   labelLarge: { fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl },
   labelPrimary: {
     color: uiRoles.surface,

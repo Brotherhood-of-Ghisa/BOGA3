@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 // `neutral`: information — offline, saved, unavailable. `danger`: something
 // failed. There is no success or warning hue: the glyph and the words carry the
@@ -29,7 +30,7 @@ export type NoticeProps = {
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const danger = tone === 'danger';
   const words = (
-    <Text allowFontScaling={false} style={[styles.message, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
+    <Text allowFontScaling={false} style={[uiText.body, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
   );
   return (
     <View
@@ -40,7 +41,7 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
       {icon ? <Icon color={danger ? uiRoles.danger : uiRoles.inkMuted} name={icon} size="sm" /> : null}
       {title ? (
         <View style={styles.words}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[styles.title, danger ? styles.messageDanger : null]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.title, danger ? styles.messageDanger : null]}>
             {title}
           </Text>
           {words}
@@ -76,22 +77,8 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: uiSpace.xs,
   },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
   fill: {
     flex: 1,
-  },
-  message: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   messageDanger: {
     fontWeight: '600',

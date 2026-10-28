@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 // The form grammar (`ux-rules.md` "Forms"): every field of an edit page sits in
 // a `FormSection` — a micro-label naming the group over one card of rows — and
@@ -115,7 +115,7 @@ export function InputRow({
           placeholder={placeholder}
           placeholderTextColor={uiRoles.inkGhost}
           selectTextOnFocus
-          style={[styles.input, invalid ? styles.inputInvalid : null]}
+          style={[uiText.input, uiText.inlineFigure, styles.input, invalid ? styles.inputInvalid : null]}
           testID={testID}
           value={value}
           allowFontScaling={false}
@@ -148,7 +148,7 @@ export function FormActionRow({ label, icon, onPress, divider = false, disabled,
       onPress={onPress}
       testID={testID}
       trailing={<Icon color={colour} name="chevron-right" size="sm" />}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.actionLabel, { color: colour }]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.option, { color: colour }]}>
         {label}
       </Text>
     </ListRow>
@@ -181,18 +181,8 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
     textAlign: 'right',
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    color: uiRoles.ink,
   },
   inputInvalid: {
     borderColor: uiRoles.danger,
-  },
-  actionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
   },
 });
