@@ -11,7 +11,8 @@ import { Notice } from '@/components/ui/notice';
 import { PageSheet } from '@/components/ui/page-sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { SwitchRow } from '@/components/ui/switch-row';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
@@ -176,7 +177,7 @@ function EditorBody({ form }: { form: EditorForm }) {
 
 function FieldError({ message }: { message: string | null }) {
   return message ? (
-    <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={styles.errorText}>
+    <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={[uiText.meta, uiTextTone.danger]}>
       {message}
     </Text>
   ) : null;
@@ -186,7 +187,7 @@ function FieldError({ message }: { message: string | null }) {
 function GymSplitField({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
   return (
     <View style={styles.group}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         Gyms
       </Text>
       <Card>
@@ -234,7 +235,7 @@ function PrimaryMuscleField({ primaryMuscleGroupId, muscleById, error, onOpen }:
   const muscleGroup = primaryMuscleGroupId ? muscleById[primaryMuscleGroupId] : undefined;
   return (
     <View style={styles.group}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         Primary muscle
       </Text>
       <View style={[styles.triggerFrame, error ? styles.triggerFrameInvalid : null]}>
@@ -245,7 +246,7 @@ function PrimaryMuscleField({ primaryMuscleGroupId, muscleById, error, onOpen }:
           label={primaryMuscleGroupId ? muscleGroup?.displayName ?? primaryMuscleGroupId : undefined}
           meta={
             primaryMuscleGroupId ? (
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
                 {muscleGroup?.familyName ?? ''}
               </Text>
             ) : undefined
@@ -255,7 +256,7 @@ function PrimaryMuscleField({ primaryMuscleGroupId, muscleById, error, onOpen }:
           trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}>
           {primaryMuscleGroupId ? null : (
             // Faint until chosen, as a field's placeholder is.
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.triggerPlaceholder}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, uiTextTone.faint]}>
               Select primary muscle
             </Text>
           )}
@@ -275,7 +276,7 @@ function SecondaryMusclesField({ rows, muscleById, error, onOpen, onRemove }: {
 }) {
   return (
     <View style={styles.group}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         Secondary muscles
       </Text>
       {rows.length > 0 ? (
@@ -290,7 +291,7 @@ function SecondaryMusclesField({ rows, muscleById, error, onOpen, onRemove }: {
                 key={row.rowId}
                 label={displayName}
                 meta={
-                  <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+                  <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
                     {muscleGroup?.familyName ?? 'Unknown'}
                   </Text>
                 }
@@ -308,7 +309,7 @@ function SecondaryMusclesField({ rows, muscleById, error, onOpen, onRemove }: {
           })}
         </Card>
       ) : (
-        <Text allowFontScaling={false} selectable style={styles.helperText}>
+        <Text allowFontScaling={false} selectable style={[uiText.body, uiTextTone.muted]}>
           No secondary muscles selected.
         </Text>
       )}
@@ -358,7 +359,7 @@ function MuscleSelectorList({ mode, options, primaryMuscleGroupId, onPick }: {
               />
             }
             meta={
-              <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
                 {muscleGroup.familyName}
               </Text>
             }
@@ -397,15 +398,6 @@ const styles = StyleSheet.create({
   group: {
     gap: uiSpace.sm,
   },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   // The primary-muscle trigger is framed like a field (`FormField`): a
   // `rule` hairline at the control radius that turns `danger` when
   // the choice is missing.
@@ -419,36 +411,8 @@ const styles = StyleSheet.create({
   triggerFrameInvalid: {
     borderColor: uiRoles.danger,
   },
-  triggerPlaceholder: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.inkFaint,
-  },
-  metaText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
   addSecondary: {
     alignSelf: 'flex-start',
-  },
-  helperText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  errorText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
   footer: {
     gap: uiSpace.sm,

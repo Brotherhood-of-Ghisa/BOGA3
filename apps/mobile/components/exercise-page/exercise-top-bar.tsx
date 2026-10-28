@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 type ExerciseTopBarProps = {
   title: string;
@@ -41,13 +42,13 @@ export function ExerciseTopBar({
           onPress={onOpenSwitcher}
           style={({ pressed }) => [styles.switcher, pressed ? styles.pressed : null]}
           testID="exercise-page-title">
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.switcherTitle}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.switcherTitle]}>
             {title}
           </Text>
           <Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />
         </Pressable>
       ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
+        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[uiText.title, styles.title]} testID="exercise-page-title">
           {title}
         </Text>
       )}
@@ -75,14 +76,6 @@ export function ExerciseTopBar({
   );
 }
 
-const titleText = {
-  fontFamily: uiFonts.display.family,
-  fontWeight: '700',
-  fontSize: uiTypography.size.xl,
-  lineHeight: uiTypography.lineHeight.xl,
-  color: uiRoles.ink,
-} as const;
-
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
@@ -100,7 +93,6 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     minWidth: 0,
-    ...titleText,
   },
   switcher: {
     flex: 1,
@@ -114,7 +106,6 @@ const styles = StyleSheet.create({
   switcherTitle: {
     flexShrink: 1,
     minWidth: 0,
-    ...titleText,
   },
   // The same feedback as the bar's icon buttons.
   pressed: {

@@ -2,6 +2,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet, type TextStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -51,6 +52,7 @@ import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import ExerciseShareRoute from '../app/exercise-share';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 
 const SAMPLE_PAYLOAD: ExerciseSharePayload = {
   v: 1,
@@ -133,6 +135,28 @@ describe('ExerciseShareRoute', () => {
     expect(screen.getByTestId('exercise-share-secondary-muscles')).toHaveTextContent('Glute Max');
     expect(screen.getByTestId('exercise-share-save-btn')).toBeTruthy();
     expect(screen.getByTestId('exercise-share-customize-btn')).toBeTruthy();
+  });
+
+  it('takes every text from the shared text roles', async () => {
+    render(<ExerciseShareRoute />);
+    await screen.findByTestId('exercise-share-card');
+    const styleOf = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style) as TextStyle;
+    const faintLabel = { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkFaint };
+
+    expect(styleOf('exercise-share-group-eyebrow')).toMatchObject(faintLabel);
+    expect(StyleSheet.flatten(screen.getByText('Primary muscle').props.style)).toMatchObject(faintLabel);
+    expect(styleOf('exercise-share-title')).toMatchObject({
+      fontFamily: uiFonts.display.family,
+      fontWeight: '700',
+      fontSize: uiTypography.size.lg,
+      lineHeight: uiTypography.lineHeight.lg,
+    });
+    expect(styleOf('exercise-share-primary-muscles')).toMatchObject({
+      fontFamily: uiFonts.body.family,
+      fontWeight: '400',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.ink,
+    });
   });
 
   it('saves the exercise directly when save button is pressed', async () => {

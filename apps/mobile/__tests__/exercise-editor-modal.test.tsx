@@ -9,8 +9,10 @@
  */
 
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet, type TextStyle } from 'react-native';
 
 import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import type { ExerciseCatalogCacheSnapshot } from '@/src/exercise-catalog/cache';
 import { buildMuscleSetup, EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
@@ -490,5 +492,50 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
       { muscleGroupId: 'quads', weight: 1, role: 'primary' },
       { muscleGroupId: 'glutes_max', weight: 0.5, role: 'secondary' },
     ]);
+  });
+});
+
+// The editor on the shared text roles (`design-language.md` §3, "Text roles").
+describe('text roles', () => {
+  const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as TextStyle;
+  const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkMuted };
+  const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm };
+
+  it('heads each section with a label, the core fields included', () => {
+    renderEditor({ editingExercise: exercise() });
+    for (const heading of ['Secondary muscles', 'Weight entry']) {
+      expect(styleOf(screen.getByText(heading))).toMatchObject(LABEL);
+    }
+  });
+
+  it('draws the empty primary trigger as a faint row name and its family as meta', async () => {
+    renderEditor({ editingExercise: exercise({ mappings: [] }) });
+    expect(styleOf(screen.getByText('Select primary muscle'))).toMatchObject({
+      fontFamily: uiFonts.body.family,
+      fontWeight: '600',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.inkFaint,
+    });
+    await save();
+    expect(styleOf(screen.getByText('Select a primary muscle before saving.'))).toMatchObject({ ...META, color: uiRoles.danger });
+  });
+
+  it('writes a muscle family as meta and an empty list as muted body', () => {
+    renderEditor({ editingExercise: exercise() });
+    expect(styleOf(screen.getByText('Arms'))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    fireEvent.press(screen.getByLabelText('Remove secondary muscle Triceps'));
+    expect(styleOf(screen.getByText('No secondary muscles selected.'))).toMatchObject({
+      fontFamily: uiFonts.body.family,
+      fontWeight: '400',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.inkMuted,
+    });
+  });
+
+  it('writes a contribution error as danger meta', async () => {
+    renderEditor({ editingExercise: exercise() });
+    fireEvent.changeText(screen.getByTestId('exercise-editor-bodyweight-percentage'), 'abc');
+    await save();
+    expect(styleOf(screen.getByTestId('exercise-editor-bodyweight-error'))).toMatchObject({ ...META, color: uiRoles.danger });
   });
 });
