@@ -2239,6 +2239,9 @@ run_psql "
 " >/dev/null
 agent_get "training-status"
 assert_status "200" "training status over the seeded history"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.week_start')" == "$(node -e \
+  'process.stdout.write(new Date(Number(process.argv[1])).toISOString().slice(0, 10))' "${WEEK_START_MS}")" ]] ||
+  fail "the server's week is not the one the seeded history was laid out for (did the run cross a UTC Monday?)"
 printf '%s' "${RESPONSE_BODY}" | jq -e \
   --arg muscle "${HISTORY_MUSCLE}" --arg singles "${HISTORY_SINGLES}" \
   --arg trained "${HISTORY_LAST_TRAINED}" --arg starts "${HISTORY_SERIES_STARTS}" \

@@ -188,6 +188,8 @@ const coachSetsTargets = async (changes: Record<string, unknown>): Promise<void>
       p_idempotency_key: `muscle-targets-live-${Date.now()}-${runSeq}`,
       p_payload_sha256: createHash('sha256').update(JSON.stringify(changes)).digest('hex'),
       p_expected_revision: row && row.deleted_at === null ? row.client_updated_at_ms : 0,
+      // The route derives the scope from the server's muscle rows; the devices
+      // hold the same system muscles, so the device's setup is the one it derives.
       p_scope: deriveMuscleReportPreset(await listMuscleReportRows()),
       p_changes: changes,
     }) as { error: { message: string } | null };

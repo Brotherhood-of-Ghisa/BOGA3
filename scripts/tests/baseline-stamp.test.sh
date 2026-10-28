@@ -11,7 +11,7 @@
 #     migration, an unreadable stamp or a down runtime → the full path again;
 #   - a failing full path exits non-zero and leaves no stamp.
 # And `boga` exports one fresh BOGA_GATE_RUN_ID per gate run, never one for a
-# lane run by name.
+# lane run by name, and runs every lane of a gate even if one reads stdin.
 #
 # Runs the real preflight in a temp leased worktree. Its repair scripts are
 # stubs that log their name; stub npx / curl / docker stand in for the stack,
@@ -219,6 +219,13 @@ while read -r _ id; do ids+=("${id:-<none>}"); done <"$SEEN"
 [[ "${ids[2]}" != "<none>" && "${ids[2]}" != "${ids[0]}" && "${ids[3]}" == "${ids[2]}" ]] \
   && pass "gate run 2 gets a fresh id: ${ids[2]}" || fail "gate run 2 ids '${ids[2]}' '${ids[3]}'"
 [[ "${ids[4]}" == "<none>" ]] && pass "a lane by name sees no gate id" || fail "lane by name saw '${ids[4]}'"
+
+echo "== a lane that reads stdin does not swallow the rest of its gate"
+: >"$SEEN"
+printf 'one\tslow-backend\tnone\tno\t.\tcat >/dev/null; echo one >>%s\n' "$SEEN" >"$ROOT/scripts/lanes.tsv"
+printf 'two\tslow-backend\tnone\tno\t.\techo two >>%s\n' "$SEEN" >>"$ROOT/scripts/lanes.tsv"
+"$ROOT/boga" test backend >/dev/null
+[[ "$(tr '\n' ' ' <"$SEEN")" == "one two " ]] && pass "both lanes ran" || fail "lanes run: '$(tr '\n' ' ' <"$SEEN")'"
 
 echo
 echo "baseline-stamp: ${PASS} passed, ${FAIL} failed"
