@@ -15,11 +15,9 @@ import {
   Notice,
   ScreenScroll,
   Tag,
-  uiFonts,
-  uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -284,12 +282,12 @@ function ExerciseShareCard({
   return (
     <Card style={styles.card} testID="exercise-share-card">
       <View style={styles.eyebrowRow}>
-        <Text allowFontScaling={false} style={styles.eyebrow} testID="exercise-share-group-eyebrow">
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID="exercise-share-group-eyebrow">
           Shared via {groupName}
         </Text>
       </View>
 
-      <Text allowFontScaling={false} style={styles.title} testID="exercise-share-title">
+      <Text allowFontScaling={false} style={uiText.title} testID="exercise-share-title">
         {payload.name}
       </Text>
 
@@ -305,10 +303,10 @@ function ExerciseShareCard({
 
       {primaryMuscles.length > 0 ? (
         <View style={styles.muscleSection}>
-          <Text allowFontScaling={false} style={styles.sectionLabel}>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
             Primary muscle{primaryMuscles.length > 1 ? 's' : ''}
           </Text>
-          <Text allowFontScaling={false} style={styles.muscleList} testID="exercise-share-primary-muscles">
+          <Text allowFontScaling={false} style={uiText.body} testID="exercise-share-primary-muscles">
             {primaryMuscles.join(', ')}
           </Text>
         </View>
@@ -316,10 +314,10 @@ function ExerciseShareCard({
 
       {secondaryMuscles.length > 0 ? (
         <View style={styles.muscleSection}>
-          <Text allowFontScaling={false} style={styles.sectionLabel}>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
             Secondary muscle{secondaryMuscles.length > 1 ? 's' : ''}
           </Text>
-          <Text allowFontScaling={false} style={styles.muscleList} testID="exercise-share-secondary-muscles">
+          <Text allowFontScaling={false} style={uiText.body} testID="exercise-share-secondary-muscles">
             {secondaryMuscles.join(', ')}
           </Text>
         </View>
@@ -340,22 +338,6 @@ const styles = StyleSheet.create({
   eyebrowRow: {
     flexDirection: 'row',
   },
-  eyebrow: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxl,
-    lineHeight: uiTypography.lineHeight.xxl,
-    color: uiRoles.ink,
-  },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -365,18 +347,6 @@ const styles = StyleSheet.create({
   muscleSection: {
     marginTop: uiSpace.sm,
     gap: uiSpace.xs,
-  },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  muscleList: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.md,
-    color: uiRoles.ink,
   },
   actions: {
     gap: uiSpace.sm,

@@ -24,6 +24,7 @@ import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
 import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -66,7 +67,6 @@ import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
-import { pageText } from './text-styles';
 
 type ExercisePageScreenProps = {
   sessionId: string;
@@ -525,14 +525,14 @@ export function ExercisePageScreen({
               ]}
               testID="exercise-add-set">
               <Icon color={uiRoles.ink} name="plus" size="xs" />
-              <Text allowFontScaling={false} style={pageText.controlLabel}>Add set</Text>
+              <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Add set</Text>
             </Pressable>
           </Card>
           {draft.saveError ? (
             <Text
               allowFontScaling={false}
               accessibilityLiveRegion="polite"
-              style={[pageText.body, styles.saveError]}
+              style={[uiText.body, uiTextTone.danger]}
               testID="exercise-save-error">
               {`Not saved: ${draft.saveError}`}
             </Text>
@@ -546,7 +546,7 @@ export function ExercisePageScreen({
             onPress={onComplete}
             style={({ pressed }) => [styles.complete, pressed ? styles.pressed : null]}
             testID="exercise-complete">
-            <Text allowFontScaling={false} style={pageText.controlLabel}>Complete exercise</Text>
+            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Complete exercise</Text>
           </Pressable>
         </ScreenScroll>
       </KeyboardAvoidingView>
@@ -648,9 +648,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     backgroundColor: uiRoles.paper,
-  },
-  saveError: {
-    color: uiRoles.danger,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

@@ -158,7 +158,8 @@ figures keeps its word role and draws only the figures in Plex Mono 500
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
 so it never outweighs the title. Today, Groups, Sessions, Progress, the
 session flow (recorder, session view, completion, View Session, Train), the
-session planner, Settings (its pages, Appearance, Profile, Gyms) and the app
+session planner, the exercise screens (page, catalogue, editor, history, link,
+shared exercise), Settings (its pages, Appearance, Profile, Gyms) and the app
 shell (tab bar, stack header, More, connected agents, logs) take every text
 from the roles. Display art keeps its own type: the full-screen
 repeating timer, the Train START disc and the share image; the log viewer's

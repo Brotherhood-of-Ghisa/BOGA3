@@ -2,11 +2,10 @@ import { forwardRef, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
-
-import { pageText } from './text-styles';
 
 type SetEntryFieldsProps = {
   number: number;
@@ -45,14 +44,14 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
         onLongPress={onOpenEffort}
         style={[styles.field, styles.effortField]}
         testID={`${testID}-effort`}>
-        <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Effort</Text>
         <View style={styles.effortValue}>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>{effortText}</Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.effortText]}>{effortText}</Text>
           <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
         </View>
       </Pressable>
       <View style={[styles.field, styles.weightField, weightError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={pageText.microLabel}>Weight</Text>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Weight</Text>
         <TextInput
           allowFontScaling={false}
           accessibilityLabel={`Set ${number} weight`}
@@ -60,20 +59,20 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
           onChangeText={onChangeWeight}
           ref={weightInputRef}
           selectTextOnFocus
-          style={styles.input}
+          style={[uiText.figureHero, styles.input]}
           testID={`${testID}-weight`}
           value={weightValue}
         />
       </View>
       <View style={[styles.field, styles.repsField, repsError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={pageText.microLabel}>Reps</Text>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Reps</Text>
         <TextInput
           allowFontScaling={false}
           accessibilityLabel={`Set ${number} reps`}
           keyboardType="number-pad"
           onChangeText={onChangeReps}
           selectTextOnFocus
-          style={styles.input}
+          style={[uiText.figureHero, styles.input]}
           testID={`${testID}-reps`}
           value={repsValue}
         />
@@ -101,18 +100,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 0,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxl,
-    color: uiRoles.ink,
   },
   effortValue: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
-  effortText: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
+  effortText: { flexShrink: 1 },
 });
