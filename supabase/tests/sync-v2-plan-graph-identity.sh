@@ -200,6 +200,7 @@ push_body="$(jq -nc --arg id "${A_SPE_PUSH}" --arg p "${A_SP}" --argjson now "${
              created_at: $now, updated_at: $now, deleted_at: null}}]}')"
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST \
   -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${USER_A_TOKEN}" \
+  -H "Accept-Profile: app_public" -H "Content-Profile: app_public" \
   -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
   --data "${push_body}" "${API_URL}/rest/v1/rpc/sync_push")"
 [[ "${status}" == "200" ]] || fail "user A's sync_push of an own block returned ${status}"
