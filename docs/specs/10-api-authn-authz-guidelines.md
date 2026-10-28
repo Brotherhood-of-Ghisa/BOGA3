@@ -109,8 +109,8 @@ semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/REA
 
 The base OAuth grant stays read-only. A coaching client may read the upcoming
 plan queue, create new plans/programmes and edit exercises only while an
-app-owned, default-denied `public.agent_plan_permissions` row (the app's one
-write-access switch, [[agents.write-access]]) matches the live grant timestamp; a missing, false or
+app-owned, default-denied `public.agent_plan_permissions` row (the app's
+write-access switches, [[agents.write-access]]) matches the live grant timestamp; a missing, false or
 grant-mismatched row returns `403 PLAN_PERMISSION_REQUIRED` before any
 referenced resource is resolved. Editing authored plans and programmes requires
 the separate `plan_edit_enabled = true` permission; if disabled, edit requests fail
