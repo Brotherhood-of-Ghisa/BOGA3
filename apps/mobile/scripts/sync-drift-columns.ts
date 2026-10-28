@@ -18,7 +18,8 @@ export interface ServerColumn {
 
 export interface ColumnExemptions {
   local_only_columns: string[];
-  // Server-side columns tolerated with no client counterpart.
+  // Server-side columns tolerated with no client counterpart, each named
+  // `<entity>.<column>` so a waiver never covers another table's column.
   server_only_columns?: { column: string; rationale?: string }[];
   // Client columns whose server counterpart is intentionally untyped text.
   untyped_text_references?: { entity: string; column: string }[];
@@ -139,7 +140,7 @@ export function diffEntityColumns(
   for (const serverCol of serverColumns) {
     if (WIRE_ENVELOPE_COLUMNS.has(serverCol.column_name)) continue;
     if (clientWireNames.has(serverCol.column_name)) continue;
-    if (serverOnlyExempt.has(serverCol.column_name)) continue;
+    if (serverOnlyExempt.has(`${entity}.${serverCol.column_name}`)) continue;
     findings.push({
       kind: 'server_only_column',
       message:

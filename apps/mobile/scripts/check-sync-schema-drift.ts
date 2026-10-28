@@ -554,9 +554,8 @@ async function main(): Promise<number> {
     const extras = JSON.parse(readFileSync(SYNC_EXTRAS_PATH, 'utf8')) as {
       exemptions: {
         local_only_columns: string[];
-        // Server-side columns we tolerate as having no client counterpart
-        // (typically because plan-2 hasn't shipped the matching client column
-        // yet — see sync-extras.json rationale per entry).
+        // Server-side columns we tolerate as having no client counterpart,
+        // named `<entity>.<column>` (see sync-extras.json rationale per entry).
         server_only_columns?: { column: string; rationale?: string }[];
         // Client columns whose server counterpart is intentionally untyped text.
         // Optional: the key (and the whole list) may be absent when no entity

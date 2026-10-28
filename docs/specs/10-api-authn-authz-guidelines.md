@@ -37,7 +37,14 @@ This is the shortest operational summary. Use the "Further reading" section when
     through the dedicated BoGa3 agent API.
 14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
     developer helpers, must independently reject non-null OAuth `client_id`
-    claims before executing any read or write body.
+    claims before executing any read or write body. Request identity is never
+    derived from row data: no trigger may write `request.jwt.claim*`
+    (PostgREST sends identity only in `request.jwt.claims`, so a trigger-set
+    `claim.sub` becomes `auth.uid()` before RLS `WITH CHECK` runs). Triggers
+    on user-owned tables are `SECURITY INVOKER`, so their parent reads, locks
+    and bumps obey the caller's RLS. Only service-role-only agent RPCs may set
+    an owner context, from their validated `p_owner` argument
+    (`supabase/tests/sync-v2-plan-graph-identity.sh`).
 15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
 16. **RLS recursion prevention.** Group membership and role lookups MUST use `SECURITY DEFINER` helpers with `SET search_path = app_public, pg_temp`. If a later phase adds RLS policies on group tables (for example for Realtime), those policies must call the helpers. Direct subqueries on `group_memberships` inside `group_memberships` policies are prohibited (Postgres `42P17`).
 17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the agent access boundary: agent tokens get no group access.

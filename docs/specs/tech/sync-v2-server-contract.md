@@ -7,8 +7,7 @@
 > `docs/specs/10-api-authn-authz-guidelines.md`. **Load when:** changing the
 > server sync schema, the sync RPCs, or `apps/mobile/src/sync/**`.
 
-Invariants and reasons live here; the code is the how (fix the doc when they
-disagree):
+Invariants and reasons live here; the code is the how:
 `supabase/migrations/20260525120000_sync_v2_clean_room.sql`, the sync RPC
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
@@ -68,8 +67,7 @@ Deletion is `deleted_at` going non-null; undelete is the same id with
 `deleted_at` back to null, under the same rule. There is no special path.
 
 - **Stale undelete loses.** An undelete stamped earlier than a stored tombstone
-  is a no-op; the next pull tells the device the row is deleted (the cost of
-  trusting client clocks).
+  is a no-op; the next pull tells the device the row is deleted.
 - **Newer undelete restores.** Re-emitting the original id with a fresh
   timestamp and a full payload restores the row losslessly; it is the only
   undelete path (relink, a future restore UI).
@@ -203,8 +201,10 @@ holds the algorithm, flags and exit codes. It guarantees:
 - The ground rules and universal objects above hold per table.
 - The topological layers match the FK graph.
 
-Local-only client columns are exempt through
-`apps/mobile/src/data/schema/sync-extras.json`.
+`apps/mobile/src/data/schema/sync-extras.json` exempts local-only client
+columns and `<entity>.<column>` server-only columns. The only server-only ones
+are the agent API's concurrency tokens `session_plans.graph_version` and
+`training_programmes.graph_version`, which never cross the wire.
 
 ---
 
@@ -319,9 +319,8 @@ deferral. Each page applies in one SQLite transaction with this per-row rule:
 - **Otherwise:** no-op, and the dirty bit stays set because the local write is
   newer.
 
-The page transaction holds the connection, so a concurrent local edit resolves
-correctly in either order. A per-row FK failure rolls back the page and leaves
-the cursor where it was.
+A concurrent local edit resolves correctly in either order. A per-row FK
+failure rolls back the page and leaves the cursor where it was.
 
 **Cursors.** One per layer (`sync_runtime_state.pull_cursor`), each moving
 only after its page commits, so an aborted drain resumes where it stopped; push
