@@ -31,6 +31,9 @@ jest.mock('@/src/utils/agent-connect', () => ({
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
+import { StyleSheet } from 'react-native';
+
+import { uiRoles, uiText } from '@/components/ui';
 import MoreScreen from '../app/(tabs)/more';
 
 const agent = (name: string) => ({ clientId: name, grantedAt: '', lastAccessAt: null, name, planAccessEnabled: false, scopes: [] });
@@ -141,8 +144,8 @@ describe('More screen', () => {
 
     fireEvent.press(screen.getByTestId('more-connect-ai-row'));
 
-    expect(await screen.findByTestId('more-connect-ai-error')).toHaveTextContent(
-      'Couldn’t open the setup page. Try again.',
-    );
+    const error = await screen.findByTestId('more-connect-ai-error');
+    expect(error).toHaveTextContent('Couldn’t open the setup page. Try again.');
+    expect(error).toHaveStyle({ ...StyleSheet.flatten(uiText.bodyStrong), color: uiRoles.danger });
   });
 });

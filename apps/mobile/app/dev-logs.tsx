@@ -5,15 +5,15 @@ import {
   ActionButton,
   Card,
   ChipGroup,
+  FigureText,
   Icon,
   Screen,
   StatePanel,
   uiBorder,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
   type ChipOption,
 } from '@/components/ui';
 import {
@@ -36,12 +36,12 @@ const FILTER_OPTIONS: readonly ChipOption<LevelFilter>[] = [
 ];
 
 // Only an error takes a hue; a warning is `ink` plus the warning glyph (G3).
-const LEVEL_COLOR: Record<LogLevel, string> = {
-  error: uiRoles.danger,
-  warn: uiRoles.ink,
-  info: uiRoles.inkMuted,
-  debug: uiRoles.inkFaint,
-};
+const LEVEL_TONE = {
+  error: uiTextTone.danger,
+  warn: uiTextTone.ink,
+  info: uiTextTone.muted,
+  debug: uiTextTone.faint,
+} satisfies Record<LogLevel, object>;
 
 const formatTime = (iso: string): string => {
   const date = new Date(iso);
@@ -61,24 +61,27 @@ function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
       <View style={styles.rowHeader}>
         <View style={styles.levelMark}>
           {record.level === 'warn' ? <Icon name="warning" size="xs" /> : null}
-          <Text allowFontScaling={false} style={[styles.level, { color: LEVEL_COLOR[record.level] }]}>{record.level.toUpperCase()}</Text>
+          <Text allowFontScaling={false} style={[uiText.label, LEVEL_TONE[record.level]]}>{record.level.toUpperCase()}</Text>
         </View>
-        <Text allowFontScaling={false} style={styles.time}>{formatTime(record.createdAt)}</Text>
+        <Text allowFontScaling={false} style={uiText.meta} testID={`dev-logs-row-${record.seq}-time`}>
+          <FigureText>{formatTime(record.createdAt)}</FigureText>
+        </Text>
       </View>
-      <Text allowFontScaling={false} selectable style={styles.event}>
+      <Text allowFontScaling={false} selectable style={uiText.bodyStrong}>
         {record.source} · {record.event}
       </Text>
       {record.message ? (
-        <Text allowFontScaling={false} selectable style={styles.message}>
+        <Text allowFontScaling={false} selectable style={[uiText.body, uiTextTone.muted]}>
           {record.message}
         </Text>
       ) : null}
+      {/* A dump of code, so it keeps the figure face whole: the one place words take Plex Mono. */}
       {hasContext && expanded ? (
-        <Text allowFontScaling={false} selectable style={styles.context}>
+        <Text allowFontScaling={false} selectable style={[uiText.figureSmall, styles.context]}>
           {JSON.stringify(record.context, null, 2)}
         </Text>
       ) : null}
-      {hasContext && !expanded ? <Text allowFontScaling={false} style={styles.contextHint}>Tap to show context</Text> : null}
+      {hasContext && !expanded ? <Text allowFontScaling={false} style={uiText.meta}>Tap to show context</Text> : null}
     </Pressable>
   );
 }
@@ -173,49 +176,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-  level: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  },
-  time: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  event: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  message: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
   context: {
     paddingTop: uiSpace.sm,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  contextHint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

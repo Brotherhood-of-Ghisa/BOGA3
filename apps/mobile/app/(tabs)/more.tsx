@@ -9,10 +9,10 @@ import {
   Icon,
   ListRow,
   ScreenScroll,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { MORE_GROUPS, type MoreDestination } from '@/src/navigation/more-destinations';
@@ -83,7 +83,7 @@ export default function MoreScreen() {
                   <Text
                     allowFontScaling={false}
                     accessibilityLiveRegion="polite"
-                    style={styles.inlineError}
+                    style={[uiText.bodyStrong, uiTextTone.danger, styles.inlineError]}
                     testID="more-connect-ai-error">
                     {connectError}
                   </Text>
@@ -105,10 +105,5 @@ const styles = StyleSheet.create({
   inlineError: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
   },
 });

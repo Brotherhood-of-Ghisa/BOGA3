@@ -214,7 +214,7 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
   `sync-setup`). Headerless screens still declare a title for VoiceOver back
   labels. `exercise-history` is the one hybrid: native header with `MainTabBar`.
 - Native headers take styling from the root stack's `screenOptions`: `surface`
-  background, Archivo 700 `ink` title at `xl`, and minimal arrow-only back.
+  background, the `title` text role (Archivo 700 `ink` at `lg`), and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back
   item that ignores display mode.
 - Three screens replace the native back item with the shared `IconButton` arrow

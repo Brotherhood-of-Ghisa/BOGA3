@@ -17,7 +17,9 @@ jest.mock('@/src/auth/connected-agents', () => ({
 }));
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
+
+import { uiFonts, uiRoles, uiText } from '@/components/ui';
 
 import ConnectedAgentsScreen from '../app/connected-agents';
 
@@ -49,6 +51,31 @@ describe('Connected agents screen', () => {
     expect(screen.getByTestId('connected-agent-granted-client-a')).toBeTruthy();
     expect(screen.getByTestId('connected-agent-last-access-client-a')).toBeTruthy();
     expect(screen.queryByText(/email|billing/i)).toBeNull();
+  });
+
+  it('takes every text from the shared roles, with the dates in words and figures', async () => {
+    mockListConnectedAgents.mockResolvedValue([{ ...agent, lastAccessAt: null, planAccessEnabled: 'unavailable' }]);
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    const role = (name: keyof typeof uiText) => StyleSheet.flatten(uiText[name]);
+    expect(screen.getByText('Coach Agent')).toHaveStyle(role('title'));
+    expect(screen.getByText('Read training data')).toHaveStyle(role('meta'));
+    expect(screen.getByText('Access granted')).toHaveStyle(role('body'));
+    expect(screen.getByText('Last access')).toHaveStyle(role('body'));
+
+    // A date's words stay in the line's face; only its digits take Plex Mono.
+    const granted = screen.getByTestId('connected-agent-granted-client-a');
+    expect(granted).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+    const digits = granted.findAll((node) => String(node.type) === 'Text' && node !== granted && /^\d/.test(String(node.props.children)));
+    expect(digits.length).toBeGreaterThan(0);
+    for (const digit of digits) expect(digit).toHaveStyle({ fontFamily: uiFonts.figure.family });
+    const never = screen.getByTestId('connected-agent-last-access-client-a');
+    expect(never).toHaveTextContent('Never');
+    expect(never).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+
+    expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toHaveStyle({ ...role('meta'), color: uiRoles.danger });
+    expect(screen.getByTestId('connected-agent-plan-disclosure-client-a')).toHaveStyle(role('meta'));
   });
 
   it('leaves the title to the native header, with no intro under it', async () => {
