@@ -119,6 +119,7 @@ session is its baseline only where it did the same
 | Exercise and muscle heatmap cells, exercise block history (and its `limit`), session-comparison baselines | per exercise / per muscle |
 | Exercise session facts rows | per exercise, with either working or volume-included sets; rows with zero working sets do not imply a counted session |
 | Agent API exercise context, `exercise_count` | per exercise |
+| Agent API training status: muscle sets, favourites' `sessions_28d` | per muscle / per exercise |
 | Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`) |
 
 **Lists, not statistics.** These show sessions, not counts:
@@ -201,6 +202,7 @@ read the rule:
 - the records panel and all-time bests (`loadExerciseBests`);
 - the comparison baselines (`loadEarlierBestsByDefinition`);
 - the exercise page, session view and completion markers;
+- the agent API training status's `last_record_on`;
 - the agent API's `personal_records`, except Volume: its `max_session_volume`
   still skips a session with an uncalculable set (§4 Totals).
 

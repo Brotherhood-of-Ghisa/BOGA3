@@ -1,7 +1,7 @@
 // The preferences that live on the synced settings row rather than in the
 // device's kv store ([[muscle.weekly-targets]], [[muscle.secondary-filter]]).
 // Pure conversion between the stored columns and the preference values.
-import { type AccountLocalPreferences, DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from './model';
+import { type AccountLocalPreferences, DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from './model.ts';
 
 /**
  * The settings row's four columns as the data layer stores them (null until

@@ -15,6 +15,12 @@ import {
   type GymBucketRank,
 } from './gym-buckets.ts';
 import {
+  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
+  trainingStatusWindow,
+  type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
+  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
+} from './training-status.ts';
+import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
 } from './training-metrics.ts';
@@ -340,6 +346,7 @@ const routeToolName = (path: string, method: string): string => {
   if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+\/restore$/.test(path)) return 'restore_exercise';
   if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+$/.test(path)) return 'update_exercise';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
+  if (path === '/v1/agent/training-status') return 'get_training_status';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
@@ -906,10 +913,10 @@ const searchExercises = async (
 };
 
 // Resolve only already-authorized session IDs in one owner-filtered server call.
-const attachSessionWeightContexts = async (
-  client: SupabaseClient, userId: string, rows: SessionRow[], calculationsEnabled: boolean,
-): Promise<SessionRow[]> => {
-  if (rows.length === 0) return rows;
+const attachSessionWeightContexts = async <T extends { id: string }>(
+  client: SupabaseClient, userId: string, rows: T[], calculationsEnabled: boolean,
+): Promise<Array<T & SessionWeightRow>> => {
+  if (rows.length === 0) return [];
   if (!calculationsEnabled) {
     return rows.map(row => ({ ...row, body_weight_kg: null, body_weight_source: null,
       body_weight_measurement_id: null, body_weight_measured_at: null }));
@@ -1699,6 +1706,174 @@ const getExerciseHistory = async (
       })
       : null,
   };
+};
+
+/** Status reads: sets of the profile's last 56 days, then each favourite's history. */
+const STATUS_MAX_SESSIONS = 200;
+const STATUS_ROW_LIMIT = 1000;
+const STATUS_MAX_MUSCLES = 500;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type StatusRead<T> = { rows: T[]; truncated: boolean };
+
+/** Parallel chunk reads per wave, so a heavy history never bursts the database pool. */
+const STATUS_PARALLEL_READS = 8;
+
+/** One owner-filtered read per chunk, a wave at a time; truncated when any chunk hits `STATUS_ROW_LIMIT`. */
+const readChunks = async <T>(
+  ids: string[], size: number, read: (chunkIds: string[]) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>,
+): Promise<StatusRead<T>> => {
+  const results: Array<{ data: T[] | null; error: { message?: string } | null }> = [];
+  for (const wave of chunk(chunk(ids, size), STATUS_PARALLEL_READS)) {
+    results.push(...await Promise.all(wave.map((chunkIds) => read(chunkIds))));
+  }
+  for (const result of results) throwDatabaseError(result.error);
+  return {
+    rows: results.flatMap((result) => result.data ?? []),
+    truncated: results.some((result) => (result.data?.length ?? 0) >= STATUS_ROW_LIMIT),
+  };
+};
+
+const loadStatusSessions = async (
+  client: SupabaseClient, userId: string, sessionIds: string[], calculationsEnabled: boolean,
+): Promise<StatusSessionRow[]> => {
+  const { rows } = await readChunks([...new Set(sessionIds)], 100, (ids) =>
+    client.schema('app_public').from('sessions')
+      .select('id,completed_at').eq('owner_user_id', userId).eq('status', 'completed')
+      .is('deleted_at', null).not('completed_at', 'is', null).in('id', ids).limit(100)
+      .returns<Array<{ id: string; completed_at: number }>>());
+  return attachSessionWeightContexts(client, userId, rows, calculationsEnabled);
+};
+
+const loadStatusBlocks = (
+  client: SupabaseClient, userId: string, sessionIds: string[],
+): Promise<StatusRead<StatusBlockRow>> =>
+  readChunks(sessionIds, 100, (ids) =>
+    client.schema('app_public').from('session_exercises')
+      .select('id,session_id,exercise_definition_id,order_index').eq('owner_user_id', userId)
+      .is('deleted_at', null).in('session_id', ids).limit(STATUS_ROW_LIMIT).returns<StatusBlockRow[]>());
+
+const loadStatusSets = (
+  client: SupabaseClient, userId: string, blockIds: string[],
+): Promise<StatusRead<StatusSetRow>> =>
+  readChunks(blockIds, 40, (ids) =>
+    client.schema('app_public').from('exercise_sets')
+      .select('id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status')
+      .eq('owner_user_id', userId).is('deleted_at', null).is('performance_status', null)
+      .in('session_exercise_id', ids).order('order_index').order('id').limit(STATUS_ROW_LIMIT)
+      .returns<StatusSetRow[]>());
+
+/** Every definition the blocks name, deleted ones included: their sets still count for muscles. */
+const loadStatusDefinitions = async (
+  client: SupabaseClient, userId: string, exerciseIds: string[],
+): Promise<Map<string, StatusDefinitionRow>> => {
+  const { rows } = await readChunks(exerciseIds, 100, (ids) =>
+    client.schema('app_public').from('exercise_definitions')
+      .select('id,name,load_input_mode,bodyweight_contribution,deleted_at').eq('owner_user_id', userId)
+      .in('id', ids).limit(100).returns<StatusDefinitionRow[]>());
+  return new Map(rows.map((row) => [row.id, row]));
+};
+
+const loadStatusMappings = (
+  client: SupabaseClient, userId: string, exerciseIds: string[],
+): Promise<StatusRead<StatusMappingRow>> =>
+  readChunks(exerciseIds, 100, (ids) =>
+    client.schema('app_public').from('exercise_muscle_mappings')
+      .select('exercise_definition_id,muscle_group_id,role').eq('owner_user_id', userId)
+      .is('deleted_at', null).in('exercise_definition_id', ids).limit(STATUS_ROW_LIMIT)
+      .returns<StatusMappingRow[]>());
+
+/**
+ * Each favourite's sessions over all time, as `get_exercise_context` reads one
+ * exercise: its newest-edited `MAX_CONTEXT_BLOCKS` blocks. The ids of the
+ * favourites whose history hit a cap come back in `truncated`.
+ */
+const loadFavouriteHistory = async (
+  client: SupabaseClient, userId: string, exerciseIds: string[], calculationsEnabled: boolean,
+): Promise<{ training: StatusTraining; truncated: Set<string> }> => {
+  const perExercise = await Promise.all(exerciseIds.map(async (exerciseId) => {
+    const { data, error } = await client.schema('app_public').from('session_exercises')
+      .select('id,session_id,exercise_definition_id,order_index').eq('owner_user_id', userId)
+      .eq('exercise_definition_id', exerciseId).is('deleted_at', null)
+      .order('updated_at', { ascending: false }).order('id').limit(MAX_CONTEXT_BLOCKS + 1)
+      .returns<StatusBlockRow[]>();
+    throwDatabaseError(error);
+    return { exerciseId, blocks: (data ?? []).slice(0, MAX_CONTEXT_BLOCKS), capped: (data?.length ?? 0) > MAX_CONTEXT_BLOCKS };
+  }));
+  const blocks = perExercise.flatMap((entry) => entry.blocks);
+  const [sessions, sets] = await Promise.all([
+    loadStatusSessions(client, userId, blocks.map((row) => row.session_id), calculationsEnabled),
+    loadStatusSets(client, userId, blocks.map((row) => row.id)),
+  ]);
+  // A set chunk spans exercises, so its cap marks every favourite.
+  const truncated = new Set(perExercise.filter((entry) => entry.capped || sets.truncated).map((entry) => entry.exerciseId));
+  return { training: { sessions, blocks, sets: sets.rows }, truncated };
+};
+
+const getTrainingStatus = async (
+  client: SupabaseClient,
+  userId: string,
+  url: URL,
+  bodyweightCalculationsEnabled: boolean,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set());
+  const now = new Date();
+  const [profile, settings, muscles] = await Promise.all([
+    client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
+      .maybeSingle<{ time_zone: string | null }>(),
+    client.schema('app_public').from('user_settings')
+      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,client_updated_at_ms')
+      .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>(),
+    client.schema('app_public').from('muscle_groups')
+      .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', userId)
+      .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
+      .returns<StatusMuscleRow[]>(),
+  ]);
+  throwDatabaseError(profile.error);
+  throwDatabaseError(settings.error);
+  throwDatabaseError(muscles.error);
+  const timeZone = resolveStatusTimeZone(profile.data?.time_zone);
+
+  // A margin past 56 days: the builder keeps the sessions inside the profile's calendar window.
+  const { data: recent, error: recentError } = await client.schema('app_public').from('sessions')
+    .select('id,completed_at').eq('owner_user_id', userId).eq('status', 'completed').is('deleted_at', null)
+    .gte('completed_at', now.getTime() - (STATUS_READ_DAYS + 2) * DAY_MS)
+    .order('completed_at', { ascending: false }).order('id').limit(STATUS_MAX_SESSIONS + 1)
+    .returns<Array<{ id: string; completed_at: number }>>();
+  throwDatabaseError(recentError);
+  const sessions = await attachSessionWeightContexts(
+    client, userId, (recent ?? []).slice(0, STATUS_MAX_SESSIONS), bodyweightCalculationsEnabled,
+  );
+  const blocks = await loadStatusBlocks(client, userId, sessions.map((row) => row.id));
+  const exerciseIds = [...new Set(blocks.rows.flatMap((block) => block.exercise_definition_id ? [block.exercise_definition_id] : []))];
+  const [sets, definitions, mappings] = await Promise.all([
+    loadStatusSets(client, userId, blocks.rows.map((row) => row.id)),
+    loadStatusDefinitions(client, userId, exerciseIds),
+    loadStatusMappings(client, userId, exerciseIds),
+  ]);
+  const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
+  const window = trainingStatusWindow(now, timeZone);
+  const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
+  const history = await loadFavouriteHistory(
+    client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled,
+  );
+  return buildTrainingStatus({
+    now, timeZone,
+    settings: settings.data,
+    muscleRows: muscles.data ?? [],
+    mappings: mappings.rows,
+    training,
+    definitions,
+    favourites,
+    history: history.training,
+    historyTruncated: history.truncated,
+    calculationsEnabled: bodyweightCalculationsEnabled,
+    complete: statusReadComplete({
+      sessionsRead: recent?.length ?? 0, maxSessions: STATUS_MAX_SESSIONS,
+      musclesRead: muscles.data?.length ?? 0, maxMuscles: STATUS_MAX_MUSCLES,
+      truncatedReads: [blocks, sets, mappings],
+    }),
+  });
 };
 
 const getWorkoutDetail = async (
@@ -2620,6 +2795,9 @@ const dispatchAgentRequest = async (
   }
   if (path === '/v1/agent/workouts/recent') {
     return getRecentWorkouts(client, agent.userId, url, bodyweightCalculationsEnabled);
+  }
+  if (path === '/v1/agent/training-status') {
+    return getTrainingStatus(client, agent.userId, url, bodyweightCalculationsEnabled);
   }
   const contextMatch = /^\/v1\/agent\/exercises\/([^/]+)\/context$/.exec(path);
   if (contextMatch) {

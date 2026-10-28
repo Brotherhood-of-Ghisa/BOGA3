@@ -92,6 +92,13 @@ const responses: Record<string, Record<string, unknown>> = {
     id: 'prog-a',
     plan_ids: ['plan-1', 'plan-2'],
   },
+  '/functions/v1/agent-api/v1/agent/training-status': {
+    complete: true,
+    favourite_exercises: [{ exercise_id: 'exercise-a', name: 'Bench Press', sessions_28d: 3 }],
+    metric_revision: 'working_sets_v7',
+    muscles: [{ id: 'chest_sternal', name: 'Chest', week_sets: 4.5, weekly_target: 10 }],
+    targets: { default_weekly_sets: 10, mode: 'single', revision: 1_730_000_000_000, uploaded: true },
+  },
   '/functions/v1/agent-api/v1/agent/muscles': {
     muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest', report_group: null, tracked: true }],
   },
@@ -204,7 +211,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly fourteen tools with correct annotations', async () => {
+  it('discovers exactly fifteen tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -218,6 +225,7 @@ describe('BoGa MCP server', () => {
       'get_exercise_history',
       'get_recent_workouts',
       'get_training_profile',
+      'get_training_status',
       'get_upcoming_session_plans',
       'get_workout_detail',
       'list_muscles',
@@ -230,11 +238,15 @@ describe('BoGa MCP server', () => {
       'get_exercise_history',
       'get_recent_workouts',
       'get_training_profile',
+      'get_training_status',
       'get_upcoming_session_plans',
       'get_workout_detail',
       'list_muscles',
       'search_exercises',
     ]);
+    // The instructions count the read-only tools a client can call.
+    expect(readOnlyNames.size).toBe(9);
+    expect(running.client.getInstructions()).toContain('Nine read-only tools');
     // Edits and deletes replace what the person had, so clients confirm them.
     const destructiveNames = new Set(['delete_exercise', 'update_exercise']);
     for (const tool of result.tools) {
@@ -291,6 +303,7 @@ describe('BoGa MCP server', () => {
       arguments: { limit: 10, session_id: 'workout-a' },
       name: 'get_workout_detail',
     });
+    const status = await running.client.callTool({ arguments: {}, name: 'get_training_status' });
     const plans = await running.client.callTool({
       arguments: { include_unscheduled: true, limit: 5 },
       name: 'get_upcoming_session_plans',
@@ -337,6 +350,9 @@ describe('BoGa MCP server', () => {
     expect(workoutDetail.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/workouts/workout-a'
     ]);
+    expect(status.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/training-status'
+    ]);
     expect(plans.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/session-plans'
     ]);
@@ -357,6 +373,7 @@ describe('BoGa MCP server', () => {
     expect(called).toContain(
       'GET /functions/v1/agent-api/v1/agent/workouts/recent?limit=4',
     );
+    expect(called).toContain('GET /functions/v1/agent-api/v1/agent/training-status');
     expect(called).toContain(
       'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/history?limit=10',
     );
