@@ -79,7 +79,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/exercise-core/`
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
-  - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form.
+  - its editor fields (`ExerciseNameField`, `ExerciseWeightSection`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form.
 - `apps/mobile/src/exercise-calculations/`
   - owns the fixed effort vocabulary and pure explicit personal eligibility policy (`effort-policy.ts`), and the load calculation kernel (`load-metrics.ts`, `analytics.ts`) and the set rules every reader shares (`set-semantics.ts`: which sets count as performed, the canonical weight for the reps). Persistence (`src/data`), the session recorder, session insights and groups import them; this directory never imports `src/data`, hooks or UI.
   - the `agent-api` and `group-eval` Edge Functions load it by relative path, so its whole import graph uses relative `.ts` specifiers (never `@/`).
@@ -120,6 +120,12 @@ Define the canonical repository structure, path ownership, and placement convent
     every figure places a session by its `completed_at`.
   - derived-only, like `session-insights`: no schema, no sync, no history replay.
   - drawn by Today's You page, `apps/mobile/components/today/`.
+- `apps/mobile/src/today-plan/`
+  - owns Today's Plan read (`loadTodayPlan`): each muscle's working sets on
+    the three days before today, today and this calendar week
+    ([[comparison.allowed-periods]]), the week's trained and planned days, and
+    the next planned sessions, from the stats aggregation and
+    `src/session-planner`. Derived-only.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.
@@ -166,8 +172,6 @@ Define the canonical repository structure, path ownership, and placement convent
 
 ## Agreed structure conventions
 
-- `supabase/`
-  - backend root for local Supabase project assets (migrations, seeds, functions, and backend-local tests).
 - `docs/specs/ui/`
   - canonical location for authoritative UI discovery/audit/guardrail docs (for example repo discovery baseline, pattern audit, screen map, navigation contract, components catalog, UX rules).
   - keep UI docs under `docs/specs/ui/**` rather than `docs/brainstorms/**` once they become source-of-truth references.
@@ -176,12 +180,6 @@ Define the canonical repository structure, path ownership, and placement convent
   - keep deep-dive docs concise, source-linked, and update them in the same task when subsystem behavior materially changes.
 - `docs/plans/` lifecycle
   - there is no in-repo archive for plans, milestones, or task cards: delete them in the change that ships or abandons their work (git history keeps them). Durable decisions move into the owning `docs/specs/**` doc in the PR that ships them.
-- `apps/mobile/.maestro/flows`
-  - remains the canonical location for Maestro flow definitions.
-- `apps/mobile/.maestro/maestro.env.sample`
-  - checked-in sample for per-worktree Maestro configuration.
-- `apps/mobile/.maestro/maestro.env.local`
-  - canonical untracked per-worktree Maestro config file.
 - `apps/mobile/artifacts/maestro/`
   - canonical runtime artifact root for Maestro runs.
   - each run writes task/timestamp-scoped subdirectories plus `runtime.env` and lifecycle logs under that root.

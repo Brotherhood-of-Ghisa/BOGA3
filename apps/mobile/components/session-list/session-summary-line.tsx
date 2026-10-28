@@ -1,6 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatMonthDayTime } from '@/src/utils/local-time';
@@ -57,24 +59,24 @@ export function SessionSummaryLine({
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={[styles.summaryToken, styles.summaryTokenPrimary, styles.summaryTokenStrong]}
+          style={[uiText.figureSmall, uiTextTone.ink]}
           testID={`${testIdPrefix}-start`}>
           {formatDateTimeStamp(session.startedAt, resolvedDateFormat)}
         </Text>
-        <Text allowFontScaling={false} selectable style={styles.summarySeparator}>
+        <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
           ·
         </Text>
         <Text
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={[styles.summaryToken, styles.summaryTokenStrong]}
+          style={[uiText.figureSmall, uiTextTone.ink]}
           testID={`${testIdPrefix}-duration`}>
           {durationLabel}
         </Text>
         {locationLabel ? (
           <>
-            <Text allowFontScaling={false} selectable style={[styles.summaryToken, styles.summaryAtToken, styles.summaryTokenStrong]}>
+            <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
               @
             </Text>
             <Text
@@ -82,7 +84,7 @@ export function SessionSummaryLine({
               selectable
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[styles.summaryToken, styles.summaryLocationToken, styles.summaryTokenStrong]}
+              style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.summaryFlexibleToken]}
               testID={`${testIdPrefix}-gym`}>
               {locationLabel}
             </Text>
@@ -95,11 +97,11 @@ export function SessionSummaryLine({
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={[styles.summaryToken, styles.summaryTokenSecondary]}
+          style={uiText.meta}
           testID={`${testIdPrefix}-sets`}>
-          {formatSetCount(session.setCount)}
+          <FigureText>{formatSetCount(session.setCount)}</FigureText>
         </Text>
-        <Text allowFontScaling={false} selectable style={styles.summarySeparator}>
+        <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
           ·
         </Text>
         <Text
@@ -107,17 +109,17 @@ export function SessionSummaryLine({
           selectable
           numberOfLines={1}
           ellipsizeMode="tail"
-          style={[styles.summaryToken, styles.summaryTokenSecondary, styles.summaryFlexibleToken]}
+          style={[uiText.meta, styles.summaryFlexibleToken]}
           testID={`${testIdPrefix}-exercises`}>
-          {formatExerciseCount(session.exerciseCount)}
+          <FigureText>{formatExerciseCount(session.exerciseCount)}</FigureText>
         </Text>
       </View>
     </View>
   );
 }
 
-// Figures (the start stamp, the duration, the counts) are Plex Mono so they
-// align down a list (`design-language.md` §3); the gym is words.
+// The start stamp and the duration are figures; the counts are words with
+// their figures in Plex Mono, and the gym is words (`design-language.md` §3).
 const styles = StyleSheet.create({
   summaryLines: {
     gap: uiSpace.xs,
@@ -129,42 +131,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
     minWidth: 0,
   },
-  summaryToken: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  summaryTokenPrimary: {
-    color: uiRoles.ink,
-  },
-  summaryTokenStrong: {
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  summaryTokenSecondary: {
-    color: uiRoles.inkMuted,
-  },
-  summaryAtToken: {
-    fontFamily: uiFonts.body.family,
-    color: uiRoles.inkFaint,
-  },
-  // A gym name is words, not a figure.
-  summaryLocationToken: {
-    flexShrink: 1,
-    minWidth: 0,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-  },
   summaryFlexibleToken: {
     flexShrink: 1,
     minWidth: 0,
-  },
-  summarySeparator: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    color: uiRoles.inkFaint,
   },
 });

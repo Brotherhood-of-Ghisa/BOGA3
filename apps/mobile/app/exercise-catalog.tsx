@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Keyboard, ScrollView, Share, StyleSheet, View } from 'react-native';
 
-import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
-import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { ExerciseMerge } from '@/components/exercise-catalog/exercise-merge';
+import { useOpenExerciseEditor, type ExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
+import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
@@ -16,7 +17,6 @@ import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { ListRow } from '@/components/ui/list-row';
 import { Notice } from '@/components/ui/notice';
-import { TitleBar } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
@@ -30,7 +30,6 @@ import {
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   buildDuplicateExercisePrefill,
-  type ExerciseEditorPrefill,
 } from '@/src/exercise-catalog/editor-model';
 import {
   buildExerciseListModel,
@@ -45,6 +44,7 @@ import {
 } from '@/src/exercise-share';
 import { listMyGroups, type GroupSummary } from '@/src/groups';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { useLinkedExerciseIds } from '@/src/groups/use-linked-exercise-ids';
 import { exerciseHistoryHref, exerciseLinkHref } from '@/src/navigation/routes';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
@@ -68,21 +68,35 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   return debouncedValue;
 };
 
-export default function ExerciseCatalogScreen() {
+// A root-stack page: the native header (title, ⋮) over the list, and the tab
+// bar kept below with More selected. Opened from a workout's picker (Manage)
+// it is a step of that task, so it has no tab bar to leave the task by.
+export default function ExerciseCatalogRoute() {
+  const params = useLocalSearchParams<{ source?: string | string[] }>();
+  if (coerceRouteParam(params.source) === 'session') {
+    return <ExerciseCatalogScreen />;
+  }
+  return (
+    <TabOwnedPage>
+      <ExerciseCatalogScreen />
+    </TabOwnedPage>
+  );
+}
+
+function ExerciseCatalogScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ source?: string | string[]; intent?: string | string[] }>();
   const routeSource = coerceRouteParam(params.source);
   const routeIntent = coerceRouteParam(params.intent);
   const isFromSession = routeSource === 'session';
 
-  const [isEditorModalVisible, setIsEditorModalVisible] = useState(false);
   const [isCatalogOptionsMenuVisible, setIsCatalogOptionsMenuVisible] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [didHandleInitialIntent, setDidHandleInitialIntent] = useState(false);
+  const didHandleInitialIntent = useRef(false);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
-  const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
-  const [editorPrefill, setEditorPrefill] = useState<ExerciseEditorPrefill | null>(null);
-  const [editorModalTitle, setEditorModalTitle] = useState<string | undefined>(undefined);
+  const [queuedMerge, setQueuedMerge] = useState<ExerciseCatalogExercise | null>(null);
+  const [mergeSource, setMergeSource] = useState<ExerciseCatalogExercise | null>(null);
+  const openExerciseEditor = useOpenExerciseEditor();
   const [exerciseSearchValue, setExerciseSearchValue] = useState('');
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -90,6 +104,8 @@ export default function ExerciseCatalogScreen() {
   const [shareTarget, setShareTarget] = useState<{ exercise: ExerciseCatalogExercise; groups: GroupSummary[] } | null>(null);
   // Signed in only: linking needs my groups' exercises.
   const groupLinkingUserId = useGroupLinkingUserId();
+  // My local links (signed in), marking linked rows; they re-read on focus.
+  const linkedExerciseIds = useLinkedExerciseIds(groupLinkingUserId);
 
   const triggerShare = useCallback(async (group: GroupSummary, exercise: ExerciseCatalogExercise) => {
     const payload: ExerciseSharePayload = {
@@ -173,21 +189,37 @@ export default function ExerciseCatalogScreen() {
   );
   const familyExpansion = useFamilyExpansion(exerciseListModel.isSearching);
 
-  const openEditorForExercise = useCallback((exercise: ExerciseCatalogExercise) => {
-    setEditorExerciseTarget(exercise);
-    setEditorPrefill(null);
-    setEditorModalTitle(undefined);
-    setSaveFeedback(null);
-    setIsEditorModalVisible(true);
-  }, []);
+  // The editor is a page over the catalogue; its save reports back here.
+  const withCatalogueSave = useCallback(
+    (request: ExerciseEditorRequest): ExerciseEditorRequest => ({
+      ...request,
+      onSaved: () => {
+        setSaveFeedback(request.exerciseDefinitionId ? 'Exercise updated.' : 'Exercise created.');
+        if (isFromSession) router.back();
+      },
+    }),
+    [isFromSession, router]
+  );
 
-  const duplicateExercise = useCallback((exercise: ExerciseCatalogExercise) => {
-    setEditorExerciseTarget(null);
-    setEditorPrefill(buildDuplicateExercisePrefill(exercise));
-    setEditorModalTitle('Duplicate Exercise');
-    setSaveFeedback(null);
-    setIsEditorModalVisible(true);
-  }, []);
+  const openEditor = useCallback(
+    (request: ExerciseEditorRequest) => {
+      setSaveFeedback(null);
+      setExerciseActionMenuTarget(null);
+      openExerciseEditor(withCatalogueSave(request));
+    },
+    [openExerciseEditor, withCatalogueSave]
+  );
+
+  const openEditorForExercise = useCallback(
+    (exercise: ExerciseCatalogExercise) => openEditor({ exerciseDefinitionId: exercise.id }),
+    [openEditor]
+  );
+
+  const duplicateExercise = useCallback(
+    (exercise: ExerciseCatalogExercise) =>
+      openEditor({ prefill: buildDuplicateExercisePrefill(exercise), title: 'Duplicate exercise' }),
+    [openEditor]
+  );
 
   const handlePressEditRow = useCallback(
     (exercise: ExerciseListItem) => {
@@ -223,57 +255,19 @@ export default function ExerciseCatalogScreen() {
     [handlePressRowActions]
   );
 
-  const startNewExercise = () => {
-    setEditorExerciseTarget(null);
-    setEditorPrefill(null);
-    setEditorModalTitle(undefined);
-    setSaveFeedback(null);
-    setIsEditorModalVisible(true);
-  };
+  const startNewExercise = () => openEditor({});
 
-  // The route's intent is handled once, in the first render after the catalog loads.
-  if (!didHandleInitialIntent && !isLoading && !loadError) {
-    if (routeIntent === 'add') {
-      setEditorExerciseTarget(null);
-      setEditorPrefill(null);
-      setEditorModalTitle(undefined);
-      setSaveFeedback(null);
-      setIsEditorModalVisible(true);
-    }
-
-    setDidHandleInitialIntent(true);
-  }
-
-  const closeEditorModal = () => {
-    setIsEditorModalVisible(false);
-    setEditorExerciseTarget(null);
-    setEditorPrefill(null);
-    setEditorModalTitle(undefined);
-    setExerciseActionMenuTarget(null);
-  };
-
-  const handleEditorSaved = () => {
-    const wasEditing = editorExerciseTarget !== null;
-    setSaveFeedback(wasEditing ? 'Exercise updated.' : 'Exercise created.');
-    setIsEditorModalVisible(false);
-    setEditorExerciseTarget(null);
-    setEditorPrefill(null);
-    setEditorModalTitle(undefined);
-    setExerciseActionMenuTarget(null);
-
-    if (isFromSession) {
-      router.back();
-    }
-  };
+  // The route's intent is handled once, after the catalog loads.
+  useEffect(() => {
+    if (didHandleInitialIntent.current || isLoading || loadError) return;
+    didHandleInitialIntent.current = true;
+    if (routeIntent === 'add') openExerciseEditor(withCatalogueSave({}));
+  }, [isLoading, loadError, openExerciseEditor, routeIntent, withCatalogueSave]);
 
   const deleteExercise = async (exercise: ExerciseCatalogExercise) => {
     try {
       await deleteExerciseCatalogExercise(exercise.id);
       setSaveFeedback('Exercise deleted.');
-
-      if (editorExerciseTarget?.id === exercise.id) {
-        setEditorExerciseTarget(null);
-      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to delete exercise.');
     }
@@ -302,7 +296,7 @@ export default function ExerciseCatalogScreen() {
   const actionTarget = exerciseActionMenuTarget;
   const isActionTargetDeleted = Boolean(actionTarget?.deletedAt);
 
-  if (isLoading) {
+  if (isLoading && exercises.length === 0 && !mergeSource) {
     return (
       <Screen testID="exercise-catalog-screen">
         <StatePanel body="Loading exercise catalog…" kind="loading" />
@@ -310,7 +304,7 @@ export default function ExerciseCatalogScreen() {
     );
   }
 
-  if (loadError) {
+  if (loadError && !mergeSource) {
     return (
       <Screen testID="exercise-catalog-screen">
         <StatePanel body={loadError} kind="error" />
@@ -321,18 +315,18 @@ export default function ExerciseCatalogScreen() {
   return (
     <Screen style={styles.screen} testID="exercise-catalog-screen">
       <View style={styles.pinnedTopRegion}>
-        <TitleBar
-          actions={
-            <IconButton
-              accessibilityLabel="Exercise catalog options"
-              name="more-vertical"
-              onPress={openFilters}
-              testID="exercise-catalog-options-button"
-            />
-          }
-          back={<MoreHubBackButton />}
-          testID="exercise-catalog-title"
-          title="Exercises"
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <IconButton
+                nativeHeader
+                accessibilityLabel="Exercise catalog options"
+                name="more-vertical"
+                onPress={openFilters}
+                testID="exercise-catalog-options-button"
+              />
+            ),
+          }}
         />
         <View style={styles.topActionRow}>
           <View style={styles.search}>
@@ -356,6 +350,7 @@ export default function ExerciseCatalogScreen() {
           <GymPicker onChange={setGymId} options={gymOptions} testID="exercise-catalog-gym" value={gymId} />
         </ExerciseListPreferenceControls>
         {saveFeedback ? <Notice icon="success" live message={saveFeedback} testID="exercise-catalog-feedback" /> : null}
+        {mergeSource ? <ExerciseMerge key={mergeSource.id} source={mergeSource} onDismiss={() => setMergeSource(null)} /> : null}
         {saveError ? <Notice live message={saveError} testID="exercise-catalog-error" tone="danger" /> : null}
       </View>
 
@@ -376,17 +371,9 @@ export default function ExerciseCatalogScreen() {
           onPressExercise={handlePressEditRow}
           getExerciseAccessibilityLabel={(exercise) => `Edit exercise definition ${exercise.name}`}
           renderActions={renderExerciseActions}
+          linkedExerciseIds={linkedExerciseIds}
         />
       </ScrollView>
-
-      <ExerciseEditorModal
-        visible={isEditorModalVisible}
-        editingExercise={editorExerciseTarget}
-        prefill={editorPrefill}
-        title={editorModalTitle}
-        onRequestClose={closeEditorModal}
-        onSaved={handleEditorSaved}
-      />
 
       <Sheet
         dismissLabel="Close exercise management"
@@ -410,19 +397,10 @@ export default function ExerciseCatalogScreen() {
       <Sheet
         dismissLabel="Dismiss exercise action menu overlay"
         onDismiss={() => setExerciseActionMenuTarget(null)}
+        onDismissed={() => { if (queuedMerge) { setMergeSource(queuedMerge); setQueuedMerge(null); } }}
         testID="exercise-catalog-actions-sheet"
         title={actionTarget?.name}
         visible={actionTarget !== null}>
-        <ListRow
-          accessibilityLabel="View exercise history from actions"
-          label="History"
-          leading={<Icon color={uiRoles.ink} name="list" size="md" />}
-          onPress={() => {
-            setExerciseActionMenuTarget(null);
-            if (actionTarget) router.push(exerciseHistoryHref(actionTarget.id));
-          }}
-          testID="exercise-action-history"
-        />
         <ListRow
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
@@ -435,6 +413,32 @@ export default function ExerciseCatalogScreen() {
             }
           }}
           testID="exercise-action-edit"
+        />
+        {groupLinkingUserId ? (
+          <ListRow
+            accessibilityLabel="Link to group exercise from actions"
+            // A soft-deleted exercise is never linked from the UI.
+            disabled={isActionTargetDeleted}
+            label="Link to group exercise"
+            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}
+            onPress={() => {
+              setExerciseActionMenuTarget(null);
+              if (actionTarget && !actionTarget.deletedAt) {
+                router.push(exerciseLinkHref(actionTarget.id));
+              }
+            }}
+            testID="exercise-action-link-group"
+          />
+        ) : null}
+        <ListRow
+          accessibilityLabel="View exercise history from actions"
+          label="History"
+          leading={<Icon color={uiRoles.ink} name="list" size="md" />}
+          onPress={() => {
+            setExerciseActionMenuTarget(null);
+            if (actionTarget) router.push(exerciseHistoryHref(actionTarget.id));
+          }}
+          testID="exercise-action-history"
         />
         <ListRow
           accessibilityLabel="Duplicate exercise from actions"
@@ -451,22 +455,6 @@ export default function ExerciseCatalogScreen() {
         />
         {groupLinkingUserId ? (
           <ListRow
-            accessibilityLabel="Link to group exercise from actions"
-            // A soft-deleted exercise is never linked from the UI.
-            disabled={isActionTargetDeleted}
-            label="Link to group exercise…"
-            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}
-            onPress={() => {
-              setExerciseActionMenuTarget(null);
-              if (actionTarget && !actionTarget.deletedAt) {
-                router.push(exerciseLinkHref(actionTarget.id));
-              }
-            }}
-            testID="exercise-action-link-group"
-          />
-        ) : null}
-        {groupLinkingUserId ? (
-          <ListRow
             accessibilityLabel="Share exercise with group member from actions"
             disabled={isActionTargetDeleted}
             label="Share with group member…"
@@ -479,6 +467,15 @@ export default function ExerciseCatalogScreen() {
             testID="exercise-action-share"
           />
         ) : null}
+        <ListRow accessibilityLabel="Merge exercise from actions" label="Merge into…"
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.danger} name="swap" size="md" />}
+          disabled={isActionTargetDeleted} tone="danger" testID="exercise-action-merge"
+          onPress={() => {
+            if (actionTarget && !actionTarget.deletedAt) {
+              setSaveError(null); setSaveFeedback(null);
+              setQueuedMerge(actionTarget); setExerciseActionMenuTarget(null);
+            }
+          }} />
         {isActionTargetDeleted ? (
           <ListRow
             accessibilityLabel="Undelete exercise from actions"

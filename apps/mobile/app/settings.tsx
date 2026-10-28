@@ -3,30 +3,39 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
-import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { effortStatus, experimentsStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
 import { useSyncStatusSnapshot } from '@/components/sync-status/use-sync-status';
 import {
   Card,
+  FigureText,
   Icon,
   ListRow,
   ScreenScroll,
-  TitleBar,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
+// A root-stack page under the native header, keeping the tab bar (More).
+export default function SettingsRoute() {
+  return (
+    <TabOwnedPage>
+      <SettingsScreen />
+    </TabOwnedPage>
+  );
+}
+
 // A list of cards, each an icon, a label and what is set now. Every setting
 // lives on a sub page.
-export default function SettingsScreen() {
+function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const preferences = useAccountLocalPreferenceState();
@@ -38,8 +47,6 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="settings-screen">
-      <TitleBar back={<MoreHubBackButton />} title="Settings" />
-
       <SettingsCard
         accessibilityHint="Opens your account screen"
         icon="user"
@@ -138,15 +145,15 @@ function AboutCard() {
         divider={false}
         leading={<Icon color={uiRoles.inkMuted} name="info" />}>
         <View style={styles.about}>
-          <Text allowFontScaling={false} style={styles.aboutLabel}>About</Text>
+          <Text allowFontScaling={false} style={uiText.title}>About</Text>
           {aboutLines.length > 0 ? (
             aboutLines.map((line) => (
-              <Text allowFontScaling={false} key={line.testID} style={styles.aboutLine} testID={line.testID}>
-                {line.text}
+              <Text allowFontScaling={false} key={line.testID} style={[uiText.body, uiTextTone.muted]} testID={line.testID}>
+                <FigureText>{line.text}</FigureText>
               </Text>
             ))
           ) : (
-            <Text allowFontScaling={false} style={styles.aboutLine}>Release information unavailable</Text>
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Release information unavailable</Text>
           )}
         </View>
       </ListRow>
@@ -161,19 +168,5 @@ const styles = StyleSheet.create({
   about: {
     flex: 1,
     paddingVertical: uiSpace.sm,
-  },
-  aboutLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  aboutLine: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

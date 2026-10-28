@@ -1,3 +1,4 @@
+import { seedStandardCatalogFixture } from './standard-catalog-fixture';
 import { completeSessionDraft, persistSessionDraftSnapshot, upsertLocalGym } from '@/src/data';
 
 const MINUTE_MS = 60 * 1000;
@@ -23,6 +24,7 @@ const BLOCKS = [
 ] as const;
 
 export const seedMuscleReportFixture = async ({ now = new Date() }: { now?: Date } = {}) => {
+  await seedStandardCatalogFixture();
   const { gymId, gymName, sessionId } = MUSCLE_REPORT_FIXTURE;
   await upsertLocalGym({ id: gymId, name: gymName });
   const startedAt = new Date(now.getTime() - 90 * MINUTE_MS);

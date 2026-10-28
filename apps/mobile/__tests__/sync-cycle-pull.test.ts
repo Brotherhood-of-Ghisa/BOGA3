@@ -14,6 +14,8 @@ import {
   applyPullPage,
   createPullDrainTracker,
   finalizePullDrain,
+  readPendingProvisionalMoves,
+  writeCursorAndPendingMoves,
   selectPushBatch,
   BATCH_CAP,
   type WireEntity,
@@ -890,5 +892,85 @@ describe('applyPullPage collision-safe order application and tombstone parking',
     expect(loserAfterPull?.orderIndex).toBe(1);
     expect(loserAfterPull?.localDirty).toBeTruthy();
     expect(loserAfterPull?.localUpdatedAtMs).toBe(loser?.localUpdatedAtMs);
+  });
+
+  it('persists pending provisional moves atomically with cursor across network failure and process restart', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-0', 'plan-1', 0, 100),
+          blockWire('block-a', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const tracker1 = createPullDrainTracker();
+
+    // Page 1 arrives: block-b arrives at slot 1 (displacing clean block-a to slot 2)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+        tracker1,
+      );
+      // Persist cursor and pending moves atomically with page 1
+      writeCursorAndPendingMoves(
+        tx as Transaction,
+        2,
+        { server_received_at: '2026-10-28T10:00:00Z', owner_user_id: 'u1', type: 'session_plan_exercises', id: 'block-b' },
+        Array.from(tracker1.provisionalMoves.values()),
+      );
+    });
+
+    // Verify pending move is persisted in SQLite
+    const persistedBeforeCrash = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    expect(persistedBeforeCrash).toHaveLength(1);
+    expect(persistedBeforeCrash[0].id).toBe('block-a');
+    expect(persistedBeforeCrash[0].type).toBe('session_plan_exercises');
+
+    // Simulate network drop on Page 2 and process restart
+    __resetClockForTests();
+
+    // Next cycle / process restart: create fresh tracker and restore persisted moves from SQLite
+    const tracker2 = createPullDrainTracker();
+    const restored = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    for (const move of restored) {
+      tracker2.provisionalMoves.set(move.id, move);
+    }
+    expect(tracker2.provisionalMoves.has('block-a')).toBe(true);
+
+    // Case 1: Page 2 does NOT deliver block-a; drain finishes
+    database.transaction((tx) => {
+      finalizePullDrain(tx as Transaction, tracker2);
+    });
+
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aFinal?.orderIndex).toBe(2);
+    expect(aFinal?.localDirty).toBeTruthy();
+    expect(Number(aFinal?.localUpdatedAtMs)).toBeGreaterThan(200);
+
+    // Persisted moves are cleared on finalization
+    const persistedAfterFinalize = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    expect(persistedAfterFinalize).toHaveLength(0);
+
+    // Case 2: Verify later-page arrival preserves LWW when server delivers block-a
+    const futureServerStamp = Number(aFinal!.localUpdatedAtMs) + 100;
+    database.transaction((tx) => {
+      // Server delivers block-a at slot 2 with timestamp > aFinal timestamp
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 2, futureServerStamp)],
+        'session_plan_exercises',
+      );
+    });
+
+    const aLww = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aLww?.orderIndex).toBe(2);
+    expect(aLww?.localDirty).toBeFalsy();
+    expect(aLww?.localUpdatedAtMs).toBe(futureServerStamp);
   });
 });

@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 
+jest.unmock('@/src/auth/session-user');
+
 /**
  * Outcome: an UPDATE to an already-synced row, and a SOFT-DELETE, both
  * round-trip through real server-side last-write-wins and are reflected on a

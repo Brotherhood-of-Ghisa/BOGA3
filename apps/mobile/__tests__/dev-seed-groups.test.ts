@@ -7,7 +7,7 @@ import {
   trainingDays,
   rpc,
 } from '../scripts/import/seed-dev-groups';
-import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 
 // Saturday 3 Oct 2026, mid-morning local.
 const NOW = new Date(2026, 9, 3, 10, 30);
@@ -71,8 +71,8 @@ describe('dev groups seed: recent training', () => {
     expect(firstSet('2026-09-28')?.fields.weight_value).toBe('87.5');
   });
 
-  it('logs only starter-catalog exercises, under their catalog names', () => {
-    const catalog = new Map(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise) => [exercise.id, exercise.name]));
+  it('logs only standard-catalog exercises, under their catalog names', () => {
+    const catalog = new Map(STANDARD_EXERCISE_DEFINITION_SEEDS.map((exercise) => [exercise.id, exercise.name]));
 
     for (const trainee of [HISTORY_TRAINEE, B_TRAINEE]) {
       for (const exercise of trainee.rotation.flat()) {

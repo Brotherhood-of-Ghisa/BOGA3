@@ -11,7 +11,7 @@
 // child layer can return rows whose parents the parent layer skipped — the
 // local FK check then rejects the page (`LOCAL_FK_VIOLATION`) on every retry.
 
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 import { type LocalDatabase } from './bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from './clock';
@@ -19,6 +19,7 @@ import { clearExerciseSessionFacts } from './exercise-session-facts';
 import {
   bodyWeightMeasurements,
   exerciseDefinitions,
+  exerciseMergeLocal,
   exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
@@ -79,7 +80,7 @@ export const LOCAL_WIPE_TABLES = [...SYNCED_ENTITY_TABLES, groupCache, syncQuara
  * than deleted, because it carries the device-global monotonic clock; the
  * migrator's bookkeeping table is the schema itself.
  */
-export const LOCAL_WIPE_PRESERVED_TABLES = ['sync_runtime_state', '__drizzle_migrations'] as const;
+export const LOCAL_WIPE_PRESERVED_TABLES = ['sync_runtime_state', '__drizzle_migrations', 'exercise_merge_local'] as const;
 
 export interface LocalWipeOptions {
   /**
@@ -115,6 +116,7 @@ export const wipeLocalDatabaseRows = (database: LocalDatabase, options: LocalWip
     for (const table of LOCAL_WIPE_TABLES) {
       transaction.delete(table).run();
     }
+    transaction.delete(exerciseMergeLocal).where(inArray(exerciseMergeLocal.kind, ['stage', 'state', 'conflicts'])).run();
     clearExerciseSessionFacts(transaction);
 
     const reset = {

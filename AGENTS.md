@@ -20,9 +20,8 @@ place each under `docs/specs/**`, routed from here.
    shared by all worktrees). If a lane has no data, run it; the gate records
    it. Estimating a duration is an error.
 
-3. **Jest always; slower lanes agreed with your reviewer agent** (the
-   operator — the human you are working with — may override when present). Run
-   the agreed lanes to green before opening the PR.
+3. **Jest always; other lanes per your build protocol.** Run the chosen lanes
+   to green before opening the PR.
    `./boga` is the single entrypoint (runnable from anywhere in the repo;
    lanes defined in `scripts/lanes.tsv`; `./boga test --list` shows everything):
 
@@ -52,17 +51,15 @@ place each under `docs/specs/**`, routed from here.
 
    - **Jest is never optional:** every code change adds or updates Jest
      coverage for the behaviour it changes and passes `boga test fast`.
-   - **The table is a default, not a rule.** Before running any lane beyond
-     `boga test fast`, propose a lane set to your reviewer agent — the default
-     lowered or raised by judgement (`cosmetic`, `copy-only`, `test-only`,
-     `docs-only`, `covered-by-jest`; definitions in spec `02`, "Choosing
-     lanes") — and run what you agree.
+   - **The table is a default, not a rule.** Lower or raise it by judgement
+     (`cosmetic`, `copy-only`, `test-only`, `docs-only`, `covered-by-jest`;
+     definitions in spec `02`, "Choosing lanes"); your build protocol says who agrees.
    - **Maestro is minimal.** Run only the lanes whose flows exercise the change.
      Adding a Maestro flow or scenario needs a written justification first (why
      Jest cannot prove it); every flow states what it proves (spec `06`,
      "Maestro scope policy").
-   - **Quality targets — run once before the PR.** Not in CI and not in
-     `boga test fast`, so nothing runs them for you: on the finished change run
+   - **Quality targets — run once before the PR.** Not in CI or
+     `boga test fast`: on the finished change run
      `./boga test jest-coverage`, `./boga test complexity` and
      `./boga test dependencies`, get all three green, and list them in the PR's
      Tests table.
@@ -83,7 +80,7 @@ place each under `docs/specs/**`, routed from here.
        `npm run lint:deps:prune` after you fix one.
      - Meet a target by adding tests, splitting the function or moving the
        code to the layer a rule allows. Lowering a threshold or adding a
-       suppression or baseline entry needs the operator's agreement.
+       suppression or baseline entry needs the operator's (the human you are working with) agreement.
        Details: spec `02`, "Quality targets".
    - **The full sweep** (`./boga sweep --ref <ref>`, every lane in its own
      worktree) is required only before a release build. Otherwise suggest it to
@@ -154,14 +151,12 @@ never a spec of the result: what must outlive the build moves to its owner.
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
+| You have no build protocol (engine run, task card, user instruction), or yours is silent on lanes or on merging | `docs/procedures/build.md` |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
 per-feature coverage policies live next to the tests they govern (e.g.
 `apps/mobile/__tests__/sync/README.md`), not in the specs.
-
-Product and domain details are maintained in the specs above — do not duplicate
-them here.
 
 ## Persistent docs have word budgets
 
@@ -191,9 +186,8 @@ already-applied migrations are exempt (`scripts/plan-ref-exempt.txt`).
 **Task protocol.** When the user wants to plan multi-PR work together, or hands
 you a task card to execute, offer the task protocol in
 [`docs/plans/README.md`](docs/plans/README.md#task-protocol-boga)
-(Claude Code: the user-level `/task-protocol` skill): plan together → one session per task → task-level
-design → build → review agent → PR → user review → merge → offer next cards →
-clean up the worktree and its stack.
+(Claude Code: the user-level `/task-protocol` skill): one session per task,
+from plan to merge and worktree cleanup.
 
 `docs/plans/**` and `docs/brainstorms/**` are working notes, not
 source-of-truth, and may be stale. **Do not read them, and do not let them
@@ -220,8 +214,8 @@ manually written content.
 Follow `.github/pull_request_template.md`: **Objective / Tests / Review hard /
 Deviations**, using data and `file:line` pointers, not prose (~25 lines; link,
 don't quote). **Tests** lists each lane run, result and evidence link ("CI green"
-alone is insufficient), reviewer-agent agreement, and skipped defaults with
-reasons.
+alone is insufficient), the lane agreement your build protocol requires, and
+skipped defaults with reasons.
 Before opening, spawn a separate agent to run
 `docs/procedures/product-review.md` on the branch diff alongside
 `/code-review`; put its verdict on **Tests**' `Product facts:` line.

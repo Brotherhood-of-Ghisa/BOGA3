@@ -1,6 +1,6 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Card, ListRow, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, FigureText, ListRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanDetailView } from '@/src/session-planner';
 
@@ -41,14 +41,14 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
       {detail.blocks.map((block, index) => (
         <Card key={block.id} testID={`plan-detail-block-${index + 1}`}>
           <View style={styles.blockHeader}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={styles.blockTitle}>
+            <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
               {block.name}
             </Text>
-            <Text allowFontScaling={false} style={styles.meta} testID={`plan-detail-block-${index + 1}-state`}>
-              {blockStateWord(block)} · Block {index + 1} of {detail.blocks.length}
+            <Text allowFontScaling={false} style={uiText.meta} testID={`plan-detail-block-${index + 1}-state`}>
+              <FigureText>{`${blockStateWord(block)} · Block ${index + 1} of ${detail.blocks.length}`}</FigureText>
             </Text>
-            <Text allowFontScaling={false} style={styles.targets} testID={`plan-detail-block-${index + 1}-targets`}>
-              {blockTargetsLine(block)}
+            <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
+              <FigureText>{blockTargetsLine(block)}</FigureText>
             </Text>
           </View>
           {block.status === 'pending' ? (
@@ -97,26 +97,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.sm,
-  },
-  blockTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  meta: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  targets: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });

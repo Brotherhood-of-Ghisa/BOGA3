@@ -8,10 +8,10 @@ import {
   Notice,
   SearchField,
   Sheet,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import {
   buildPickSheetModel,
@@ -141,7 +141,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       visible>
       {target.mode === 'choose-linked' ? (
         <>
-          <Text allowFontScaling={false} style={[styles.note, styles.prompt]}>Which of your linked exercises?</Text>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.prompt]}>Which of your linked exercises?</Text>
           <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
             {target.linkedExercises.map((exercise, index) => (
               <ListRow
@@ -158,7 +158,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
         </>
       ) : (
         <>
-          <Text allowFontScaling={false} style={[styles.note, styles.prompt]}>Which of your exercises is this?</Text>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.prompt]}>Which of your exercises is this?</Text>
           <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
             {model?.suggestion ? (
               <RadioRow
@@ -202,11 +202,11 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
                     onPress={() => setOption({ kind: 'other', exerciseId: exercise.id })}
                     testID={`group-pick-sheet-choice-${exercise.id}`}>
                     <View style={styles.choiceText}>
-                      <Text allowFontScaling={false} style={[styles.choiceName, unavailableReason ? styles.faint : null]}>
+                      <Text allowFontScaling={false} style={[uiText.body, unavailableReason ? uiTextTone.faint : null]}>
                         {exercise.name}
                       </Text>
                       {unavailableReason ? (
-                        <Text allowFontScaling={false} style={[styles.detail, styles.faint]}>
+                        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.faint]}>
                           {unavailableReason}
                         </Text>
                       ) : null}
@@ -225,7 +225,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
           </ScrollView>
           <View style={styles.footer}>
             {chosen ? (
-              <Text allowFontScaling={false} style={styles.note} testID="group-pick-sheet-retroactivity">
+              <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-pick-sheet-retroactivity">
                 {describeLinkRetroactivity(chosen.name, target.groupName)}
               </Text>
             ) : null}
@@ -273,11 +273,11 @@ function RadioRow({
       onPress={onPress}
       testID={testID}>
       <View style={styles.choiceText}>
-        <Text allowFontScaling={false} style={styles.optionLabel}>
+        <Text allowFontScaling={false} style={uiText.bodyStrong}>
           {label}
         </Text>
         {detail ? (
-          <Text allowFontScaling={false} style={styles.detail}>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
             {detail}
           </Text>
         ) : null}
@@ -306,40 +306,9 @@ const styles = StyleSheet.create({
   choiceText: {
     paddingVertical: uiSpace.sm,
   },
-  optionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  choiceName: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  detail: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  faint: {
-    color: uiRoles.inkFaint,
-  },
   footer: {
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.md,
-  },
-  note: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

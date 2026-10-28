@@ -26,11 +26,12 @@ import {
   StatePanel,
   Tag,
   uiBorder,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextEmphasis,
+  uiTextTone,
+  FigureText,
   type ChipOption,
 } from '@/components/ui';
 import {
@@ -254,7 +255,7 @@ function HistorySessionCards({ summary, historyStart, onPressSession }: {
       {index === firstOlder ? (
         <View style={styles.olderDivider} testID="exercise-history-older-divider">
           <View style={styles.olderRule} />
-          <Text accessibilityRole="header" allowFontScaling={false} style={styles.olderLabel}>Older sessions</Text>
+          <Text accessibilityRole="header" allowFontScaling={false} style={uiText.meta}>Older sessions</Text>
           <View style={styles.olderRule} />
         </View>
       ) : null}
@@ -280,7 +281,7 @@ function BestCard({
   const topWeight = best.topWeight;
   return (
     <Card testID="exercise-history-best-card">
-      <Text allowFontScaling={false} style={styles.cardLabel} testID="exercise-history-best-label">
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.cardLabel]} testID="exercise-history-best-label">
         {gymLabel ? `All-time bests · ${gymLabel}` : 'All-time bests'}
       </Text>
       <BestRow
@@ -328,11 +329,11 @@ function BestRow({
         <View style={styles.bestFigures}>
           <Text
             allowFontScaling={false}
-            style={[styles.bestValue, date ? null : styles.bestValueEmpty]}
+            style={[uiText.figureLarge, date ? uiTextTone.record : uiTextTone.faint]}
             testID={`${testID}-value`}>
             {value}
           </Text>
-          {date ? <Text allowFontScaling={false} style={styles.bestDate}>{date}</Text> : null}
+          {date ? <Text allowFontScaling={false} style={uiText.meta}><FigureText>{date}</FigureText></Text> : null}
         </View>
       }
       onPress={onPress}
@@ -381,14 +382,13 @@ function SessionCard({
       accessibilityLabel={`Open session from ${date}`}
       count={`${entry.workingSetCount} ${entry.workingSetCount === 1 ? 'set' : 'sets'}`}
       name={date}
-      nameFace="figure"
       onPress={onPress}
       record={cardRecordBand(record, entry.sessionExerciseId)}
       rowTestID={(row) => `exercise-history-set-row-${row.id}`}
       rows={rows}
       summary={
         <View style={styles.sessionSummary}>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.gym}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextEmphasis.strong]}>
             {entry.gymName?.trim() ? entry.gymName : 'No gym'}
           </Text>
           {tags.length > 0 ? (
@@ -576,13 +576,6 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
   },
   olderRule: { flex: 1, height: uiBorder.width, backgroundColor: uiRoles.rule },
-  olderLabel: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
   // A chip row is as tall as its chips: a ScrollView grows by default, and
   // inside the page's scroll that stretched them into circles.
   chipScroll: {
@@ -599,46 +592,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
   },
   bestFigures: {
     alignItems: 'flex-end',
-  },
-  bestValue: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.record,
-  },
-  bestValueEmpty: {
-    fontWeight: '500',
-    color: uiRoles.inkFaint,
-  },
-  bestDate: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   sessionSummary: {
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.sm,
-  },
-  gym: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   tags: {
     flexDirection: 'row',

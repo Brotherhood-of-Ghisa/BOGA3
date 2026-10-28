@@ -13,16 +13,16 @@ for the how (fix the doc when they disagree):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 4`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 5`
 (see `sync_push`, "Update-required cutoff").
 
 ---
 
 # Part A — Server schema
 
-The server is a typed mirror: one `app_public.<entity>` table per client
-Drizzle table (`apps/mobile/src/data/schema/`), no projection, no event log,
-written only through `sync_push`.
+The server mirrors typed entities. For protocol-5 protected revisions, selective push outcomes,
+sequence discovery and atomic merge/recovery RPCs, load
+[`exercise-merge-contract.md`](exercise-merge-contract.md).
 
 ## Ground rules
 
@@ -42,9 +42,7 @@ written only through `sync_push`.
   - Domain columns are nullable wherever the client may write NULL. Only the
     structural columns (PK, `owner_user_id`, `client_updated_at_ms`) are
     NOT NULL.
-  - No content-validating triggers, except the planning provenance triggers
-    (see "Per-entity rules"): Sync v2's other triggers are the two structural
-    ones (group triggers follow "Out of scope").
+  - Provenance guards and merge revision fences supplement structural triggers; group triggers follow "Out of scope".
   - No uniqueness beyond the PK, except the three planning provenance guards
     (`sessions_owner_source_plan_unique`,
     `session_exercises_owner_source_block_unique`,

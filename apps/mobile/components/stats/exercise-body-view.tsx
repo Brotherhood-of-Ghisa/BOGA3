@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiSpace, uiText } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -30,7 +30,7 @@ export function ExerciseBodyView({
   return <View style={styles.body}>
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedMuscleId} onSelect={onSelectMuscle} report={report} />
     {selectedMuscle ? <View testID="stats-exercise-body-detail" style={styles.detail}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selectedMuscle.displayName}</Text>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>{selectedMuscle.displayName}</Text>
       {renderDetail(selectedMuscle.exercises, selectedMuscle.secondary)}
     </View> : renderAll()}
   </View>;
@@ -39,6 +39,4 @@ export function ExerciseBodyView({
 const styles = StyleSheet.create({
   body: { gap: uiSpace.lg },
   detail: { gap: uiSpace.sm },
-  heading: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
 });

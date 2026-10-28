@@ -194,7 +194,7 @@ export const useSessionExerciseDraft = ({
     await autosave.dispose({ flushDirty: false });
     await saveSessionExerciseDraft(
       sessionId,
-      { sessionExerciseId, exercise: null, sessionStatus: live.sessionStatus },
+      { sessionExerciseId, exercise: null, mergeRevision: live.exercise?.mergeRevision ?? 0, sessionStatus: live.sessionStatus },
       client
     );
   }, [autosave, client, live, sessionExerciseId, sessionId]);

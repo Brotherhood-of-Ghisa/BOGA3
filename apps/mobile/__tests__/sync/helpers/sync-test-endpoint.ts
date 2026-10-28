@@ -104,6 +104,7 @@ type AnySupabaseClient = {
       data: { session: { access_token: string; user: { id: string } } | null };
       error: { message: string } | null;
     }>;
+    getSession: () => Promise<{ data: { session: { access_token: string; user: { id: string } } | null } }>;
     signOut: () => Promise<unknown>;
   };
   schema: (name: string) => {
@@ -165,9 +166,10 @@ export const createAuthedTestClient = async (
 
   const client = createClient(config.url, config.anonKey, {
     auth: NO_TIMER_AUTH,
-    global: { headers: { 'x-boga-sync-protocol': '4', Authorization: `Bearer ${jwt}` } },
+    global: { headers: { 'x-boga-sync-protocol': '5', Authorization: `Bearer ${jwt}` } },
   });
 
+  client.auth.getSession = () => authClient.auth.getSession();
   return {
     client,
     jwt,

@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ListRow, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, ListRow, uiRoles, uiSpace, uiText, uiTextEmphasis } from '@/components/ui';
 import { UNCERTIFIED_MARK_LABEL, type BoardRowViewModel } from '@/src/groups';
 
 import { GroupCertificationStatus } from './certification-status';
+import { scoreStyle } from './score-style';
 import { cardListItemStyles } from './screen-styles';
 
 type GroupBoardRowProps = {
@@ -31,17 +32,17 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
         density="list"
         divider={index > 0}
         leading={
-          <Text allowFontScaling={false} style={styles.rank}>
+          <Text allowFontScaling={false} style={[uiText.figureLarge, styles.rank]}>
             {row.rankLabel}
           </Text>
         }
         meta={
           <View style={styles.meta}>
-            <Text allowFontScaling={false} style={styles.value} testID={`${testID}-value`}>
+            <Text allowFontScaling={false} style={scoreStyle(row.valueLabel, 'base')} testID={`${testID}-value`}>
               {row.valueLabel}
             </Text>
             <View style={styles.dateLine}>
-              <Text allowFontScaling={false} style={styles.date} testID={`${testID}-date`}>
+              <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-date`}>
                 {row.dateLabel}
               </Text>
               {row.certification ? (
@@ -63,13 +64,13 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={[styles.member, row.isMe ? styles.memberMine : null]}
+            style={[uiText.body, row.isMe ? uiTextEmphasis.strong : null]}
             testID={`${testID}-member`}>
             {row.memberLabel}
           </Text>
           {row.detailLabel ? (
-            <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>
-              {row.detailLabel}
+            <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-detail`}>
+              <FigureText>{row.detailLabel}</FigureText>
             </Text>
           ) : null}
         </View>
@@ -84,53 +85,17 @@ const styles = StyleSheet.create({
   },
   rank: {
     minWidth: 24,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
   body: {
     paddingVertical: uiSpace.xs,
-  },
-  member: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  memberMine: {
-    fontWeight: '600',
-  },
-  detail: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   meta: {
     alignItems: 'flex-end',
     paddingVertical: uiSpace.xs,
   },
-  value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
   dateLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
-  },
-  date: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

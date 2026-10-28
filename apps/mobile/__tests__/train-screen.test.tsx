@@ -30,7 +30,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
-import { uiRoles } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import * as sessionDrafts from '@/src/data/session-drafts';
 import * as sessionList from '@/src/data/session-list';
 import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
@@ -226,6 +226,9 @@ describe('Train over real data', () => {
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
 
     expect(await screen.findByTestId('train-empty-launch-error')).toHaveTextContent("Couldn't start. Try again.");
+    expect(StyleSheet.flatten(screen.getByTestId('train-empty-launch-error').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger, textAlign: 'center',
+    });
     expect(await activeSessionId()).toBeNull();
 
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
@@ -240,6 +243,17 @@ describe('Train over real data', () => {
 
     expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Start');
     expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Upper bodyBench pressStart');
+    // The plan reads as a list row: a micro-label above, its title in
+    // bodyStrong and its detail in meta.
+    expect(StyleSheet.flatten(screen.getByText('Planned').props.style)).toMatchObject({
+      fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase',
+    });
+    expect(StyleSheet.flatten(screen.getByText('Upper body').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base,
+    });
+    expect(StyleSheet.flatten(screen.getByText('Bench press').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted,
+    });
     fireEvent.press(screen.getByRole('button', { name: 'Start Upper body' }));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/planned-session'));
@@ -258,6 +272,9 @@ describe('Train over real data', () => {
     expect(await screen.findByTestId('train-planned-launch-error')).toHaveTextContent(
       "Couldn't start this plan. Try again.",
     );
+    expect(StyleSheet.flatten(screen.getByTestId('train-planned-launch-error').props.style)).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger, textAlign: 'center',
+    });
     expect(isBusy()).toBe(false);
     expect(await activeSessionId()).toBeNull();
   });

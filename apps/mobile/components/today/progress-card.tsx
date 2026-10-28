@@ -18,30 +18,27 @@ export type TodayProgressCardProps = {
   onShowCompared?: (periodsBack: number) => void;
   /** Shows the completed session this many places before the latest. */
   onShowSession?: (offset: number) => void;
-  /** The cards layout: the progress card takes the height the session card leaves, the chart filling it. */
-  fill?: boolean;
 };
 
 // Today's You page: the progress card (this week against last week, the
 // period against the previous period, or an earlier one, day by day) over
 // the session card (the latest session, or an earlier one stepped back to).
+// The progress card takes the height the session card leaves, the chart filling it.
 export function TodayProgressCard({
   progress,
   onOpenSession,
   onOpenSessions,
   onShowCompared,
   onShowSession,
-  fill = false,
 }: TodayProgressCardProps) {
   return (
-    <View style={[styles.stack, fill ? styles.fill : null]}>
-      <Card style={[styles.card, fill ? styles.fillProgress : null]} testID="today-progress-card">
+    <View style={[styles.stack, styles.fill]}>
+      <Card style={[styles.card, styles.fillProgress]} testID="today-progress-card">
         <WeekFigures week={progress.week} />
         <View style={styles.divider} />
-        <PeriodPace fill={fill} onShowCompared={onShowCompared} period={progress.period} />
+        <PeriodPace onShowCompared={onShowCompared} period={progress.period} />
       </Card>
       <TodaySessionCard
-        fill={fill}
         hasOlderSession={progress.hasOlderSession}
         offset={progress.latestOffset}
         onOpenSession={onOpenSession}

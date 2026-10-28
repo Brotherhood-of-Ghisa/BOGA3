@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EMPTY_SESSION_WEIGHT, isValidSessionWeight } from '@/src/bodyweight/weight-entry';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
-import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import { useOpenExerciseEditor } from '@/components/exercise-catalog/exercise-editor-request';
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -24,6 +24,7 @@ import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
 import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -31,6 +32,7 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { resolveRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { exerciseHistoryHref, exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
 import { loadOwnBookGymId } from '@/src/data/exercise-session-facts';
 import { exerciseHistoryOpeningGym } from '@/src/session-recorder/exercise-history-view';
@@ -51,6 +53,7 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
+import { buildExerciseSwitcherRows } from '@/src/session-recorder/exercise-switcher';
 import { useSessionRestTimer } from '@/src/session-recorder/rest-timer';
 import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
@@ -59,12 +62,11 @@ import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 
-import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
+import { EffortSheet, ExerciseOptionsSheet, ExerciseSwitcherSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
-import { pageText } from './text-styles';
 
 type ExercisePageScreenProps = {
   sessionId: string;
@@ -74,7 +76,7 @@ type ExercisePageScreenProps = {
   loadRecords?: LoadExerciseRecords;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
+type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'switcher';
 
 const LOAD_ERROR_MESSAGES = {
   'missing-session': 'This session no longer exists.',
@@ -151,6 +153,23 @@ export function ExercisePageScreen({
     ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
     : null;
   const [recordsRevision, setRecordsRevision] = useState(0);
+  const openExerciseEditor = useOpenExerciseEditor();
+  // The editor page opens over this one, which stays mounted beneath it.
+  const openEditor = () => {
+    setOpenSheet('none');
+    if (!editingExercise) return;
+    openExerciseEditor({
+      exerciseDefinitionId: editingExercise.id,
+      onSaved: (saved) => {
+        // Review may have converted sets outside this page's draft. Reload
+        // them before any graph autosave can write the older values back.
+        void draft.reload().then(loaded => {
+          setRecordsRevision(value => value + 1);
+          if (loaded) draft.update((current) => ({ ...current, name: saved.name }), 'structural');
+        });
+      },
+    });
+  };
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
@@ -210,6 +229,14 @@ export function ExercisePageScreen({
     else router.replace(FALLBACK_BACK_ROUTE);
   }, [router]);
 
+  // Replace, never push: Back from any exercise reached this way returns to
+  // the session in one step. The switch itself writes nothing; leaving the
+  // page saves pending edits exactly as Back does.
+  const switchExercise = (targetId: string) => {
+    setOpenSheet('none');
+    if (targetId !== sessionExerciseId) router.replace(sessionExerciseHref(sessionId, targetId));
+  };
+
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
   const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
   const loadContext = personalCalculationContext(
@@ -225,6 +252,8 @@ export function ExercisePageScreen({
   const recordSession = exercise && draft.state.status === 'ready'
     ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
   const rows = buildSetRows(sets, baseline, loadContext, recordSession);
+  const switcherRows = exercise && draft.state.status === 'ready'
+    ? buildExerciseSwitcherRows(draft.state.sessionBlocks, exercise) : [];
   const recordLines = recordBandFor(sets, baseline, loadContext, recordSession);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
@@ -441,6 +470,7 @@ export function ExercisePageScreen({
       <ExerciseTopBar
         onBack={goBack}
         onOpenOptions={() => setOpenSheet('options')}
+        onOpenSwitcher={() => setOpenSheet('switcher')}
         onToggleRestTimer={restTimer.toggleForSession}
         restTimerActive={restTimer.isActive}
         titleBarTimer={timerHost.titleBarTimer}
@@ -512,14 +542,14 @@ export function ExercisePageScreen({
               ]}
               testID="exercise-add-set">
               <Icon color={uiRoles.ink} name="plus" size="xs" />
-              <Text allowFontScaling={false} style={pageText.controlLabel}>Add set</Text>
+              <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Add set</Text>
             </Pressable>
           </Card>
           {draft.saveError ? (
             <Text
               allowFontScaling={false}
               accessibilityLiveRegion="polite"
-              style={[pageText.body, styles.saveError]}
+              style={[uiText.body, uiTextTone.danger]}
               testID="exercise-save-error">
               {`Not saved: ${draft.saveError}`}
             </Text>
@@ -533,7 +563,7 @@ export function ExercisePageScreen({
             onPress={onComplete}
             style={({ pressed }) => [styles.complete, pressed ? styles.pressed : null]}
             testID="exercise-complete">
-            <Text allowFontScaling={false} style={pageText.controlLabel}>Complete exercise</Text>
+            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Complete exercise</Text>
           </Pressable>
         </ScreenScroll>
       </KeyboardAvoidingView>
@@ -550,7 +580,7 @@ export function ExercisePageScreen({
           exercise.sourcePlanExerciseId != null && blockStatus !== 'resolved' ? onCompleteBlock : undefined
         }
         onDismiss={() => setOpenSheet('none')}
-        onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}
+        onEdit={() => { void draft.flush().then(saved => { if (saved) openEditor(); }); }}
         onLink={
           groupLinkingUserId && exercise.exerciseDefinitionId
             ? () => {
@@ -569,6 +599,16 @@ export function ExercisePageScreen({
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}
       />
+      <ExerciseSwitcherSheet
+        onDismiss={() => setOpenSheet('none')}
+        onOpenSession={() => {
+          setOpenSheet('none');
+          goBack();
+        }}
+        onSelect={switchExercise}
+        rows={switcherRows}
+        visible={openSheet === 'switcher'}
+      />
       <ExerciseSwapSheet
         currentExerciseDefinitionId={exercise.exerciseDefinitionId}
         onDismiss={() => setOpenSheet('none')}
@@ -584,20 +624,6 @@ export function ExercisePageScreen({
           );
         }}
         visible={openSheet === 'swap'}
-      />
-      <ExerciseEditorModal
-        editingExercise={editingExercise}
-        onRequestClose={() => setOpenSheet('none')}
-        onSaved={(saved) => {
-          // Review may have converted sets outside this page's draft. Reload
-          // them before any graph autosave can write the older values back.
-          void draft.reload().then(loaded => {
-            setRecordsRevision(value => value + 1);
-            if (loaded) draft.update((current) => ({ ...current, name: saved.name }), 'structural');
-            setOpenSheet('none');
-          });
-        }}
-        visible={openSheet === 'edit' && editingExercise !== null}
       />
     </SafeAreaView>
   );
@@ -625,9 +651,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     backgroundColor: uiRoles.paper,
-  },
-  saveError: {
-    color: uiRoles.danger,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

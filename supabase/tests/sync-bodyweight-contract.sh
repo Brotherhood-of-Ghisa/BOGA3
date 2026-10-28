@@ -87,7 +87,7 @@ for bw_layer in 0 1 2 3 4; do
   esac
   assert_json_expr --argjson expected "${BW_BODY}" --argjson types "${bw_expected_types}" \
     '.entities as $rows | all($expected.entities[] | select(.type as $t | $types | index($t));
-      . as $e | any($rows[]; .id == $e.id and .type == $e.type and .fields == $e.fields))' \
+      . as $e | ($e.fields + (if (["session_exercises","exercise_sets","session_exercise_tags"] | index($e.type)) then {merge_revision:0} else {} end)) as $fields | any($rows[]; .id == $e.id and .type == $e.type and .fields == $fields))' \
     "all current bodyweight fields round-trip layer ${bw_layer}"
 done
 

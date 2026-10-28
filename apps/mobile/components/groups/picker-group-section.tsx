@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
 /**
@@ -22,7 +23,7 @@ export function PickerGroupSectionList({
   }
   return (
     <View style={styles.section} testID="exercise-picker-group-section">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         From your groups
       </Text>
       {sections.map((section) => (
@@ -36,11 +37,11 @@ export function PickerGroupSectionList({
               onPress={() => onPressRow(row)}
               testID={`exercise-picker-group-row-${row.groupExercise.group_exercise_id}`}>
               <View style={styles.rowText}>
-                <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
+                <Text allowFontScaling={false} numberOfLines={2} style={uiText.bodyStrong}>
                   {row.groupExercise.name}
-                  <Text allowFontScaling={false} style={styles.groupName}> · {row.groupName}</Text>
+                  <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}> · {row.groupName}</Text>
                 </Text>
-                <Text allowFontScaling={false} numberOfLines={1} style={styles.status}>
+                <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
                   {row.statusLabel}
                 </Text>
               </View>
@@ -74,35 +75,7 @@ const styles = StyleSheet.create({
   section: {
     gap: uiSpace.sm,
   },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   rowText: {
     paddingVertical: uiSpace.sm,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  groupName: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    color: uiRoles.inkMuted,
-  },
-  status: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
   },
 });

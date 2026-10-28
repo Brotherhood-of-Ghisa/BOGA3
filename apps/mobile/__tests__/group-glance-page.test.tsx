@@ -10,6 +10,7 @@ import { StyleSheet } from 'react-native';
 import { Circle, Svg } from 'react-native-svg';
 
 import { GROUP_GLANCE_HOLD_FADE_DELAY_MS, GroupGlancePage } from '@/components/groups/group-glance-page';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { GroupApiError } from '@/src/groups/api';
 import {
   GROUP_HOME_BOARD_SIZE,
@@ -283,5 +284,50 @@ describe('At a glance: the group total', () => {
 
     expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 wk before');
     expect(byId('group-week-totals-prs').props.accessibilityLabel).toBe('PRs 7, vs 9 the week before');
+  });
+});
+
+// The shared text roles (`design-language.md` §3, "Text roles"): names in the
+// body face, my own one step heavier; figures in Plex Mono; words never in it.
+describe('At a glance: text roles', () => {
+  const body = { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
+  const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.sm };
+
+  it('titles the period and labels its range', () => {
+    renderPage();
+
+    expect(byId('group-home-period-title')).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
+    expect(byId('group-home-period-detail')).toHaveStyle({ textTransform: 'uppercase', color: uiRoles.inkFaint });
+  });
+
+  it('draws board names as body and figures as small ink figures', () => {
+    renderPage({ metric: 'prs' });
+
+    expect(byId('group-home-board-row-marco-name')).toHaveStyle({ ...body, fontWeight: '400' });
+    expect(byId(`group-home-board-row-${ME}-name`)).toHaveStyle({ ...body, fontWeight: '600' });
+    expect(byId('group-home-board-row-marco-rank')).toHaveStyle({ ...figureSmall, color: uiRoles.inkMuted });
+    expect(byId('group-home-board-row-luca-value')).toHaveStyle({ ...figureSmall, color: uiRoles.ink });
+    // A PR count above zero is a record: the record colour, drawn heavy.
+    expect(byId(`group-home-board-row-${ME}-value`)).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '700', color: uiRoles.record });
+  });
+
+  it('keeps my closing line in words, with only my place in the figure face', () => {
+    renderPage();
+
+    const line = byId('group-home-board-me-label');
+    expect(line).toHaveStyle(body);
+    expect(within(line).getByText('You')).toHaveStyle({ fontWeight: '600' });
+    // `6th`: the digit in Plex Mono, the suffix stays in the line's body face.
+    expect(within(line).getByText('6')).toHaveStyle({ fontFamily: uiFonts.figure.family });
+    expect(line).toHaveTextContent('You · 6th');
+  });
+
+  it('draws the rank table the same way: body names, small ink figures', () => {
+    renderPage();
+
+    const mine = byId(`group-rank-table-row-${ME}`);
+    expect(within(mine).getByText('You')).toHaveStyle({ ...body, fontWeight: '600' });
+    expect(within(byId('group-rank-table-row-marco')).getByText('Marco')).toHaveStyle({ ...body, fontWeight: '400' });
+    expect(byId(`group-rank-table-row-${ME}-sets`)).toHaveStyle({ ...figureSmall, color: uiRoles.ink });
   });
 });

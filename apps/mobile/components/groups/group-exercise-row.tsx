@@ -1,7 +1,7 @@
 import type { Ref } from 'react';
 import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
-import { ActionButton, Icon, ListRow, Tag, uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Icon, ListRow, Tag, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { GroupExerciseRowViewModel } from '@/src/groups';
 
 type GroupExerciseRowProps = {
@@ -53,14 +53,14 @@ export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending
         testID={`group-exercise-row-${id}`}
         trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" /> : undefined}>
         <View style={styles.text}>
-          <Text allowFontScaling={false} style={styles.name} testID={`group-exercise-name-${id}`}>
+          <Text allowFontScaling={false} style={uiText.bodyStrong} testID={`group-exercise-name-${id}`}>
             {row.name}
           </Text>
-          <Text allowFontScaling={false} style={styles.meta} testID={`group-exercise-load-mode-${id}`}>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={`group-exercise-load-mode-${id}`}>
             {row.loadInputModeLabel}
           </Text>
           {row.linkStatus ? (
-            <Text allowFontScaling={false} style={styles.meta} testID={`group-exercise-link-status-${id}`}>
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={`group-exercise-link-status-${id}`}>
               {row.linkStatus}
             </Text>
           ) : null}
@@ -103,20 +103,6 @@ const styles = StyleSheet.create({
   },
   text: {
     paddingVertical: uiSpace.sm,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  meta: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   textAction: {
     alignItems: 'flex-start',

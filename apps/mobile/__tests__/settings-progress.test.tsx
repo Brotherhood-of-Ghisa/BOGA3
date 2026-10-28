@@ -23,6 +23,7 @@ import {
 } from '@/components/settings/sub-pages';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
@@ -57,6 +58,30 @@ const editNumber = (id: string, value: string) => {
 };
 beforeEach(() => { mockUserId = 'A'; resetLocalData(); });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
+
+const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+
+it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
+  await openSettings();
+  for (const label of ['Progress view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
+    expect(screen.getByText(label)).toHaveStyle(LABEL);
+  }
+  // Auto-start is a form card's switch row under the `Rest timer` section heading.
+  expect(screen.getByRole('switch', { name: 'Auto-start rest timer' })).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: 'Rest timer' })).toHaveStyle(LABEL);
+  const effort = within(screen.getByTestId('settings-effort-selections'));
+  expect(effort.getByText('Effort')).toHaveStyle(LABEL);
+  expect(effort.getByText('Volume')).toHaveStyle(LABEL);
+  expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+});
+
+it('labels the Other page controls as micro-labels', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<OtherSettingsScreen />);
+  expect(screen.getByText('Date format')).toHaveStyle(LABEL);
+  expect(screen.getByText('Past records gym filter')).toHaveStyle(LABEL);
+});
 
 const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');
@@ -278,12 +303,13 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
 it('edits rest timer auto-start and duration on its page and surfaces invalid durations in the centralized error flow', async () => {
   await openSettings();
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
-  expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: false });
+  // On/off is a switch row, not a two-choice control (`ux-rules.md` "Forms").
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityRole', 'switch');
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: true });
 
-  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start-off'));
+  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start'));
   expect(values().restTimerAutoStart).toBe(false);
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: false });
 
   editNumber('settings-rest-timer-duration', '150');
   expect(values().restTimerDurationSec).toBe(150);
@@ -327,20 +353,6 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
 
-it('switches Today between List and Cards on Experiments, saved per account', async () => {
-  setAccountLocalPreferenceAccount('A', true);
-  await ensureAccountLocalPreferencesLoaded();
-  render(<ExperimentsSettingsScreen />);
-  const selector = within(screen.getByTestId('settings-today-layout-row'));
-  expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['Show Today as a list', 'Show Today as cards']);
-  expect(values().todayLayout).toBe('list');
-  fireEvent.press(screen.getByTestId('settings-today-layout-cards'));
-  expect(values().todayLayout).toBe('cards');
-  expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout')).toBe('cards');
-  fireEvent.press(screen.getByTestId('settings-today-layout-list'));
-  expect(values().todayLayout).toBe('list');
-});
-
 it('turns the title-bar timer on and off on Experiments, off by default and saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
@@ -355,10 +367,15 @@ it('turns the title-bar timer on and off on Experiments, off by default and save
   expect(values().timerInTitleBar).toBe(false);
 });
 
-it('keeps Today layout off Other, which now holds only the date and gym filters', async () => {
+// Today is always cards, so neither page offers a Today layout.
+it('offers no Today layout on Experiments or Other', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
+  render(<ExperimentsSettingsScreen />);
+  expect(screen.getByTestId('settings-timer-in-title-bar')).toBeTruthy();
+  expect(screen.queryByText('Today layout')).toBeNull();
+  screen.unmount();
   render(<OtherSettingsScreen />);
   expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
-  expect(screen.queryByTestId('settings-today-layout-row')).toBeNull();
+  expect(screen.queryByText('Today layout')).toBeNull();
 });

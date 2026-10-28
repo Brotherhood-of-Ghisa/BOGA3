@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { SessionInsightPresentation, type SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
 import { ActionButton } from '@/components/ui/action-button';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type {
   CurrentSessionMuscleSummary, ExerciseVolumeComparison, SessionMuscleWorkingSetEntry,
 } from '@/src/session-insights';
@@ -21,10 +22,10 @@ const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
   `${muscle.displayName}, ${formatCount(muscle.weightedSetCount, 'set')}: ` +
   `${muscle.primarySetCount} primary, ${muscle.secondarySetCount} secondary`;
 
-// A role with no sets is an absent value: a dash in `ink-ghost`.
+// A role with no sets is an absent value: a dash in `faint`.
 function RoleCount({ count }: { count: number }) {
   return (
-    <Text allowFontScaling={false} style={[styles.count, styles.countCell, count === 0 && styles.absent]}>
+    <Text allowFontScaling={false} style={[uiText.figure, count === 0 ? uiTextTone.faint : uiTextTone.muted, styles.countCell]}>
       {count === 0 ? '—' : String(count)}
     </Text>
   );
@@ -43,13 +44,13 @@ export function SessionMuscleBreakdown({
     <>
       {workingSetCount > 0 ? (
         <View style={[styles.muscles, standalone && styles.standaloneMuscles]} testID="session-completion-muscle-breakdown">
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.cardTitle}>Sets by muscle</Text>
+          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>Sets by muscle</Text>
           {workingSetsByMuscle.length > 0 ? (
             <View testID="session-completion-muscle-table">
               <View style={styles.tableRow}>
-                <Text allowFontScaling={false} style={[styles.microLabel, styles.nameCell]}>Muscle</Text>
+                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.nameCell]}>Muscle</Text>
                 {MUSCLE_TABLE_COLUMNS.map((column) => (
-                  <Text allowFontScaling={false} key={column} style={[styles.microLabel, styles.countCell]}>{column}</Text>
+                  <Text allowFontScaling={false} key={column} style={[uiText.label, uiTextTone.faint, styles.countCell]}>{column}</Text>
                 ))}
               </View>
               {workingSetsByMuscle.map((muscle) => (
@@ -59,17 +60,17 @@ export function SessionMuscleBreakdown({
                   key={muscle.id}
                   style={[styles.tableRow, styles.bodyRow]}
                   testID={`session-completion-muscle-${muscle.id}`}>
-                  <Text allowFontScaling={false} style={[styles.muscleName, styles.nameCell]}>{muscle.displayName}</Text>
+                  <Text allowFontScaling={false} style={[uiText.bodyStrong, styles.nameCell]}>{muscle.displayName}</Text>
                   <RoleCount count={muscle.primarySetCount} />
                   <RoleCount count={muscle.secondarySetCount} />
-                  <Text allowFontScaling={false} style={[styles.count, styles.countCell, styles.total]}>
+                  <Text allowFontScaling={false} style={[uiText.figure, styles.countCell]}>
                     {String(muscle.weightedSetCount)}
                   </Text>
                 </View>
               ))}
             </View>
           ) : (
-            <Text allowFontScaling={false} style={styles.muted} testID="session-completion-muscle-empty-state">
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="session-completion-muscle-empty-state">
               {muscleCatalogState === 'loading'
                 ? 'Loading muscle breakdown…'
                 : muscleCatalogState === 'error'
@@ -105,7 +106,7 @@ export function SessionSummaryContent({
     <>
       {personalRecords.length > 0 ? (
         <View style={styles.section} testID="session-completion-personal-records">
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
             Personal records
           </Text>
           {personalRecords.map((personalRecord) => (
@@ -157,31 +158,6 @@ const styles = StyleSheet.create({
   section: {
     gap: uiSpace.sm,
   },
-  heading: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  // A card's own title: Archivo 700 at `md` in `ink`, a step below the
-  // page's `lg` section headings and clear of the micro-label column heads.
-  cardTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   muscles: {
     marginHorizontal: uiSpace.md,
     paddingTop: uiSpace.sm,
@@ -210,33 +186,5 @@ const styles = StyleSheet.create({
   countCell: {
     width: uiGeometry.metricValueWidth,
     textAlign: 'right',
-  },
-  muscleName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  count: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  total: {
-    fontWeight: '600',
-    color: uiRoles.ink,
-  },
-  absent: {
-    color: uiRoles.inkGhost,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

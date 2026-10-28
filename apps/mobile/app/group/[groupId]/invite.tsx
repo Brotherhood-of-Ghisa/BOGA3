@@ -13,10 +13,8 @@ import {
   ActionButton,
   Card,
   ScreenScroll,
-  uiFonts,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -139,11 +137,11 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
           allowFontScaling={false}
           accessibilityLabel={`Invite code ${code.split('').join(' ')}`}
           selectable
-          style={styles.code}
+          style={[uiText.figureHero, styles.code]}
           testID="group-invite-code">
           {code}
         </Text>
-        <Text allowFontScaling={false} selectable style={styles.link} testID="group-invite-link">
+        <Text allowFontScaling={false} selectable style={[uiText.meta, styles.link]} testID="group-invite-link">
           {groupInviteLink(code)}
         </Text>
       </>
@@ -160,7 +158,7 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
   return (
     <ScreenScroll testID="group-invite-screen">
       <Card style={styles.card}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
           {groupName ? `Invite friends to ${groupName}` : 'Invite friends'}
         </Text>
         {codeArea}
@@ -184,30 +182,11 @@ const styles = StyleSheet.create({
     padding: uiSpace.md,
     gap: uiSpace.sm,
   },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  // A figure: Plex Mono 700, spaced so each character reads apart.
   code: {
     paddingVertical: uiSpace.md,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxl,
-    lineHeight: uiTypography.lineHeight.xxl,
-    letterSpacing: uiSpace.xs,
     textAlign: 'center',
-    color: uiRoles.ink,
   },
   link: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
     textAlign: 'center',
-    color: uiRoles.inkMuted,
   },
 });

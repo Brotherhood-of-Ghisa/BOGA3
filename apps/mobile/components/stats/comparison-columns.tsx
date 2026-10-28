@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { changeToneColour, uiBorder, uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui';
+import { changeToneColour, FigureText, uiBorder, uiGeometry, uiIconSize, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ProgressExerciseMetric } from '@/src/preferences/model';
@@ -20,7 +20,7 @@ import {
 // they still fit beside the row's name. Both tables put spoken header
 // labels or shared sort controls over them; neither owns the
 // columns, and a figure means the same thing in both. Muscle List pairs the
-// periods in one column under `Now` — Sets on one line as `12 (10)`, the wider
+// periods in one column under `Now (Prev)` — Sets on one line as `12 (10)`, the wider
 // Volume figures one over the other; Exercise and 3D keep three separate columns.
 
 /** The figure the columns show. 1RM is a metric only an exercise has. */
@@ -82,17 +82,6 @@ export const comparisonFigures = (row: ComparisonRow, metric: ComparisonMetric):
 /** Paired periods share one line where the figures are short enough: Sets. */
 const inlinePeriods = (metric: ComparisonMetric): boolean => metric === 'workingSetCount';
 const inlinePeriodsText = (figures: { now: string; previous: string }): string => `${figures.now} (${figures.previous})`;
-
-/**
- * The columns of a table pairing its periods: with Sets on one line, the
- * first column is as wide as its widest `now (previous)` and its sort arrow.
- * Uncapped: a count pair (`123 (100)`) still leaves the name its room.
- */
-export const pairedPeriodColumns = (columns: number[], rows: ComparisonRow[], metric: ComparisonMetric): number[] =>
-  inlinePeriods(metric)
-    ? [statsTableColumnWidth(COLUMN_LABELS[0], rows.map(row => inlinePeriodsText(comparisonFigures(row, metric))),
-      uiIconSize.xs + uiSpace.xs), ...columns.slice(1)]
-    : columns;
 
 /** The same three figures as text, in column order — what a column reserves room for. */
 export const comparisonColumnTexts = (row: ComparisonRow, metric: ComparisonMetric): string[] => {
@@ -172,6 +161,21 @@ export const resolveComparisonLayout = (
   return { columns, stacked: nameRoom < uiGeometry.tapTarget + uiSpace.xl };
 };
 
+/** Muscle List shares one width budget across metrics, keeping its history in place. */
+export const resolvePairedComparisonLayout = (width: number, rows: ComparisonRow[]): ComparisonLayout => {
+  const sets = resolveComparisonLayout(width, rows, 'workingSetCount', true, true);
+  const volume = resolveComparisonLayout(width, rows, 'totalVolume', true, true);
+  const columns = sets.columns.map((column, index) => Math.max(column, volume.columns[index]));
+  const periods = statsTableColumnWidth('Now', rows.map(row =>
+    inlinePeriodsText(comparisonFigures(row, 'workingSetCount'))), uiIconSize.xs + uiSpace.xs);
+  // Keep the history link and disclosure reachable even when full figures wrap.
+  const available = width - uiSpace.lg * 2 - uiBorder.width * 2 - uiSpace.md * 4
+    - uiGeometry.tapTarget * 2 - uiSpace.sm * 3 - columns[2];
+  columns[0] = Math.min(Math.max(periods, columns[0], columns[1]), Math.max(0, available));
+  columns[1] = columns[0];
+  return { columns, stacked: false, pairedPeriods: true };
+};
+
 export type ComparisonColumnPosition = {
   key: ComparisonColumnKey; label: string; name: string; index: number;
 };
@@ -191,12 +195,15 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
       if (layout.pairedPeriods && index === 1) return null;
       const paired = layout.pairedPeriods && index === 0;
       const width = paired ? Math.max(layout.columns[0], layout.columns[1]) : layout.columns[index];
+      const heading = paired ? (width < statsTableColumnWidth('Now (Prev)', [], uiIconSize.xs + uiSpace.xs)
+        ? 'Now\n(Prev)' : 'Now (Prev)') : label;
+      const spoken = paired ? 'Now and previous' : COLUMN_NAMES[index];
       const header = column
-        ? column({ key: COLUMN_KEYS[index], label, name: COLUMN_NAMES[index], index }, width)
+        ? column({ key: COLUMN_KEYS[index], label: heading, name: spoken, index }, width)
         : <View accessible accessibilityRole="header"
-          accessibilityLabel={`${COLUMN_NAMES[index]}, ${metricUnit(metric)}`}
+          accessibilityLabel={`${spoken}, ${metricUnit(metric)}`}
           style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width }]}>
-          <StatsTableHeaderLabel label={label} />
+          <StatsTableHeaderLabel label={heading} />
         </View>;
       return <Fragment key={label}>{header}</Fragment>;
     })}
@@ -230,26 +237,33 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true }: 
     style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
     <StatsTableFigures testID={`${prefix}-values`}>
       {layout.pairedPeriods ? <>
-        {inlinePeriods(metric) ? <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: periodWidth }]}
+        {inlinePeriods(metric) ? <Text allowFontScaling={false} style={[uiText.figure, statsTableStyles.figure, { width: periodWidth }]}
           testID={`${prefix}-periods`}>
           <Text allowFontScaling={false} testID={`${prefix}-now`}>{figures.now}</Text>
-          <Text allowFontScaling={false} style={styles.previous}> (<Text allowFontScaling={false}
+          <Text allowFontScaling={false} style={uiTextTone.muted}> (<Text allowFontScaling={false}
             testID={`${prefix}-previous`}>{figures.previous}</Text>)</Text>
         </Text> : <View style={{ width: periodWidth }} testID={`${prefix}-periods`}>
-          <Text allowFontScaling={false} style={statsTableStyles.figure} testID={`${prefix}-now`}>{figures.now}</Text>
-          <Text allowFontScaling={false} style={[statsTableStyles.figure, styles.previous]} testID={`${prefix}-previous`}>{figures.previous}</Text>
+          <Text allowFontScaling={false} style={[uiText.figure, statsTableStyles.figure]} testID={`${prefix}-now`}>{figures.now}</Text>
+          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, statsTableStyles.figure]} testID={`${prefix}-previous`}>{figures.previous}</Text>
         </View>}
-        <Text allowFontScaling={false} style={[statsTableStyles.figure, { width: layout.columns[2] }, changeColour]}
-          testID={`${prefix}-change`}>{figures.change.text}</Text>
-      </> : texts.map((value, index) => <Text key={COLUMN_KEYS[index]} allowFontScaling={false}
-        style={[statsTableStyles.figure, { width: layout.columns[index] }, COLUMN_KEYS[index] === 'change' && changeColour]}
-        testID={`${prefix}-${COLUMN_KEYS[index]}`}>{value}</Text>)}
+        <ComparisonCell text={figures.change.text} width={layout.columns[2]} colour={changeColour} testID={`${prefix}-change`} />
+      </> : texts.map((value, index) => <ComparisonCell key={COLUMN_KEYS[index]} text={value} width={layout.columns[index]}
+        colour={COLUMN_KEYS[index] === 'change' ? changeColour : undefined} testID={`${prefix}-${COLUMN_KEYS[index]}`} />)}
     </StatsTableFigures>
   </View>;
 }
 
+// One figure column's cell. A change that reads as a word (`new`, `Increased`)
+// is a word, so it leaves the figure face (`design-language.md` §3).
+function ComparisonCell({ text, width, colour, testID }: {
+  text: string; width: number; colour?: { color: string }; testID: string;
+}) {
+  const word = /[A-Za-z]/.test(text);
+  return <Text allowFontScaling={false} style={[word ? uiText.body : uiText.figure, statsTableStyles.figure, { width }, colour]}
+    testID={testID}>{word ? <FigureText>{text}</FigureText> : text}</Text>;
+}
+
 const styles = StyleSheet.create({
-  previous: { color: uiRoles.inkMuted },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { alignItems: 'stretch' },
   stackedFigures: { alignSelf: 'stretch', width: '100%', justifyContent: 'flex-end', paddingBottom: uiSpace.xs },

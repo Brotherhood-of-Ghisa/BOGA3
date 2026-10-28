@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FigureText, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanTargetView } from '@/src/session-planner';
 
@@ -45,10 +45,10 @@ export function NextProgrammeBlockCard({
   if (nextBlock === null) {
     return (
       <Card style={styles.emptyCard} testID="programme-next-block-empty">
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
           Next block
         </Text>
-        <Text allowFontScaling={false} style={styles.emptyText} testID="programme-next-block-empty-text">
+        <Text allowFontScaling={false} style={uiText.meta} testID="programme-next-block-empty-text">
           {emptyMessage(blockCounts)}
         </Text>
       </Card>
@@ -58,17 +58,17 @@ export function NextProgrammeBlockCard({
   return (
     <Card style={styles.card} testID="programme-next-block-card">
       <View style={styles.headerRow}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
           Next up
         </Text>
       </View>
 
       <View style={styles.content}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseName} testID="programme-next-block-name">
+        <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong} testID="programme-next-block-name">
           {nextBlock.name}
         </Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.targetLine} testID="programme-next-block-targets">
-          {formatTargetLine(nextBlock.targets)}
+        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID="programme-next-block-targets">
+          <FigureText>{formatTargetLine(nextBlock.targets)}</FigureText>
         </Text>
       </View>
 
@@ -106,35 +106,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   content: {
     gap: uiSpace.xs,
-  },
-  exerciseName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-  },
-  targetLine: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  emptyText: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.sm,
-    color: uiRoles.inkMuted,
   },
   actions: {
     flexDirection: 'row',

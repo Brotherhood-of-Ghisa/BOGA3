@@ -65,6 +65,7 @@ import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import StatsRoute from '../app/(tabs)/stats-history';
+import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import * as statsRepository from '@/src/data/stats';
@@ -219,6 +220,50 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
+  it.each(['exercise', 'muscle'] as const)('compares Monday-based periods in %s 3D independently of targets and History', async breakdown => {
+    jest.setSystemTime(new Date(2026, 9, 26, 12));
+    mockSearchParams = { period: '7', breakdown };
+    await loadMaestroFixture('exercise-block-history');
+    await logPulldown(30);
+    await logPulldown(1);
+    await logPulldown(.05);
+    const db = localDataClient();
+    db.prepare("UPDATE sessions SET gym_id = ? WHERE id = 'stats_pulldown_1'").run(EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
+    db.prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('pulldown_biceps', ?, 'biceps', 0.5, 'secondary') ON CONFLICT (exercise_definition_id, muscle_group_id) DO UPDATE SET weight = 0.5, role = 'secondary'").run(PULLDOWN);
+    await act(async () => updatePreferences({ progressMuscleLayout: '3d' }));
+    await renderStats();
+    fireEvent.press(await screen.findByTestId('stats-muscle-body-target-back_lats'));
+    expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
+    const change = () => screen.getByTestId('stats-muscle-body-comparison-change');
+    expect(change()).toHaveTextContent(/^0$/);
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1$/);
+    chooseFilter('period', '4 weeks');
+    expect(change()).toHaveTextContent(/^\+1$/);
+    chooseFilter('metric', 'Volume');
+    expect(change()).toHaveTextContent(/^\+100%$/);
+    const before = screen.UNSAFE_getByType(MuscleBodyCard).props.muscles;
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1, weeklyWorkingSetTarget: 999 }));
+    expect(screen.UNSAFE_getByType(MuscleBodyCard).props.muscles).toEqual(before);
+    expect(change()).toHaveTextContent(/^\+100%$/);
+    chooseFilter('period', 'This week');
+    expect(change()).toHaveTextContent(/^0%$/);
+    if (breakdown === 'exercise') {
+      fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Lat Pulldown');
+      expect(change()).toHaveTextContent(/^0%$/);
+      chooseGym('no-gym');
+      expect(change()).toHaveTextContent(/^new$/);
+      chooseGym(EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
+      expect(change()).toHaveTextContent(/^−100%$/);
+      chooseGym('all');
+    }
+    fireEvent.press(screen.getByTestId('stats-muscle-body-target-biceps'));
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(breakdown === 'exercise' ? /^300$/ : /^150$/);
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    expect(await screen.findByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
+    expect(change()).toHaveTextContent(/^—$/);
+  });
+
   it('holds Group by and Gym in the Filters sheet, whose compact button fills while either is changed', async () => {
     await renderSeededStats();
     const button = () => screen.getByTestId('stats-filters');

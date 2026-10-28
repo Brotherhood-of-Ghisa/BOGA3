@@ -577,9 +577,8 @@ const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loa
   { id: 'seed_standing_lunge_stretch_at_wall', name: 'Standing Lunge Stretch at Wall' },
 ];
 
-// The starter bundle is pruned for fresh installs and explicit dev wipes.
-// Existing-client tombstone/rename migrations are intentionally separate, so
-// this slice does not bump CURRENT_APP_VERSION.
+// Keep the shipped standard catalogue stable for groups and old bundle upgrades.
+// The fresh-account starter bundle is curated separately below.
 const M19_STARTER_EXERCISE_KEEP_IDS = new Set<string>([
   'seed_barbell_bench_press',
   'seed_incline_dumbbell_press',
@@ -815,6 +814,7 @@ const M19_STARTER_EXERCISE_NAME_OVERRIDES: Record<string, string> = {
   seed_standing_machine_calf_raises: 'Standing Machine Calf Raise',
 };
 
+// Includes retired starter IDs because bundle migration 2 still uses this list.
 export const PER_SIDE_LOAD_SEED_IDS = new Set<string>([
   'seed_incline_dumbbell_press',
   'seed_seated_dumbbell_overhead_press',
@@ -863,7 +863,7 @@ export const PER_SIDE_LOAD_SEED_IDS = new Set<string>([
   'seed_standing_leg_curls',
 ]);
 
-export const SYSTEM_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
+export const STANDARD_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
   SYSTEM_EXERCISE_DEFINITION_INPUTS.filter((exercise) => M19_STARTER_EXERCISE_KEEP_IDS.has(exercise.id)).map(
     (exercise) => ({
       ...exercise,
@@ -2113,7 +2113,7 @@ const SYSTEM_EXERCISE_MUSCLE_MAPPING_INPUTS: SystemExerciseMuscleMappingSeedInpu
   { exerciseDefinitionId: 'seed_standing_lunge_stretch_at_wall', muscleGroupId: 'calves', weight: 1, role: 'primary' },
 ];
 
-export const SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS: SystemExerciseMuscleMappingSeed[] =
+export const STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS: SystemExerciseMuscleMappingSeed[] =
   SYSTEM_EXERCISE_MUSCLE_MAPPING_INPUTS.filter((mapping) =>
     M19_STARTER_EXERCISE_KEEP_IDS.has(mapping.exerciseDefinitionId)
   ).map((mapping) => ({
@@ -2121,7 +2121,178 @@ export const SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS: SystemExerciseMuscleMappingSe
     id: createMappingId(mapping.exerciseDefinitionId, mapping.muscleGroupId),
   }));
 
+// Fresh accounts and explicit developer resets only: no catalog-generation bump.
+// Display names are singular; IDs retain the shipped identities.
+const STARTER_EXERCISES: {
+  id: string;
+  name: string;
+  primary: string[];
+  secondary: string[];
+  rationale: string;
+  sourceReferenceIds?: string[];
+}[] = [
+  {
+    id: 'seed_barbell_bench_press', name: 'Barbell Bench Press',
+    primary: ['chest'],
+    secondary: ['delts_front', 'triceps'],
+    rationale: 'Bench press targets pectoralis, with front delts and triceps assisting.',
+  },
+  {
+    id: 'seed_push_up', name: 'Push-Up',
+    primary: ['chest'],
+    secondary: ['delts_front', 'triceps', 'serratus_anterior'],
+    rationale: 'Full-range push-ups include scapular protraction; core bracing is not separately credited.',
+  },
+  {
+    id: 'seed_seated_dumbbell_overhead_press', name: 'Seated Dumbbell Shoulder Press',
+    primary: ['delts_front'],
+    secondary: ['delts_lateral', 'triceps', 'serratus_anterior', 'traps_upper', 'traps_lower'],
+    rationale: 'Full-range overhead pressing includes the scapular upward rotators.',
+    sourceReferenceIds: ['overhead-press-muscle-activity-2022'],
+  },
+  {
+    id: 'seed_dumbbell_lateral_raise', name: 'Dumbbell Lateral Raise',
+    primary: ['delts_lateral'],
+    secondary: ['rotator_cuff'],
+    rationale: 'Rotator-cuff credit represents supraspinatus assisting abduction, not complete rotational coverage.',
+    sourceReferenceIds: ['loyola-supraspinatus-anatomy'],
+  },
+  {
+    id: 'seed_reverse_machine_flys', name: 'Reverse Machine Fly',
+    primary: ['delts_rear'],
+    secondary: ['back_upper'],
+    rationale: 'Horizontal abduction targets rear delts, with scapular retractors assisting.',
+  },
+  {
+    id: 'seed_pull_up', name: 'Pull-Up',
+    primary: ['back_lats'],
+    secondary: ['biceps', 'brachialis', 'forearms_grip', 'back_upper', 'traps_lower'],
+    rationale: 'Pull-ups combine shoulder adduction, elbow flexion and scapular depression; forearm credit includes brachioradialis.',
+  },
+  {
+    id: 'seed_lat_pulldown', name: 'Lat Pulldown',
+    primary: ['back_lats'],
+    secondary: ['biceps', 'brachialis', 'forearms_grip', 'back_upper', 'traps_lower'],
+    rationale: 'Pulldowns combine shoulder adduction, elbow flexion and scapular depression; forearm credit includes brachioradialis.',
+  },
+  {
+    id: 'seed_seated_cable_row', name: 'Seated Cable Row',
+    primary: ['back_upper'],
+    secondary: ['back_lats', 'delts_rear', 'biceps', 'brachialis', 'forearms_grip'],
+    rationale: 'Rows emphasize scapular retraction, with shoulder extensors and elbow flexors assisting.',
+  },
+  {
+    id: 'seed_back_extensions', name: 'Back Extension',
+    primary: ['spinal_erectors'],
+    secondary: ['glutes_max', 'hamstrings'],
+    rationale: 'Assumes spinal-extension emphasis; a neutral-spine hip-hinge variation needs its own mapping.',
+  },
+  {
+    id: 'seed_hammer_curl', name: 'Dumbbell Hammer Curl',
+    primary: ['biceps', 'brachialis'],
+    secondary: ['forearms_grip'],
+    rationale: 'Neutral-grip elbow flexion targets biceps and brachialis; forearm credit includes brachioradialis.',
+  },
+  {
+    id: 'seed_push-downs', name: 'Cable Triceps Pushdown',
+    primary: ['triceps'],
+    secondary: [],
+    rationale: 'Pushdown targets elbow extension without incidental shoulder or core credit.',
+  },
+  {
+    id: 'seed_dumbbell_wrist_curls', name: 'Dumbbell Wrist Curl',
+    primary: ['forearms_grip'],
+    secondary: [],
+    rationale: 'Wrist flexion provides direct forearm work.',
+  },
+  {
+    id: 'seed_cable_crunch', name: 'Cable Crunch',
+    primary: ['abs_rectus'],
+    secondary: ['abs_obliques'],
+    rationale: 'Trunk flexion targets abs, with obliques assisting.',
+  },
+  {
+    id: 'seed_russian_twists', name: 'Russian Twist',
+    primary: ['abs_obliques'],
+    secondary: ['abs_rectus'],
+    rationale: 'Trunk rotation targets obliques, with abs providing substantial trunk support.',
+  },
+  {
+    id: 'seed_hanging_leg_raises', name: 'Hanging Leg Raise',
+    primary: ['hip_flexors', 'abs_rectus'],
+    secondary: ['abs_obliques'],
+    rationale: 'Assumes a controlled pelvic curl at the top; hip flexion alone does not earn primary abs credit.',
+  },
+  {
+    id: 'seed_barbell_back_squat', name: 'Barbell Back Squat',
+    primary: ['quads', 'glutes_max'],
+    secondary: ['adductors', 'spinal_erectors'],
+    rationale: 'Full-range squats target knee and hip extension, with adductors and loaded spinal erectors assisting.',
+  },
+  {
+    id: 'seed_romanian_deadlift', name: 'Barbell Romanian Deadlift',
+    primary: ['hamstrings', 'glutes_max'],
+    secondary: ['spinal_erectors'],
+    rationale: 'Hip extension targets hamstrings and glute max, with loaded spinal erectors supporting the trunk.',
+  },
+  {
+    id: 'seed_seated_leg_curl', name: 'Seated Leg Curl',
+    primary: ['hamstrings'],
+    secondary: [],
+    rationale: 'Seated knee flexion targets hamstrings.',
+  },
+  {
+    id: 'seed_seated_machine_hip_abductions', name: 'Machine Hip Abduction',
+    primary: ['hip_abductors'],
+    secondary: ['glutes_max'],
+    rationale: 'Hip abduction targets glute med/min and TFL; upper glute-max fibers assist.',
+  },
+  {
+    id: 'seed_machine_adductions', name: 'Machine Hip Adduction',
+    primary: ['adductors'],
+    secondary: [],
+    rationale: 'Hip adduction targets the adductor group.',
+  },
+  {
+    id: 'seed_standing_machine_calf_raises', name: 'Machine Calf Raise',
+    primary: ['calves'],
+    secondary: [],
+    rationale: 'Plantar flexion targets calves; it does not provide tibialis-anterior dorsiflexion work.',
+  },
+];
+
+export const SYSTEM_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
+  STARTER_EXERCISES.map(({ id, name }) => ({
+    id, name,
+    bodyweightContribution: BODYWEIGHT_SEED_CONTRIBUTIONS[id] ?? 0,
+    loadInputMode: PER_SIDE_LOAD_SEED_IDS.has(id) ? 'per_side_load' : 'total_load',
+  }));
+
+export const SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS: SystemExerciseMuscleMappingSeed[] =
+  STARTER_EXERCISES.flatMap(({ id, primary, secondary }) => [
+    ...primary.map((muscleGroupId) => ({
+      id: createMappingId(id, muscleGroupId), exerciseDefinitionId: id, muscleGroupId,
+      weight: 1, role: 'primary' as const,
+    })),
+    ...secondary.map((muscleGroupId) => ({
+      id: createMappingId(id, muscleGroupId), exerciseDefinitionId: id, muscleGroupId,
+      weight: 0.5, role: 'secondary' as const,
+    })),
+  ]);
+
 export const SYSTEM_EXERCISE_CATALOG_SOURCE_REFERENCES: SeedSourceReference[] = [
+  {
+    id: 'overhead-press-muscle-activity-2022', type: 'study',
+    title: 'The Effect of the Weight and Type of Equipment on Shoulder and Back Muscle Activity during the Overhead Press',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC9781216/',
+    note: 'Anatomical and muscle-activity context for scapular upward-rotator involvement; not a stimulus-percentage formula.',
+  },
+  {
+    id: 'loyola-supraspinatus-anatomy', type: 'reference',
+    title: 'Loyola University: Supraspinatus',
+    url: 'https://www.meddean.luc.edu/lumen/meded/grossanatomy/dissector/mml/sups.htm',
+    note: 'Supraspinatus assists arm abduction; this represents only part of the grouped rotator-cuff entry.',
+  },
   {
     id: 'exrx-resistance-exercise-directory',
     type: 'reference',
@@ -2166,1981 +2337,12 @@ export const SYSTEM_EXERCISE_CATALOG_SOURCE_REFERENCES: SeedSourceReference[] = 
   },
 ];
 
-const SYSTEM_EXERCISE_SEED_DOCUMENTATION_INPUTS: SeedExerciseDocumentation[] = [
-  {
-    exerciseDefinitionId: 'seed_barbell_bench_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench press is seeded as chest-primary with front-delt/triceps secondary contributions using the default 1.0/0.5 ladder.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale:
-      'Incline dumbbell press is mapped to the same chest bucket as flat pressing to avoid false precision about chest sub-region emphasis in the initial system catalog.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_dumbbell_overhead_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Overhead pressing is seeded with front delts primary and lateral delts/triceps as common secondary contributors.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_lateral_raise',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lateral raise is mapped to lateral delts only to keep the starter catalog focused on clear primary-target logging defaults.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lat_pulldown',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Pulldown is lats-primary with upper back and biceps as secondary contributors; grip support is intentionally omitted in seed defaults.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_row',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable row is upper-back-primary with lats/rear delts/biceps as secondary contributors; grip support is intentionally omitted in seed defaults.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_back_squat',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory', 'escamilla-squat-biomechanics-2001'],
-    rationale:
-      'Back squat starts with quads primary plus glutes/adductors/erectors secondary, while bracing musculature is intentionally omitted to reduce false precision in seed defaults.',
-  },
-  {
-    exerciseDefinitionId: 'seed_romanian_deadlift',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory', 'escamilla-deadlift-sumo-conventional-2002'],
-    rationale: 'RDL is seeded as hamstrings and glute-max primary co-drivers with spinal erectors secondary; grip support is intentionally omitted in seed defaults.',
-  },
-  {
-    exerciseDefinitionId: 'seed_leg_extension',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Leg extension is mapped to quads only for a simple single-target machine pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_leg_curl',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated leg curl is mapped to hamstrings only for a simple single-target machine pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_hip_thrust',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory', 'contreras-hip-thrust-emg-2015'],
-    rationale: 'Hip thrust is glute-max primary with hamstrings and hip abductors secondary using the default weight ladder.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_calf_raise',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing calf raise is mapped to calves only for a simple single-target machine/free-standing pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_biceps_curl',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Biceps curl is biceps-primary with grip/forearm secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_crunch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable crunch is abs-primary with obliques secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_pull_up',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Pull-up is lats-primary with biceps and upper back secondary; bodyweight vertical pulling pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_push_up',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Push-up is chest-primary with triceps/front delts/abs secondary; bodyweight horizontal pushing pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_bent_over_row',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-over row is lats-primary with upper back/traps/biceps/erectors secondary; free-weight horizontal pulling pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_leg_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Leg press is quads-primary with glutes/hamstrings secondary; machine-based compound leg pushing.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_fly',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell fly is chest-primary with front delts secondary; isolation chest movement with minimal triceps involvement.',
-  },
-  {
-    exerciseDefinitionId: 'seed_conventional_deadlift',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory', 'escamilla-deadlift-sumo-conventional-2002'],
-    rationale: 'Conventional deadlift is hamstrings/glutes/erectors primary with traps/forearms secondary; full posterior chain compound movement.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_bench_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell bench press follows same chest-primary pattern as barbell bench press with front delts/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_row',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell row is lats-primary with upper back/rear delts/biceps secondary; unilateral horizontal pulling pattern.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close_grip_bench_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-grip bench press is triceps-primary with chest/front delts secondary; emphasizes elbow flexion for tricep focus.',
-  },
-  {
-    exerciseDefinitionId: 'seed_overhead_tricep_extension',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Overhead tricep extension is triceps-primary with front delts secondary; isolation movement for tricep long head.',
-  },
-  {
-    exerciseDefinitionId: 'seed_face_pull',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Face pull is rear delts-primary with upper back/traps secondary; cable-based rear shoulder development exercise.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bulgarian_split_squat',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bulgarian split squat is quads-primary with glutes/hamstrings secondary; unilateral leg development with balance challenge.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hammer_curl',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hammer curl is biceps-primary with forearms secondary; neutral grip variation emphasizing brachialis and brachioradialis.',
-  },
-  {
-    exerciseDefinitionId: 'seed_plank',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Plank is abs-primary with obliques secondary; isometric core stability exercise targeting anterior core musculature.',
-  },
-
-  {
-    exerciseDefinitionId: 'seed_standing_barbell_overhead_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Barbell Overhead Press is mapped to delts_front.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_curl',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Curl is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_low_cable_one-arm_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Low Cable One-Arm Lateral Raises is mapped to delts_front.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Lateral Raises is mapped to delts_front.',
-  },
-  {
-    exerciseDefinitionId: 'seed_rotator_cuffs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Rotator Cuffs is mapped to delts_front.',
-  },
-  {
-    exerciseDefinitionId: 'seed_side-lying_dumbbell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Side-Lying Dumbbell Lateral Raises is mapped to delts_front.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_dumbbell_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Dumbbell Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_one-arm_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable One-Arm Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-dumbbell_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Dumbbell Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_barbell_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Barbell Front Raises is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_cable_internal_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Cable Internal Rotations is mapped to delts_front with chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_arnold_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Arnold Presses is mapped to delts_front with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_front_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Front Presses is mapped to delts_front with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Presses is mapped to delts_front with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-arm_arnold_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Arm Arnold Presses is mapped to delts_front with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_barbell_front_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Barbell Front Presses is mapped to delts_front with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_dumbbell_hammer_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Dumbbell Hammer Front Raises is mapped to delts_front with chest/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_one-arm_hammer_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable One-Arm Hammer Front Raises is mapped to delts_front with chest/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_one-arm_hammer_front_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell One-Arm Hammer Front Raises is mapped to delts_front with chest/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bent-over_cable_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-Over Cable Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bent-over_dumbbell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-Over Dumbbell Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_dumbbell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Dumbbell Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_high_cable_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse High Cable Flys is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_machine_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Machine Flys is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_dumbbell_lateral_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Dumbbell Lateral Raises is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_cable_external_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Cable External Rotations is mapped to delts_front with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_back_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Back Presses is mapped to delts_front with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Presses is mapped to delts_front with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_bottom-up_kneeling_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Bottom-Up Kneeling Press is mapped to delts_front with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_dumbbell_one-arm_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Dumbbell One-Arm Presses is mapped to delts_front with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_dumbbell_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Dumbbell Presses is mapped to delts_front with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_landmine_press',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Landmine Press is mapped to delts_front, chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_powell_raise',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Powell Raise is mapped to delts_front, traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_face_pulls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Face Pulls is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_one-arm_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell One-Arm Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ez-bar_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'EZ-Bar Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_upright_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Upright Rows is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_face_pulls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Face Pulls is mapped to delts_front, traps_upper with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_decline_dumbbell_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Decline Dumbbell Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_high_cable_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'High Cable Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_low_cable_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Low Cable Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_flys',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Flys is mapped to chest.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_machine_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Machine Bench Presses is mapped to chest with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_decline_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Decline Push-Ups is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_decline_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Decline Push-Ups is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_barbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Barbell Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_cable_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Cable Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_smith_machine_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Smith Machine Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Push-Ups is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_smith_machine_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Smith Machine Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_spiderman_push-up',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Spiderman Push-up is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_barbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Barbell Bench Presses is mapped to chest with delts_front/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_incline_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Incline Push-Ups is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_decline_barbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Decline Barbell Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_decline_cable_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Decline Cable Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_decline_dumbbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Decline Dumbbell Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Push-Ups is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_machine_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Machine Bench Presses is mapped to chest with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_dumbbell_pullovers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Dumbbell Pullovers is mapped to chest, back_lats with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_pullovers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Pullovers is mapped to chest, back_lats with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_pullovers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Pullovers is mapped to chest, back_lats with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_band_pull-apart',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Band Pull-Apart is mapped to delts_front, traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_pullover',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Pullover is mapped to chest, back_lats.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_shrugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Shrugs is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_shrugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Shrugs is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbells_reverse_fly',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbells Reverse Fly is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_shrugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Shrugs is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_trap_bar_shrugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Trap Bar Shrugs is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_cable_row',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Cable Row is mapped to traps_upper, back_lats.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_barbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Barbell Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_barbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Barbell Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_t-bar_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying T-Bar Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_smith_machine_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Smith Machine Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_t-bar_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'T-Bar Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_seated_cable_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Seated Cable Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_seated_machine_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Seated Machine Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_renegade_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Renegade Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps/abs_rectus/abs_obliques/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_renegade_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Renegade Rows is mapped to traps_upper, back_lats with delts_front/spinal_erectors/biceps/abs_rectus/abs_obliques/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_one-arm_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell One-Arm Rows is mapped to traps_upper, back_lats with delts_front/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_one-arm_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell One-Arm Rows is mapped to traps_upper, back_lats with delts_front/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_pull-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Pull-Ups is mapped to traps_upper, back_lats with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_back_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Back Lat Pull-Downs is mapped to traps_upper, back_lats with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Lat Pull-Downs is mapped to traps_upper, back_lats with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Deadlifts is mapped to traps_upper, spinal_erectors, glutes_max, quads with back_lats/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Deadlifts is mapped to traps_upper, spinal_erectors, glutes_max, quads with back_lats/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_smith_machine_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Smith Machine Deadlifts is mapped to traps_upper, spinal_erectors, glutes_max, quads with back_lats/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_trap_bar_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Trap Bar Deadlifts is mapped to traps_upper, glutes_max, quads with back_lats/spinal_erectors/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_barbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Barbell Rows is mapped to back_lats with delts_front/traps_upper/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_dumbbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Dumbbell Rows is mapped to back_lats with delts_front/traps_upper/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_incline_barbell_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Incline Barbell Rows is mapped to back_lats with delts_front/traps_upper/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Rows is mapped to back_lats with delts_front/traps_upper/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_machine_rows',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Machine Rows is mapped to back_lats with delts_front/traps_upper/spinal_erectors/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_chin-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Chin-Ups is mapped to back_lats with delts_front/traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Lat Pull-Downs is mapped to back_lats with delts_front/traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-arm_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Arm Lat Pull-Downs is mapped to back_lats with delts_front/traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_pullovers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Pullovers is mapped to back_lats with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_pullovers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Pullovers is mapped to back_lats with chest/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lat Pull-Downs is mapped to back_lats with traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Lat Pull-Downs is mapped to back_lats with traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-arm_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Arm Lat Pull-Downs is mapped to back_lats with triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_chin-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Chin-Ups is mapped to back_lats, biceps with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Lat Pull-Downs is mapped to back_lats, biceps with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_machine_lat_pull-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Machine Lat Pull-Downs is mapped to back_lats, biceps with traps_upper secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_back_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Back Extensions is mapped to spinal_erectors.',
-  },
-  {
-    exerciseDefinitionId: 'seed_back_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Back Extensions is mapped to spinal_erectors with glutes_max/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_back_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Back Extensions is mapped to spinal_erectors with glutes_max/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_supermans',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Supermans is mapped to spinal_erectors with glutes_max/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_sumo_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Sumo Deadlifts is mapped to spinal_erectors, glutes_max, quads with traps_upper/back_lats/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_romanian_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Romanian Deadlifts is mapped to spinal_erectors, glutes_max, hamstrings with traps_upper/back_lats/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_romanian_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Romanian Deadlifts is mapped to spinal_erectors, glutes_max, hamstrings with traps_upper/back_lats/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_romanian_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Romanian Deadlifts is mapped to spinal_erectors, glutes_max, hamstrings with traps_upper/back_lats/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-leg_barbell_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Leg Barbell Deadlifts is mapped to spinal_erectors, glutes_max, hamstrings with traps_upper/back_lats/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-leg_dumbbell_deadlifts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Leg Dumbbell Deadlifts is mapped to spinal_erectors, glutes_max, hamstrings with traps_upper/back_lats/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_barbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Barbell Bench Presses is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_dumbbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Dumbbell Bench Presses is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_incline_dumbbell_bench_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Incline Dumbbell Bench Presses is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_incline_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Incline Push-Ups is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_close-grip_push-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Close-Grip Push-Ups is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_dips',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Dips is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_parallel_bar_dips',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Parallel Bar Dips is mapped to chest, triceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hammer_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hammer Push-Downs is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_low_cable_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Low Cable Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_barbell_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Barbell Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_dumbbell_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Dumbbell Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_ez-bar_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying EZ-Bar Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_low_cable_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Low Cable Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Push-Downs is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-arm_hammer_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Arm Hammer Push-Downs is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Push-Downs is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_dumbbell_one-arm_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Dumbbell One-Arm Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_ez-bar_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated EZ-Bar Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_high_cable_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated High Cable Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_one-dumbbell_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated One-Dumbbell Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_dumbbell_one-arm_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Dumbbell One-Arm Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_high_cable_one-arm_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing High Cable One-Arm Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_low_cable_hammer_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Low Cable Hammer Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_low_cable_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Low Cable Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_one-dumbbell_triceps_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing One-Dumbbell Triceps Extensions is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_triceps_kickbacks',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Triceps Kickbacks is mapped to triceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_dips',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Dips is mapped to triceps with delts_front/chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_dips',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Dips is mapped to triceps with delts_front/chest secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_one-arm_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse One-Arm Push-Downs is mapped to triceps with forearms_grip secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_push-downs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Push-Downs is mapped to triceps with forearms_grip secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_dumbbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Dumbbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_dumbbell_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Dumbbell Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_hammer_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Hammer Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_hammer_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Hammer Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_incline_dumbbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Incline Dumbbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_incline_hammer_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Incline Hammer Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_spider_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Spider Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_concentration_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Concentration Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_concentration_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Concentration Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_spider_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Spider Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ez-bar_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'EZ-Bar Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ez-bar_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'EZ-Bar Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ez-bar_spider_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'EZ-Bar Spider Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hammer_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hammer Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hammer_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hammer Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hammer_spider_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hammer Spider Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_high_cable_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'High Cable Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_high_cable_one-arm_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'High Cable One-Arm Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_hammer_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Hammer Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_low_cable_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Low Cable Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_low_cable_hammer_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Low Cable Hammer Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_low_cable_one-arm_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Low Cable One-Arm Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_one-arm_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine One-Arm Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_dumbbell_one-arm_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Dumbbell One-Arm Preacher Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_barbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip Barbell Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_wide-grip_ez-bar_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Wide-Grip EZ-Bar Curls is mapped to biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_dumbbell_twist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Dumbbell Twist Curls is mapped to biceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_alternating_incline_dumbbell_twist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Alternating Incline Dumbbell Twist Curls is mapped to biceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_twist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Twist Curls is mapped to biceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_dumbbell_twist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Dumbbell Twist Curls is mapped to biceps with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_curls_rotated',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Curls (rotated) is mapped to biceps with forearms_grip secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_barbell_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Barbell Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_cable_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Cable Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_dumbbell_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Dumbbell Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_barbell_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Barbell Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_barbell_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Barbell Preacher Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_cable_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Cable Preacher Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_dumbbell_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Dumbbell Preacher Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_dumbbell_spider_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Dumbbell Spider Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_ez-bar_preacher_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse EZ-Bar Preacher Curls is mapped to forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_farmers_walk',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Farmer\'s Walk is mapped to forearms_grip, glutes_max, quads, hamstrings, calves with delts_front / traps_upper / spinal_erectors / triceps / biceps / abs_rectus / abs_obliques / adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_farmers_walk',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Farmer\'s Walk is mapped to forearms_grip, glutes_max, quads, hamstrings, calves with delts_front / traps_upper / spinal_erectors / triceps / biceps / abs_rectus / abs_obliques / adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_trap_bar_farmers_walk',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Trap Bar Farmer\'s Walk is mapped to forearms_grip, glutes_max, quads, hamstrings, calves with delts_front / traps_upper / spinal_erectors / triceps / biceps / abs_rectus / abs_obliques / adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_wrist_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Wrist Curls is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_planks',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Planks is mapped to spinal_erectors, abs_rectus, abs_obliques with delts_front/traps_upper/glutes_max/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_side_planks',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Side Planks is mapped to spinal_erectors, abs_obliques with delts_front/abs_rectus/glutes_max/quads/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_dead_bugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Dead Bugs is mapped to abs_rectus with delts_front/back_lats/spinal_erectors/abs_obliques/glutes_max/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dead_bugs',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dead Bugs is mapped to abs_rectus with delts_front/back_lats/spinal_erectors/abs_obliques/glutes_max/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kneeling_cable_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kneeling Cable Crunches is mapped to abs_rectus with abs_obliques secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Crunches is mapped to abs_rectus with abs_obliques secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Crunches is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Crunches is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_flutter_kicks',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Flutter Kicks is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hanging_leg_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hanging Leg Raises is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_leg_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Leg Raises is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_sit-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Sit-Ups is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_leg_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Leg Raises is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Crunches is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_leg_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Leg Raises is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_sit-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Sit-Ups is mapped to abs_rectus with abs_obliques/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ab-wheel_rollouts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ab-Wheel Rollouts is mapped to abs_rectus, abs_obliques with delts_front/back_lats/spinal_erectors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_rollouts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Rollouts is mapped to abs_rectus, abs_obliques with delts_front/back_lats/spinal_erectors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_rollouts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Rollouts is mapped to abs_rectus, abs_obliques with delts_front/back_lats/spinal_erectors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ez-bar_rollouts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'EZ-Bar Rollouts is mapped to abs_rectus, abs_obliques with delts_front/back_lats/spinal_erectors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_incline_twist_sit-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Incline Twist Sit-Ups is mapped to abs_rectus, abs_obliques with quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_twist_crunches',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Twist Crunches is mapped to abs_rectus, abs_obliques with quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_twist_sit-ups',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Twist Sit-Ups is mapped to abs_rectus, abs_obliques with quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_mountain_climbers',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Mountain Climbers is mapped to abs_rectus, abs_obliques, quads with delts_front/traps_upper/spinal_erectors/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_trunk_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Trunk Rotations is mapped to abs_obliques.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_side_bends',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Side Bends is mapped to abs_obliques.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_trunk_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Trunk Rotations is mapped to abs_obliques.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_side_bends',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Side Bends is mapped to abs_obliques.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_cable_trunk_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Cable Trunk Rotations is mapped to abs_obliques.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_trunk_rotations',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Trunk Rotations is mapped to abs_obliques with abs_rectus secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_russian_twists',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Russian Twists is mapped to abs_obliques with abs_rectus/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_russian_twists',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Russian Twists is mapped to abs_obliques with abs_rectus/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_russian_twists',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Russian Twists is mapped to abs_obliques with abs_rectus/quads secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_one-arm_swings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell One-Arm Swings is mapped to spinal_erectors, abs_obliques, glutes_max, hamstrings with delts_front/chest/traps_upper/back_lats/abs_rectus/quads/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_swings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Swings is mapped to spinal_erectors, glutes_max, hamstrings with delts_front/chest/traps_upper/back_lats/abs_rectus/abs_obliques/quads/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_swings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Swings is mapped to spinal_erectors, glutes_max, hamstrings with delts_front/chest/traps_upper/back_lats/abs_rectus/abs_obliques/quads/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_hip_abductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Hip Abductions is mapped to glutes_max.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_hip_abductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Hip Abductions is mapped to glutes_max.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_machine_hip_abductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Machine Hip Abductions is mapped to glutes_max.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_machine_hip_abductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Machine Hip Abductions is mapped to glutes_max.',
-  },
-  {
-    exerciseDefinitionId: 'seed_ball_hip_thrusts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Ball Hip Thrusts is mapped to glutes_max with quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_hip_thrusts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Hip Thrusts is mapped to glutes_max with quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_hip_thrusts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Hip Thrusts is mapped to glutes_max with quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hip_thrusts',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hip Thrusts is mapped to glutes_max with quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_bridging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Bridging is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_barbell_bridging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Barbell Bridging is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_bridging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Bridging is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_reverse_flutter_kicks',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Reverse Flutter Kicks is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bent-knee_hip_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-Knee Hip Extensions is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bridging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bridging is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_hip_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Hip Extensions is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_bridging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Bridging is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_hip_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Hip Extensions is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_hip_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Hip Extensions is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_single_leg_romanian_deadlift',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Single Leg Romanian Deadlift is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_lunges',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Lunges is mapped to glutes_max, quads with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_lunges',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Lunges is mapped to glutes_max, quads with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_lunges',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Lunges is mapped to glutes_max, quads with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_burpees',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Burpees is mapped to chest, quads, hamstrings, calves with delts_front/triceps/abs_rectus/abs_obliques/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cosak_squat',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cosak Squat is mapped to glutes_max, quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-dumbbell_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Dumbbell Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_front_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Front Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_barbell_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Barbell Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bench_dumbbell_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bench Dumbbell Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_front_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Front Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_goblet_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Goblet Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_goblet_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Goblet Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_smith_machine_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Smith Machine Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kettlebell_pistol_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kettlebell Pistol Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_pistol_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Pistol Squats is mapped to glutes_max, quads with spinal_erectors/abs_rectus/abs_obliques/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_bulgarian_split_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Bulgarian Split Squats is mapped to glutes_max, quads with adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bulgarian_split_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bulgarian Split Squats is mapped to glutes_max, quads with adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dumbbell_bulgarian_split_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dumbbell Bulgarian Split Squats is mapped to glutes_max, quads with adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_hack_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Hack Squats is mapped to glutes_max, quads with adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_pendulum_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Pendulum Squats is mapped to glutes_max, quads with adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_star_jumps',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Star Jumps is mapped to glutes_max, quads, hamstrings, calves with delts_front/chest/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_one-leg_leg_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable One-Leg Leg Extensions is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_leg_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Leg Extensions is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-leg_leg_extensions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Leg Leg Extensions is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_reverse_nordics_assisted',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Reverse Nordics (assisted) is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_single_leg_extension_isohold',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Single Leg Extension Isohold is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_sissy_squat',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Sissy Squat is mapped to quads with glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_leg_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Leg Presses is mapped to quads with glutes_max/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_one-leg_leg_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'One-Leg Leg Presses is mapped to quads with glutes_max/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_leg_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Leg Presses is mapped to quads with glutes_max/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_one-leg_leg_presses',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated One-Leg Leg Presses is mapped to quads with glutes_max/adductors/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_power_squats',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Power Squats is mapped to quads, adductors with spinal_erectors/abs_rectus/abs_obliques/glutes_max/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_half_burpees',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Half Burpees is mapped to quads, hamstrings, calves with delts_front/chest/triceps/abs_rectus/abs_obliques/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cable_adductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable Adductions is mapped to adductors.',
-  },
-  {
-    exerciseDefinitionId: 'seed_machine_adductions',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Machine Adductions is mapped to adductors.',
-  },
-  {
-    exerciseDefinitionId: 'seed_barbell_good_mornings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Barbell Good Mornings is mapped to hamstrings with spinal_erectors/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_barbell_good_mornings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Barbell Good Mornings is mapped to hamstrings with spinal_erectors/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_smith_machine_good_mornings',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Smith Machine Good Mornings is mapped to hamstrings with spinal_erectors/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_one-leg_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying One-Leg Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_nordic_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Nordic Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_one-leg_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated One-Leg Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_leg_curls',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Leg Curls is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_donkey_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Donkey Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_barbell_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Barbell Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_dumbbell_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Dumbbell Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_seated_machine_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Seated Machine Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_barbell_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Barbell Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_dumbbell_one-leg_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Dumbbell One-Leg Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_machine_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Machine Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_one-leg_calf_raises',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing One-Leg Calf Raises is mapped to calves.',
-  },
-  {
-    exerciseDefinitionId: 'seed_swimming',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Swimming is mapped to delts_front, chest, back_lats, triceps, biceps, glutes_max, quads, hamstrings, calves with traps_upper/spinal_erectors/abs_rectus/abs_obliques/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_battle_ropes_alternating_waves',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Battle Ropes Alternating Waves is mapped to delts_front, traps_upper, back_lats, triceps, biceps, forearms_grip with chest/spinal_erectors/abs_rectus/abs_obliques/glutes_max/quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_battle_ropes_double_waves',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Battle Ropes Double Waves is mapped to delts_front, traps_upper, back_lats, triceps, biceps, forearms_grip with chest/spinal_erectors/abs_rectus/abs_obliques/glutes_max/quads/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_boxing',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Boxing is mapped to delts_front, triceps, biceps with chest/traps_upper/back_lats/spinal_erectors/abs_rectus/abs_obliques/glutes_max/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_rowing',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Rowing is mapped to back_lats, hamstrings with delts_front/traps_upper/spinal_erectors/biceps/glutes_max/quads/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cycling',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cycling is mapped to glutes_max, quads with hamstrings/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_stationary_cycling',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Stationary Cycling is mapped to glutes_max, quads with hamstrings/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_elliptical_trainer',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Elliptical Trainer is mapped to glutes_max, quads, hamstrings with delts_front/chest/traps_upper/back_lats/spinal_erectors/triceps/biceps/calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_jumping_rope',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Jumping Rope is mapped to glutes_max, quads, hamstrings, calves with delts_front/biceps/forearms_grip/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_jumping_rope_double_unders',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Jumping Rope Double Unders is mapped to glutes_max, quads, hamstrings, calves with delts_front/biceps/forearms_grip/adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_jogging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Jogging is mapped to glutes_max, quads, hamstrings, calves with adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_stationary_stair_climbing',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Stationary Stair Climbing is mapped to glutes_max, quads, hamstrings, calves with adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_treadmill_jogging',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Treadmill Jogging is mapped to glutes_max, quads, hamstrings, calves with adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_treadmill_walking',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Treadmill Walking is mapped to glutes_max, quads, hamstrings, calves with adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_walking',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Walking is mapped to glutes_max, quads, hamstrings, calves with adductors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_front_elbow_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Front Elbow Pull Stretch is mapped to delts_front with traps_upper/back_lats/triceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_palms-in_back_arm_extension_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Palms-In Back Arm Extension Stretch is mapped to delts_front, chest, biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-arm_torso_rotation_stretch_at_wall',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Arm Torso Rotation Stretch at Wall is mapped to delts_front, chest, biceps.',
-  },
-  {
-    exerciseDefinitionId: 'seed_child_pose_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Child Pose Stretch is mapped to delts_front, back_lats with chest/spinal_erectors secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bent-arm_torso_rotation_stretch_at_wall',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-Arm Torso Rotation Stretch at Wall is mapped to chest with delts_front secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-arm_torso_lean_stretch_in_corner',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Arm Torso Lean Stretch in Corner is mapped to chest with delts_front/traps_upper/biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_back_arm_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Back Arm Pull Stretch is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cross-legged_seated_head_tilt_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cross-Legged Seated Head Tilt Stretch is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_head_tilt_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Head Tilt Stretch is mapped to traps_upper.',
-  },
-  {
-    exerciseDefinitionId: 'seed_dead_hang_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Dead Hang Stretch is mapped to back_lats with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_side_bend_stretch_at_wall',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Side Bend Stretch at Wall is mapped to back_lats with abs_obliques/glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_palms-out_upward_arm_extension_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Palms-Out Upward Arm Extension Stretch is mapped to back_lats, forearms_grip with biceps secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_back_elbow_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Back Elbow Pull Stretch is mapped to triceps with back_lats secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_palms-out_front_arm_extension_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Palms-Out Front Arm Extension Stretch is mapped to forearms_grip.',
-  },
-  {
-    exerciseDefinitionId: 'seed_cobra_pose_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cobra Pose Stretch is mapped to abs_rectus, abs_obliques with glutes_max/hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_lying_hip_rotation_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lying Hip Rotation Stretch is mapped to glutes_max with abs_obliques secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_bent-knee_lying_leg_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Bent-Knee Lying Leg Pull Stretch is mapped to glutes_max with hamstrings secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_side-lying_back_foot_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Side-Lying Back Foot Pull Stretch is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_back_foot_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Back Foot Pull Stretch is mapped to quads.',
-  },
-  {
-    exerciseDefinitionId: 'seed_kneeling_lunge_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Kneeling Lunge Stretch is mapped to quads with glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_straight-leg_lying_leg_pull_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Straight-Leg Lying Leg Pull Stretch is mapped to hamstrings with glutes_max secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_one-leg_leg_extension_stretch',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing One-Leg Leg Extension Stretch is mapped to hamstrings with calves secondary.',
-  },
-  {
-    exerciseDefinitionId: 'seed_standing_lunge_stretch_at_wall',
-    sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Standing Lunge Stretch at Wall is mapped to calves.',
-  },
-];
-
 export const SYSTEM_EXERCISE_SEED_DOCUMENTATION: SeedExerciseDocumentation[] =
-  SYSTEM_EXERCISE_SEED_DOCUMENTATION_INPUTS.filter((documentation) =>
-    M19_STARTER_EXERCISE_KEEP_IDS.has(documentation.exerciseDefinitionId)
-  );
+  STARTER_EXERCISES.map(({ id, rationale, sourceReferenceIds }) => ({
+    exerciseDefinitionId: id,
+    sourceReferenceIds: sourceReferenceIds ?? ['exrx-resistance-exercise-directory'],
+    rationale,
+  }));
 
 export const SYSTEM_EXERCISE_GRANULAR_WEIGHT_RATIONALES: GranularWeightRationale[] = [];
 

@@ -5,8 +5,9 @@ import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-scr
 const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? '';
 
 /**
- * The exercise page. It is reached only from the session view, for an active
- * session or a completed one being edited.
+ * The exercise page. It is reached from the session view, or from another
+ * exercise's title switcher (which replaces it), for an active session or a
+ * completed one being edited.
  */
 export default function ExercisePageRoute() {
   const params = useLocalSearchParams<{

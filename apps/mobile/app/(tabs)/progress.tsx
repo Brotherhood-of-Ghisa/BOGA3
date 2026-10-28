@@ -23,6 +23,7 @@ import {
   StatePanel,
   ToggleChip,
   uiSpace,
+  uiText,
 } from '@/components/ui';
 import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
@@ -468,7 +469,7 @@ export function StatsScreenShell({
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
-          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={statsTableStyles.name}>Sessions</Text></ListRow>
+          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>Sessions</Text></ListRow>
       </ScreenScroll>
 
     </Screen>
@@ -627,7 +628,7 @@ function ExerciseListView({
             meta={layout.stacked ? undefined : values}
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
             testID={`stats-exercise-row-${item.id}`}>
-            <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
+            <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]} testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
             {layout.stacked ? values : null}
@@ -722,7 +723,8 @@ function StatsContent() {
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
-    exerciseListItems={exerciseListItems} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
+    exerciseListItems={exerciseListItems}
+    searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
     gymId={gymId} gymOptions={gymOptions} onSelectGym={setGymId}
     countSecondary={countSecondary} onChangeCountSecondary={filters.selectCountSecondary}
     defaultCountSecondary={values.progressCountSecondary} defaultGrouped={values.progressGrouped} />;

@@ -94,20 +94,13 @@ export const formatCalendarWeekHeading = (key: string, dateFormat: ExerciseDateF
   const start = new Date(`${key}T12:00:00`);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
-  const firstYear = start.getFullYear();
   const lastYear = end.getFullYear();
-  if (firstYear !== lastYear) {
-    const label = (date: Date) => dateFormat === 'YYYY-MM-DD'
-      ? `${date.getFullYear()} ${formatDayMonth(date, dateFormat)}`
-      : `${formatDayMonth(date, dateFormat)} ${date.getFullYear()}`;
-    return `${label(start)} – ${label(end)}`;
-  }
   const days = `${start.getDate()}–${end.getDate()}`;
   const month = MONTH_NAMES[start.getMonth()].slice(0, 3);
   const range = start.getMonth() !== end.getMonth()
     ? `${formatDayMonth(start, dateFormat)} – ${formatDayMonth(end, dateFormat)}`
     : dateFormat === 'DD-MM-YYYY' ? `${days} ${month}` : `${month} ${days}`;
-  return dateFormat === 'YYYY-MM-DD' ? `${firstYear} ${range}` : `${range} ${firstYear}`;
+  return dateFormat === 'YYYY-MM-DD' ? `${lastYear} ${range}` : `${range} ${lastYear}`;
 };
 
 /** Inclusive range of calendar days; callers supply the actual last day. */

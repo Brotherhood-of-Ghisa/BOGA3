@@ -5,7 +5,8 @@ import { ComparisonUnavailableCard } from '@/components/session-complete/compari
 import { ExerciseVolumeCard } from '@/components/session-complete/exercise-volume-card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SectionHeader } from '@/components/ui/page-header';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { partitionVolumeComparisons, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 export type SessionComparisonMode = 'exercise' | 'muscle';
@@ -62,7 +63,7 @@ export function SessionInsightPresentation({
             <ComparisonUnavailableCard names={unavailable} testID={`${testIdPrefix}-comparison-unavailable-${mode}`} />
           </>
         ) : (
-          <Text allowFontScaling={false} style={styles.muted} testID="session-insight-empty">
+          <Text allowFontScaling={false} style={uiText.meta} testID="session-insight-empty">
             {state === 'loading' ? 'Loading comparisons…'
               : state === 'error' ? unavailableMessage
                 : mode === 'muscle' ? 'No mapped working sets for this session.' : 'No working sets to compare.'}
@@ -75,11 +76,4 @@ export function SessionInsightPresentation({
 
 const styles = StyleSheet.create({
   section: { gap: uiSpace.sm },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
 });

@@ -62,7 +62,7 @@ http_request() {
     curl_args+=(-H "Accept-Profile: ${profile}" -H "Content-Profile: ${profile}")
   fi
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -85,7 +85,7 @@ sign_in() {
   local payload
   payload="$(jq -nc --arg e "${email}" --arg p "${password}" '{email: $e, password: $p}')"
   REQUEST_STATUS="$(curl --silent --show-error \
-    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -o "${response_file}" -w "%{http_code}" \
     --data "${payload}" \
     "${API_URL}/auth/v1/token?grant_type=password")"

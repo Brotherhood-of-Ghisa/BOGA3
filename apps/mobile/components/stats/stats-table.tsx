@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, Icon, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, Icon, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
 
 // Progress's one table style, which both breakdowns are drawn with: a `Card`
 // holding a micro-label header row over right-aligned figure columns, and
@@ -16,7 +16,7 @@ import { Card, Icon, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypograp
 const FIGURE_ADVANCE = 0.61;
 // Archivo 700 is proportional, so this is a safe upper bound for an uppercase
 // micro-label with its 0.1em tracking (`W` is the widest glyph at 1.0em),
-// measured on the simulator: a header label is never truncated or wrapped.
+// measured on the simulator; the paired heading can use two lines on a phone.
 const MICRO_LABEL_ADVANCE = 0.95;
 
 /**
@@ -29,7 +29,7 @@ export const statsTableColumnWidth = (
   headerLabel: string, figures: string[], labelExtra = 0,
 ): number => Math.max(
   headerLabel.length * uiTypography.size.xxs * MICRO_LABEL_ADVANCE + labelExtra,
-  ...figures.map(figure => figure.length * uiTypography.size.md * FIGURE_ADVANCE + uiSpace.xs),
+  ...figures.map(figure => figure.length * uiTypography.size.base * FIGURE_ADVANCE + uiSpace.xs),
 );
 
 export function StatsTable({ children, testID }: { children: ReactNode; testID?: string }) {
@@ -50,8 +50,9 @@ export function StatsTableFigures({ children, style, testID }: {
 
 /** One header column: the micro-label, plus any sort indicator as children. */
 export function StatsTableHeaderLabel({ label, active = false }: { label: string; active?: boolean }) {
-  return <Text allowFontScaling={false} numberOfLines={1}
-    style={[styles.headerLabel, active && styles.headerLabelActive]}>{label}</Text>;
+  const multiline = label.includes('\n');
+  return <Text allowFontScaling={false} numberOfLines={multiline ? 2 : 1}
+    style={[uiText.label, active && uiTextTone.ink, multiline && styles.pairedLabel]}>{label}</Text>;
 }
 
 /** Shared sortable header; the caller names its ordering and next action. */
@@ -65,7 +66,7 @@ export function StatsTableSortHeader({ label, active, descending, description, c
     accessibilityLabel={`${description}.${active ? ` Current sort: ${currentSort}.` : ''} Activate to sort ${nextSort}.`}
     onPress={onPress} testID={testID}
     style={({ pressed }) => [statsTableStyles.headerCell, style,
-      numeric && statsTableStyles.headerCellNumeric, pressed && styles.pressed]}>
+      numeric && styles.numericSortHeader, pressed && styles.pressed]}>
     <StatsTableHeaderLabel active={active} label={label} />
     <View accessible={false} testID={`${testID}-indicator`}
       style={[styles.indicator, recent && styles.recency, !active && styles.hidden]}>
@@ -77,7 +78,7 @@ export function StatsTableSortHeader({ label, active, descending, description, c
 }
 
 export function StatsTableFamily({ name, testID }: { name: string; testID?: string }) {
-  return <Text allowFontScaling={false} accessibilityRole="header" style={styles.family} testID={testID}>{name}</Text>;
+  return <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.family]} testID={testID}>{name}</Text>;
 }
 
 export const statsTableStyles = StyleSheet.create({
@@ -85,16 +86,16 @@ export const statsTableStyles = StyleSheet.create({
   nameCell: { flex: 1, minWidth: 0 },
   headerCell: { minHeight: uiGeometry.tapTarget, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   headerCellNumeric: { justifyContent: 'flex-end' },
-  name: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, paddingVertical: uiSpace.xs },
-  figure: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md, color: uiRoles.ink, textAlign: 'right' },
+  // A row's name and a figure cell: layout only, after `uiText.bodyStrong` and
+  // `uiText.figure`.
+  name: { paddingVertical: uiSpace.xs },
+  figure: { textAlign: 'right' },
 });
 
 const styles = StyleSheet.create({
-  family: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase', color: uiRoles.inkMuted, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
+  numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
+  pairedLabel: { textAlign: 'right' },
+  family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
   pressed: { backgroundColor: uiRoles.paper },
   indicator: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
@@ -102,8 +103,4 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.md, paddingHorizontal: uiSpace.md },
   figures: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
-  headerLabel: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase', color: uiRoles.inkMuted },
-  headerLabelActive: { color: uiRoles.ink },
 });

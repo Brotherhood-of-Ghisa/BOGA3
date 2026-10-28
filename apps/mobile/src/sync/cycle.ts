@@ -21,6 +21,8 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 
 import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
+import { mergePullCanApply, syncExerciseMerges, validateMergeOutcomes } from './exercise-merge';
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
@@ -100,6 +102,8 @@ interface PullResponse {
   entities: WireEntity[];
   next_cursor: PullCursor;
   has_more: boolean;
+  merge_sequence?: number;
+  merge_conflict_count?: number;
 }
 
 /** Structured error envelope a successful-status RPC body can carry. */
@@ -687,6 +691,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   session_exercises: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_id', 'sessionId'),
     SC('exercise_definition_id', 'exerciseDefinitionId'),
     SC('source_plan_exercise_id', 'sourcePlanExerciseId'),
@@ -698,6 +703,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   exercise_sets: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('source_plan_set_id', 'sourcePlanSetId'),
     SC('order_index', 'orderIndex'),
@@ -713,6 +719,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   session_exercise_tags: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('exercise_tag_definition_id', 'exerciseTagDefinitionId'),
     TS('created_at', 'createdAt'),
@@ -997,7 +1004,7 @@ const ORDERED_TABLE_CONFIGS: Partial<Record<EntityTableName, OrderedTableConfig>
 
 export interface ProvisionalMove {
   id: string;
-  table: typeof schema.gyms;
+  type: EntityTableName;
 }
 
 export interface PullDrainTracker {
@@ -1013,21 +1020,25 @@ export const finalizePullDrain = (
   tracker: PullDrainTracker,
 ): number => {
   if (tracker.provisionalMoves.size === 0) {
+    clearPersistedPendingMoves(tx);
     return 0;
   }
   let finalizedCount = 0;
   for (const move of tracker.provisionalMoves.values()) {
+    const config = ORDERED_TABLE_CONFIGS[move.type];
+    if (!config) continue;
     const stamp = nowMonotonic(tx);
-    tx.update(move.table)
+    tx.update(config.table)
       .set({
         localDirty: true,
         localUpdatedAtMs: stamp,
       } as never)
-      .where(eq(move.table.id, move.id))
+      .where(eq(config.table.id, move.id))
       .run();
     finalizedCount += 1;
   }
   tracker.provisionalMoves.clear();
+  clearPersistedPendingMoves(tx);
   return finalizedCount;
 };
 
@@ -1131,6 +1142,7 @@ const buildSiblingCandidates = (
 
 const resolveCandidateOrderSlots = (
   candidates: SiblingCandidate[],
+  type: EntityTableName,
   config: OrderedTableConfig,
   tracker: PullDrainTracker,
 ): void => {
@@ -1184,7 +1196,7 @@ const resolveCandidateOrderSlots = (
     ) {
       tracker.provisionalMoves.set(cand.id, {
         id: cand.id,
-        table: config.table,
+        type,
       });
     }
   }
@@ -1223,7 +1235,9 @@ const writeSiblingCandidate = (
     return 0;
   }
 
-  const dirty = cand.needsConflictRepair ? true : Boolean(cand.existingRow?.localDirty);
+  const dirty = cand.needsConflictRepair
+    ? true
+    : (cand.isLocalWinner ? Boolean(cand.existingRow?.localDirty) : false);
   const stamp = cand.needsConflictRepair
     ? nowMonotonic(tx)
     : (cand.isLocalWinner ? Number(cand.existingRow?.localUpdatedAtMs) : cand.effectiveTimestamp);
@@ -1262,13 +1276,19 @@ const applySiblingWrites = (
   return changed;
 };
 
+interface OrderedPullOptions {
+  type: EntityTableName;
+  config: OrderedTableConfig;
+  tracker: PullDrainTracker;
+  force?: boolean;
+}
+
 const applyOrderedPullPage = (
   tx: Transaction,
   entities: WireEntity[],
-  type: EntityTableName,
-  config: OrderedTableConfig,
-  tracker: PullDrainTracker,
+  opts: OrderedPullOptions,
 ): number => {
+  const { type, config, tracker, force = false } = opts;
   for (const envelope of entities) {
     tracker.provisionalMoves.delete(envelope.id);
   }
@@ -1277,6 +1297,13 @@ const applyOrderedPullPage = (
   const orphaned: WireEntity[] = [];
 
   for (const envelope of entities) {
+    const existing = tx
+      .select()
+      .from(config.table)
+      .where(eq(config.table.id, envelope.id))
+      .get() as EntityRow | undefined;
+    if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
+
     const values = wireToEntity(envelope, type) as Record<string, unknown>;
     const parentId = values[config.parentField];
     if (typeof parentId === 'string' && parentId.length > 0) {
@@ -1299,7 +1326,7 @@ const applyOrderedPullPage = (
       .all() as unknown as SiblingEntityRow[];
 
     const candidates = buildSiblingCandidates(type, existingSiblings, incomingEnvelopes);
-    resolveCandidateOrderSlots(candidates, config, tracker);
+    resolveCandidateOrderSlots(candidates, type, config, tracker);
     changed += applySiblingWrites(tx, config, existingSiblings, candidates);
   }
 
@@ -1309,11 +1336,12 @@ const applyOrderedPullPage = (
       .from(config.table)
       .where(eq(config.table.id, envelope.id))
       .get() as EntityRow | undefined;
+    if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
     const values = wireToEntity(envelope, type);
     if (!existing) {
       tx.insert(config.table).values(values as never).run();
       changed += 1;
-    } else if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+    } else if (force || envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
       tx.update(config.table).set(values as never).where(eq(config.table.id, envelope.id)).run();
       changed += 1;
     }
@@ -1326,6 +1354,7 @@ const applyUnorderedPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
+  force = false,
 ): number => {
   const table = ENTITY_TABLES[type] as typeof schema.gyms;
   let changed = 0;
@@ -1337,6 +1366,7 @@ const applyUnorderedPullPage = (
       .where(eq(table.id, envelope.id))
       .get() as EntityRow | undefined;
 
+    if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
     const values = wireToEntity(envelope, type);
 
     if (!existing) {
@@ -1345,7 +1375,7 @@ const applyUnorderedPullPage = (
       continue;
     }
 
-    if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
+    if (force || envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
       changed += 1;
     }
@@ -1379,8 +1409,22 @@ export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
-  tracker?: PullDrainTracker,
+  forceOrTrackerOrOptions?: boolean | PullDrainTracker | { force?: boolean; tracker?: PullDrainTracker },
+  maybeTracker?: PullDrainTracker,
 ): number => {
+  let force = false;
+  let tracker: PullDrainTracker | undefined;
+
+  if (typeof forceOrTrackerOrOptions === 'boolean') {
+    force = forceOrTrackerOrOptions;
+    tracker = maybeTracker;
+  } else if (forceOrTrackerOrOptions && 'provisionalMoves' in forceOrTrackerOrOptions) {
+    tracker = forceOrTrackerOrOptions;
+  } else if (forceOrTrackerOrOptions && typeof forceOrTrackerOrOptions === 'object') {
+    force = Boolean(forceOrTrackerOrOptions.force);
+    tracker = forceOrTrackerOrOptions.tracker;
+  }
+
   let newestStamp = 0;
   for (const envelope of entities) {
     newestStamp = Math.max(newestStamp, envelope.client_updated_at_ms);
@@ -1394,8 +1438,8 @@ export const applyPullPage = (
   const activeTracker = tracker ?? createPullDrainTracker();
   const orderConfig = ORDERED_TABLE_CONFIGS[type];
   const changed = orderConfig
-    ? applyOrderedPullPage(tx, entities, type, orderConfig, activeTracker)
-    : applyUnorderedPullPage(tx, entities, type);
+    ? applyOrderedPullPage(tx, entities, { type, config: orderConfig, tracker: activeTracker, force })
+    : applyUnorderedPullPage(tx, entities, type, force);
 
   let finalized = 0;
   if (!tracker) {
@@ -1409,7 +1453,19 @@ export const applyPullPage = (
 // Pull cursor persistence
 // -----------------------------------------------------------------------------
 
-const readCursorMap = (tx: Transaction): PullCursorMap => {
+const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
+  if (rows.some(row => !ENTITY_ORDER.includes(row.type as EntityTableName))) {
+    throw new Error('Invalid exercise history entity.');
+  }
+  let changed = 0;
+  for (const type of ENTITY_ORDER) {
+    const entities = rows.filter(row => row.type === type) as WireEntity[];
+    if (entities.length) changed += applyPullPage(tx, entities, type, force);
+  }
+  return changed;
+};
+
+const readRawCursorState = (tx: Transaction): Record<string, unknown> => {
   const row = tx
     .select({ pullCursor: schema.syncRuntimeState.pullCursor })
     .from(schema.syncRuntimeState)
@@ -1422,24 +1478,70 @@ const readCursorMap = (tx: Transaction): PullCursorMap => {
   }
   if (typeof raw === 'string') {
     try {
-      return JSON.parse(raw) as PullCursorMap;
+      return JSON.parse(raw) as Record<string, unknown>;
     } catch {
       return {};
     }
   }
-  return raw as PullCursorMap;
+  return raw as Record<string, unknown>;
 };
 
-const writeCursorEntry = (tx: Transaction, layer: number, cursor: PullCursor): void => {
-  const map = readCursorMap(tx);
-  map[String(layer)] = cursor;
+const readCursorMap = (tx: Transaction): PullCursorMap => {
+  const raw = readRawCursorState(tx);
+  const map: PullCursorMap = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (/^\d+$/.test(k)) {
+      map[k] = v as PullCursor;
+    }
+  }
+  return map;
+};
+
+export const readPendingProvisionalMoves = (tx: Transaction): ProvisionalMove[] => {
+  const raw = readRawCursorState(tx);
+  const list = raw.provisional_moves;
+  if (Array.isArray(list)) {
+    return list as ProvisionalMove[];
+  }
+  return [];
+};
+
+export const writeCursorAndPendingMoves = (
+  tx: Transaction,
+  layer: number,
+  cursor: PullCursor,
+  pendingMoves?: ProvisionalMove[],
+): void => {
+  const state = readRawCursorState(tx);
+  state[String(layer)] = cursor;
+  if (pendingMoves !== undefined) {
+    if (pendingMoves.length > 0) {
+      state.provisional_moves = pendingMoves;
+    } else {
+      delete state.provisional_moves;
+    }
+  }
   tx.insert(schema.syncRuntimeState)
-    .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: map as never })
+    .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
     .onConflictDoUpdate({
       target: schema.syncRuntimeState.id,
-      set: { pullCursor: map as never },
+      set: { pullCursor: state as never },
     })
     .run();
+};
+
+const clearPersistedPendingMoves = (tx: Transaction): void => {
+  const state = readRawCursorState(tx);
+  if ('provisional_moves' in state) {
+    delete state.provisional_moves;
+    tx.insert(schema.syncRuntimeState)
+      .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
+      .onConflictDoUpdate({
+        target: schema.syncRuntimeState.id,
+        set: { pullCursor: state as never },
+      })
+      .run();
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -1453,11 +1555,23 @@ type RpcResult = { data: unknown; error: { message?: string } | null };
  * { entities: [...] } straight onto the RPC argument. Throws SyncCycleError on
  * any recognised failure so the caller can branch per error code.
  */
-const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
+// Pin the bearer and check both ends of each request while an account wipe waits for this cycle.
+const callOwnerSyncRpc = async (database: LocalDatabase, name: string, args: Record<string, unknown>): Promise<RpcResult> => {
+  const owner = database.select().from(schema.syncRuntimeState)
+    .where(eq(schema.syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId ?? null;
+  if (await getSignedInUserId() !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client
-    .schema(SYNC_RPC_SCHEMA)
-    .rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
+  const session = owner ? (await client.auth.getSession()).data.session : null;
+  if (owner && session?.user.id !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
+  const result = await client.schema(SYNC_RPC_SCHEMA).rpc(name, args)
+    .setHeader('Authorization', session ? 'Bearer ' + session.access_token : 'Bearer ');
+  if (await getSignedInUserId() !== owner) throw new SyncCycleError('AUTH_REQUIRED', 'Account changed during sync.');
+  if (!owner && result.error?.code === 'PGRST301') throw new SyncCycleError('AUTH_REQUIRED', 'Sign in to sync.');
+  return result as RpcResult;
+};
+
+const callSyncPush = async (database: LocalDatabase, entities: WireEntity[]): Promise<void> => {
+  const { data, error } = await callOwnerSyncRpc(database, SYNC_PUSH_RPC, { entities });
   const code = classifyRpcResult(error, data);
   if (code) {
     const message = error?.message ?? `sync push failed: ${code}`;
@@ -1469,6 +1583,7 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
     }
     throw new SyncCycleError(code, message);
   }
+  validateMergeOutcomes(data, entities);
 };
 
 /**
@@ -1476,13 +1591,8 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
  * argument, so the whole body is the argument value. Throws SyncCycleError on a
  * recognised failure; otherwise returns the typed page.
  */
-const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResponse> => {
-  const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PULL_RPC, {
-    layer,
-    cursor,
-    limit: BATCH_CAP,
-  })) as RpcResult;
+const callSyncPull = async (database: LocalDatabase, layer: number, cursor: PullCursor): Promise<PullResponse> => {
+  const { data, error } = await callOwnerSyncRpc(database, SYNC_PULL_RPC, { layer, cursor, limit: BATCH_CAP });
 
   const code = classifyRpcResult(error, data);
   if (code) {
@@ -1490,10 +1600,17 @@ const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResp
   }
 
   const page = (data ?? {}) as Partial<PullResponse>;
+  for (const value of [page.merge_sequence, page.merge_conflict_count]) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      throw new SyncCycleError('INTERNAL', 'Invalid merge sync state.');
+    }
+  }
   return {
     entities: page.entities ?? [],
     next_cursor: page.next_cursor ?? null,
     has_more: page.has_more ?? false,
+    merge_sequence: page.merge_sequence ?? 0,
+    merge_conflict_count: page.merge_conflict_count ?? 0,
   };
 };
 
@@ -1571,7 +1688,12 @@ const applyPageWithArbitrationRepair = async (
             changed += applyPullPage(transaction, forType, type, tracker);
           }
         }
-        writeCursorEntry(transaction, layer, page.next_cursor);
+        writeCursorAndPendingMoves(
+          transaction,
+          layer,
+          page.next_cursor,
+          tracker ? Array.from(tracker.provisionalMoves.values()) : undefined,
+        );
         return changed;
       });
     } catch (error) {
@@ -1607,22 +1729,66 @@ const applyPageWithArbitrationRepair = async (
   }
 };
 
+const notifyPageCommitted = async (page: PullResponse, pageChanged: number): Promise<void> => {
+  if (pageChanged <= 0) return;
+  invalidateExerciseCatalogCache();
+  if (page.entities.some(entity => entity.type === 'body_weight_measurements' || entity.type === 'sessions')) {
+    invalidateBodyWeightContext();
+  }
+  if (page.entities.some(entity => entity.type === 'user_settings')) {
+    await refreshBodyweightCalculationPreference();
+  }
+};
+
+const syncPostDrainMerges = async (
+  database: LocalDatabase,
+  remoteMergeSequence: number,
+  conflictCount: number,
+): Promise<number> => {
+  const owner = database.select().from(schema.syncRuntimeState)
+    .where(eq(schema.syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
+  if (!owner) return 0;
+  const changed = await syncExerciseMerges({
+    database,
+    owner,
+    remoteSequence: remoteMergeSequence,
+    conflictCount,
+    adapter: {
+      toWire: (row, type) => entityToWire(row as EntityRow, type as EntityTableName),
+      apply: applyMergeRows,
+    },
+  });
+  if (changed > 0) {
+    invalidateExerciseCatalogCache();
+    invalidateBodyWeightContext();
+  }
+  return changed;
+};
+
 const runPullLeg = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
 ): Promise<PullLegResult> => {
   let receivedTotal = 0;
   let changedTotal = 0;
+  let remoteMergeSequence = 0;
+  let conflictCount = 0;
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
     const layerTypes = TOPO_LAYERS[layer] as readonly EntityTableName[];
     const tracker = createPullDrainTracker();
+    const restoredMoves = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    for (const move of restoredMoves) {
+      tracker.provisionalMoves.set(move.id, move);
+    }
 
     for (;;) {
       const cursor = database.transaction(
         (tx) => readCursorMap(tx as Transaction)[String(layer)] ?? null,
       );
-      const page = await callSyncPull(layer, cursor);
+      const page = await callSyncPull(database, layer, cursor);
+      remoteMergeSequence = Math.max(remoteMergeSequence, page.merge_sequence ?? 0);
+      conflictCount = Math.max(conflictCount, page.merge_conflict_count ?? 0);
 
       const pageChanged = await applyPageWithArbitrationRepair(
         database,
@@ -1632,16 +1798,7 @@ const runPullLeg = async (
         tracker,
       );
 
-      // Notify after this page commits, even if a later pull/push fails.
-      if (pageChanged > 0) {
-        invalidateExerciseCatalogCache();
-        if (page.entities.some(entity => entity.type === 'body_weight_measurements' || entity.type === 'sessions')) {
-          invalidateBodyWeightContext();
-        }
-        if (page.entities.some(entity => entity.type === 'user_settings')) {
-          await refreshBodyweightCalculationPreference();
-        }
-      }
+      await notifyPageCommitted(page, pageChanged);
       receivedTotal += page.entities.length;
       changedTotal += pageChanged;
       // Progress reflects rows the server delivered (received), matching what a
@@ -1666,6 +1823,7 @@ const runPullLeg = async (
     reporter?.onLayerDrained?.(layer + 1);
   }
 
+  changedTotal += await syncPostDrainMerges(database, remoteMergeSequence, conflictCount);
   return { received: receivedTotal, changed: changedTotal };
 };
 
@@ -1805,7 +1963,7 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
       attempted.add(rowKey(entity.type, entity.id));
     }
 
-    await callSyncPush(batch);
+    await callSyncPush(database, batch);
 
     // Clear the dirty bit one row at a time, each in its own transaction, so a
     // concurrent local edit on a different row is never clobbered and a row

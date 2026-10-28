@@ -108,19 +108,19 @@ B_GYM="dw-${RUN_TAG}-bgym"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.session_exercise_tags    where id in ('${A_SXTAG}');
+    delete from app_public.exercise_sets            where id in ('${A_SET}');
+    delete from app_public.session_exercises        where id in ('${A_SX}');
+    delete from app_public.sessions                 where id in ('${A_SESS}');
     delete from app_public.session_plan_sets        where id in ('${A_SPS}');
     delete from app_public.session_plan_exercises   where id in ('${A_SPE}');
     delete from app_public.session_plans            where id in ('${A_SP}');
     delete from app_public.training_programmes      where id in ('${A_TP}');
-    delete from app_public.session_exercise_tags    where id in ('${A_SXTAG}');
-    delete from app_public.exercise_sets            where id in ('${A_SET}');
-    delete from app_public.session_exercises        where id in ('${A_SX}');
     delete from app_public.exercise_muscle_mappings where id in ('${A_EMM}');
     delete from app_public.muscle_groups            where id in ('${A_MG}');
     delete from app_public.exercise_tag_definitions where id in ('${A_ETD}');
     delete from app_public.body_weight_measurements where id = '${A_BW}';
     delete from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid;
-    delete from app_public.sessions                 where id in ('${A_SESS}');
     delete from app_public.exercise_group_links     where id in ('${A_EGL}');
     delete from app_public.exercise_definitions     where id in ('${A_EDEF}');
     delete from app_public.gyms                     where id in ('${A_GYM}', '${B_GYM}');
@@ -195,18 +195,20 @@ echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 run_psql_sql "
   begin;
     set constraints all deferred;
+    delete from public.agent_plan_write_receipts where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from public.agent_plan_permissions where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.sessions                 where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_plan_sets        where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_plan_exercises   where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_plans            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.training_programmes      where owner_user_id = '${USER_A_UUID}'::uuid;
-    delete from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid;
-    delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
-    delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_muscle_mappings where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.muscle_groups            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_tag_definitions where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.body_weight_measurements where owner_user_id = '${USER_A_UUID}'::uuid;
-    delete from app_public.sessions                 where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_definitions     where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.gyms                     where owner_user_id = '${USER_A_UUID}'::uuid;

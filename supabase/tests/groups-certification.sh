@@ -70,7 +70,8 @@ set_sweep_active() {
 
 cleanup() {
   run_psql "set client_min_messages = warning;
-            alter table app_public.group_metric_eval_queue drop constraint if exists ${FORCE_ENQUEUE_CONSTRAINT};" >/dev/null
+            alter table app_public.group_metric_eval_queue drop constraint if exists ${FORCE_ENQUEUE_CONSTRAINT};
+            alter table app_public.group_metric_certifications drop constraint if exists groups_ct_merge_end_failure;" >/dev/null
   set_kick_url "${ORIGINAL_KICK_URL}"
   if [[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" ]]; then set_sweep_active true; else set_sweep_active false; fi
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
@@ -1070,6 +1071,43 @@ expect_sql "the rebuild writes only the rules_change" \
   "select string_agg(kind, ',' order by seq) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" \
   "rules_change"
 pass "a rules-revision rebuild keeps the certification and writes only the rules_change"
+
+# Exercise merges retain links and same-mode witnesses; distribution changes are terminal,
+# even when eager group correction fails. The immutable boundary protects public reads.
+MS="${T}-merge-source"; MT="${T}-merge-target"; MP="${T}-merge-per-side"
+def "${ATHLETE_TOKEN}" "${MS}" total_load
+def "${ATHLETE_TOKEN}" "${MT}" total_load
+def "${ATHLETE_TOKEN}" "${MP}" per_side_load
+link "${ATHLETE_TOKEN}" "${MS}"
+link "${ATHLETE_TOKEN}" "${MT}"
+link "${ATHLETE_TOKEN}" "${MP}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-merge-session" completed "${MS}" "merge-set:200:1"
+drain "merge witness setup"
+certify_set "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" merge-set MERGE_ORIGINAL
+LINKS_BEFORE="$(run_psql "select md5(jsonb_agg(to_jsonb(l) order by l.id)::text) from app_public.exercise_group_links l where owner_user_id='${ATHLETE_UID}';")"
+merge_exercises() {
+  local source="$1" destination="$2" operation="$3" preview_token
+  rpc "${ATHLETE_TOKEN}" exercise_merge_preview "$(jq -nc --arg a "${source}" --arg b "${destination}" '{p_source:$a,p_destination:$b}')"
+  expect_ok "preview exercise merge"
+  preview_token="$(jq -er '.token' <<<"${BODY}")"
+  rpc "${ATHLETE_TOKEN}" exercise_merge_execute "$(jq -nc --arg a "${source}" --arg b "${destination}" --arg id "${operation}" --arg token "${preview_token}" '{p_source:$a,p_destination:$b,p_id:$id,p_token:$token}')"
+  expect_ok "execute exercise merge"
+}
+merge_exercises "${MS}" "${MT}" "${T}-same-mode"
+expect_sql "same-mode merge retains the witness" "select bool_and(app_public.group_metric_certification_mode_matches(c)) from app_public.group_metric_certifications c where set_id='${T}-merge-set' and ended_at is null;" "t"
+expect_sql "merge never rewrites links" "select md5(jsonb_agg(to_jsonb(l) order by l.id)::text) from app_public.exercise_group_links l where owner_user_id='${ATHLETE_UID}';" "${LINKS_BEFORE}"
+run_psql "alter table app_public.group_metric_certifications add constraint groups_ct_merge_end_failure check(ended_at is null) not valid;" >/dev/null
+merge_exercises "${MT}" "${MP}" "${T}-changed-mode"
+run_psql "alter table app_public.group_metric_certifications drop constraint groups_ct_merge_end_failure;" >/dev/null
+expect_sql "failed eager correction retains raw witness rows for repair" "select count(*) from app_public.group_metric_certifications where set_id='${T}-merge-set' and ended_at is null;" "2"
+expect_sql "merge boundary makes the old witness terminal" "select bool_and(not app_public.group_metric_certification_mode_matches(c)) from app_public.group_metric_certifications c where set_id='${T}-merge-set' and ended_at is null;" "t"
+expect_sql "fallback audit names the real merge instant" "select bool_and((app_public.group_competition_certification_json(c)->>'ended_at_ms')::bigint >= floor(extract(epoch from o.created_at)*1000)::bigint) from app_public.group_metric_certifications c join public.exercise_merge_operations o on o.user_id=c.member_user_id and o.id='${T}-changed-mode' where c.set_id='${T}-merge-set';" "t"
+drain "mode-changing merge"
+certify_set "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" merge-set MERGE_FRESH
+expect_sql "new post-merge root observations stay valid" "select bool_and(app_public.group_metric_certification_mode_matches(c)) from app_public.group_metric_certifications c where set_id='${T}-merge-set' and ended_at is null;" "t"
+expect_sql "merge created no witnesses" "select count(distinct coalesce(witness_certification_id,id)) from app_public.group_metric_certifications where set_id='${T}-merge-set';" "2"
+pass "exercise merges preserve links and same-mode witnesses; failed correction is terminal; fresh observations remain valid"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

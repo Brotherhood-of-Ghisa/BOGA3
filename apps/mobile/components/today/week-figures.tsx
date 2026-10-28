@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 
 import { formatPeriodRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
-import { todayText } from './text-styles';
 
 type ShareBarProps = { current: number; previous: number; testID?: string };
 
@@ -52,20 +53,20 @@ export function WeekFigure({ label, current, previous, record = false, previousW
       accessibilityLabel={weekFigureAccessibilityLabel(label, { current, previous }, previousWeek.spoken)}
       style={styles.figure}
       testID={testID}>
-      <Text allowFontScaling={false} style={todayText.microLabel}>
+      <Text allowFontScaling={false} style={uiText.label}>
         {label}
       </Text>
       <View style={styles.valueRow}>
         <Text
           allowFontScaling={false}
-          style={[todayText.headlineFigure, showRecord ? todayText.record : null]}
+          style={[uiText.figureHero, showRecord ? uiTextTone.record : null]}
           testID={`${testID}-value`}>
           {current}
         </Text>
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
-      <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-previous`}>
-        {previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}
+      <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-previous`}>
+        <FigureText>{previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}</FigureText>
       </Text>
     </View>
   );
@@ -78,12 +79,12 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
           This week
         </Text>
         <Text
           allowFontScaling={false}
-          style={[todayText.microLabel, todayText.microLabelFaint]}
+          style={[uiText.label, uiTextTone.faint]}
           testID="today-progress-week-range">
           {formatPeriodRange(week.window)}
         </Text>

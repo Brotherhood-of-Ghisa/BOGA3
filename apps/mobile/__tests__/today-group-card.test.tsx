@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * Today's Group activity card through the production route: My groups and the
+ * Today's Groups cards through the production route: My groups and the
  * week summary go through the real cache-first hooks over the in-memory app
  * database (helpers/local-data.ts, so `group_cache` is real). Only the group
  * RPCs, auth, NetInfo and the router are replaced. The week summary's own
@@ -60,7 +60,6 @@ import {
 } from '@/src/groups';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
-import { updatePreferences } from '@/src/preferences/hooks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
 
@@ -159,8 +158,7 @@ describe('Today: the group card account states', () => {
     await renderToday();
 
     fireEvent.press(byId('today-group-sign-in'));
-    fireEvent.press(byId('today-view-groups-button'));
-    expect(mockPush.mock.calls).toEqual([[SIGN_IN_ROUTE], ['/groups']]);
+    expect(mockPush.mock.calls).toEqual([[SIGN_IN_ROUTE]]);
     expect(api.listMyGroups).not.toHaveBeenCalled();
   });
 
@@ -214,7 +212,7 @@ const sessionMembers = () => within(byId('today-group-section')).queryAllByTestI
   .map((node) => node.props.children as string);
 
 describe('Today: the group card', () => {
-  it('with one group: the heading names it with no switch, and this local week is read', async () => {
+  it("with one group: the section is Groups, the board card's header row names the group with no switch, and this local week is read", async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
     api.getCompetitionWeek.mockResolvedValue(summary());
     await renderToday();
@@ -222,7 +220,8 @@ describe('Today: the group card', () => {
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     const week = localWeekWindow(new Date());
     expect(api.getCompetitionWeek).toHaveBeenCalledWith('g1',week.start.getTime(),week.end.getTime());
-    expect(byId('today-group-title')).toHaveTextContent('Iron Wednesdays');
+    expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
+    expect(within(byId('today-group-card')).getByTestId('today-group-title')).toHaveTextContent('Iron Wednesdays');
     expect(screen.queryByTestId('today-group-switch')).toBeNull();
     // `This week` and this local week (Mon 5 – Sun 11 Oct 2026), in Today's range format.
     expect(within(byId('today-group-card')).getByText(/This week/)).toBeTruthy();
@@ -237,8 +236,8 @@ describe('Today: the group card', () => {
     // The count column is the working sets, labelled `Sets` like every set count.
     expect(within(byId('today-group-board')).getByText('Sets')).toBeTruthy();
 
-    // The board and the heading both open the group's home page, At a glance;
-    // the card carries no link of its own.
+    // The board and the header row's name both open the group's home page, At a glance;
+    // the card carries no other link.
     expect(screen.queryByTestId('today-view-group-button')).toBeNull();
     fireEvent.press(byId('today-group-board'));
     fireEvent.press(byId('today-group-title'));
@@ -271,7 +270,7 @@ describe('Today: the group card', () => {
     expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 5 – 11 Oct 26; 1, dave, 60 sets, 0 PRs;.*; You, 7th, 30 sets, 2 PRs$/);
   });
 
-  it('with several groups: the heading names the Groups screen pick, and its switch moves both', async () => {
+  it("with several groups: the header row names the Groups screen pick, and its switch, on the same row, moves both", async () => {
     setLastViewedGroupId('g2');
     api.listMyGroups.mockResolvedValue({ groups: [IRON, LUNCH] });
     api.getCompetitionWeek.mockImplementation(async (groupId) =>
@@ -281,6 +280,7 @@ describe('Today: the group card', () => {
 
     await waitFor(() => expect(byId('today-group-board-row-lena')).toBeTruthy());
     expect(byId('today-group-title')).toHaveTextContent('Lunch Club');
+    expect(within(byId('today-group-card')).getByTestId('today-group-switch')).toBeTruthy();
     expect(api.getCompetitionWeek).toHaveBeenLastCalledWith('g2',expect.any(Number),expect.any(Number));
 
     fireEvent.press(byId('today-group-switch'));
@@ -319,6 +319,8 @@ describe('Today: the group card', () => {
 
       // Live: today's start time and the figures so far, no record.
       expect(byId('today-group-session-maria-live-when')).toHaveTextContent('Started 11:30');
+      // The live time keeps the line's emphasis: its figure is no lighter than `Started`.
+      expect(within(byId('today-group-session-maria-live-when')).getByText('11:30')).toHaveStyle({ fontWeight: '600' });
       expect(byId('today-group-session-maria-live-figures')).toHaveTextContent('3 exercises · 7 sets so far');
       expect(screen.queryByTestId('today-group-session-maria-live-record')).toBeNull();
       // Completed: Today's compact date and time, then the session's figures.
@@ -438,6 +440,8 @@ describe('Today: the group card offline and on errors', () => {
     const view = await renderToday();
 
     await waitFor(() => expect(byId('today-group-error-state')).toBeTruthy());
+    // Missing data: no header row to name the group or switch it; Retry is the way on.
+    expect(screen.queryByTestId('today-group-title')).toBeNull();
     await act(async () => {
       fireEvent.press(byId('today-group-error-state-retry'));
     });
@@ -469,14 +473,7 @@ describe('Today: the group card offline and on errors', () => {
   });
 });
 
-describe("Today: the group card in the cards layout (Settings' Today layout: Cards)", () => {
-  beforeEach(() => {
-    act(() => updatePreferences({ todayLayout: 'cards' }));
-  });
-  afterEach(() => {
-    act(() => updatePreferences({ todayLayout: 'list' }));
-  });
-
+describe("Today: the group's page", () => {
   it('lets the live card take the page and scroll its rows when it is the only sessions card', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
     api.getCompetitionWeek.mockResolvedValue(summary({ training_now: ['maria', 'sam', 'tom', 'kit'].map(live) }));
@@ -488,45 +485,42 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     expect(within(byId('today-group-live')).UNSAFE_getAllByType(ScrollView)).toHaveLength(1);
   });
 
-  it("names the group's card after it, and offers its switch only while that card shows", async () => {
+  it("labels the tab Groups and heads the board card with the group's name and its switch", async () => {
     setLastViewedGroupId('g2');
     api.listMyGroups.mockResolvedValue({ groups: [IRON, LUNCH] });
     api.getCompetitionWeek.mockImplementation(async (groupId) => summary({ group_id: groupId }));
     await renderToday();
 
     await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
-    expect(byId('today-group-section-tab')).toHaveTextContent('Lunch Club');
-    expect(screen.queryByTestId('today-group-switch')).toBeNull();
+    expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
+    // Nothing sits beside the tabs: the name and switch are the board card's.
     expect(screen.queryByTestId('today-group-open')).toBeNull();
+    const card = within(byId('today-group-card'));
+    expect(card.getByTestId('today-group-title')).toHaveTextContent('Lunch Club');
 
-    fireEvent.press(byId('today-group-section-tab'));
-    fireEvent.press(byId('today-group-switch'));
+    fireEvent.press(card.getByTestId('today-group-switch'));
     fireEvent.press(byId('today-group-switch-g1'));
-    await waitFor(() => expect(byId('today-group-section-tab')).toHaveTextContent('Iron Wednesdays'));
+    await waitFor(() => expect(byId('today-group-title')).toHaveTextContent('Iron Wednesdays'));
+    expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
     expect(getLastViewedGroupId()).toBe('g1');
 
-    // The first page is `You`; the group's page draws its own two cards, with no footer link.
+    // The first page is `You`; the group's page draws its own two cards.
     expect(byId('today-progress-section-tab')).toHaveTextContent('You');
     expect(within(byId('today-group-section')).getByTestId('today-group-sessions')).toBeTruthy();
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
 
-    // The open-group icon beside the tabs opens the shown group At a glance, as
-    // the list layout's heading does; the board card has no link of its own.
-    expect(screen.queryByTestId('today-view-group-button')).toBeNull();
-    expect(byId('today-group-open')).toHaveProp('accessibilityLabel', 'Open group');
-    fireEvent.press(byId('today-group-open'));
+    // The name opens the shown group At a glance.
+    fireEvent.press(byId('today-group-title'));
     expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
   });
 
-  it('offers the open-group icon with one group, where there is no switch', async () => {
+  it('with one group: the header row opens the group, and there is no switch', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
     api.getCompetitionWeek.mockResolvedValue(summary());
     await renderToday();
 
     await waitFor(() => expect(within(byId('today-group-section')).getByTestId('today-group-card')).toBeTruthy());
-    fireEvent.press(byId('today-group-section-tab'));
     expect(screen.queryByTestId('today-group-switch')).toBeNull();
-    fireEvent.press(byId('today-group-open'));
+    fireEvent.press(byId('today-group-title'));
     expect(mockPush).toHaveBeenLastCalledWith('/groups?groupId=g1&section=glance');
   });
 
@@ -538,13 +532,12 @@ describe("Today: the group card in the cards layout (Settings' Today layout: Car
     expect(byId('today-group-missing')).toHaveStyle({ flex: 1, justifyContent: 'center' });
   });
 
-  it("shows the signed-out panel on the group's page, with no footer link", async () => {
+  it("shows the signed-out panel on the group's page", async () => {
     mockUseAuth.mockReturnValue({ isConfigured: true, user: null });
     await renderToday();
 
     expect(within(byId('today-group-section')).getByTestId('today-group-signed-out')).toBeTruthy();
-    expect(byId('today-group-section-tab')).toHaveTextContent('Group activity');
-    expect(screen.queryByTestId('today-view-groups-button')).toBeNull();
+    expect(byId('today-group-section-tab')).toHaveTextContent('Groups');
     fireEvent.press(byId('today-group-sign-in'));
     expect(mockPush).toHaveBeenLastCalledWith(SIGN_IN_ROUTE);
   });

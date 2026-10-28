@@ -2,6 +2,84 @@
 -- Service-role-only atomic RPCs for connected coaching agent plan and programme mutations.
 
 -- -----------------------------------------------------------------------------
+-- Dedicated monotonic graph_version token independent of Sync v2 server_received_at
+-- -----------------------------------------------------------------------------
+
+alter table app_public.session_plans
+  add column if not exists graph_version timestamptz not null default clock_timestamp();
+
+alter table app_public.training_programmes
+  add column if not exists graph_version timestamptz not null default clock_timestamp();
+
+create or replace function app_public.advance_plan_graph_version(p_owner uuid, p_plan_id text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _prog_id text;
+  _new_ver timestamptz;
+begin
+  if p_owner is null or p_plan_id is null then
+    return null;
+  end if;
+
+  if nullif(current_setting('request.jwt.claim.sub', true), '') is null then
+    perform set_config('request.jwt.claim.sub', p_owner::text, true);
+  end if;
+
+  select sp.programme_id
+    into _prog_id
+    from app_public.session_plans sp
+   where sp.owner_user_id = p_owner
+     and sp.id = p_plan_id;
+
+  if _prog_id is not null then
+    update app_public.training_programmes tp
+       set graph_version = greatest(clock_timestamp(), coalesce(tp.graph_version, clock_timestamp()) + interval '1 microsecond')
+     where tp.owner_user_id = p_owner
+       and tp.id = _prog_id;
+  end if;
+
+  update app_public.session_plans sp
+     set graph_version = greatest(clock_timestamp(), coalesce(sp.graph_version, clock_timestamp()) + interval '1 microsecond')
+   where sp.owner_user_id = p_owner
+     and sp.id = p_plan_id
+  returning sp.graph_version into _new_ver;
+
+  return _new_ver;
+end;
+$func$;
+
+create or replace function app_public.advance_programme_graph_version(p_owner uuid, p_programme_id text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _new_ver timestamptz;
+begin
+  if p_owner is null or p_programme_id is null then
+    return null;
+  end if;
+
+  if nullif(current_setting('request.jwt.claim.sub', true), '') is null then
+    perform set_config('request.jwt.claim.sub', p_owner::text, true);
+  end if;
+
+  update app_public.training_programmes tp
+     set graph_version = greatest(clock_timestamp(), coalesce(tp.graph_version, clock_timestamp()) + interval '1 microsecond')
+   where tp.owner_user_id = p_owner
+     and tp.id = p_programme_id
+  returning tp.graph_version into _new_ver;
+
+  return _new_ver;
+end;
+$func$;
+
+-- -----------------------------------------------------------------------------
 -- Coordinate sync provenance and child writes with plan/programme graph locking
 -- -----------------------------------------------------------------------------
 
@@ -12,36 +90,21 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _prog_id text;
+  _plan_id text;
+  _owner   uuid;
 begin
-  if new.session_plan_id is not null then
-    select sp.programme_id
-      into _prog_id
-      from app_public.session_plans sp
-     where sp.owner_user_id = new.owner_user_id
-       and sp.id = new.session_plan_id;
-
-    if _prog_id is not null then
-      perform 1
-         from app_public.training_programmes tp
-        where tp.owner_user_id = new.owner_user_id
-          and tp.id = _prog_id
-          for update;
-    end if;
-
-    perform 1
-       from app_public.session_plans sp
-      where sp.owner_user_id = new.owner_user_id
-        and sp.id = new.session_plan_id
-        for update;
+  _plan_id := coalesce(new.session_plan_id, old.session_plan_id);
+  _owner   := coalesce(new.owner_user_id, old.owner_user_id);
+  if _plan_id is not null and _owner is not null then
+    perform app_public.advance_plan_graph_version(_owner, _plan_id);
   end if;
-  return new;
+  return coalesce(new, old);
 end;
 $func$;
 
 drop trigger if exists session_plan_exercises_coordinate_sync_lock on app_public.session_plan_exercises;
 create trigger session_plan_exercises_coordinate_sync_lock
-  before insert or update on app_public.session_plan_exercises
+  before insert or update or delete on app_public.session_plan_exercises
   for each row
   execute function app_public.coordinate_session_plan_exercise_sync_lock();
 
@@ -52,47 +115,106 @@ security definer
 set search_path = ''
 as $func$
 declare
-  _plan_id text;
-  _prog_id text;
+  _block_id text;
+  _plan_id  text;
+  _owner    uuid;
 begin
-  if new.session_plan_exercise_id is not null then
+  _block_id := coalesce(new.session_plan_exercise_id, old.session_plan_exercise_id);
+  _owner    := coalesce(new.owner_user_id, old.owner_user_id);
+
+  if _block_id is not null and _owner is not null then
     select spe.session_plan_id
       into _plan_id
       from app_public.session_plan_exercises spe
-     where spe.owner_user_id = new.owner_user_id
-       and spe.id = new.session_plan_exercise_id;
+     where spe.owner_user_id = _owner
+       and spe.id = _block_id;
 
     if _plan_id is not null then
-      select sp.programme_id
-        into _prog_id
-        from app_public.session_plans sp
-       where sp.owner_user_id = new.owner_user_id
-         and sp.id = _plan_id;
+      perform app_public.advance_plan_graph_version(_owner, _plan_id);
+    end if;
+  end if;
+  return coalesce(new, old);
+end;
+$func$;
 
-      if _prog_id is not null then
-        perform 1
-           from app_public.training_programmes tp
-          where tp.owner_user_id = new.owner_user_id
-            and tp.id = _prog_id
-            for update;
-      end if;
+drop trigger if exists session_plan_sets_coordinate_sync_lock on app_public.session_plan_sets;
+create trigger session_plan_sets_coordinate_sync_lock
+  before insert or update or delete on app_public.session_plan_sets
+  for each row
+  execute function app_public.coordinate_session_plan_set_sync_lock();
 
-      perform 1
-         from app_public.session_plans sp
-        where sp.owner_user_id = new.owner_user_id
-          and sp.id = _plan_id
-          for update;
+create or replace function app_public.touch_session_plan_graph_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _prog_id text;
+begin
+  if new.graph_version is not distinct from old.graph_version then
+    new.graph_version := greatest(clock_timestamp(), coalesce(old.graph_version, clock_timestamp()) + interval '1 microsecond');
+
+    _prog_id := coalesce(new.programme_id, old.programme_id);
+    if _prog_id is not null then
+      update app_public.training_programmes tp
+         set graph_version = greatest(clock_timestamp(), coalesce(tp.graph_version, clock_timestamp()) + interval '1 microsecond')
+       where tp.owner_user_id = new.owner_user_id
+         and tp.id = _prog_id;
     end if;
   end if;
   return new;
 end;
 $func$;
 
-drop trigger if exists session_plan_sets_coordinate_sync_lock on app_public.session_plan_sets;
-create trigger session_plan_sets_coordinate_sync_lock
-  before insert or update on app_public.session_plan_sets
+drop trigger if exists session_plans_touch_graph_version on app_public.session_plans;
+create trigger session_plans_touch_graph_version
+  before update on app_public.session_plans
   for each row
-  execute function app_public.coordinate_session_plan_set_sync_lock();
+  execute function app_public.touch_session_plan_graph_version();
+
+create or replace function app_public.touch_training_programme_graph_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+begin
+  if new.graph_version is not distinct from old.graph_version then
+    new.graph_version := greatest(clock_timestamp(), coalesce(old.graph_version, clock_timestamp()) + interval '1 microsecond');
+  end if;
+  return new;
+end;
+$func$;
+
+drop trigger if exists training_programmes_touch_graph_version on app_public.training_programmes;
+create trigger training_programmes_touch_graph_version
+  before update on app_public.training_programmes
+  for each row
+  execute function app_public.touch_training_programme_graph_version();
+
+create or replace function app_public.coordinate_session_plan_delete_graph_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+begin
+  if old.programme_id is not null and old.owner_user_id is not null then
+    update app_public.training_programmes tp
+       set graph_version = greatest(clock_timestamp(), coalesce(tp.graph_version, clock_timestamp()) + interval '1 microsecond')
+     where tp.owner_user_id = old.owner_user_id
+       and tp.id = old.programme_id;
+  end if;
+  return old;
+end;
+$func$;
+
+drop trigger if exists session_plans_coordinate_delete_graph_version on app_public.session_plans;
+create trigger session_plans_coordinate_delete_graph_version
+  after delete on app_public.session_plans
+  for each row
+  execute function app_public.coordinate_session_plan_delete_graph_version();
 
 create or replace function app_public.coordinate_session_exercise_provenance_lock()
 returns trigger
@@ -222,6 +344,177 @@ create trigger exercise_sets_coordinate_provenance_lock
   execute function app_public.coordinate_exercise_set_provenance_lock();
 
 -- -----------------------------------------------------------------------------
+-- Re-affirm plan creation helpers with request.jwt.claim.sub authentication context
+-- -----------------------------------------------------------------------------
+
+create or replace function app_public.agent_create_session_plan(
+  p_owner uuid,
+  p_client_id text,
+  p_idempotency_key text,
+  p_payload_sha256 text,
+  p_plan jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _operation     text := 'create_session_plan';
+  _now_ms        bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  _existing_hash text;
+  _existing      jsonb;
+  _plan_id       text := gen_random_uuid()::text;
+  _graph         jsonb;
+  _result        jsonb;
+begin
+  perform set_config('request.jwt.claim.sub', p_owner::text, true);
+
+  if p_idempotency_key is null
+     or length(btrim(p_idempotency_key)) < 1
+     or length(p_idempotency_key) > 128 then
+    raise exception 'INVALID_ARGUMENT' using errcode = 'P0001';
+  end if;
+
+  insert into public.agent_plan_write_receipts (
+    owner_user_id, client_id, operation, idempotency_key, payload_sha256, result_ids
+  ) values (
+    p_owner, p_client_id, _operation, p_idempotency_key, p_payload_sha256, '{}'::jsonb
+  )
+  on conflict (owner_user_id, client_id, operation, idempotency_key) do nothing;
+
+  if not found then
+    select r.payload_sha256, r.result_ids
+      into _existing_hash, _existing
+      from public.agent_plan_write_receipts r
+     where r.owner_user_id = p_owner
+       and r.client_id = p_client_id
+       and r.operation = _operation
+       and r.idempotency_key = p_idempotency_key;
+    if _existing_hash is distinct from p_payload_sha256 then
+      raise exception 'IDEMPOTENCY_CONFLICT' using errcode = 'P0001';
+    end if;
+    return _existing || jsonb_build_object('idempotent_replay', true);
+  end if;
+
+  _graph := app_public.agent_insert_plan_graph(
+    p_owner, _plan_id, null, null, p_plan, _now_ms
+  );
+
+  _result := jsonb_build_object(
+    'plan_id', _plan_id,
+    'programme_id', null,
+    'exercise_ids', _graph -> 'exercise_ids',
+    'set_ids', _graph -> 'set_ids',
+    'idempotent_replay', false
+  );
+
+  update public.agent_plan_write_receipts
+     set result_ids = _result
+   where owner_user_id = p_owner
+     and client_id = p_client_id
+     and operation = _operation
+     and idempotency_key = p_idempotency_key;
+
+  return _result;
+end;
+$func$;
+
+create or replace function app_public.agent_create_training_programme(
+  p_owner uuid,
+  p_client_id text,
+  p_idempotency_key text,
+  p_payload_sha256 text,
+  p_programme jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+declare
+  _operation     text := 'create_training_programme';
+  _now_ms        bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  _existing_hash text;
+  _existing      jsonb;
+  _programme_id  text := gen_random_uuid()::text;
+  _plan          jsonb;
+  _plan_id       text;
+  _plan_ids      jsonb := '[]'::jsonb;
+  _exercise_ids  jsonb := '[]'::jsonb;
+  _set_ids       jsonb := '[]'::jsonb;
+  _graph         jsonb;
+  _plan_index    integer := 0;
+  _result        jsonb;
+begin
+  perform set_config('request.jwt.claim.sub', p_owner::text, true);
+
+  if p_idempotency_key is null
+     or length(btrim(p_idempotency_key)) < 1
+     or length(p_idempotency_key) > 128 then
+    raise exception 'INVALID_ARGUMENT' using errcode = 'P0001';
+  end if;
+
+  insert into public.agent_plan_write_receipts (
+    owner_user_id, client_id, operation, idempotency_key, payload_sha256, result_ids
+  ) values (
+    p_owner, p_client_id, _operation, p_idempotency_key, p_payload_sha256, '{}'::jsonb
+  )
+  on conflict (owner_user_id, client_id, operation, idempotency_key) do nothing;
+
+  if not found then
+    select r.payload_sha256, r.result_ids
+      into _existing_hash, _existing
+      from public.agent_plan_write_receipts r
+     where r.owner_user_id = p_owner
+       and r.client_id = p_client_id
+       and r.operation = _operation
+       and r.idempotency_key = p_idempotency_key;
+    if _existing_hash is distinct from p_payload_sha256 then
+      raise exception 'IDEMPOTENCY_CONFLICT' using errcode = 'P0001';
+    end if;
+    return _existing || jsonb_build_object('idempotent_replay', true);
+  end if;
+
+  insert into app_public.training_programmes (
+    owner_user_id, id, name, description,
+    created_at, updated_at, deleted_at, client_updated_at_ms, server_received_at
+  ) values (
+    p_owner, _programme_id, p_programme ->> 'name', nullif(p_programme ->> 'description', ''),
+    _now_ms, _now_ms, null, _now_ms, timezone('utc', now())
+  );
+
+  for _plan in select value from jsonb_array_elements(coalesce(p_programme -> 'plans', '[]'::jsonb)) loop
+    _plan_id := gen_random_uuid()::text;
+    _graph := app_public.agent_insert_plan_graph(
+      p_owner, _plan_id, _programme_id, _plan_index, _plan, _now_ms
+    );
+    _plan_ids := _plan_ids || to_jsonb(_plan_id);
+    _exercise_ids := _exercise_ids || (_graph -> 'exercise_ids');
+    _set_ids := _set_ids || (_graph -> 'set_ids');
+    _plan_index := _plan_index + 1;
+  end loop;
+
+  _result := jsonb_build_object(
+    'programme_id', _programme_id,
+    'plan_ids', _plan_ids,
+    'exercise_ids', _exercise_ids,
+    'set_ids', _set_ids,
+    'idempotent_replay', false
+  );
+
+  update public.agent_plan_write_receipts
+     set result_ids = _result
+   where owner_user_id = p_owner
+     and client_id = p_client_id
+     and operation = _operation
+     and idempotency_key = p_idempotency_key;
+
+  return _result;
+end;
+$func$;
+
+-- -----------------------------------------------------------------------------
 -- 1. Receipt claim and store helpers for plan operations
 -- -----------------------------------------------------------------------------
 
@@ -307,26 +600,10 @@ stable
 security definer
 set search_path = ''
 as $func$
-  select max(server_received_at)
-    from (
-      select sp.server_received_at
-        from app_public.session_plans sp
-       where sp.owner_user_id = p_owner
-         and sp.id = p_plan_id
-      union all
-      select spe.server_received_at
-        from app_public.session_plan_exercises spe
-       where spe.owner_user_id = p_owner
-         and spe.session_plan_id = p_plan_id
-      union all
-      select sps.server_received_at
-        from app_public.session_plan_sets sps
-        join app_public.session_plan_exercises spe
-          on spe.id = sps.session_plan_exercise_id
-         and spe.owner_user_id = p_owner
-       where sps.owner_user_id = p_owner
-         and spe.session_plan_id = p_plan_id
-    ) versions;
+  select sp.graph_version
+    from app_public.session_plans sp
+   where sp.owner_user_id = p_owner
+     and sp.id = p_plan_id;
 $func$;
 
 create or replace function app_public.agent_programme_graph_version(p_owner uuid, p_programme_id text)
@@ -336,37 +613,10 @@ stable
 security definer
 set search_path = ''
 as $func$
-  select max(server_received_at)
-    from (
-      select tp.server_received_at
-        from app_public.training_programmes tp
-       where tp.owner_user_id = p_owner
-         and tp.id = p_programme_id
-      union all
-      select sp.server_received_at
-        from app_public.session_plans sp
-       where sp.owner_user_id = p_owner
-         and sp.programme_id = p_programme_id
-      union all
-      select spe.server_received_at
-        from app_public.session_plan_exercises spe
-        join app_public.session_plans sp
-          on sp.id = spe.session_plan_id
-         and sp.owner_user_id = p_owner
-       where spe.owner_user_id = p_owner
-         and sp.programme_id = p_programme_id
-      union all
-      select sps.server_received_at
-        from app_public.session_plan_sets sps
-        join app_public.session_plan_exercises spe
-          on spe.id = sps.session_plan_exercise_id
-         and spe.owner_user_id = p_owner
-        join app_public.session_plans sp
-          on sp.id = spe.session_plan_id
-         and sp.owner_user_id = p_owner
-       where sps.owner_user_id = p_owner
-         and sp.programme_id = p_programme_id
-    ) versions;
+  select tp.graph_version
+    from app_public.training_programmes tp
+   where tp.owner_user_id = p_owner
+     and tp.id = p_programme_id;
 $func$;
 
 create or replace function app_public.agent_check_plan_version(p_owner uuid, p_plan_id text, p_base_version text)
@@ -417,6 +667,9 @@ begin
 
   _live_tstz := app_public.agent_plan_graph_version(p_owner, p_plan_id);
   if _live_tstz is null or _live_tstz is distinct from _base_tstz then
+    if _programme_id is not null and _base_tstz is not distinct from app_public.agent_programme_graph_version(p_owner, _programme_id) then
+      return;
+    end if;
     raise exception 'PLAN_CONCURRENT_MODIFICATION' using errcode = 'P0001';
   end if;
 end;
@@ -1855,6 +2108,12 @@ grant execute on function app_public.agent_plan_claim_receipt(uuid, text, text, 
 
 revoke all on function app_public.agent_plan_store_receipt(uuid, text, text, text, jsonb) from public, anon, authenticated;
 grant execute on function app_public.agent_plan_store_receipt(uuid, text, text, text, jsonb) to service_role;
+
+revoke all on function app_public.advance_plan_graph_version(uuid, text) from public, anon, authenticated;
+grant execute on function app_public.advance_plan_graph_version(uuid, text) to service_role;
+
+revoke all on function app_public.advance_programme_graph_version(uuid, text) from public, anon, authenticated;
+grant execute on function app_public.advance_programme_graph_version(uuid, text) to service_role;
 
 revoke all on function app_public.agent_plan_graph_version(uuid, text) from public, anon, authenticated;
 grant execute on function app_public.agent_plan_graph_version(uuid, text) to service_role;

@@ -44,7 +44,7 @@ Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/se
 An unqualified `Sets` is the working-set count ([[set.eligibility]]) on every
 screen and in the share image. All-sets and working-sets counts are never
 shown side by side. Only plain row counts count every row: `n of m sets done`
-and the remove-exercise alert's `its N sets`.
+the remove-exercise alert's `its N sets`, and a merge confirmation's affected live set rows (including warm-ups and drafts).
 
 Why: one number per idea.
 Code: the aggregators' `workingSetCount` (`apps/mobile/src/session-insights/calculations.ts`).

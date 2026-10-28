@@ -19,7 +19,8 @@ Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/m
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
-alternatives: one calendar week and Today’s periods. Comparisons
+alternatives: one calendar week, Today’s periods and the Plan page's three
+days before today, plus today so far (it never reorders the rows). Comparisons
 default to Progress or Settings' This week; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 
@@ -30,7 +31,7 @@ Groups use calendar weeks only.
   explicit expansion of exercise session history beyond History look-back.
 
 Why: consistent periods.
-Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`.
+Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`; `todayPlanWindow` in `apps/mobile/src/today-plan/calculations.ts`.
 
 ### comparison.window · definition · accepted
 
@@ -51,9 +52,28 @@ Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calen
 Settings' History look-back selects N complete
 Monday–Sunday weeks through today. On Monday–Saturday start on the Monday N
 weeks before this week's Monday; on Sunday, N − 1 weeks before it. The current
-partial week follows them. History views may omit rest rows without shortening
-this window or the Weekly reference sample.
+partial week follows them. History display compaction never shortens this
+window or the Weekly reference sample. Progress history remains bounded by it; only explicit exercise session
+history expansion reads beyond it.
 
 Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
+
+### comparison.colour-scale · presentation · accepted
+
+Progress 3D uses theme shades for the displayed change against
+[[comparison.window]]: light for decreases, middle for unchanged activity, dark
+for increases; empty/unavailable stays neutral. Both breakdowns follow filtered
+comparisons, independently of History and targets, with no legend. The selected
+muscle shows Now/Prev/Change.
+
+History legends precede their charts and run 0%–100%. Muscle Sets reads
+`% of target`, capped at the effective weekly muscle target; other legends read
+`% of max`, measured from zero. The maximum comes from History look-back using
+the plotted aggregation: daily Grid values, summed weekly Sets/Volume or best
+weekly strength. Empty or all-zero samples stay neutral.
+
+Why: 3D shows period changes; history shows training intensity.
+Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
+`apps/mobile/components/stats/muscle-body-projection.ts`.

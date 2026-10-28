@@ -12,9 +12,10 @@ import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
   type FamilyExpansion,
+  FilterChip,
   useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { uiFonts, uiRoles } from '@/components/ui';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   type ExerciseListItem,
@@ -67,14 +68,14 @@ describe('ExerciseListContent rows', () => {
     expect(muscles.props.ellipsizeMode).toBeUndefined();
   });
 
-  it('makes each row one target labelled for the pick, with the stats line in Plex Mono', () => {
+  it('makes each row one target labelled for the pick, with the stats line in words', () => {
     const { onPressExercise } = renderList();
 
     expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', `${bench.muscleSummary}. ${bench.statsSummary}.`);
     fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
     expect(onPressExercise).toHaveBeenCalledWith(bench);
     const stats = screen.getAllByText('Never done')[0];
-    expect(StyleSheet.flatten(stats.props.style).fontFamily).toBe(uiFonts.figure.family);
+    expect(StyleSheet.flatten(stats.props.style).fontFamily).toBe(uiFonts.body.family);
     expect(colorOf(stats)).toBe(uiRoles.inkMuted);
   });
 
@@ -261,4 +262,60 @@ it('replaces unknown history with loading or a retryable error, never Never done
   expect(screen.getByText('Unable to load exercise history.')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('Retry exercise history'));
   expect(onRetryHistory).toHaveBeenCalledTimes(1);
+});
+
+// The catalogue on the shared text roles (`design-language.md` §3, "Text roles").
+describe('text roles', () => {
+  const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as TextStyle;
+  const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' };
+  const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm };
+  const chip = (props: Partial<Parameters<typeof FilterChip>[0]>) =>
+    render(
+      <FilterChip accessibilityLabel="Chest" accessibilityRole="button" label="Chest" on={false} onPress={jest.fn()} testID="chip" {...props} />,
+    );
+
+  it.each([
+    ['a pill chip in ink', {}, uiRoles.ink],
+    ['a compact chip muted', { size: 'compact' as const }, uiRoles.inkMuted],
+    ['a selected chip in the surface colour on its ink pill', { on: true }, uiRoles.surface],
+  ])('labels %s', (_, props, color) => {
+    chip(props);
+    expect(styleOf(screen.getByText('Chest'))).toMatchObject({ ...LABEL, color });
+  });
+
+  it('names a row in bodyStrong, its muscles and stats as meta, the stats figures in the figure face', () => {
+    const recent = item('row', 'Row', { statsSummary: 'Last: 12-10-2026 · 4 sessions' });
+    renderList({ items: [recent], sections: [{ familyName: 'Chest', count: 1, exercises: [recent] }] });
+    const row = within(screen.getByLabelText('Select exercise Row'));
+    expect(styleOf(row.getByText('Row'))).toMatchObject({
+      fontFamily: uiFonts.body.family,
+      fontWeight: '600',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.ink,
+    });
+    expect(styleOf(row.getByText(recent.muscleSummary))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    const stats = row.getByText(/^Last:/);
+    expect(styleOf(stats)).toMatchObject(META);
+    expect(styleOf(within(stats).getByText('12-10-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+  });
+
+  it('fades every line of a deleted row', () => {
+    renderList();
+    const row = within(screen.getByLabelText('Select exercise Cable Fly'));
+    expect(styleOf(row.getByText('Cable Fly'))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', color: uiRoles.inkFaint });
+    expect(colorOf(row.getByText(fly.muscleSummary))).toBe(uiRoles.inkFaint);
+    expect(colorOf(row.getByText('Never done'))).toBe(uiRoles.inkFaint);
+  });
+
+  it('counts a family in the small figure, an empty one faint', () => {
+    renderList({
+      sections: [
+        { familyName: 'Chest', count: 2, exercises: [bench, fly] },
+        { familyName: 'Legs', count: 0, exercises: [] },
+      ],
+    });
+    const small = { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.sm };
+    expect(styleOf(screen.getByText('2'))).toMatchObject({ ...small, color: uiRoles.inkMuted });
+    expect(styleOf(screen.getByText('0'))).toMatchObject({ ...small, color: uiRoles.inkFaint });
+  });
 });

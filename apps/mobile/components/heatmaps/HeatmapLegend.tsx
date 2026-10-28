@@ -1,23 +1,22 @@
-// HeatmapLegend.tsx — the metric legend and its ramp under both heatmap views.
-// Target-graded colour names the target and its 0%…100% ends, not Less…More.
+// Colour reference above the Progress chart it explains.
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 import { HEAT_RAMP } from './heatmap-metric';
-import { heatmapStyles } from './heatmap-style';
 
-export function HeatmapLegend({ label, target = false }: { label: string; target?: boolean }) {
+export function HeatmapLegend({ target = false }: { target?: boolean }) {
   return (
     <View style={styles.legend}>
-      <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-        {target ? 'Weekly target' : label}
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+        {target ? '% of target' : '% of max'}
       </Text>
       <View style={styles.ramp}>
-        <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-          {target ? '0%' : 'Less'}
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+          0%
         </Text>
         {HEAT_RAMP.map((color, i) => (
           <View
@@ -25,8 +24,8 @@ export function HeatmapLegend({ label, target = false }: { label: string; target
             style={[styles.swatch, { backgroundColor: color }, i === 0 ? styles.restSwatch : null]}
           />
         ))}
-        <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-          {target ? '100%' : 'More'}
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+          100%
         </Text>
       </View>
     </View>
@@ -38,7 +37,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: uiSpace.lg,
+    marginBottom: uiSpace.lg,
   },
   ramp: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   swatch: {

@@ -1,5 +1,7 @@
 /* eslint-disable import/first */
 
+jest.unmock('@/src/auth/session-user');
+
 /**
  * Outcome: TWO devices attaching the SAME plan block converge on at most one
  * live claim, server commit order deciding — the second device's cycle meets

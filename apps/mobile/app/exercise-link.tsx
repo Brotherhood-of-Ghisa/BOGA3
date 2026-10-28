@@ -20,11 +20,9 @@ import {
   Screen,
   ScreenScroll,
   SearchField,
-  uiFonts,
-  uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { linkExercise } from '@/src/data/exercise-group-links';
@@ -265,7 +263,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
             <Section title="All group exercises">
               {model.groups.map((group) => (
                 <View key={group.groupId} style={styles.group}>
-                  <Text allowFontScaling={false} style={styles.groupName}>{group.groupName}</Text>
+                  <Text allowFontScaling={false} style={uiText.title}>{group.groupName}</Text>
                   <Card>
                     {group.rows.map((row, index) => (
                       <AvailableRow divider={index > 0} key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} />
@@ -276,7 +274,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
             </Section>
           ) : null}
           {offeredCount === 0 ? (
-            <Text allowFontScaling={false} style={styles.muted} testID="exercise-link-empty">
+            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="exercise-link-empty">
               {(linking.catalogs?.length ?? 0) === 0
                 ? "You're not in any groups yet."
                 : query.trim().length > 0
@@ -293,7 +291,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         {title}
       </Text>
       {children}
@@ -305,12 +303,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function RowText({ name, groupName, lines }: { name: string; groupName?: string; lines: (string | null | undefined)[] }) {
   return (
     <View style={styles.rowText}>
-      <Text allowFontScaling={false} style={styles.name}>
+      <Text allowFontScaling={false} style={uiText.bodyStrong}>
         {name}
-        {groupName ? <Text allowFontScaling={false} style={styles.nameGroup}> · {groupName}</Text> : null}
+        {groupName ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}> · {groupName}</Text> : null}
       </Text>
       {lines.filter(Boolean).map((line) => (
-        <Text allowFontScaling={false} key={line} style={styles.muted}>
+        <Text allowFontScaling={false} key={line} style={[uiText.body, uiTextTone.muted]}>
           {line}
         </Text>
       ))}
@@ -366,45 +364,10 @@ const styles = StyleSheet.create({
   section: {
     gap: uiSpace.sm,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   group: {
     gap: uiSpace.xs,
   },
-  groupName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
   rowText: {
     paddingVertical: uiSpace.sm,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  nameGroup: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    color: uiRoles.inkMuted,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

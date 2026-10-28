@@ -17,6 +17,7 @@ export const sessionExerciseTags = sqliteTable(
     exerciseTagDefinitionId: text('exercise_tag_definition_id')
       .notNull()
       .references(() => exerciseTagDefinitions.id, { onDelete: 'cascade' }),
+    mergeRevision: integer('merge_revision').notNull().default(0),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),

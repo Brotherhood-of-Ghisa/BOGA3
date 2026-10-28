@@ -126,7 +126,7 @@ rpc() {
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
     -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
     --data "${body}" \
     "${API_URL}/rest/v1/rpc/${name}"
@@ -142,7 +142,7 @@ rest() {
     -H "Content-Profile: app_public"
     -H "Prefer: return=representation")
   if [[ -n "${body}" ]]; then
-    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
+    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
   fi
   http_call "${args[@]}" "${API_URL}/rest/v1/${table}?${query}"
 }
@@ -150,7 +150,7 @@ rest() {
 # eval_drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
 eval_drain() {
   http_call -X POST -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${1-${EVAL_SECRET}}" \
     --data '{}' "${API_URL}/functions/v1/group-eval"
 }
@@ -180,7 +180,7 @@ sign_in() {
   local email="$1"
   http_call -X POST \
     -H "apikey: ${ANON_KEY}" -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     --data "$(jq -nc --arg e "${email}" --arg p "${PASSWORD}" '{email: $e, password: $p}')" \
     "${API_URL}/auth/v1/token?grant_type=password"
   [[ "${STATUS}" == "200" ]] || fail "password sign-in for ${email}"

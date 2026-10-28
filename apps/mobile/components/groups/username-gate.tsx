@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
-import { ActionButton, Card, FormField, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FormField, uiSpace, uiText } from '@/components/ui';
 import { loadUserProfile, saveUsername } from '@/src/auth/profile';
 import { describeGroupWriteError, useGroupAction } from '@/src/groups';
 
@@ -87,7 +87,7 @@ export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
 
   return (
     <Card style={styles.card} testID="group-username-gate">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
         Choose a username
       </Text>
       {notice ? <GroupWriteNotice message={notice} testID="group-username-gate-notice" tone="error" /> : null}
@@ -123,12 +123,5 @@ const styles = StyleSheet.create({
   card: {
     padding: uiSpace.md,
     gap: uiSpace.md,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });

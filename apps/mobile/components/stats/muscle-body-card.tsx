@@ -3,23 +3,23 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 
-import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 import {
   Card,
+  FigureText,
   Icon,
   ListRow,
   SegmentedControl,
   Sheet,
-  uiFonts,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
   type SegmentedControlOption,
 } from '@/components/ui';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { comparisonFigures, metricUnit } from './comparison-columns';
+import { COLUMN_LABELS, ComparisonValues, comparisonFigures, metricUnit } from './comparison-columns';
 import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
@@ -123,7 +123,7 @@ function MuscleBodyHeader({
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={styles.selectedName}
+            style={[uiText.label, uiTextTone.ink]}
             testID="stats-muscle-body-selected">
             {selectedMuscle?.displayName ?? 'Select'}
           </Text>
@@ -175,7 +175,7 @@ function MusclePickerSheet({
           return (
             <ListRow
               accessibilityHint="Selects this muscle on the 3D model"
-              accessibilityLabel={`${row.displayName}, ${figures.now} ${unit}.`}
+              accessibilityLabel={`${row.displayName}. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
               density="sheet"
               key={row.muscleGroupId}
               onPress={() => onSelectMuscle(row.muscleGroupId)}
@@ -185,11 +185,11 @@ function MusclePickerSheet({
               <View style={styles.sheetRowContent}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.sheetRowName, isSelected && styles.sheetRowNameSelected]}>
+                  style={[uiText.bodyStrong, isSelected && uiTextTone.accent]}>
                   {row.displayName}
                 </Text>
-                <Text allowFontScaling={false} style={styles.sheetRowMeta}>
-                  {figures.now} {unit}
+                <Text allowFontScaling={false} style={uiText.meta}>
+                  <FigureText>{`${figures.now} ${unit}`}</FigureText>
                 </Text>
               </View>
             </ListRow>
@@ -213,7 +213,7 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
         return (
           <Pressable
             accessibilityHint="Selects muscle on the 3D body model."
-            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now} ${unit}.`}
+            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
             accessibilityRole="button"
             accessibilityState={{ selected, expanded: selected }}
             key={row.muscleGroupId}
@@ -229,8 +229,8 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
 
 /**
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
- * Colours each muscle group from the active theme's sequential `viz0..viz4` ramp
- * in CIE LCh, supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
+ * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
+ * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects/deselects a muscle group on tap.
  */
 export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
@@ -396,6 +396,14 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
           </Svg>
         </View>
       </GestureDetector>
+      {selectedMuscle ? <View testID="stats-muscle-body-comparison">
+        <View style={styles.comparisonLabels}>
+          {COLUMN_LABELS.map(label => <Text key={label} allowFontScaling={false}
+            style={[uiText.label, uiTextTone.muted, { width: (viewportWidth - uiSpace.sm * 2) / 3, textAlign: 'right' }]}>{label}</Text>)}
+        </View>
+        <ComparisonValues row={selectedMuscle} metric={metric} prefix="stats-muscle-body-comparison"
+          layout={{ columns: Array(3).fill((viewportWidth - uiSpace.sm * 2) / 3), stacked: false }} />
+      </View> : null}
       <MuscleAccessibilityTargets
         metric={metric}
         muscles={muscles}
@@ -413,12 +421,12 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         selectedId={selectedId}
         visible={sheetVisible}
       />
-      <HeatmapLegend label={metric === 'workingSetCount' ? 'Sets per muscle' : 'Volume per muscle'} />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
   card: {
     padding: uiSpace.md,
     gap: uiSpace.sm,
@@ -450,13 +458,6 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
     maxWidth: 160,
   },
-  selectedName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
   sheetScroll: {
     maxHeight: 460,
   },
@@ -469,23 +470,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingRight: uiSpace.sm,
-  },
-  sheetRowName: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  sheetRowNameSelected: {
-    color: uiRoles.accent,
-  },
-  sheetRowMeta: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   viewport: {
     alignItems: 'center',

@@ -144,9 +144,11 @@ layer 0 and pulls readings in layer 4.
 Settings' always-visible Bodyweight card (status: On/Off and the current
 reading) opens the body weight page: the `Bodyweight calculations` On/Off
 control above dated kg history. Disabling the
-toggle hides the exercise-editor contribution field but never hides reading
-management or deletes anything. The personal exercise editor shows only
-`Bodyweight contribution (%)` while enabled, with no hint under it
+toggle hides the exercise-editor contribution controls but never hides reading
+management or deletes anything. While enabled, the exercise editors' Weight
+section shows a `Uses bodyweight` switch, on whenever the stored contribution
+is positive; on, it reveals `Bodyweight share (%)` (a new exercise starts at
+0), and switching it off stores 0. No hint sits under either
 ([[copy.no-inline-explanation]]).
 
 The logger always says `Weight`; rows, records, History, Stats, completion and

@@ -19,7 +19,7 @@ The setting is synced and retroactive: changing it recomputes history and PRs.
 
 Why: equipment differs between gyms, yet the whole exercise stays the default so
 a split never multiplies rows.
-Code: `GymSplitField` in `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`.
+Code: `OptionsSection` in `apps/mobile/components/exercise-catalog/exercise-editor-screen.tsx`.
 
 ### gym.view-filter · definition · accepted
 

@@ -10,6 +10,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
 import { Modal, StyleSheet } from 'react-native';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
 import {
   default as StatsRoute,
@@ -568,7 +569,8 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-search-input')).toBeTruthy();
     expect(screen.queryByText('Time range')).toBeNull();
     expect(screen.queryByText('Breakdown')).toBeNull();
-    expect(screen.getByTestId('stats-sessions-link')).toBeTruthy();
+    expect(StyleSheet.flatten(within(screen.getByTestId('stats-sessions-link')).getByText('Sessions').props.style))
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
   });
 
   it('cycles its metric through 1RM, which the muscle table never offers', () => {
@@ -630,7 +632,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       'Activate to sort Most recent exercise.'
     );
     expect(screen.getByTestId('stats-exercise-sort-now')).toHaveStyle({
-      flexDirection: 'row',
+      flexDirection: 'row-reverse',
       minHeight: uiGeometry.tapTarget,
     });
     expect(header.getByText('Now').props.numberOfLines).toBe(1);
@@ -657,6 +659,9 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-sort-change-indicator')).toHaveStyle({ opacity: 0 });
     expect(sortArrow('change')).toBe('down');
     expect(screen.getByTestId('stats-exercise-name-missing').props.numberOfLines).toBeUndefined();
+    // A row's name is `bodyStrong` (`design-language.md` §3), not Archivo.
+    expect(StyleSheet.flatten(screen.getByTestId('stats-exercise-name-missing').props.style))
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
   });
 
   it('draws each metric in the same three columns, change coloured by direction', () => {

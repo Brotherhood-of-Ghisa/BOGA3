@@ -71,7 +71,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -1840,6 +1840,70 @@ if [[ "${CONN2_EDIT_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
 fi
 [[ "$(run_psql "select name from app_public.session_plan_exercises where id = '${BLOCK_RACE_EDIT}';")" == "Phone Edited Block" ]] ||
   fail "concurrency race: phone-edited block name was overwritten by stale agent mutation"
+
+# Finding 2: Transaction / commit-order inversion race test
+# Conn 1 starts at t0 (freezing now() to t0) and sleeps before updating a child block.
+# Conn 2 (Agent) mutates plan title at t1 > t0 and receives version V1.
+# Conn 1 updates pending child block and commits at t2 > t1 (so spe.server_received_at would be t0 < t1 if now() were used,
+# but session_plans.graph_version is advanced using clock_timestamp() to t2 > t1).
+# Conn 3 (Agent) attempts block mutation with base version V1.
+# Assert failure with PLAN_CONCURRENT_MODIFICATION and phone's child block update is preserved.
+PLAN_RACE_INVERT="agent-api-${RUN_TAG}-race-invert"
+BLOCK_RACE_INVERT="agent-api-${RUN_TAG}-blk-invert"
+run_psql "
+  insert into app_public.session_plans (owner_user_id, id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${PLAN_RACE_INVERT}', 'Inversion Initial Title', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_exercises (owner_user_id, id, session_plan_id, order_index, name, progress_status, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${BLOCK_RACE_INVERT}', '${PLAN_RACE_INVERT}', 0, 'Original Inversion Block', 'pending', 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_plan_sets (owner_user_id, id, session_plan_exercise_id, order_index, target_reps, last_modified_by, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'sps-invert-${RUN_TAG}', '${BLOCK_RACE_INVERT}', 0, 5, 'human', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+V_INVERT_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_INVERT}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
+
+# Conn 1 starts transaction at t0: now() is frozen at t0. Sleeps 0.8s before executing its update.
+docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+  begin;
+  select set_config('request.jwt.claim.sub', '${USER_A_UUID}', true);
+  select pg_sleep(0.8);
+  update app_public.session_plan_exercises
+     set name = 'Phone Inversion Block',
+         client_updated_at_ms = $((NOW_MS + 8000))
+   where owner_user_id = '${USER_A_UUID}'::uuid
+     and id = '${BLOCK_RACE_INVERT}';
+  commit;
+" >/dev/null 2>&1 &
+CONN1_INVERT_PID=$!
+sleep 0.2
+
+# Conn 2: Agent mutates plan title at t1 > t0 and receives version V1
+AGENT_MUT_OUT="$(run_psql "
+  select app_public.agent_update_plan_meta(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-invert-1', '${MUT_HASH_1}',
+    '${PLAN_RACE_INVERT}', '${V_INVERT_BASE}', '{\"title\": \"Agent Mutated Plan Title\"}'::jsonb
+  );
+")"
+V_AGENT_V1="$(printf '%s' "${AGENT_MUT_OUT}" | jq -r '.version')"
+[[ -n "${V_AGENT_V1}" && "${V_AGENT_V1}" != "null" ]] ||
+  fail "concurrency inversion: agent mutation failed to return version V1, got: ${AGENT_MUT_OUT}"
+
+# Wait for Conn 1 to execute its update and commit at t2 > t1
+wait "${CONN1_INVERT_PID}"
+
+# Conn 3: Agent attempts block mutation with base version V1 (believing plan has not changed since t1)
+CONN3_INVERT_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+  select app_public.agent_update_plan_block(
+    '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-invert-stale', '${MUT_HASH_2}',
+    '${PLAN_RACE_INVERT}', '${BLOCK_RACE_INVERT}', '${V_AGENT_V1}',
+    '{\"name\": \"Stale Override Block\"}'::jsonb
+  );
+" 2>&1 || true)"
+
+if [[ "${CONN3_INVERT_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
+  fail "commit-order inversion race: agent mutation with V1 did not raise PLAN_CONCURRENT_MODIFICATION after t2 child block commit, got: ${CONN3_INVERT_OUT}"
+fi
+[[ "$(run_psql "select name from app_public.session_plan_exercises where id = '${BLOCK_RACE_INVERT}';")" == "Phone Inversion Block" ]] ||
+  fail "commit-order inversion race: phone inversion child block update was not preserved"
 
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"

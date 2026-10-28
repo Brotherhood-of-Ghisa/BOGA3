@@ -9,6 +9,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { GymPicker } from '@/components/gyms/gym-picker';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 const OPTIONS: GymScopeOption[] = [
@@ -33,6 +34,13 @@ describe('GymPicker', () => {
     expect(screen.getByRole('radio', { name: 'All gyms, 19 sessions' })).toHaveProp('accessibilityState', { checked: true });
     expect(screen.getByRole('radio', { name: 'Club, 12 sessions' })).toHaveProp('accessibilityState', { checked: false });
     expect(screen.getByRole('radio', { name: 'No gym, 2 sessions' })).toBeTruthy();
+  });
+
+  it('names each choice in body, its session count as a quiet figure', () => {
+    renderPicker(undefined);
+    fireEvent.press(screen.getByTestId('gym'));
+    expect(screen.getByText('Club')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base });
+    expect(screen.getByText('12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.sm });
   });
 
   it('writes the three-state scope: an id, null for No gym, unset for All gyms', () => {

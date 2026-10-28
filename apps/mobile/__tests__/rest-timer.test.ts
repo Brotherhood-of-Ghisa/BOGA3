@@ -644,6 +644,43 @@ describe('rest-timer store and pure rules', () => {
     expect(() => triggerRestCompletionCue()).not.toThrow();
   });
 
+  it('with auto-start off, a set tick restarts a showing rest timer, leaves repeating alone and starts nothing after a dismiss', () => {
+    jest.setSystemTime(1_000);
+    const now = () => Date.now();
+    const { result } = renderHook(() =>
+      useSessionRestTimer('session-1', {
+        defaultDurationSec: 90,
+        defaultRepeatingIntervalSec: 60,
+        autoStart: false,
+        isActiveSession: true,
+        now,
+      }),
+    );
+
+    // Completed hand-started timer: the tick restarts it.
+    act(() => result.current.start());
+    act(() => {
+      jest.advanceTimersByTime(95_000);
+    });
+    expect(result.current.view).toMatchObject({ mode: 'rest', status: 'completed' });
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toMatchObject({ mode: 'rest', status: 'running', remainingSec: 90 });
+
+    // After a dismiss the tick starts nothing.
+    act(() => result.current.dismiss());
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toEqual({ status: 'idle' });
+
+    // A repeating timer is left alone.
+    act(() => result.current.switchMode('repeating'));
+    act(() => {
+      jest.advanceTimersByTime(40_000);
+    });
+    const before = result.current.view;
+    act(() => result.current.onSetConfirmed());
+    expect(result.current.view).toEqual(before);
+  });
+
   it('isolates set logging from repeating mode: onSetConfirmed neither restarts nor interrupts repeating timer', () => {
     jest.setSystemTime(1_000);
     const now = () => Date.now();
@@ -828,7 +865,7 @@ describe('rest-timer store and pure rules', () => {
     });
     expect(result.current.view).toEqual({ status: 'idle' });
 
-    // With autoStart = false, onSetConfirmed does nothing, but manual toggle still starts.
+    // With autoStart = false, onSetConfirmed starts nothing, but manual toggle still starts.
     rerender({ isActiveSession: true, autoStart: false, defaultDurationSec: 75 });
     act(() => {
       result.current.onSetConfirmed();
@@ -844,6 +881,17 @@ describe('rest-timer store and pure rules', () => {
       remainingSec: 75,
       formatted: '1:15',
     });
+
+    // A manually started timer restarts when a set is ticked, even with autoStart off.
+    act(() => {
+      nowMs = 61_000;
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 60 });
+    act(() => {
+      result.current.onSetConfirmed();
+    });
+    expect(result.current.view).toMatchObject({ status: 'running', remainingSec: 75 });
 
     // Completed session edit suppresses the view and toggleForSession.
     rerender({ isActiveSession: false, autoStart: true, defaultDurationSec: 75 });

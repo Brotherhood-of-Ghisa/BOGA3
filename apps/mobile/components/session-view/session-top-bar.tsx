@@ -5,7 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatElapsed, sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 
 type SessionTopBarProps =
@@ -63,13 +65,13 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
     // Shrinks to fit rather than truncate, so the elapsed time stays visible
     // past the hour on a narrow phone.
     <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
-      numberOfLines={1} style={styles.title} testID="session-view-title">
-      {`${sessionTitleForStart(startedAt)} · ${formatElapsed(startedAt, current)}`}
+      numberOfLines={1} style={[uiText.title, styles.title]} testID="session-view-title">
+      <FigureText strong>{`${sessionTitleForStart(startedAt)} · ${formatElapsed(startedAt, current)}`}</FigureText>
     </Text>
   );
 }
 
-// `<Time of day> training · <elapsed>` · ⋮ · Finish;
+// `<Time of day> training · <elapsed>` · ⋮ · ✓ (Finish);
 // `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
@@ -85,7 +87,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
       {props.mode === 'active' ? (
         <ActiveTitle now={props.now ?? systemNow} startedAt={props.startedAt} />
       ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
+        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[uiText.title, styles.title]}>
           {copy.title}
         </Text>
       )}
@@ -109,7 +111,17 @@ export function SessionTopBar(props: SessionTopBarProps) {
           testID="session-view-options-button"
         />
       ) : null}
-      {onPrimary ? (
+      {onPrimary && props.mode === 'active' ? (
+        // Finish is a tick, the screen's one `accent` action as an icon.
+        <IconButton
+          accessibilityLabel={copy.a11y}
+          disabled={disabled}
+          name="check"
+          onPress={onPrimary}
+          testID={copy.testID}
+          tone="accent"
+        />
+      ) : onPrimary ? (
         <ActionButton
           accessibilityLabel={copy.a11y}
           disabled={disabled}
@@ -140,13 +152,6 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-    // The elapsed digits keep their width, so the title does not jitter.
-    fontVariant: ['tabular-nums'],
   },
   spacer: {
     width: uiGeometry.tapTarget,

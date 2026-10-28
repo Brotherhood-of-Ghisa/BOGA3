@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text } from 'react-native';
 
-import { ActionButton, ListRow, Sheet, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, ListRow, Sheet, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 
 type Props = {
@@ -29,7 +29,7 @@ export function GroupExerciseUnlinkSheet({ visible, groupName, groupExerciseName
       testID="group-unlink-chooser"
       title="Your linked exercises"
       visible={visible}>
-      <Text allowFontScaling={false} style={styles.context}>
+      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.context]}>
         {groupExerciseName} · {groupName}
       </Text>
       <ScrollView style={styles.list}>
@@ -47,7 +47,7 @@ export function GroupExerciseUnlinkSheet({ visible, groupName, groupExerciseName
                 variant="text"
               />
             }>
-            <Text allowFontScaling={false} style={styles.name}>
+            <Text allowFontScaling={false} style={[uiText.bodyStrong, styles.name]}>
               {choice.label}
             </Text>
           </ListRow>
@@ -61,11 +61,6 @@ const styles = StyleSheet.create({
   context: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   list: {
     flexShrink: 1,
@@ -73,10 +68,5 @@ const styles = StyleSheet.create({
   // Long names wrap rather than truncate.
   name: {
     paddingVertical: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });

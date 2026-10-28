@@ -1,9 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { bodyweightStatus } from '@/components/settings/statuses';
-import { ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FormError, SwitchRow, uiSpace } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { readCurrentBodyWeight } from '@/src/data/bodyweight';
 import {
@@ -48,45 +48,24 @@ function useCurrentBodyWeightKg(): number | null {
   return currentKg;
 }
 
-// The calculation switch, at the top of the body weight page.
+// The calculation switch, at the top of the body weight page: a form card's
+// `SwitchRow`, its write error under it (`ux-rules.md` "Forms").
 export function BodyweightCalculationsRow() {
   const enabled = useBodyweightCalculationsEnabled();
   const preferenceError = useBodyweightCalculationPreferenceError();
   return (
     <>
-      <ListRow
+      <SwitchRow
         density="list"
-        divider={false}
         label="Bodyweight calculations"
-        testID="settings-bodyweight-calculations-row"
-        trailing={
-          <Pressable
-            accessibilityLabel={`Bodyweight calculations ${enabled ? 'on' : 'off'}`}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: enabled }}
-            hitSlop={uiSpace.sm}
-            onPress={() => { void setBodyweightCalculationsEnabled(!enabled); }}
-            style={({ pressed }) => [
-              styles.stateButton,
-              enabled ? styles.stateButtonOn : null,
-              pressed ? styles.stateButtonPressed : null,
-            ]}
-            testID="settings-bodyweight-calculations-toggle">
-            <Text allowFontScaling={false} style={[styles.stateLabel, enabled ? styles.stateLabelOn : null]}>
-              {enabled ? 'On' : 'Off'}
-            </Text>
-          </Pressable>
-        }
+        onValueChange={(next) => { void setBodyweightCalculationsEnabled(next); }}
+        testID="settings-bodyweight-calculations-toggle"
+        value={enabled}
       />
       {preferenceError ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          accessibilityRole="alert"
-          allowFontScaling={false}
-          style={styles.preferenceError}
-          testID="settings-bodyweight-calculations-error">
-          {preferenceError}
-        </Text>
+        <View style={styles.preferenceError}>
+          <FormError message={preferenceError} testID="settings-bodyweight-calculations-error" />
+        </View>
       ) : null}
     </>
   );
@@ -94,39 +73,7 @@ export function BodyweightCalculationsRow() {
 
 const styles = StyleSheet.create({
   preferenceError: {
-    color: uiRoles.danger,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
     paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
-  },
-  stateButton: {
-    minWidth: uiGeometry.tapTarget + uiSpace.sm,
-    minHeight: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
-    borderWidth: 1,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.surface,
-  },
-  stateButtonOn: {
-    borderColor: uiRoles.accent,
-    backgroundColor: uiRoles.accent,
-  },
-  stateButtonPressed: {
-    opacity: 0.72,
-  },
-  stateLabel: {
-    color: uiRoles.ink,
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    lineHeight: uiTypography.lineHeight.sm,
-  },
-  stateLabelOn: {
-    color: uiRoles.surface,
   },
 });

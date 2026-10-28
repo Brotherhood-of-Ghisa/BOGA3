@@ -65,7 +65,7 @@ requires ios-sync-e2e      apps/mobile/components/sync-status/sync-status-panel.
 requires ios-groups-e2e    apps/mobile/app/group/join.tsx
 requires ios-smoke         apps/mobile/app/group/join.tsx
 not_requires frontend-ui   apps/mobile/app/group/join.tsx
-requires ios-groups-e2e    "apps/mobile/app/(tabs)/groups.tsx"
+requires ios-groups-e2e    apps/mobile/app/groups.tsx
 not_requires frontend-ui   apps/mobile/components/groups/stream-row.tsx
 requires frontend-ui       apps/mobile/app/group/join.tsx apps/mobile/components/Button.tsx
 

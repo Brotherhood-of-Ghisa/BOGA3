@@ -18,7 +18,8 @@ import {
 import { ActionButton } from '@/components/ui/action-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles } from '@/components/ui/tokens';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
@@ -443,7 +444,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           variant="outline"
         />
         {notice ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger]} testID="session-view-notice">
             {notice}
           </Text>
         ) : null}
@@ -529,12 +530,5 @@ export default function SessionViewRoute() {
 const styles = StyleSheet.create({
   statusSpacer: {
     backgroundColor: uiRoles.surface,
-  },
-  notice: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
   },
 });

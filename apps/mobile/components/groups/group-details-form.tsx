@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FormField, SegmentedControl, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, FormField, SegmentedControl, uiSpace, uiText } from '@/components/ui';
 import {
   GROUP_DESCRIPTION_MAX_LENGTH,
   GROUP_NAME_MAX_LENGTH,
@@ -94,13 +94,13 @@ export function GroupDetailsFormFields({
           testID="group-form-description-input"
           value={description}
         />
-        <Text allowFontScaling={false} style={styles.counter} testID="group-form-description-counter">
+        <Text allowFontScaling={false} style={[uiText.figureSmall, styles.counter]} testID="group-form-description-counter">
           {`${description.trim().length}/${GROUP_DESCRIPTION_MAX_LENGTH}`}
         </Text>
       </View>
       {initialBodyweightCalculationsEnabled !== undefined ? (
         <View style={styles.field}>
-          <Text allowFontScaling={false} style={styles.sectionLabel}>Bodyweight calculations</Text>
+          <Text allowFontScaling={false} style={uiText.label}>Bodyweight calculations</Text>
           <SegmentedControl
             accessibilityLabel="Bodyweight calculations"
             disabled={pending || positiveContributionCount === null}
@@ -130,22 +130,8 @@ const styles = StyleSheet.create({
   field: {
     gap: uiSpace.xs,
   },
-  // A figure, so Plex Mono; right-aligned under the field it counts.
+  // Right-aligned under the field it counts.
   counter: {
     alignSelf: 'flex-end',
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  sectionLabel: {
-    color: uiRoles.inkMuted,
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.xxs,
-    fontWeight: '700',
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    lineHeight: uiTypography.lineHeight.xxs,
-    textTransform: 'uppercase',
   },
 });

@@ -2,7 +2,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { personalRecordCount, type ExercisePersonalRecord } from '@/src/session-insights';
 import { personalRecordLines } from '@/src/session-insights/record-band';
 
@@ -28,10 +30,12 @@ export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCar
         accessibilityLabel={`${personalRecord.exerciseName}, ${count}: ${lines.map((line) => line.spoken).join('; ')}`}
         accessible>
         <View style={styles.header}>
-          <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
-            {personalRecord.exerciseName}
+          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.title, styles.name]}>
+            <FigureText strong>{personalRecord.exerciseName}</FigureText>
           </Text>
-          <Text allowFontScaling={false} style={styles.count} testID={`${testID}-count`}>{count}</Text>
+          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-count`}>
+            <FigureText>{count}</FigureText>
+          </Text>
         </View>
         <RecordBand lines={lines} placement="footer" testID={`${testID}-record`} />
       </View>
@@ -50,17 +54,5 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  count: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
 });

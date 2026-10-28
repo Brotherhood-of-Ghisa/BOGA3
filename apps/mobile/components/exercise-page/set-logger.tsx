@@ -4,7 +4,9 @@ import { Pressable, StyleSheet, Text, type TextInputInstance, View } from 'react
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import {
   uiBorder,
   uiGeometry,
@@ -18,8 +20,6 @@ import {
 } from '@/src/session-recorder/exercise-page-model';
 
 import { SetEntryFields } from './set-entry-fields';
-
-import { pageText } from './text-styles';
 
 type SetLoggerProps = {
   loadContext: LoadContext;
@@ -86,9 +86,9 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         }}
         style={styles.header}
         testID="exercise-set-logger-header">
-        <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
-        <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
-          {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.accent]}>{`Set ${number}`}</Text>
+        <Text allowFontScaling={false} style={uiText.meta} testID="exercise-set-logger-preview">
+          <FigureText>{`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}</FigureText>
         </Text>
       </View>
       <SetEntryFields
@@ -140,10 +140,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  setLabel: {
-    fontWeight: '800',
-    color: uiRoles.accent,
   },
   // Pinned to the trailing edge so the tick keeps the list's control axis.
   control: {

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, Tag, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FigureText, Tag, uiSpace, uiText } from '@/components/ui';
 import type { ProgrammeDetailView } from '@/src/session-planner';
 
 export type ProgrammeDetailHeaderProps = {
@@ -35,11 +35,11 @@ export function ProgrammeDetailHeader({
     <Card style={styles.card} testID="programme-detail-header">
       <View style={styles.topRow}>
         <View style={styles.meta}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
             {detail.name}
           </Text>
           {detail.description ? (
-            <Text allowFontScaling={false} style={styles.description}>
+            <Text allowFontScaling={false} style={uiText.meta}>
               {detail.description}
             </Text>
           ) : null}
@@ -52,8 +52,10 @@ export function ProgrammeDetailHeader({
         />
       </View>
 
-      <Text allowFontScaling={false} style={styles.statsLine} testID="programme-detail-stats">
-        {detail.planCount} {detail.planCount === 1 ? 'session' : 'sessions'} · {counts.completed} of {totalBlocks} {totalBlocks === 1 ? 'block' : 'blocks'} completed
+      <Text allowFontScaling={false} style={uiText.meta} testID="programme-detail-stats">
+        <FigureText>
+          {`${detail.planCount} ${detail.planCount === 1 ? 'session' : 'sessions'} · ${counts.completed} of ${totalBlocks} ${totalBlocks === 1 ? 'block' : 'blocks'} completed`}
+        </FigureText>
       </Text>
 
       <View style={styles.actionsRow}>
@@ -98,25 +100,6 @@ const styles = StyleSheet.create({
   meta: {
     flex: 1,
     gap: uiSpace.xs,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  description: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  statsLine: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   actionsRow: {
     flexDirection: 'row',

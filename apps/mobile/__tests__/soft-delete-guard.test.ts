@@ -51,6 +51,8 @@ const SRC_ROOT = path.resolve(__dirname, '..', 'src');
 const EXEMPT_FILES_AGAINST_SYNCABLE_ENTITIES = new Set<string>([
   'data/dev-reset.ts',
   'sync/account-wipe.ts',
+  // Canonical snapshot replacement preserves dirty edits first, then restores the same IDs/tombstones atomically.
+  'sync/exercise-merge.ts',
 ]);
 
 const collectTypeScriptSourceFiles = (dir: string): string[] => {

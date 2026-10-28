@@ -10,6 +10,8 @@ import {
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { changeToneColour } from '@/components/ui/change-tone';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
 
@@ -29,7 +31,6 @@ import {
   type PeriodChartGeometry,
 } from './progress-format';
 import { StepAround } from './step-arrows';
-import { todayText } from './text-styles';
 
 // Until the first layout pass reports the card's width (and in Jest, where
 // none runs): roughly a 390pt phone's card.
@@ -112,15 +113,13 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // the projection's) against the previous period's at the same day, and their
 // difference ([[comparison.change-display]]); then the cumulative lines by day.
 // The arrows either side of the compared range step to an earlier or later
-// period, never later than the previous one. `fill` lets the chart take the height the block is
-// given (Today's cards layout) instead of its own.
+// period, never later than the previous one. The chart takes the height the
+// block is given.
 export function PeriodPace({
   period,
-  fill = false,
   onShowCompared,
 }: {
   period: TodayProgressPeriod;
-  fill?: boolean;
   /** Compares against the period this many periods back. */
   onShowCompared?: (periodsBack: number) => void;
 }) {
@@ -135,7 +134,7 @@ export function PeriodPace({
 
   const onLayout = (event: LayoutChangeEvent) => {
     const measuredWidth = Math.round(event.nativeEvent.layout.width);
-    const measuredHeight = fill ? Math.round(event.nativeEvent.layout.height) : CHART_HEIGHT;
+    const measuredHeight = Math.round(event.nativeEvent.layout.height);
     if (measuredWidth > 0 && measuredHeight > 0 && (measuredWidth !== width || measuredHeight !== height)) {
       setSize({ width: measuredWidth, height: measuredHeight });
     }
@@ -161,14 +160,14 @@ export function PeriodPace({
     <Text
       allowFontScaling={false}
       numberOfLines={1}
-      style={[todayText.microLabel, todayText.microLabelFaint]}
+      style={[uiText.label, uiTextTone.faint]}
       testID="today-progress-period-previous-range">
       {formatPeriodRange(period.previous.window)}
     </Text>
   );
 
   return (
-    <View style={[styles.block, fill ? styles.fill : null]} testID="today-progress-period">
+    <View style={[styles.block, styles.fill]} testID="today-progress-period">
       {/* One element when spoken: its arrows are offered as its actions. */}
       <View
         accessibilityActions={compareActions}
@@ -178,23 +177,23 @@ export function PeriodPace({
         style={styles.figures}
         testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]} testID="today-progress-period-range">
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]} testID="today-progress-period-range">
             {formatPeriodRange(period.window)}
           </Text>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={styles.currentRow} testID="today-progress-period-working-sets">
-            <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-progress-period-day">{label} </Text>
-            <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[todayText.headlineFigure, styles.currentFigure]}>
+            <Text allowFontScaling={false} style={uiText.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
+            <Text adjustsFontSizeToFit allowFontScaling={false} numberOfLines={1} style={[uiText.figureHero, styles.currentFigure]}>
               {figures.workingSets}
-              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.meta}> sets</Text>
             </Text>
           </View>
         </View>
         {/* `vs` between the two periods, a rule above and below it. */}
         <View style={styles.versus}>
           <View style={styles.versusRule} />
-          <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]}>vs</Text>
+          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>vs</Text>
           <View style={styles.versusRule} />
         </View>
         <View style={[styles.column, styles.comparedColumn]}>
@@ -210,23 +209,22 @@ export function PeriodPace({
             comparedRange
           )}
           <View style={styles.previousRow}>
-            <Text allowFontScaling={false} style={todayText.differenceFigure} testID="today-progress-period-previous-sets">
+            <Text allowFontScaling={false} style={uiText.figureLarge} testID="today-progress-period-previous-sets">
               {figures.previousWorkingSets}
-              <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
+              <Text allowFontScaling={false} style={uiText.meta}> sets</Text>
             </Text>
             {/* The difference takes its direction's colour, like every other
                 change figure (`design-language.md` §6). */}
             <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[todayText.differenceFigure, { color: changeToneColour(paceTone(figures.difference)) }]}>
+              style={[uiText.figureLarge, { color: changeToneColour(paceTone(figures.difference)) }]}>
               {formatSignedCount(figures.difference)}
             </Text>
           </View>
         </View>
       </View>
-      {/* Lifting a finger off the chart selects the day under it, and in the
-          list layout so does dragging across it; a drag the scroller takes
-          (the screen's scroll, the cards' swipe) selects nothing. The Svg
-          takes no touches, so `locationX` is across this view. */}
+      {/* Lifting a finger off the chart selects the day under it; a drag the
+          scroller takes (the cards' swipe) selects nothing. The Svg takes no
+          touches, so `locationX` is across this view. */}
       <View
         accessible
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
@@ -235,15 +233,14 @@ export function PeriodPace({
         accessibilityValue={{ text: periodChartAccessibilityValue(period, figures) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
-        onResponderMove={fill ? undefined : onTouch}
         onResponderRelease={onTouch}
         onStartShouldSetResponder={() => true}
-        style={fill ? styles.fillChart : null}
+        style={styles.fillChart}
         testID="today-progress-chart">
-        {/* Filling, the drawing sits over the box rather than in it, so the
-            last measured height never props the box up: the box takes only
-            the height the card leaves it. */}
-        <View pointerEvents="none" style={fill ? StyleSheet.absoluteFill : null}>
+        {/* The drawing sits over the box rather than in it, so the last
+            measured height never props the box up: the box takes only the
+            height the card leaves it. */}
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Svg height={height} style={styles.chart} width={width}>
             <PeriodChart geometry={geometry} />
           </Svg>

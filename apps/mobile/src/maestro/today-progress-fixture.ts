@@ -1,3 +1,4 @@
+import { seedStandardCatalogFixture } from './standard-catalog-fixture';
 import { completeSessionDraft, persistSessionDraftSnapshot, upsertLocalGym } from '@/src/data';
 import { getAccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { localPeriodWindow } from '@/src/utils/local-calendar';
@@ -63,6 +64,7 @@ export const seedTodayProgressFixture = async ({
   now = new Date(),
   periodWeeks = getAccountLocalPreferenceState().values.targetWindowWeeks,
 }: { now?: Date; periodWeeks?: number } = {}) => {
+  await seedStandardCatalogFixture();
   await upsertLocalGym({ id: TODAY_PROGRESS_FIXTURE.gymId, name: TODAY_PROGRESS_FIXTURE.gymName });
 
   const days = sessionDays(now, periodWeeks);

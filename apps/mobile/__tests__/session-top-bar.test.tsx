@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
 
@@ -30,4 +30,25 @@ it('keeps the fixed titles for an edited and a just-finished session', () => {
   expect(screen.queryByTestId('session-view-title')).toBeNull();
   rerender(<SessionTopBar mode="complete" onDone={() => {}} />);
   expect(screen.getByText('Session summary')).toBeTruthy();
+});
+
+it('draws Finish as a tick with no text, still named and pressable as Finish', () => {
+  const onFinish = jest.fn();
+  render(<SessionTopBar mode="active" onFinish={onFinish} onOpenOptions={() => {}} startedAt={new Date(2026, 8, 23, 18, 0, 0)} />);
+  const finish = screen.getByTestId('session-view-finish-button');
+  expect(screen.getByLabelText('Finish session')).toBe(finish);
+  expect(screen.queryByText('Finish')).toBeNull();
+  fireEvent.press(finish);
+  expect(onFinish).toHaveBeenCalledTimes(1);
+});
+
+it('disables the Finish tick while a Finish is being written', () => {
+  const onFinish = jest.fn();
+  render(
+    <SessionTopBar finishDisabled mode="active" onFinish={onFinish} onOpenOptions={() => {}} startedAt={new Date(2026, 8, 23, 18, 0, 0)} />
+  );
+  const finish = screen.getByTestId('session-view-finish-button');
+  expect(finish).toBeDisabled();
+  fireEvent.press(finish);
+  expect(onFinish).not.toHaveBeenCalled();
 });

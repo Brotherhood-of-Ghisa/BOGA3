@@ -34,7 +34,7 @@ appId: com.dinoderek.mobile
 #   history, Filters, figures), __tests__/muscle-body-3d.test.tsx (shading, hit
 #   test, merged selection), __tests__/completed-session-local-data.test.tsx and
 #   __tests__/session-muscle-report.test.ts (session summary, comparisons, live
-#   insights), __tests__/exercise-editor-modal.test.tsx and
+#   insights), __tests__/exercise-editor-screen.test.tsx and
 #   __tests__/exercise-catalog-search.test.ts (editor, search),
 #   __tests__/groups-link-view-model.test.ts (group searches).
 #
@@ -91,7 +91,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
+    visible: { id: "settings-muscle-preset-detailed", selected: true }
     timeout: 15000
 - tapOn: { id: "settings-enabled-muscles-row" }
 - extendedWaitUntil:
@@ -148,7 +148,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "settings-muscle-preset-broad", selected: true }
     timeout: 15000
-- assertNotVisible: { id: "settings-enabled-muscles-row" }
+- assertVisible: { id: "settings-enabled-muscles-row" }
 - takeScreenshot: "muscles-settings-page"
 - openLink: "boga3://progress?breakdown=muscle"
 # Chest merges Serratus, so it is one muscle and its family has no header.
@@ -221,10 +221,10 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "exercise-editor-primary-muscle-trigger" }
     timeout: 10000
-- assertVisible: "Remove secondary muscle Biceps"
-- assertNotVisible: "Remove secondary muscle Upper back"
+- assertVisible: "Secondary: .*Biceps.*"
+- assertNotVisible: "Secondary: .*Upper back.*"
 - takeScreenshot: "muscle-report-06-broad-editor"
-- tapOn: "Close exercise editor"
+- tapOn: { id: "BackButton" }
 
 # --- 4. The 3D body --------------------------------------------------------
 - openLink: "boga3://settings-progress"
@@ -258,7 +258,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "settings-muscle-preset-detailed" }
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
+    visible: { id: "settings-muscle-preset-detailed", selected: true }
     timeout: 15000
 - tapOn: { id: "settings-enabled-muscles-row" }
 - extendedWaitUntil:
