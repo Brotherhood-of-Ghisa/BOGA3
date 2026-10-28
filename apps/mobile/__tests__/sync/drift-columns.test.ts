@@ -94,12 +94,24 @@ describe('sync drift column rules', () => {
       { column_name: 'tolerated', udt_name: 'text' },
     ];
     const findings = diffEntityColumns('exercise_sets', clientSets, server, {
-      local_only_columns: [], server_only_columns: [{ column: 'tolerated' }],
+      local_only_columns: [], server_only_columns: [{ column: 'exercise_sets.tolerated' }],
     });
 
     expect(findings).toEqual([{
       kind: 'server_only_column',
       message: expect.stringContaining('exercise_sets.legacy_note: server has a typed column with no client counterpart.'),
+    }]);
+  });
+
+  it('applies a server-only exemption to its own entity only', () => {
+    const server: ServerColumn[] = [...serverSets, { column_name: 'tolerated', udt_name: 'text' }];
+    const exemptions: ColumnExemptions = {
+      local_only_columns: [], server_only_columns: [{ column: 'gyms.tolerated' }, { column: 'tolerated' }],
+    };
+
+    expect(diffEntityColumns('exercise_sets', clientSets, server, exemptions)).toEqual([{
+      kind: 'server_only_column',
+      message: expect.stringContaining('exercise_sets.tolerated: server has a typed column with no client counterpart.'),
     }]);
   });
 

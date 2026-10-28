@@ -195,16 +195,17 @@ moved the session chain down a layer; an upgraded client resets `pull_cursor`
 
 `apps/mobile/scripts/check-sync-schema-drift.ts` (`npm run check:sync-drift`,
 run by the backend gate with `--strict`) resets the local Postgres, replays the
-Drizzle schema into in-memory SQLite, and diffs the live catalogs. Its header
-holds the algorithm, flags and exit codes. It guarantees:
+Drizzle schema into in-memory SQLite, and diffs the live catalogs (algorithm,
+flags and exit codes: its header). It guarantees:
 
 - Every client column maps to a typed server column of a compatible type.
-- Server columns with no client counterpart warn, and fail under `--strict`.
+- Unexempted server-only columns warn, and fail under `--strict`.
 - The ground rules and universal objects above hold per table.
 - The topological layers match the FK graph.
 
-Local-only client columns are exempt through
-`apps/mobile/src/data/schema/sync-extras.json`.
+`apps/mobile/src/data/schema/sync-extras.json` exempts local-only client
+columns and the server-only agent API tokens `session_plans.graph_version`,
+`training_programmes.graph_version` (not in push/pull fields).
 
 ---
 

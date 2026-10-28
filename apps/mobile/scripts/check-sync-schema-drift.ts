@@ -47,7 +47,7 @@ import Database from 'better-sqlite3';
 import { Client as PgClient } from 'pg';
 
 import { TOPO_LAYERS } from '../src/sync/topo-order.js';
-import { diffEntityColumns } from './sync-drift-columns.js';
+import { diffEntityColumns, type ColumnExemptions } from './sync-drift-columns.js';
 
 // -----------------------------------------------------------------------------
 // Paths
@@ -551,19 +551,7 @@ async function main(): Promise<number> {
   try {
     const findings: Findings = { errors: [], warnings: [] };
     const sqliteDb = materialiseClientSqlite();
-    const extras = JSON.parse(readFileSync(SYNC_EXTRAS_PATH, 'utf8')) as {
-      exemptions: {
-        local_only_columns: string[];
-        // Server-side columns we tolerate as having no client counterpart
-        // (typically because plan-2 hasn't shipped the matching client column
-        // yet — see sync-extras.json rationale per entry).
-        server_only_columns?: { column: string; rationale?: string }[];
-        // Client columns whose server counterpart is intentionally untyped text.
-        // Optional: the key (and the whole list) may be absent when no entity
-        // needs the waiver.
-        untyped_text_references?: { entity: string; column: string }[];
-      };
-    };
+    const extras = JSON.parse(readFileSync(SYNC_EXTRAS_PATH, 'utf8')) as { exemptions: ColumnExemptions };
 
     const entities = await listEntityTables(pg);
     if (entities.length === 0) {
@@ -651,13 +639,7 @@ interface EntityContext {
   pg: PgClient;
   sqliteDb: Database.Database;
   clientTables: Set<string>;
-  extras: {
-    exemptions: {
-      local_only_columns: string[];
-      server_only_columns?: { column: string; rationale?: string }[];
-      untyped_text_references?: { entity: string; column: string }[];
-    };
-  };
+  extras: { exemptions: ColumnExemptions };
   fixtureFile: FixtureFile;
   flags: Flags;
   findings: Findings;
