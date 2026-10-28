@@ -18,6 +18,8 @@ const ENTRY_MODULES = [
   'src/data/muscle-report-presets.ts',
   'src/data/muscle-report-setup.ts',
   'src/today-plan/calculations.ts',
+  // The coach's training status reaches the synced target preferences too.
+  '../../supabase/functions/agent-api/training-status.ts',
 ];
 
 const IMPORT_SPECIFIER = /(?:^|[\s;])(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]|(?:^|[\s;])import\s*['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -62,6 +64,7 @@ describe('Deno-importable muscle modules', () => {
       'src/exercise-calculations/analytics.ts',
       'src/utils/calendar-weeks.ts',
       'src/utils/local-calendar.ts',
+      'src/preferences/synced.ts',
     ]));
     expect(visited).not.toContain('src/data/muscle-report-settings.ts');
     expect(visited.filter((file) => /bootstrap|schema|write-nudge/.test(file))).toEqual([]);

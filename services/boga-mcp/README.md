@@ -30,7 +30,13 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Eight read-only tools:
+Nine read-only tools:
+- `get_training_status` — one bounded check-in: per tracked muscle, sets on the
+  three recovery days, today, this week and the four weeks before, with its
+  weekly target and last trained date (Today's Plan's figures and order); the
+  top ten exercises of the last 28 days with best 1RM in that window and the 28
+  days before and the last record date; the target mode, default and
+  `revision`. Days are the profile `time_zone`'s ([[agents.write-access]]).
 - `get_training_profile` — training preferences, equipment, gyms.
 - `list_muscles` — the muscle ids exercise mappings name, each with the
   person's `report_group` and `tracked` setup.

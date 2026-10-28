@@ -533,6 +533,53 @@ assert_status "404" "missing exercise context"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "NOT_FOUND" ]] ||
   fail "missing context did not match cross-owner not-found behavior"
 
+# The bucketing, ranking, windows and Today's Plan parity are the pure
+# builder's, in apps/mobile/__tests__/agent-api-training-status.test.ts. Here:
+# the route's reads, ownership and shape, before any write permission exists.
+echo "[agent-api-test] verifying the training status is owner-scoped, read-only and bounded"
+COMPLETED_DAY="$(node -e "process.stdout.write(new Date(${COMPLETED_MS}).toISOString().slice(0, 10))")"
+agent_get "training-status"
+assert_status "200" "training status without write permission"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg day "${COMPLETED_DAY}" \
+  --arg muscle "${MUSCLE_A}" \
+  --arg untracked "${MUSCLE_A2}" \
+  --arg exercise "${EXERCISE_A}" \
+  --arg warmup_only "${EXERCISE_A2}" '
+    .data as $s
+    | ($s.muscles | map(select(.id == $muscle)) | first) as $m
+    | ($s.favourite_exercises | map(select(.exercise_id == $exercise)) | first) as $f
+    | $s.metric_revision == "working_sets_v7"
+    and $s.time_zone == "UTC"
+    and $s.complete == true
+    and ($s.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
+    and ($s.targets.mode == "single" or $s.targets.mode == "per_muscle")
+    and ($s.targets.default_weekly_sets | type) == "number"
+    and ($s.targets.revision | type) == "number"
+    and ($s.counts_secondary_sets | type) == "boolean"
+    and $m != null
+    and ($m.weekly_target | type) == "number"
+    and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 2
+    and $m.last_trained_on == $day
+    and ($m.weekly_sets_last_4_weeks | length) == 4
+    and ($s.muscles | map(.id) | index($untracked)) == null
+    and $f.sessions_28d == 1
+    and $f.last_done_on == $day
+    and ($f.best_e1rm_kg.last_28d | type) == "number"
+    and $f.best_e1rm_kg.previous_28d == null
+    and ($s.favourite_exercises | map(.exercise_id) | index($warmup_only)) == null
+  ' >/dev/null || fail "training status shape or figures are wrong"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg exercise_b "${EXERCISE_B}" --arg muscle_b "${MUSCLE_B}" '
+    tostring | (contains($exercise_b) or contains($muscle_b)) | not
+  ' >/dev/null || fail "training status crossed the ownership boundary"
+agent_get "training-status?days=7"
+assert_status "400" "training status takes no inputs"
+[[ "$(run_psql "select count(*) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name = 'get_training_status' and http_status = 200;")" -ge 1 ]] ||
+  fail "training status was not audited under its tool name"
+
 echo "[agent-api-test] verifying identity inputs and bounded pagination"
 agent_get "exercises?user_id=${USER_B_UUID}"
 assert_status "400" "caller-supplied user_id"

@@ -347,6 +347,36 @@ any internal safety cap explicit. `exercises` lists every block, while
 `completed_set_count`, `set_count` and every volume count working sets
 ([working sets only](#working-sets-only), [[set.eligibility]]).
 
+## Training status
+
+`GET /v1/agent/training-status` takes no inputs and needs no write access. It
+returns one bounded object ([[agents.write-access]]); days and Monday-start
+weeks are the profile `time_zone`'s (UTC when unset or unknown).
+
+```json
+{
+  "metric_revision": "working_sets_v7", "as_of": "2026-10-28T12:00:00.000Z",
+  "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
+  "muscle_setup": "broad", "counts_secondary_sets": true,
+  "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
+  "muscles": [{ "id": "chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
+    "week_sets": 6.5, "recovery_days": [{ "date": "2026-10-25", "sets": null }],
+    "today_sets": null, "last_trained_on": "2026-10-27",
+    "weekly_sets_last_4_weeks": [{ "week_start": "2026-09-28", "sets": 10 }] }],
+  "favourite_exercises": [{ "exercise_id": "…", "name": "Bench Press", "sessions_28d": 7,
+    "last_done_on": "2026-10-26", "best_e1rm_kg": { "last_28d": 102.5, "previous_28d": 98.0 },
+    "last_record_on": "2026-10-12" }],
+  "complete": true
+}
+```
+
+`training-status.ts` derives it with Today's Plan's own functions. `revision`
+is the settings row's `client_updated_at_ms` (0 with no row); `uploaded: false`
+shows app defaults. Sets older than 56 days are not read, except each
+favourite's history (2000 blocks), which dates its records. `complete: false`
+when a read cap hit: 200 sessions, 1000 rows per chunk, 500 muscles, or that
+history.
+
 ## Working sets only
 
 The API reads the app's own rule for which sets and sessions count

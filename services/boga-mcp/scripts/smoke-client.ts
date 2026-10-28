@@ -84,6 +84,7 @@ try {
     'get_exercise_history',
     'get_recent_workouts',
     'get_training_profile',
+    'get_training_status',
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
@@ -144,6 +145,25 @@ try {
     )
   ) {
     throw new Error('Recent workouts did not return the test user session.');
+  }
+
+  // One bounded status: the seeded exercise is a favourite of the last 28 days.
+  const trainingStatus = structured(
+    await client.callTool({ arguments: {}, name: 'get_training_status' }),
+    'get_training_status',
+  );
+  const favourites = Array.isArray(trainingStatus.favourite_exercises) ? trainingStatus.favourite_exercises : [];
+  if (
+    trainingStatus.metric_revision !== 'working_sets_v7' ||
+    !Array.isArray(trainingStatus.muscles) ||
+    !isObject(trainingStatus.targets) ||
+    typeof trainingStatus.complete !== 'boolean' ||
+    !favourites.some((favourite) =>
+      isObject(favourite) && favourite.exercise_id === expectedExerciseId &&
+      typeof favourite.sessions_28d === 'number' && favourite.sessions_28d >= 1
+    )
+  ) {
+    throw new Error('Training status did not return the bounded shape with the test exercise as a favourite.');
   }
 
   // Drain exact exercise history across pages

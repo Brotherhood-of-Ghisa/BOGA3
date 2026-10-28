@@ -165,6 +165,10 @@ export class BogaAgentApi {
     return this.#getObject('v1/agent/workouts/recent', accessToken, input);
   }
 
+  async getTrainingStatus(accessToken: string): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/training-status', accessToken);
+  }
+
   async getExerciseHistory(
     accessToken: string,
     input: { cursor?: string; exercise_id: string; gym_bucket?: string; limit?: number },
