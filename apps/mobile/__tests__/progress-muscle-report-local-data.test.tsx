@@ -159,7 +159,7 @@ const tapEntryOnBody = async (entry: string) => {
   const viewport = screen.getByTestId('stats-muscle-body-viewport');
   fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
   fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, buckets: new Map() });
+  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores: new Map() });
   const facet = detailed.triangles.filter(tri => tri.muscleGroupId === entry).at(-1)!;
   const tap = viewport.props.gesture.gestures.find((gesture: { type: string }) => gesture.type === 'tap');
   await act(async () => {

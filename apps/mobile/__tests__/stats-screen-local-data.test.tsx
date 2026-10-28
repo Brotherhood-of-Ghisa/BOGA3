@@ -66,6 +66,7 @@ import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import StatsRoute from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
+import { computeMuscleScores } from '@/components/stats/muscle-body-projection';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import * as statsRepository from '@/src/data/stats';
@@ -235,16 +236,25 @@ describe('Stats over real data', () => {
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-back_lats'));
     expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
     const change = () => screen.getByTestId('stats-muscle-body-comparison-change');
+    const scores = () => {
+      const props = screen.UNSAFE_getByType(MuscleBodyCard).props;
+      return computeMuscleScores(props.muscles, props.metric);
+    };
     expect(change()).toHaveTextContent(/^0$/);
+    expect(scores().get('back_lats')).toBe(0);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^1$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1$/);
     chooseFilter('period', '4 weeks');
     expect(change()).toHaveTextContent(/^\+1$/);
+    expect(scores().get('back_lats')).toBe(1 / 9);
+    expect(scores().get('quads')).toBe(1);
     chooseFilter('metric', 'Volume');
     expect(change()).toHaveTextContent(/^\+100%$/);
     const before = screen.UNSAFE_getByType(MuscleBodyCard).props.muscles;
+    const beforeScores = scores();
     await act(async () => updatePreferences({ historyLookbackWeeks: 1, weeklyWorkingSetTarget: 999 }));
     expect(screen.UNSAFE_getByType(MuscleBodyCard).props.muscles).toEqual(before);
+    expect(scores()).toEqual(beforeScores);
     expect(change()).toHaveTextContent(/^\+100%$/);
     chooseFilter('period', 'This week');
     expect(change()).toHaveTextContent(/^0%$/);
@@ -253,6 +263,7 @@ describe('Stats over real data', () => {
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
     expect(await screen.findByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
     expect(change()).toHaveTextContent(/^—$/);
+    expect(scores().get('biceps')).toBeNull();
   });
 
   it('holds Group by and Gym in the Filters sheet, whose compact button fills while either is changed', async () => {
@@ -577,6 +588,9 @@ describe('Stats over real data', () => {
     await screen.findByTestId('stats-muscle-body-card');
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-quads'));
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^7$/);
+    const body = screen.UNSAFE_getByType(MuscleBodyCard).props;
+    const allGyms = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
+    expect(computeMuscleScores(body.muscles, body.metric)).toEqual(computeMuscleScores(allGyms.muscles, body.metric));
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
     chooseFilter('view-mode', 'Exercise');

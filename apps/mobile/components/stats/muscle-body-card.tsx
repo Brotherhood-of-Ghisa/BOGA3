@@ -24,7 +24,7 @@ import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
   canonicalOrientationForMuscle,
-  computeMuscleBuckets,
+  computeMuscleScores,
   hitTestProjectedMuscle,
   normaliseBodyAngle,
   projectMuscleBody,
@@ -247,7 +247,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
   const orientation = bodyOrientationForAngle(angleDeg);
-  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric), [muscles, metric]);
+  const scores = useMemo(() => computeMuscleScores(muscles, metric), [muscles, metric]);
   const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
   const projected = useMemo(
     () =>
@@ -255,12 +255,12 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         angleDeg,
         width: viewportWidth,
         height: VIEWPORT_HEIGHT,
-        buckets,
+        scores,
         selectedId,
         report,
         palette,
       }),
-    [angleDeg, buckets, palette, report, selectedId, viewportWidth]
+    [angleDeg, scores, palette, report, selectedId, viewportWidth]
   );
 
   const selectedMuscle = useMemo(
