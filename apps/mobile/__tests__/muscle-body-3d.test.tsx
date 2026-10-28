@@ -10,6 +10,7 @@ import { uiRoles } from '@/components/ui/tokens';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
+import { MOUSTACHE_FILL } from '@/components/stats/muscle-body-moustache';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import {
   SHADE_STEPS,
@@ -22,6 +23,9 @@ import {
   projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
 import type { ProgressComparisons, ProgressMuscleComparison } from '@/src/data';
+
+beforeEach(() => { jest.useFakeTimers({ now: new Date(2026, 9, 20) }); });
+afterEach(() => { jest.useRealTimers(); });
 
 const makeMuscle = (
   muscleGroupId: string,
@@ -157,7 +161,6 @@ describe('buildThemeShadePalette', () => {
     expect(palette.neutral).toHaveLength(SHADE_STEPS);
     expect(buildMuscleShadeRamp(null, palette)).toEqual(palette.neutral);
     expect(buildMuscleShadeRamp(NaN, palette)).toEqual(palette.neutral);
-    expect(palette.selectedStroke).toBe(roles.ink);
     for (const [score, seed] of [[-1, roles.viz1], [0, roles.viz2], [1, roles.viz4]] as const) {
       const ramp = buildMuscleShadeRamp(score, palette);
       expect(ramp).toHaveLength(SHADE_STEPS);
@@ -276,23 +279,14 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
 
     // At 180° (back view), posterior muscles (`back_lats`, `glutes_max`) are frontmost.
     const back = projectMuscleBody({ angleDeg: 180, width, height, scores, selectedId: 'back_lats' });
-    expect(back.batches.some(b => b.selected && b.stroke === uiRoles.ink)).toBe(true);
-    expect(back.contour).not.toBeNull();
-    expect(back.contour?.stroke).toBe(uiRoles.ink);
-    expect(back.contour?.d.startsWith('M')).toBe(true);
-    expect(front.contour).toBeNull();
+    expect(back.batches.some(b => b.selected)).toBe(true);
+    expect(back.fibres.surface.startsWith('M')).toBe(true);
+    expect(front.fibres).toEqual({ surface: '', deep: '' });
 
-    // Contours on the opposite side of the body are depth-occluded:
-    // Front muscles (chest) produce no contour when looking from the back (180°).
+    // Selection is surfaced even when the owning anatomy faces away.
     const chestFromBack = projectMuscleBody({ angleDeg: 180, width, height, scores, selectedId: 'chest' });
-    expect(chestFromBack.contour).toBeNull();
-    // Back muscles (glutes) produce no contour when looking from the front (0°).
-    const glutesFromFront = projectMuscleBody({ angleDeg: 0, width, height, scores, selectedId: 'glutes_max' });
-    expect(glutesFromFront.contour).toBeNull();
-    // Front muscles (chest) produce a valid contour when looking from the front (0°).
-    const chestFromFront = projectMuscleBody({ angleDeg: 0, width, height, scores, selectedId: 'chest' });
-    expect(chestFromFront.contour).not.toBeNull();
-    expect(chestFromFront.contour?.d.startsWith('M')).toBe(true);
+    expect(chestFromBack.fibres.surface.startsWith('M')).toBe(true);
+    expect(chestFromBack.fibres.deep.startsWith('M')).toBe(true);
 
     const latsTri = back.triangles.filter(t => t.muscleGroupId === 'back_lats').at(-1)!;
     const latsCx = (latsTri.x0 + latsTri.x1 + latsTri.x2) / 3;
@@ -302,8 +296,63 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     expect(projectMuscleBody({ angleDeg: 0, width: 0, height: 280, scores })).toEqual({
       triangles: [],
       batches: [],
-      contour: null,
+      fibres: { surface: '', deep: '' },
     });
+  });
+});
+
+describe('November face decoration', () => {
+  it.each([0, 45, 90, 135, 180, 225, 315])('preserves anatomy, colours, hit tests and selection at %s degrees', angleDeg => {
+    const options = { angleDeg, width: 280, height: 280, selectedId: 'chest',
+      scores: computeMuscleScores([makeMuscle('chest', 'Chest', 8)], 'workingSetCount') };
+    const ordinary = projectMuscleBody(options);
+    const november = projectMuscleBody({ ...options, november: true });
+    expect(november.triangles).toEqual(ordinary.triangles);
+    expect(november.batches.slice(0, ordinary.batches.length)).toEqual(ordinary.batches);
+    expect(november.fibres).toEqual(ordinary.fibres);
+    for (const triangle of ordinary.triangles.filter((_, index) => index % 37 === 0)) {
+      const x = (triangle.x0 + triangle.x1 + triangle.x2) / 3;
+      const y = (triangle.y0 + triangle.y1 + triangle.y2) / 3;
+      expect(hitTestProjectedMuscle(november, x, y)).toBe(hitTestProjectedMuscle(ordinary, x, y));
+    }
+  });
+
+  it('projects the charcoal handlebar with the face and culls it from the back', () => {
+    const project = (angleDeg: number, november = true) => projectMuscleBody({ angleDeg, november,
+      width: 280, height: 280, scores: new Map() }).batches.filter(batch => batch.fill === MOUSTACHE_FILL);
+    expect(project(0, false)).toEqual([]);
+    expect(project(0).length).toBeGreaterThan(0);
+    expect(project(45).length).toBeGreaterThan(0);
+    expect(project(45).map(batch => batch.d)).not.toEqual(project(0).map(batch => batch.d));
+    expect(project(0).every(batch => !batch.selected)).toBe(true);
+    expect(project(180)).toEqual([]);
+    expect(projectMuscleBody({ angleDeg: 0, november: true, width: 0, height: 280, scores: new Map() }).batches).toEqual([]);
+  });
+
+  it('uses the device calendar through restoration, while preserving rotation and controls', () => {
+    jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 59));
+    const onSelect = jest.fn();
+    render(<MuscleBodyCard metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
+      selectedId="chest" onSelect={onSelect} />);
+    const moustache = () => screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill === MOUSTACHE_FILL);
+    const viewport = screen.getByTestId('stats-muscle-body-viewport');
+    expect(moustache().length).toBeGreaterThan(0);
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
+    const front = moustache().map(path => path.props.d);
+    fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(moustache().map(path => path.props.d)).not.toEqual(front);
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
+    expect(moustache()).toEqual([]);
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-front'));
+    expect(moustache().length).toBeGreaterThan(0);
+    const fibres = screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.d;
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(moustache()).toEqual([]);
+    expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.d).toBe(fibres);
+    expect(viewport.props.accessibilityValue).toEqual({ text: 'Front view, 0 degrees' });
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
+    fireEvent.press(screen.getByTestId('stats-muscle-body-target-chest'));
+    expect(onSelect).toHaveBeenCalledWith('chest');
   });
 });
 
@@ -405,8 +454,16 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
-    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-body-contour').props.strokeWidth).toBe(1.5);
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.strokeWidth).toBe(0.9);
+    expect(screen.getByTestId('stats-muscle-body-fibres-deep-shade').props.opacity).toBe(0.70);
+    const highlight = screen.UNSAFE_getAllByType(Path).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-highlight')!;
+    expect(highlight.props).toMatchObject({ stroke: uiRoles.surface, strokeWidth: 1.1,
+      opacity: 0.95, translateX: 0.45, translateY: -0.45, strokeLinecap: 'round', strokeLinejoin: 'round' });
+    expect(screen.UNSAFE_getAllByType(Path).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-shade')!.props).toMatchObject({
+      stroke: uiRoles.inkMuted, opacity: 0.72, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round',
+    });
+    expect(screen.getByTestId('stats-muscle-body-svg').props.pointerEvents).toBe('none');
     expect(
       screen.getByLabelText('Select Chest. Now 8, previous 0, change +8. working sets.').props.accessibilityState
     ).toEqual({
@@ -430,6 +487,32 @@ describe('MuscleBodyCard', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-picker-row-back_lats'));
     expect(onSelect).toHaveBeenCalledWith('back_lats');
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Back view, 180 degrees' });
+  });
+
+  it('explains schematic depth on demand without changing selection or rotation', () => {
+    const onSelect = jest.fn();
+    render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />);
+    const viewport = screen.getByTestId('stats-muscle-body-viewport');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
+    const before = screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.d;
+    expect(screen.queryByTestId('stats-muscle-body-help')).toBeNull();
+    fireEvent.press(screen.getByLabelText('About the muscle model'));
+    expect(screen.getByText(/Fibre lines are schematic directions/)).toBeTruthy();
+    fireEvent(screen.getByTestId('stats-muscle-body-help'), 'accessibilityEscape');
+    expect(screen.queryByTestId('stats-muscle-body-help')).toBeNull();
+    expect(viewport.props.accessibilityValue.text).toBe('Back view, 180 degrees');
+    expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.d).toBe(before);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('retains figures and controls for geometry-free muscles without fibres', () => {
+    render(<MuscleBodyCard metric="workingSetCount" muscles={[makeMuscle('custom', 'Custom', 3)]}
+      selectedId="custom" onSelect={jest.fn()} />);
+    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Custom');
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent('3');
+    expect(screen.queryByTestId('stats-muscle-body-fibres-surface-shade')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-body-fibres-deep-shade')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-body-picker-trigger')).toBeTruthy();
   });
 
   it('renders MuscleBodyCard in 3D Muscle layout with top trained muscle selected by default and discloses contributions', () => {

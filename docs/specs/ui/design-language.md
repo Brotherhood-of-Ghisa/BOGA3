@@ -76,7 +76,8 @@ active and retries interruptions after foregrounding. Other native failures
 attempt the primary icon and are logged without blocking boot. Matching icons
 are left alone to avoid repeated OS alerts. `app.config.ts` bundles the PNGs in
 `apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
-every launcher alias.
+every launcher alias. Seasonal identity follows [[appearance.november]]; its
+alternates require a native build, while ordinary Warm remains primary.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
 empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
