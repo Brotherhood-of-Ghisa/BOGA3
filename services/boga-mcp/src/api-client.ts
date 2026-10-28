@@ -78,6 +78,14 @@ export type ExerciseFields = {
   split_by_gym?: boolean;
 };
 
+/** The weekly targets an agent may set; overrides map muscle ids to a target, null clearing one. */
+export type MuscleTargetFields = {
+  default_weekly_sets?: number;
+  expected_revision: number;
+  mode?: 'per_muscle' | 'single';
+  overrides?: Record<string, number | null>;
+};
+
 export class BogaAgentApi {
   readonly #baseUrl: URL;
   readonly #fetch: typeof fetch;
@@ -167,6 +175,14 @@ export class BogaAgentApi {
 
   async getTrainingStatus(accessToken: string): Promise<Record<string, unknown>> {
     return this.#getObject('v1/agent/training-status', accessToken);
+  }
+
+  async setMuscleTargets(
+    accessToken: string,
+    input: MuscleTargetFields & { idempotency_key: string },
+  ): Promise<Record<string, unknown>> {
+    const { idempotency_key, ...body } = input;
+    return this.#postObject('v1/agent/muscle-targets', accessToken, idempotency_key, body, 'PUT');
   }
 
   async getExerciseHistory(
@@ -288,8 +304,9 @@ export class BogaAgentApi {
     accessToken: string,
     idempotencyKey: string,
     body: Record<string, unknown>,
+    method: 'POST' | 'PUT' = 'POST',
   ): Promise<Record<string, unknown>> {
-    const value = await this.#request('POST', relativePath, accessToken, {
+    const value = await this.#request(method, relativePath, accessToken, {
       body,
       idempotencyKey,
     });
@@ -313,7 +330,7 @@ export class BogaAgentApi {
   }
 
   async #request(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     relativePath: string,
     accessToken: string,
     options: {
@@ -325,7 +342,7 @@ export class BogaAgentApi {
     if (!accessToken.trim()) {
       throw new BogaAgentApiError(401, 'UNAUTHORIZED', 'Authentication required.', null);
     }
-    if (method === 'POST' && (!options.idempotencyKey || !options.idempotencyKey.trim())) {
+    if (method !== 'GET' && (!options.idempotencyKey || !options.idempotencyKey.trim())) {
       throw new BogaAgentApiError(400, 'INVALID_ARGUMENT', 'Idempotency key is required.', null);
     }
     const url = new URL(relativePath, this.#baseUrl);
@@ -347,7 +364,7 @@ export class BogaAgentApi {
         'x-request-id': requestId,
       };
       let requestBody: string | undefined;
-      if (method === 'POST') {
+      if (method !== 'GET') {
         headers['content-type'] = 'application/json';
         headers['idempotency-key'] = options.idempotencyKey!;
         requestBody = JSON.stringify(options.body ?? {});

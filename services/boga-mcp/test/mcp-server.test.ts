@@ -99,6 +99,12 @@ const responses: Record<string, Record<string, unknown>> = {
     muscles: [{ id: 'chest_sternal', name: 'Chest', week_sets: 4.5, weekly_target: 10 }],
     targets: { default_weekly_sets: 10, mode: 'single', revision: 1_730_000_000_000, uploaded: true },
   },
+  '/functions/v1/agent-api/v1/agent/muscle-targets': {
+    idempotent_replay: false,
+    overrides: { chest_sternal: 14 },
+    scope: 'broad',
+    targets: { default_weekly_sets: 10, mode: 'per_muscle', revision: 1_730_000_000_001, uploaded: true },
+  },
   '/functions/v1/agent-api/v1/agent/muscles': {
     muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest', report_group: null, tracked: true }],
   },
@@ -211,7 +217,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly fifteen tools with correct annotations', async () => {
+  it('discovers exactly sixteen tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -231,6 +237,7 @@ describe('BoGa MCP server', () => {
       'list_muscles',
       'restore_exercise',
       'search_exercises',
+      'set_muscle_targets',
       'update_exercise',
     ]);
     const readOnlyNames = new Set([
@@ -247,8 +254,8 @@ describe('BoGa MCP server', () => {
     // The instructions count the read-only tools a client can call.
     expect(readOnlyNames.size).toBe(9);
     expect(running.client.getInstructions()).toContain('Nine read-only tools');
-    // Edits and deletes replace what the person had, so clients confirm them.
-    const destructiveNames = new Set(['delete_exercise', 'update_exercise']);
+    // Edits, deletes and new targets replace what the person had, so clients confirm them.
+    const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise']);
     for (const tool of result.tools) {
       if (destructiveNames.has(tool.name)) {
         expect(tool.annotations).toMatchObject({
@@ -460,6 +467,81 @@ describe('BoGa MCP server', () => {
     expect(running.requests.map((r) => `${r.method} ${r.url.pathname}${r.url.search}`)).toContain(
       'GET /functions/v1/agent-api/v1/agent/exercises?include_deleted=true&query=fly',
     );
+  });
+
+  it('translates set_muscle_targets into a PUT of the targets with an idempotency key', async () => {
+    const running = await startMcp();
+    active.push(running);
+
+    const result = await running.client.callTool({
+      arguments: {
+        default_weekly_sets: 10,
+        expected_revision: 1_730_000_000_000,
+        idempotency_key: 'targets-1',
+        mode: 'per_muscle',
+        overrides: { chest_sternal: 14, lats: null },
+      },
+      name: 'set_muscle_targets',
+    });
+    expect(result.structuredContent).toEqual(responses['/functions/v1/agent-api/v1/agent/muscle-targets']);
+
+    const puts = running.requests.filter((r) => r.method === 'PUT');
+    expect(puts.map((r) => ({
+      body: JSON.parse(r.body ?? '{}') as unknown,
+      key: r.headers.get('idempotency-key'),
+      path: r.url.pathname.replace('/functions/v1/agent-api/v1/agent/', ''),
+      type: r.headers.get('content-type'),
+    }))).toEqual([{
+      // null reaches the API, which clears that muscle's override.
+      body: {
+        default_weekly_sets: 10,
+        expected_revision: 1_730_000_000_000,
+        mode: 'per_muscle',
+        overrides: { chest_sternal: 14, lats: null },
+      },
+      key: 'targets-1',
+      path: 'muscle-targets',
+      type: 'application/json',
+    }]);
+  });
+
+  it('tells the coach overrides need per_muscle mode and name the revision to quote', async () => {
+    const running = await startMcp();
+    active.push(running);
+
+    const { tools } = await running.client.listTools();
+    const description = tools.find((tool) => tool.name === 'set_muscle_targets')?.description ?? '';
+    expect(description).toMatch(/only in per_muscle mode/);
+    expect(description).toMatch(/targets\.revision from get_training_status/);
+  });
+
+  it.each([
+    [{ default_weekly_sets: 0 }],
+    [{ default_weekly_sets: 8.5 }],
+    [{ mode: 'per-muscle' }],
+    [{ overrides: { chest_sternal: 0 } }],
+    [{ overrides: { chest_sternal: '9' } }],
+    [{ overrides: { '': 9 } }],
+    [{ expected_revision: -1, default_weekly_sets: 9 }],
+    [{ default_weekly_sets: 9, omitExpectedRevision: true }],
+    [{ default_weekly_sets: 9, count_secondary_muscles: false }],
+  ])('rejects set_muscle_targets %j before calling the API', async (changes) => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+
+    const { omitExpectedRevision, ...fields } = changes as Record<string, unknown>;
+    const result = await running.client.callTool({
+      arguments: {
+        idempotency_key: 'targets-bad',
+        ...(omitExpectedRevision ? {} : { expected_revision: 1 }),
+        ...fields,
+      },
+      name: 'set_muscle_targets',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'PUT')).toHaveLength(0);
   });
 
   it('rejects an unknown muscle role before calling the API', async () => {
