@@ -702,3 +702,28 @@ describe('opening the editor page', () => {
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });
+
+// The editor on the shared text roles (`design-language.md` §3, "Text roles").
+describe('text roles', () => {
+  const { StyleSheet } = jest.requireActual('react-native') as typeof import('react-native');
+  const { uiFonts, uiRoles, uiTypography } = jest.requireActual('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
+  const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
+
+  it('heads each section with a muted micro-label, the shared Weight section included', () => {
+    renderEditor({ editing: exercise() });
+    for (const heading of ['Muscles', 'Weight', 'Options']) {
+      expect(styleOf(screen.getByText(heading))).toMatchObject({
+        fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkMuted,
+      });
+    }
+  });
+
+  it('draws an empty choice faint and a section error as meta in danger', async () => {
+    renderEditor({ editing: exercise({ mappings: [] }) });
+    expect(styleOf(screen.getByText('Choose'))).toMatchObject({ fontFamily: uiFonts.body.family, color: uiRoles.inkFaint });
+    await save();
+    expect(styleOf(screen.getByTestId('exercise-editor-muscles-error'))).toMatchObject({
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.danger,
+    });
+  });
+});

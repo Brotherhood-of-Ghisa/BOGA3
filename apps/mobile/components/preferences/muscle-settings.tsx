@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton, Card, FormSection, Icon, ListRow, Notice, ScreenScroll, SegmentedControl, SwitchRow,
-  uiFonts, uiRoles, uiSpace, uiText, uiTypography } from '@/components/ui';
+  FigureText, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { buildSettingsMuscleSections, deriveMuscleReportPreset, setMuscleReportPreset, setMuscleTracked,
   type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
@@ -36,7 +36,7 @@ function MusclePageBody({ page, preferences }: { page: Page; preferences: Prefer
     {setup.error ? <Notice action={<ActionButton label="Retry" disabled={setup.busy} onPress={setup.retry} variant="text" />}
       icon="warning" live message={setup.error} testID="settings-muscles-error" tone="danger" /> : null}
     {page === 'muscles' ? <MuscleChoices preferences={preferences} scope={scope} setup={setup} sections={sections} /> : null}
-    {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={styles.body}>Loading muscles…</Text> : null}
+    {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={uiText.meta}>Loading muscles…</Text> : null}
     {page === 'targets' && scope ? <TargetSections preferences={preferences} scope={scope} sections={sections} /> : null}
     {page === 'enabled' ? sections.map(section => <MuscleSection key={section.family} section={section}>
       {section.muscles.map((muscle, index) => <SwitchRow key={muscle.id} density="list" disabled={setup.busy} divider={index > 0} label={muscle.label}
@@ -69,7 +69,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
   return <>
     <FormSection title="Weekly targets">
         <View style={styles.choice}>
-          <Text allowFontScaling={false} style={styles.label}>Target mode</Text>
+          <Text allowFontScaling={false} style={uiText.label}>Target mode</Text>
           <SegmentedControl accessibilityLabel="Target mode" options={[{ value: 'single', label: 'Single' }, { value: 'per-muscle', label: 'Per muscle' }]}
             value={current.muscleTargetMode} testIDPrefix="settings-muscle-target-mode"
             onChange={muscleTargetMode => updatePreferences({ muscleTargetMode })} />
@@ -83,7 +83,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
           <SegmentedControl<MuscleTargetScope> accessibilityLabel="Muscle breakdown" disabled={!scope || setup.busy}
             options={PRESET_OPTIONS} value={scope ?? 'detailed'} testIDPrefix="settings-muscle-preset"
             onChange={next => { if (next !== 'custom') void setup.change(() => setMuscleReportPreset(next)); }} />
-          {scope === 'custom' ? <Text allowFontScaling={false} style={styles.label} testID="settings-muscle-custom">Custom</Text> : null}
+          {scope === 'custom' ? <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]} testID="settings-muscle-custom">Custom</Text> : null}
         </View>
         <Destination label="Enabled muscles" status={setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…'}
           testID="settings-enabled-muscles-row" onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} />
@@ -114,7 +114,7 @@ function TargetSections({ preferences, scope, sections }: { preferences: Prefere
         value={Object.hasOwn(current.muscleTargetOverrides[scope] ?? {}, muscle.id) ? current.muscleTargetOverrides[scope]![muscle.id] : undefined}
         onCommit={target => save(muscle.id, target)} />)}
     </MuscleSection>)}
-    {enabled.length === 0 ? <Text allowFontScaling={false} style={styles.body} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}
+    {enabled.length === 0 ? <Text allowFontScaling={false} style={uiText.meta} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}
   </>;
 }
 
@@ -129,7 +129,7 @@ function SectionLabel({ title }: { title: string }) {
 }
 function Destination({ label, status, testID, onPress }: { label: string; status: string; testID: string; onPress: () => void }) {
   return <ListRow label={label} density="list" onPress={onPress} testID={testID}
-    accessibilityLabel={`${label}, ${status}`} meta={<Text allowFontScaling={false} style={styles.meta}>{status}</Text>}
+    accessibilityLabel={`${label}, ${status}`} meta={<Text allowFontScaling={false} style={uiText.meta}><FigureText>{status}</FigureText></Text>}
     trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />} />;
 }
 
@@ -138,7 +138,4 @@ const styles = StyleSheet.create({
   section: { gap: uiSpace.sm },
   choice: { padding: uiSpace.md, gap: uiSpace.sm },
   listHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: uiSpace.md },
-  label: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
-  body: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.inkMuted },
-  meta: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
 });

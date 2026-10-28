@@ -4,13 +4,12 @@ import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calc
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Stat } from '@/components/ui/stat';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
   formatEffort,
   type SetRowView,
 } from '@/src/session-recorder/exercise-page-model';
-
-import { pageText } from './text-styles';
 
 type SetRowProps = {
   row: SetRowView;
@@ -51,7 +50,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
       density="list"
       divider={divider}
       leading={
-        <Text allowFontScaling={false} style={[pageText.microLabel, styles.type, performed ? styles.typePerformed : null]}>
+        <Text allowFontScaling={false} style={[uiText.label, performed ? uiTextTone.ink : uiTextTone.faint, styles.type]}>
           {effort}
         </Text>
       }
@@ -105,8 +104,8 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
           allowFontScaling={false}
           numberOfLines={1}
           style={[
-            pageText.runningFigure,
-            performed ? (row.weightRecord ? styles.figureRecord : null) : styles.figurePlanned,
+            uiText.figure,
+            performed ? (row.weightRecord ? uiTextTone.record : null) : uiTextTone.faint,
           ]}
           testID={`exercise-set-${row.number}-values`}>
           {row.weight === null && row.reps === null
@@ -122,19 +121,9 @@ const styles = StyleSheet.create({
   type: {
     width: uiGeometry.tapTarget,
   },
-  typePerformed: {
-    color: uiRoles.ink,
-  },
   body: {
     justifyContent: 'center',
     paddingVertical: uiSpace.sm,
-  },
-  figurePlanned: {
-    color: uiRoles.inkFaint,
-  },
-  figureRecord: {
-    fontWeight: '700',
-    color: uiRoles.record,
   },
   glyph: {
     width: uiGeometry.tapTarget,

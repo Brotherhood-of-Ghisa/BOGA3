@@ -4,13 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   ListRow,
   uiBorder,
-  uiFonts,
   uiRoles,
   uiSpace,
   uiText,
-  uiTypography,
+  uiTextTone,
 } from '@/components/ui';
 import { getDatabaseBackups, type DatabaseBackups } from '@/src/backup/database-backups';
 import type { Snapshot } from '@/src/backup/snapshots';
@@ -59,22 +59,22 @@ export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps
         density="list"
         divider={false}
         meta={
-          <Text allowFontScaling={false} style={styles.value} testID="settings-backup-last">
-            {newest ? formatLocalDateTime(newest.takenAtMs, dateFormat) : 'Never'}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-backup-last">
+            <FigureText>{newest ? formatLocalDateTime(newest.takenAtMs, dateFormat) : 'Never'}</FigureText>
           </Text>
         }
         testID="settings-backup-last-row">
-        <Text allowFontScaling={false} style={styles.label}>Last backup</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Last backup</Text>
       </ListRow>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.value} testID="settings-backup-count">
-            {snapshots === null ? 'Unavailable' : String(snapshots.length)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-backup-count">
+            <FigureText>{snapshots === null ? 'Unavailable' : String(snapshots.length)}</FigureText>
           </Text>
         }
         testID="settings-backup-count-row">
-        <Text allowFontScaling={false} style={styles.label}>Saved backups</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Saved backups</Text>
       </ListRow>
       <View style={styles.actions}>
         <ActionButton
@@ -92,7 +92,7 @@ export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps
             accessibilityLiveRegion="polite"
             accessibilityRole="alert"
             allowFontScaling={false}
-            style={styles.error}
+            style={[uiText.meta, uiTextTone.danger]}
             testID="settings-backup-error">
             {error}
           </Text>
@@ -108,19 +108,7 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.xs,
   },
-  label: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
   value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
     textAlign: 'right',
   },
   actions: {
@@ -129,11 +117,5 @@ const styles = StyleSheet.create({
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
     alignItems: 'flex-start',
-  },
-  error: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
 });

@@ -2,11 +2,13 @@ import { memo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   type ExerciseListItem,
   type ExerciseListPreferences,
@@ -76,7 +78,7 @@ export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID
       onPress={onPress}
       style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipLabel, compact && styles.compactLabel, on ? styles.chipLabelOn : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, compact ? styles.compactLabel : uiTextTone.ink, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>
       {trailing}
@@ -181,7 +183,7 @@ export function ExerciseListContent({
               divider={false}
               expanded={isExpanded}
               label={section.familyName}
-              meta={<Text allowFontScaling={false} style={[styles.familyCount, empty ? styles.familyCountEmpty : null]}>{section.count}</Text>}
+              meta={<Text allowFontScaling={false} style={[uiText.figureSmall, empty ? uiTextTone.faint : null]}>{section.count}</Text>}
               onPress={() => familyExpansion.toggle(section.familyName)}
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
@@ -230,18 +232,18 @@ const ExerciseListRow = memo(function ExerciseListRow({
           ellipsizeMode="clip"
           minimumFontScale={0.82}
           numberOfLines={2}
-          style={[styles.name, deleted ? styles.faded : null]}>
+          style={[uiText.bodyStrong, deleted ? uiTextTone.faint : null, styles.name]}>
           {exercise.name}
         </Text>
         {linked ? <Icon color={uiRoles.inkMuted} name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
       <Text allowFontScaling={false}
-        style={[styles.muscles, deleted ? styles.faded : null]}>
+        style={[uiText.meta, deleted ? uiTextTone.faint : null]}>
         {exercise.muscleSummary}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.stats, deleted ? styles.faded : null]}>
-        {exercise.statsSummary}
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, deleted ? uiTextTone.faint : null]}>
+        <FigureText>{exercise.statsSummary}</FigureText>
       </Text>
     </View>
   );
@@ -302,13 +304,6 @@ const styles = StyleSheet.create({
   },
   compactLabel: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   chipOn: {
     backgroundColor: uiRoles.ink,
@@ -317,28 +312,13 @@ const styles = StyleSheet.create({
   chipPressed: {
     backgroundColor: uiRoles.paper,
   },
-  chipLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
+  // The ink pill's label: no text tone draws on ink, so the selected chip keeps
+  // the surface colour here.
   chipLabelOn: {
     color: uiRoles.surface,
   },
   sections: {
     gap: uiSpace.sm,
-  },
-  familyCount: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  familyCountEmpty: {
-    color: uiRoles.inkGhost,
   },
   rowText: {
     paddingVertical: uiSpace.sm,
@@ -351,27 +331,5 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  muscles: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  stats: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  faded: {
-    color: uiRoles.inkFaint,
   },
 });

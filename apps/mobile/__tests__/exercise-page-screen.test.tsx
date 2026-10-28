@@ -636,7 +636,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-0')).toHaveTextContent(/^W-Up60\.0 × 10/);
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
-    fireEvent.press(screen.getByRole('link', { name: 'Open exercise progress' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Open exercise progress' }));
     expect(screen.getByTestId('exercise-records-progress')).toHaveTextContent('Progress');
     expect(mockRouter.push).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${BENCH_DEF}`);
   });

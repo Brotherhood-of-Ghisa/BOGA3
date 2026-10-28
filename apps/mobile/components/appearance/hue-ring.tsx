@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { uiRoles, uiText, uiTextTone } from '@/components/ui';
 import { hueName, normaliseHue, seedsFromHue } from '@/components/ui/theme-hue';
 
 type HueRingProps = {
@@ -82,10 +82,10 @@ export function HueRing({ hue, onChange, size = 240, testID }: HueRingProps) {
           <Circle cx={thumb[0]} cy={thumb[1]} fill={seedsFromHue(hue).accent} r={THUMB_RADIUS - 4} />
         </Svg>
         <View pointerEvents="none" style={styles.centre}>
-          <Text allowFontScaling={false} style={styles.name} testID={testID ? `${testID}-name` : undefined}>
+          <Text allowFontScaling={false} style={uiText.title} testID={testID ? `${testID}-name` : undefined}>
             {hueName(hue)}
           </Text>
-          <Text allowFontScaling={false} style={styles.degrees}>
+          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted]}>
             {hue}°
           </Text>
         </View>
@@ -103,19 +103,5 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  degrees: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });
