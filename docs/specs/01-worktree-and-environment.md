@@ -41,6 +41,13 @@ nested.**
 - A session that died before step 4 leaves leftovers. `./boga worktree ls` shows
   them; clear them with [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md).
 
+## Delegated writes
+
+Before delegating write work, verify effective write access in the actual
+worktree under the writer's execution permissions. A writer needing approval
+must notify the parent promptly. If only the parent can apply changes, return
+a patch instead of waiting silently.
+
 ## Release checkout
 
 A release uses a dedicated detached worktree at a recorded full commit SHA.
