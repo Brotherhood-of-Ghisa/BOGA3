@@ -220,6 +220,7 @@ while read -r _ id; do ids+=("${id:-<none>}"); done <"$SEEN"
   && pass "gate run 2 gets a fresh id: ${ids[2]}" || fail "gate run 2 ids '${ids[2]}' '${ids[3]}'"
 [[ "${ids[4]}" == "<none>" ]] && pass "a lane by name sees no gate id" || fail "lane by name saw '${ids[4]}'"
 
+# ---------- boga: a gate runs every lane even if one reads stdin ----------
 echo "== a lane that reads stdin does not swallow the rest of its gate"
 : >"$SEEN"
 printf 'one\tslow-backend\tnone\tno\t.\tcat >/dev/null; echo one >>%s\n' "$SEEN" >"$ROOT/scripts/lanes.tsv"
