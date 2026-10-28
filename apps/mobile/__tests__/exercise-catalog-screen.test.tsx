@@ -7,7 +7,11 @@
  * (helpers/local-data.ts). The `exercise-browser` Maestro fixture adds the
  * history the browser controls read. Only the native database open and the
  * router are replaced; the two failure tests force one rejection on the real
- * module with `jest.spyOn`, the only states real data cannot produce.
+ * module with `jest.spyOn`, the only states real data cannot produce. The
+ * exercise editor is the real page over the catalogue, opened by the pushed
+ * `/exercise-edit` href (helpers/exercise-editor-page.tsx); its internals are
+ * exercise-editor-screen.test.tsx's, and this suite proves the default save
+ * over real data and what the catalogue does once it saves.
  */
 
 import * as mockReact from 'react';
@@ -22,7 +26,8 @@ jest.mock('@/src/data/bootstrap', () =>
 
 const mockPrepareMerge = jest.fn();
 const mockExecuteMerge = jest.fn();
-const mockNavigation = { addListener: jest.fn(() => () => undefined) };
+// `getState`: the exercise editor page reads the stack beneath it.
+const mockNavigation = { addListener: jest.fn(() => () => undefined), getState: () => ({ routes: [] }), isFocused: () => true };
 jest.mock('@/src/exercise-catalog/merge', () => ({
   ...jest.requireActual('@/src/exercise-catalog/merge'),
   prepareExerciseMerge: (...args: unknown[]) => mockPrepareMerge(...args),
@@ -30,14 +35,24 @@ jest.mock('@/src/exercise-catalog/merge', () => ({
 }));
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+const mockBack = jest.fn();
 let mockSearchParams: Record<string, string> = {};
+// Page titles set through the native header, latest last (the editor page's).
+let mockHeaderTitles: string[] = [];
 
 jest.mock('expo-router', () => ({
+  // The native header: its right action renders in place, as on device.
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown; title?: string } }) => {
+      if (options?.title) mockHeaderTitles.push(options.title);
+      return (options?.headerRight?.() ?? null) as never;
+    },
+  },
   useNavigation: () => mockNavigation,
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: mockPush,
-    back: jest.fn(),
+    back: mockBack,
     replace: mockReplace,
   }),
   // Focus runs as on device: the screen re-reads exercise history on focus.
@@ -46,7 +61,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-import ExerciseCatalogScreen from '../app/(tabs)/exercise-catalog';
+import ExerciseCatalogScreen from '../app/exercise-catalog';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { Sheet, uiRoles } from '@/components/ui';
@@ -68,6 +83,13 @@ import {
 } from './helpers/local-data';
 import { broadSetupOf } from './helpers/muscle-setup';
 import { waitForGone } from './helpers/wait-for-gone';
+import {
+  exerciseEditorHrefs,
+  exerciseEditorPage,
+  exerciseEditorParams,
+  WithExerciseEditorPage,
+} from './helpers/exercise-editor-page';
+import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 
 type TestNode = typeof screen.UNSAFE_root;
 
@@ -92,7 +114,7 @@ const openCatalog = async ({
     prepare();
   }
   await bootLocalApp();
-  render(<ExerciseCatalogScreen />);
+  render(<WithExerciseEditorPage><ExerciseCatalogScreen /></WithExerciseEditorPage>);
   await screen.findByLabelText('Create new exercise');
   // Past the search debounce the screen arms at mount (150 ms), inside act.
   await act(async () => {
@@ -152,11 +174,20 @@ const createExercise = async (name: string) => {
   fireEvent.changeText(screen.getByLabelText('Exercise definition name'), name);
 };
 
+// The editor page's muscle rows open a picker sheet over it.
+const openPrimaryPicker = () => fireEvent.press(screen.getByTestId('exercise-editor-primary-muscle-trigger'));
+const openSecondaryPicker = () => fireEvent.press(screen.getByTestId('exercise-editor-secondary-muscle-trigger'));
+const saveEditor = () => act(async () => fireEvent.press(screen.getByLabelText('Save exercise definition')));
+const lastEditorHref = () => exerciseEditorHrefs(mockPush).at(-1)!;
+
 describe('ExerciseCatalogScreen', () => {
   beforeEach(() => {
     resetLocalData();
     mockReplace.mockReset();
-    mockPush.mockReset();
+    mockPush.mockReset().mockImplementation((href: unknown) => exerciseEditorPage.push(href));
+    mockBack.mockReset().mockImplementation(() => exerciseEditorPage.back());
+    exerciseEditorPage.reset();
+    mockHeaderTitles = [];
     mockSearchParams = {};
     mockPrepareMerge.mockReset(); mockExecuteMerge.mockReset();
     __resetExerciseListPreferencesForTests();
@@ -168,27 +199,72 @@ describe('ExerciseCatalogScreen', () => {
     closeLocalData();
   });
 
-  it('returns explicitly to More when the catalog was launched from the hub', async () => {
+  it('keeps the tab bar with More selected and draws no back of its own (the native header has it)', async () => {
     mockSearchParams = { source: 'more' };
     await openCatalog();
 
-    fireEvent.press(screen.getByTestId('back-to-more-button'));
+    expect(screen.getByTestId('main-tab-bar')).toBeTruthy();
+    expect(screen.getByTestId('top-level-tab-more')).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ selected: true })
+    );
+    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
+  });
 
-    expect(mockReplace).toHaveBeenCalledWith('/more');
+  it('drops the tab bar when opened from a session, and goes back to it once an exercise is saved', async () => {
+    mockSearchParams = { source: 'session' };
+    await openCatalog();
+    expect(screen.queryByTestId('main-tab-bar')).toBeNull();
+
+    await createExercise('Session Press');
+    openPrimaryPicker();
+    fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
+    await saveEditor();
+
+    expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    // The page's own back, then the catalogue's, back to the session.
+    expect(mockBack).toHaveBeenCalledTimes(2);
+    expect(definitionNamed('Session Press')).toMatchObject({ deletedAt: null });
+  });
+
+  it('opens the editor page once for the add intent, creating an exercise', async () => {
+    mockSearchParams = { intent: 'add' };
+    await openCatalog();
+
+    expect(await screen.findByTestId('exercise-editor')).toBeTruthy();
+    expect(exerciseEditorHrefs(mockPush)).toHaveLength(1);
+    expect(exerciseEditorParams(lastEditorHref()).exerciseDefinitionId).toBeNull();
+    // A catalogue reload (loading, then ready) does not open it again.
+    await act(async () => {
+      invalidateExerciseCatalogCache();
+      await ensureExerciseCatalogLoaded();
+    });
+    expect(exerciseEditorHrefs(mockPush)).toHaveLength(1);
+
+    fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Intent Press');
+    openPrimaryPicker();
+    fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
+    await saveEditor();
+    expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    expect(definitionNamed('Intent Press')).toMatchObject({ deletedAt: null });
+    expect(exerciseEditorHrefs(mockPush)).toHaveLength(1);
   });
 
   it('creates a new exercise with primary and secondary muscles', async () => {
     await openCatalog();
 
     await createExercise('Incline Press');
+    expect(exerciseEditorParams(lastEditorHref()).exerciseDefinitionId).toBeNull();
+    expect(mockHeaderTitles.at(-1)).toBe('New exercise');
     fireEvent.press(screen.getByLabelText('Per side weight entry'));
-    fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+    openPrimaryPicker();
     fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
-    fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
-    fireEvent.press(await screen.findByLabelText('Select secondary muscle Triceps'));
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    openSecondaryPicker();
+    fireEvent.press(await screen.findByLabelText('Secondary muscle Triceps'));
+    await saveEditor();
 
     expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-editor')).toBeNull();
     const saved = definitionNamed('Incline Press');
     expect(saved).toMatchObject({ loadInputMode: 'per_side_load', deletedAt: null });
     expect(activeMappingsOf(saved!.id)).toEqual([
@@ -208,13 +284,16 @@ describe('ExerciseCatalogScreen', () => {
     fireEvent.press(screen.getByLabelText('Exercise actions Barbell Bench Press'));
     await screen.findByTestId('exercise-catalog-actions-sheet');
     fireEvent.press(screen.getByLabelText('Edit exercise from actions'));
-    await screen.findByText('Edit Exercise');
+    await screen.findByTestId('exercise-editor');
+    expect(exerciseEditorParams(lastEditorHref()).exerciseDefinitionId).toBe('seed_barbell_bench_press');
+    expect(mockHeaderTitles.at(-1)).toBe('Edit "Barbell Bench Press"');
     expect(screen.getByLabelText('Total load weight entry').props.accessibilityState.selected).toBe(true);
-    expect(screen.queryByText('Cancel')).toBeNull();
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Bench Press');
     fireEvent.press(screen.getByLabelText('Per side weight entry'));
-    fireEvent.press(screen.getByLabelText('Remove secondary muscle Triceps'));
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    // Unticking Triceps in the open secondary picker removes it.
+    openSecondaryPicker();
+    fireEvent.press(await screen.findByLabelText('Secondary muscle Triceps'));
+    await saveEditor();
 
     expect(await screen.findByText('Exercise updated.')).toBeTruthy();
     expect(definitionNamed('Bench Press')).toMatchObject({
@@ -230,16 +309,16 @@ describe('ExerciseCatalogScreen', () => {
     );
 
     fireEvent.press(screen.getByLabelText('Edit exercise definition Bench Press'));
-    await screen.findByText('Edit Exercise');
+    await screen.findByTestId('exercise-editor');
     expect(screen.getByDisplayValue('Bench Press')).toBeTruthy();
-    expect(screen.queryByLabelText('Remove secondary muscle Triceps')).toBeNull();
-    expect(screen.getByLabelText('Remove secondary muscle Front Delts')).toBeTruthy();
+    expect(screen.getByTestId('exercise-editor-secondary-muscle-trigger')).toHaveTextContent('Front Delts', { exact: false });
+    expect(screen.getByTestId('exercise-editor-secondary-muscle-trigger')).not.toHaveTextContent('Triceps', { exact: false });
   });
 
   it('shows the bodyweight contribution only while calculations are on, keeping it while hidden', async () => {
     const openEditor = async (name: string) => {
       fireEvent.press(await screen.findByLabelText(`Edit exercise definition ${name}`));
-      await screen.findByText('Edit Exercise');
+      await screen.findByTestId('exercise-editor');
     };
     const percentage = () => screen.queryByTestId('exercise-editor-bodyweight-percentage');
     await openCatalog();
@@ -248,8 +327,9 @@ describe('ExerciseCatalogScreen', () => {
     // Off: no contribution field, and saving keeps the stored 100%.
     await openEditor('Pull-Up');
     expect(percentage()).toBeNull();
+    expect(screen.queryByTestId('exercise-editor-uses-bodyweight')).toBeNull();
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Strict Pull-Up');
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
     expect(await screen.findByText('Exercise updated.')).toBeTruthy();
     expect(definitionNamed('Strict Pull-Up')).toMatchObject({ id: 'seed_pull_up', bodyweightContribution: 1 });
 
@@ -258,25 +338,35 @@ describe('ExerciseCatalogScreen', () => {
       await setBodyweightCalculationsEnabled(true);
     });
     await openEditor('Strict Pull-Up');
+    expect(screen.getByTestId('exercise-editor-uses-bodyweight').props.accessibilityState).toMatchObject({ checked: true });
     expect(percentage()).toHaveProp('value', '100');
     fireEvent.changeText(percentage()!, '101');
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
     expect(screen.getByTestId('exercise-editor-bodyweight-error')).toBeTruthy();
     expect(definitionNamed('Strict Pull-Up')).toMatchObject({ bodyweightContribution: 1 });
 
     fireEvent.changeText(percentage()!, '70');
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
     expect(await screen.findByText('Exercise updated.')).toBeTruthy();
     expect(definitionNamed('Strict Pull-Up')).toMatchObject({ bodyweightContribution: 0.7 });
+
+    // Uses bodyweight off stores 0.
+    await openEditor('Strict Pull-Up');
+    fireEvent(screen.getByTestId('exercise-editor-uses-bodyweight'), 'valueChange', false);
+    expect(percentage()).toBeNull();
+    await saveEditor();
+    expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+    expect(definitionNamed('Strict Pull-Up')).toMatchObject({ bodyweightContribution: 0 });
   });
 
   it('blocks save when no primary muscle is selected', async () => {
     await openCatalog();
 
     await createExercise('Cable Fly Variation');
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
 
-    expect(screen.getByText('Select a primary muscle before saving.')).toBeTruthy();
+    expect(screen.getByTestId('exercise-editor-muscles-error')).toHaveTextContent('Select a primary muscle before saving.');
+    expect(screen.getByTestId('exercise-editor')).toBeTruthy();
     expect(definitionNamed('Cable Fly Variation')).toBeUndefined();
   });
 
@@ -284,7 +374,7 @@ describe('ExerciseCatalogScreen', () => {
     await openCatalog();
 
     fireEvent.press(screen.getByLabelText('Create new exercise'));
-    await screen.findByText('Create Exercise');
+    await screen.findByTestId('exercise-editor');
     // The fields come from ExerciseCoreFields and keep the editor's testIDs.
     expect(screen.getByTestId('exercise-editor-name-input')).toBeTruthy();
     expect(screen.getByTestId('exercise-editor-load-mode-total_load').props.accessibilityState).toMatchObject({
@@ -294,40 +384,46 @@ describe('ExerciseCatalogScreen', () => {
       selected: false,
     });
     fireEvent.changeText(screen.getByTestId('exercise-editor-name-input'), ' \t ');
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
 
     expect(screen.getByTestId('exercise-editor-name-error')).toHaveTextContent('Exercise name is required');
   });
 
-  it('dismisses the keyboard and uses keyboard-aware scrolling for the muscle selector', async () => {
+  it('dismisses the keyboard before the muscle picker, and the page scrolls keyboard-aware', async () => {
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
     await openCatalog();
 
     await createExercise('Cable Row Variation');
-    fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+    const page = screen.getByTestId('exercise-editor');
+    expect(page.props.automaticallyAdjustKeyboardInsets).toBe(Platform.OS === 'ios');
+    expect(page.props.keyboardDismissMode).toBe('on-drag');
+    expect(page.props.keyboardShouldPersistTaps).toBe('handled');
+    openPrimaryPicker();
 
     expect(dismissKeyboard).toHaveBeenCalledTimes(1);
-    const selectorList = await screen.findByTestId('exercise-editor-muscle-selector-list');
-    expect(selectorList.props.automaticallyAdjustKeyboardInsets).toBe(Platform.OS === 'ios');
-    expect(selectorList.props.contentInsetAdjustmentBehavior).toBe('automatic');
-    expect(selectorList.props.keyboardDismissMode).toBe('on-drag');
-    expect(selectorList.props.keyboardShouldPersistTaps).toBe('handled');
+    expect(await screen.findByTestId('exercise-editor-muscle-selector-list')).toBeTruthy();
   });
 
   it('prevents duplicate secondary links and excludes the selected primary from secondary options', async () => {
     await openCatalog();
 
     await createExercise('Press Variation');
-    fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+    openPrimaryPicker();
     fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
 
-    fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
-    expect(screen.queryByLabelText('Select secondary muscle Pectoralis')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Select secondary muscle Triceps'));
+    openSecondaryPicker();
+    expect(screen.queryByLabelText('Secondary muscle Pectoralis')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Secondary muscle Triceps'));
+    // A tick, not a second row: Triceps is selected once and the picker stays open.
+    expect(screen.getAllByLabelText('Secondary muscle Triceps')).toHaveLength(1);
+    expect(screen.getByLabelText('Secondary muscle Triceps').props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByLabelText('Secondary muscle Front Delts')).toBeTruthy();
+    await saveEditor();
 
-    fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
-    expect(screen.queryByLabelText('Select secondary muscle Triceps')).toBeNull();
-    expect(screen.getByLabelText('Select secondary muscle Front Delts')).toBeTruthy();
+    expect(activeMappingsOf(definitionNamed('Press Variation')!.id)).toEqual([
+      { muscleGroupId: 'chest', role: 'primary', weight: 1 },
+      { muscleGroupId: 'triceps', role: 'secondary', weight: 0.5 },
+    ]);
   });
 
   it('keeps the cached search available for typing during a background refresh', async () => {
@@ -467,10 +563,14 @@ describe('ExerciseCatalogScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Duplicate exercise from actions'));
 
-    expect(await screen.findByRole('header', { name: 'Duplicate Exercise' })).toBeTruthy();
+    await screen.findByTestId('exercise-editor');
+    const { exerciseDefinitionId, request } = exerciseEditorParams(lastEditorHref());
+    expect(exerciseDefinitionId).toBeNull();
+    expect(readExerciseEditorRequest(request)?.title).toBe('Duplicate exercise');
+    expect(mockHeaderTitles.at(-1)).toBe('Duplicate exercise');
     expect(screen.getByDisplayValue('Barbell Bench Press (Copy)')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    await saveEditor();
 
     expect(await screen.findByText('Exercise created.')).toBeTruthy();
     const copyDef = definitionNamed('Barbell Bench Press (Copy)');
@@ -488,14 +588,13 @@ describe('ExerciseCatalogScreen', () => {
   });
 
   describe('design language', () => {
-    it('titles the screen Exercises in one bar with its ⋮, with a labelled Add as its one accent', async () => {
-      mockSearchParams = { source: 'more' };
+    it('puts its ⋮ in the native header (titled by the root stack), with a labelled Add as its one accent', async () => {
       await openCatalog();
 
-      const titleBar = within(screen.getByTestId('exercise-catalog-title'));
-      expect(titleBar.getByRole('header', { name: 'Exercises' })).toBeTruthy();
-      expect(titleBar.getByTestId('back-to-more-button')).toBeTruthy();
-      expect(titleBar.getByLabelText('Exercise catalog options')).toBeTruthy();
+      // No in-content title bar: the root stack's native header titles it.
+      expect(screen.queryByTestId('exercise-catalog-title')).toBeNull();
+      expect(screen.queryByRole('header', { name: 'Exercises' })).toBeNull();
+      expect(screen.getByLabelText('Exercise catalog options')).toBeTruthy();
       const accents = accentGrounds();
       expect(accents).toHaveLength(1);
       expect(accents[0].props.testID).toBe('create-new-exercise-button');
@@ -564,44 +663,39 @@ describe('ExerciseCatalogScreen', () => {
       ).toHaveLength(1);
     });
 
-    it('opens the editor as a page sheet with Save as its one accent, closed by its X', async () => {
+    it('opens the editor as a page with Save as its one accent; leaving by Back writes nothing', async () => {
       await openCatalog();
 
-      fireEvent.press(screen.getByLabelText('Create new exercise'));
-      expect(await screen.findByTestId('exercise-editor')).toBeTruthy();
-      expect(screen.getByRole('header', { name: 'Create Exercise' })).toBeTruthy();
-      expect(screen.getByTestId('exercise-editor-load-mode-row').props.accessibilityRole).toBe('tablist');
+      await createExercise('Abandoned Press');
+      expect(screen.getByTestId('exercise-editor-save')).toHaveTextContent('Add exercise', { exact: false });
       const editorAccents = accentGrounds(screen.getByTestId('exercise-editor'));
       expect(editorAccents).toHaveLength(1);
       expect(editorAccents[0].props.accessibilityLabel).toBe('Save exercise definition');
 
-      fireEvent.press(screen.getByLabelText('Close exercise editor'));
-      expect(screen.queryByTestId('exercise-editor')).toBeNull();
+      // The native header's Back.
+      act(() => exerciseEditorPage.back());
+      await waitForGone(() => screen.queryByTestId('exercise-editor'));
+      expect(definitionNamed('Abandoned Press')).toBeUndefined();
+      expect(screen.queryByTestId('exercise-catalog-feedback')).toBeNull();
     });
 
-    it('swaps the editor for the muscle list in the same sheet, and Back to exercise returns without choosing', async () => {
+    it('picks the primary muscle in a sheet over the page, which closes on the choice', async () => {
       await openCatalog();
 
       await createExercise('Cable Fly Variation');
-      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      expect(screen.getByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Choose', { exact: false });
+      openPrimaryPicker();
 
-      expect(screen.getByRole('header', { name: 'Select primary muscle' })).toBeTruthy();
-      expect(screen.getByTestId('exercise-editor-muscle-selector-list')).toBeTruthy();
-      // The form is hidden, not a second sheet over it.
-      expect(screen.queryByLabelText('Save exercise definition')).toBeNull();
-      expect(screen.getAllByTestId('exercise-editor')).toHaveLength(1);
-
-      fireEvent.press(screen.getByLabelText('Back to exercise'));
-      expect(screen.getByRole('header', { name: 'Create Exercise' })).toBeTruthy();
+      expect(await screen.findByRole('header', { name: 'Primary muscle' })).toBeTruthy();
+      fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
+      await waitForGone(() => screen.queryByRole('header', { name: 'Primary muscle' }));
       expect(screen.getByDisplayValue('Cable Fly Variation')).toBeTruthy();
-      expect(screen.getByText('Select primary muscle')).toBeTruthy();
+      expect(screen.getByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Pectoralis', { exact: false });
 
       // The chosen primary is marked in the list when it opens again.
-      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
-      fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
-      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      openPrimaryPicker();
       expect(screen.getByTestId('exercise-editor-muscle-option-chest').props.accessibilityState).toMatchObject({
-        selected: true,
+        checked: true,
       });
     });
   });
@@ -671,9 +765,9 @@ describe('ExerciseCatalogScreen', () => {
       expect(before.map((mapping) => mapping.muscleGroupId)).toEqual(['adductors', 'glutes_max', 'quads', 'spinal_erectors']);
       fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'back squat');
       fireEvent.press(await screen.findByLabelText('Edit exercise definition Barbell Back Squat'));
-      await screen.findByText('Edit Exercise');
+      await screen.findByTestId('exercise-editor');
       fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Back Squat');
-      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+      await saveEditor();
 
       expect(await screen.findByText('Exercise updated.')).toBeTruthy();
       expect(activeMappingsOf('seed_barbell_back_squat')).toEqual(before);
@@ -702,9 +796,9 @@ describe('ExerciseCatalogScreen', () => {
       await openCatalog();
 
       await createExercise('Cable Fly Variation');
-      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      openPrimaryPicker();
       fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
-      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+      await saveEditor();
 
       const notice = await screen.findByTestId('exercise-editor-save-error');
       expect(notice.props.accessibilityRole).toBe('alert');

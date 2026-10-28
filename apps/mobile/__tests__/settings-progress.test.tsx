@@ -63,9 +63,12 @@ const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize:
 
 it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
   await openSettings();
-  for (const label of ['Progress view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric', 'Auto-start rest timer']) {
+  for (const label of ['Progress view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
     expect(screen.getByText(label)).toHaveStyle(LABEL);
   }
+  // Auto-start is a form card's switch row under the `Rest timer` section heading.
+  expect(screen.getByRole('switch', { name: 'Auto-start rest timer' })).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: 'Rest timer' })).toHaveStyle(LABEL);
   const effort = within(screen.getByTestId('settings-effort-selections'));
   expect(effort.getByText('Effort')).toHaveStyle(LABEL);
   expect(effort.getByText('Volume')).toHaveStyle(LABEL);
@@ -300,12 +303,13 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
 it('edits rest timer auto-start and duration on its page and surfaces invalid durations in the centralized error flow', async () => {
   await openSettings();
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
-  expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: false });
+  // On/off is a switch row, not a two-choice control (`ux-rules.md` "Forms").
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityRole', 'switch');
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: true });
 
-  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start-off'));
+  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start'));
   expect(values().restTimerAutoStart).toBe(false);
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: false });
 
   editNumber('settings-rest-timer-duration', '150');
   expect(values().restTimerDurationSec).toBe(150);

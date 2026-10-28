@@ -116,16 +116,17 @@ describe('Gyms screen over real data', () => {
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm });
 
     await openEditor('Synced Strength House');
-    for (const heading of ['Name', 'Location']) {
-      expect(screen.getByText(heading)).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
-    }
+    // The name field's micro-label (faint, inside the field); Location heads its form section (muted).
+    expect(screen.getByText('Name')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
+    expect(screen.getByText('Location')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkMuted });
     expect(screen.getByTestId('gym-editor-location-status')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
-    expect(screen.getByText(/^Private to you/)).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
+    // No inline explanation under the section ([[copy.no-inline-explanation]]).
+    expect(screen.queryByText(/^Private to you/)).toBeNull();
     fireEvent.press(screen.getByLabelText('Replace location for gym Synced Strength House'));
     expect(screen.getByText('Replace the saved location with where you are now?')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600' });
   });
 
-  it('draws a failed location write as a strong meta line in danger', async () => {
+  it('draws a failed location write as the form error line, in danger', async () => {
     readPosition.mockResolvedValue({ status: 'read_failure', error: new Error('gps') });
     await renderScreen();
     await openEditor('Downtown Iron Temple');
@@ -133,7 +134,7 @@ describe('Gyms screen over real data', () => {
       fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
     });
     expect(screen.getByTestId('gym-editor-feedback')).toHaveStyle({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, color: uiRoles.danger,
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.danger,
     });
   });
 
@@ -201,16 +202,29 @@ describe('Gyms screen over real data', () => {
     expect(locationOf('synced-strength-house')).toEqual({ latitude: 51.5, longitude: -0.12, accuracyM: 12 });
   });
 
-  it('cancels an edit without writing', async () => {
+  it('closes an edit from its header row without writing (forms have no Cancel)', async () => {
     await renderScreen();
 
     await openEditor('Downtown Iron Temple');
+    expect(screen.queryByText('Cancel')).toBeNull();
     fireEvent.changeText(screen.getByDisplayValue('Downtown Iron Temple'), 'Something Else');
-    fireEvent.press(screen.getByTestId('gym-editor-cancel'));
+    fireEvent.press(screen.getByLabelText('Close editor for gym Downtown Iron Temple'));
 
     expect(screen.queryByTestId('gym-editor')).toBeNull();
     expect(screen.getByLabelText('Edit gym Downtown Iron Temple')).toBeTruthy();
     expect(gymRow('downtown-iron-temple')).toBeUndefined();
+  });
+
+  it('closes a new gym from its header row, adding nothing', async () => {
+    await renderScreen();
+
+    fireEvent.press(screen.getByTestId('gyms-add'));
+    fireEvent.changeText(screen.getByTestId('gym-editor-name'), 'Never Added');
+    fireEvent.press(screen.getByLabelText('Close editor for new gym'));
+
+    expect(screen.queryByTestId('gym-editor')).toBeNull();
+    expect(screen.getByTestId('gyms-add')).toBeTruthy();
+    expect(allGymRows().map((row) => row.name)).not.toContain('Never Added');
   });
 
   it('saves the current location from the editor, keeping it open', async () => {
@@ -337,19 +351,15 @@ describe('Gyms screen over real data', () => {
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveTextContent('No location saved');
   });
 
-  it('shows Back to More only when opened from More, and returns without stacking the tabs', async () => {
+  it('draws no back of its own: the native header is the one way back, from More or a session', async () => {
     await seed();
-    render(<GymsRoute />);
-    await screen.findByTestId('gyms-list');
-    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
-    screen.unmount();
-
     mockSearchParams = { source: 'more' };
     render(<GymsRoute />);
     await screen.findByTestId('gyms-list');
-    fireEvent.press(screen.getByTestId('back-to-more-button'));
 
-    expect(mockDismissTo).toHaveBeenCalledWith('/more');
+    expect(screen.queryByTestId('back-to-more-button')).toBeNull();
+    expect(screen.queryByLabelText('Back to More')).toBeNull();
+    expect(mockDismissTo).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 

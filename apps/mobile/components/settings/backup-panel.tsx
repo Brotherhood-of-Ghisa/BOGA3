@@ -54,7 +54,7 @@ export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps
   const newest = snapshots?.[0];
   return (
     <Card testID="settings-backup-card">
-      <Text allowFontScaling={false} style={[uiText.label, styles.cardLabel]}>Backups</Text>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.cardLabel]}>Backups</Text>
       <ListRow
         density="list"
         divider={false}

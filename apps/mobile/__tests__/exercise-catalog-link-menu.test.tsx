@@ -2,13 +2,16 @@
 
 /**
  * The Exercise Catalog row ⋮ actions sheet
- * gains "Link to group exercise…", which pushes the Link screen for that
+ * gains "Link to group exercise", which pushes the Link screen for that
  * exercise. It is signed-in only, and disabled for a soft-deleted exercise.
+ * Signed in, a row of mine linked to a group exercise shows the link glyph.
  *
  * Over real data like exercise-catalog-screen.test.tsx: the starter catalogue
  * on the migrated in-memory SQLite database (helpers/local-data.ts), the
- * deleted exercise deleted through the catalogue's own write. Only the native
- * database open, the router and the auth snapshot are replaced.
+ * deleted exercise deleted through the catalogue's own write, the link made
+ * through the links repository. Only the native database open, the router,
+ * the auth snapshot and NetInfo (offline, so no group read leaves the test)
+ * are replaced.
  */
 
 import * as mockReact from 'react';
@@ -21,10 +24,26 @@ jest.mock('@/src/data/bootstrap', () =>
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
+  // The native header: its right action renders in place, as on device.
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
+      (options?.headerRight?.() ?? null) as never,
+  },
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
+  },
+}));
+
+// Offline: the catalogue's links read locally and no group refresh runs.
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: (listener: (state: { isConnected: boolean | null }) => void) => {
+      listener({ isConnected: false });
+      return () => undefined;
+    },
   },
 }));
 
@@ -37,8 +56,9 @@ jest.mock('@/src/auth', () => ({
   subscribeToAuthState: () => () => undefined,
 }));
 
-import ExerciseCatalogScreen from '../app/(tabs)/exercise-catalog';
+import ExerciseCatalogScreen from '../app/exercise-catalog';
 import { deleteExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import { linkExercise } from '@/src/data/exercise-group-links';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
@@ -75,7 +95,7 @@ afterEach(() => {
   closeLocalData();
 });
 
-describe('catalogue ⋮ Link to group exercise…', () => {
+describe('catalogue ⋮ Link to group exercise', () => {
   it('pushes the Link screen for the exercise', async () => {
     await openCatalog();
     await expandChest();
@@ -111,5 +131,32 @@ describe('catalogue ⋮ Link to group exercise…', () => {
 
     expect(screen.getByLabelText('Edit exercise from actions')).toBeTruthy();
     expect(screen.queryByLabelText('Link to group exercise from actions')).toBeNull();
+  });
+});
+
+describe('catalogue link glyph', () => {
+  const linkBench = async () => {
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+  };
+  // The glyph is decorative (hidden from VoiceOver); the row's hint says it.
+  const glyphs = () => screen.queryAllByTestId(/^exercise-linked-/, { includeHiddenElements: true });
+
+  it('marks only my linked exercises', async () => {
+    await openCatalog(linkBench);
+    await expandChest();
+
+    expect(await screen.findByTestId('exercise-linked-seed_barbell_bench_press', { includeHiddenElements: true })).toBeTruthy();
+    // Other Chest rows show, unmarked.
+    expect(screen.getAllByLabelText(/^Exercise actions /).length).toBeGreaterThan(1);
+    expect(glyphs().map((glyph) => glyph.props.testID)).toEqual(['exercise-linked-seed_barbell_bench_press']);
+  });
+
+  it('shows no glyph while signed out, even for a linked exercise', async () => {
+    mockAuthSnapshot = { isConfigured: true, user: null };
+    await openCatalog(linkBench);
+    await expandChest();
+
+    expect(await screen.findByLabelText('Exercise actions Barbell Bench Press')).toBeTruthy();
+    expect(glyphs()).toHaveLength(0);
   });
 });

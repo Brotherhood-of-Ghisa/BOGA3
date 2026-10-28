@@ -53,7 +53,7 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import {
@@ -120,12 +120,13 @@ describe('the Settings list', () => {
     });
   });
 
-  it('shows the title, every card in the agreed order and the release metadata', async () => {
+  it('shows every card in the agreed order and the release metadata, under the native header', async () => {
     const result = await renderSettings();
     const tree = JSON.stringify(result.toJSON());
     const positions = CARD_ORDER.map((id) => tree.indexOf(`"testID":"${id}"`));
 
-    expect(screen.getByText('Settings')).toBeTruthy();
+    // The root stack's native header titles the page; the list draws no title.
+    expect(screen.queryByText('Settings')).toBeNull();
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     expect(screen.getByText('member@example.test')).toBeTruthy();

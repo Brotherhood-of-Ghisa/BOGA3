@@ -1,30 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { SegmentedControl, uiSpace, uiText } from '@/components/ui';
+import { FormSection, SwitchRow, uiSpace } from '@/components/ui';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 
 import { PreferenceNumberField } from './number-field';
 
-type AutoStartOptionValue = 'on' | 'off';
-
-const AUTO_START_OPTIONS: readonly {
-  value: AutoStartOptionValue;
-  label: string;
-  accessibilityLabel: string;
-}[] = [
-  {
-    value: 'on',
-    label: 'On',
-    accessibilityLabel: 'Set auto-start rest timer to On',
-  },
-  {
-    value: 'off',
-    label: 'Off',
-    accessibilityLabel: 'Set auto-start rest timer to Off',
-  },
-];
-
+// The rest timer page: one form section of the auto-start switch and the two
+// durations, each typed in place and saved when editing ends.
 export function RestTimerSettings({ state }: { state: AccountLocalPreferenceState }) {
   const { values, pending } = state;
   const autoStart = pending.restTimerAutoStart ?? values.restTimerAutoStart;
@@ -33,30 +16,31 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
 
   return (
     <View style={styles.container} testID="settings-rest-timer">
-      <View style={styles.preference}>
-        <Text allowFontScaling={false} style={uiText.label}>
-          Auto-start rest timer
-        </Text>
-        <SegmentedControl
-          accessibilityLabel="Auto-start rest timer"
-          onChange={(choice) => updatePreferences({ restTimerAutoStart: choice === 'on' })}
-          options={AUTO_START_OPTIONS}
-          testIDPrefix="settings-rest-timer-auto-start"
-          value={autoStart ? 'on' : 'off'}
+      <FormSection title="Rest timer">
+        <SwitchRow
+          density="list"
+          label="Auto-start rest timer"
+          onValueChange={(restTimerAutoStart) => updatePreferences({ restTimerAutoStart })}
+          testID="settings-rest-timer-auto-start"
+          value={autoStart}
         />
-      </View>
-      <PreferenceNumberField
-        label="Rest timer (seconds)"
-        onCommit={(restTimerDurationSec) => updatePreferences({ restTimerDurationSec })}
-        testID="settings-rest-timer-duration"
-        value={durationSec}
-      />
-      <PreferenceNumberField
-        label="Repeating interval (seconds)"
-        onCommit={(repeatingTimerIntervalSec) => updatePreferences({ repeatingTimerIntervalSec })}
-        testID="settings-repeating-timer-interval"
-        value={intervalSec}
-      />
+        <PreferenceNumberField
+          divider
+          label="Rest timer (s)"
+          onCommit={(restTimerDurationSec) => updatePreferences({ restTimerDurationSec })}
+          row
+          testID="settings-rest-timer-duration"
+          value={durationSec}
+        />
+        <PreferenceNumberField
+          divider
+          label="Repeating interval (s)"
+          onCommit={(repeatingTimerIntervalSec) => updatePreferences({ repeatingTimerIntervalSec })}
+          row
+          testID="settings-repeating-timer-interval"
+          value={intervalSec}
+        />
+      </FormSection>
     </View>
   );
 }
@@ -64,8 +48,5 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
 const styles = StyleSheet.create({
   container: {
     gap: uiSpace.md,
-  },
-  preference: {
-    gap: uiSpace.sm,
   },
 });

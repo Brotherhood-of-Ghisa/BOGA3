@@ -4,6 +4,16 @@ import * as mockReact from 'react';
 import { Alert, Share } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
+// Offline: the catalogue's links read locally and no group refresh runs.
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: (listener: (state: { isConnected: boolean | null }) => void) => {
+      listener({ isConnected: false });
+      return () => undefined;
+    },
+  },
+}));
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
   require('./helpers/local-data').localDataBootstrapModule()
@@ -11,6 +21,11 @@ jest.mock('@/src/data/bootstrap', () =>
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
+  // The native header: its right action renders in place, as on device.
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
+      (options?.headerRight?.() ?? null) as never,
+  },
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
   useFocusEffect: (callback: () => void | (() => void)) => {
@@ -33,7 +48,7 @@ jest.mock('@/src/groups/api', () => ({
 }));
 
 import * as groupsApi from '@/src/groups/api';
-import ExerciseCatalogScreen from '../app/(tabs)/exercise-catalog';
+import ExerciseCatalogScreen from '../app/exercise-catalog';
 import { deleteExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';

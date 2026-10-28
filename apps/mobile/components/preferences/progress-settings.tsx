@@ -64,9 +64,9 @@ function ProgressDefaults({ values }: { values: AccountLocalPreferenceState['val
       </View>
     </Card>
     <Card>
-      <SwitchRow label="Group by muscle family" testID="settings-progress-grouped" value={values.progressGrouped}
+      <SwitchRow density="list" label="Group by muscle family" testID="settings-progress-grouped" value={values.progressGrouped}
         onValueChange={progressGrouped => updatePreferences({ progressGrouped })} />
-      <SwitchRow label="Count secondary sets" testID="settings-progress-count-secondary" value={values.progressCountSecondary}
+      <SwitchRow density="list" divider label="Count secondary sets" testID="settings-progress-count-secondary" value={values.progressCountSecondary}
         onValueChange={progressCountSecondary => updatePreferences({ progressCountSecondary })} />
     </Card>
   </>;

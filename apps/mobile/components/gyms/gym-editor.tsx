@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { FormField } from '@/components/ui/form-field';
+import { FormError, FormSection } from '@/components/ui/form-section';
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { ListRow } from '@/components/ui/list-row';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   readGymCoordinates,
   type GymCoordinates,
@@ -29,6 +32,8 @@ export type GymEditorProps = {
   onDone: () => void;
   // Saved or cleared the location: the screen reloads, the editor stays open.
   onLocationChanged: () => void;
+  // Collapses the editor without saving: its header row, the tapped gym row
+  // drawn open (an inline editor has no back, and forms have no Cancel).
   onCancel: () => void;
   // Injected by tests; the native reader by default.
   readPosition?: ReadForegroundPosition;
@@ -38,7 +43,9 @@ export type GymEditorProps = {
  * One gym's editor, open in place of its row on the Gyms screen (lifted from
  * the old recorder's gym modal). The name saves with Save; the private location
  * saves at once from the current position, and replacing or clearing one asks
- * first. Archive is the synced soft delete.
+ * first. Archive is the synced soft delete, alone at the bottom. Laid out by
+ * the form grammar (`ux-rules.md` "Forms"): the name stands alone, the
+ * location is a section.
  */
 export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPosition }: GymEditorProps) {
   const [name, setName] = useState(gym?.name ?? '');
@@ -204,43 +211,59 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
   return (
     <View style={styles.editor} testID="gym-editor">
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Name</Text>
-      <TextInput
-        allowFontScaling={false}
+      <ListRow
+        accessibilityLabel={`Close editor for ${label}`}
+        density="list"
+        divider={false}
+        expanded
+        label={gym ? gym.name : 'New gym'}
+        onPress={onCancel}
+        testID="gym-editor-close"
+        trailing={<Icon color={uiRoles.inkMuted} name="chevron-up" />}
+      />
+      <FormField
         accessibilityLabel="Gym name"
         autoFocus={gym === null}
+        face="text"
+        label="Name"
         onChangeText={setName}
         placeholder="Gym name"
-        placeholderTextColor={uiRoles.inkFaint}
         returnKeyType="done"
-        style={styles.input}
         testID="gym-editor-name"
         value={name}
       />
 
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Location</Text>
-      <View style={styles.status}>
-        <Icon color={hasLocation ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />
-        <Text allowFontScaling={false} style={uiText.bodyStrong} testID="gym-editor-location-status">
-          {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
-        </Text>
-      </View>
-      <Text allowFontScaling={false} style={uiText.meta}>
-        Private to you. A saved location lets the gym sheet suggest this gym when you are here.
-      </Text>
-      {feedback ? (
+      <FormSection title="Location">
+        <ListRow density="list" divider={false} leading={<Icon color={hasLocation ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />}>
+          <Text allowFontScaling={false} style={uiText.bodyStrong} testID="gym-editor-location-status">
+            {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
+          </Text>
+        </ListRow>
+      </FormSection>
+      {feedback?.tone === 'error' ? <FormError message={feedback.message} testID="gym-editor-feedback" /> : null}
+      {feedback?.tone === 'success' ? (
         <Text
           allowFontScaling={false}
           accessibilityLiveRegion="polite"
-          style={[uiText.meta, uiTextEmphasis.strong, feedback.tone === 'error' ? uiTextTone.danger : null]}
+          style={[uiText.meta, uiTextTone.muted]}
           testID="gym-editor-feedback">
           {feedback.message}
         </Text>
       ) : null}
       {locationActions}
 
-      <View style={styles.footer}>
-        {gym ? (
+      <View style={styles.save}>
+        <ActionButton
+          disabled={isBusy || !trimmedName}
+          label={gym ? 'Save' : 'Add gym'}
+          onPress={() => void save()}
+          testID="gym-editor-save"
+          variant="primary"
+        />
+      </View>
+
+      {gym ? (
+        <View style={styles.destructive}>
           <ActionButton
             accessibilityLabel={`${gym.archived ? 'Unarchive' : 'Archive'} ${label}`}
             disabled={isBusy}
@@ -250,18 +273,8 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
             tone={gym.archived ? 'default' : 'danger'}
             variant="text"
           />
-        ) : null}
-        <View style={styles.footerEnd}>
-          <ActionButton label="Cancel" onPress={onCancel} testID="gym-editor-cancel" variant="text" />
-          <ActionButton
-            disabled={isBusy || !trimmedName}
-            label={gym ? 'Save' : 'Add gym'}
-            onPress={() => void save()}
-            testID="gym-editor-save"
-            variant="primary"
-          />
         </View>
-      </View>
+      ) : null}
     </View>
   );
 }
@@ -278,43 +291,23 @@ const styles = StyleSheet.create({
     borderLeftWidth: uiSpace.xs,
     borderLeftColor: uiRoles.accent,
   },
-  input: {
-    height: uiGeometry.fieldHeight,
-    paddingHorizontal: uiSpace.sm,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    color: uiRoles.ink,
-  },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
   confirm: {
     gap: uiSpace.sm,
   },
-  buttonRow: {
+  save: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.sm,
+    justifyContent: 'flex-end',
   },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Archive sits alone at the end, below the save (`ux-rules.md` "Forms" F3).
+  destructive: {
+    alignItems: 'flex-start',
     paddingTop: uiSpace.sm,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
   },
-  footerEnd: {
-    flex: 1,
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: uiSpace.sm,
   },
 });

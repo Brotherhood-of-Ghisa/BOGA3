@@ -69,7 +69,7 @@ import { render, screen } from '@testing-library/react-native';
 import DeveloperToolsRoute from '../../app/settings-developer-tools';
 
 const MOBILE_ROOT = join(__dirname, '..', '..');
-const SETTINGS_PATH = join(MOBILE_ROOT, 'app', '(tabs)', 'settings.tsx');
+const SETTINGS_PATH = join(MOBILE_ROOT, 'app', 'settings.tsx');
 const DEVELOPER_TOOLS_PATH = join(MOBILE_ROOT, 'components', 'settings', 'developer-tools.tsx');
 const DEV_AFFORDANCES_PATH = join(MOBILE_ROOT, 'src', 'sync', 'dev-affordances.ts');
 

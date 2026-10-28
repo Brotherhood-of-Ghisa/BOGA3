@@ -234,7 +234,7 @@ describe('Plan and programme forms', () => {
     );
     await act(async () => {});
     await act(async () => fireEvent.press(screen.getByTestId('programme-form-plan-1-edit')));
-    ['Exercise blocks', 'Schedule (optional)', 'Gym'].forEach((text) =>
+    ['Exercise blocks', 'When and where'].forEach((text) =>
       expect(style(screen.getByText(text))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted }),
     );
     expect(style(screen.getByTestId('programme-child-plan-blocks-empty'))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });

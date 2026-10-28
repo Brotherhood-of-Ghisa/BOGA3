@@ -64,9 +64,9 @@ describe('More screen', () => {
 
   it.each([
     ['more-groups-row', '/groups'],
-    ['more-gyms-row', '/gyms?source=more'],
-    ['more-exercises-row', '/exercise-catalog?source=more'],
-    ['more-settings-row', '/settings?source=more'],
+    ['more-gyms-row', '/gyms'],
+    ['more-exercises-row', '/exercise-catalog'],
+    ['more-settings-row', '/settings'],
   ])('opens %s at its route', async (testID, route) => {
     render(<MoreScreen />);
     await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, SegmentedControl, SwitchRow,
+import { ActionButton, Card, FormSection, Icon, ListRow, Notice, ScreenScroll, SegmentedControl, SwitchRow,
   FigureText, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { buildSettingsMuscleSections, deriveMuscleReportPreset, setMuscleReportPreset, setMuscleTracked,
   type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
@@ -39,7 +39,7 @@ function MusclePageBody({ page, preferences }: { page: Page; preferences: Prefer
     {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={uiText.meta}>Loading muscles…</Text> : null}
     {page === 'targets' && scope ? <TargetSections preferences={preferences} scope={scope} sections={sections} /> : null}
     {page === 'enabled' ? sections.map(section => <MuscleSection key={section.family} section={section}>
-      {section.muscles.map(muscle => <SwitchRow key={muscle.id} disabled={setup.busy} label={muscle.label}
+      {section.muscles.map((muscle, index) => <SwitchRow key={muscle.id} density="list" disabled={setup.busy} divider={index > 0} label={muscle.label}
         testID={`settings-track-${muscle.id}`} value={muscle.tracked}
         onValueChange={tracked => { void setup.change(() => setMuscleTracked(muscle.entryIds, tracked)); }} />)}
     </MuscleSection>) : null}
@@ -67,9 +67,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
   const trackedEntries = entries.filter(row => row.tracked === true || row.tracked === 1);
   const custom = enabled.filter(muscle => overrides && Object.hasOwn(overrides, muscle.id)).length;
   return <>
-    <View style={styles.section}>
-      <SectionLabel title="Weekly targets" />
-      <Card>
+    <FormSection title="Weekly targets">
         <View style={styles.choice}>
           <Text allowFontScaling={false} style={uiText.label}>Target mode</Text>
           <SegmentedControl accessibilityLabel="Target mode" options={[{ value: 'single', label: 'Single' }, { value: 'per-muscle', label: 'Per muscle' }]}
@@ -79,11 +77,8 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
         <DefaultTarget preferences={preferences} />
         {current.muscleTargetMode === 'per-muscle' ? <Destination label="Per muscle targets"
           status={`${custom} custom`} testID="settings-muscle-targets-row" onPress={() => router.push(SETTINGS_SUB_PAGES.muscleTargets)} /> : null}
-      </Card>
-    </View>
-    <View style={styles.section}>
-      <SectionLabel title="Muscle breakdown" />
-      <Card>
+    </FormSection>
+    <FormSection title="Muscle breakdown">
         <View style={styles.choice}>
           <SegmentedControl<MuscleTargetScope> accessibilityLabel="Muscle breakdown" disabled={!scope || setup.busy}
             options={PRESET_OPTIONS} value={scope ?? 'detailed'} testIDPrefix="settings-muscle-preset"
@@ -92,8 +87,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
         </View>
         <Destination label="Enabled muscles" status={setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…'}
           testID="settings-enabled-muscles-row" onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} />
-      </Card>
-    </View>
+    </FormSection>
   </>;
 }
 

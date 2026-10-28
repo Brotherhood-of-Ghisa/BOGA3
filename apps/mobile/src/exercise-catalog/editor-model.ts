@@ -182,7 +182,7 @@ export const parseRestTimerText = (text: string): ExerciseRestTimerValidation =>
   return validateExerciseRestTimerSec(/^\d+$/.test(trimmed) ? Number(trimmed) : NaN);
 };
 
-/** The muscles the selector offers: the current primary or any unchosen muscle; for secondaries, only unchosen ones. */
+/** The muscles the selector offers: the current primary or any unchosen muscle; for secondaries (a multi-select), every muscle but the primary. */
 export const muscleSelectorOptions = (
   mode: MuscleSelectorMode,
   muscleGroups: ReportedMuscle[],
@@ -191,7 +191,7 @@ export const muscleSelectorOptions = (
 ): ReportedMuscle[] =>
   mode === 'primary'
     ? muscleGroups.filter((muscleGroup) => muscleGroup.id === primaryMuscleGroupId || !selectedSecondaryMuscleIds.has(muscleGroup.id))
-    : muscleGroups.filter((muscleGroup) => muscleGroup.id !== primaryMuscleGroupId && !selectedSecondaryMuscleIds.has(muscleGroup.id));
+    : muscleGroups.filter((muscleGroup) => muscleGroup.id !== primaryMuscleGroupId);
 
 /** The exercise's mappings to entries the user does not track: hidden by the editor and kept on Save. */
 export const untrackedMappings = <M extends { muscleGroupId: string }>(

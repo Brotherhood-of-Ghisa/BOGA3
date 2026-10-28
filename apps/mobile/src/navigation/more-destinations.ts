@@ -4,9 +4,9 @@ export type MoreDestinationKey = 'groups' | 'exercises' | 'gyms' | 'connect-ai' 
 
 export type MoreRoute =
   | '/groups'
-  | '/exercise-catalog?source=more'
-  | '/gyms?source=more'
-  | '/settings?source=more';
+  | '/exercise-catalog'
+  | '/gyms'
+  | '/settings';
 
 export type MoreDestination = {
   key: MoreDestinationKey;
@@ -33,14 +33,14 @@ export const MORE_GROUPS: readonly (readonly MoreDestination[])[] = [
       label: 'Exercises',
       icon: 'database',
       testID: 'more-exercises-row',
-      action: { type: 'route', href: '/exercise-catalog?source=more' },
+      action: { type: 'route', href: '/exercise-catalog' },
     },
     {
       key: 'gyms',
       label: 'Gyms',
       icon: 'location',
       testID: 'more-gyms-row',
-      action: { type: 'route', href: '/gyms?source=more' },
+      action: { type: 'route', href: '/gyms' },
     },
   ],
   [
@@ -56,7 +56,7 @@ export const MORE_GROUPS: readonly (readonly MoreDestination[])[] = [
       label: 'Settings',
       icon: 'settings',
       testID: 'more-settings-row',
-      action: { type: 'route', href: '/settings?source=more' },
+      action: { type: 'route', href: '/settings' },
     },
   ],
 ];

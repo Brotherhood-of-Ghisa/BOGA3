@@ -185,6 +185,12 @@ describe('plan form: create', () => {
     expect(screen.getByTestId('plan-form-scroll')).toHaveProp('automaticallyAdjustKeyboardInsets', true);
     expect(screen.getByTestId('plan-form-scroll')).toHaveProp('keyboardDismissMode', 'on-drag');
 
+    // A new plan's primary names what it adds (`ux-rules.md` "Forms" F5).
+    expect(screen.getByTestId('plan-form-save')).toHaveTextContent('Add plan');
+    // Schedule and gym are rows of one section, their defaults as placeholders.
+    expect(screen.getByText('When and where')).toBeTruthy();
+    expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/Unscheduled/);
+    expect(screen.getByTestId('plan-form-gym')).toHaveTextContent(/No gym/);
     fillTitle('Heavy Day');
     await addExerciseBlock('Barbell Squat');
     expect(screen.getByText('Weight')).toBeTruthy();
@@ -544,7 +550,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     await screen.findByTestId('plan-detail');
   };
 
-  it('Edit opens the shared form over the plan; Save changes writes meta and blocks', async () => {
+  it('Edit opens the shared form over the plan; Save writes meta and blocks', async () => {
     await seedCatalog();
     const planId = await createPlanThroughRepository({ title: 'Heavy Day' });
     await openDetail(planId);
@@ -556,6 +562,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     mockParams = { edit: planId };
     render(<SessionPlanNewRoute />);
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Heavy Day');
+    expect(screen.getByTestId('plan-form-save')).toHaveTextContent('Save');
     fillTitle('Heavy Day II');
     fillSet(1, 1, '105', '5');
     fireEvent.press(screen.getByTestId('plan-form-save'));

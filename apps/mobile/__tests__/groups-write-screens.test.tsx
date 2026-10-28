@@ -87,7 +87,7 @@ import {
 import * as groupsApi from '@/src/groups/api';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
-import GroupsTabRoute from '../app/(tabs)/groups';
+import GroupsTabRoute from '../app/groups';
 import EditGroupRoute from '../app/group/[groupId]/edit';
 import GroupScreenRoute from '../app/group/[groupId]/index';
 import GroupMembersRoute from '../app/group/[groupId]/members';

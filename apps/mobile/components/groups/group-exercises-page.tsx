@@ -1,11 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
-import {
-  ExerciseEditorModal,
-  type ExerciseEditorSaveInput,
-} from '@/components/exercise-catalog/exercise-editor-modal';
+import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
 import {
   ActionButton,
   Card,
@@ -94,7 +91,7 @@ export function GroupExercisesPage({
   const links = useMyGroupExerciseLinks(groupId);
   const [sheetExercise, setSheetExercise] = useState<GroupExercise | null>(null);
   const [pickTarget, setPickTarget] = useState<GroupExercisePickTarget | null>(null);
-  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercise | null>(null);
+  const openExerciseEditor = useOpenExerciseEditor();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const unlink = useExerciseUnlink({ offline, reloadLinks: links.reload, onNotice: setFeedback });
   const [unlinkExercise, setUnlinkExercise] = useState<GroupExercise | null>(null);
@@ -132,7 +129,6 @@ export function GroupExercisesPage({
   };
   const archiveWrite = useGroupAction(runArchiveWrite);
   const canManage = canManageGroup(myRole);
-  const addAsNewPrefill = useMemo(() => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget) : null), [addAsNewTarget]);
 
   const performArchiveWrite = async (action: 'archive' | 'unarchive', exercise: GroupExercise) => {
     setFeedback(null);
@@ -183,28 +179,22 @@ export function GroupExercisesPage({
     setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.groupExercise.name) });
   };
 
+  // "Add as new": my exercise and its link commit in one local transaction,
+  // from the editor page opened over this one.
   const openAddAsNew = () => {
-    setAddAsNewTarget(pickTarget?.groupExercise ?? null);
+    const target = pickTarget?.groupExercise ?? null;
     setPickTarget(null);
-  };
-
-  // "Add as new": my exercise and its link commit in one local transaction.
-  const saveAddAsNew = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
-    const target = addAsNewTarget;
-    if (!target) {
-      throw new Error('No group exercise selected.');
-    }
-    const { exercise } = await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id });
-    return exercise;
-  };
-
-  const onAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
-    const target = addAsNewTarget;
-    setAddAsNewTarget(null);
-    void links.reload();
-    if (target) {
-      setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.name) });
-    }
+    if (!target) return;
+    openExerciseEditor({
+      prefill: buildAddAsNewPrefill(target),
+      title: 'Add as new exercise',
+      onSave: async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> =>
+        (await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id })).exercise,
+      onSaved: (exercise) => {
+        void links.reload();
+        setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.name) });
+      },
+    });
   };
 
   const header = (
@@ -326,15 +316,6 @@ export function GroupExercisesPage({
         onRequestClose={() => setPickTarget(null)}
         purpose="link-only"
         target={pickTarget}
-      />
-      <ExerciseEditorModal
-        editingExercise={null}
-        onRequestClose={() => setAddAsNewTarget(null)}
-        onSave={saveAddAsNew}
-        onSaved={onAddAsNewSaved}
-        prefill={addAsNewPrefill}
-        title="Add as new exercise"
-        visible={addAsNewTarget !== null}
       />
     </View>
   );

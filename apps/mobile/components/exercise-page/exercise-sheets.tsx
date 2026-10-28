@@ -71,7 +71,7 @@ type ExerciseOptionsSheetProps = {
   onDismiss: () => void;
 };
 
-// The exercise's ⋮: Edit / Swap / Exercise history / Link to group exercise… /
+// The exercise's ⋮: Edit / Link to group exercise / Swap / Exercise history /
 // Complete block (sourced cards) / Remove from session. Removing lives here, not on the
 // session view's card (spec 08, "Read-only link card pattern").
 export function ExerciseOptionsSheet({
@@ -106,6 +106,14 @@ export function ExerciseOptionsSheet({
         onPress={onEdit}
         testID="exercise-options-edit"
       />
+      {onLink ? (
+        <ListRow
+          label="Link to group exercise"
+          leading={<Icon color={uiRoles.ink} name="link" />}
+          onPress={onLink}
+          testID="exercise-options-link-group"
+        />
+      ) : null}
       <ListRow
         label="Swap exercise"
         leading={<Icon color={uiRoles.ink} name="swap" />}
@@ -118,14 +126,6 @@ export function ExerciseOptionsSheet({
         onPress={onOpenHistory}
         testID="exercise-options-history"
       />
-      {onLink ? (
-        <ListRow
-          label="Link to group exercise…"
-          leading={<Icon color={uiRoles.ink} name="link" />}
-          onPress={onLink}
-          testID="exercise-options-link-group"
-        />
-      ) : null}
       <ListRow
         label="Remove from session"
         leading={<Icon color={uiRoles.danger} name="trash" />}

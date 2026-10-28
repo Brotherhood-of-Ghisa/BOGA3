@@ -15,12 +15,17 @@ For the route inventory and owning files, load `screen-map.md`.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
+- **Two kinds of page.** The four tabs title themselves in content
+  (`PageHeader`), with no back. Every other page takes the native header
+  (back, title, optional right action); back returns to where it came from.
+  `/exercise-catalog`, `/groups` and `/settings` also keep the tab bar
+  (`apps/mobile/components/navigation/tab-owned-page.tsx`).
 - The shell is the four-tab model in `apps/mobile/src/navigation/main-tabs.ts`
   — Today / Train / Progress / More — rendered by `MainTabBar`
   (`apps/mobile/components/navigation/main-tab-bar.tsx`), the same bar on every
   screen that shows tabs. Only those four are visible destinations; the
-  preserved roots `/stats-history`, `/exercise-catalog`, `/groups` and
-  `/settings` stay addressable and each maps to a canonical owner
+  preserved root `/stats-history` and the tab-owned pages `/exercise-catalog`,
+  `/groups` and `/settings` each map to a canonical owner
   (`resolveMainTab`), so every recognised root keeps exactly one tab selected
   and an unrecognised one selects none. A tab root in
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
@@ -106,7 +111,6 @@ access level, and `useRootRouteAccess`
 | | `presentation=completion` | the post-submit summary; `summary`, absent and invalid all open View Session with Summary active |
 | `/exercise-catalog` | `source=session` | a save returns by `router.back()` |
 | | `intent` | `add` auto-opens the create editor once on first load; the session picker passes `manage` |
-| `/settings`, `/gyms`, `/exercise-catalog` | `source=more` | adds `Back to More` (below) |
 | `/groups` | `groupId` | selects that group when it is in My groups, else the one last shown this app session, else the first by name |
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
@@ -117,14 +121,6 @@ access level, and `useRootRouteAccess`
 | | `from` | prefills a duplicate; Save creates a new programme |
 | `/programme/[programmeId]` | `programmeId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
-
-`source=more` is a navigation marker, not screen state:
-`apps/mobile/components/navigation/more-hub-back-button.tsx` renders the
-`Back to More` arrow only when it is present, returning by `router.replace` for
-a destination inside the tabs and `router.dismissTo` for one pushed over them on
-the root stack (`/gyms`). Every such route stays valid, and looks the same,
-without the marker. The More rows that carry it are declared in
-`apps/mobile/src/navigation/more-destinations.ts`.
 
 ## Allowed transitions
 
@@ -172,7 +168,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/groups`, `/exercise-catalog?source=more`, `/gyms?source=more`, `/connected-agents`, `/settings?source=more` | hub rows; `Connect an AI` only with an agent connected |
+| `/more` | `/groups`, `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
+| `/exercise-catalog`, `/groups`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | cards (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never reached from workouts |
 | `/settings-developer-tools` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
@@ -184,7 +181,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/groups`, `/group/mine` | `/group/new`, `/group/join` | `Join group` / `Create group` and the empty-state actions (`push`) |
 | `/group/new`, `/group/join` | `/group/<groupId>` | after create, join, or `Open group` when already a member (`replace`, so Back returns to where the flow started) |
 | `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` actions, the member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
-| `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the tab's focus refresh drops the group from the chips |
+| `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards segment (`push`, no query) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
 | `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
@@ -212,9 +209,11 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
   screens drawing their own top bar or needing none (`session/[sessionId]/index`,
   the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,
   `sync-setup`). Headerless screens still declare a title for VoiceOver back
-  labels. `exercise-history` is the one hybrid: native header with `MainTabBar`.
-- Native headers take styling from the root stack's `screenOptions`: `surface`
-  background, the `title` text role (Archivo 700 `ink` at `lg`), and minimal arrow-only back.
+  labels. `exercise-history` and the tab-owned pages are hybrids: native
+  header (actions in `headerRight`) with `MainTabBar`.
+- Native headers take styling from the root stack's `screenOptions`: `paper`
+  background with no shadow line, the `title` text role (Archivo 700 `ink` at
+  `lg`), and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back
   item that ignores display mode.
 - Three screens replace the native back item with the shared `IconButton` arrow

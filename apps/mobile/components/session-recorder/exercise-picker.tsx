@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
+import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
@@ -98,9 +98,8 @@ export function ExercisePicker({
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
   const [groupsOnly, setGroupsOnly] = useState(false);
   const [plannerOnly, setPlannerOnly] = useState(false);
-  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const openExerciseEditor = useOpenExerciseEditor();
   const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
-  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercisePickTarget | null>(null);
   const preselectionRequestKeyRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
@@ -118,10 +117,6 @@ export function ExercisePicker({
   const exerciseOptions = useMemo(
     () => exerciseCatalog.exercises.filter((exercise) => !exercise.deletedAt),
     [exerciseCatalog.exercises]
-  );
-  const addAsNewPrefill = useMemo(
-    () => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget.groupExercise) : null),
-    [addAsNewTarget]
   );
   const listModel = useMemo(
     () =>
@@ -224,12 +219,8 @@ export function ExercisePicker({
   const openInlineCreate = () => {
     Keyboard.dismiss();
     clearPreselection();
-    setIsCreateModalVisible(true);
-  };
-
-  const handleInlineCreated = (exercise: ExerciseCatalogExercise) => {
-    setIsCreateModalVisible(false);
-    selectExercise(exercise.id, exercise.name);
+    // The editor page opens over the picker; a saved exercise is added as if picked.
+    openExerciseEditor({ onSaved: (exercise) => selectExercise(exercise.id, exercise.name) });
   };
 
   // ---- Group exercises in the picker (E0.1) and the pick sheet (E0.2).
@@ -284,28 +275,24 @@ export function ExercisePicker({
     selectExercise(exercise.id, exercise.name);
   };
 
-  const openAddAsNewFromGroupPickSheet = () => {
-    setAddAsNewTarget(groupPickTarget);
-    setGroupPickTarget(null);
-  };
-
   // "Add as new": the exercise and its link commit in one local transaction.
-  const saveAddAsNewExercise = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
-    const target = addAsNewTarget;
-    if (!target) {
-      throw new Error('No group exercise selected.');
-    }
-    const { exercise } = await createExerciseWithGroupLink(input, {
-      groupId: target.groupId,
-      groupExerciseId: target.groupExercise.group_exercise_id,
+  const openAddAsNewFromGroupPickSheet = () => {
+    const target = groupPickTarget;
+    setGroupPickTarget(null);
+    if (!target) return;
+    openExerciseEditor({
+      prefill: buildAddAsNewPrefill(target.groupExercise),
+      title: 'Add as new exercise',
+      onSave: async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> =>
+        (await createExerciseWithGroupLink(input, {
+          groupId: target.groupId,
+          groupExerciseId: target.groupExercise.group_exercise_id,
+        })).exercise,
+      onSaved: (exercise) => {
+        void groupLinking.reloadLinks();
+        selectExercise(exercise.id, exercise.name);
+      },
     });
-    return exercise;
-  };
-
-  const handleAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
-    setAddAsNewTarget(null);
-    void groupLinking.reloadLinks();
-    selectExercise(exercise.id, exercise.name);
   };
 
   const appendDisabled = !preselection || preselection.status !== 'ready' || !preselection.suggestion;
@@ -414,13 +401,6 @@ export function ExercisePicker({
         </ScrollView>
       </View>
 
-      <ExerciseEditorModal
-        visible={isCreateModalVisible}
-        editingExercise={null}
-        onRequestClose={() => setIsCreateModalVisible(false)}
-        onSaved={handleInlineCreated}
-      />
-
       <GroupExercisePickSheet
         target={groupPickTarget}
         exercises={exerciseOptions}
@@ -431,15 +411,6 @@ export function ExercisePicker({
         onAddAsNew={openAddAsNewFromGroupPickSheet}
       />
 
-      <ExerciseEditorModal
-        visible={addAsNewTarget !== null}
-        editingExercise={null}
-        prefill={addAsNewPrefill}
-        title="Add as new exercise"
-        onSave={saveAddAsNewExercise}
-        onRequestClose={() => setAddAsNewTarget(null)}
-        onSaved={handleAddAsNewSaved}
-      />
     </>
   );
 }
