@@ -27,10 +27,9 @@ export type TodayCardPage = {
   testID: string;
 };
 
-// The next card shows this much at the screen's edge, so the swipe is
-// discoverable without a dot row.
-const PEEK = uiSpace.lg;
-const CARD_GAP = uiSpace.sm;
+// Both gutters between cards, so a page steps one screen width and the next
+// card sits just off the edge: the tabs, not a peek, say there is more.
+const CARD_GAP = 2 * uiSpace.lg;
 
 /** The page an offset settles on, given the snap interval. */
 export const pageAtOffset = (offsetX: number, interval: number, pageCount: number): number =>
@@ -38,7 +37,7 @@ export const pageAtOffset = (offsetX: number, interval: number, pageCount: numbe
 
 /**
  * Today: one full-height page per tab, swiped between, the
- * next one peeking at the edge. A page draws its own cards (You: progress
+ * cards using the full width. A page draws its own cards (You: progress
  * and session; a group: board and sessions); a panel gets one card. Tabs over the cards name each page and move to
  * it on tap, so swiping is never the only way there. Each card owns the height
  * between the tabs and the tab bar; its body is laid out to fill it, and
@@ -53,7 +52,7 @@ export function TodayCards({ pages, initialPage = 0, testID }: { pages: TodayCar
   const [pagerHeight, setPagerHeight] = useState<number | null>(null);
   const [page, setPage] = useState(initialPage);
   const scroller = useRef<ScrollViewInstance>(null);
-  const cardWidth = Math.max(0, width - 2 * uiSpace.lg - PEEK);
+  const cardWidth = Math.max(0, width - 2 * uiSpace.lg);
   const interval = cardWidth + CARD_GAP;
 
   const onLayout = (event: LayoutChangeEvent) => {
