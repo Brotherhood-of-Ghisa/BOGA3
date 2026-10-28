@@ -1,6 +1,8 @@
 name: Daily development log
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '30 7 * * *'
       timezone: Europe/London
