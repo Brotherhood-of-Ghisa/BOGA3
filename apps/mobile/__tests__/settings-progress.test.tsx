@@ -63,7 +63,7 @@ const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize:
 
 it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
   await openSettings();
-  for (const label of ['Progress view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
+  for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
     expect(screen.getByText(label)).toHaveStyle(LABEL);
   }
   // Auto-start is a form card's switch row under the `Rest timer` section heading.
@@ -92,7 +92,7 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('offers only List and 3D for both breakdowns, persists 3D and falls back to List for 1RM', async () => {
+it('saves List or 3D for Muscle while Exercise always lists full figures and opens on Sets', async () => {
   const page = await openSettingsAndProgress();
   const selector = within(screen.getByTestId('settings-muscle-view-row'));
   expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['List', '3D']);
@@ -101,7 +101,8 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   await screen.findByTestId('stats-muscle-body-card');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
-  expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
@@ -109,6 +110,9 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-muscle-body-card');
   page.unmount();
   __resetAccountLocalPreferencesForTests();
@@ -165,7 +169,7 @@ it('offers no period default when the Progress period is one week', async () => 
   expect(screen.queryByTestId('settings-progress-period-window')).toBeNull();
 });
 
-it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise after Refresh', async () => {
+it('keeps an unsaved 3D choice as a Settings draft and applies it only to Muscle after Refresh', async () => {
   await openSettingsAndProgress();
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
@@ -178,15 +182,16 @@ it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise af
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('restores the shared Exercise layout per account without carrying another account’s 3D choice', async () => {
+it('restores the Muscle layout per account without carrying another account’s 3D choice', async () => {
   const page = await openSettingsAndProgress();
-  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
-  await screen.findByTestId('stats-exercise-list');
   fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
   await screen.findByTestId('stats-muscle-body-card');
 

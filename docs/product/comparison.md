@@ -64,7 +64,7 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 Progress 3D uses theme shades for the displayed change against
 [[comparison.window]]: light for decreases, middle for unchanged activity, dark
-for increases; empty/unavailable stays neutral. Both breakdowns follow filtered
+for increases; empty/unavailable stays neutral. The Muscle breakdown follows its
 comparisons, independently of History and targets, with no legend. The selected
 muscle shows Now/Prev/Change.
 

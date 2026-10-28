@@ -189,16 +189,6 @@ describe('The 3D body on the Progress screens under Broad', () => {
     expect(screen.queryByText('Spinal erectors')).toBeNull();
   });
 
-  it('selects Back when a member facet is tapped in Exercise 3D', async () => {
-    await choose('broad');
-    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
-    await renderProgress('exercise');
-    await screen.findByTestId('stats-muscle-body-card');
-    await tapEntryOnBody('back_upper');
-    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Back');
-    expect(screen.getByTestId('stats-exercise-body-detail')).toBeTruthy();
-  });
-
   it('selects the entry itself under Detailed', async () => {
     await choose('detailed');
     act(() => updatePreferences({ progressMuscleLayout: '3d' }));
