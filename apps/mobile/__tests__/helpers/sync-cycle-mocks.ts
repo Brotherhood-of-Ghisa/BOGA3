@@ -81,13 +81,22 @@ export const supabaseClientMockFactory = <TClient = unknown>(
     if (!client) {
       throw new Error('Test supabase client not initialised');
     }
-    const typed = client as unknown as { auth?: unknown; schema: (name: string) => { rpc: (name: string, args?: unknown) => unknown } };
+    const typed = client as unknown as {
+      auth?: unknown;
+      schema: (name: string) => { rpc: (name: string, args?: unknown) => unknown; from?: (table: string) => unknown };
+    };
     return { ...typed, auth: typed.auth ?? syncRpcClient(() => undefined).auth, schema: (schema: string) => ({
       rpc: (name: string, args?: unknown) => {
         const request = typed.schema(schema).rpc(name, args);
         if (request && typeof (request as { setHeader?: unknown }).setHeader === 'function') return request;
         const result = Promise.resolve(request);
         return Object.assign(result, { setHeader: () => result });
+      },
+      // A live client's table reads (the muscle-target adoption's) pass through as they are.
+      from: (table: string) => {
+        const scoped = typed.schema(schema);
+        if (!scoped.from) throw new Error(`Test supabase client has no table access (${table})`);
+        return scoped.from(table);
       },
     }) };
   }),

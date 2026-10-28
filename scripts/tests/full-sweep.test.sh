@@ -3,7 +3,8 @@
 # full-sweep.test.sh — the full sweep (scripts/full-sweep.sh) is the
 # backstop for the selective PR triggers, so it must run EVERY gate lane in
 # scripts/lanes.tsv (fast-*, slow-backend, slow-frontend), backend before
-# frontend. Infra-free: checks `--dry-run` output only.
+# frontend, each with stdin closed so no lane swallows the rest of the list.
+# Infra-free: checks `--dry-run` output and the lane call only.
 
 set -euo pipefail
 
@@ -31,5 +32,8 @@ fi
 last_backend="$(grep -n -x -F -f <(awk -F'\t' '$2 == "slow-backend" { print $1 }' "${REPO_ROOT}/scripts/lanes.tsv") <<<"${planned}" | tail -1 | cut -d: -f1)"
 first_frontend="$(grep -n -x -F -f <(awk -F'\t' -v g="${frontend_gate}" '$2 == g { print $1 }' "${REPO_ROOT}/scripts/lanes.tsv") <<<"${planned}" | head -1 | cut -d: -f1)"
 (( last_backend < first_frontend )) || fail "backend lanes must all run before the first frontend lane"
+
+grep -qE 'boga" test .*</dev/null' "${REPO_ROOT}/scripts/full-sweep.sh" \
+  || fail "the sweep must run each lane with stdin closed: a lane reading stdin swallows the lane list"
 
 echo "  full-sweep: $(wc -l <<<"${planned}" | tr -d ' ') lanes planned, every gate lane covered, backend before frontend"

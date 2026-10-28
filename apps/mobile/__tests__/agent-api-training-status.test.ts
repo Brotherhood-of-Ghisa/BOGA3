@@ -275,6 +275,62 @@ describe('training status: favourites and progression', () => {
   });
 });
 
+type ParityFixture = { rows: StatusMuscleRow[]; mappings: StatusMappingRow[]; training: StatusTraining };
+
+const reportRowsOf = (rows: readonly StatusMuscleRow[]) => rows.map((row) => ({
+  id: row.id, displayName: row.display_name, familyName: row.family_name, sortOrder: row.sort_order,
+  reportGroup: row.report_group, tracked: row.tracked as number,
+}));
+
+/** The app's stats repository over the same rows, as its store holds them. */
+const appStatsOf = ({ rows, mappings, training: rowsTraining }: ParityFixture) => {
+  const reportRows = reportRowsOf(rows);
+  const input: StatsAggregationInput = {
+    sessions: rowsTraining.sessions.map((session) => ({ id: session.id, completedAt: new Date(session.completed_at) })),
+    sessionExercises: rowsTraining.blocks.map((block) => ({ id: block.id, sessionId: block.session_id, exerciseDefinitionId: block.exercise_definition_id })),
+    exerciseSets: rowsTraining.sets.map((set) => ({
+      id: set.id, sessionExerciseId: set.session_exercise_id, orderIndex: set.order_index,
+      setType: set.set_type, weightValue: set.weight_value, repsValue: set.reps_value, performanceStatus: null,
+    })),
+    muscleMappings: mappings.map((mapping) => ({
+      exerciseDefinitionId: mapping.exercise_definition_id, muscleGroupId: mapping.muscle_group_id,
+      role: mapping.role as 'primary' | 'secondary',
+    })),
+    muscleGroups: reportRows.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
+    muscleReport: buildMuscleReportAssignment(reportRows),
+  };
+  return createStatsRepository({
+    loadAggregationInput: async ({ start, end }) => ({
+      ...input, sessions: input.sessions.filter((session) => session.completedAt >= start && session.completedAt < end),
+    }),
+    loadMuscleGroupTaxonomy: async () => input.muscleGroups,
+  } as Parameters<typeof createStatsRepository>[0]);
+};
+
+/** Today's Plan at NOW with what `useTodayPlan` passes: the default, the setup scope's overrides and the switch. */
+const todayPlanOf = (fixture: ParityFixture, settings: StatusSettingsRow) => {
+  const stats = appStatsOf(fixture);
+  const repository = createTodayPlanRepository({
+    computeMuscleDailySets: stats.computeMuscleDailySets,
+    planQueries: { listUpcomingPlans: async () => [], loadPlanDetail: async () => null },
+    loadCatalog: async () => { throw new Error('no plans to describe'); },
+  });
+  const preferences = {
+    weeklyWorkingSetTarget: settings.weekly_working_set_target!,
+    muscleTargetMode: settings.muscle_target_mode === 'per_muscle' ? 'per-muscle' as const : 'single' as const,
+    muscleTargetOverrides: settings.muscle_target_overrides as Record<string, Record<string, number>>,
+  };
+  return repository.loadTodayPlan(NOW, {
+    weeklyTarget: preferences.weeklyWorkingSetTarget, countSecondary: settings.count_secondary_muscles!,
+    overrides: { ...effectiveMuscleTargetOverrides(preferences, deriveMuscleReportPreset(reportRowsOf(fixture.rows))) },
+  });
+};
+
+const planRowsOf = (result: ReturnType<typeof buildTrainingStatus>) => result.muscles.map((muscle) => ({
+  muscleGroupId: muscle.id, name: muscle.name, days: muscle.recovery_days.map((day) => day.sets),
+  today: muscle.today_sets, weekSets: muscle.week_sets, target: muscle.weekly_target,
+}));
+
 describe('training status: parity with Today\'s Plan', () => {
   // Broad setup: serratus merges into Chest; calves untracked; a custom muscle stays its own.
   const rows: StatusMuscleRow[] = [
@@ -310,68 +366,117 @@ describe('training status: parity with Today\'s Plan', () => {
     count_secondary_muscles: countSecondary, client_updated_at_ms: 5,
   });
 
-  /** The same rows as the app's stats store holds them. */
-  const appInput = (): StatsAggregationInput => {
-    const reportRows = rows.map((row) => ({
-      id: row.id, displayName: row.display_name, familyName: row.family_name, sortOrder: row.sort_order,
-      reportGroup: row.report_group, tracked: row.tracked as number,
-    }));
-    return {
-      sessions: rowsTraining.sessions.map((session) => ({ id: session.id, completedAt: new Date(session.completed_at) })),
-      sessionExercises: rowsTraining.blocks.map((block) => ({ id: block.id, sessionId: block.session_id, exerciseDefinitionId: block.exercise_definition_id })),
-      exerciseSets: rowsTraining.sets.map((set) => ({
-        id: set.id, sessionExerciseId: set.session_exercise_id, orderIndex: set.order_index,
-        setType: set.set_type, weightValue: set.weight_value, repsValue: set.reps_value, performanceStatus: null,
-      })),
-      muscleMappings: mappings.map((mapping) => ({
-        exerciseDefinitionId: mapping.exercise_definition_id, muscleGroupId: mapping.muscle_group_id,
-        role: mapping.role as 'primary' | 'secondary',
-      })),
-      muscleGroups: reportRows.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
-      muscleReport: buildMuscleReportAssignment(reportRows),
-    };
-  };
-
-  const todayPlan = (countSecondary: boolean) => {
-    const input = appInput();
-    const stats = createStatsRepository({
-      loadAggregationInput: async ({ start, end }) => ({
-        ...input, sessions: input.sessions.filter((session) => session.completedAt >= start && session.completedAt < end),
-      }),
-      loadMuscleGroupTaxonomy: async () => input.muscleGroups,
-    } as Parameters<typeof createStatsRepository>[0]);
-    const repository = createTodayPlanRepository({
-      computeMuscleDailySets: stats.computeMuscleDailySets,
-      planQueries: { listUpcomingPlans: async () => [], loadPlanDetail: async () => null },
-      loadCatalog: async () => { throw new Error('no plans to describe'); },
-    });
-    const reportRows = rows.map((row) => ({ id: row.id, displayName: row.display_name, familyName: row.family_name,
-      sortOrder: row.sort_order, reportGroup: row.report_group, tracked: row.tracked }));
-    // What `useTodayPlan` passes: the default, the setup scope's overrides and the switch.
-    const preferences = { weeklyWorkingSetTarget: 9, muscleTargetMode: 'per-muscle' as const,
-      muscleTargetOverrides: { broad: { chest: 12, 'custom-grip': 3 }, detailed: { chest: 40 } } };
-    return repository.loadTodayPlan(NOW, {
-      weeklyTarget: 9, countSecondary,
-      overrides: { ...effectiveMuscleTargetOverrides(preferences, deriveMuscleReportPreset(reportRows)) },
-    });
-  };
-
   it.each([true, false])('gives Today\'s Plan\'s per-muscle figures and order with count-secondary %s', async (countSecondary) => {
-    const plan = await todayPlan(countSecondary);
+    const plan = await todayPlanOf({ rows, mappings, training: rowsTraining }, settingsRow(countSecondary));
     const result = status({
       timeZone: 'Europe/London', settings: settingsRow(countSecondary), muscleRows: rows, mappings, training: rowsTraining,
       definitions: definitionsOf(definition('bench'), definition('dip'), definition('raise'), definition('hang')),
     });
     expect(result.muscle_setup).toBe('broad');
-    expect(result.muscles.map((muscle) => ({
-      muscleGroupId: muscle.id, name: muscle.name, days: muscle.recovery_days.map((day) => day.sets),
-      today: muscle.today_sets, weekSets: muscle.week_sets, target: muscle.weekly_target,
-    }))).toEqual(plan.muscles);
+    expect(planRowsOf(result)).toEqual(plan.muscles);
     expect(result.muscles.map((muscle) => muscle.recovery_days.map((day) => day.date)))
       .toEqual(result.muscles.map(() => ['2026-10-25', '2026-10-26', '2026-10-27']));
     // The fixture exercises what parity must cover: a merged muscle, a half set and an override.
     expect(plan.muscles.length).toBeGreaterThan(2);
     expect(plan.muscles.some((row) => !Number.isInteger(row.weekSets))).toBe(countSecondary);
     expect(plan.muscles.find((row) => row.muscleGroupId === 'chest')?.target).toBe(12);
+  });
+});
+
+describe('training status: parity with the app over seven weeks of training', () => {
+  // Detailed setup: every entry its own muscle, calves switched off, one custom muscle.
+  const rows: StatusMuscleRow[] = [
+    muscleRow('chest', 0, { display_name: 'Pectoralis', family_name: 'Chest' }),
+    muscleRow('delts_front', 1, { display_name: 'Front Delts', family_name: 'Shoulders' }),
+    muscleRow('delts_lateral', 2, { display_name: 'Lateral Delts', family_name: 'Shoulders' }),
+    muscleRow('triceps', 3, { display_name: 'Triceps', family_name: 'Arms' }),
+    muscleRow('biceps', 4, { display_name: 'Biceps', family_name: 'Arms' }),
+    muscleRow('lats', 5, { display_name: 'Lats', family_name: 'Back' }),
+    muscleRow('quads', 6, { display_name: 'Quadriceps', family_name: 'Legs' }),
+    muscleRow('hamstrings', 7, { display_name: 'Hamstrings', family_name: 'Legs' }),
+    muscleRow('glutes', 8, { display_name: 'Glutes', family_name: 'Legs' }),
+    muscleRow('calves', 9, { display_name: 'Calves', family_name: 'Lower Legs', tracked: 0 }),
+    muscleRow('custom-forearms', 10, { display_name: 'Forearms', family_name: 'Custom' }),
+  ];
+  const mapped: Record<string, Array<[string, 'primary' | 'secondary']>> = {
+    bench: [['chest', 'primary'], ['delts_front', 'secondary'], ['triceps', 'secondary']],
+    ohp: [['delts_front', 'primary'], ['delts_lateral', 'secondary'], ['triceps', 'secondary']],
+    pushdown: [['triceps', 'primary']],
+    lateral: [['delts_lateral', 'primary']],
+    row: [['lats', 'primary'], ['biceps', 'secondary']],
+    pulldown: [['lats', 'primary'], ['biceps', 'secondary']],
+    curl: [['biceps', 'primary'], ['custom-forearms', 'secondary']],
+    squat: [['quads', 'primary'], ['glutes', 'secondary'], ['hamstrings', 'secondary']],
+    rdl: [['hamstrings', 'primary'], ['glutes', 'primary']],
+    calf: [['calves', 'primary']],
+  };
+  const mappings: StatusMappingRow[] = Object.entries(mapped).flatMap(([exercise, muscles]) =>
+    muscles.map(([muscle, role]) => ({ exercise_definition_id: exercise, muscle_group_id: muscle, role })));
+
+  // Push, Pull, Legs late at night, Upper: a warm-up, then 3 or 4 working sets
+  // by week, some with an effort tag; London local times across the clock change
+  // of Sun 25 Oct. Week 3 is a two-session deload; this week has Push, Pull and
+  // an early session today.
+  const DAYS: Array<{ weekday: number; hour: number; minute: number; exercises: string[] }> = [
+    { weekday: 0, hour: 18, minute: 30, exercises: ['bench', 'ohp', 'pushdown', 'lateral'] },
+    { weekday: 1, hour: 7, minute: 15, exercises: ['row', 'pulldown', 'curl'] },
+    { weekday: 3, hour: 23, minute: 40, exercises: ['squat', 'rdl', 'calf'] },
+    { weekday: 5, hour: 10, minute: 0, exercises: ['bench', 'row', 'lateral', 'curl'] },
+  ];
+  const sessions: SessionSpec[] = [];
+  for (let week = 0; week < 7; week += 1) {
+    const monday = new Date(2026, 8, 14 + week * 7);
+    for (const [index, day] of DAYS.entries()) {
+      if (week === 3 && index % 2 === 1) continue;
+      const completed = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day.weekday, day.hour, day.minute);
+      if (completed.getTime() > NOW.getTime()) continue;
+      const working = 3 + (week % 2);
+      sessions.push({
+        id: `w${week}-d${index}`, completedAt: completed.getTime(),
+        blocks: day.exercises.map((exercise, order) => ({ exercise, sets: [
+          ['40', '10', 'warm_up'],
+          ...Array.from({ length: working }, (_, set) => ['80', '8', set === working - 1 ? `rir_${order % 3}` : null] as [string, string, string | null]),
+        ] })),
+      });
+    }
+  }
+  sessions.push({ id: 'today', completedAt: new Date(2026, 9, 28, 8, 0).getTime(), blocks: [{ exercise: 'curl', sets: [['20', '12', null], ['20', '10', null]] }] });
+  const fixture: ParityFixture = { rows, mappings, training: training(sessions) };
+  const settingsRow = (countSecondary: boolean): StatusSettingsRow => ({
+    weekly_working_set_target: 10, muscle_target_mode: 'per_muscle',
+    muscle_target_overrides: { detailed: { chest: 14, 'custom-forearms': 4 }, broad: { chest: 99 } },
+    count_secondary_muscles: countSecondary, client_updated_at_ms: 5,
+  });
+  const definitions = definitionsOf(...Object.keys(mapped).map((exercise) => definition(exercise)));
+
+  it.each([true, false])('gives Today\'s Plan\'s rows and the app\'s weekly sets with count-secondary %s', async (countSecondary) => {
+    const result = status({ timeZone: 'Europe/London', settings: settingsRow(countSecondary), muscleRows: rows, mappings, training: fixture.training, definitions });
+    expect(result.muscle_setup).toBe('detailed');
+    expect(planRowsOf(result)).toEqual((await todayPlanOf(fixture, settingsRow(countSecondary))).muscles);
+
+    // Each of the four weeks before this one, summed from the app's daily sets over that local week.
+    const stats = appStatsOf(fixture);
+    for (const [index, week] of result.muscles[0].weekly_sets_last_4_weeks.entries()) {
+      const [year, month, day] = week.week_start.split('-').map(Number);
+      const daily = await stats.computeMuscleDailySets({
+        start: new Date(year, month - 1, day), end: new Date(year, month - 1, day + 7), now: NOW, countSecondary,
+      });
+      for (const muscle of result.muscles) {
+        const appSets = Object.values(daily.sets[muscle.id] ?? {}).reduce((total, sets) => total + sets, 0);
+        expect({ muscle: muscle.id, week: week.week_start, sets: muscle.weekly_sets_last_4_weeks[index].sets })
+          .toEqual({ muscle: muscle.id, week: week.week_start, sets: appSets });
+      }
+    }
+
+    // The fixture covers what parity must: every tracked muscle trained, none untracked,
+    // the deload and clock-change weeks, a late-night session and half sets.
+    expect(result.muscles.map((muscle) => muscle.id).sort()).toEqual(rows.filter((row) => row.tracked === 1).map((row) => row.id).sort());
+    expect(result.muscles[0].weekly_sets_last_4_weeks.map((week) => week.week_start))
+      .toEqual(['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19']);
+    const quads = result.muscles.find((muscle) => muscle.id === 'quads')!;
+    expect(quads.weekly_sets_last_4_weeks.map((week) => week.sets)).toEqual([3, 4, 3, 4]);
+    expect(quads.last_trained_on).toBe('2026-10-22');
+    expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ weekly_target: 14, week_sets: 3 });
+    expect(result.muscles.some((muscle) => !Number.isInteger(muscle.week_sets))).toBe(countSecondary);
   });
 });

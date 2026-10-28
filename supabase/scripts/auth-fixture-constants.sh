@@ -25,8 +25,10 @@ export USER_D_USERNAME="maestro-user-d"
 # sync-infra jest suite (apps/mobile/__tests__/sync/cycle-fresh-device-and-
 # account-switch.test.ts): user_e is the account a fresh device restores and the
 # one a device switches to; user_f the account the device held before the
-# switch. Dedicated to that suite, which hard-resets both users' Sync v2 rows
-# with the service role at the start of each test. No fixture key.
+# switch. The synced muscle-targets suite (muscle-targets-live.test.ts) signs in
+# as user_e too. Dedicated to those sync-infra suites, which hard-reset their
+# users' Sync v2 rows with the service role at the start of each test. No
+# fixture key.
 export USER_E_EMAIL="user_e.local@example.test"
 export USER_E_PASSWORD="ScaffoldingUserE!234"
 

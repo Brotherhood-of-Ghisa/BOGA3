@@ -88,15 +88,23 @@ export interface FixtureCredentials {
 const USER_A: FixtureCredentials = { email: 'user_a.local@example.test', password: 'ScaffoldingUserA!234' };
 
 /**
- * The fresh-device / account-switch suite's dedicated fixtures (`user_e`,
- * `user_f` in `supabase/scripts/auth-fixture-constants.sh`). No other suite or
- * flow signs in as them, so the suite may reset their server rows.
+ * Dedicated fixtures (`user_e`, `user_f` in
+ * `supabase/scripts/auth-fixture-constants.sh`) of the suites that reset their
+ * server rows before each test: fresh-device / account-switch and the synced
+ * muscle targets. No flow signs in as them, and the lane runs its suites one at
+ * a time.
  */
 export const USER_E: FixtureCredentials = { email: 'user_e.local@example.test', password: 'ScaffoldingUserE!234' };
 export const USER_F: FixtureCredentials = { email: 'user_f.local@example.test', password: 'ScaffoldingUserF!234' };
 
 // The Postgres schema the sync RPCs live in.
 export const SYNC_RPC_SCHEMA = 'app_public';
+
+type QueryResult = { data: unknown; error: { message: string } | null };
+type FilterBuilder = PromiseLike<QueryResult> & {
+  eq: (column: string, value: string) => FilterBuilder;
+  maybeSingle: () => Promise<QueryResult>;
+};
 
 type AnySupabaseClient = {
   auth: {
@@ -111,6 +119,7 @@ type AnySupabaseClient = {
     rpc: (fn: string, args?: unknown) => Promise<unknown>;
     from: (table: string) => {
       delete: () => { eq: (column: string, value: string) => Promise<{ error: { message: string } | null }> };
+      select: (columns: string) => FilterBuilder;
     };
   };
   rpc: (fn: string, args?: unknown) => Promise<unknown>;
@@ -219,16 +228,12 @@ const SYNC_TABLES_CHILD_FIRST = [
 ] as const;
 
 /**
- * Hard-deletes every Sync v2 row a fixture user owns, with the service role, so
- * a test starts from an empty server account. `dev_wipe_my_data` cannot do this
- * locally (it refuses unless `app.env` is set, which the local REST path does
- * not set). Needs `SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY` (exported by
- * `supabase/scripts/test-sync-infra.sh`); only ever pass a dedicated fixture.
+ * A service-role client on THIS worktree's local stack, for suites that set up
+ * server state the app cannot write itself. Needs
+ * `SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY` (exported by
+ * `supabase/scripts/test-sync-infra.sh`), and refuses a non-local endpoint.
  */
-export const resetFixtureServerRows = async (
-  config: SyncTestEndpointConfig,
-  userId: string,
-): Promise<void> => {
+export const createLocalServiceRoleClient = (config: SyncTestEndpointConfig): AnySupabaseClient => {
   const serviceRoleKey = process.env.SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
     throw new Error(
@@ -238,9 +243,22 @@ export const resetFixtureServerRows = async (
   }
   const { hostname } = new URL(config.url);
   if (hostname !== '127.0.0.1' && hostname !== 'localhost') {
-    throw new Error(`refusing to hard-delete fixture rows on a non-local endpoint: ${config.url}`);
+    throw new Error(`refusing a service-role client on a non-local endpoint: ${config.url}`);
   }
-  const admin = loadCreateClient()(config.url, serviceRoleKey, { auth: NO_TIMER_AUTH });
+  return loadCreateClient()(config.url, serviceRoleKey, { auth: NO_TIMER_AUTH });
+};
+
+/**
+ * Hard-deletes every Sync v2 row a fixture user owns, with the service role, so
+ * a test starts from an empty server account. `dev_wipe_my_data` cannot do this
+ * locally (it refuses unless `app.env` is set, which the local REST path does
+ * not set). Only ever pass a dedicated fixture.
+ */
+export const resetFixtureServerRows = async (
+  config: SyncTestEndpointConfig,
+  userId: string,
+): Promise<void> => {
+  const admin = createLocalServiceRoleClient(config);
   for (const table of SYNC_TABLES_CHILD_FIRST) {
     const { error } = await admin.schema(SYNC_RPC_SCHEMA).from(table).delete().eq('owner_user_id', userId);
     if (error) {
