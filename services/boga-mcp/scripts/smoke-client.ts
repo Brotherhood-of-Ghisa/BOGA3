@@ -488,5 +488,5 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: rejected token challenged; fourteen tools discovered and verified');
+console.log('[boga-mcp-smoke] PASS: rejected token challenged; fifteen tools discovered and verified');
 
