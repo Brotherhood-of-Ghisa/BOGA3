@@ -1,13 +1,13 @@
-import type { SessionWeightContext } from '@/src/bodyweight/as-of';
-import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
-import { type SetMetrics } from '@/src/exercise-calculations/load-metrics';
-import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '@/src/exercise-calculations/analytics';
+import type { SessionWeightContext } from '../bodyweight/as-of.ts';
+import type { EffortCalculationPolicy } from '../exercise-calculations/effort-policy.ts';
+import { type SetMetrics } from '../exercise-calculations/load-metrics.ts';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '../exercise-calculations/analytics.ts';
 import {
   countedSessionIds,
   isWorkingSet,
   isVolumeSet,
   type SessionSetPerformanceStatus,
-} from '@/src/exercise-calculations/set-semantics';
+} from '../exercise-calculations/set-semantics.ts';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 

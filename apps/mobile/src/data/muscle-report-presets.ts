@@ -1,4 +1,4 @@
-import type { MuscleReportAssignment, ReportedMuscle } from './muscle-analytics';
+import type { MuscleReportAssignment, ReportedMuscle } from './muscle-analytics.ts';
 
 /** One muscle of the Broad preset: the anatomy entries it merges and where an editor writes to. */
 export type BroadMuscle = {
