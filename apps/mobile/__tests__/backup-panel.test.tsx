@@ -71,7 +71,10 @@ it('draws Unavailable as a word, not in the figure face', () => {
     throw new Error('no access');
   });
   render(<BackupPanel backups={backups} />);
-  expect(screen.getByTestId('settings-backup-count')).toHaveStyle({ fontFamily: uiFonts.body.family });
+  const count = screen.getByTestId('settings-backup-count');
+  expect(count).toHaveStyle({ fontFamily: uiFonts.body.family });
+  // The word sits in the line itself, not in a nested figure Text.
+  expect(screen.getByText('Unavailable').props.testID).toBe('settings-backup-count');
 });
 
 it('shows Unavailable when the backups directory cannot be read', () => {
