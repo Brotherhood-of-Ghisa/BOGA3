@@ -140,7 +140,7 @@ export type StatusSettings = ReturnType<typeof statusSettings>;
 
 const ROLES = new Set(['primary', 'secondary', 'stabilizer']);
 
-const asMuscleReportRows = (rows: readonly StatusMuscleRow[]): MuscleReportRow[] =>
+export const asMuscleReportRows = (rows: readonly StatusMuscleRow[]): MuscleReportRow[] =>
   rows.map((row) => ({
     id: row.id, displayName: row.display_name, familyName: row.family_name, sortOrder: row.sort_order,
     reportGroup: row.report_group, tracked: row.tracked,

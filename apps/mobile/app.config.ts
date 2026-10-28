@@ -116,12 +116,18 @@ export default ({ config }: { config: ExpoConfig }) => ({
         "expo-dev-client",
         [
             "expo-alternate-app-icons",
-            ["Slate", "Forest", "Plum", "Rainbow"].map((name) => ({
+            [
+                ...["Slate", "Forest", "Plum", "Rainbow"].map((name) => ({ name, file: name.toLowerCase() })),
+                ...["Warm", "Slate", "Forest", "Plum", "Rainbow"].map((name) => ({
+                    name: `${name}November`, file: `${name.toLowerCase()}-november`,
+                })),
+            ].map(({ name, file }) => ({
                 name,
-                ios: `./assets/images/app-icons/${name.toLowerCase()}.png`,
-                android: { foregroundImage: `./assets/images/app-icons/${name.toLowerCase()}.png` },
+                ios: `./assets/images/app-icons/${file}.png`,
+                android: { foregroundImage: `./assets/images/app-icons/${file}.png` },
             })),
         ],
+        "./plugins/with-android-app-icon-state",
         "expo-router",
         [
             "expo-splash-screen",

@@ -17,6 +17,7 @@ import {
   uiTextTone,
   type SegmentedControlOption,
 } from '@/components/ui';
+import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -234,9 +235,11 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects/deselects a muscle group on tap. Selected schematic fibres use
  * surfaced relief, even through hidden/back-facing anatomy; body colours stay live.
+ * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
   const { width: windowWidth } = useWindowDimensions();
+  const november = useNovemberAppearance();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
@@ -263,8 +266,9 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         selectedFibres,
         report,
         palette,
+        november,
       }),
-    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth]
+    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth, november]
   );
 
   const selectedMuscle = useMemo(

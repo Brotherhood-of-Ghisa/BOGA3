@@ -34,6 +34,7 @@ async function applyThemeAppIcon(preset: Parameters<typeof startThemeAppIcon>[0]
 }
 
 beforeEach(() => {
+  jest.useFakeTimers({ now: new Date(2026, 9, 20), doNotFake: ['setImmediate'] });
   jest.replaceProperty(AppState, 'currentState', 'active');
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
     listeners.add(listener);
@@ -48,6 +49,8 @@ afterEach(async () => {
   stops = [];
   await settle();
   expect(listeners.size).toBe(0);
+  expect(jest.getTimerCount()).toBe(0);
+  jest.useRealTimers();
   Storage.removeItemSync(THEME_PRESET_STORAGE_KEY);
   jest.restoreAllMocks();
   jest.clearAllMocks();
@@ -242,4 +245,107 @@ it('defers an interrupted Warm fallback and retries the launch theme after resum
   changeState('active');
   await settle();
   expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Plum'], [null], ['Plum']]);
+});
+
+
+it.each([
+  ['warm', 'WarmNovember'], ['slate', 'SlateNovember'], ['forest', 'ForestNovember'],
+  ['plum', 'PlumNovember'], ['custom', 'RainbowNovember'],
+] as const)('applies the November variant for %s without changing the chosen theme', async (id, name) => {
+  jest.setSystemTime(new Date(2026, 10, 1));
+  await applyThemeAppIcon(id === 'custom' ? customTheme(200) : getThemePreset(id));
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(name);
+});
+
+function trackNativeIcon(initial: string | null) {
+  let icon = initial;
+  jest.mocked(appIcons.getAppIconName).mockImplementation(() => icon);
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementation(async (name) => {
+    icon = name;
+    return name;
+  });
+}
+
+it.each(['warm', 'slate'] as const)('switches %s at both local boundaries and repeats next year', async (id) => {
+  jest.setSystemTime(new Date(2026, 9, 31, 23, 59, 59));
+  const ordinary = id === 'warm' ? null : 'Slate';
+  const seasonal = id === 'warm' ? 'WarmNovember' : 'SlateNovember';
+  trackNativeIcon(ordinary);
+  await applyThemeAppIcon(getThemePreset(id));
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(appIcons.setAlternateAppIcon).toHaveBeenLastCalledWith(seasonal);
+  jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 59));
+  changeState('active'); // Re-aim after a device-clock change.
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(appIcons.setAlternateAppIcon).toHaveBeenLastCalledWith(ordinary);
+  jest.setSystemTime(new Date(2027, 10, 1));
+  changeState('background');
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([[seasonal], [ordinary], [seasonal]]);
+});
+
+it.each([
+  [new Date(2026, 9, 31), new Date(2026, 10, 1), null, 'WarmNovember'],
+  [new Date(2026, 10, 30), new Date(2026, 11, 1), 'WarmNovember', null],
+] as const)('reconciles a boundary crossed while suspended', async (before, after, initial, expected) => {
+  jest.setSystemTime(before);
+  trackNativeIcon(initial);
+  await applyThemeAppIcon(getThemePreset('warm'));
+  changeState('background');
+  jest.setSystemTime(after);
+  expect(appIcons.setAlternateAppIcon).not.toHaveBeenCalled();
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([[expected]]);
+});
+
+it('does not repeatedly alert for a matching November icon on foreground or daily refresh', async () => {
+  jest.setSystemTime(new Date(2026, 10, 1));
+  trackNativeIcon('ForestNovember');
+  await applyThemeAppIcon(getThemePreset('forest'));
+  changeState('inactive');
+  changeState('active');
+  await jest.advanceTimersByTimeAsync(86400000);
+  expect(appIcons.setAlternateAppIcon).not.toHaveBeenCalled();
+});
+
+it('serializes a season change behind an unfinished native request', async () => {
+  jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 59));
+  let resolve!: (value: string | null) => void;
+  jest.mocked(appIcons.setAlternateAppIcon).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  await applyThemeAppIcon(getThemePreset('warm'));
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['WarmNovember']]);
+  jest.mocked(appIcons.getAppIconName).mockReturnValue('WarmNovember');
+  resolve('WarmNovember');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['WarmNovember'], [null]]);
+});
+
+it('falls back to ordinary Warm after a seasonal native failure and retries only after the season changes', async () => {
+  jest.setSystemTime(new Date(2026, 10, 30));
+  jest.mocked(appIcons.setAlternateAppIcon).mockRejectedValueOnce(new Error('missing seasonal icon'));
+  await applyThemeAppIcon(getThemePreset('forest'));
+  changeState('background');
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['ForestNovember'], [null]]);
+  expect(logEvent).toHaveBeenCalledTimes(1);
+  jest.setSystemTime(new Date(2026, 11, 1));
+  changeState('active');
+  await settle();
+  expect(appIcons.setAlternateAppIcon).toHaveBeenLastCalledWith('Forest');
+});
+
+
+it('retries a failed November next year even if suspended across the entire ordinary season', async () => {
+  jest.setSystemTime(new Date(2026, 10, 15));
+  jest.mocked(appIcons.setAlternateAppIcon).mockRejectedValueOnce(new Error('temporarily unavailable'));
+  await applyThemeAppIcon(getThemePreset('warm'));
+  changeState('background');
+  jest.setSystemTime(new Date(2027, 10, 15));
+  changeState('active');
+  await settle();
+  expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['WarmNovember'], [null], ['WarmNovember']]);
 });

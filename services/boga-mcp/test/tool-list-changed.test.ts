@@ -45,7 +45,7 @@ describe('MCP tool-list change notifications', () => {
 
       expect(client.getServerCapabilities()?.tools?.listChanged).toBe(true);
       const before = await client.listTools();
-      expect(before.tools).toHaveLength(15);
+      expect(before.tools).toHaveLength(16);
       expect(before.tools.some((tool) => tool.name === 'boga_list_change_probe')).toBe(false);
 
       // Only a test-only tool is registered: no user data or production

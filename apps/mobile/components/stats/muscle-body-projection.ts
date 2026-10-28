@@ -10,6 +10,7 @@ import {
   type MuscleBodyMaterialId,
   type MuscleBodyMesh,
 } from './muscle-body-mesh';
+import { MOUSTACHE_FILL, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
 
 export type BodyOrientation = 'front' | 'back';
 
@@ -418,6 +419,32 @@ const batchSlabTriangles = (
   return batches;
 };
 
+const depthAtPoint = (triangle: ProjectedTriangle, x: number, y: number, verts: RotatedVertices): number => {
+  const { x0, y0, x1, y1, x2, y2, v0, v1, v2 } = triangle;
+  const denominator = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+  if (Math.abs(denominator) < 1e-9) return -Infinity;
+  const a = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denominator;
+  const b = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denominator;
+  return a * verts.rz[v0] + b * verts.rz[v1] + (1 - a - b) * verts.rz[v2];
+};
+
+const projectMoustache = (
+  angleDeg: number, width: number, height: number,
+  ctx: ProjectionContext, body: readonly ProjectedTriangle[],
+): ProjectedTriangle[] => {
+  const mesh = NOVEMBER_MOUSTACHE_MESH;
+  const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
+  return mesh.faces.flatMap(face => {
+    const triangle = projectSingleFace(face, { ...ctx, verts, materials: mesh.materials, report: undefined });
+    if (!triangle) return [];
+    const x = (triangle.x0 + triangle.x1 + triangle.x2) / 3;
+    const y = (triangle.y0 + triangle.y1 + triangle.y2) / 3;
+    const occluded = body.some(facet => pointInTriangle(x, y, facet)
+      && depthAtPoint(facet, x, y, ctx.verts) > triangle.depth + .001);
+    return occluded ? [] : [{ ...triangle, fill: MOUSTACHE_FILL, selected: false }];
+  });
+};
+
 export type ProjectMuscleBodyOptions = {
   readonly angleDeg: number;
   readonly width: number;
@@ -430,6 +457,7 @@ export type ProjectMuscleBodyOptions = {
   readonly mesh?: MuscleBodyMesh;
   /** Prepared for this selection/report; omit to resolve directly from the source asset. */
   readonly selectedFibres?: readonly MuscleBodyFibreSegment[];
+  readonly november?: boolean;
 };
 
 /**
@@ -446,6 +474,7 @@ export function projectMuscleBody({
   palette = getDefaultPalette(),
   mesh = MUSCLE_BODY_MESH,
   selectedFibres = selectMuscleFibres(selectedId, report),
+  november = false,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return { triangles: [], batches: [], fibres: { surface: '', deep: '' } };
@@ -476,6 +505,11 @@ export function projectMuscleBody({
   for (let i = 0; i < triangles.length; i += slabSize) {
     const slice = triangles.slice(i, i + slabSize);
     batches.push(...batchSlabTriangles(slice, i / slabSize));
+  }
+
+  // Draw only surface-visible decoration, leaving anatomy batches and hit targets unchanged.
+  if (november) {
+    batches.push(...batchSlabTriangles(projectMoustache(angleDeg, width, height, ctx, triangles), DEPTH_SLABS));
   }
 
   const fibres = projectFibreSegments(selectedFibres, mesh, verts);

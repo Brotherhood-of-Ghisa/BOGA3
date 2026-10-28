@@ -10,9 +10,9 @@ https://<project>.supabase.co/functions/v1/agent-api
 Every route below validates the bearer token live with Supabase Auth, requires
 its OAuth `client_id` and an active matching grant, derives the owner from the
 validated subject, and performs an explicit owner-filtered read. The read routes
-accept `GET` only; the two plan-write routes accept `POST` and require a
-current-grant plan permission. Request bodies and caller identity fields
-(`user_id`, `userId`, `owner_user_id`) are rejected.
+accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets)
+and require a current-grant plan permission. GET bodies and caller identity
+fields (`user_id`, `userId`, `owner_user_id`) are rejected.
 
 Success envelope:
 
@@ -36,10 +36,9 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps are ISO 8601. Every weight is kg and load-volume uses
-`kg_reps`. The entire serialized success response is limited to 256 KiB and a
-validated user/client pair is limited to 120 requests per minute per function
-instance.
+Timestamps are ISO 8601, weights kg, load-volume `kg_reps`. A success response
+is limited to 256 KiB and a validated user/client pair to 120 requests per
+minute per function instance.
 
 ## Session validation
 
@@ -55,7 +54,7 @@ instance.
 }
 ```
 
-The MCP resource server calls this route to validate every bearer token. It
+The MCP resource server calls this route to validate every bearer token; it
 returns no user or account fields.
 
 ## Training profile
@@ -248,29 +247,26 @@ which count only there and are never a bucket of their own. `gym_bucket` names
 one gym id, and context's figures, or history's stream, then come from that
 gym's sessions alone. It is `400 INVALID_ARGUMENT` on an exercise that is not
 split, when empty, or against a cursor for another gym, and `404` for a gym the
-user does not own. `none` is rejected the same way (the no-gym sessions count in
-the whole exercise, so a gym whose id is `none` cannot be named), and a history cursor pinned to them is `400 INVALID_CURSOR`
-while the exercise is split.
+user does not own. `none` is rejected the same way, and a history cursor pinned
+to the no-gym sessions is `400 INVALID_CURSOR` while the exercise is split.
 
 The context route's `exercise.gym_buckets` lists every gym it could see, most
 recently performed first, each with its own `personal_records` and
-`session_count`, so one call compares the gyms beside the whole exercise. Past
-50 gyms it lists the 50 newest and sets `gym_buckets_truncated`. Gyms are
+`session_count`, so one call compares the gyms. Past 50 gyms it lists the 50
+newest and sets `gym_buckets_truncated`. Gyms are
 ranked over the sessions those figures count — [working sets
 only](#working-sets-only) — so a gym performed only as warm-ups is not listed.
 Each of a split exercise's `recent_performances` and `volume_series` points
 names its `gym` (`null` for no gym). The history route carries no inventory;
 its sets already name their gyms.
 
-`exercise.gym` appears only when one gym owns the response: a context or
-history request naming `gym_bucket`. Equal `last_performed_at` values break on
-the gym id; a truncated history (`history_truncated`) can still hide a gym. An
-exercise that is not split carries `split_by_gym: false` and no gym field, and a cursor's filter lapses if the flag is turned off
-between pages.
-
-A filtered history's `next_cursor` carries its gym, so draining it keeps the
-filter whether or not the caller repeats `gym_bucket`; an unfiltered cursor
-stays unfiltered.
+`exercise.gym` appears only when one gym owns the response: a request naming
+`gym_bucket`. Equal `last_performed_at` values break on the gym id; a truncated
+history (`history_truncated`) can still hide a gym. An exercise that is not
+split carries `split_by_gym: false` and no gym field, and a cursor's filter
+lapses if the flag is turned off between pages. A filtered history's
+`next_cursor` carries its gym, so draining it keeps the filter; an unfiltered
+cursor stays unfiltered.
 
 ## Workout detail
 
@@ -342,9 +338,9 @@ inaccessible or nonexistent session produces a `404` envelope.
 ```
 
 At most 50 compact exercise blocks are embedded per workout; `truncated` makes
-any internal safety cap explicit. `exercises` lists every block, while
-`exercise_count` counts only blocks with at least one working set, and
-`completed_set_count`, `set_count` and every volume count working sets
+any cap explicit. `exercises` lists every block, while `exercise_count` counts
+only blocks with a working set, and `completed_set_count`, `set_count` and every
+volume count working sets
 ([working sets only](#working-sets-only), [[set.eligibility]]).
 
 ## Training status
@@ -373,13 +369,27 @@ returns one bounded object; days and Monday-start weeks are the profile
 `training-status.ts` derives the muscles with Today's Plan's own functions,
 under coaching's working-set rule and completed workouts only. Favourites are
 a coach-only order: most sessions with a working set in 28 days, then latest
-done, then name; never the app's recency-weighted Favourites sort. `revision`
-is the settings row's `client_updated_at_ms` (0 with no row); `uploaded: false`
-shows app defaults. Sets older than 56 days are not read, except each
-favourite's own history, which dates its records; `record_history_complete:
-false` when that history hit the exercise-context cap (500 blocks), so a
-record may be dated too late. `complete: false` when a 56-day or muscle read
-hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
+done, then name; never the app's recency-weighted Favourites sort. `revision` is the settings row's `client_updated_at_ms` (0
+with no row); `uploaded: false` shows app defaults. Sets older than 56 days are
+not read, except each favourite's own history, which dates its records;
+`record_history_complete: false` when it hit the exercise-context cap (500
+blocks), so a record may be dated too late. `complete: false` when a 56-day or
+muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
+
+## Muscle targets
+
+`PUT /v1/agent/muscle-targets` needs write access and an `Idempotency-Key`
+(own window, 30 per minute). Strict JSON: `expected_revision`
+(`targets.revision` above) and at least one of `default_weekly_sets`, `mode`
+(`single` | `per_muscle`), `overrides` (`{muscle_id: n | null}`, null clears).
+Targets are positive whole numbers, ids muscles the user's setup reports (`400
+VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a stale revision
+is `409 REVISION_CONFLICT`. The setup scope is derived as the app does
+(`muscle-targets.ts`); `agent_set_muscle_targets` merges into it, keeps the
+other scopes and the count-secondary switch, and stamps the row past the wall
+clock so devices pull it. While `uploaded` is false it builds on app defaults
+(first writer wins). It returns `scope`, `overrides`, `targets`,
+`idempotent_replay`.
 
 ## Working sets only
 
@@ -485,12 +495,13 @@ persisted.
 ## Plan permission and write routes
 
 The base OAuth grant is read-only. Reading the upcoming plan queue, creating
-plans/programmes and editing exercises additionally require a current-grant row in
-`public.agent_plan_permissions` (`plan_access_enabled = true` and `granted_at`
-equal to the live OAuth grant timestamp). A missing, false or grant-mismatched
-row returns `403 PLAN_PERMISSION_REQUIRED` before any referenced exercise or gym
-is resolved. The person enables it per client on the Connected Agents screen (one switch
-covers plans and exercises); base OAuth consent is never described as write access.
+plans/programmes, editing exercises and setting muscle targets additionally
+require a current-grant row in `public.agent_plan_permissions`
+(`plan_access_enabled = true` and `granted_at` equal to the live OAuth grant
+timestamp). A missing, false or grant-mismatched row returns `403
+PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. The person
+enables it per client on the Connected Agents screen (one switch covers all
+writes); base OAuth consent is never described as write access.
 
 ### `GET /v1/agent/session-plans`
 
@@ -512,9 +523,9 @@ must be owned; a foreign or nonexistent ID returns `400
 FOREIGN_RESOURCE_REFERENCE`.
 
 Each call creates the whole graph in one transaction with `provenance = 'agent'`
-and `pending` blocks. A child failure rolls back every row, including the
-receipt. Replaying the same key and payload returns the original IDs
-(`idempotent_replay: true`); the same key with a different payload returns `409
+and `pending` blocks; a child failure rolls back every row, receipt included.
+Replaying the same key and payload returns the original IDs
+(`idempotent_replay: true`); the same key with another payload returns `409
 IDEMPOTENCY_CONFLICT`. No performed session, exercise or set row is ever
 created, and the agent cannot attach, complete, skip or edit a plan.
 
@@ -550,23 +561,22 @@ FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
 `expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
 EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.
 
-The service-role-only `agent_*_exercise` RPCs stamp each touched row at or past
-the wall clock and past every stamp the exercise holds, so devices pull the
-change under LWW. A re-added muscle
-revives its row, a new one takes the id `map_<exercise>__<muscle>`, a dropped one
-is tombstoned, and a `load_input_mode` change re-scores linked group exercises.
-The response is the RPC result (`exercise_id`, `revision`, `idempotent_replay`,
-plus `deleted`/`changed` for delete and restore) and `exercise`, the catalog view
-after the write.
+The service-role-only `agent_*_exercise` RPCs stamp each touched row at or past the
+wall clock and past every stamp the exercise holds, so devices pull it under LWW. A
+re-added muscle revives its row, a new one takes the id
+`map_<exercise>__<muscle>`, a dropped one is tombstoned, and a `load_input_mode`
+change re-scores linked group exercises. The response is the RPC result
+(`exercise_id`, `revision`, `idempotent_replay`, plus `deleted`/`changed`) and
+`exercise`, the catalog view after the write.
 
 ## Status contract
 
-- `400` invalid/unknown argument, identity input, cursor, or foreign/nonexistent resource reference.
+- `400` invalid/unknown argument (`VALIDATION_ERROR` for targets), identity input, cursor, or foreign/nonexistent resource reference.
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
 - `403` write access missing, disabled or bound to a stale grant.
 - `404` unknown route or inaccessible/nonexistent exercise.
-- `405` unsupported method for the route.
-- `409` idempotency conflict, stale exercise revision, or edit of a deleted exercise.
+- `405` unsupported method for the route (`PUT` only for muscle targets).
+- `409` idempotency conflict, stale revision, or edit of a deleted exercise.
 - `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
@@ -574,5 +584,5 @@ after the write.
   check the token (unreachable, timeout, `408`/`429` or `5xx` from `getUser` or
   the grants endpoint). Only a `4xx` rejection from Auth is a `401`.
 
-Run `./boga test agent-api` for the real OAuth/RLS contract and
-`./boga test mcp-smoke` for the real MCP-to-API path.
+`./boga test agent-api` runs the real OAuth/RLS contract and
+`./boga test mcp-smoke` the real MCP-to-API path.
