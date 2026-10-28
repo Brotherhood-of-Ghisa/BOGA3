@@ -67,6 +67,13 @@ Four exercise tools (require the same write access, idempotent; edits quote the
 Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing).
 
+One targets tool (same write access, idempotent, marked destructive):
+`set_muscle_targets` sets the default weekly target, the mode and per-muscle
+overrides (`null` clears one) on the person's setup; devices show them after
+their next sync. `expected_revision` is `targets.revision` from
+`get_training_status`. Rules and errors: the
+[agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
+
 `get_exercise_context` reports `gym_usage` for every exercise: sessions with a
 working set per gym and with no gym, so a coach can judge `split_by_gym`.
 `get_exercise_context` and `get_exercise_history` take an optional `gym_bucket`

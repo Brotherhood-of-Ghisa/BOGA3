@@ -15,7 +15,10 @@ import {
   type GymBucketRank,
 } from './gym-buckets.ts';
 import {
-  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
+  checkOverrideIds, muscleTargetScope, MuscleTargetsError, normalizeMuscleTargetsWrite,
+} from './muscle-targets.ts';
+import {
+  asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
   trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
@@ -56,7 +59,7 @@ const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 
 const CORS_HEADERS = {
   'access-control-allow-headers': 'authorization, content-type, x-request-id, idempotency-key',
-  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
   'access-control-allow-origin': '*',
 };
 
@@ -147,6 +150,7 @@ const writeRateWindows = new Map<string, RateWindow>();
 // Exercise edits count apart from plan writes, so curating a catalog does not
 // use up a coach's plan-writing allowance (and the reverse).
 const exerciseWriteRateWindows = new Map<string, RateWindow>();
+const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -347,6 +351,7 @@ const routeToolName = (path: string, method: string): string => {
   if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+$/.test(path)) return 'update_exercise';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
   if (path === '/v1/agent/training-status') return 'get_training_status';
+  if (path === '/v1/agent/muscle-targets') return 'set_muscle_targets';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
@@ -413,6 +418,9 @@ const enforceWriteRateLimit = (agent: AuthenticatedAgent): void =>
 
 const enforceExerciseWriteRateLimit = (agent: AuthenticatedAgent): void =>
   enforceRateLimit(exerciseWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+
+const enforceMuscleTargetsWriteRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(muscleTargetsWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
 
 const parseBoundedInteger = (
   raw: string | null,
@@ -2405,6 +2413,69 @@ const normalizeExerciseInput = <T>(normalize: () => T): T => {
   }
 };
 
+const throwMuscleTargetsWriteError = (error: { message?: string } | null): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('REVISION_CONFLICT')) {
+    throw new ApiError(
+      409,
+      'REVISION_CONFLICT',
+      'The targets changed since they were read. Call get_training_status again and retry with targets.revision.',
+    );
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+/**
+ * Sets the weekly targets on the settings row. Overrides land in the scope of
+ * the setup the user reports under now, derived as the app derives it; the RPC
+ * merges them and keeps the other scopes.
+ */
+const setMuscleTargets = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  body: JsonObject,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  let write: ReturnType<typeof normalizeMuscleTargetsWrite>;
+  try {
+    write = normalizeMuscleTargetsWrite(body);
+  } catch (error) {
+    if (error instanceof MuscleTargetsError) throw new ApiError(400, 'VALIDATION_ERROR', error.message);
+    throw error;
+  }
+  const { data: muscles, error: musclesError } = await client.schema('app_public').from('muscle_groups')
+    .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', agent.userId)
+    .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
+    .returns<StatusMuscleRow[]>();
+  throwDatabaseError(musclesError);
+  const { scope, reportedIds } = muscleTargetScope(asMuscleReportRows(muscles ?? []));
+  try {
+    checkOverrideIds(write.changes, reportedIds);
+  } catch (error) {
+    if (error instanceof MuscleTargetsError) throw new ApiError(400, 'VALIDATION_ERROR', error.message);
+    throw error;
+  }
+  const { data, error } = await client.schema('app_public').rpc('agent_set_muscle_targets', {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    p_payload_sha256: await sha256Hex(JSON.stringify(write)),
+    p_expected_revision: write.expected_revision,
+    p_scope: scope,
+    p_changes: write.changes,
+  });
+  throwMuscleTargetsWriteError(error);
+  return data as JsonObject;
+};
+
 /** Reads one exercise back in its catalog view, deleted or not, for a write's response. */
 const loadCatalogExercise = async (
   client: SupabaseClient,
@@ -2767,6 +2838,15 @@ const dispatchAgentRequest = async (
     return createTrainingProgramme(client, agent, request, await readJsonBody(request));
   }
 
+  if (path === '/v1/agent/muscle-targets') {
+    if (method !== 'PUT') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use PUT.');
+    }
+    enforceMuscleTargetsWriteRateLimit(agent);
+    await loadPlanPermission(client, agent);
+    return setMuscleTargets(client, agent, request, await readJsonBody(request));
+  }
+
   if (method === 'POST') {
     const exerciseWrite = exerciseWriteFor(path);
     if (exerciseWrite) {
@@ -2861,8 +2941,8 @@ const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST.'));
+  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PUT') {
+    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET, POST or PUT.'));
   }
 
   const startedAt = performance.now();
