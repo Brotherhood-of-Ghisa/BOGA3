@@ -353,6 +353,8 @@ const listSourcedCardsForBlocksInTransaction = (tx: Transaction, planExerciseIds
         .select({
           id: sessionExercises.id,
           sessionId: sessionExercises.sessionId,
+          sessionStatus: sessions.status,
+          sessionCompletedAt: sessions.completedAt,
           sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
         })
         .from(sessionExercises)
@@ -370,6 +372,8 @@ const listSourcedCardsForBlocksInTransaction = (tx: Transaction, planExerciseIds
         .map((row) => ({
           id: row.id,
           sessionId: row.sessionId,
+          sessionStatus: row.sessionStatus as 'active' | 'completed',
+          sessionCompletedAt: row.sessionCompletedAt,
           // The `inArray` filter above excludes the null link (manual cards).
           sourcePlanExerciseId: row.sourcePlanExerciseId as string,
         }));
@@ -462,7 +466,13 @@ export type SessionPlanStore = {
   }): Promise<boolean>;
   /** Live performed cards claiming any of these blocks (attachment lookup in one query). */
   listSourcedCardsForBlocks(planExerciseIds: string[]): Promise<
-    { id: string; sessionId: string; sourcePlanExerciseId: string }[]
+    {
+      id: string;
+      sessionId: string;
+      sessionStatus: 'active' | 'completed';
+      sessionCompletedAt: Date | null;
+      sourcePlanExerciseId: string;
+    }[]
   >;
   /** Live blocks of the given plans, ordered by plan then block order. */
   listBlocksForPlans(planIds: string[]): Promise<PlanExerciseRow[]>;
@@ -894,14 +904,30 @@ const resolvePlanBlock = async (input: { planExerciseId: string; status: 'comple
 
 
 /** See {@link SessionPlanStore}. */
-const listSourcedCardsForBlocks = async (planExerciseIds: string[]): Promise<{ id: string; sessionId: string; sourcePlanExerciseId: string }[]> => {
-    const database = await bootstrapLocalDataLayer();
-    let cards: { id: string; sessionId: string; sourcePlanExerciseId: string }[] = [];
-    database.transaction((tx) => {
-      cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
-    });
-    return cards;
-  };
+const listSourcedCardsForBlocks = async (
+  planExerciseIds: string[],
+): Promise<
+  {
+    id: string;
+    sessionId: string;
+    sessionStatus: 'active' | 'completed';
+    sessionCompletedAt: Date | null;
+    sourcePlanExerciseId: string;
+  }[]
+> => {
+  const database = await bootstrapLocalDataLayer();
+  let cards: {
+    id: string;
+    sessionId: string;
+    sessionStatus: 'active' | 'completed';
+    sessionCompletedAt: Date | null;
+    sourcePlanExerciseId: string;
+  }[] = [];
+  database.transaction((tx) => {
+    cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
+  });
+  return cards;
+};
 
 
 /** See {@link SessionPlanStore}. */

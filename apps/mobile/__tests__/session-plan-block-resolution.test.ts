@@ -38,6 +38,7 @@ import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data
 import { exerciseDefinitions, sessionPlanExercises } from '@/src/data/schema';
 import {
   addPlanBlockToSession,
+  autoCompletePlanBlocksForSession,
   completePlanBlock,
   planQueries,
   planRepository,
@@ -277,5 +278,44 @@ describe('skipPlanBlock', () => {
     await skipPlanBlock(blockId, T2);
     expect(await skipPlanBlock(blockId, T2)).toEqual({ status: 'not-resolvable' });
     expect(await skipPlanBlock('no-such-block', T2)).toEqual({ status: 'block-not-found' });
+  });
+});
+
+describe('autoCompletePlanBlocksForSession', () => {
+  it('automatically completes pending plan blocks that have confirmed performed work', async () => {
+    const { blockId } = await planWithBlock();
+    const attached = await attachBlock(blockId);
+    await performSets(attached.sessionId, [{ reps: '5', weight: '100' }]);
+
+    const resolved = await autoCompletePlanBlocksForSession(attached.sessionId, T2);
+    expect(resolved).toEqual([blockId]);
+
+    const block = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.id, blockId))
+      .get();
+    expect(block).toMatchObject({ progressStatus: 'completed', resolvedAt: T2 });
+  });
+
+  it('leaves blocks without confirmed performed work pending', async () => {
+    const { blockId } = await planWithBlock();
+    const attached = await attachBlock(blockId);
+    // No sets performed.
+
+    const resolved = await autoCompletePlanBlocksForSession(attached.sessionId, T2);
+    expect(resolved).toEqual([]);
+
+    const block = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.id, blockId))
+      .get();
+    expect(block?.progressStatus).toBe('pending');
+  });
+
+  it('handles unknown sessions gracefully', async () => {
+    const resolved = await autoCompletePlanBlocksForSession('no-such-session', T2);
+    expect(resolved).toEqual([]);
   });
 });

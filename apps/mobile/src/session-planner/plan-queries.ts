@@ -88,11 +88,18 @@ const progressFromCounts = (counts: BlockCounts): PlanProgress => {
   return counts.attached + counts.completed + counts.skipped > 0 ? 'in_progress' : 'planned';
 };
 
+type ClaimingCard = {
+  sessionId: string;
+  sessionExerciseId: string;
+  sessionStatus: 'active' | 'completed';
+  sessionCompletedAt: Date | null;
+};
+
 /** Assembles block views from one pass of rows; `cardsByBlockId` supplies attachment. */
 const toBlockViews = (
   blocks: PlanExerciseRow[],
   sets: PlanSetRow[],
-  cardsByBlockId: Map<string, { sessionId: string; sessionExerciseId: string }>,
+  cardsByBlockId: Map<string, ClaimingCard>,
 ): PlanBlockView[] => {
   const setsByBlockId = sets.reduce<Map<string, PlanSetRow[]>>((acc, row) => {
     const current = acc.get(row.sessionPlanExerciseId) ?? [];
@@ -103,8 +110,13 @@ const toBlockViews = (
 
   return blocks.map((block) => {
     // A consumed block keeps the link to its performed session (contract §5.1);
-    // only a pending block's live claim makes it attached.
+    // a pending block claimed by an active session is attached, while one whose
+    // claiming session is already completed falls back to completed on read.
     const claimingCard = cardsByBlockId.get(block.id) ?? null;
+    let derivedStatus: PlanBlockStatus = block.progressStatus;
+    if (block.progressStatus === 'pending' && claimingCard !== null) {
+      derivedStatus = claimingCard.sessionStatus === 'completed' ? 'completed' : 'attached';
+    }
     return {
       id: block.id,
       planId: block.sessionPlanId,
@@ -112,9 +124,8 @@ const toBlockViews = (
       name: block.name,
       orderIndex: block.orderIndex,
       progressStatus: block.progressStatus,
-      status:
-        block.progressStatus === 'pending' && claimingCard !== null ? 'attached' : block.progressStatus,
-      resolvedAt: block.resolvedAt,
+      status: derivedStatus,
+      resolvedAt: block.resolvedAt ?? (derivedStatus === 'completed' ? claimingCard?.sessionCompletedAt ?? null : null),
       attachedSessionId: claimingCard?.sessionId ?? null,
       attachedSessionExerciseId: claimingCard?.sessionExerciseId ?? null,
       targets: (setsByBlockId.get(block.id) ?? []).map((set) => ({
@@ -155,8 +166,16 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
       store.listSetsForBlocks(blockIds),
       store.listSourcedCardsForBlocks(blockIds),
     ]);
-    const cardsByBlockId = new Map(
-      cards.map((card) => [card.sourcePlanExerciseId, { sessionId: card.sessionId, sessionExerciseId: card.id }]),
+    const cardsByBlockId = new Map<string, ClaimingCard>(
+      cards.map((card) => [
+        card.sourcePlanExerciseId,
+        {
+          sessionId: card.sessionId,
+          sessionExerciseId: card.id,
+          sessionStatus: card.sessionStatus,
+          sessionCompletedAt: card.sessionCompletedAt,
+        },
+      ]),
     );
     const views = toBlockViews(blocks, sets, cardsByBlockId);
     const byPlanId = new Map<string, PlanBlockView[]>();

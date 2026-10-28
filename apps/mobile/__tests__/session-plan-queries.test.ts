@@ -199,6 +199,50 @@ describe('plan detail with block consumption state', () => {
     const resolvedDetail = await planQueries.loadPlanDetail(created.id);
     expect(resolvedDetail?.progress).toBe('completed');
   });
+
+  it('falls back to completed on read when a claiming session is completed', async () => {
+    const created = await planRepository.createPlan(
+      planDraft('Legacy Done', {
+        exercises: [exercise('Squat'), exercise('Bench', { exerciseDefinitionId: 'def-bench' })],
+      }),
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const ids = await blockIdsByPlan(created.id);
+    db()
+      .insert(sessions)
+      .values({ id: 'sess-completed', startedAt: T0, completedAt: T1, status: 'completed' })
+      .run();
+    db()
+      .insert(sessionExercises)
+      .values([
+        {
+          id: 'card-1',
+          sessionId: 'sess-completed',
+          exerciseDefinitionId: 'def-squat',
+          orderIndex: 0,
+          name: 'Back Squat',
+          sourcePlanExerciseId: ids[0],
+        },
+        {
+          id: 'card-2',
+          sessionId: 'sess-completed',
+          exerciseDefinitionId: 'def-bench',
+          orderIndex: 1,
+          name: 'Bench Press',
+          sourcePlanExerciseId: ids[1],
+        },
+      ])
+      .run();
+
+    // In the database, both blocks still have stored progressStatus = 'pending'.
+    const detail = await planQueries.loadPlanDetail(created.id);
+    expect(detail).not.toBeNull();
+    expect(detail?.progress).toBe('completed');
+    expect(detail?.blockCounts).toEqual({ pending: 0, attached: 0, completed: 2, skipped: 0 });
+    expect(detail?.blocks.map((b) => b.status)).toEqual(['completed', 'completed']);
+    expect(detail?.blocks[0].resolvedAt).toEqual(T1);
+  });
 });
 
 describe('programme progress and next block', () => {

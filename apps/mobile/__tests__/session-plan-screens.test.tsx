@@ -55,6 +55,7 @@ import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
 import { planRepository, savePlanEdits, startSessionPlan } from '@/src/session-planner';
 import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/plan-form-model';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
+import { completeActiveSession, loadActiveSessionGraph } from '@/src/session-recorder/session-lifecycle';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
 import { parseSessionDateTime } from '@/src/utils/local-time';
@@ -698,6 +699,33 @@ describe('recorder: complete block on a sourced card', () => {
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     await screen.findByTestId('exercise-options-sheet');
     expect(screen.queryByTestId('exercise-options-complete-block')).toBeNull();
+  });
+
+  it('finishing an active session automatically completes eligible plan blocks', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    const cardId = await startFromPlan(planId);
+    const sessionId = await determineSessionId();
+
+    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
+    await screen.findByTestId('exercise-page');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '100');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+
+    // Complete the session through the session lifecycle path
+    const activeGraph = await loadActiveSessionGraph(sessionId);
+    await completeActiveSession({
+      sessionId,
+      gymId: null,
+      startedAt: activeGraph!.startedAt,
+      completedHistorySession: activeGraph!.session,
+    });
+
+    const detail = await planQueries.loadPlanDetail(planId);
+    expect(detail?.progress).toBe('completed');
+    expect(detail?.blocks[0].status).toBe('completed');
+    expect(detail?.blockCounts).toEqual({ pending: 0, attached: 0, completed: 1, skipped: 0 });
   });
 });
 

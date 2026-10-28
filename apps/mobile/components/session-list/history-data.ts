@@ -6,6 +6,7 @@ import {
   persistSessionDraftSnapshot,
   setSessionDeletedState,
 } from '@/src/data';
+import { autoCompletePlanBlocksForSession } from '@/src/session-planner';
 import { logEvent } from '@/src/logging';
 import {
   createDrizzleProgressSummaryStore,
@@ -104,6 +105,7 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
   },
   async completeActiveSession(sessionId) {
     await completeSessionDraft(sessionId);
+    await autoCompletePlanBlocksForSession(sessionId);
   },
   async discardActiveSession(sessionId) {
     await setSessionDeletedState(sessionId, true);
