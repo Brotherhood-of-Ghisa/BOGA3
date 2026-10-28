@@ -78,7 +78,11 @@ export const readMuscleTargetSettings = async (
     .get() ?? null;
 };
 
-/** A device edit: the four values are written together and pushed as one LWW row. */
+/**
+ * A device edit: the four values are written together and pushed as one LWW
+ * row. Unlike the read, neither write checks the store's owner: like every
+ * local write, one landing before the cycle's ownership wipe goes with it.
+ */
 export const writeMuscleTargetSettings = async (values: MuscleTargetSettingsWrite): Promise<void> => {
   const db = await bootstrapLocalDataLayer();
   const now = new Date();

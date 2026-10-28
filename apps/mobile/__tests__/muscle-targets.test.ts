@@ -58,6 +58,19 @@ it('reads the kv target until the settings row holds one, and restores the row a
   expect(values().muscleTargetOverrides).toEqual(overrides);
 });
 
+it('keeps the stored targets when a synced field changes before the settings row has loaded', async () => {
+  await userSettingsData.writeMuscleTargetSettings({ weeklyWorkingSetTarget: 12, muscleTargetMode: 'per_muscle',
+    muscleTargetOverrides: '{"broad":{"chest":16}}', countSecondaryMuscles: true });
+  // No await: the edit lands while the row is still being read.
+  setAccountLocalPreferenceAccount('A', true);
+  setAccountLocalPreferences({ progressCountSecondary: false });
+  await drainAccountLocalSyncedWrites();
+  expect(await userSettingsData.readMuscleTargetSettings('A')).toEqual({ weeklyWorkingSetTarget: 12,
+    muscleTargetMode: 'per_muscle', muscleTargetOverrides: '{"broad":{"chest":16}}', countSecondaryMuscles: false });
+  expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetMode: 'per-muscle',
+    muscleTargetOverrides: { broad: { chest: 16 } }, progressCountSecondary: false });
+});
+
 it('inherits the live default, ignores overrides in Single, and resets only one muscle', () => {
   const overrides = { detailed: { chest: 12, hidden: 6 }, broad: { chest: 16 } };
   const preferences = { ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, muscleTargetMode: 'per-muscle' as const, muscleTargetOverrides: overrides };

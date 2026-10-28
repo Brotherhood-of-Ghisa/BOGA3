@@ -168,7 +168,7 @@ export function setAccountLocalPreferences(patch: Partial<AccountLocalPreference
   const syncedPatch = usesSyncedRow(activeProfile) ? pickSyncedPreferences(pending) : {};
   for (const field of Object.keys(syncedPatch) as (keyof SyncedPreferences)[]) delete pending[field];
   writeKvPreferences(activeProfile, pending);
-  writeSyncedPreferences(activeProfile, syncedPatch);
+  if (usesSyncedRow(activeProfile)) writeSyncedPreferences(activeProfile, syncedPatch);
 }
 
 function writeKvPreferences(activeProfile: PreferenceProfile, pending: Partial<AccountLocalPreferences>): void {
@@ -198,23 +198,28 @@ const syncedView = (activeProfile: PreferenceProfile): AccountLocalPreferences =
 
 /**
  * Publishes the synced fields at once and writes all four to the settings row,
- * which the next sync pushes. A failed write restores the previous values and
- * keeps the patch pending for retry.
+ * which the next sync pushes. The fields the patch leaves out come from the
+ * stored row, not from memory, which may not hold the row yet. A failed write
+ * restores the previous values and keeps the patch pending for retry.
  */
-function writeSyncedPreferences(activeProfile: PreferenceProfile, patch: Partial<SyncedPreferences>): void {
+function writeSyncedPreferences(activeProfile: `account:${string}`, patch: Partial<SyncedPreferences>): void {
   if (Object.keys(patch).length === 0) return;
   const previous = synced;
-  const next = { ...pickSyncedPreferences(state.values), ...patch };
-  synced = next;
+  const optimistic = { ...pickSyncedPreferences(state.values), ...patch };
+  synced = optimistic;
   syncedVersion += 1;
   const version = syncedVersion;
   publish({ values: withSynced(state.values) });
   syncedWrites = syncedWrites.then(async () => {
     try {
-      await requireSyncedStore().write(storedFromSyncedPreferences(next));
+      const store = requireSyncedStore();
+      const stored = syncedPreferencesFromStored(await store.read(activeProfile.slice('account:'.length)));
+      const next = { ...optimistic, ...stored, ...patch };
+      await store.write(storedFromSyncedPreferences(next));
       if (version !== syncedVersion) return;
+      synced = next;
       saveError = null;
-      publish({ error: currentError() });
+      publish({ values: syncedView(activeProfile), error: currentError() });
     } catch {
       if (version !== syncedVersion) return;
       synced = previous;
@@ -239,7 +244,14 @@ export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
   try { stored = await requireSyncedStore().read(activeProfile.slice('account:'.length)); }
   catch { return; }
   if (capturedGeneration !== generation || version !== syncedVersion) return;
-  synced = syncedPreferencesFromStored(stored);
+  const next = syncedPreferencesFromStored(stored);
+  // Keep the same overrides object when unchanged, so an unrelated settings
+  // pull does not republish every preference.
+  if (next.muscleTargetOverrides && synced.muscleTargetOverrides
+    && JSON.stringify(next.muscleTargetOverrides) === JSON.stringify(synced.muscleTargetOverrides)) {
+    next.muscleTargetOverrides = synced.muscleTargetOverrides;
+  }
+  synced = next;
   syncedLoaded = true;
   publish({ values: syncedView(activeProfile) });
 }
