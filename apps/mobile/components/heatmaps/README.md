@@ -9,7 +9,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
-| `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
+| `HeatmapLegend.tsx` | The percentage reference and 0%…100% ramp above each chart. |
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → the columns and where each month label sits; `weekLabel` → a week's name on screen. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with the focused week between its previous / next arrows, y axis, month axis, the focused column in `ink` on a `ruleSoft` band; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`, a column wide enough to tap; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection and is told which week is focused (`FocusedTimelineWeek`), for the page's ⋮. |
@@ -39,17 +39,17 @@ Muscle history offers per-side, role-weighted `totalVolume`, and
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
 raw entered kg, and every exercise uses the same labels.
 
-**Exercise metrics and Volume buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
-smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
+**Exercise metrics and Volume buckets** follow [[comparison.colour-scale]]
+(`getCalendarHeatmapBucket`); zero or an empty scale is bucket 0.
 `hasTraining` distinguishes a known zero from rest in tiles and accessibility;
 `unavailable` marks a figure that cannot be shown (a Volume sum that is not
 finite) instead of treating it as zero.
 Exercise history also carries all-time session-fact PR counts into the selected
 metric's cells; muscle history carries none.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
-against one shared weekly target, capped before group averaging and including
+against effective targets ([[muscle.weekly-targets]]), capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
-the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
+the legend then reads `% of target`, `0%` to `100%`, and accessible labels
 report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
@@ -63,7 +63,7 @@ Daily retains a neutral dashed rule.
 ## Props & opening
 
 A day or week with training opens its sessions: the host passes the openers
-and routes; a rest day or week stays text.
+and routes; rest cells in Daily stay text.
 
 ```tsx
 <DailyHeatmap
@@ -71,7 +71,6 @@ and routes; a rest day or week stays text.
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap", "<prefix>-heatmap-cell-<dateKey>"
   metricLabel="Volume"                  // tile accessibility
   formatValue={(v) => String(v)}
-  legendLabel="Volume per day"
   onOpenDay={onOpenDay}                 // (day: DayCell) => void; day.sessionIds names its sessions
   onOpenWeek={onOpenWeek}               // (weekStartDateKey) => void; the Week tiles
 />
@@ -88,14 +87,19 @@ and routes; a rest day or week stays text.
 ```
 
 - **Daily** owns its calendar framing. `daily-calendar.ts` builds
-  the month/row framing without changing adapter values or colours. Tiles have no
+  the month/row framing without changing adapter values or colours. Months without
+  training retain only their heading; occupancy includes adjacent-month days
+  in their Monday-owned rows, including zero/unavailable training. Tiles have no
   selection or black outlines. Figure visibility follows
   [[copy.blank-history]]. Missing/future positions are empty spacers without
   accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
   the eight tile columns shrink independently of the outside date gutter.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
-  follows [[copy.blank-history]]. Rest/current semantics remain accessible.
+  follows [[copy.blank-history]]. Occupied Monday-owned months retain all weeks; empty months collapse to one labelled, non-interactive placeholder, except the current week always remains visible with an unfilled track until activity. Zero/unavailable training keeps a month expanded; the current week is announced accessibly.
+  Two-line dates sit left of each bar: the complete range, then a smaller muted
+  year. Collapsed months use the same month/year treatment. All weeks share
+  one compact row height, including the annotated current week. Headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -120,7 +124,7 @@ short windows have no implicit 52-week minimum.
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
 - **No black outlines:** current tiles/bars have no black border.
-  Current-week wording remains beside its row.
+  Current-week wording is accessible only.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history page mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
@@ -131,18 +135,14 @@ short windows have no implicit 52-week minimum.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- Weekly numeric annotations label the references when present, using `formatReferenceValue`; otherwise they label the scale.
-  They centre on their ticks using measured text and plot widths; edge labels
-  stay inside the plot. On overlap the middle label wins, then the lower, then
-  the upper. A label wider than the plot is ellipsized; full formatted values
-  stay on accessible ticks. Labels remeasure on metric changes; ticks and
-  references retain exact coordinates even if text is hidden.
-- Weekly references use discrete vertical dashes on the same scale
-  as the bars. Accessible values use whole
-  Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
-  retain the selected metric format. Axis marks announce the saved window, each
-  reference and value accessibly, including coincident references; no visible
-  label stack is drawn. References and displayed weeks use the same look-back.
+- Weekly percentile names and formatted values belong only to the current
+  week's bar; older rows carry no reference rules. `formatReferenceValue`
+  formats them. Before the history minimum, a numeric scale stays above the list.
+  Median label/value midpoints follow its exact tick, including at plot edges;
+  other labels stay within the measured plot;
+  collisions favour Median, then P25, then P75. Full reference names, values
+  and the saved window remain in the current row's accessible description,
+  including coincident ticks. Sets retains only its median.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
-  subtitles and reference-name captions are omitted. Selected metric controls
+  subtitles are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.

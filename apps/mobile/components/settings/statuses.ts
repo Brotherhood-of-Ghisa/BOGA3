@@ -17,10 +17,7 @@ export const progressStatus = (values: AccountLocalPreferences): string =>
 
 // The experiments turned on, by their Settings names, or `Off`.
 export const experimentsStatus = (values: AccountLocalPreferences): string =>
-  [
-    values.todayLayout === 'cards' ? 'Today cards' : null,
-    values.timerInTitleBar ? 'Title-bar timer' : null,
-  ].filter(Boolean).join(' · ') || 'Off';
+  [values.timerInTitleBar ? 'Title-bar timer' : null].filter(Boolean).join(' · ') || 'Off';
 
 const sameChoices = (a: readonly EffortChoice[], b: readonly EffortChoice[]) =>
   a.length === b.length && a.every((choice) => b.includes(choice));

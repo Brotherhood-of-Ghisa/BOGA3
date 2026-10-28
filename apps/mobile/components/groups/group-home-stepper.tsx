@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { todayText } from '@/components/today/text-styles';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import type { GroupHomePeriod } from '@/src/groups/home-periods';
 
 import type { GroupHomePeriodLabel } from './group-home-labels';
@@ -34,10 +34,10 @@ export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: Grou
         tone="muted"
       />
       <View style={styles.stepperLabel}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.periodTitle} testID="group-home-period-title">
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="group-home-period-title">
           {label.title}
         </Text>
-        <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint]} testID="group-home-period-detail">
+        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID="group-home-period-detail">
           {label.detail}
         </Text>
       </View>
@@ -66,12 +66,5 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  periodTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });

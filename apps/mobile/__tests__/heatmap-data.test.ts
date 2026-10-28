@@ -15,32 +15,21 @@ const source = (over: Partial<HeatmapMetricSource> = {}): HeatmapMetricSource =>
 });
 
 describe('getCalendarHeatmapBucket', () => {
-  it('normalizes across the observed [min, max] range onto buckets 1..4', () => {
-    // observed range 10..110 (span 100): lowest logged value is light, highest is dark.
-    expect(getCalendarHeatmapBucket(10, 10, 110)).toBe(1); // the min itself → light green
-    expect(getCalendarHeatmapBucket(35, 10, 110)).toBe(1); // ratio 0.25
-    expect(getCalendarHeatmapBucket(60, 10, 110)).toBe(2); // ratio 0.50
-    expect(getCalendarHeatmapBucket(85, 10, 110)).toBe(3); // ratio 0.75
-    expect(getCalendarHeatmapBucket(110, 10, 110)).toBe(4); // ratio 1.00
-  });
+  it.each([[0, 0], [20, 1], [25, 1], [50, 2], [75, 3], [80, 4], [100, 4], [120, 4]])(
+    'grades %i as its share of a 100 maximum (bucket %i)', (value, bucket) => {
+      expect(getCalendarHeatmapBucket(value, 100)).toBe(bucket);
+    }
+  );
 
-  it('spreads a high-floor range (e.g. top weight 80..100) across the ramp', () => {
-    // Previously every one of these landed in bucket 4 (all dark green).
-    expect(getCalendarHeatmapBucket(80, 80, 100)).toBe(1); // lightest session
-    expect(getCalendarHeatmapBucket(85, 80, 100)).toBe(1);
-    expect(getCalendarHeatmapBucket(90, 80, 100)).toBe(2);
-    expect(getCalendarHeatmapBucket(95, 80, 100)).toBe(3);
-    expect(getCalendarHeatmapBucket(100, 80, 100)).toBe(4);
-  });
+  it.each([[0, 0], [5, 0], [-1, 100], [NaN, 100], [Infinity, 100], [10, Infinity]])(
+    'keeps invalid or empty scales neutral (%s / %s)', (value, maximum) => {
+      expect(getCalendarHeatmapBucket(value, maximum)).toBe(0);
+    }
+  );
 
-  it('returns 0 (rest) when the value is non-positive or there is no activity', () => {
-    expect(getCalendarHeatmapBucket(0, 0, 0)).toBe(0);
-    expect(getCalendarHeatmapBucket(5, 0, 0)).toBe(0);
-    expect(getCalendarHeatmapBucket(0, 80, 100)).toBe(0);
-  });
-
-  it('maps any activity to the top bucket when the range collapses (all equal)', () => {
-    expect(getCalendarHeatmapBucket(90, 90, 90)).toBe(4);
+  it('grades a sole positive value as 100% and retains high-floor values near the maximum', () => {
+    expect(getCalendarHeatmapBucket(90, 90)).toBe(4);
+    expect(getCalendarHeatmapBucket(80, 100)).toBe(4);
   });
 });
 
@@ -62,6 +51,38 @@ describe('getMetricValue', () => {
 describe('buildHeatmapData', () => {
   // 2026-06-05 is a Friday; Monday of its week is 2026-06-01.
   const TODAY = '2026-06-05';
+
+  it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
+    'uses only History daily/weekly %s values, recomputing when the look-back changes', metric => {
+      const days = [
+        ['2026-05-13', 1000], ['2026-05-27', 100], ['2026-05-28', 100], ['2026-06-03', 20],
+      ].map(([dateKey, value]) => ({ dateKey: String(dateKey), ...source({
+        totalVolume: Number(value), workingSetCount: Number(value), estimatedRM1: Number(value), highestWeight: Number(value),
+      }) }));
+      const short = buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks: 1 });
+      expect(short.daily.find(day => day.dateKey === '2026-06-03')).toMatchObject({ value: 20, level: 1 });
+      expect(short.daily.find(day => day.dateKey === '2026-05-27')).toMatchObject({ value: 100, level: 4 });
+      const additive = metric === 'totalVolume' || metric === 'workingSetCount';
+      expect(short.weekly.find(week => week.weekStartDateKey === '2026-05-25')).toMatchObject({ value: additive ? 200 : 100, level: 4 });
+      expect(short.weekly.find(week => week.weekStartDateKey === '2026-06-01')).toMatchObject({ value: 20, level: 1 });
+      const long = buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks: 4 });
+      expect(long.daily.find(day => day.dateKey === '2026-05-27')).toMatchObject({ value: 100, level: 1 });
+      expect(long.weekly.find(week => week.weekStartDateKey === '2026-05-25')).toMatchObject({ value: additive ? 200 : 100, level: 1 });
+    }
+  );
+
+  it('uses weekly sums rather than the daily maximum to grade weeks', () => {
+    const days = [['2026-05-27', 40], ['2026-05-28', 40], ['2026-06-03', 20]]
+      .map(([dateKey, value]) => ({ dateKey: String(dateKey), ...source({ totalVolume: Number(value) }) }));
+    const data = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.daily.find(day => day.dateKey === '2026-06-03')?.level).toBe(2);
+    expect(data.weekly.find(week => week.weekStartDateKey === '2026-06-01')?.level).toBe(1);
+  });
+
+  it.each([{ days: [] }, { days: [{ dateKey: TODAY, ...source() }] }])('keeps empty/all-zero windows neutral ($days)', ({ days }) => {
+    const data = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
+    expect([...data.daily, ...data.weekly].every(cell => cell.value === 0 && cell.level === 0)).toBe(true);
+  });
 
   it.each(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'])
   ('keeps four complete weeks, unique calendar dates and the ongoing row at %s', todayDateKey => {
@@ -103,6 +124,9 @@ describe('buildHeatmapData', () => {
       muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4 } });
     expect(group.weekly.at(-1)).toMatchObject({ value: 8, level: 2, targetAttainment: .5 });
     expect(group.targetGrading).toEqual({ averaged: true });
+    const individual = buildHeatmapData(days, 'workingSetCount', { todayDateKey: TODAY, weeks: 4,
+      muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4, weeklyTargets: { quads: 16 } } });
+    expect(individual.weekly.at(-1)).toMatchObject({ value: 8, level: 1, targetAttainment: .25 });
     const volume = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 4,
       muscleTargets: { muscleIds: ['quads'], weeklyTarget: 1000 } });
     expect(volume.targetGrading).toBeUndefined();
@@ -126,15 +150,15 @@ describe('buildHeatmapData', () => {
     });
   });
 
-  it('sums additive metrics across the week and buckets across the observed daily range', () => {
+  it('sums additive metrics across the week and grades daily values from zero', () => {
     const data = buildHeatmapData(daily, 'totalVolume', { todayDateKey: TODAY });
     const wed = data.daily.find((d) => d.dateKey === '2026-06-03')!;
     const thu = data.daily.find((d) => d.dateKey === '2026-06-04')!;
     expect(wed.value).toBe(100);
     expect(thu.value).toBe(300);
-    // Observed daily range is [100, 300]: the min (wed) is light, the max (thu) is dark.
-    expect(thu.level).toBe(4); // (300-100)/(300-100) = 1
-    expect(wed.level).toBe(1); // (100-100)/(300-100) = 0
+    // 100 is one third of the daily maximum, so it is in the second bucket.
+    expect(thu.level).toBe(4);
+    expect(wed.level).toBe(2);
 
     const currentWeek = data.weekly.find((w) => w.weekStartDateKey === '2026-06-01')!;
     expect(currentWeek.value).toBe(400); // 100 + 300

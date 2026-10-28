@@ -1,0 +1,31 @@
+name: Daily development log
+
+on:
+  schedule:
+    - cron: '30 7 * * *'
+      timezone: Europe/London
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  discussions: write
+
+concurrency:
+  group: daily-development-log
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { publish } = require('./scripts/publish-daily-development-log.cjs');
+            await publish({ github, context, core });

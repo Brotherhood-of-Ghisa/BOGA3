@@ -6,7 +6,8 @@ import { GymScopeChoices, offersGymChoice } from '@/components/gyms/gym-picker';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SwitchRow } from '@/components/ui/switch-row';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { gymScopeLabel, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
 /** `opening` is the value the view opened on (Settings' default); on when absent. */
@@ -80,7 +81,7 @@ export function ProgressFilters({ grouping, secondary, gym, testID }: ProgressFi
           {secondary ? <SwitchRow label="Count secondary sets" onValueChange={secondary.onChange}
             testID="stats-secondary-toggle" value={secondary.value} /> : null}
           {offeredGym ? <>
-            <Text accessibilityRole="header" allowFontScaling={false} style={styles.sectionLabel}>Gym</Text>
+            <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, styles.sectionLabel]}>Gym</Text>
             <GymScopeChoices allSessionCount={offeredGym.allSessionCount} onChoose={offeredGym.onChange} options={offeredGym.options}
               testID="stats-gym" value={offeredGym.value} />
           </> : null}
@@ -96,12 +97,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
 });

@@ -1,6 +1,6 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { ListRow, Sheet, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ListRow, Sheet, uiSpace, uiText, uiTextTone } from '@/components/ui';
 
 export type GroupActionSheetItem<TKey extends string> = {
   key: TKey;
@@ -43,7 +43,7 @@ export function GroupActionSheet<TKey extends string>({
   return (
     <Sheet dismissLabel={dismissLabel} onDismiss={onClose} testID={`${testIDPrefix}-sheet`} title={title} visible={visible}>
       {subtitle ? (
-        <Text allowFontScaling={false} style={styles.subtitle}>
+        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.subtitle]}>
           {subtitle}
         </Text>
       ) : null}
@@ -66,10 +66,5 @@ const styles = StyleSheet.create({
     marginTop: -uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

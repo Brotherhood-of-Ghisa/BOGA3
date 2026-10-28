@@ -23,7 +23,7 @@ tutorials or rule provenance (`Rules N · …`).
 - **Incomplete figures:** plain `Volume`, even when excluding uncalculable
   loads or kg a group cannot see.
 - **Bad:** `Sets = primary + ½ secondary` under Sets by muscle.
-- **Good:** `Weekly target` ramp: `0%`…`100%`.
+- **Good:** `% of target` ramp: `0%`…`100%` ([[comparison.colour-scale]]).
 
 ### copy.blank-history · presentation · accepted
 
@@ -39,6 +39,8 @@ Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/componen
 While kg is the sole weight unit, visible/spoken labels omit kg/kilograms,
 including compound volume units. Retain `per side`, `%BW`, `%BW·reps`. Stored
 values, wire units and coaching/import payloads stay unchanged.
+Shared group-session cards may use `(% BW)` once in the exercise heading
+instead of visible per-set units; spoken units remain complete.
 
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
 
@@ -48,4 +50,12 @@ Complete dates displayed, spoken or edited use Date format, including ranges
 and shared images, preserving device-local days and stored instants. Month/day
 headings, relative and time-only labels keep their roles.
 
-Code: `apps/mobile/src/utils/local-time.ts`.
+Calendar-week headings use a named month and shared day range in the selected
+order, with only the end date's year even across New Year; accessibility retains
+complete numeric dates.
+
+- **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
+  whatever the setting. A range takes one dash and the year once, at its end:
+  `12 – 18 Oct 26`, `26 Oct – 1 Nov 26`; across years both ends carry it.
+
+Code: `apps/mobile/src/utils/local-time.ts` (Today: `formatCompactDate`, `formatCompactDateRange`).

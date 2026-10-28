@@ -4,7 +4,7 @@
 // search behind "Add exercise". The server stays the authority on who may
 // write; these rules only decide what the UI offers.
 
-import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
 import {
@@ -173,7 +173,7 @@ export type StandardExerciseOption = {
 
 export const STANDARD_EXERCISE_RESULT_LIMIT = 30;
 
-const STANDARD_EXERCISES: StandardExerciseOption[] = SYSTEM_EXERCISE_DEFINITION_SEEDS.map((seed) => ({
+const STANDARD_EXERCISES: StandardExerciseOption[] = STANDARD_EXERCISE_DEFINITION_SEEDS.map((seed) => ({
   sourceExerciseId: seed.id,
   name: seed.name,
   loadInputMode: seed.loadInputMode,

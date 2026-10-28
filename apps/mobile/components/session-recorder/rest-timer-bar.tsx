@@ -4,7 +4,9 @@ import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   REPEATING_TIMER_STEP_SEC,
   REST_TIMER_STEP_SEC,
@@ -158,7 +160,7 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
   const isPaused = isRepeating && view.isPaused;
   const isPreparing = isRepeating && view.round === 0;
   const phase = isRepeating ? (isPreparing ? 'Get ready' : `Round ${view.round}`) : 'Rest';
-  const statusLabel = isCompleted ? 'Rest complete' : `${phase}${isPaused ? ' · PAUSED' : ''}`;
+  const statusLabel = isCompleted ? 'Rest complete' : phase;
   const accessiblePhase = isPreparing ? 'preparation' : phase.toLowerCase();
   // Repeating's View owns its changing label because iOS Text caches labels for repeated digits.
   const countdownLabel = isRepeating
@@ -179,16 +181,16 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
       />
       <Text
         allowFontScaling={false}
-        style={[styles.statusLabel, isCompleted ? styles.statusCompleted : null]}
+        style={[uiText.label, isCompleted ? uiTextTone.ink : null]}
         testID={isRepeating ? 'repeating-timer-round' : 'rest-timer-status'}>
-        {statusLabel}
+        <FigureText>{statusLabel}</FigureText>
       </Text>
       <Text
         accessible={isRepeating ? false : undefined}
         allowFontScaling={false}
         accessibilityLabel={isRepeating ? undefined : countdownLabel}
         accessibilityLiveRegion={isRepeating ? 'none' : 'polite'}
-        style={styles.countdown}
+        style={uiText.figureLarge}
         testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
         {view.formatted}
       </Text>
@@ -229,26 +231,6 @@ const styles = StyleSheet.create({
   repeatingActionRow: {
     flexDirection: 'column',
     alignItems: 'stretch',
-  },
-  statusLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  statusCompleted: {
-    color: uiRoles.ink,
-  },
-  countdown: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-    fontVariant: ['tabular-nums'],
   },
   controls: {
     flexDirection: 'row',

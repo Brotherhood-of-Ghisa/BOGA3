@@ -6,6 +6,8 @@
 
 import {
   CHART_RIGHT_GUTTER,
+  formatBestSet,
+  formatRecordCount,
   formatSessionSummaryFigures,
   formatPeriodDayLabel,
   formatPeriodRange,
@@ -20,7 +22,7 @@ import {
   periodDayAtX,
   periodDayFigures,
   periodFiguresAccessibilityLabel,
-  todayLabelAnchor,
+  todaySessionAccessibilityLabel,
   toPolyline,
   weekShare,
 } from '@/components/today/progress-format';
@@ -37,6 +39,7 @@ const counts = (workingSets: number, sessions = 0, prs = 0): ProgressCounts => (
 const period = (overrides: {
   now: Date;
   weeks?: number;
+  compareBack?: number;
   cumulative: number[];
   previousCumulative?: number[];
   projected?: number;
@@ -44,19 +47,20 @@ const period = (overrides: {
   toSameDay?: ProgressCounts;
   total?: ProgressCounts;
 }): TodayProgressPeriod => {
-  const { now, weeks = 4 } = overrides;
+  const { now, weeks = 4, compareBack = 1 } = overrides;
   const last = (values: number[]) => values[values.length - 1] ?? 0;
   const previousCumulative = overrides.previousCumulative ?? [];
   return {
     window: localPeriodWindow(now, weeks),
     weeks,
+    compareBack,
     dayOfPeriod: overrides.cumulative.length,
     daysInPeriod: weeks * 7,
     cumulativeWorkingSets: overrides.cumulative,
     toDate: overrides.toDate ?? counts(last(overrides.cumulative)),
     projectedWorkingSets: overrides.projected ?? 0,
     previous: {
-      window: localPeriodWindow(now, weeks, -1),
+      window: localPeriodWindow(now, weeks, -compareBack),
       cumulativeWorkingSets: previousCumulative,
       toSameDay: overrides.toSameDay ?? counts(0),
       total: overrides.total ?? counts(last(previousCumulative)),
@@ -77,6 +81,7 @@ const latest = (overrides: Partial<LatestSessionSummary> = {}): LatestSessionSum
   workingSets: 12,
   exerciseCount: 4,
   records: [BENCH_1RM, BENCH_WEIGHT],
+  exercises: [],
   ...overrides,
 });
 
@@ -126,7 +131,7 @@ describe('the period against the previous period', () => {
       previousWorkingSets: 98,
       difference: 4,
     });
-    expect(formatPeriodDayLabel(periodDayFigures(october, null), 'DD-MM-YYYY')).toBe('Today');
+    expect(formatPeriodDayLabel(periodDayFigures(october, null))).toBe('Today');
   });
 
   it('gives a selected past day its counts, and a later day the projection at the same rate', () => {
@@ -139,12 +144,14 @@ describe('the period against the previous period', () => {
 
     const past = periodDayFigures(october, 4);
     expect(past).toMatchObject({ when: 'past', workingSets: 10, previousWorkingSets: 12, difference: -2 });
-    expect(formatPeriodDayLabel(past, 'MM-DD-YYYY')).toBe('Oct 9');
+    expect(formatPeriodDayLabel(past)).toBe('9 Oct 26');
 
     // 38 sets over 19 days: 2 a day, reaching the projection on the last day.
     const projected = periodDayFigures(october, 21);
     expect(projected).toMatchObject({ when: 'projected', workingSets: 44, previousWorkingSets: 63, difference: -19 });
-    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY')).toBe('26 Oct (projected)');
+    // Shown as its date alone; spoken, it says it is projected.
+    expect(formatPeriodDayLabel(projected)).toBe('26 Oct 26');
+    expect(formatPeriodDayLabel(projected, { spoken: true })).toBe('26 Oct 26 (projected)');
     expect(periodDayFigures(october, 27).workingSets).toBe(october.projectedWorkingSets);
 
     // A selection outside the period stays on its edge.
@@ -152,10 +159,11 @@ describe('the period against the previous period', () => {
     expect(periodDayFigures(october, 40).dayIndex).toBe(27);
   });
 
-  it('names both periods by month and day, Monday to Sunday, without the year', () => {
+  it("names both periods Monday to Sunday in Today's format, the year once at the end", () => {
     const october = period({ now, cumulative: days(19, () => 0) });
-    expect(formatPeriodRange(october.window, 'YYYY-MM-DD')).toBe('Oct 5 to Nov 1');
-    expect(formatPeriodRange(october.previous.window, 'DD-MM-YYYY')).toBe('7 Sep to 4 Oct');
+    expect(formatPeriodRange(october.window)).toBe('5 Oct – 1 Nov 26');
+    expect(formatPeriodRange(october.previous.window)).toBe('7 Sep – 4 Oct 26');
+    expect(formatPeriodRange(localWeekWindow(local(2026, 10, 16)))).toBe('12 – 18 Oct 26');
     expect(formatDayMonth(local(2026, 12, 28), 'MM-DD-YYYY')).toBe('Dec 28');
     expect(formatDayMonth(new Date(Number.NaN), 'DD-MM-YYYY')).toBe('—');
     expect(formatWeekRange(october.window, 'DD-MM-YYYY')).toBe('05-10-2026 – 01-11-2026');
@@ -163,10 +171,20 @@ describe('the period against the previous period', () => {
 
   it('speaks both periods with the selected day as one heading', () => {
     const october = period({ now, cumulative: days(19, () => 18), toSameDay: counts(6) });
-    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'YYYY-MM-DD')).toBe(
-      '4-week period, Oct 5 to Nov 1: Today 18 sets, against the last period, Sep 7 to Oct 4: 6 sets by Sep 25, +12',
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null))).toBe(
+      '4-week period, 5 Oct – 1 Nov 26: Today 18 sets, against the last period, 7 Sep – 4 Oct 26: 6 sets by 25 Sep 26, +12',
     );
-    expect(periodChartAccessibilityValue(periodDayFigures(october, null), 'YYYY-MM-DD')).toBe('Today: 18 sets, last period 6');
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null))).toBe('Today: 18 sets, last period 6');
+  });
+
+  it('speaks an earlier compared period by how far back it is', () => {
+    const october = period({ now, compareBack: 3, cumulative: days(19, () => 18), toSameDay: counts(6), total: counts(9) });
+    expect(formatPeriodRange(october.previous.window)).toBe('13 Jul – 9 Aug 26');
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null))).toBe(
+      '4-week period, 5 Oct – 1 Nov 26: Today 18 sets, against the period 3 back, 13 Jul – 9 Aug 26: 6 sets by 31 Jul 26, +12',
+    );
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null))).toBe('Today: 18 sets, period 3 back 6');
+    expect(periodChartAccessibilityLabel(october)).toContain('against the period 3 back 6 by day 19; the period 3 back finished at 9.');
   });
 
   it('speaks the chart as one sentence', () => {
@@ -195,6 +213,8 @@ describe('the period chart geometry', () => {
     );
 
     expect(geometry.plot.width).toBe(plotWidth);
+    // The compared period never changes the plot's width: its line carries no label.
+    expect(periodChartGeometry(period({ now, compareBack: 2, cumulative: days(19, () => 0) }), width).plot.width).toBe(plotWidth);
     expect(geometry.current).toHaveLength(19);
     expect(geometry.current[0].x).toBe(0);
     expect(geometry.previous[27].x).toBeCloseTo(plotWidth);
@@ -220,12 +240,12 @@ describe('the period chart geometry', () => {
     expect(geometry.previous[6].x).toBeCloseTo(plotWidth);
   });
 
-  it('fits the plot to a given height, keeping the axis room under it (the cards layout)', () => {
+  it('fits the plot to a given height, keeping room for the week ticks under it', () => {
     const input = period({ now, cumulative: [0, 10], previousCumulative: days(28, (index) => index), projected: 20 });
-    expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 108 });
+    expect(periodChartGeometry(input, width).plot).toEqual({ width: plotWidth, top: 6, bottom: 120 });
     const tall = periodChartGeometry(input, width, 240);
-    expect(tall.plot.bottom).toBe(222);
-    expect(tall.current[0].y).toBe(222);
+    expect(tall.plot.bottom).toBe(234);
+    expect(tall.current[0].y).toBe(234);
     // Never a plot upside down, however short the space.
     expect(periodChartGeometry(input, width, 10).plot.bottom).toBe(6);
   });
@@ -251,17 +271,9 @@ describe('the period chart geometry', () => {
     expect(periodDayAtX(10, plotWidth, 1)).toBe(0);
   });
 
-  it('centres TODAY under today, flush with an edge it would overrun', () => {
-    expect(todayLabelAnchor(0, plotWidth)).toBe('start');
-    expect(todayLabelAnchor(17.9, plotWidth)).toBe('start');
-    expect(todayLabelAnchor(18, plotWidth)).toBe('middle');
-    expect(todayLabelAnchor(plotWidth - 18, plotWidth)).toBe('middle');
-    expect(todayLabelAnchor(plotWidth - 17.9, plotWidth)).toBe('end');
-    expect(todayLabelAnchor(plotWidth, plotWidth)).toBe('end');
-  });
 
   it('draws nothing wider than the space it is given, and writes points to one decimal', () => {
-    const narrow = periodChartGeometry(period({ now, cumulative: [1, 2] }), 10);
+    const narrow = periodChartGeometry(period({ now, cumulative: [1, 2] }), 6);
     expect(narrow.plot.width).toBe(0);
     expect(narrow.today.previous.x).toBe(0);
     expect(toPolyline([{ x: 0, y: 80.25 }, { x: 9.731, y: 6 }])).toBe('0.0,80.3 9.7,6.0');
@@ -307,5 +319,31 @@ describe("the latest session's PRs", () => {
       .toEqual({ kind: 'one', lead: 'Bench Press Weight 90.0 × 5', note: 'PR' });
     // One exercise taking 1RM and Weight is two PRs.
     expect(sessionSummaryRecordLine(latest())).toEqual({ kind: 'many', count: '2 PRs' });
+  });
+});
+
+describe('the session card', () => {
+  const lines = [
+    { name: 'Bench Press', workingSets: 4, bestSet: { weightKg: 100, reps: 5, oneRepMaxKg: 116.64 }, oneRepMaxRecord: true },
+    { name: 'Cable Fly', workingSets: 0, bestSet: null, oneRepMaxRecord: false },
+  ];
+
+  it('writes a best set as entered Weight by reps, and counts PRs', () => {
+    expect(formatBestSet({ weightKg: 100, reps: 5 })).toBe('100.0 × 5');
+    expect(formatBestSet({ weightKg: 22.5, reps: 12 })).toBe('22.5 × 12');
+    expect(formatRecordCount(0)).toBe('0 PRs');
+    expect(formatRecordCount(1)).toBe('1 PR');
+    expect(formatRecordCount(3)).toBe('3 PRs');
+  });
+
+  it('speaks when, what, where and its PRs, then each exercise', () => {
+    expect(todaySessionAccessibilityLabel(latest({ exercises: lines }))).toBe(
+      // The exercises are the rows' count, so the line and the table agree.
+      'Session on 15 Oct 26 07:12; 2 exercises; 12 sets; 2 PRs; at Canal Street Gym; '
+        + 'Bench Press, 4 sets, best 100.0 × 5, 1RM 116.6, a 1RM PR; Cable Fly, 0 sets',
+    );
+    expect(todaySessionAccessibilityLabel(latest({ gymName: ' ', records: [], exercises: [] }))).toBe(
+      'Session on 15 Oct 26 07:12; 0 exercises; 12 sets; 0 PRs',
+    );
   });
 });

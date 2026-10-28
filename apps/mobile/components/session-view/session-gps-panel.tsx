@@ -1,6 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { DEFAULT_SUGGESTION_RADIUS_M } from '@/src/location/gym-location-matcher';
 import { SESSION_POSITION_GOOD_ACCURACY_M, type SessionPositionState } from '@/src/location/session-position';
 
@@ -100,13 +102,13 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
 
   return (
     <View style={styles.panel} testID="session-gps-panel">
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.title]}>
         GPS state
       </Text>
       {rows.map((row, index) => (
         <View key={row.key} style={[styles.row, index > 0 ? styles.rowDivider : null]} testID={`session-gps-row-${row.key}`}>
-          <Text allowFontScaling={false} style={styles.label}>{row.label}</Text>
-          <Text allowFontScaling={false} style={styles.value} testID={`session-gps-value-${row.key}`}>{row.value}</Text>
+          <Text allowFontScaling={false} style={uiText.meta}>{row.label}</Text>
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.value]} testID={`session-gps-value-${row.key}`}><FigureText strong>{row.value}</FigureText></Text>
         </View>
       ))}
     </View>
@@ -122,13 +124,6 @@ const styles = StyleSheet.create({
     padding: uiSpace.md,
   },
   title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
     marginBottom: uiSpace.sm,
   },
   row: {
@@ -141,19 +136,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: uiRoles.rule,
   },
-  label: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
   value: {
     flexShrink: 1,
     textAlign: 'right',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
   },
 });

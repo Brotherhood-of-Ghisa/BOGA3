@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
 import { GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
 
@@ -45,18 +46,6 @@ export type GroupScreenHeaderProps = {
   filterTrailing?: ReactNode;
 };
 
-// The title is always one line: a longer name is drawn a step smaller, and a
-// name past the last step is clipped. Nothing wraps.
-const TITLE_STEPS = [
-  { maxLength: 14, style: { fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl } },
-  { maxLength: 22, style: { fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl } },
-] as const;
-
-const LONGEST_TITLE = { fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg };
-
-const titleStep = (name: string) =>
-  TITLE_STEPS.find((step) => name.length <= step.maxLength)?.style ?? LONGEST_TITLE;
-
 /**
  * The Groups screen's heading: the group's name as the title, which opens the
  * group switch; then the filter row — the section, pinned across all three,
@@ -96,7 +85,7 @@ export function GroupScreenHeader({
             allowFontScaling={false}
             ellipsizeMode="tail"
             numberOfLines={1}
-            style={[styles.titleText, titleStep(groupName)]}
+            style={[uiText.title, styles.titleText]}
             testID="groups-title-name">
             {groupName}
           </Text>
@@ -159,11 +148,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.6,
   },
+  // One line: a name too long for it is clipped. Nothing wraps.
   titleText: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    color: uiRoles.ink,
   },
   filters: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, IconButton, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FigureText, IconButton, uiSpace, uiText } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
 
 export type PlanDetailSummaryProps = {
@@ -39,22 +39,24 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
     <Card style={styles.card} testID="plan-detail-summary">
       <View style={styles.summaryRow}>
         <View style={styles.summaryText}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.title} testID="plan-detail-title">
+          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="plan-detail-title">
             {detail.title}
           </Text>
-          <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-schedule">
-            {detail.scheduledFor !== null ? `Scheduled ${formatLocalDateTime(detail.scheduledFor.getTime(), dateFormat)}` : 'Unscheduled'}
+          <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-schedule">
+            <FigureText>
+              {detail.scheduledFor !== null ? `Scheduled ${formatLocalDateTime(detail.scheduledFor.getTime(), dateFormat)}` : 'Unscheduled'}
+            </FigureText>
           </Text>
-          <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-progress">
-            {progressLine(detail)}
+          <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-progress">
+            <FigureText>{progressLine(detail)}</FigureText>
           </Text>
           {detail.programmeId !== null ? (
-            <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-programme-badge">
-              Programme session{detail.programmeOrderIndex !== null ? ` · Session ${detail.programmeOrderIndex + 1}` : ''}
+            <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-programme-badge">
+              <FigureText>{`Programme session${detail.programmeOrderIndex !== null ? ` · Session ${detail.programmeOrderIndex + 1}` : ''}`}</FigureText>
             </Text>
           ) : null}
           {PROVENANCE_LABEL[detail.provenance] ? (
-            <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-provenance">
+            <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-provenance">
               {PROVENANCE_LABEL[detail.provenance]}
             </Text>
           ) : null}
@@ -105,19 +107,5 @@ const styles = StyleSheet.create({
   summaryText: {
     flex: 1,
     gap: uiSpace.xs,
-  },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  meta: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
 });

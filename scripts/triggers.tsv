@@ -1,7 +1,7 @@
 # BOGA path-trigger registry — machine-readable form of "which lanes a change
 # runs by default" (the human table lives in AGENTS.md; keep both in sync in the same
 # change — docs-check validates that the lanes cited here exist). The result is
-# a default the agent proposes and its reviewer agent agrees, not a requirement
+# a default the agent settles per its build protocol, not a requirement
 # (spec 02, "Choosing lanes").
 #
 # Consumed by `./boga test for [--diff <range>] [paths...]`.
@@ -38,7 +38,7 @@ apps/mobile/app/connected-agents.tsx	ios-auth-profile	connected agents screen (a
 apps/mobile/components/sync-status/**	ios-sync-e2e	sync-status surface (sync e2e)
 apps/mobile/app/group/**	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	group screens (groups e2e + launch smoke)
 apps/mobile/app/group-session/**	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	group session screens (groups e2e + launch smoke)
-apps/mobile/app/(tabs)/groups.tsx	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	Groups tab (groups e2e + launch smoke)
+apps/mobile/app/groups.tsx	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	Groups screen (groups e2e + launch smoke)
 apps/mobile/app/exercise-link.tsx	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	group exercise link screen (groups e2e + launch smoke)
 apps/mobile/components/groups/**	-frontend-ui,ios-smoke,ios-groups-e2e,android-smoke	group components (groups e2e + launch smoke)
 apps/mobile/__tests__/sync/**	fast,backend	sync tests (sync-infra lane covers them)

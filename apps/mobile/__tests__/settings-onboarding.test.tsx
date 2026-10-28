@@ -53,8 +53,9 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import {
   __resetExerciseListPreferencesForTests,
   ensureExerciseListPreferencesLoaded,
@@ -95,6 +96,7 @@ const CARD_ORDER = [
   'settings-rest-timer-row',
   'settings-notifications-row',
   'settings-progress-row',
+  'settings-muscles-row',
   'settings-effort-row',
   'settings-developer-tools-row',
   'settings-data-sync-row',
@@ -118,12 +120,13 @@ describe('the Settings list', () => {
     });
   });
 
-  it('shows the title, every card in the agreed order and the release metadata', async () => {
+  it('shows every card in the agreed order and the release metadata, under the native header', async () => {
     const result = await renderSettings();
     const tree = JSON.stringify(result.toJSON());
     const positions = CARD_ORDER.map((id) => tree.indexOf(`"testID":"${id}"`));
 
-    expect(screen.getByText('Settings')).toBeTruthy();
+    // The root stack's native header titles the page; the list draws no title.
+    expect(screen.queryByText('Settings')).toBeNull();
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     expect(screen.getByText('member@example.test')).toBeTruthy();
@@ -142,6 +145,7 @@ describe('the Settings list', () => {
     ['settings-body-weight-row', '/body-weight'],
     ['settings-rest-timer-row', '/settings-rest-timer'],
     ['settings-progress-row', '/settings-progress'],
+    ['settings-muscles-row', '/settings-muscles'],
     ['settings-effort-row', '/settings-effort'],
     ['settings-developer-tools-row', '/settings-developer-tools'],
     ['settings-data-sync-row', '/settings-data-sync'],
@@ -151,6 +155,16 @@ describe('the Settings list', () => {
     await renderSettings();
     fireEvent.press(screen.getByTestId(testID));
     expect(mockPush).toHaveBeenCalledWith(route);
+  });
+
+  it('titles the About card and draws its lines as muted body, the version figures in Plex Mono', async () => {
+    await renderSettings();
+    const about = within(screen.getByTestId('settings-about-card'));
+    expect(about.getByText('About')).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
+    const version = screen.getByTestId('settings-about-version');
+    expect(version).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', color: uiRoles.inkMuted });
+    expect(within(version).getByText('1.2.3')).toHaveStyle({ fontFamily: uiFonts.figure.family });
+    expect(within(version).getByText('45')).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });
 
   it('presses nothing from the About card', async () => {
@@ -164,6 +178,7 @@ describe('the Settings list', () => {
 
     expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 90 s · Auto-start on');
     expect(statusOf('settings-progress-row')).toBe('Progress, List · 4-week period');
+    expect(statusOf('settings-muscles-row')).toBe('Muscles, Single target');
     expect(statusOf('settings-effort-row')).toBe('Effort, Default');
     expect(statusOf('settings-other-row')).toBe('Other, DD-MM-YYYY');
     expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode off');
@@ -177,7 +192,6 @@ describe('the Settings list', () => {
         targetWindowWeeks: 6,
         displayEfforts: ['rir_0'],
         dateFormat: 'YYYY-MM-DD',
-        todayLayout: 'cards',
         timerInTitleBar: true,
       });
       expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 120 s · Auto-start off');
@@ -185,7 +199,7 @@ describe('the Settings list', () => {
     expect(statusOf('settings-progress-row')).toBe('Progress, 3D · 6-week period');
     expect(statusOf('settings-effort-row')).toBe('Effort, Custom');
     expect(statusOf('settings-other-row')).toBe('Other, YYYY-MM-DD');
-    expect(statusOf('settings-experiments-row')).toBe('Experiments, Today cards · Title-bar timer');
+    expect(statusOf('settings-experiments-row')).toBe('Experiments, Title-bar timer');
   });
 
   it('keeps the Developer mode switch off the list, naming its state on Developer tools', async () => {

@@ -31,13 +31,13 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   const newer = model.observations.find(p => p.setId === 'maestro_regime_31_set_0')!;
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   for (let i = 0; i < model.observations.indexOf(newer); i++) fireEvent.press(screen.getByLabelText('Previous set'));
-  expect(screen.getByTestId('rm-selected-period').props.children).toMatch(/^From /);
+  expect(screen.getByTestId('rm-selected-period')).toHaveTextContent(/^From /);
   expect(screen.getByTestId('rm-selected-period').props.style).toContainEqual({ color: periodColour('newer') });
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   // Identity is cleared immediately while the other method is fitting.
   expect(screen.queryByTestId('rm-selected-period')).toBeNull();
   act(() => { jest.runAllTimers(); });
   expect(screen.getByTestId('rm-fit-newer')).toBeTruthy();
-  expect(screen.getByTestId('rm-selected-period').props.children).toMatch(/^From /);
+  expect(screen.getByTestId('rm-selected-period')).toHaveTextContent(/^From /);
   expect(localDataClient().prepare('SELECT * FROM exercise_sets ORDER BY id').all()).toEqual(before);
 });

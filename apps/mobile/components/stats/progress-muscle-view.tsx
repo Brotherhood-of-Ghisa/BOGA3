@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { SegmentedControl, uiSpace, uiText } from '@/components/ui';
 import { hasComparisonMetric, resolveComparisonLayout } from './comparison-columns';
 import { StatsTable } from './stats-table';
 import { MuscleBodyCard } from './muscle-body-card';
@@ -22,7 +22,7 @@ export function ProgressMuscleView(props: Props) {
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} />
     {selected ? <StatsTable testID="stats-contributions">
       <View style={styles.contributionHeader}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>{selected.displayName}</Text>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.title, styles.heading]}>{selected.displayName}</Text>
         <SegmentedControl accessibilityLabel={`Open ${selected.displayName} history`} density="compact" layout="inline"
           hitSlop={uiSpace.md} options={HISTORY_VIEW_OPTIONS.map(option => ({ ...option,
             accessibilityLabel: `Open ${selected.displayName} ${option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'}` }))}
@@ -36,6 +36,5 @@ export function ProgressMuscleView(props: Props) {
 const styles = StyleSheet.create({
   body: { gap: uiSpace.lg },
   contributionHeader: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, padding: uiSpace.md },
-  heading: { flex: 1, fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
+  heading: { flex: 1 },
 });

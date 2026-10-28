@@ -2,9 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
-  ExerciseEditorModal,
+  useOpenExerciseEditor,
   type ExerciseEditorSaveInput,
-} from '@/components/exercise-catalog/exercise-editor-modal';
+} from '@/components/exercise-catalog/exercise-editor-request';
 import {
   ActionButton,
   Card,
@@ -310,9 +310,9 @@ export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, o
 
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
-  const [customizingItem, setCustomizingItem] = useState<GroupSharedExerciseItemWire | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const openExerciseEditor = useOpenExerciseEditor();
 
   const fetcher = useCallback(() => listGroupSharedExercises(groupId), [groupId]);
   const resource = useGroupResource<GroupSharedExercisesListWire>({
@@ -393,23 +393,34 @@ export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, o
     );
   };
 
-  const handleCustomSave = async (saveInput: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
-    const item = customizingItem;
-    if (!item) throw new Error('No shared exercise selected');
-    if (item.exercise.group_exercise_id) {
-      const { exercise } = await createExerciseWithGroupLink(saveInput, {
-        groupId: item.group_id,
-        groupExerciseId: item.exercise.group_exercise_id,
-      });
-      void links.reload();
-      return exercise;
-    }
-    return saveExerciseCatalogExercise(saveInput);
-  };
-
-  const handleCustomSaved = (exercise: ExerciseCatalogExercise) => {
-    setCustomizingItem(null);
-    setFeedback({ tone: 'success', message: `Added "${exercise.name}" to your exercises.` });
+  const handleCustomize = (item: GroupSharedExerciseItemWire) => {
+    openExerciseEditor({
+      title: 'Customize shared exercise',
+      prefill: {
+        name: item.exercise.name,
+        loadInputMode: item.exercise.load_input_mode,
+        bodyweightContribution: item.exercise.bodyweight_contribution,
+        mappings: item.exercise.mappings.map((m) => ({
+          muscleGroupId: m.muscle_group_id,
+          weight: m.weight,
+          role: m.role ?? 'primary',
+        })),
+      },
+      onSave: async (saveInput: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
+        if (item.exercise.group_exercise_id) {
+          const { exercise } = await createExerciseWithGroupLink(saveInput, {
+            groupId: item.group_id,
+            groupExerciseId: item.exercise.group_exercise_id,
+          });
+          void links.reload();
+          return exercise;
+        }
+        return saveExerciseCatalogExercise(saveInput);
+      },
+      onSaved: (exercise) => {
+        setFeedback({ tone: 'success', message: `Added "${exercise.name}" to your exercises.` });
+      },
+    });
   };
 
   const availablePersonalExercises = useMemo(() => {
@@ -464,7 +475,7 @@ export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, o
               item={item}
               key={item.id}
               links={links.links}
-              onCustomize={setCustomizingItem}
+              onCustomize={handleCustomize}
               onDelete={handleDelete}
               onDirectAdd={handleDirectAdd}
               onLinkExisting={handleLinkExisting}
@@ -486,27 +497,6 @@ export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, o
         search={shareSearch}
         visible={sharePickerOpen}
       />
-
-      {/* Exercise editor modal for customizing before saving */}
-      {customizingItem ? (
-        <ExerciseEditorModal
-          editingExercise={null}
-          onRequestClose={() => setCustomizingItem(null)}
-          onSave={handleCustomSave}
-          onSaved={handleCustomSaved}
-          prefill={{
-            name: customizingItem.exercise.name,
-            loadInputMode: customizingItem.exercise.load_input_mode,
-            bodyweightContribution: customizingItem.exercise.bodyweight_contribution,
-            mappings: customizingItem.exercise.mappings.map((m) => ({
-              muscleGroupId: m.muscle_group_id,
-              weight: m.weight,
-              role: m.role ?? 'primary',
-            })),
-          }}
-          visible={customizingItem !== null}
-        />
-      ) : null}
     </View>
   );
 }

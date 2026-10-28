@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { FigureText, uiText, uiTextTone } from '@/components/ui';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { RmCurveModel } from '@/src/rm-curve/model';
@@ -20,15 +21,14 @@ export function RmRegimes({ model, result, method, selectedId, dateFormat, onPic
     <RmCurveChart model={model} selectedId={selectedId} onPick={onPick}
       uncertainty={method === 'fixed' ? FIXED_REGIME_UNCERTAINTY : assessment?.uncertainty ?? null}
       curves={assessment?.curves ?? []} boundary={assessment?.boundary ?? null} />
-    <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={styles.body}>
+    <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
       {result === null ? 'Fitting curves' : result.limited ? 'Choose a shorter range' : result.error ? 'Fit unavailable' : assessment?.message}
     </Text>
-    {assessment ? <Text allowFontScaling={false} style={styles.figure}>{assessment.sampledSessions} fitting sessions</Text> : null}
+    {assessment ? <Text allowFontScaling={false} style={uiText.body}><FigureText>{`${assessment.sampledSessions} fitting sessions`}</FigureText></Text> : null}
     {assessment?.curves.map(curve => <View key={curve.period} style={styles.legend}>
       <View style={[styles.dot, { borderColor: periodColour(curve.period), backgroundColor: 'transparent' }, curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
-      <Text allowFontScaling={false} style={[styles.figure, { color: periodColour(curve.period) }]}>
-        {periodLabel(curve.period, assessment.boundary, dateFormat)}
-        {' · 1RM '}{formatOneRepMax(curve.totalRm / factor)}{factor === 2 ? ' per side' : ''}
+      <Text allowFontScaling={false} style={[uiText.body, styles.shrink, { color: periodColour(curve.period) }]}>
+        <FigureText>{`${periodLabel(curve.period, assessment.boundary, dateFormat)} · 1RM ${formatOneRepMax(curve.totalRm / factor)}${factor === 2 ? ' per side' : ''}`}</FigureText>
       </Text>
     </View>)}
   </>;

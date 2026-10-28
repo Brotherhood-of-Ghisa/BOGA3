@@ -107,7 +107,7 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
           testID="plan-form-unavailable"
         />
       ) : (
-        <PlanFormScreen initialForm={initialForm} onSave={onSave} saveLabel={isEdit ? 'Save changes' : 'Save plan'} />
+        <PlanFormScreen initialForm={initialForm} onSave={onSave} saveLabel={isEdit ? 'Save' : 'Add plan'} />
       )}
     </ScreenScroll>
   );

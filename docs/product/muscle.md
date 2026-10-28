@@ -6,7 +6,7 @@ Every screen counts working sets per muscle as **primary 1, secondary ½**.
 Decided 2026-10-09.
 
 A muscle counts a set once, at the strongest role any of its entries has
-([[muscle.report-groups]]): squat × 3 under Broad is Quads 3, Glutes & Hams 1.5.
+([[muscle.report-groups]]).
 Totals use half-steps (`1.5`), unlike the session's physical `Sets`
 ([[set.count-display]]). Whether to show secondaries is separate
 ([[muscle.secondary-filter]]).
@@ -35,16 +35,33 @@ Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.report-groups · definition · accepted
 
-Settings → Progress → Muscles offers **Detailed** (default: one muscle per
-anatomy entry) or **Broad**, per account, synced, with a Track switch per
-muscle. A preset changes merging, never a switch; merges
+Settings → Muscles offers **Detailed** (default: one muscle per
+anatomy entry) or **Broad**, per account, synced. Enabled muscles is always
+available, with individual anatomy switches and their enabled/total count,
+regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle's switch is on while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family.
+A merged muscle is enabled while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family.
 
 
 Why: a simpler view.
 Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
+
+### muscle.weekly-targets · definition · accepted
+
+Weekly working-set targets repeat until changed, per account on this device.
+Single uses the default for every muscle; Per muscle uses an override or the
+live default. Broad and Detailed remember separate overrides; Custom setups
+keep their own. Mode changes and disabling a muscle retain its overrides.
+Targets list only enabled reported muscles, including custom muscles. Clearing
+an override restores inheritance; targets are positive whole numbers.
+
+History Sets target grading, Progress Sets references and Today's Plan week
+column use the effective target of each reported muscle, scaled to the period.
+Counting is unchanged.
+
+Why: individual training goals without losing a shared fallback.
+Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`.
 
 ### muscle.no-breakdown · presentation · accepted
 

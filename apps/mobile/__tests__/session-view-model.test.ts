@@ -294,6 +294,14 @@ describe('submit cleanup', () => {
     expect(done.session.exercises.map((exercise) => exercise.sets.map((set) => set.id))).toEqual([['b2']]);
   });
 
+  it('saves only performed sets on Done, dropping a planned set nobody did without asking', () => {
+    const result = nextSubmitCleanup(session([{ ...bench, sets: [bench.sets[1], plannedSet('p1', '60', '8', 'rir_2')] }]));
+
+    expect(result.kind).toBe('ready');
+    if (result.kind !== 'ready') throw new Error('expected ready');
+    expect(result.session.exercises.map((exercise) => exercise.sets.map((set) => set.id))).toEqual([['b2']]);
+  });
+
   it('asks once for an added exercise whose only set was left empty', () => {
     const start = session([
       { ...bench, sets: [bench.sets[1]] },

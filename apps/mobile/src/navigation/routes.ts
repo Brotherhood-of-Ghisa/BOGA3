@@ -1,12 +1,12 @@
 import type { Href } from 'expo-router';
 
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
+import { sessionViewHref } from './active-session-entry';
 import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
-// The Gyms screen, from the session view's gym sheet (`Manage gyms`). More
-// opens it as `/gyms?source=more`, which adds its `Back to More`.
+// The Gyms screen, from the session view's gym sheet (`Manage gyms`) and More.
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
@@ -14,6 +14,9 @@ export const BODY_WEIGHT_ROUTE = '/body-weight';
 export const SETTINGS_SUB_PAGES = {
   restTimer: '/settings-rest-timer',
   progress: '/settings-progress',
+  muscles: '/settings-muscles',
+  muscleTargets: '/settings-muscle-targets',
+  enabledMuscles: '/settings-enabled-muscles',
   effort: '/settings-effort',
   other: '/settings-other',
   experiments: '/settings-experiments',
@@ -24,6 +27,16 @@ export const SETTINGS_SUB_PAGES = {
 /** The Link screen for one of my exercises (E0.3). */
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
+
+/** The exercise editor page: edit one of my exercises by id, or create one. `request` names the caller's in-memory request (prefill, save callbacks). */
+export const EXERCISE_EDIT_ROUTE = '/exercise-edit';
+export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDefinitionId?: string | null; request?: string | null }): Href => {
+  const params = [
+    exerciseDefinitionId ? `exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` : null,
+    request ? `request=${encodeURIComponent(request)}` : null,
+  ].filter(Boolean);
+  return `${EXERCISE_EDIT_ROUTE}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
+};
 export const THEME_COLOUR_ROUTE = '/theme-colour';
 
 /** One muscle's or one exercise's effort history, pushed from Progress. */
@@ -80,7 +93,8 @@ export const sessionsDayHref = (dateKey: string): Href =>
   `/sessions?day=${encodeURIComponent(dateKey)}` as Href;
 
 /** Where a history day leads; null for a day without a session. */
-export const historyDayHref = (dateKey: string, sessionIds: readonly string[]): Href | null => {
+export const historyDayHref = (dateKey: string, sessionIds: readonly string[], activeSessionId: string | null = null): Href | null => {
   if (sessionIds.length === 0) return null;
-  return sessionIds.length === 1 ? completedSessionHref(sessionIds[0]) : sessionsDayHref(dateKey);
+  if (sessionIds.length > 1) return sessionsDayHref(dateKey);
+  return sessionIds[0] === activeSessionId ? sessionViewHref(sessionIds[0]) : completedSessionHref(sessionIds[0]);
 };

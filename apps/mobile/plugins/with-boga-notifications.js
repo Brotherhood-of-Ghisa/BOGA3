@@ -4,8 +4,10 @@ const { IOSConfig, withDangerousMod, withEntitlementsPlist, withInfoPlist, withX
 const { build: buildPlist } = require('@expo/plist').default;
 
 const TARGETS = [
-  { name: 'BogaNotificationService', suffix: 'notification-service', point: 'com.apple.usernotifications.service' },
-  { name: 'BogaNotificationContent', suffix: 'notification-content', point: 'com.apple.usernotifications.content-extension' },
+  { name: 'BogaNotificationService', suffix: 'notification-service', point: 'com.apple.usernotifications.service',
+    frameworks: ['UserNotifications'] },
+  { name: 'BogaNotificationContent', suffix: 'notification-content', point: 'com.apple.usernotifications.content-extension',
+    frameworks: ['UserNotifications', 'UserNotificationsUI'] },
 ];
 
 function notificationConfig(bundleId) {
@@ -60,16 +62,24 @@ function configureTargets(project, config, fonts) {
     }
     const configurations = IOSConfig.XcodeUtils.getBuildConfigurationsForListId(project, added.pbxNativeTarget.buildConfigurationList);
     for (const [, configuration] of configurations) {
-      Object.assign(configuration.buildSettings, { CODE_SIGN_ENTITLEMENTS: `"${target.name}/${target.name}.entitlements"`,
-        INFOPLIST_FILE: `"${target.name}/${target.name}-Info.plist"`, SWIFT_VERSION: '5.9',
-        IPHONEOS_DEPLOYMENT_TARGET: '16.0', TARGETED_DEVICE_FAMILY: '"1,2"',
-        APPLICATION_EXTENSION_API_ONLY: 'YES', CODE_SIGN_STYLE: 'Automatic',
-        PRODUCT_BUNDLE_IDENTIFIER: `"${config.ios.bundleIdentifier}.${target.suffix}"`,
-        CURRENT_PROJECT_VERSION: config.ios.buildNumber ?? '1', MARKETING_VERSION: config.version ?? '1.0',
-        GENERATE_INFOPLIST_FILE: 'NO' });
+      Object.assign(configuration.buildSettings, targetBuildSettings(target, config));
     }
   }
   return project;
+}
+
+// Frameworks are linked explicitly: the linker drops an autolinked framework
+// whose symbols nothing references, and a content extension without
+// UserNotificationsUI crashes at launch, leaving the expanded notification blank.
+function targetBuildSettings(target, config) {
+  return { CODE_SIGN_ENTITLEMENTS: `"${target.name}/${target.name}.entitlements"`,
+    INFOPLIST_FILE: `"${target.name}/${target.name}-Info.plist"`, SWIFT_VERSION: '5.9',
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0', TARGETED_DEVICE_FAMILY: '"1,2"',
+    APPLICATION_EXTENSION_API_ONLY: 'YES', CODE_SIGN_STYLE: 'Automatic',
+    PRODUCT_BUNDLE_IDENTIFIER: `"${config.ios.bundleIdentifier}.${target.suffix}"`,
+    CURRENT_PROJECT_VERSION: config.ios.buildNumber ?? '1', MARKETING_VERSION: config.version ?? '1.0',
+    GENERATE_INFOPLIST_FILE: 'NO',
+    OTHER_LDFLAGS: `"${['$(inherited)', ...target.frameworks.flatMap(name => ['-framework', name])].join(' ')}"` };
 }
 
 function withBogaNotifications(config, { fonts = [] } = {}) {
@@ -121,3 +131,5 @@ module.exports = withBogaNotifications;
 module.exports.notificationConfig = notificationConfig;
 module.exports.extensionInfo = extensionInfo;
 module.exports.configureTargets = configureTargets;
+module.exports.targetBuildSettings = targetBuildSettings;
+module.exports.TARGETS = TARGETS;

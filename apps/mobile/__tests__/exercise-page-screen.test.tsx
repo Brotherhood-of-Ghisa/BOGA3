@@ -31,8 +31,11 @@ jest.mock('expo-router', () => {
   const mockReact = jest.requireActual('react');
   return {
     useRouter: () => mockRouter,
-    useNavigation: () => undefined,
+    // No beforeRemove listener; `getState` for the exercise editor page's stack read.
+    useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true }),
     useLocalSearchParams: () => mockRouteParams,
+    // The exercise editor page's title (helpers/exercise-editor-page.tsx).
+    Stack: { Screen: () => null },
     useFocusEffect: (callback: () => void | (() => void)) => {
       mockReact.useEffect(() => callback(), [callback]);
     },
@@ -72,6 +75,7 @@ import {
   resetLocalData,
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { exerciseEditorPage, WithExerciseEditorPage } from './helpers/exercise-editor-page';
 
 const SESSION = EXERCISE_PAGE_FIXTURE.activeSessionId;
 const BENCH = EXERCISE_PAGE_FIXTURE.benchSessionExerciseId;
@@ -159,6 +163,7 @@ describe('ExercisePageScreen', () => {
     __resetExerciseListPreferencesForTests();
     mockLinkingUserId = null;
     mockRouteParams = {};
+    exerciseEditorPage.reset();
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
@@ -631,7 +636,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-0')).toHaveTextContent(/^W-Up60\.0 × 10/);
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
-    fireEvent.press(screen.getByRole('link', { name: 'Open exercise progress' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Open exercise progress' }));
     expect(screen.getByTestId('exercise-records-progress')).toHaveTextContent('Progress');
     expect(mockRouter.push).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${BENCH_DEF}`);
   });
@@ -788,7 +793,35 @@ describe('ExercisePageScreen', () => {
     );
   });
 
-  it('offers Link to group exercise… in the ⋮ only when signed in, opening the Link screen', async () => {
+  it('opens the exercise editor page from Edit exercise, and a rename there renames the page', async () => {
+    await seedPage();
+    mockRouter.push.mockImplementation((href: unknown) => exerciseEditorPage.push(href));
+    mockRouter.back.mockImplementation(() => exerciseEditorPage.back());
+    render(
+      <WithExerciseEditorPage>
+        <ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />
+      </WithExerciseEditorPage>
+    );
+    await waitFor(() => expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1'));
+
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-edit'));
+    // The editor opens after the page's pending edits are written.
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^/exercise-edit\\?exerciseDefinitionId=${BENCH_DEF}&request=`)))
+    );
+    expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+
+    fireEvent.changeText(await screen.findByTestId('exercise-editor-name-input'), 'Paused Bench Press');
+    await act(async () => fireEvent.press(screen.getByLabelText('Save exercise definition')));
+
+    await waitForGone(() => screen.queryByTestId('exercise-editor'));
+    await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Paused Bench Press'));
+    expect(localDatabase().select().from(exerciseDefinitions).where(eq(exerciseDefinitions.id, BENCH_DEF)).get()?.name)
+      .toBe('Paused Bench Press');
+  });
+
+  it('offers Link to group exercise in the ⋮ only when signed in, opening the Link screen', async () => {
     await openPage();
 
     fireEvent.press(screen.getByTestId('exercise-page-options'));
@@ -801,7 +834,7 @@ describe('ExercisePageScreen', () => {
     await renderPage();
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     const sheet = await screen.findByTestId('exercise-options-sheet');
-    fireEvent.press(within(sheet).getByText('Link to group exercise…'));
+    fireEvent.press(within(sheet).getByText('Link to group exercise'));
 
     // The Link screen opens after the page's pending edits are written,
     // so the push resolves through the flush.
@@ -1118,7 +1151,8 @@ describe('ExercisePageScreen', () => {
     __resetRestTimerForTests();
     jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     await seedPage(async () => {
-      localDatabase().update(exerciseDefinitions).set({ restTimerSec: 45 }).where(eq(exerciseDefinitions.id, BENCH_DEF)).run();
+      await saveExerciseCatalogExercise({ id: BENCH_DEF, name: 'Barbell Bench Press', loadInputMode: 'total_load',
+        restTimerSec: 45, mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }] });
     });
     await renderPage();
 
@@ -1142,6 +1176,125 @@ describe('ExercisePageScreen', () => {
   });
 });
 
+describe('exercise page title switcher', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetLocalData();
+    __resetExerciseListPreferencesForTests();
+    mockRouter.canGoBack.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    closeLocalData();
+  });
+
+  const openSwitcher = async () => {
+    fireEvent.press(screen.getByTestId('exercise-page-title'));
+    return screen.findByTestId('exercise-switcher-sheet');
+  };
+
+  it('lists the session exercises in order with done / total sets, the open one marked', async () => {
+    await openPage();
+
+    const sheet = await openSwitcher();
+
+    const rowIds = within(sheet)
+      .getAllByTestId(/^exercise-switcher-row-/)
+      .map((row) => row.props.testID);
+    expect(rowIds).toEqual([`exercise-switcher-row-${BENCH}`, `exercise-switcher-row-${SQUAT}`]);
+    expect(screen.getByTestId(`exercise-switcher-row-${BENCH}`)).toHaveTextContent('1Barbell Bench Press2/5');
+    expect(screen.getByTestId(`exercise-switcher-row-${SQUAT}`)).toHaveTextContent('2Barbell Back Squat1/1');
+    expect(screen.getByTestId(`exercise-switcher-row-${BENCH}`)).toBeSelected();
+    expect(screen.getByTestId(`exercise-switcher-row-${SQUAT}`)).not.toBeSelected();
+    expect(screen.getByTestId('exercise-switcher-session')).toHaveTextContent('All exercises (session)');
+    // A tick means finished, not open: Squat's only set is done, Bench has planned ones.
+    expect(screen.getByTestId(`exercise-switcher-finished-${SQUAT}`, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId(`exercise-switcher-finished-${BENCH}`, { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows the open exercise\'s progress as just confirmed, before it is saved', async () => {
+    await openPage();
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+
+    await openSwitcher();
+
+    expect(screen.getByTestId(`exercise-switcher-progress-${BENCH}`)).toHaveTextContent('3/5');
+  });
+
+  it('replaces the page with the chosen exercise, never pushing, and writes nothing — even with an unsaved edit', async () => {
+    await seedPage();
+    const client: SessionExerciseDraftClient = {
+      ...defaultSessionExerciseDraftClient,
+      persistSessionDraftSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistSessionDraftSnapshot),
+      persistCompletedSessionSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistCompletedSessionSnapshot),
+    };
+    render(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    // Dirty but inside the autosave debounce: only leaving the page saves it.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+    // Let any write the switch started settle (well inside the autosave debounce).
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${SQUAT}`);
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    expect(client.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+  });
+
+  it('closes without navigating when the open exercise is chosen', async () => {
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${BENCH}`));
+
+    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it('All exercises returns to the session as Back does', async () => {
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId('exercise-switcher-session'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('All exercises falls back to Train with no history, as Back does', async () => {
+    mockRouter.canGoBack.mockReturnValue(false);
+    await openPage();
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId('exercise-switcher-session'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/train');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('offers the switcher when editing a completed session too', async () => {
+    await seedPage();
+    const completedId = NEWER_HISTORY;
+    render(<ExercisePageScreen sessionExerciseId={`${completedId}_bench`} sessionId={completedId} />);
+    await screen.findByTestId('exercise-page');
+
+    await openSwitcher();
+
+    expect(screen.getByTestId(`exercise-switcher-row-${completedId}_bench`)).toBeSelected();
+  });
+});
+
 describe('exercise page route', () => {
   beforeEach(() => resetLocalData());
   afterEach(() => closeLocalData());
@@ -1150,6 +1303,7 @@ describe('exercise page route', () => {
     await seedPage();
     mockRouteParams = { sessionId: SESSION, sessionExerciseId: BENCH };
     render(<ExercisePageRoute />);
-    expect(await screen.findByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
+    // Loading draws a plain title; the loaded one is the switcher button.
+    await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press'));
   });
 });

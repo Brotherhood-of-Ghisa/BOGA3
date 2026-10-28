@@ -6,12 +6,12 @@ import {
   Icon,
   ListRow,
   SearchField,
+  FigureText,
   uiBorder,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -34,7 +34,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
 
   return (
     <View style={styles.picker} testID="group-standard-exercise-picker">
-      <Text allowFontScaling={false} style={styles.microLabel}>
+      <Text allowFontScaling={false} style={uiText.label}>
         Standard exercise
       </Text>
       <SearchField
@@ -46,7 +46,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
       />
       <Card>
         {options.length === 0 ? (
-          <Text allowFontScaling={false} style={[styles.message, styles.muted]} testID="group-standard-exercise-no-match">
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]} testID="group-standard-exercise-no-match">
             {`No standard exercise matches "${query.trim()}".`}
           </Text>
         ) : (
@@ -62,7 +62,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
                 key={option.sourceExerciseId}
                 leading={<Icon color={uiRoles.ink} name={selected ? 'radio-on' : 'radio-off'} />}
                 meta={
-                  <Text allowFontScaling={false} style={styles.muted}>
+                  <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
                     {modeLabel}
                   </Text>
                 }
@@ -72,7 +72,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
                   onPick(option);
                 }}
                 testID={`group-standard-exercise-${option.sourceExerciseId}`}>
-                <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
+                <Text allowFontScaling={false} numberOfLines={2} style={[uiText.bodyStrong, styles.name]}>
                   {option.name}
                 </Text>
               </ListRow>
@@ -80,8 +80,8 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
           })
         )}
         {total > options.length ? (
-          <Text allowFontScaling={false} style={[styles.message, styles.more, styles.muted]} testID="group-standard-exercise-more">
-            {`Showing ${options.length} of ${total}. Search to narrow the list.`}
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message, styles.more]} testID="group-standard-exercise-more">
+            <FigureText>{`Showing ${options.length} of ${total}. Search to narrow the list.`}</FigureText>
           </Text>
         ) : null}
       </Card>
@@ -93,29 +93,8 @@ const styles = StyleSheet.create({
   picker: {
     gap: uiSpace.sm,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   name: {
     paddingVertical: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   message: {
     paddingHorizontal: uiSpace.md,

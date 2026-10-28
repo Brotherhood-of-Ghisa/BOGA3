@@ -113,7 +113,7 @@ Two traps:
 
 ## Choosing lanes
 
-Lane choice is **judgement, agreed with your reviewer agent** — paths give a
+Lane choice is **judgement** — paths give a
 default, not a requirement, because a path match says little about risk (a
 restyle of a screen matches the same rows as a rewrite of its logic) and the
 simulator and Docker lanes are the expensive part of the ladder.
@@ -124,9 +124,10 @@ simulator and Docker lanes are the expensive part of the ladder.
 2. **Start from the default.** `./boga test for` prints the default lanes for
    your diff and the rule that selected each, out of the path-trigger registry
    `scripts/triggers.tsv` (`AGENTS.md` carries the short human summary).
-3. **Propose, then agree.** Before running any lane beyond `./boga test fast`,
-   propose a lane set to your reviewer agent: the default, lowered or raised by
-   judgement, one line of reason per change. Lowering uses these categories:
+3. **Settle the set.** Before running any lane beyond `./boga test fast`,
+   settle a lane set as your build protocol says: the default, lowered or
+   raised by judgement, one line of reason per change. Lowering uses these
+   categories:
    - `cosmetic` — colours, fonts, spacing, icons, styling that do not change what
      renders, when it renders, or where an interactive element sits. Not
      cosmetic: conditional rendering, `testID`s, layout that can push a control
@@ -140,18 +141,17 @@ simulator and Docker lanes are the expensive part of the ladder.
      `06`, "Maestro scope policy") and the Jest tests in the diff prove it.
 
    Raise the default when the change carries risk its paths do not show (a
-   shared hook, a boot-time effect, a native call). The operator, when present,
-   may override; the dev-client rebuild below is not a lane choice and is never
-   lowered.
+   shared hook, a boot-time effect, a native call). The dev-client rebuild
+   below is not a lane choice and is never lowered.
 4. **Run the smallest Maestro set** for your platform (iOS on macOS, Android on
    Linux; required only on their relevant platform) — lanes whose flows exercise
    the change. Some areas have no Maestro lane at all (bodyweight: Jest over
    real data plus `ios-sync-e2e` covers it); adding a flow needs a written
    justification first (spec `06`, "Maestro scope policy").
-5. **Run the agreed lanes to green before opening the PR**, and record each one
+5. **Run the chosen lanes to green before opening the PR**, and record each one
    there with its result, its evidence (command output or Maestro artifact path)
-   and the reviewer agent's agreement. No checker validates this; reviewers
-   read it.
+   and any agreement your build protocol requires. No checker validates this;
+   reviewers read it.
 
 **Why the UI default is `frontend-ui`, not `frontend`:** the three
 Supabase-backed e2e lanes (`ios-auth-profile`, `ios-sync-e2e`, `ios-groups-e2e`)
@@ -227,6 +227,8 @@ installing each workspace from its own lockfile; a docs-only PR runs
 local-only** — backend/sync by choice, Maestro iOS/Android by necessity — so
 breakage there accumulates on `main` invisibly until a human runs the gate. Run
 the slow gate for your area before the PR.
+
+Updates: [workflow](../../.github/workflows/daily-development-log.yml).
 
 ## Maintenance
 

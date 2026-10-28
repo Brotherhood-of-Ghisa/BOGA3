@@ -1,11 +1,12 @@
 import { useDateFormat } from '@/src/preferences/hooks';
+import { formatCalendarWeek } from '@/src/utils/local-time';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
-  DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData, weekLabel,
+  DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData,
   type BuildHeatmapDataOptions, type DayCell, type FocusedTimelineWeek,
 } from '@/components/heatmaps';
 import { WeekSetList, type WeekSetExerciseLink } from '@/components/stats/week-set-list';
@@ -146,7 +147,7 @@ function HistoryHeatmap({
     const week = view === 'timeline' ? data.weekly.find(candidate => candidate.weekStartDateKey === focusedWeekKey) : undefined;
     return week ? {
       weekStartDateKey: week.weekStartDateKey,
-      label: weekLabel(week.monday, dateFormat),
+      label: formatCalendarWeek(week.weekStartDateKey, dateFormat),
       hasTraining: week.hasTraining ?? week.value > 0,
     } : null;
   }, [data, focusedWeekKey, view, dateFormat]);
@@ -187,7 +188,6 @@ function HistoryHeatmap({
         testIDPrefix={testIDPrefix}
         metricLabel={metricLabel}
         formatValue={formatDailyValue}
-        legendLabel={`${metricLabel} per day`}
         header={status}
         onOpenDay={onOpenDay}
         onOpenWeek={onOpenWeek}

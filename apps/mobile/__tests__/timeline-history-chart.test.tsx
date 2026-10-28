@@ -66,7 +66,7 @@ it('fills the selected column in ink, so a full column still shows it', () => {
 
 it('marks the week it reads out, selected or not, so the two never disagree', () => {
   const { rerender } = render(chart());
-  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('05-10-2026 – 11-10-2026');
+  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('5–11 Oct 2026');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 volume');
   // The readout names the week alone: the current week takes no note.
   expect(screen.queryByText('Current week', { includeHiddenElements: true })).toBeNull();
@@ -74,7 +74,7 @@ it('marks the week it reads out, selected or not, so the two never disagree', ()
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 240);
 
   rerender(chart({ selectedWeekKey: '2026-09-14' }));
-  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14-09-2026 – 20-09-2026');
+  expect(hidden(`${ID}-readout-week`)).toHaveTextContent('14–20 Sep 2026');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('400 volume');
   expect(screen.getByTestId(`${ID}-selected`)).toHaveProp('x', 60);
 });

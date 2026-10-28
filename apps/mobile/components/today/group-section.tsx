@@ -16,16 +16,13 @@ export type TodayGroupSectionProps = {
   onFindGroup: () => void;
   onOpenGroup: (groupId: string) => void;
   onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
-  /** The cards layout: the page is the card, so panels fill it and nothing draws its own. */
-  fill?: boolean;
 };
 
-function AccountPanel({ state, onSignIn, fill }: { state: Exclude<TodayGroupState, Available>; onSignIn: () => void; fill: boolean }) {
+function AccountPanel({ state, onSignIn }: { state: Exclude<TodayGroupState, Available>; onSignIn: () => void }) {
   if (state.status === 'auth-unavailable') {
     return (
       <TodayPanel
         body="Groups need an account, and sign-in is not available in this build."
-        fill={fill}
         testID="today-group-auth-unavailable"
         title="Group activity needs an account"
       />
@@ -35,14 +32,13 @@ function AccountPanel({ state, onSignIn, fill }: { state: Exclude<TodayGroupStat
     <TodayPanel
       action={{ label: 'Sign in', onPress: onSignIn, testID: 'today-group-sign-in' }}
       body="Sign in to see activity from groups you've joined."
-      fill={fill}
       testID="today-group-signed-out"
       title="Group activity needs an account"
     />
   );
 }
 
-function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSession, fill = false }: Omit<TodayGroupSectionProps, 'state' | 'onSignIn'> & { state: Available }) {
+function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSession }: Omit<TodayGroupSectionProps, 'state' | 'onSignIn'> & { state: Available }) {
   const retry = () => {
     void state.refresh();
   };
@@ -51,26 +47,28 @@ function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSessio
       <TodayPanel
         action={{ label: 'Find a group', onPress: onFindGroup, testID: 'today-group-find-group' }}
         body="Join or create a group to see who's leading the week and who's training now."
-        fill={fill}
         testID="today-group-empty"
         title="Train with friends"
       />
     );
   }
   if (state.groups === null || state.selectedGroupId === null || state.summary === null) {
-    const missing = <GroupMissingDataState error={state.error} offline={state.offline} onRetry={retry} testIDPrefix="today-group" />;
-    // The shared state draws at its content's height; in a card, centre it.
-    return fill ? (
+    // The shared state draws at its content's height; in the page's card, centre it.
+    return (
       <View style={styles.centred} testID="today-group-missing">
-        {missing}
+        <GroupMissingDataState error={state.error} offline={state.offline} onRetry={retry} testIDPrefix="today-group" />
       </View>
-    ) : (
-      missing
     );
   }
+  const groups = state.groups.map((candidate) => ({ groupId: candidate.group_id, name: candidate.name }));
+  // `useTodayGroup` picks the selection from `groups`, so it is always among them.
+  const selected = groups.find((candidate) => candidate.groupId === state.selectedGroupId);
+  if (!selected) throw new Error(`Today's selected group ${state.selectedGroupId} is not among My groups`);
   return (
     <TodayGroupCard
-      fill={fill}
+      groupName={selected.name}
+      groups={groups}
+      onSelectGroup={state.selectGroup}
       myUserId={state.myUserId}
       nowMs={nowMs}
       onOpenGroup={onOpenGroup}
@@ -82,29 +80,29 @@ function AvailableContent({ state, nowMs, onFindGroup, onOpenGroup, onOpenSessio
 }
 
 /**
- * The Group activity section's body: the account panels, then (signed in)
+ * The Groups section's body: the account panels, then (signed in)
  * the offline marker and an inline error above the cached card, the no-group
  * panel, or the missing-data states while nothing is cached.
  */
-export function TodayGroupSection({ state, onSignIn, fill = false, ...rest }: TodayGroupSectionProps) {
+export function TodayGroupSection({ state, onSignIn, ...rest }: TodayGroupSectionProps) {
   if (state.status !== 'available') {
-    return <AccountPanel fill={fill} onSignIn={onSignIn} state={state} />;
+    return <AccountPanel onSignIn={onSignIn} state={state} />;
   }
   const inlineError = pickInlineError(state.error);
   const hasCard = state.summary !== null;
   return (
-    <View style={[styles.list, fill ? styles.fill : null]}>
+    <View style={[styles.list, styles.fill]}>
       {state.offline ? (
-        <View style={fill ? styles.inset : null}>
+        <View style={styles.inset}>
           <GroupOfflineBanner lastUpdatedAtMs={state.lastUpdatedAtMs} />
         </View>
       ) : null}
       {inlineError && hasCard ? (
-        <View style={fill ? styles.inset : null}>
+        <View style={styles.inset}>
           <GroupInlineError error={inlineError} onRetry={() => void state.refresh()} testID="today-group-inline-error" />
         </View>
       ) : null}
-      <AvailableContent fill={fill} state={state} {...rest} />
+      <AvailableContent state={state} {...rest} />
     </View>
   );
 }
@@ -120,7 +118,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  // In the cards layout a notice sits inside the page's card, so takes an inset.
+  // A notice sits inside the page's card, so takes an inset.
   inset: {
     paddingHorizontal: uiSpace.sm,
     paddingTop: uiSpace.sm,

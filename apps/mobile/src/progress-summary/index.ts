@@ -2,7 +2,9 @@ export {
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
+  buildSessionExerciseLines,
   type LatestSessionSummary,
+  type SessionExerciseLine,
   type ProgressCounts,
   type ProgressSession,
   type SessionPersonalRecord,
@@ -18,4 +20,5 @@ export {
   type LatestCompletedSessionRow,
   type PersonalRecordFact,
   type ProgressSummaryStore,
+  type TodayProgressOptions,
 } from './repository';

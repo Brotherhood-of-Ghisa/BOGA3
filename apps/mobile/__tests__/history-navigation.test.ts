@@ -23,6 +23,13 @@ describe('history hrefs', () => {
     expect(historyDayHref('2026-10-07', [])).toBeNull();
   });
 
+  it('opens the active workout on its session view and preserves other day destinations', () => {
+    expect(historyDayHref('2026-10-25', ['active a/b'], 'active a/b')).toBe('/session/active%20a%2Fb');
+    expect(historyDayHref('2026-10-25', ['completed'], 'active')).toBe('/completed-session/completed');
+    expect(historyDayHref('2026-10-25', ['active', 'completed'], 'active')).toBe('/sessions?day=2026-10-25');
+    expect(historyDayHref('2026-10-25', [], 'active')).toBeNull();
+  });
+
   it('adds the optional history entry override only when requested', () => {
     expect(progressHistoryHref({ muscleGroupId: 'quads' }, 'workingSetCount', 'timeline'))
       .toBe('/progress-history?muscleGroupId=quads&metric=sets&view=timeline');

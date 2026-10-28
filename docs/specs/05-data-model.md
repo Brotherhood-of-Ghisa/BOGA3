@@ -21,8 +21,9 @@ Code owns columns/checks/FKs; this doc owns layering, sync scope and invariants.
    under per-row last-write-wins. No projection function and no event log: the
    data is the event.
 
-Starter taxonomies sync as ordinary per-user entities. Group projections and
-calculated metrics stay outside the mirror.
+Taxonomies sync as ordinary entities; projections do not.
+For merging, revision scope and private control/recovery storage, load
+[`tech/exercise-merge-contract.md`](tech/exercise-merge-contract.md).
 
 Load [`tech/bodyweight-load-contract.md`](tech/bodyweight-load-contract.md)
 when changing bodyweight storage or policy. Its data-model consequence:
@@ -132,8 +133,7 @@ one transaction — the sixteen entity tables child before parent, `group_cache`
 `sync_quarantine`, then the three facts tables last, after the raw deletes have
 fired their triggers — resets `bootstrap_completed_at`, `pull_cursor` and
 `applied_seed_migration_app_version`, sets `account_user_id`, keeps
-`last_emitted_ms`, and issues no server delete. Jest fails if a table is
-neither wiped nor listed as preserved.
+`last_emitted_ms`, and issues no server delete. Unacknowledged owner-private merge recovery survives this wipe; its contract above owns the exception.
 
 Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
 `apps/mobile/src/data/dev-reset.ts`):
@@ -335,13 +335,9 @@ Server-first additions must also keep unknown entity types out of old-reader
 pulls. The kg-only rename was a protocol-3 cutover, not an
 additive change.
 
-The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, run by
-`npm run check:sync-drift` and gated by `./scripts/quality-slow.sh backend`)
-enforces this by booting a local Postgres, applying every migration and
-introspecting the live schema; PRs failing the gate cannot merge. It also
-asserts the hardcoded topological order in `apps/mobile/src/sync/topo-order.ts`
-against the live FK graph, so adding an entity table or FK without updating
-that list fails too.
+The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
+introspects migrated local Postgres and checks the FK order in
+`apps/mobile/src/sync/topo-order.ts`. Schema or order drift blocks merging.
 
 The rule does NOT apply to any `out of sync scope` local table above: no
 server counterpart, and the checker introspects only the sixteen

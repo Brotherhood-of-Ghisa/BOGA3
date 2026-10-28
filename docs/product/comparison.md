@@ -10,25 +10,28 @@
 
 More is better; zero is unsigned; colour never replaces the sign.
 
-Today's week figures show none: each fills a bar in laps of last week's total.
+Today's week figures and a group's At a glance total show none: each fills a
+bar in laps of the previous week's total.
 
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
-Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
 
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
-alternatives: one calendar week and Today’s periods. Comparisons
+alternatives: one calendar week, Today’s periods and the Plan page's three
+days before today, plus today so far (it never reorders the rows). Comparisons
 default to Progress or Settings' This week; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 
 - Bad: a 30-day default, fixed 4/12/24-week presets or a monthly group view.
 - Good: changing either setting changes every consumer of that period.
 - Kept: lifetime record baselines and catalogue metadata, individual-session
-  views, calendar-date navigation and explicit coaching query bounds.
+  views, calendar-date navigation, explicit coaching query bounds and an
+  explicit expansion of exercise session history beyond History look-back.
 
 Why: consistent periods.
-Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`.
+Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts`; `apps/mobile/src/groups/home-periods.ts`; `todayPlanWindow` in `apps/mobile/src/today-plan/calculations.ts`.
 
 ### comparison.window · definition · accepted
 
@@ -39,18 +42,38 @@ Weeks start Monday, local time.
 | Progress, N weeks | the last N calendar weeks, from the Monday N − 1 weeks back until now; N is Settings' `Progress period (weeks)` | the preceding N full calendar weeks |
 | Progress, This week (N = 1) | this calendar week until now; the only choice when N is 1 | the whole previous calendar week |
 | Today, week figures | this calendar week until now | the whole previous calendar week |
+| Groups, At a glance total | the stepper's calendar week (until now when current), every current member | that week's whole previous calendar week, the same members |
 
 Why: include the unfinished week; Today's bar targets last week's whole total.
-Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week window in `apps/mobile/src/progress-summary/calculations.ts`.
+Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week window in `apps/mobile/src/progress-summary/calculations.ts`; `buildGroupWeekTotals` in `apps/mobile/src/groups/home-view-model.ts`.
 
 ### comparison.history-window · definition · accepted
 
 Settings' History look-back selects N complete
 Monday–Sunday weeks through today. On Monday–Saturday start on the Monday N
 weeks before this week's Monday; on Sunday, N − 1 weeks before it. The current
-partial week follows them. Displayed weeks and Weekly reference calculations
-use the whole window.
+partial week follows them. History display compaction never shortens this
+window or the Weekly reference sample. Progress history remains bounded by it; only explicit exercise session
+history expansion reads beyond it.
 
 Why: chart and baseline share one sample.
 Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
+
+### comparison.colour-scale · presentation · accepted
+
+Progress 3D uses theme shades for the displayed change against
+[[comparison.window]]: light for decreases, middle for unchanged activity, dark
+for increases; empty/unavailable stays neutral. The Muscle breakdown follows its
+comparisons, independently of History and targets, with no legend. The selected
+muscle shows Now/Prev/Change.
+
+History legends precede their charts and run 0%–100%. Muscle Sets reads
+`% of target`, capped at the effective weekly muscle target; other legends read
+`% of max`, measured from zero. The maximum comes from History look-back using
+the plotted aggregation: daily Grid values, summed weekly Sets/Volume or best
+weekly strength. Empty or all-zero samples stay neutral.
+
+Why: 3D shows period changes; history shows training intensity.
+Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
+`apps/mobile/components/stats/muscle-body-projection.ts`.

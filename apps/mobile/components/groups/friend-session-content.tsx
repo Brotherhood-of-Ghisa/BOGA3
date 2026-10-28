@@ -4,7 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { GroupRole } from '@/src/groups';
 import {
   buildSessionRecordBands,
@@ -30,7 +31,7 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  * Gym, Ex, Sets, Volume),
  * the Group records card, then one card per exercise with its performed sets
  * as `type · weight × reps · 1RM · VOL` and a `#1 in group` band on the set
- * that took a group record. Normalized sets use wrapped percentage rows
+ * that took a group record. Normalized sets use single-line percentage rows
  * (group-competition-contract.md §2). Who and when
  * are the screen title's. Read-only for
  * the session — no edit, delete or append; certification is the records
@@ -62,7 +63,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
         // A ring marks "current" in the design language (§5).
         <View style={styles.status} testID="group-session-status-row">
           {session.status === 'active' ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
-          <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">{STATUS_LABELS[session.status]}</Text>
+          <Text allowFontScaling={false} style={[uiText.bodyStrong, uiTextTone.muted]} testID="group-session-status">{STATUS_LABELS[session.status]}</Text>
         </View>
       )}
       <SessionFactsCard
@@ -81,7 +82,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
       />
       <GroupSessionRecordsCard groupId={groupId} myRole={myRole} onChanged={onRecordsChanged} online={online} rows={rows} userId={userId} />
       {model.cards.length === 0 ? (
-        <Text allowFontScaling={false} style={styles.empty} testID="group-session-no-sets">
+        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-session-no-sets">
           No performed sets yet.
         </Text>
       ) : (
@@ -95,7 +96,7 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
             rowTestID={(row) => `group-session-set-row-${row.id}`}
             rows={card.rows}
             hideDerivedMetrics={card.hideDerivedMetrics}
-            stackedMetrics={card.stackedMetrics}
+            percentageMetrics={card.percentageMetrics}
             testID={`group-session-exercise-${card.id}`}
           />
         ))
@@ -109,19 +110,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  statusText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  empty: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

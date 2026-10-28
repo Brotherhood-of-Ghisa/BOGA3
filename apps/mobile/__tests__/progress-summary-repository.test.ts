@@ -228,7 +228,37 @@ describe('loadTodayProgress', () => {
         { kind: 'weight', exerciseName: 'Squat', value: 110, reps: 5 },
         { kind: 'volume', exerciseName: 'Squat', value: 550, reps: null },
       ],
+      // In session order, named as logged; a warm-up is not a working set, a
+      // removed exercise is gone, and one with no working set has no best set.
+      exercises: [
+        {
+          name: 'Back Squat',
+          workingSets: 1,
+          bestSet: { weightKg: 110, reps: 5, oneRepMaxKg: expect.closeTo(128.24, 2) },
+          oneRepMaxRecord: true,
+        },
+        {
+          name: 'Bench Press',
+          workingSets: 2,
+          bestSet: { weightKg: 95, reps: 5, oneRepMaxKg: expect.closeTo(110.75, 2) },
+          oneRepMaxRecord: true,
+        },
+        { name: 'Face Pull', workingSets: 0, bestSet: null, oneRepMaxRecord: false },
+      ],
     });
+  });
+
+  it("marks a best set's 1RM as a PR only when the session took the 1RM record", async () => {
+    insertSession('heavier', { completedAt: local(2026, 10, 6, 18) }, [bench('100', 1)]);
+    insertSession('lighter', { startedAt: local(2026, 10, 13, 17), completedAt: local(2026, 10, 13, 18) }, [
+      { definitionId: BENCH, name: 'Bench Press', sets: [['90', '5']] },
+    ]);
+
+    const { latest } = ready(await loadTodayProgress(NOW, 4));
+
+    expect(latest.exercises).toEqual([
+      { name: 'Bench Press', workingSets: 1, bestSet: { weightKg: 90, reps: 5, oneRepMaxKg: expect.any(Number) }, oneRepMaxRecord: false },
+    ]);
   });
 
   it('summarises a latest session older than both periods, with zero figures for the windows', async () => {
@@ -241,6 +271,40 @@ describe('loadTodayProgress', () => {
     expect(progress.latest.records.map((record) => record.kind)).toEqual(['oneRepMax', 'weight', 'volume']);
     expect(progress.week.current).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
     expect(progress.period.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+  });
+
+  it('shows an earlier session by its offset from the latest, saying whether an older one exists', async () => {
+    insertSession('may-8', { completedAt: local(2026, 5, 8, 18) }, [bench('90', 2)]);
+    insertSession('oct-6', { completedAt: local(2026, 10, 6, 18) }, [bench('95', 3)]);
+    insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('100')]);
+
+    const latest = ready(await loadTodayProgress(NOW, 4));
+    expect(latest).toMatchObject({ latest: { id: 'oct-13' }, latestOffset: 0, hasOlderSession: true });
+    const second = ready(await loadTodayProgress(NOW, 4, { sessionOffset: 1 }));
+    expect(second).toMatchObject({ latest: { id: 'oct-6', workingSets: 3 }, latestOffset: 1, hasOlderSession: true });
+    // Older than the loaded range: read alone, with its own figures.
+    const oldest = ready(await loadTodayProgress(NOW, 4, { sessionOffset: 2 }));
+    expect(oldest).toMatchObject({ latest: { id: 'may-8', workingSets: 2 }, latestOffset: 2, hasOlderSession: false });
+    // The week and period figures never move with the session shown.
+    expect(oldest.week).toEqual(latest.week);
+    expect(oldest.period).toEqual(latest.period);
+    // Past the oldest (a session deleted meanwhile): the latest again.
+    expect(ready(await loadTodayProgress(NOW, 4, { sessionOffset: 3 }))).toMatchObject({ latest: { id: 'oct-13' }, latestOffset: 0 });
+  });
+
+  it('compares against the period compareBack periods back', async () => {
+    insertSession('aug-12', { completedAt: local(2026, 8, 12, 18) }, [bench('90', 4)]); // day 3 of 10 Aug – 6 Sep
+    insertSession('sep-28', { completedAt: local(2026, 9, 28, 18) }, [bench('90', 2)]);
+    insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('100')]);
+
+    const { period } = ready(await loadTodayProgress(NOW, 4, { compareBack: 2 }));
+
+    expect(period.compareBack).toBe(2);
+    expect(period.previous.window).toEqual({ start: local(2026, 8, 10), end: local(2026, 9, 7) });
+    expect(period.previous.toSameDay).toEqual({ sessions: 1, workingSets: 4, prs: 0 });
+    expect(period.previous.total).toEqual({ sessions: 1, workingSets: 4, prs: 0 });
+    // This period is the same whichever it is compared with: 100 × 5 over 90 × 5 is a 1RM and a Weight PR.
+    expect(period.toDate).toEqual({ sessions: 1, workingSets: 1, prs: 2 });
   });
 
   it('reads the latest session alone only when it is older than the loaded range', async () => {

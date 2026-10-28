@@ -92,7 +92,8 @@ it('pushes the selected exercise chart and returns to the same History metric/we
   // The visual week duplicates the plot's accessible value and is hidden from VoiceOver.
   await screen.findByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true });
   fireEvent.press(screen.getByLabelText('Previous week'));
-  const week = screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true }).props.children;
+  // The heading's words wrap in `FigureText`, which holds the label as its text.
+  const week: string = screen.getByTestId('stats-exercise-history-timeline-readout-week', { includeHiddenElements: true }).props.children.props.children;
   fireEvent.press(screen.getByTestId('progress-history-options-button'));
   fireEvent.press(screen.getByTestId('progress-history-rm-curve'));
   await screen.findByTestId('rm-curve-plot');

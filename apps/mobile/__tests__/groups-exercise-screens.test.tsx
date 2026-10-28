@@ -44,6 +44,8 @@ let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  // The exercise editor page reads the stack beneath it.
+  useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -51,7 +53,12 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockUseAuth = jest.fn();
-jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
+jest.mock('@/src/auth', () => ({
+  useAuth: () => mockUseAuth(),
+  // The exercise editor page reads the auth store (helpers/exercise-editor-page.tsx).
+  getAuthSnapshot: () => mockUseAuth(),
+  subscribeToAuthState: () => () => undefined,
+}));
 
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
@@ -75,7 +82,9 @@ jest.mock('@/src/data/exercise-group-links', () => ({
 }));
 
 import { uiRoles } from '@/components/ui';
-import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
+import { exerciseEditorHrefs, exerciseEditorPage, exerciseEditorParams, WithExerciseEditorPage } from './helpers/exercise-editor-page';
+import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
 import { createExerciseWithGroupLink } from '@/src/data/exercise-group-links';
@@ -162,7 +171,8 @@ const pressAlertButton = async (spy: jest.SpyInstance, text: string) => {
 
 const openGroupAs = async (role: GroupRole) => {
   api.getGroup.mockResolvedValue(detailFor(role));
-  render(<GroupScreenRoute />);
+  // The exercise editor page opens over the group page (Add as new).
+  render(<WithExerciseEditorPage><GroupScreenRoute /></WithExerciseEditorPage>);
   // Without a jest cache, CI runs this file first, so its first render also
   // pays the process's cold start; the 1 s default can expire before it lands.
   await screen.findByText(META[role], {}, { timeout: 10_000 });
@@ -203,6 +213,7 @@ beforeEach(() => {
   api.getGroup.mockResolvedValue(detailFor('owner'));
   api.listCompetitionExercises.mockResolvedValue(LIST);
   __resetExerciseCatalogCacheForTests();
+  exerciseEditorPage.reset();
 });
 
 afterEach(() => {
@@ -405,7 +416,7 @@ describe('Add exercise route', () => {
   };
 
   it('copies a standard exercise: its seed id, name, and weight entry', async () => {
-    const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
+    const seed = STANDARD_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
     api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
     await renderNew();
     expect(screen.queryByTestId('group-exercise-form')).toBeNull();
@@ -746,12 +757,19 @@ describe('Link your exercise (E0.4, link-only pick sheet)', () => {
     fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
     // None of my exercises matches, so Add as new is preselected.
     expect(screen.getByTestId('group-pick-sheet-option-add-new').props.accessibilityState).toMatchObject({ checked: true });
+    mockRouter.push.mockImplementationOnce((href: unknown) => exerciseEditorPage.push(href));
+    mockRouter.back.mockImplementationOnce(() => exerciseEditorPage.back());
     fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
 
+    // The editor page opens to create my exercise, prefilled from the group's.
+    const [href] = exerciseEditorHrefs(mockRouter.push);
+    expect(exerciseEditorParams(href).exerciseDefinitionId).toBeNull();
+    expect(readExerciseEditorRequest(exerciseEditorParams(href).request)?.title).toBe('Add as new exercise');
     expect(await screen.findByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bench Press');
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Save exercise definition'));
     });
+    expect(exerciseEditorPage.isOpen()).toBe(false);
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -58,7 +58,7 @@ http_request() {
   fi
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -105,7 +105,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -264,13 +264,13 @@ SEED_PAYLOAD="$(jq -nc \
 
     # Layer 3 — session_exercises (parent for the Layer 4 sets/tags below).
     {type: "session_exercises", id: ("pd-" + $tag + "-sx-1"), client_updated_at_ms: ($b + 120),
-     fields: {session_id: ("pd-" + $tag + "-sess-1"),
+     fields: {merge_revision: 0, session_id: ("pd-" + $tag + "-sess-1"),
               exercise_definition_id: ("pd-" + $tag + "-ed-1"),
               source_plan_exercise_id: null,
               order_index: 0, name: "SX1", machine_name: null,
               created_at: ($b + 120), updated_at: ($b + 120), deleted_at: null}},
     {type: "session_exercises", id: ("pd-" + $tag + "-sx-2"), client_updated_at_ms: ($b + 130),
-     fields: {session_id: ("pd-" + $tag + "-sess-2"),
+     fields: {merge_revision: 0, session_id: ("pd-" + $tag + "-sess-2"),
               exercise_definition_id: ("pd-" + $tag + "-ed-2"),
               source_plan_exercise_id: null,
               order_index: 0, name: "SX2", machine_name: "Smith",
@@ -278,25 +278,25 @@ SEED_PAYLOAD="$(jq -nc \
 
     # Layer 4
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-1"), client_updated_at_ms: ($b + 140),
-     fields: {session_exercise_id: ("pd-" + $tag + "-sx-1"), source_plan_set_id: null, order_index: 0,
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-1"), source_plan_set_id: null, order_index: 0,
               weight_value: "100", reps_value: "8", set_type: "rir_4",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
               created_at: ($b + 140), updated_at: ($b + 140), deleted_at: null}},
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-2"), client_updated_at_ms: ($b + 150),
-     fields: {session_exercise_id: ("pd-" + $tag + "-sx-2"), source_plan_set_id: null, order_index: 0,
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-2"), source_plan_set_id: null, order_index: 0,
               weight_value: "120", reps_value: "5", set_type: "rir_0",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
               created_at: ($b + 150), updated_at: ($b + 150), deleted_at: null}},
     {type: "session_exercise_tags", id: ("pd-" + $tag + "-sxtag-1"),
      client_updated_at_ms: ($b + 160),
-     fields: {session_exercise_id: ("pd-" + $tag + "-sx-1"),
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-1"),
               exercise_tag_definition_id: ("pd-" + $tag + "-etd-1"),
               created_at: ($b + 160), deleted_at: null}},
     {type: "session_exercise_tags", id: ("pd-" + $tag + "-sxtag-2"),
      client_updated_at_ms: ($b + 170),
-     fields: {session_exercise_id: ("pd-" + $tag + "-sx-2"),
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-2"),
               exercise_tag_definition_id: ("pd-" + $tag + "-etd-2"),
               created_at: ($b + 170), deleted_at: null}}
   ]}')"

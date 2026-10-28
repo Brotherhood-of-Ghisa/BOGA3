@@ -10,7 +10,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, Share, type AlertButton } from 'react-native';
+import { Alert, Share, StyleSheet, type AlertButton } from 'react-native';
 
 import { competitionExercise } from './helpers/competition-fixtures';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -85,8 +85,9 @@ import {
   type GroupSummary,
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
-import GroupsTabRoute from '../app/(tabs)/groups';
+import GroupsTabRoute from '../app/groups';
 import EditGroupRoute from '../app/group/[groupId]/edit';
 import GroupScreenRoute from '../app/group/[groupId]/index';
 import GroupMembersRoute from '../app/group/[groupId]/members';
@@ -295,6 +296,9 @@ describe('Join group (flow 3)', () => {
     expect(await screen.findByTestId('group-join-preview-name')).toHaveTextContent('Garage Gym');
     expect(screen.getByTestId('group-join-code-input').props.value).toBe('ABCD2345');
     expect(screen.getByTestId('group-join-preview-meta')).toHaveTextContent('3 members');
+    // Words in the body face; only the count takes Plex Mono.
+    expect(StyleSheet.flatten(screen.getByTestId('group-join-preview-meta').props.style).fontFamily).toBe(uiFonts.body.family);
+    expect(within(screen.getByTestId('group-join-preview-meta')).getByText('3')).toHaveStyle({ fontFamily: uiFonts.figure.family });
     expect(api.previewGroupInvite).toHaveBeenCalledWith('ABCD2345');
 
     await act(async () => {
@@ -377,6 +381,10 @@ describe('Invite (flow 2)', () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
     render(<GroupInviteRoute />);
     expect(await screen.findByTestId('group-invite-code')).toHaveTextContent('ABCD2345');
+    // The code is a headline figure, untracked like every other.
+    const codeStyle = StyleSheet.flatten(screen.getByTestId('group-invite-code').props.style);
+    expect(codeStyle).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xxl });
+    expect(codeStyle.letterSpacing).toBeUndefined();
     expect(screen.getByTestId('group-invite-link')).toHaveTextContent('boga3://group/join?code=ABCD2345');
     await waitFor(() => expect(screen.getByText('Invite friends to Garage Gym')).toBeTruthy());
     expect(screen.queryByText(/Anyone with this code can join/)).toBeNull();

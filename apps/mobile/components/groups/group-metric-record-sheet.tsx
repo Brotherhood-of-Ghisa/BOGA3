@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { Text, Alert, ScrollView } from 'react-native';
 
-import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, uiSpace } from '@/components/ui';
+import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
 import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -14,7 +14,6 @@ import {
 import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionCertificationWire as GroupMetricCertificationWire,CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 import { useMetricCertification } from '@/src/groups/use-metric-certification';
 import { GroupWriteNotice } from './write-notice';
-import { groupMetricTextStyles as textStyles } from './screen-styles';
 
 /** A metric attestation always submits the revision and random write token shown here. */
 export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole, onClose, onChanged, readOnlyReason, initialCertification, metricOptions, onSelectMetric, onHistory }: {
@@ -46,9 +45,9 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
-      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</Text>
-      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">{formatSetFigure(row.performance)}</Text>
-      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{model.statusText}</Text>
+      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-who">{formatBoardMemberLabel(row.member, row.former, userId)} · <FigureText>{formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</FigureText></Text>
+      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-raw"><FigureText>{formatSetFigure(row.performance)}</FigureText></Text>
+      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-status"><FigureText>{model.statusText}</FigureText></Text>
       <MutedLine text={model.readOnlyNote} />
       <MutedLine text={model.offlineNote} />
       <MutedLine text={model.ownPerformanceNote} />
@@ -69,5 +68,5 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
 }
 
 function MutedLine({ text }: { text: string | null }) {
-  return text ? <Text allowFontScaling={false} style={textStyles.muted}>{text}</Text> : null;
+  return text ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{text}</Text> : null;
 }

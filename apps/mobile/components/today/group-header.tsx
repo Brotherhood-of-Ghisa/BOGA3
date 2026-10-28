@@ -4,10 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GroupSwitchSheet } from '@/components/groups/group-switch-sheet';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type TodayGroupHeaderProps = {
-  /** The primary group's name; the section is named after it. */
+  /** The primary group's name. */
   groupName: string;
   /** Opens the group on the Groups screen, At a glance. */
   onOpenHome: () => void;
@@ -18,9 +19,9 @@ export type TodayGroupHeaderProps = {
 };
 
 /**
- * Today's group section heading: the primary group's name, which opens that
- * group At a glance, and the switch beside it that changes which group is
- * primary. One group needs no switch.
+ * The group board card's header row: the primary group's name, which opens
+ * that group At a glance, and the switch on the same row that changes which
+ * group is primary. One group needs no switch.
  */
 export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupId, onSelectGroup }: TodayGroupHeaderProps) {
   return (
@@ -32,7 +33,7 @@ export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupI
         onPress={onOpenHome}
         style={({ pressed }) => [styles.title, pressed ? styles.pressed : null]}
         testID="today-group-title">
-        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={styles.titleText}>
+        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={[uiText.title, styles.titleText]}>
           {groupName}
         </Text>
         <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
@@ -73,13 +74,20 @@ export function TodayGroupSwitch({ groups, selectedGroupId, onSelectGroup }: Tod
 }
 
 const styles = StyleSheet.create({
+  // A tap-height row, ruled off from the board below it.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
+    minHeight: uiGeometry.tapTarget,
+    paddingLeft: uiSpace.md,
+    paddingRight: uiSpace.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: uiRoles.ruleSoft,
   },
   title: {
     flex: 1,
+    alignSelf: 'stretch',
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -91,10 +99,5 @@ const styles = StyleSheet.create({
   },
   titleText: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });

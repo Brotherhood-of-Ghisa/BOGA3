@@ -1,11 +1,11 @@
 import { formatCalendarDate } from '@/src/utils/local-time';
 import { useDateFormat } from '@/src/preferences/hooks';
-// The virtualized month list owns scrolling. Calendar layout follows
+// The virtualized month list owns scrolling; empty months keep only headings.
 // Figure visibility follows [[copy.blank-history]].
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiRoles, uiSpace, uiText } from '@/components/ui';
 import { buildCalendarMonths, type CalendarMonth, type CalendarWeek } from './daily-calendar';
 import { CalendarTile } from './calendar-tile';
 import { heatmapStyles } from './heatmap-style';
@@ -20,7 +20,6 @@ interface Props {
   testIDPrefix: string;
   metricLabel: string;
   formatValue: (value: number) => string;
-  legendLabel?: string;
   header?: ReactNode;
   /** Opens a day's sessions. */
   onOpenDay?: (day: DayCell) => void;
@@ -42,7 +41,7 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   const dateFormat = useDateFormat();
   const week = row.week;
   return <View style={styles.row} testID={`${testID}-row-${row.weekStartDateKey}`}>
-    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={styles.rowLabel}
+    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={[uiText.figureSmall, styles.rowLabel]}
       testID={`${testID}-row-label-${row.weekStartDateKey}`}>{row.startDay}</Text>
     <View style={[styles.cells, { gap }]}>
       {row.days.map(day => day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={formatCalendarDate(day.dateKey, dateFormat)}
@@ -65,12 +64,14 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
 }
 
 function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<typeof CalendarRow>[0], 'row' | 'monthKey'>) {
+  const hasTraining = month.weeks.some(row => row.days.some(({ day, future }) =>
+    !future && day && (day.hasTraining ?? day.value > 0)));
   return <View style={styles.month} testID={`${props.testID}-month-${month.key}`}>
-    <Text allowFontScaling={false} accessibilityRole="header" style={styles.monthTitle} testID={`${props.testID}-month-title-${month.key}`}>{month.title}</Text>
-    <View style={styles.calendar}>
+    <Text allowFontScaling={false} accessibilityRole="header" style={uiText.meta} testID={`${props.testID}-month-title-${month.key}`}><FigureText>{month.title}</FigureText></Text>
+    {hasTraining ? <View style={styles.calendar}>
       <View style={styles.row}>
         <View style={styles.labelSpacer} />
-        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
+        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[uiText.label, styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
       </View>
       {month.weeks.map(row => <CalendarRow key={row.weekStartDateKey} {...props} row={row} monthKey={month.key} />)}
       {/* Eight equal columns, with an extra Week margin: place the rule at
@@ -78,11 +79,11 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
       <View pointerEvents="none" style={styles.gridOverlay}>
         <View style={[styles.weekSeparator, { transform: [{ translateX: (props.gap - uiSpace.sm) * 3 / 8 + uiBorder.width / 2 }] }]} testID={`${props.testID}-week-separator-${month.key}`} />
       </View>
-    </View>
+    </View> : null}
   </View>;
 }
 
-export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day', header, onOpenDay, onOpenWeek }: Props) {
+export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, header, onOpenDay, onOpenWeek }: Props) {
   const [width, setWidth] = useState(0);
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
@@ -100,8 +101,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       testID={`${testIDPrefix}-scroll`}
-      ListHeaderComponent={<View style={styles.header}>{header}</View>}
-      ListFooterComponent={<HeatmapLegend label={legendLabel} target={!!data.targetGrading} />}
+      ListHeaderComponent={<View style={styles.header}>{header}<HeatmapLegend target={!!data.targetGrading} /></View>}
     />
   </View>;
 }
@@ -111,19 +111,15 @@ const styles = StyleSheet.create({
   content: { paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm, gap: uiSpace.lg },
   header: { gap: uiSpace.lg, paddingTop: uiSpace.xs },
   month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: uiRoles.rule },
-  monthTitle: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
   calendar: { position: 'relative', gap: uiSpace.xs },
   weekSeparator: { position: 'absolute', top: 0, bottom: 0, right: '12.5%', width: uiBorder.width, backgroundColor: uiRoles.rule },
   row: { flexDirection: 'row', gap: uiSpace.xs, alignItems: 'center' },
   cells: { flex: 1, minWidth: 0, flexDirection: 'row' },
   labelSpacer: { width: ROW_LABEL_WIDTH },
-  rowLabel: { width: ROW_LABEL_WIDTH, textAlign: 'right', fontFamily: uiFonts.figure.family, fontWeight: '400',
-    fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
+  rowLabel: { width: ROW_LABEL_WIDTH, textAlign: 'right' },
   gridOverlay: { position: 'absolute', left: ROW_LABEL_GUTTER, right: 0, top: 0, bottom: 0 },
   blankTile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget },
-  column: { flex: 1, minWidth: 0, textAlign: 'center', fontFamily: uiFonts.display.family,
-    fontWeight: '600', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
+  column: { flex: 1, minWidth: 0, textAlign: 'center' },
 });
 
 export default DailyHeatmap;

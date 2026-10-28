@@ -1,12 +1,9 @@
-import {
-  getCalendarHeatmapBucket,
-  type CalendarHeatmapBucket,
-} from '@/components/heatmaps/heatmap-metric';
 import { hexToLch, lchToHex } from '@/components/ui/lch';
 import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
+import { formatCountDelta, formatVolumeDelta } from './comparison-format';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
@@ -18,20 +15,14 @@ export type BodyOrientation = 'front' | 'back';
 
 export type ThemeShadeRoles = Pick<
   typeof uiRoles,
-  'paper' | 'rule' | 'ink' | 'viz0' | 'viz1' | 'viz2' | 'viz3' | 'viz4'
+  'paper' | 'rule' | 'ink' | 'viz1' | 'viz2' | 'viz4'
 >;
+
+export type MuscleChangeBucket = 0 | 1 | 2 | 3;
 
 export type ThemeShadePalette = {
   readonly neutral: readonly string[];
   readonly buckets: readonly [
-    readonly string[],
-    readonly string[],
-    readonly string[],
-    readonly string[],
-    readonly string[],
-  ];
-  readonly selected: readonly [
-    readonly string[],
     readonly string[],
     readonly string[],
     readonly string[],
@@ -125,31 +116,21 @@ export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
 
-const readMetricValue = (
-  row: ProgressMuscleComparison,
-  metric: ProgressMetric
-): number => {
-  const raw = row.current[metric];
-  return raw !== null && Number.isFinite(raw) && raw > 0 ? raw : 0;
-};
-
-/**
- * Maps each muscle group to its 0..4 sequential intensity bucket relative to
- * the highest-trained muscle in the current period for `metric`.
- */
+/** Follows [[comparison.colour-scale]] and the displayed change's rounding. */
 export function computeMuscleBuckets(
   muscles: readonly ProgressMuscleComparison[],
-  metric: ProgressMetric
-): ReadonlyMap<string, CalendarHeatmapBucket> {
-  let maxValue = 0;
+  metric: ProgressMetric,
+): ReadonlyMap<string, MuscleChangeBucket> {
+  const buckets = new Map<string, MuscleChangeBucket>();
   for (const row of muscles) {
-    const val = readMetricValue(row, metric);
-    if (val > maxValue) maxValue = val;
-  }
-  const buckets = new Map<string, CalendarHeatmapBucket>();
-  for (const row of muscles) {
-    const val = readMetricValue(row, metric);
-    const bucket = getCalendarHeatmapBucket(val, 0, maxValue);
+    const current = row.current[metric];
+    const previous = row.previous[metric];
+    const comparable = current !== null && previous !== null
+      && Number.isFinite(current) && Number.isFinite(previous) && (current > 0 || previous > 0);
+    const { tone } = metric === 'workingSetCount'
+      ? formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount)
+      : formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume);
+    const bucket = !comparable ? 0 : tone === 'negative' ? 1 : tone === 'neutral' ? 2 : 3;
     buckets.set(row.muscleGroupId, bucket);
     buckets.set(canonicalMuscleId(row.muscleGroupId), bucket);
   }
@@ -173,8 +154,7 @@ const buildShadeRamp = (
 };
 
 /**
- * Precomputes LCh-shaded facet ramps from the active theme's sequential `viz0..viz4`
- * and neutral `paper`/`rule` roles so every 3D facet stays faithful to the theme.
+ * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]).
  */
 export function buildThemeShadePalette(
   roles: ThemeShadeRoles = uiRoles
@@ -186,23 +166,15 @@ export function buildThemeShadePalette(
     chroma: (paperC + ruleC) / 2,
     hue: paperH,
   });
-  const vizSeeds = [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4] as const;
+  const neutral = buildShadeRamp(neutralBase, 18);
 
   return {
-    neutral: buildShadeRamp(neutralBase, 18),
+    neutral,
     buckets: [
-      buildShadeRamp(vizSeeds[0], 20),
-      buildShadeRamp(vizSeeds[1], 22),
-      buildShadeRamp(vizSeeds[2], 22),
-      buildShadeRamp(vizSeeds[3], 22),
-      buildShadeRamp(vizSeeds[4], 22),
-    ],
-    selected: [
-      buildShadeRamp(vizSeeds[0], 22, -6, 1.15),
-      buildShadeRamp(vizSeeds[1], 22, -5, 1.15),
-      buildShadeRamp(vizSeeds[2], 22, -5, 1.15),
-      buildShadeRamp(vizSeeds[3], 22, -4, 1.15),
-      buildShadeRamp(vizSeeds[4], 22, -4, 1.15),
+      neutral,
+      buildShadeRamp(roles.viz1, 22),
+      buildShadeRamp(roles.viz2, 22),
+      buildShadeRamp(roles.viz4, 22),
     ],
     selectedStroke: roles.ink,
   };
@@ -245,7 +217,7 @@ type ProjectionContext = {
   readonly verts: RotatedVertices;
   readonly materials: readonly MuscleBodyMaterialId[];
   readonly report?: MuscleReportAssignment;
-  readonly buckets: ReadonlyMap<string, CalendarHeatmapBucket>;
+  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
   readonly selectedCanonicalId: string | null;
   readonly palette: ThemeShadePalette;
 };
@@ -483,7 +455,7 @@ export type ProjectMuscleBodyOptions = {
   readonly angleDeg: number;
   readonly width: number;
   readonly height: number;
-  readonly buckets: ReadonlyMap<string, CalendarHeatmapBucket>;
+  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
   readonly selectedId?: string | null;
   /** The user's muscle setup; unset shows every anatomy entry as its own muscle. */
   readonly report?: MuscleReportAssignment;

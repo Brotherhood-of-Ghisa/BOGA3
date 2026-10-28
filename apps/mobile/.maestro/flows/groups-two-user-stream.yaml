@@ -316,9 +316,8 @@ appId: com.dinoderek.mobile
       STEP: push-complete-edit
 # The native back arrow returns to the stream on every visit, not just the first:
 # react-native-screens 4.16 on iOS 26 left it dead from the second visit on.
-# Its accessibility label is the previous route's title: Groups is a tab, and
-# the root stack titles the `(tabs)` group "Back"
-# (components/navigation/root-stack.tsx).
+# Its label is the previous route's title on some iOS runtimes ("Groups"),
+# "Back" on others, so tap it by UIKit's stable `BackButton` identifier.
 - repeat:
     times: 2
     commands:
@@ -328,7 +327,8 @@ appId: com.dinoderek.mobile
           visible:
             id: "group-session-summary"
           timeout: 15000
-      - tapOn: "Back"
+      - tapOn:
+          id: "BackButton"
       - extendedWaitUntil:
           visible:
             id: "groups-stream-list"

@@ -220,7 +220,8 @@ export const useExerciseCatalogComparison = (
   const periods = useMemo(() => {
     const now = new Date(snapshot.loadedAt);
     const windows = progressComparisonWindows(weeks, now);
-    const historyStart = historyWeekBounds(historyLookbackWeeks, now).start;
+    const history = historyWeekBounds(historyLookbackWeeks, now);
+    const historyStart = history.start;
     return {
       current: aggregateExerciseCatalogStats(raw, windows.current, now, { gymId, historyStart }),
       previous: aggregateExerciseCatalogStats(raw, windows.previous, now, { gymId, historyStart }),

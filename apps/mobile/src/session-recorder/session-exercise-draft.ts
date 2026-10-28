@@ -42,12 +42,13 @@ export type SessionExerciseDraftLoad =
       gymId: string | null;
       // Every block of the session as loaded, in session order: a record is
       // the session's, not a block's (`sessionRecordBlocks` picks this
-      // exercise's blocks at render, so a swap regroups them).
+      // exercise's blocks at render, so a swap regroups them). The title's
+      // exercise switcher lists them too.
       sessionBlocks: SessionBlock[];
     }
   | { status: SessionExerciseDraftLoadError };
 
-export type SessionBlock = Pick<SessionDraftExerciseSnapshot, 'id' | 'exerciseDefinitionId' | 'sets'>;
+export type SessionBlock = Pick<SessionDraftExerciseSnapshot, 'id' | 'exerciseDefinitionId' | 'name' | 'sets'>;
 
 export class SessionExerciseDraftError extends Error {
   constructor(readonly reason: SessionExerciseDraftLoadError) {
@@ -68,7 +69,7 @@ export const loadSessionExerciseDraft = async (
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
-  const sessionBlocks = session.exercises.map(({ id, exerciseDefinitionId, sets }) => ({ id, exerciseDefinitionId, sets }));
+  const sessionBlocks = session.exercises.map(({ id, exerciseDefinitionId, name, sets }) => ({ id, exerciseDefinitionId, name, sets }));
   return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, sessionBlocks, bodyWeight: {
     bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
     bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
@@ -79,6 +80,7 @@ export const loadSessionExerciseDraft = async (
 export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDraftExerciseInput => ({
   id: exercise.id,
   exerciseDefinitionId: exercise.exerciseDefinitionId,
+  mergeRevision: exercise.mergeRevision ?? 0,
   name: exercise.name,
   machineName: exercise.machineName,
   sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
@@ -106,6 +108,7 @@ export const saveSessionExerciseDraft = async (
   sessionId: string,
   change: {
     sessionExerciseId: string;
+    mergeRevision?: number;
     exercise: SessionDraftExerciseSnapshot | null;
     // The status the page loaded the session with.
     sessionStatus: SessionGraphSnapshot['status'];
@@ -131,6 +134,10 @@ export const saveSessionExerciseDraft = async (
     gymId: session.gymId,
     startedAt: session.startedAt,
     sourcePlanId: session.sourcePlanId ?? null,
+    mergeRevisions: {
+      ...Object.fromEntries(session.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
+      [change.sessionExerciseId]: change.mergeRevision ?? change.exercise?.mergeRevision ?? 0,
+    },
     exercises: exercises.map(toSessionExerciseInput),
   };
   if (session.status === 'completed') {

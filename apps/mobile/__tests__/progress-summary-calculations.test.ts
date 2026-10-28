@@ -6,6 +6,7 @@
  */
 import type { StatsAggregationInput } from '@/src/data/stats';
 import {
+  buildSessionExerciseLines,
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
@@ -27,6 +28,7 @@ const LATEST: LatestSessionSummary = {
   workingSets: 12,
   exerciseCount: 3,
   records: [{ kind: 'oneRepMax', exerciseName: 'Bench Press', value: 102.5, reps: null }],
+  exercises: [],
 };
 
 const session = (id: string, completedAt: Date, workingSets: number): ProgressSession => ({ id, completedAt, workingSets });
@@ -190,5 +192,52 @@ describe('workingSetsBySession', () => {
 
     expect(workingSetsBySession(input).map(({ id, workingSets }) => [id, workingSets]))
       .toEqual([['a', 3], ['b', 1]]);
+  });
+});
+
+describe("a session's exercise lines", () => {
+  const fact = (exerciseDefinitionId: string, workingSets: number, bestE1rmSetId: string | null, ownPrE1rm = false) => ({
+    exerciseDefinitionId,
+    workingSets,
+    bestE1rmKg: bestE1rmSetId ? 116.64 : null,
+    bestE1rmSetId,
+    ownPrE1rm,
+  });
+  const bestSets = new Map([['bench-best', { weightKg: 100, reps: 5 }], ['row-best', { weightKg: 70, reps: 8 }]]);
+
+  it('keeps session order, one line per exercise, where it first appears, its best set the highest-1RM working set', () => {
+    const lines = buildSessionExerciseLines(
+      [
+        { exerciseDefinitionId: 'bench', name: ' Bench Press ' },
+        { exerciseDefinitionId: 'row', name: 'Row' },
+        { exerciseDefinitionId: 'bench', name: 'Bench Press (again)' },
+      ],
+      [fact('row', 2, 'row-best'), fact('bench', 5, 'bench-best', true)],
+      bestSets,
+    );
+    expect(lines).toEqual([
+      { name: 'Bench Press', workingSets: 5, bestSet: { weightKg: 100, reps: 5, oneRepMaxKg: 116.64 }, oneRepMaxRecord: true },
+      { name: 'Row', workingSets: 2, bestSet: { weightKg: 70, reps: 8, oneRepMaxKg: 116.64 }, oneRepMaxRecord: false },
+    ]);
+  });
+
+  it('has no best set, and no PR, without a working set', () => {
+    const lines = buildSessionExerciseLines(
+      [
+        { exerciseDefinitionId: 'curl', name: 'Curl' },
+        { exerciseDefinitionId: 'press', name: 'Press' },
+        { exerciseDefinitionId: null, name: 'Legacy lift' },
+        { exerciseDefinitionId: null, name: 'Another legacy lift' },
+      ],
+      // Volume-only: a fact with no working set. A best set missing from the read.
+      [fact('curl', 0, null, true), fact('press', 3, 'gone', true)],
+      bestSets,
+    );
+    expect(lines.map((line) => [line.name, line.workingSets, line.bestSet, line.oneRepMaxRecord])).toEqual([
+      ['Curl', 0, null, false],
+      ['Press', 3, null, false],
+      ['Legacy lift', 0, null, false],
+      ['Another legacy lift', 0, null, false],
+    ]);
   });
 });

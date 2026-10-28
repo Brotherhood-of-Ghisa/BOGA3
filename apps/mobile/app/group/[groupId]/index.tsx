@@ -17,10 +17,11 @@ import {
 import {
   ActionButton,
   Icon,
+  FigureText,
   ListRow,
-  uiFonts,
   uiRoles,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupNotificationMuteRow } from '@/components/notifications/group-mute-row';
@@ -124,8 +125,8 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           density="list"
           label="Members"
           meta={
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.memberLine} testID="group-screen-meta">
-              {memberLine}
+            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, uiTextTone.muted, styles.memberLine]} testID="group-screen-meta">
+              <FigureText>{memberLine}</FigureText>
             </Text>
           }
           onPress={() => router.push(`/group/${groupId}/members`)}
@@ -185,10 +186,5 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
 const styles = StyleSheet.create({
   memberLine: {
     flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

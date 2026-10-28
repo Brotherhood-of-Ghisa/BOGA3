@@ -4,7 +4,7 @@ import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, ChoiceRow, FormActionRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
@@ -194,30 +194,32 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           accessibilityLabel="Plan title"
           autoCapitalize="sentences"
           error={errors.get('title')}
+          face="text"
           label="Title"
           onChangeText={(title) => patchForm({ title })}
           placeholder="e.g. Heavy squat day"
           testID="plan-form-title"
           value={form.title}
         />
-        <ListRow
-          accessibilityLabel={`Plan schedule, ${planScheduleLabel(form.scheduleText, dateFormat)}`}
-          density="list"
-          divider
-          description={planScheduleLabel(form.scheduleText, dateFormat)}
-          label="Schedule (optional)"
-          onPress={() => setScheduleSheetOpen(true)}
-          testID="plan-form-schedule"
-        />
-        <ListRow
-          accessibilityLabel={`Plan gym, ${form.gymId === null ? 'none' : 'selected'}`}
-          density="list"
-          divider
-          description={form.gymId === null ? 'None' : gyms?.find((gym) => gym.id === form.gymId)?.name ?? 'Selected'}
-          label="Gym (optional)"
-          onPress={() => void openGymSheet()}
-          testID="plan-form-gym"
-        />
+        <FormSection title="When and where">
+          <ChoiceRow
+            accessibilityLabel={`Plan schedule, ${planScheduleLabel(form.scheduleText, dateFormat)}`}
+            label="Schedule"
+            onPress={() => setScheduleSheetOpen(true)}
+            placeholder="Unscheduled"
+            testID="plan-form-schedule"
+            value={form.scheduleText.trim() ? planScheduleLabel(form.scheduleText, dateFormat) : null}
+          />
+          <ChoiceRow
+            accessibilityLabel={`Plan gym, ${form.gymId === null ? 'none' : 'selected'}`}
+            divider
+            label="Gym"
+            onPress={() => void openGymSheet()}
+            placeholder="No gym"
+            testID="plan-form-gym"
+            value={form.gymId === null ? null : gyms?.find((gym) => gym.id === form.gymId)?.name ?? 'Selected'}
+          />
+        </FormSection>
         {form.blocks.map((block, index) => (
           <PlanBlockEditor
             block={block}
@@ -234,21 +236,18 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
             onRemoveSet={removeSet}
           />
         ))}
-        <ListRow
-          accessibilityLabel="Add exercise block to the plan"
-          density="list"
-          divider
-          label="Add exercise"
-          onPress={() => setPickRequest({ blockId: null })}
-          testID="plan-form-add-block"
-        />
-        {errors.get('exercises') ? (
-          <Text allowFontScaling={false} style={styles.error} testID="plan-form-blocks-error">
-            {errors.get('exercises')}
-          </Text>
-        ) : null}
+        <Card>
+          <FormActionRow
+            accessibilityLabel="Add exercise block to the plan"
+            icon="plus"
+            label="Add exercise"
+            onPress={() => setPickRequest({ blockId: null })}
+            testID="plan-form-add-block"
+          />
+        </Card>
+        <FormError message={errors.get('exercises')} testID="plan-form-blocks-error" />
         {form.blocks.length === 0 ? (
-          <Text allowFontScaling={false} style={styles.hint} testID="plan-form-blocks-empty">
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="plan-form-blocks-empty">
             A plan needs at least one exercise.
           </Text>
         ) : null}
@@ -298,19 +297,5 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: uiSpace.md,
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  error: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
   },
 });

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
+import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 
 import { DailyHeatmap, HEAT_RAMP, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { uiRoles } from '@/components/ui';
@@ -40,6 +41,15 @@ const renderDaily = () =>
   );
 
 describe('DailyHeatmap marks', () => {
+  it('puts the 0–100% maximum legend in the list header, before the calendars', () => {
+    renderDaily();
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.ListFooterComponent).toBeUndefined();
+    expect(screen.getByText('% of max')).toBeTruthy();
+    expect(screen.getByText('0%')).toBeTruthy();
+    expect(screen.getByText('100%')).toBeTruthy();
+    expect(list.props.ListHeaderComponent.props.children.at(-1).type).toBe(HeatmapLegend);
+  });
   it('announces today without selecting or outlining it', () => {
     renderDaily();
 
@@ -83,6 +93,11 @@ describe('DailyHeatmap marks', () => {
 });
 
 describe('WeeklyHeatmap marks', () => {
+  it('puts the maximum legend before the axis and rows', () => {
+    render(<WeeklyHeatmap data={data} metric="totalVolume" testIDPrefix={PREFIX} formatValue={String} />);
+    expect(screen.UNSAFE_getByType(FlatList).props.ListFooterComponent).toBeUndefined();
+    expect(screen.UNSAFE_getByType(FlatList).props.ListHeaderComponent.props.children[1].type).toBe(HeatmapLegend);
+  });
   it('keeps current and past bars borderless, with no selected state', () => {
     render(<WeeklyHeatmap data={data} metric="totalVolume" onOpenWeek={jest.fn()} testIDPrefix={PREFIX} formatValue={String} />);
 
@@ -90,6 +105,13 @@ describe('WeeklyHeatmap marks', () => {
     expect(border(`${PREFIX}-heatmap-bar-2026-05-11`)).toEqual({ borderWidth: undefined, borderColor: undefined });
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`).props.accessibilityState?.selected).toBeFalsy();
   });
+});
+
+it('labels target grading as a 0–100% target share', () => {
+  render(<HeatmapLegend target />);
+  expect(screen.getByText('% of target')).toBeTruthy();
+  expect(screen.getByText('0%')).toBeTruthy();
+  expect(screen.getByText('100%')).toBeTruthy();
 });
 
 

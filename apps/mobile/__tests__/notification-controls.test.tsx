@@ -39,9 +39,10 @@ import { __resetNotificationsForTests, refreshNotificationStatus, startNotificat
 import { setNotificationAccount } from '@/src/notifications/auth-boundary';
 import { __setNotificationNativeAdapterForTests } from '@/src/notifications/native-adapter';
 import type { NotificationNativeAdapter, NotificationPreferences } from '@/src/notifications/types';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { ensurePreferencesLoaded } from '@/src/preferences/hooks';
-import SettingsRoute from '../app/(tabs)/settings';
+import SettingsRoute from '../app/settings';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import { fakeNotificationNative } from './helpers/notification-native';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -110,6 +111,7 @@ it('opens a scrolling sheet and asks permission only after Enable, then can disa
   await waitFor(() => expect(screen.getByLabelText('Notifications, On')).toBeTruthy());
   expect(native.requestPermission).toHaveBeenCalledTimes(1);
   expect(native.readBinding()?.userId).toBe(USER);
+  expect(sheet.getByText('Categories')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
   for (const category of ['activity', 'bests', 'ranks']) {
     expect(sheet.getByTestId(`settings-notifications-${category}`).props.accessibilityState.checked).toBe(true);
   }

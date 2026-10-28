@@ -1,10 +1,12 @@
 /**
- * The Groups screen's heading: the group name as the one-line title (sized to
- * its length, clipped past the last step), the picker behind it, and the
+ * The Groups screen's heading: the group name as the one-line title (the
+ * `title` role at any length, clipped when too long), the picker behind it, and the
  * filter row. The screen's own behaviour is groups-screens.test.tsx.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
+
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
 import { GroupScreenHeader } from '@/components/groups/group-screen-header';
 
@@ -29,26 +31,19 @@ const renderHeader = (overrides: Partial<Parameters<typeof GroupScreenHeader>[0]
     />,
   );
 
-const titleSize = (): number => {
-  const style = StyleSheet.flatten(screen.getByTestId('groups-title-name').props.style) as TextStyle;
-  return style.fontSize ?? 0;
-};
+const titleStyle = (): TextStyle => StyleSheet.flatten(screen.getByTestId('groups-title-name').props.style) as TextStyle;
+const TITLE = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg };
 
 describe('the Groups heading', () => {
-  it('keeps the title on one line and steps its size down as the name grows', () => {
+  it('keeps the title on one line, in the title role whatever the name\'s length', () => {
     renderHeader();
     expect(screen.getByTestId('groups-title-name').props.numberOfLines).toBe(1);
     expect(screen.getByTestId('groups-title-name').props.ellipsizeMode).toBe('tail');
-    const short = titleSize();
-
-    screen.unmount();
-    renderHeader({ groupName: 'Brotherhood of Ghisa' });
-    const medium = titleSize();
-    expect(medium).toBeLessThan(short);
+    expect(titleStyle()).toMatchObject(TITLE);
 
     screen.unmount();
     renderHeader({ groupName: 'The Brotherhood of the Iron Ghisa' });
-    expect(titleSize()).toBeLessThan(medium);
+    expect(titleStyle()).toMatchObject(TITLE);
     // A title says where you are on its own: no line under it.
     expect(screen.queryByTestId('groups-subtitle')).toBeNull();
   });

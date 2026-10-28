@@ -62,9 +62,9 @@ const mockCatalog = {
     },
   ],
   muscleGroups: [
-    { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20 },
-    { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 30 },
-    { id: 'core', displayName: 'Core', familyName: 'Core', sortOrder: 40 },
+    { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20, reportGroup: null, tracked: 1 },
+    { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 30, reportGroup: null, tracked: 1 },
+    { id: 'core', displayName: 'Core', familyName: 'Core', sortOrder: 40, reportGroup: null, tracked: 1 },
   ],
   muscleGroupsById: {
     front_delts: { id: 'front_delts', displayName: 'Side delts', familyName: 'Shoulders', sortOrder: 20 },
@@ -402,13 +402,13 @@ describe('HistoryView', () => {
     // Values are visible and announced directly, without a selection action.
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03-value')).toHaveTextContent(/1200/);
-    expect(screen.getByText('Volume per day')).toBeTruthy();
+    expect(screen.getByText('% of max')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
 
     rerender(<HistoryView {...buildViewProps({ ...props, metric: 'workingSetCount' })} />);
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03-value')).toHaveTextContent(/2/);
     // Muscle Sets colour grades the weekly target, so the ramp names it (0%…100%).
-    expect(screen.getByText('Weekly target')).toBeTruthy();
+    expect(screen.getByText('% of target')).toBeTruthy();
     expect(screen.queryByText('Sets per day')).toBeNull();
   });
 });
@@ -677,15 +677,16 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('grades a muscle page’s Sets against the saved weekly target for that one muscle', async () => {
-    await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 4 }); });
+    await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 8, muscleTargetMode: 'per-muscle',
+      muscleTargetOverrides: { detailed: { front_delts: 4 }, broad: { front_delts: 16 } } }); });
     render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
-    await waitFor(() => expect(screen.getByText('Volume per day')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('% of max')).toBeTruthy());
     expect(stats.computeSelectedMuscleHistoryEffort).toHaveBeenCalledWith(
       expect.objectContaining({ muscleGroupIds: ['front_delts'] })
     );
     // Only Sets is target-graded, and the page grades this one muscle alone.
     await chooseMetric('muscle', 'workingSetCount');
-    expect(screen.getByText('Weekly target')).toBeTruthy();
+    expect(screen.getByText('% of target')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03'))
       .toHaveProp('accessibilityLabel', expect.stringContaining('50% of weekly muscle target'));
   });

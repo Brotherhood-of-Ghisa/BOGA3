@@ -1,6 +1,6 @@
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import {
-  SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
+  STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
 } from '@/src/data/exercise-catalog-seeds';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
@@ -66,7 +66,7 @@ const SEED_MUSCLE_GROUPS_BY_ID = new Map(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) =>
 /** The anatomy entries each bundled-catalogue exercise maps as primary, by its seed id. */
 const SEED_PRIMARY_ENTRY_IDS_BY_ID: ReadonlyMap<string, readonly string[]> = (() => {
   const entryIdsById = new Map<string, string[]>();
-  for (const mapping of SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS) {
+  for (const mapping of STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS) {
     if (mapping.role !== 'primary') continue;
     entryIdsById.set(mapping.exerciseDefinitionId, [...(entryIdsById.get(mapping.exerciseDefinitionId) ?? []), mapping.muscleGroupId]);
   }

@@ -11,8 +11,8 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert, type AlertButton } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Alert, StyleSheet, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -29,10 +29,12 @@ jest.mock('expo-router', () => ({
 
 import { BodyWeightScreen } from '@/components/bodyweight/body-weight-screen';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
+import { WeightEntrySheet } from '@/components/bodyweight/weight-entry-sheet';
 import { __resetBodyweightCalculationPreferenceForTests } from '@/src/bodyweight/calculation-preference';
 import * as bodyweightRepository from '@/src/data/bodyweight';
 import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import * as userSettingsRepository from '@/src/data/user-settings';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -84,6 +86,26 @@ describe('body weight log', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     closeLocalData();
+  });
+
+  it('draws its prose in muted body, its heading as a label and the Measured line\'s figures in Plex Mono', async () => {
+    await bootLocalApp();
+    await seedReading('82.5');
+    render(<BodyWeightScreen />);
+    const flat = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never);
+    const measured = await screen.findByText(/^Measured /);
+    expect(flat(measured)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
+    expect(flat(within(measured).getAllByText(/^\d[\d:.,-]*$/)[0])).toMatchObject({ fontFamily: uiFonts.figure.family });
+    expect(flat(screen.getByText(/latest reading on or before/))).toMatchObject({ fontFamily: uiFonts.body.family, color: uiRoles.inkMuted });
+    expect(flat(screen.getByRole('header', { name: 'Weight history' })))
+      .toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+  });
+
+  it('explains an entry in muted body', () => {
+    render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '' }} measuredAt={new Date()} explanation="Used from this session on."
+      onSave={jest.fn()} onDismiss={jest.fn()} autoFocus={false} />);
+    expect(StyleSheet.flatten(screen.getByText('Used from this session on.').props.style))
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
   });
 
   it('starts empty and saves a kg reading offline into the history', async () => {
@@ -214,14 +236,17 @@ describe('bodyweight calculations and the Settings card', () => {
   it('keeps the body weight log available while the private preference turns off and on', async () => {
     await bootLocalApp();
     render(<><BodyWeightSettingsRow /><BodyWeightScreen /></>);
-    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
+    await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
     // The switch sits at the top of the log, above the current reading.
     const tree = JSON.stringify(screen.toJSON());
     expect(tree.indexOf('settings-bodyweight-calculations-toggle')).toBeLessThan(tree.indexOf('body-weight-current'));
 
+    // A form card's switch row: one accessible switch named for the setting.
+    expect(toggle().props.accessibilityRole).toBe('switch');
+    expect(toggle().props.accessibilityLabel).toBe('Bodyweight calculations');
     for (const [label, enabled] of [['On', true], ['Off', false], ['On', true]] as const) {
       fireEvent.press(toggle());
-      expect(toggle()).toHaveTextContent(label);
+      expect(toggle().props.accessibilityState).toEqual({ checked: enabled });
       expect(cardStatus()).toBe(`Bodyweight, ${label}`);
       expect(screen.getByTestId('body-weight-add')).toBeTruthy();
       await waitFor(() => expect(storedPreference()).toBe(enabled), AFTER_WRITE);
@@ -231,7 +256,7 @@ describe('bodyweight calculations and the Settings card', () => {
   it('reverts an optimistic toggle and shows a retryable error when the write fails', async () => {
     await bootLocalApp();
     render(<BodyWeightScreen />);
-    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
+    await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
 
     // A failed preference write.
     jest.spyOn(userSettingsRepository, 'writeBodyweightCalculationsEnabled')
@@ -242,6 +267,8 @@ describe('bodyweight calculations and the Settings card', () => {
     await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }), AFTER_WRITE);
     expect(screen.getByTestId('settings-bodyweight-calculations-error'))
       .toHaveTextContent('Bodyweight calculations could not be updated. Try again.');
+    expect(StyleSheet.flatten(screen.getByTestId('settings-bodyweight-calculations-error').props.style))
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.danger });
     expect(storedPreference()).toBe(false);
   });
 });

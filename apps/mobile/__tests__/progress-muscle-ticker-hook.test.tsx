@@ -4,10 +4,12 @@ import { useMuscleTickers } from '@/components/stats/use-muscle-tickers';
 import { computeProgressMuscleTickers } from '@/src/data';
 import type { ProgressMuscleTickers } from '@/src/data/progress-muscle-tickers';
 
-const mockPreferences = { values: { historyLookbackWeeks: 52, targetWindowWeeks: 4, weeklyWorkingSetTarget: 8 }, accountRevision: 1 };
+const mockPreferences = { values: { historyLookbackWeeks: 52, targetWindowWeeks: 4, weeklyWorkingSetTarget: 8,
+  muscleTargetMode: 'single' as 'single' | 'per-muscle', muscleTargetOverrides: {} as import('@/src/preferences/muscle-targets').MuscleTargetOverrides }, accountRevision: 1 };
 let mockRevision = 0;
 jest.mock('@/src/data', () => ({ computeProgressMuscleTickers: jest.fn() }));
 jest.mock('@/src/preferences/hooks', () => ({ useAccountLocalPreferenceState: () => mockPreferences }));
+jest.mock('@/src/exercise-catalog/cache', () => ({ useExerciseCatalog: () => ({ status: 'ready', muscleGroups: [] }) }));
 jest.mock('@/src/bodyweight/use-context-revision', () => ({ useBodyWeightContextRevision: () => mockRevision }));
 jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void | (() => void)) => mockReact.useEffect(callback, [callback]) }));
 
@@ -19,7 +21,8 @@ const deferred = () => {
   const promise = new Promise<ProgressMuscleTickers>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 };
-beforeEach(() => { read.mockReset(); mockRevision = 0; mockPreferences.accountRevision = 1; mockPreferences.values.targetWindowWeeks = 4; });
+beforeEach(() => { read.mockReset(); mockRevision = 0; mockPreferences.accountRevision = 1; mockPreferences.values.targetWindowWeeks = 4;
+  mockPreferences.values.muscleTargetMode = 'single'; mockPreferences.values.muscleTargetOverrides = {}; });
 
 it('makes no ticker read for excluded views and isolates late gym/account/settings results', async () => {
   const old = deferred();
@@ -54,4 +57,21 @@ it('hides stale series on a changed training revision and exposes read failure w
   await act(async () => { pending.reject(new Error('read failed')); });
   expect(view.result.current.status).toBe('error');
   expect(view.result.current.data).toBeNull();
+});
+
+it('re-reads effective per-muscle references when a target or mode changes', async () => {
+  read.mockResolvedValue(data());
+  mockPreferences.values.muscleTargetMode = 'per-muscle';
+  mockPreferences.values.muscleTargetOverrides = { detailed: { chest: 12 }, broad: { chest: 18 } };
+  const view = renderHook(() => useMuscleTickers(true));
+  await act(async () => { await Promise.resolve(); });
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ weeklyTargets: { chest: 12 } }));
+  mockPreferences.values.muscleTargetOverrides = { detailed: { chest: 14 } };
+  view.rerender({});
+  await act(async () => { await Promise.resolve(); });
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ weeklyTargets: { chest: 14 } }));
+  mockPreferences.values.muscleTargetMode = 'single';
+  view.rerender({});
+  await act(async () => { await Promise.resolve(); });
+  expect(read).toHaveBeenLastCalledWith({ historyWeeks: 52, rollingWeeks: 4, weeklyTarget: 8, gymId: undefined });
 });

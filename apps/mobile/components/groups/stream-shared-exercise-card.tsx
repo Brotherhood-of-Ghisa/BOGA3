@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
-  ExerciseEditorModal,
+  useOpenExerciseEditor,
   type ExerciseEditorSaveInput,
-} from '@/components/exercise-catalog/exercise-editor-modal';
+} from '@/components/exercise-catalog/exercise-editor-request';
 import {
   ActionButton,
   Card,
@@ -131,8 +131,8 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
   const dateFormat = useDateFormat();
   const catalog = useExerciseCatalog();
   const links = useMyGroupExerciseLinks(item.group_id);
+  const openExerciseEditor = useOpenExerciseEditor();
 
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -243,9 +243,26 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
   };
 
   const handleCustomSaved = (exercise: ExerciseCatalogExercise) => {
-    setIsEditorOpen(false);
     setFeedback(`Added "${exercise.name}" to your exercises.`);
     onAdded?.(exercise.name);
+  };
+
+  const handleOpenCustomizer = () => {
+    openExerciseEditor({
+      title: 'Customize shared exercise',
+      prefill: {
+        name: item.exercise.name,
+        loadInputMode: item.exercise.load_input_mode,
+        bodyweightContribution: item.exercise.bodyweight_contribution,
+        mappings: item.exercise.mappings.map((m) => ({
+          muscleGroupId: m.muscle_group_id,
+          weight: m.weight,
+          role: m.role ?? 'primary',
+        })),
+      },
+      onSave: handleCustomSave,
+      onSaved: handleCustomSaved,
+    });
   };
 
   const testID = `group-stream-shared-exercise-${item.id}`;
@@ -285,7 +302,7 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
             matchingExercise={matchingExercise}
             onDirectAdd={() => void handleDirectAdd()}
             onLinkExisting={() => void handleLinkExisting()}
-            onOpenCustomizer={() => setIsEditorOpen(true)}
+            onOpenCustomizer={handleOpenCustomizer}
             pending={pending}
             testID={testID}
           />
@@ -294,23 +311,6 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
       <Text allowFontScaling={false} style={styles.muted}>
         {date}
       </Text>
-      <ExerciseEditorModal
-        editingExercise={null}
-        onRequestClose={() => setIsEditorOpen(false)}
-        onSave={handleCustomSave}
-        onSaved={handleCustomSaved}
-        prefill={{
-          name: item.exercise.name,
-          loadInputMode: item.exercise.load_input_mode,
-          bodyweightContribution: item.exercise.bodyweight_contribution,
-          mappings: item.exercise.mappings.map((m) => ({
-            muscleGroupId: m.muscle_group_id,
-            weight: m.weight,
-            role: m.role ?? 'primary',
-          })),
-        }}
-        visible={isEditorOpen}
-      />
     </Card>
   );
 }

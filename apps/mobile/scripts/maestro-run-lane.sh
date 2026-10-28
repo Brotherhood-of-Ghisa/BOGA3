@@ -180,6 +180,8 @@ case "$lane" in
   sync-e2e)
     export_local_supabase_env
     "$REPO_ROOT/supabase/scripts/sync-e2e-fixture-reset.sh"
+    MAESTRO_ROUNDTRIP_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
+    MAESTRO_ROUNDTRIP_SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
     MAESTRO_ROUNDTRIP_EMAIL="$USER_B_EMAIL" \
     MAESTRO_ROUNDTRIP_PASSWORD="$USER_B_PASSWORD" \
     run_flow full "First-run log and remote round-trip" sync-first-run-log-and-roundtrip.yaml

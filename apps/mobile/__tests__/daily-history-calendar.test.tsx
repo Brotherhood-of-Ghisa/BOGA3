@@ -105,7 +105,7 @@ it('opens a day with sessions and a Week tile with training, and offers no rest 
 });
 
 it('leaves rest and unavailable figures blank, retains numeric zero and clips future weeks', () => {
-  draw('totalVolume', [sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
+  draw('totalVolume', [sample('2026-10-05', 0), sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01').props.accessibilityLabel).toContain('Rest');
   expect(screen.queryAllByText('Rest')).toEqual([]);
@@ -169,11 +169,11 @@ it('preserves muscle target grading on daily and weekly tiles', () => {
   expect(style('calendar-heatmap-cell-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
   expect(style('calendar-heatmap-week-2026-10-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
   expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-05').props.accessibilityLabel).toContain('30% of weekly muscle target');
-  for (const text of ['Weekly target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  for (const text of ['% of target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
   expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
-it('announces a grouped muscle target as averaged, and keeps Less…More for other metrics', () => {
+it('announces grouped target attainment and labels other metrics as a maximum share', () => {
   const sets = [{ ...sample('2026-10-05', 1), workingSetCount: 3, workingSetCountsByMuscle: { chest: 3 } }];
   const grouped = buildHeatmapData(sets, 'workingSetCount',
     { todayDateKey: today, weeks: 1, muscleTargets: { muscleIds: ['chest', 'triceps'], weeklyTarget: 10 } });
@@ -183,9 +183,9 @@ it('announces a grouped muscle target as averaged, and keeps Less…More for oth
   unmount();
 
   render(<DailyHeatmap data={buildHeatmapData(sets, 'totalVolume', { todayDateKey: today, weeks: 1 })}
-    testIDPrefix={prefix} metricLabel="Volume" formatValue={String} legendLabel="Volume per day" />);
-  for (const text of ['Volume per day', 'Less', 'More']) expect(screen.getByText(text)).toBeTruthy();
-  expect(screen.queryByText('Weekly target')).toBeNull();
+    testIDPrefix={prefix} metricLabel="Volume" formatValue={String} />);
+  for (const text of ['% of max', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  expect(screen.queryByText('% of target')).toBeNull();
 });
 
 it('updates the displayed history when its metric or look-back window changes', () => {
@@ -216,9 +216,10 @@ it.each([320, 375, 402, 448])('centres the Sun/Week separator in a wider gap at 
   expect(style('calendar-heatmap-week-2026-09-2026-09-28').marginLeft).toBe(uiSpace.sm);
   expect(style('calendar-heatmap-empty-week-2026-10-2026-10-05').marginLeft).toBe(uiSpace.sm);
   const date = style('calendar-heatmap-row-label-2026-10-05');
-  expect(date).toMatchObject({ width: uiSpace.xl, textAlign: 'right', fontSize: uiTypography.size.xxs, color: uiRoles.inkMuted });
+  expect(date).toMatchObject({ width: uiSpace.xl, textAlign: 'right', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted });
   expect(date.position).toBeUndefined();
-  expect(date.fontSize).toBeLessThan(style('calendar-heatmap-cell-2026-10-05-value').fontSize);
+  // Both are `figureSmall`: the date stays quieter than a tile's value by its muted colour.
+  expect(style('calendar-heatmap-cell-2026-10-05-value')).toMatchObject({ fontSize: date.fontSize, color: uiRoles.ink });
 });
 
 it('shows a cross-month total on Sunday with sampled rest days preceding the first workout', () => {
@@ -263,4 +264,28 @@ it('keeps the full window in the month list while mounting only the initial mont
   const older = list.props.data.at(-1);
   const oldMonth = render(list.props.renderItem({ item: older, index: 24 }));
   expect(oldMonth.getByTestId(`calendar-heatmap-month-title-${older.key}`)).toBeTruthy();
+});
+
+
+it.each([0, null])('collapses rest months to headings while retaining zero/unavailable training (%s)', value => {
+  const input = [{ ...sample('2026-10-05', 0), totalVolume: value }];
+  const { rerender } = draw('totalVolume', input);
+  expect(screen.getByTestId('calendar-heatmap-month-title-2026-09')).toHaveTextContent('September 2026');
+  expect(within(screen.getByTestId('calendar-heatmap-month-2026-09')).queryAllByText('Mon')).toEqual([]);
+  expect(screen.queryByTestId('calendar-heatmap-row-2026-09-28')).toBeNull();
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05').props.accessibilityLabel)
+    .toContain(value === null ? 'Volume unavailable' : 'Volume 0');
+  // Metric/window changes can make a previously collapsed month active.
+  const next = buildHeatmapData([sample('2026-10-01', 100)], 'totalVolume', { todayDateKey: today, weeks: 5 });
+  rerender(<DailyHeatmap data={next} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  expect(screen.getByTestId('calendar-heatmap-month-title-2026-10')).toBeTruthy();
+  expect(screen.queryByTestId('calendar-heatmap-row-2026-10-05')).toBeNull();
+  expect(within(screen.getByTestId('calendar-heatmap-month-2026-09')).getByTestId('calendar-heatmap-cell-2026-10-01'))
+    .toHaveProp('accessibilityLabel', '01-10-2026, Volume 100');
+});
+
+it('shows only month headings when the entire window has no training', () => {
+  draw('totalVolume', []);
+  expect(screen.getAllByTestId(/^calendar-heatmap-month-title-/)).toHaveLength(2);
+  expect(screen.queryAllByTestId(/^calendar-heatmap-row-/)).toEqual([]);
 });

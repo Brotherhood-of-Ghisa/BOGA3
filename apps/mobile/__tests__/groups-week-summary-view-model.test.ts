@@ -1,20 +1,21 @@
 /**
- * Today's group card rules over a `group_competition_week_summary` payload: the top three
- * and the caller's own line, the bars, and the three latest-activity forms.
+ * Today's group card rules over a `group_competition_week_summary` payload: the top five
+ * and the caller's own line, the bars, and up to four sessions, live first.
  * Pure; the suite runs in Europe/London (jest.config.js).
  */
 
 import {
-  buildLatestActivity,
+  GROUP_SESSIONS_SHOWN,
+  buildGroupSessions,
   buildWeekBoard,
   buildGroupRecordLine,
+  completedSessionsFromStream,
   formatTrainingStart,
   groupRecordBoards,
-  joinNames,
   type GroupWeekBoardRow,
 } from '@/src/groups';
 
-import { competitionEvent } from './helpers/competition-fixtures';
+import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
 import type { CompetitionEventWire,CompetitionHistoricalMetric,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
 type GroupWeekLatestSession = NonNullable<CompetitionWeekSummaryWire['latest_completed']>;
 type GroupWeekTrainingSession = CompetitionWeekSummaryWire['training_now'][number];
@@ -63,9 +64,9 @@ const completed = (overrides: Partial<GroupWeekLatestSession> = {}): GroupWeekLa
 });
 
 describe('buildWeekBoard', () => {
-  it('keeps the top three and adds my line, at my shared rank, when I am outside them', () => {
+  it('keeps the top five and adds my line, at my shared rank, when I am outside them', () => {
     const board = buildWeekBoard(
-      [row('dave', 1, 58, 3), row('maria', 2, 39, 1), row('sam', 3, 35, 2), row(ME, 4, 21), row('tom', 5, 3)],
+      [row('dave', 1, 58, 3), row('maria', 2, 39, 1), row('sam', 3, 35, 2), row('kit', 4, 30), row('ana', 5, 25), row(ME, 6, 21), row('tom', 7, 3)],
       ME,
     );
 
@@ -73,8 +74,10 @@ describe('buildWeekBoard', () => {
       [1, 'dave', 58, 3],
       [2, 'maria', 39, 1],
       [3, 'sam', 35, 2],
+      [4, 'kit', 30, 0],
+      [5, 'ana', 25, 0],
     ]);
-    expect(board.me).toEqual({ rankLabel: '4th', workingSets: 21, groupRecords: 0 });
+    expect(board.me).toEqual({ rankLabel: '6th', workingSets: 21, groupRecords: 0 });
   });
 
   it('names me You inside the three, with no extra line', () => {
@@ -84,11 +87,11 @@ describe('buildWeekBoard', () => {
     expect(board.me).toBeNull();
   });
 
-  it('finds me by user id when a tie at third pushes me to the fourth row', () => {
-    const board = buildWeekBoard([row('dave', 1, 30), row('maria', 2, 20), row('sam', 3, 10), row(ME, 3, 10)], ME);
+  it('finds me by user id when a tie at fifth pushes me to the sixth row', () => {
+    const board = buildWeekBoard([row('dave', 1, 30), row('maria', 2, 20), row('sam', 3, 15), row('kit', 4, 12), row('ana', 5, 10), row(ME, 5, 10)], ME);
 
-    expect(board.rows.map((entry) => entry.userId)).toEqual(['dave', 'maria', 'sam']);
-    expect(board.me).toEqual({ rankLabel: '3rd', workingSets: 10, groupRecords: 0 });
+    expect(board.rows.map((entry) => entry.userId)).toEqual(['dave', 'maria', 'sam', 'kit', 'ana']);
+    expect(board.me).toEqual({ rankLabel: '5th', workingSets: 10, groupRecords: 0 });
   });
 
   it('draws each bar as a share of the leader, the leader (ties too) in the darker step', () => {
@@ -117,133 +120,93 @@ describe('buildWeekBoard', () => {
   it('keeps as many rows as asked, counting the members past them besides my own line', () => {
     const members = [row('dave', 1, 58), row('maria', 2, 39), row('sam', 3, 35), row('kit', 4, 30), row(ME, 5, 21), row('tom', 6, 3), row('ana', 7, 1)];
 
-    expect(buildWeekBoard(members, ME)).toMatchObject({ me: { rankLabel: '5th' }, hiddenCount: 3 });
-    const five = buildWeekBoard(members, ME, 5);
+    expect(buildWeekBoard(members, ME, 3)).toMatchObject({ me: { rankLabel: '5th' }, hiddenCount: 3 });
+    const five = buildWeekBoard(members, ME);
     expect(five.rows.map((entry) => entry.userId)).toEqual(['dave', 'maria', 'sam', 'kit', ME]);
     expect(five).toMatchObject({ me: null, hiddenCount: 2 });
     expect(buildWeekBoard(members, ME, 20)).toMatchObject({ me: null, hiddenCount: 0 });
   });
 });
 
-describe('buildLatestActivity', () => {
-  it('shows one member training now, opening their session', () => {
-    const activity = buildLatestActivity({ training_now: [training('maria')], latest_completed: completed() }, ME, NOW, 'DD-MM-YYYY');
+describe('buildGroupSessions', () => {
+  it('draws a live session by its start, its figures so far and no record', () => {
+    const { live, recent } = buildGroupSessions({ training_now: [training('maria')], latest_completed: null }, [], ME, NOW);
 
-    expect(activity).toEqual({
-      kind: 'training',
+    expect(recent).toEqual([]);
+    expect(live).toEqual([{
       memberUserId: 'maria',
       sessionId: 'maria-live',
       name: 'maria',
-      stamp: 'Started 07:40',
-      duration: null,
+      when: 'Started 07:40',
+      live: true,
       gym: 'Iron Works',
-      figures: '7 sets · 3 exercises',
+      figures: '3 exercises · 7 sets so far',
       record: null,
-      accessibilityLabel: 'maria, training now, Started 07:40, at Iron Works, 7 sets · 3 exercises',
-    });
+      accessibilityLabel: 'maria, training now, Started 07:40, at Iron Works, 3 exercises · 7 sets so far',
+    }]);
   });
 
-  it('collapses several training now into one row with their names and gyms', () => {
-    const activity = buildLatestActivity(
-      {
-        training_now: [
-          training('maria'),
-          training(ME, { gym_name: 'Canal Street Gym' }),
-          training('tom', { gym_name: ' Iron Works ' }),
-          training('sam', { gym_name: null }),
-        ],
-        latest_completed: null,
-      },
-      ME,
-      NOW, 'DD-MM-YYYY'
-    );
-
-    expect(activity).toEqual({
-      kind: 'several',
-      count: 4,
-      names: 'maria, You, tom and sam',
-      gyms: 'Iron Works · Canal Street Gym',
-      accessibilityLabel: '4 training now: maria, You, tom and sam, Iron Works · Canal Street Gym',
-    });
-  });
-
-  it('falls back to the latest completed session with its group record', () => {
-    const activity = buildLatestActivity(
+  it("draws a completed session by its start in Today's format, naming one group record", () => {
+    const { recent } = buildGroupSessions(
       {
         training_now: [],
-        latest_completed: completed({
-          group_records: [record('Deadlift', [{ metric: 'e1rm', value: 213.3, unit: 'kg' }])],
-        }),
+        latest_completed: completed({ group_records: [record('Deadlift', [{ metric: 'e1rm', value: 213.3, unit: 'kg' }])] }),
       },
+      [],
       ME,
-      NOW, 'DD-MM-YYYY'
+      NOW,
     );
 
-    expect(activity).toEqual({
-      kind: 'completed',
+    expect(recent).toEqual([{
       memberUserId: 'dave',
       sessionId: 'dave-done',
       name: 'dave',
-      stamp: '16-10-2026 06:10',
-      duration: '52m',
+      when: '16 Oct 26 06:10',
+      live: false,
       gym: 'Iron Works',
-      figures: '18 sets · 4 exercises',
+      figures: '4 exercises · 18 sets',
       record: { kind: 'one', lead: 'Deadlift 1RM 213.3', note: 'group record' },
-      accessibilityLabel:
-        'dave, completed session on 16-10-2026 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
-    });
-
-    const ddMm = buildLatestActivity(
-      {
-        training_now: [],
-        latest_completed: completed(),
-      },
-      ME,
-      NOW,
-      'DD-MM-YYYY',
-    );
-    expect(ddMm).toMatchObject({ stamp: '16-10-2026 06:10' });
-
-    const iso = buildLatestActivity(
-      {
-        training_now: [],
-        latest_completed: completed(),
-      },
-      ME,
-      NOW,
-      'YYYY-MM-DD',
-    );
-    expect(iso).toMatchObject({ stamp: '2026-10-16 06:10' });
+      accessibilityLabel: 'dave, completed session on 16 Oct 26 06:10, at Iron Works, 4 exercises · 18 sets, Deadlift 1RM 213.3 · group record',
+    }]);
   });
 
-  it('derives a missing duration from the completion time, and shows none without either', () => {
-    const derived = buildLatestActivity({ training_now: [], latest_completed: completed({ duration_sec: null }) }, ME, NOW, 'DD-MM-YYYY');
-    const bare = buildLatestActivity(
-      { training_now: [], latest_completed: completed({ duration_sec: null, completed_at_ms: null, gym_name: null }) },
+  it('shows four in all, live first, then the latest completed and the stream, each session once', () => {
+    const stream = [
+      completed({ session_id: 'dave-done' }),
+      completed({ session_id: 'maria-live' }),
+      completed({ session_id: 'older-1', gym_name: null }),
+      completed({ session_id: 'older-2' }),
+      completed({ session_id: 'older-3' }),
+    ];
+    const sessions = buildGroupSessions(
+      { training_now: [training('maria'), training(ME)], latest_completed: completed() },
+      stream,
       ME,
-      NOW, 'DD-MM-YYYY'
+      NOW,
     );
 
-    expect(derived).toMatchObject({ duration: '52m' });
-    expect(bare).toMatchObject({ stamp: '16-10-2026 06:10', duration: null, gym: null, record: null });
-    expect(bare?.accessibilityLabel).toBe('dave, completed session on 16-10-2026 06:10, 18 sets · 4 exercises');
+    expect(GROUP_SESSIONS_SHOWN).toBe(4);
+    expect(sessions.live.map((session) => [session.sessionId, session.name])).toEqual([['maria-live', 'maria'], ['me-live', 'You']]);
+    expect(sessions.recent.map((session) => session.sessionId)).toEqual(['dave-done', 'older-1']);
+    expect(sessions.recent[1]).toMatchObject({ gym: null, accessibilityLabel: 'dave, completed session on 16 Oct 26 06:10, 4 exercises · 18 sets' });
   });
 
-  it('is null for a group with no live or completed session', () => {
-    expect(buildLatestActivity({ training_now: [], latest_completed: null }, ME, NOW, 'DD-MM-YYYY')).toBeNull();
+  it('gives every slot to live sessions when four or more are training', () => {
+    const live = ['a', 'b', 'c', 'd', 'e'].map((id) => training(id));
+    const sessions = buildGroupSessions({ training_now: live, latest_completed: completed() }, [], ME, NOW);
+    expect(sessions.live).toHaveLength(4);
+    expect(sessions.recent).toEqual([]);
+  });
+
+  it('is empty for a group with no live or completed session', () => {
+    expect(buildGroupSessions({ training_now: [], latest_completed: null }, [], ME, NOW)).toEqual({ live: [], recent: [] });
   });
 });
 
 describe('formatting', () => {
   it('names a start time today by the clock, and an earlier day by its date', () => {
-    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW, 'DD-MM-YYYY')).toBe('Started 07:40');
-    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW, 'DD-MM-YYYY')).toBe('Started 15-10-2026 23:10');
-  });
-
-  it('joins names the way the line reads them', () => {
-    expect(joinNames([])).toBe('');
-    expect(joinNames(['a'])).toBe('a');
-    expect(joinNames(['a', 'b'])).toBe('a and b');
+    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW)).toBe('Started 07:40');
+    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW)).toBe('Started 15 Oct 26 23:10');
   });
 
   it('names one group record and only counts several, one per board taken', () => {
@@ -287,5 +250,34 @@ describe('formatting', () => {
       ],
     };
     expect(groupRecordBoards([event])).toHaveLength(1);
+  });
+});
+
+describe('completedSessionsFromStream', () => {
+  const session = (sessionId: string, status: 'completed' | 'active' | 'draft' = 'completed') => ({
+    kind: 'session' as const, key: sessionId, sort_at_ms: 1, groups: [{ group_id: 'g1', name: 'Crew' }],
+    session: { ...competitionSession.session, session_id: sessionId, status },
+  });
+  const recordFor = (sessionId: string | null, overrides: Partial<CompetitionEventWire> = {}) => ({
+    kind: 'competition' as const, key: `record-${sessionId}-${overrides.event_id ?? ''}`, sort_at_ms: 1,
+    event: { ...competitionEvent, session_id: sessionId, ...overrides },
+  });
+
+  it('keeps completed sessions in stream order, counted as the stream card counts them, with their live group records', () => {
+    const sessions = completedSessionsFromStream([
+      session('live', 'active'),
+      session('s2'),
+      recordFor('s2', { event_id: 'kept' }),
+      recordFor('s2', { event_id: 'voided', voided: true }),
+      recordFor('s2', { event_id: 'lead', kind: 'lead_change' }),
+      recordFor(null, { event_id: 'unplaced' }),
+      session('draft', 'draft'),
+      session('s1'),
+    ]);
+
+    expect(sessions.map((entry) => entry.session_id)).toEqual(['s2', 's1']);
+    expect(sessions[0]).toMatchObject({ working_sets: 1, exercise_count: 1, duration_sec: 2_600, gym_name: 'Gym' });
+    expect(sessions[0].group_records.map((event) => event.event_id)).toEqual(['kept']);
+    expect(sessions[1].group_records).toEqual([]);
   });
 });

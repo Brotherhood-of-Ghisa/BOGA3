@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, FigureText, uiSpace, uiText, uiTextTone } from '@/components/ui';
 
 type GroupHeaderCardProps = {
   name: string;
@@ -17,24 +17,24 @@ type GroupHeaderCardProps = {
 
 /**
  * The header of the group and Members screens: one `Card` with the group's
- * name in Archivo 700, its description and a meta line in `ink-muted`, then
+ * name as a title, its description and a meta line in `ink-muted`, then
  * any rows.
  */
 export function GroupHeaderCard({ name, description, meta, nameTestID, metaTestID, testID, children }: GroupHeaderCardProps) {
   return (
     <Card testID={testID}>
       <View style={styles.words}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.name} testID={nameTestID}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID={nameTestID}>
           {name}
         </Text>
         {description ? (
-          <Text allowFontScaling={false} style={styles.muted}>
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
             {description}
           </Text>
         ) : null}
         {meta ? (
-          <Text allowFontScaling={false} style={styles.muted} testID={metaTestID}>
-            {meta}
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={metaTestID}>
+            <FigureText>{meta}</FigureText>
           </Text>
         ) : null}
       </View>
@@ -47,19 +47,5 @@ const styles = StyleSheet.create({
   words: {
     gap: uiSpace.xs,
     padding: uiSpace.md,
-  },
-  name: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  muted: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

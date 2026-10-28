@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, Icon, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { RecordCertificationStatus } from '@/src/groups';
 
 /** `body`: a card's or sheet's status line. `meta`: the small mark beside a board row's date. */
@@ -47,8 +47,8 @@ export function GroupCertificationStatus({
         />
       )}
       {label ? (
-        <Text allowFontScaling={false} style={[labelStyles[size], certified ? styles.labelCertified : null]}>
-          {label}
+        <Text allowFontScaling={false} style={[LABEL_ROLE[size], certified ? uiTextTone.ink : null]}>
+          <FigureText strong={size === 'body'}>{label}</FigureText>
         </Text>
       ) : null}
     </View>
@@ -61,24 +61,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-  labelCertified: {
-    color: uiRoles.ink,
-  },
 });
 
-const labelStyles = StyleSheet.create({
-  body: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  meta: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-});
+// The status line in a card or sheet is a strong body line; beside a board
+// row's date it is the row's quiet meta. Either way the figures in it (a date)
+// take the figure face.
+const LABEL_ROLE = {
+  body: [uiText.bodyStrong, uiTextTone.muted],
+  meta: uiText.meta,
+} as const;

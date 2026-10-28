@@ -1,11 +1,12 @@
+import { validateMergeOutcomes } from '../../src/exercise-core/merge-sync-ack';
 // Shared plumbing for the dev-account seeders (`seed-dev-rich-history.ts`,
 // `seed-dev-groups.ts`): the Sync v2 wire entity, password sign-in, and a
 // layered, batched `sync_push` — the same path the app pushes through, so the
 // server's triggers (the group share trigger included) see a normal client.
 
 import {
-  SYSTEM_EXERCISE_DEFINITION_SEEDS,
-  SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
+  STANDARD_EXERCISE_DEFINITION_SEEDS,
+  STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
 } from '../../src/data/exercise-catalog-seeds';
 
@@ -47,7 +48,7 @@ export const pushUnique = (entities: WireEntity[], seen: Set<string>, entity: Wi
 
 const timestamps = (atMs: number) => ({ created_at: atMs, updated_at: atMs, deleted_at: null });
 
-/** The starter catalog (muscle groups, exercises, mappings) as one user's rows. */
+/** The existing-account catalogue used by the deterministic history fixtures. */
 export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
   ...SYSTEM_MUSCLE_GROUP_SEEDS.map((muscleGroup): WireEntity => ({
     type: 'muscle_groups',
@@ -61,7 +62,7 @@ export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
       ...timestamps(atMs),
     },
   })),
-  ...SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise): WireEntity => ({
+  ...STANDARD_EXERCISE_DEFINITION_SEEDS.map((exercise): WireEntity => ({
     type: 'exercise_definitions',
     id: exercise.id,
     client_updated_at_ms: atMs,
@@ -73,7 +74,7 @@ export const buildSystemCatalogEntities = (atMs: number): WireEntity[] => [
       ...timestamps(atMs),
     },
   })),
-  ...SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.map((mapping): WireEntity => ({
+  ...STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS.map((mapping): WireEntity => ({
     type: 'exercise_muscle_mappings',
     id: mapping.id,
     client_updated_at_ms: atMs,
@@ -113,13 +114,16 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
       accept: 'application/json',
       'accept-profile': 'app_public',
       'content-profile': 'app_public',
-      'x-boga-sync-protocol': '4',
+      'x-boga-sync-protocol': '5',
     },
     body: JSON.stringify({ entities: batch }),
   });
   const body = await response.text();
   if (!response.ok) {
     throw new Error(`sync_push failed: HTTP ${response.status} ${body}`);
+  }
+  if (validateMergeOutcomes(JSON.parse(body), batch)) {
+    throw new Error('Some imported changes were saved for review after an exercise merge. Earlier batches may have committed. Open Data & Sync before retrying.');
   }
 };
 
@@ -156,7 +160,9 @@ export const countByType = (entities: WireEntity[]) =>
 
 /** Pushes every entity, layered and batched. Returns how many were pushed. */
 export const pushEntities = async (apiUrl: string, anonKey: string, token: string, entities: WireEntity[]) => {
-  const ordered = sortByLayer(entities);
+  const ordered = sortByLayer(entities.map(entity =>
+    ['session_exercises', 'exercise_sets', 'session_exercise_tags'].includes(entity.type) ?
+      { ...entity, fields: { ...entity.fields, merge_revision: 0 } } : entity));
   for (let index = 0; index < ordered.length; index += BATCH_SIZE) {
     await pushBatch(apiUrl, anonKey, token, ordered.slice(index, index + BATCH_SIZE));
   }

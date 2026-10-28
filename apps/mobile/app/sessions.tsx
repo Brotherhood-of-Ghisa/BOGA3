@@ -25,11 +25,9 @@ import {
   Screen,
   Sheet,
   SwitchRow,
-  uiFonts,
-  uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
@@ -143,7 +141,7 @@ export function SessionsScreen({
     <>
       {activeSession ? (
         <View style={styles.block}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
             Active
           </Text>
           <ActiveSessionRow
@@ -256,14 +254,5 @@ const styles = StyleSheet.create({
   },
   options: {
     paddingBottom: uiSpace.lg,
-  },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
   },
 });

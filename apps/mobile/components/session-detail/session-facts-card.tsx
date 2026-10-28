@@ -3,7 +3,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FigureText } from '@/components/ui/figure-text';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 
 export type SessionFact = {
   label: string;
@@ -76,9 +78,9 @@ export function SessionFactsCard({ header, times, facts, children, testID }: Ses
 function TimeReadout({ label, value, testID }: { label: string; value: string; testID?: string }) {
   return (
     <View accessibilityLabel={`${label} ${value}`} accessible style={styles.time} testID={testID}>
-      <Text allowFontScaling={false} style={styles.timeLabel}>{label}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={styles.timeValue}>
-        {value}
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={uiText.body}>
+        <FigureText>{value}</FigureText>
       </Text>
     </View>
   );
@@ -94,24 +96,6 @@ const styles = StyleSheet.create({
   time: {
     flex: 1,
     minWidth: 0,
-  },
-  timeLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  // The edit field's figure: `base` fits the 16 characters of a time in half
-  // the card's width.
-  timeValue: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   // A row of figures alone spreads across the card, so the eye reads four
   // columns rather than a left-packed cluster. A row holding a `text` fact

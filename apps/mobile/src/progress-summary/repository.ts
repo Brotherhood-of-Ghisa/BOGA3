@@ -1,21 +1,27 @@
 // Today's progress read: the stats aggregation for sessions and working sets,
 // the exercise session facts for PRs (every record kind), and one small query
-// for the latest completed session. Nothing here replays history.
+// for the completed session shown (the latest, or one stepped back to). Nothing here replays history.
 
-import { and, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
-import { loadFlaggedExerciseSessionFacts, type ExerciseSessionFactRow } from '@/src/data/exercise-session-facts';
+import {
+  loadFlaggedExerciseSessionFacts,
+  loadSessionExerciseFacts,
+  type ExerciseSessionFactRow,
+} from '@/src/data/exercise-session-facts';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
 import { createDrizzleStatsStore, type StatsStore } from '@/src/data/stats';
-import { parseSetReps } from '@/src/exercise-calculations/parse';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations/parse';
 import { sessionRecordKinds, type RecordKind } from '@/src/exercise-calculations/records';
 import { isInWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import {
+  buildSessionExerciseLines,
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
+  type SessionExerciseLine,
   type SessionPersonalRecord,
   type TodayProgress,
 } from './calculations';
@@ -37,8 +43,13 @@ export type ProgressSummaryStore = {
   loadAggregationInput: StatsStore['loadAggregationInput'];
   /** The PRs with `start <= completed_at < end`, one per record kind, in PR-history order. */
   loadRecordFacts(window: LocalWindow): Promise<PersonalRecordFact[]>;
-  /** The completed, non-deleted session with the latest `completed_at`. */
-  loadLatestCompletedSession(): Promise<LatestCompletedSessionRow | null>;
+  /**
+   * The completed, non-deleted session `offset` places before the one with
+   * the latest `completed_at` (0 is the latest), and whether an older one exists.
+   */
+  loadCompletedSession(offset: number): Promise<{ session: LatestCompletedSessionRow; hasOlder: boolean } | null>;
+  /** The session's exercise lines, in session order. */
+  loadSessionExercises(sessionId: string): Promise<SessionExerciseLine[]>;
 };
 
 export const createDrizzleProgressSummaryStore = (
@@ -72,9 +83,10 @@ export const createDrizzleProgressSummaryStore = (
       reps: kind === 'weight' && fact.topWeightSetId ? (reps.get(fact.topWeightSetId) ?? null) : null,
     })));
   },
-  async loadLatestCompletedSession() {
+  async loadCompletedSession(offset) {
     const database = await bootstrapLocalDataLayer();
-    const row = database
+    // The session asked for and the next older one, which says whether there is one.
+    const [row, older] = database
       .select({
         id: sessions.id,
         startedAt: sessions.startedAt,
@@ -86,8 +98,9 @@ export const createDrizzleProgressSummaryStore = (
       .leftJoin(gyms, eq(sessions.gymId, gyms.id))
       .where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt), isNotNull(sessions.completedAt)))
       .orderBy(desc(sessions.completedAt), desc(sessions.id))
-      .limit(1)
-      .get();
+      .limit(2)
+      .offset(offset)
+      .all();
     if (!row || row.completedAt === null) return null;
     const exercises = database
       .select({ value: count() })
@@ -95,7 +108,25 @@ export const createDrizzleProgressSummaryStore = (
       // Removed exercises stay as tombstones.
       .where(and(eq(sessionExercises.sessionId, row.id), isNull(sessionExercises.deletedAt)))
       .get();
-    return { ...row, completedAt: row.completedAt, exerciseCount: exercises?.value ?? 0 };
+    return { session: { ...row, completedAt: row.completedAt, exerciseCount: exercises?.value ?? 0 }, hasOlder: older !== undefined };
+  },
+  async loadSessionExercises(sessionId) {
+    const facts = await loadSessionExerciseFacts(sessionId);
+    const database = await bootstrapLocalDataLayer();
+    const exercises = database
+      .select({ exerciseDefinitionId: sessionExercises.exerciseDefinitionId, name: sessionExercises.name })
+      .from(sessionExercises)
+      .where(and(eq(sessionExercises.sessionId, sessionId), isNull(sessionExercises.deletedAt)))
+      .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
+      .all();
+    const setIds = facts.flatMap((fact) => (fact.bestE1rmSetId ? [fact.bestE1rmSetId] : []));
+    const bestSets = new Map(setIds.length === 0 ? [] : database
+      .select({ id: exerciseSets.id, weightValue: exerciseSets.weightValue, repsValue: exerciseSets.repsValue })
+      .from(exerciseSets)
+      .where(inArray(exerciseSets.id, setIds))
+      .all()
+      .map((row) => [row.id, { weightKg: parseSetWeight(row.weightValue) ?? 0, reps: parseSetReps(row.repsValue) ?? 0 }]));
+    return buildSessionExerciseLines(exercises, facts, bestSets);
   },
 });
 
@@ -122,18 +153,28 @@ const instantWindow = (instant: Date): LocalWindow => ({
 export const createTodayProgressRepository = (
   store: ProgressSummaryStore = createDrizzleProgressSummaryStore(),
 ) => ({
-  async loadTodayProgress(now: Date, periodWeeks: number): Promise<TodayProgress> {
-    const latest = await store.loadLatestCompletedSession();
-    if (latest === null) return deriveTodayProgress({ now, periodWeeks, sessions: [], prAchievedAt: [], latest: null });
+  /**
+   * `compareBack` picks the compared period (1, the previous, by default);
+   * `sessionOffset` the session shown (0, the latest). An offset past the
+   * oldest session, as after a delete, shows the latest again.
+   */
+  async loadTodayProgress(now: Date, periodWeeks: number, options: TodayProgressOptions = {}): Promise<TodayProgress> {
+    const { compareBack = 1, sessionOffset = 0 } = options;
+    const stepped = sessionOffset > 0 ? await store.loadCompletedSession(sessionOffset) : null;
+    const latestOffset = stepped ? sessionOffset : 0;
+    const found = stepped ?? (await store.loadCompletedSession(0));
+    if (found === null) return deriveTodayProgress({ now, periodWeeks, sessions: [], prAchievedAt: [], latest: null });
+    const latest = found.session;
 
-    const range = todayProgressLoadWindow(now, periodWeeks);
-    const [aggregation, recordFacts] = await Promise.all([
+    const range = todayProgressLoadWindow(now, periodWeeks, compareBack);
+    const [aggregation, recordFacts, exercises] = await Promise.all([
       // The workout in progress counts in this week and month (§2).
       store.loadAggregationInput({ ...range, now }),
       store.loadRecordFacts(range),
+      store.loadSessionExercises(latest.id),
     ]);
     const sessionsInRange = workingSetsBySession(aggregation);
-    // The latest session is nearly always inside the range; read it alone only when older.
+    // The shown session is nearly always inside the range; read it alone only when older.
     const [latestSessions, latestRecordFacts] = isInWindow(latest.completedAt, range)
       ? [sessionsInRange, recordFacts]
       : await Promise.all([
@@ -143,16 +184,22 @@ export const createTodayProgressRepository = (
     return deriveTodayProgress({
       now,
       periodWeeks,
+      compareBack,
+      latestOffset,
+      hasOlderSession: found.hasOlder,
       sessions: sessionsInRange,
       prAchievedAt: recordFacts.map((fact) => fact.achievedAt),
       latest: {
         ...latest,
         workingSets: latestSessions.find((session) => session.id === latest.id)?.workingSets ?? 0,
         records: latestRecordFacts.filter((fact) => fact.sessionId === latest.id).map(withoutPlacement),
+        exercises,
       },
     });
   },
 });
+
+export type TodayProgressOptions = { compareBack?: number; sessionOffset?: number };
 
 const defaultTodayProgressRepository = createTodayProgressRepository();
 

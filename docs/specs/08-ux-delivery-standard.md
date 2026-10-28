@@ -94,7 +94,7 @@ Use this section as the single source of truth for reusable UX patterns.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
-   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values ([[set.performed]]); allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
+   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values ([[set.performed]]); allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save (an untouched planned row is not work: Done drops it silently, and only `Complete exercise` names it); and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: the group stream (`components/groups/group-stream-list.tsx`): session cards (`stream-session-card.tsx`) and competition event cards (`group-metric-stream-card.tsx`).
@@ -136,8 +136,8 @@ Use this section as the single source of truth for reusable UX patterns.
 
 15. Fit-to-height card pager pattern
    - Intent: show a few summaries one screen each, with nothing to scroll.
-   - Usage: Today's Cards layout (`components/today/today-cards.tsx`).
-   - Rules: one `Card` per page, sized to the height between its tabs and the tab bar; the next card peeks at the edge and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each card has one elastic part that takes the height left (a chart, or as many board rows as fit with `+N more`) above a fixed floor, and below the floor the card scrolls rather than clips; a link row closes each card; a control for one page shows beside the tabs only while that page does.
+   - Usage: Today (`components/today/today-cards.tsx`).
+   - Rules: each page fills the height between its tabs and the tab bar, as its own cards (You: progress over session; a group: board over sessions) or, for a panel, one `Card`; the next page peeks at the edge and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each page has one elastic part that takes the height left (the chart, or the sessions list) above a fixed floor, and a list too long for its card scrolls inside it rather than clips; links are text buttons inside the cards (`Sessions`), never a chevron row; a page's own controls sit in its cards, never beside the tabs (the group's name and switch head its board card).
 
 ## Default appearance baseline (MVP)
 

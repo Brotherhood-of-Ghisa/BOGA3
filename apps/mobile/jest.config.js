@@ -25,6 +25,7 @@ module.exports = {
     '<rootDir>/__tests__/sync/cycle-multidevice-lww.test.ts',
     '<rootDir>/__tests__/sync/auth-required-envelope.test.ts',
     '<rootDir>/__tests__/sync/drift-check.test.ts',
+    '<rootDir>/__tests__/sync/exercise-merge-live.test.ts',
     '<rootDir>/__tests__/sync/update-softdelete-roundtrip.test.ts',
     '<rootDir>/__tests__/sync/future-clock-clamp.test.ts',
     '<rootDir>/__tests__/sync/cycle-fresh-device-and-account-switch.test.ts',

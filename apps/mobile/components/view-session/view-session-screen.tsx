@@ -5,7 +5,8 @@ import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail'
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
 import { ViewSessionOptionsSheet } from './view-session-sheets';
@@ -68,11 +69,11 @@ export function ViewSessionScreen({
         {summary.deleted ? (
           <View style={styles.band} testID="completed-session-detail-deleted-band">
             <Icon color={uiRoles.inkMuted} name="trash" size="xs" />
-            <Text allowFontScaling={false} style={styles.bandLabel}>Deleted · hidden from history</Text>
+            <Text allowFontScaling={false} style={uiText.label}>Deleted · hidden from history</Text>
           </View>
         ) : null}
         {error ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.error} testID="completed-session-detail-error-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger]} testID="completed-session-detail-error-notice">
             {error}
           </Text>
         ) : null}
@@ -99,7 +100,7 @@ export function ViewSessionScreen({
           testIDPrefix="view-session-section"
         />
         {section === 'summary' ? summaryContent : model.cards.length === 0 ? (
-          <Text allowFontScaling={false} style={styles.empty} testID="completed-session-detail-no-exercises">
+          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="completed-session-detail-no-exercises">
             No exercises logged in this session.
           </Text>
         ) : (
@@ -147,28 +148,5 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.card,
-  },
-  bandLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  error: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
-  },
-  empty: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

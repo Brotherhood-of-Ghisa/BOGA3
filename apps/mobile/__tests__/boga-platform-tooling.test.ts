@@ -16,7 +16,7 @@ describe('platform-specific group UI checks', () => {
   it.each([
     'apps/mobile/app/group/join.tsx',
     'apps/mobile/app/group-session/[sessionId].tsx',
-    'apps/mobile/app/(tabs)/groups.tsx',
+    'apps/mobile/app/groups.tsx',
     'apps/mobile/app/exercise-link.tsx',
     'apps/mobile/components/groups/stream-row.tsx',
   ])('keeps device checks for %s on each platform', (path) => {

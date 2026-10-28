@@ -23,6 +23,7 @@ import {
 } from '@/components/settings/sub-pages';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
@@ -58,6 +59,30 @@ const editNumber = (id: string, value: string) => {
 beforeEach(() => { mockUserId = 'A'; resetLocalData(); });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
+const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+
+it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
+  await openSettings();
+  for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
+    expect(screen.getByText(label)).toHaveStyle(LABEL);
+  }
+  // Auto-start is a form card's switch row under the `Rest timer` section heading.
+  expect(screen.getByRole('switch', { name: 'Auto-start rest timer' })).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: 'Rest timer' })).toHaveStyle(LABEL);
+  const effort = within(screen.getByTestId('settings-effort-selections'));
+  expect(effort.getByText('Effort')).toHaveStyle(LABEL);
+  expect(effort.getByText('Volume')).toHaveStyle(LABEL);
+  expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+});
+
+it('labels the Other page controls as micro-labels', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<OtherSettingsScreen />);
+  expect(screen.getByText('Date format')).toHaveStyle(LABEL);
+  expect(screen.getByText('Past records gym filter')).toHaveStyle(LABEL);
+});
+
 const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');
   setAccountLocalPreferenceAccount('A', true);
@@ -67,7 +92,7 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('offers only List and 3D for both breakdowns, persists 3D and falls back to List for 1RM', async () => {
+it('saves List or 3D for Muscle while Exercise always lists full figures and opens on Sets', async () => {
   const page = await openSettingsAndProgress();
   const selector = within(screen.getByTestId('settings-muscle-view-row'));
   expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['List', '3D']);
@@ -76,7 +101,8 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   await screen.findByTestId('stats-muscle-body-card');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
-  expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
@@ -84,6 +110,9 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-muscle-body-card');
   page.unmount();
   __resetAccountLocalPreferencesForTests();
@@ -140,7 +169,7 @@ it('offers no period default when the Progress period is one week', async () => 
   expect(screen.queryByTestId('settings-progress-period-window')).toBeNull();
 });
 
-it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise after Refresh', async () => {
+it('keeps an unsaved 3D choice as a Settings draft and applies it only to Muscle after Refresh', async () => {
   await openSettingsAndProgress();
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
@@ -153,15 +182,16 @@ it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise af
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('restores the shared Exercise layout per account without carrying another account’s 3D choice', async () => {
+it('restores the Muscle layout per account without carrying another account’s 3D choice', async () => {
   const page = await openSettingsAndProgress();
-  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
-  await screen.findByTestId('stats-exercise-list');
   fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
   await screen.findByTestId('stats-muscle-body-card');
 
@@ -206,7 +236,6 @@ it('saves both window settings, and retains invalid numeric drafts in the centra
 
 it.each([
   ['settings-history-lookback', 'historyLookbackWeeks', 52, 104],
-  ['settings-weekly-working-set-target', 'weeklyWorkingSetTarget', 8, 12],
 ] as const)('keeps a failed %s save as a draft and retries it with Refresh', async (id, field, previous, next) => {
   await openSettings();
   const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
@@ -221,23 +250,10 @@ it.each([
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('edits one shared weekly target inline and retains invalid drafts in the centralized error flow', async () => {
+it('keeps muscle targets and muscle setup off the Progress sub-page', async () => {
   await openSettings();
-  const id = 'settings-weekly-working-set-target';
-  expect(screen.getByLabelText('Target weekly working sets per muscle')).toHaveProp('value', '8');
-  expect(screen.getByLabelText('Progress period (weeks)')).toHaveProp('value', '4');
-  expect(screen.queryByText('Weekly muscle targets')).toBeNull();
-  editNumber(id, '12');
-  expect(values().weeklyWorkingSetTarget).toBe(12);
-  editNumber(id, '0');
-  expect(values().weeklyWorkingSetTarget).toBe(12);
-  expect(screen.getByTestId(id)).toHaveProp('value', '0');
-  expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
-    .toHaveTextContent(/positive whole number/);
-  expect(within(screen.getByTestId('settings-progress-screen')).queryByText(/positive whole number/)).toBeNull();
-  editNumber(id, '8');
-  expect(values().weeklyWorkingSetTarget).toBe(8);
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+  expect(screen.queryByTestId('settings-weekly-working-set-target')).toBeNull();
+  expect(screen.queryByTestId('settings-muscles-row')).toBeNull();
 });
 
 it('keeps the effort choices on their own page, not under Progress', async () => {
@@ -292,12 +308,13 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
 it('edits rest timer auto-start and duration on its page and surfaces invalid durations in the centralized error flow', async () => {
   await openSettings();
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
-  expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: false });
+  // On/off is a switch row, not a two-choice control (`ux-rules.md` "Forms").
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityRole', 'switch');
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: true });
 
-  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start-off'));
+  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start'));
   expect(values().restTimerAutoStart).toBe(false);
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: false });
 
   editNumber('settings-rest-timer-duration', '150');
   expect(values().restTimerDurationSec).toBe(150);
@@ -341,20 +358,6 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
 
-it('switches Today between List and Cards on Experiments, saved per account', async () => {
-  setAccountLocalPreferenceAccount('A', true);
-  await ensureAccountLocalPreferencesLoaded();
-  render(<ExperimentsSettingsScreen />);
-  const selector = within(screen.getByTestId('settings-today-layout-row'));
-  expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['Show Today as a list', 'Show Today as cards']);
-  expect(values().todayLayout).toBe('list');
-  fireEvent.press(screen.getByTestId('settings-today-layout-cards'));
-  expect(values().todayLayout).toBe('cards');
-  expect(Storage.getItemSync('boga3.accountPreferences.v1.account%3AA.todayLayout')).toBe('cards');
-  fireEvent.press(screen.getByTestId('settings-today-layout-list'));
-  expect(values().todayLayout).toBe('list');
-});
-
 it('turns the title-bar timer on and off on Experiments, off by default and saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
@@ -369,10 +372,15 @@ it('turns the title-bar timer on and off on Experiments, off by default and save
   expect(values().timerInTitleBar).toBe(false);
 });
 
-it('keeps Today layout off Other, which now holds only the date and gym filters', async () => {
+// Today is always cards, so neither page offers a Today layout.
+it('offers no Today layout on Experiments or Other', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
+  render(<ExperimentsSettingsScreen />);
+  expect(screen.getByTestId('settings-timer-in-title-bar')).toBeTruthy();
+  expect(screen.queryByText('Today layout')).toBeNull();
+  screen.unmount();
   render(<OtherSettingsScreen />);
   expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
-  expect(screen.queryByTestId('settings-today-layout-row')).toBeNull();
+  expect(screen.queryByText('Today layout')).toBeNull();
 });

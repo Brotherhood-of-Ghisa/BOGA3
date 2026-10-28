@@ -116,7 +116,7 @@ sync_pull() {
     -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -136,7 +136,7 @@ sync_pull_anon() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -183,7 +183,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \

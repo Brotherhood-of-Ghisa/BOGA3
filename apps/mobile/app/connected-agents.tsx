@@ -7,15 +7,15 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   ListRow,
   ScreenScroll,
   StatePanel,
   SwitchRow,
   Tag,
-  uiFonts,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -58,28 +58,28 @@ function ConnectedAgentCard({
     <Card testID={`connected-agent-${agent.clientId}`}>
       <View style={styles.agentHeader}>
         <View style={styles.agentTitle}>
-          <Text allowFontScaling={false} style={styles.agentName}>{agent.name}</Text>
-          <Text allowFontScaling={false} style={styles.agentScope}>Read training data</Text>
+          <Text allowFontScaling={false} style={uiText.title}>{agent.name}</Text>
+          <Text allowFontScaling={false} style={uiText.meta}>Read training data</Text>
         </View>
         <Tag label="AI" />
       </View>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
-            {formatTimestamp(agent.grantedAt, dateFormat)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-granted-${agent.clientId}`}>
+            <FigureText>{formatTimestamp(agent.grantedAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Access granted</Text>
       </ListRow>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
-            {formatTimestamp(agent.lastAccessAt, dateFormat)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-last-access-${agent.clientId}`}>
+            <FigureText>{formatTimestamp(agent.lastAccessAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Last access</Text>
       </ListRow>
       {/* A separate, opt-in authorization: the base OAuth grant stays read-only. */}
       <View style={styles.permission}>
@@ -95,14 +95,14 @@ function ConnectedAgentCard({
         {isUnavailable ? (
           <Text
             allowFontScaling={false}
-            style={styles.permissionUnavailable}
+            style={[uiText.meta, uiTextTone.danger, styles.permissionUnavailable]}
             testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
             Change settings are temporarily unavailable for this coach.
           </Text>
         ) : null}
         <Text
           allowFontScaling={false}
-          style={styles.permissionDisclosure}
+          style={[uiText.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
           {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never edit or delete plans, start a workout, or change your logged sets.`}
         </Text>
@@ -325,53 +325,15 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: uiSpace.xs,
   },
-  agentName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  agentScope: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  rowLabel: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  date: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
   permission: {
     paddingBottom: uiSpace.sm,
   },
   permissionUnavailable: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
   permissionDisclosure: {
     paddingHorizontal: uiSpace.lg,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
   agentActions: {
     padding: uiSpace.lg,

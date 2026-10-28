@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { DayCell, FocusedTimelineWeek } from '@/components/heatmaps';
@@ -18,10 +18,14 @@ import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
 } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
+import { loadActiveSessionId } from '@/src/session-entry';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
+import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import {
-  PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsWeekHref,
+  PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, completedSessionHref, exerciseHistoryHref, historyDayHref, progressHistoryHref, rmCurveHref, sessionsDayHref, sessionsWeekHref,
 } from '@/src/navigation/routes';
 import { reportedExerciseMuscles, reportedMuscleName } from '@/src/exercise-catalog/reported-muscles';
 import { EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
@@ -241,17 +245,28 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   );
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(
-    () => subject?.kind === 'muscle' ? { muscleIds: [subject.id], weeklyTarget: values.weeklyWorkingSetTarget } : undefined,
-    [subject, values.weeklyWorkingSetTarget]
+    () => subject?.kind === 'muscle' ? { muscleIds: [subject.id],
+      weeklyTarget: muscleWeeklyTarget(values, deriveMuscleReportPreset(catalog.muscleGroups), subject.id) } : undefined,
+    [subject, values, catalog.muscleGroups]
   );
   const unavailable = !subject || (catalog.status === 'ready' && name === null);
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
-  // Stable, so the charts' memoised trees survive a re-render.
-  const openDay = useCallback((day: DayCell) => {
-    const href = historyDayHref(day.dateKey, day.sessionIds);
-    if (href) router.push(href);
-  }, [router]);
+  const dayNavigation = useRef(0);
+  useFocusEffect(useCallback(() => () => { dayNavigation.current += 1; }, [accountRevision]));
+  // Recheck at the tap: a workout may have finished since the Grid was read.
+  const openDay = useCallback(async (day: DayCell) => {
+    const request = ++dayNavigation.current;
+    let href = historyDayHref(day.dateKey, day.sessionIds);
+    if (day.sessionIds.length === 1) {
+      try {
+        href = historyDayHref(day.dateKey, day.sessionIds, await loadActiveSessionId());
+      } catch {
+        href = sessionsDayHref(day.dateKey);
+      }
+    }
+    if (request === dayNavigation.current && accountRevision === getAccountLocalPreferenceAccountRevision() && href) router.push(href);
+  }, [router, accountRevision]);
   const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
   const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
   // A muscle's week list links each card's exercise to its own history, on

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
-import { startOfLocalDay } from '@/src/utils/local-calendar';
+import { loadTodayProgress, type TodayProgress, type TodayProgressOptions } from '@/src/progress-summary';
 
-/** Reads Today's figures at `now`, the period being Settings' Progress period in weeks. */
-export type TodayProgressLoader = (now: Date, periodWeeks: number) => Promise<TodayProgress>;
+import { useDailyReread } from './use-daily-reread';
+
+/**
+ * Reads Today's figures at `now`, the period being Settings' Progress period
+ * in weeks, against the compared period and with the session Today stepped to.
+ */
+export type TodayProgressLoader = (now: Date, periodWeeks: number, options: Required<TodayProgressOptions>) => Promise<TodayProgress>;
 
 export type TodayProgressState =
   | { status: 'loading' }
@@ -27,10 +30,15 @@ const systemNow = () => new Date();
  * app returns to the foreground and at local midnight, so a new day moves the
  * windows, and when the Progress period changes. The first read shows
  * loading; a re-read keeps the figures on screen until the new ones arrive.
+ * `showCompared` and `showSession` read again against another compared period
+ * (periods back, 1 the previous) or with another session (0 the latest); both
+ * hold until the account changes.
  */
 export function useTodayProgress({ isFocused, load = loadTodayProgress, now = systemNow }: UseTodayProgressInput) {
   const { accountRevision: context, values: { targetWindowWeeks: periodWeeks } } = useAccountLocalPreferenceState();
   const [result, setResult] = useState<{ context: number; state: TodayProgressState }>({ context, state: { status: 'loading' } });
+  const [view, setView] = useState({ context, compareBack: 1, sessionOffset: 0 });
+  const { compareBack, sessionOffset } = view.context === context ? view : { compareBack: 1, sessionOffset: 0 };
   const generationRef = useRef(0);
   // Read through refs, so a caller's inline loader or clock never re-triggers the focus read.
   const loadRef = useRef(load);
@@ -44,7 +52,7 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     const isCurrent = () => generationRef.current === generation;
-    return loadRef.current(nowRef.current(), periodWeeks).then(
+    return loadRef.current(nowRef.current(), periodWeeks, { compareBack, sessionOffset }).then(
       (progress) => {
         if (isCurrent()) setResult({ context, state: { status: 'loaded', progress } });
       },
@@ -54,39 +62,27 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
         }
       },
     );
-  }, [context, periodWeeks]);
+  }, [context, periodWeeks, compareBack, sessionOffset]);
+
+  const readNow = useCallback(() => {
+    void read();
+  }, [read]);
 
   const retry = useCallback(() => {
     setResult({ context, state: { status: 'loading' } });
     return read();
   }, [read, context]);
 
-  useEffect(() => {
-    if (!isFocused) return;
-    void read();
-    let midnight: ReturnType<typeof setTimeout> | undefined;
-    const readAtMidnight = () => {
-      clearTimeout(midnight);
-      const current = nowRef.current();
-      midnight = setTimeout(() => {
-        void read();
-        readAtMidnight();
-      }, startOfLocalDay(current, 1).getTime() - current.getTime());
-    };
-    readAtMidnight();
-    // A suspended app's timer may not count the time away: aim it again on return.
-    const foreground = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
-      void read();
-      readAtMidnight();
-    });
-    return () => {
-      generationRef.current += 1;
-      foreground.remove();
-      clearTimeout(midnight);
-    };
-  }, [isFocused, read]);
+  useDailyReread(isFocused, readNow, nowRef, generationRef);
 
   const state: TodayProgressState = result.context === context ? result.state : { status: 'loading' };
-  return { state, retry };
+  const showCompared = useCallback(
+    (periodsBack: number) => setView({ context, compareBack: Math.max(1, periodsBack), sessionOffset }),
+    [context, sessionOffset],
+  );
+  const showSession = useCallback(
+    (offset: number) => setView({ context, compareBack, sessionOffset: Math.max(0, offset) }),
+    [context, compareBack],
+  );
+  return { state, retry, showCompared, showSession };
 }

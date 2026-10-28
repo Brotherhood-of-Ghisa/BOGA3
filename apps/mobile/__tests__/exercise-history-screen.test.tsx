@@ -15,7 +15,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type TextStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -55,8 +55,9 @@ import {
   type ExerciseHistoryScreenShellProps,
 } from '../app/exercise-history';
 import { localWeekWindow } from '@/src/utils/local-calendar';
+import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { updatePreferences } from '@/src/preferences/hooks';
-import { uiRoles } from '@/components/ui';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
 import * as historyRepository from '@/src/data/exercise-history';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -66,6 +67,7 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import { waitForGone } from './helpers/wait-for-gone';
 import {
   bootLocalApp,
   closeLocalData,
@@ -261,6 +263,83 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-period-chip-progress')).toHaveProp('accessibilityState', { selected: true });
   });
 
+  it('opens on configured History with no gym or tag filter and extends beyond it only on request', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+      setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+      await logSquatElsewhere();
+    });
+    expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('All gyms');
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    expect(sessionCards()).not.toContain('maestro_exercise_block_history_squat_6_a');
+    const initialCards = sessionCards();
+    const initialOrder = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-show-older|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    expect(initialOrder.at(-1)).toBe('exercise-history-show-older');
+    fireEvent.press(screen.getByRole('button', { name: 'Show older sessions' }));
+
+    await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
+    expect(sessionCards()).toHaveLength(10);
+    expect(sessionCards().slice(0, initialCards.length)).toEqual(initialCards);
+    expect(screen.getByRole('tab', { name: 'History look-back, 1 weeks' })).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.queryByText('Full history')).toBeNull();
+    expect(screen.getByTestId('exercise-history-older-divider')).toHaveTextContent('Older sessions');
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-history'));
+    await screen.findByTestId('exercise-history-show-older');
+    expect(sessionCards()).toEqual(initialCards);
+  });
+
+  it('keeps recent cards after a failed expansion and Retry appends older sessions', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+    });
+    const initialCards = sessionCards();
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockRejectedValueOnce(new Error('Read failed'));
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    expect(await screen.findByTestId('exercise-history-error-state')).toHaveTextContent(/Read failed/);
+    expect(sessionCards()).toEqual(initialCards);
+    expect(screen.queryByTestId('exercise-history-show-older')).toBeNull();
+    const visibleOrder = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-error-state|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    expect(visibleOrder.at(-1)).toBe('exercise-history-error-state');
+
+    fireEvent.press(screen.getByTestId('exercise-history-retry'));
+    await screen.findByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a');
+    expect(sessionCards().slice(0, initialCards.length)).toEqual(initialCards);
+    expect(screen.getAllByTestId('exercise-history-older-divider')).toHaveLength(1);
+    expect(new Set(sessionCards()).size).toBe(sessionCards().length);
+  });
+
+  it('keeps recent cards visible during expansion and places the divider at the exact History boundary', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT }, async () => {
+      updatePreferences({ historyLookbackWeeks: 1 });
+    });
+    const initialCards = sessionCards();
+    const cutoff = historyWeekBounds(1).start;
+    const expanded = (await historyRepository.loadExercisePerformanceHistory({ exerciseDefinitionId: SQUAT,
+      period: { kind: 'all' } }))!;
+    let finishRead!: (summary: ExerciseHistorySummary) => void;
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockReturnValueOnce(
+      new Promise(resolve => { finishRead = resolve; })
+    );
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    expect(screen.getByRole('button', { name: 'Loading older sessions…' })).toBeDisabled();
+    expect(sessionCards()).toEqual(initialCards);
+    await act(async () => { finishRead(expanded); });
+
+    const firstOlder = expanded.sessions.find(entry => entry.completedAt < cutoff)!;
+    const order = screen.UNSAFE_root.findAll(node => typeof node.type === 'string'
+      && /^(exercise-history-older-divider|exercise-history-session-card-[a-z0-9_]+)$/.test(node.props.testID ?? ''))
+      .map(node => node.props.testID);
+    const boundary = order.indexOf('exercise-history-older-divider');
+    expect(order[boundary - 1]).toBe(`exercise-history-session-card-${initialCards.at(-1)}`);
+    expect(order[boundary + 1]).toBe(`exercise-history-session-card-${firstOlder.sessionExerciseId}`);
+  });
+
   it('shows the all-time bests and one card per session in the period, newest first', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
@@ -338,6 +417,11 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId('exercise-history-gym')).toHaveTextContent('Canal Street Gym');
     expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
     expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('200.0 × 5');
+
+    fireEvent.press(screen.getByTestId('exercise-history-show-older'));
+    await waitForGone(() => screen.queryByTestId('exercise-history-show-older'));
+    expect(sessionCards()).toEqual(['history_elsewhere_squat']);
+    expect(screen.getByTestId('exercise-history-best-label')).toHaveTextContent('All-time bests · Canal Street Gym');
 
     fireEvent.press(screen.getByTestId('exercise-history-gym'));
     fireEvent.press(screen.getByTestId('exercise-history-gym-option-all'));
@@ -653,6 +737,42 @@ describe('ExerciseHistoryScreenShell — design language', () => {
     expect(screen.queryByText('W/sets')).toBeNull();
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/Westside Barbell Club/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toHaveTextContent(/No gym/);
+  });
+
+  it('takes every text from the shared text roles', () => {
+    renderShell({ period: 'all', historyStart: new Date('2026-05-15T00:00:00.000Z') });
+    const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as TextStyle;
+    const meta = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm };
+
+    expect(styleOf(screen.getByTestId('exercise-history-best-label'))).toMatchObject({
+      fontFamily: uiFonts.display.family,
+      fontSize: uiTypography.size.xxs,
+      textTransform: 'uppercase',
+      color: uiRoles.inkFaint,
+    });
+    // A best is the large figure, drawn heavy in record.
+    expect(styleOf(screen.getByTestId('exercise-history-best-est-1rm-value'))).toMatchObject({
+      fontFamily: uiFonts.figure.family,
+      fontSize: uiTypography.size.lg,
+      fontWeight: '700',
+      color: uiRoles.record,
+    });
+    // Its date is a line of words, the figures in the figure face.
+    const date = within(screen.getByTestId('exercise-history-best-est-1rm')).getByText(/^18-05-2026 \d/);
+    expect(styleOf(date)).toMatchObject(meta);
+    expect(styleOf(within(date).getByText('18-05-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family });
+    expect(styleOf(screen.getByText('Westside Barbell Club'))).toMatchObject({ ...meta, fontWeight: '600', color: uiRoles.inkMuted });
+    expect(styleOf(screen.getByText('Older sessions'))).toMatchObject({ ...meta, color: uiRoles.inkMuted });
+  });
+
+  it('draws a missing best as the large figure, faint', () => {
+    renderShell({ summary: buildSummary({ allTimeBest: { estimatedOneRepMax: null, topWeight: null } }) });
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-history-best-est-1rm-value').props.style)).toMatchObject({
+      fontFamily: uiFonts.figure.family,
+      fontWeight: '600',
+      fontSize: uiTypography.size.lg,
+      color: uiRoles.inkFaint,
+    });
   });
 
   it('selects the period in a segmented control', () => {

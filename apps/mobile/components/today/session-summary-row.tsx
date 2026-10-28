@@ -1,21 +1,13 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { SessionRecordLine } from '@/src/session-insights/record-line';
 
-import { todayText } from './text-styles';
-
-export type SessionSummaryRowMember = {
-  name: string;
-  /** The `set-current` ring and `Training now`, beside the name. */
-  trainingNow: boolean;
-};
-
 export type SessionSummaryRowProps = {
-  /** Whose session: the Group card names its member; the Progress card's own session has none. */
-  member?: SessionSummaryRowMember | null;
   /** `10/16 06:10`, or `Started 07:40` for a session still in progress. */
   stamp: string;
   /** `1h 12m`; null while training. */
@@ -28,8 +20,6 @@ export type SessionSummaryRowProps = {
   accessibilityHint: string;
   onPress: () => void;
   testID: string;
-  /** The trailing chevron; Sessions' history rows leave it out. */
-  chevron?: boolean;
   /** Under the record line: Sessions' `Deleted` tag. */
   children?: ReactNode;
   /** The row's insets where its container gives none (a Sessions history row). */
@@ -46,52 +36,24 @@ export function TrainingNowMark({ children }: { children: ReactNode }) {
   );
 }
 
-function MemberHeader({ member, testID }: { member: SessionSummaryRowMember; testID: string }) {
-  return (
-    <View style={styles.header}>
-      <Text
-        allowFontScaling={false}
-        ellipsizeMode="tail"
-        numberOfLines={1}
-        style={styles.member}
-        testID={`${testID}-member`}>
-        {member.name}
-      </Text>
-      {member.trainingNow ? (
-        <View testID={`${testID}-training-now`}>
-          <TrainingNowMark>
-            <Text allowFontScaling={false} style={styles.liveText}>
-              Training now
-            </Text>
-          </TrainingNowMark>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string }) {
   return (
     <View style={styles.recordLine} testID={`${testID}-record`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.recordText}>
-        <Text allowFontScaling={false} style={todayText.record}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, styles.recordText]}>
+        <Text allowFontScaling={false} style={uiTextTone.record}>
           {line.kind === 'one' ? line.lead : line.count}
         </Text>
-        {line.kind === 'one' ? <Text allowFontScaling={false} style={styles.muted}>{` · ${line.note}`}</Text> : null}
+        {line.kind === 'one' ? <Text allowFontScaling={false} style={uiTextTone.muted}>{` · ${line.note}`}</Text> : null}
       </Text>
     </View>
   );
 }
 
 /**
- * One session as a link row, the same on both Today cards: the summary line
- * (stamp · duration @ gym), `sets · exercises`, then its PRs. The Group card
- * adds the member and the training-now mark above it. No group tags: the
- * server decides which groups a session was shared to (from membership
- * history), so the device cannot show them.
+ * One session as a link row, a Sessions history row: the summary line
+ * (stamp · duration @ gym), `sets · exercises`, then its PRs.
  */
 export function SessionSummaryRow({
-  member,
   stamp,
   duration,
   gym,
@@ -101,7 +63,6 @@ export function SessionSummaryRow({
   accessibilityHint,
   onPress,
   testID,
-  chevron = true,
   children,
   style,
 }: SessionSummaryRowProps) {
@@ -115,31 +76,29 @@ export function SessionSummaryRow({
       style={({ pressed }) => [styles.row, style, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.copy}>
-        {member ? <MemberHeader member={member} testID={testID} /> : null}
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summaryLine}>
-          <Text allowFontScaling={false} style={styles.summaryFigure} testID={`${testID}-start`}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.body}>
+          <Text allowFontScaling={false} style={uiText.inlineFigure} testID={`${testID}-start`}>
             {stamp}
           </Text>
           {duration ? (
             <>
-              <Text allowFontScaling={false} style={styles.separator}> · </Text>
-              <Text allowFontScaling={false} style={styles.summaryFigure}>{duration}</Text>
+              <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
+              <Text allowFontScaling={false} style={uiText.inlineFigure}>{duration}</Text>
             </>
           ) : null}
           {gymName ? (
             <>
-              <Text allowFontScaling={false} style={styles.separator}> @ </Text>
-              <Text allowFontScaling={false} style={styles.gym}>{gymName}</Text>
+              <Text allowFontScaling={false} style={uiTextTone.faint}> @ </Text>
+              <Text allowFontScaling={false} style={uiTextEmphasis.strong}>{gymName}</Text>
             </>
           ) : null}
         </Text>
-        <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-figures`}>
-          {figures}
+        <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}>
+          <FigureText>{figures}</FigureText>
         </Text>
         {record ? <RecordLine line={record} testID={testID} /> : null}
         {children}
       </View>
-      {chevron ? <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" /> : null}
     </Pressable>
   );
 }
@@ -160,47 +119,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  member: {
-    flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
   liveMark: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-  },
-  liveText: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
-  summaryLine: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  summaryFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-  },
-  separator: {
-    color: uiRoles.inkFaint,
-  },
-  gym: {
-    fontWeight: '600',
   },
   recordLine: {
     flexDirection: 'row',
@@ -208,11 +130,5 @@ const styles = StyleSheet.create({
   },
   recordText: {
     flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-  },
-  muted: {
-    color: uiRoles.inkMuted,
   },
 });

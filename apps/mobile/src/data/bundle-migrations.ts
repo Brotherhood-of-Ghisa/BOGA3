@@ -36,7 +36,7 @@ import { nowMonotonic, type Transaction } from './clock';
 import {
   CURRENT_APP_VERSION,
   PER_SIDE_LOAD_SEED_IDS,
-  SYSTEM_EXERCISE_DEFINITION_SEEDS,
+  STANDARD_EXERCISE_DEFINITION_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
   type MuscleGroupSeed,
   readSeedsAppliedMarker,
@@ -128,7 +128,7 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
   {
     appVersion: 3,
     apply(repo) {
-      for (const seed of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
+      for (const seed of STANDARD_EXERCISE_DEFINITION_SEEDS) {
         const contribution = BODYWEIGHT_SEED_CONTRIBUTIONS[seed.id];
         if (contribution !== undefined) {
           repo.reviseUntouchedBodyweightSeed(seed.id, seed.name, contribution);

@@ -1,3 +1,4 @@
+import { ExerciseMergeReview } from './exercise-merge-review';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatLocalDateTime } from '@/src/utils/local-time';
@@ -8,15 +9,15 @@ import { StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   Icon,
   ListRow,
   StatePanel,
   uiBorder,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { requestSync } from '@/src/sync/scheduler';
 import {
@@ -87,6 +88,7 @@ function SyncStatusPanelContent({
 }: SyncStatusPanelProps) {
   const [status, setStatus] = useState<SyncStatusSnapshot | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [reviewVisible, setReviewVisible] = useState(false);
   const lifetimeRef = useRef({ active: true });
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -170,15 +172,19 @@ function SyncStatusPanelContent({
           <Text
             allowFontScaling={false}
             accessibilityLiveRegion="polite"
-            style={[styles.value, styles.errorValue, errorText === 'None' ? null : styles.danger]}
+            style={[uiText.meta, errorText === 'None' ? uiTextTone.ink : uiTextTone.danger, styles.value, styles.errorValue]}
             testID="settings-sync-status-error">
-            {errorText}
+            <FigureText>{errorText}</FigureText>
           </Text>
         }
         testID="settings-sync-status-error-row">
-        <Text allowFontScaling={false} style={styles.label}>Error</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Error</Text>
       </ListRow> : null}
 
+      {isSignedIn && (status?.mergeReviewCount ?? 0) > 0 ? <ListRow label="Review changes"
+        onPress={() => setReviewVisible(true)} testID="settings-merge-review" /> : null}
+      <ExerciseMergeReview visible={reviewVisible} onDismiss={() => setReviewVisible(false)}
+        onChanged={() => { void refresh(); }} />
       {(isSignedIn || preferenceError) ? <View style={styles.actions}>
         <ActionButton
           accessibilityLabel={isRefreshing ? 'Refreshing data status…' : 'Refresh data and sync status'}
@@ -198,28 +204,28 @@ function SyncStatusDetails({ status }: { status: SyncStatusSnapshot | null }) {
   const networkState: SyncNetworkState = status?.networkState ?? 'unknown';
   const offline = networkState === 'offline';
   return <>
-      <Text allowFontScaling={false} style={styles.cardLabel}>Sync status</Text>
+      <Text allowFontScaling={false} style={[uiText.label, styles.cardLabel]}>Sync status</Text>
       <ListRow
         density="list"
         divider={false}
         meta={
-          <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-last-success">
-            {formatLastSuccess(status?.lastSuccessAtMs ?? null, dateFormat)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-last-success">
+            <FigureText>{formatLastSuccess(status?.lastSuccessAtMs ?? null, dateFormat)}</FigureText>
           </Text>
         }
         testID="settings-sync-status-last-success-row">
-        <Text allowFontScaling={false} style={styles.label}>Last successful sync</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Last successful sync</Text>
       </ListRow>
 
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-dirty-count">
-            {String(status?.dirtyCount ?? 0)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-dirty-count">
+            <FigureText>{String(status?.dirtyCount ?? 0)}</FigureText>
           </Text>
         }
         testID="settings-sync-status-dirty-count-row">
-        <Text allowFontScaling={false} style={styles.label}>Pending changes</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Pending changes</Text>
       </ListRow>
 
       {/* Offline is the glyph and the word, never a warning hue (G3). */}
@@ -230,13 +236,13 @@ function SyncStatusDetails({ status }: { status: SyncStatusSnapshot | null }) {
             {offline ? (
               <Icon name="offline" size="sm" testID="settings-sync-status-network-offline-glyph" />
             ) : null}
-            <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-network">
+            <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-network">
               {NETWORK_LABELS[networkState]}
             </Text>
           </View>
         }
         testID="settings-sync-status-network-row">
-        <Text allowFontScaling={false} style={styles.label}>Network</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Network</Text>
       </ListRow>
 
     </>;
@@ -265,37 +271,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  // Body text, not a destination's label: these rows are read, not pressed.
-  label: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
   value: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
     textAlign: 'right',
   },
   // A cycle error can be a sentence: it wraps within the row, right-aligned.
   errorValue: {
     flexShrink: 1,
     maxWidth: '60%',
-  },
-  danger: {
-    color: uiRoles.danger,
   },
   network: {
     flexDirection: 'row',

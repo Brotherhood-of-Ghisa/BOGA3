@@ -35,12 +35,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="train" options={{ title: 'Train' }} />
         <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />
-        {/* Preserved compatibility roots remain directly addressable but are
-            owned by the four canonical destinations rather than visible. */}
+        {/* A preserved compatibility root: addressable, owned by Progress. */}
         <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
-        <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
-        <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
-        <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
       </Tabs>
     </SafeAreaView>
   );
