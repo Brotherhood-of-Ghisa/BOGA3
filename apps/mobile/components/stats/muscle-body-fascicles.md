@@ -1,7 +1,7 @@
 # Fascicle companion asset
 
-Load when changing or consuming the fascicle geometry. This is an offline,
-schematic asset; the application does not import it yet.
+Load when changing or consuming the fascicle geometry. The native Progress 3D
+body consumes this schematic asset for selected-muscle relief fibres.
 
 Regenerate from the repository root:
 
@@ -32,15 +32,16 @@ does not establish additional rights to that mesh.
   triangle; no surface offset is baked in.
 - **Render segments independently.** `path` identifies a procedural guide,
   not a continuous biological fascicle. Never join endpoints across missing,
-  occluded or discontinuous surface patches. Any future renderer must handle
-  depth occlusion and a small display offset itself.
+  occluded or discontinuous surface patches. The selected relief overlay
+  intentionally bypasses body-depth occlusion and back-face culling; only its
+  highlight pass has a small display offset. Base anatomy retains its visibility.
 - `side` is the mesh x-coordinate sign, not a clinical left/right label.
   `layer: deep-projection` means a projected schematic, not an internal volume.
 - Pectoral `part` distinguishes clavicular, sternocostal and minor; `kind`
   distinguishes fascicle guides from insertion marks. Their projected landmark
   geometry intentionally extends beyond some old chest material labels.
 - Pectoralis minor is declared under chest `extensions`: no new catalog entry,
-  no measured BoGa volume. A future display must communicate its projected depth.
+  no measured BoGa volume. The model’s on-demand Information sheet explains its projected depth.
 
 `quality`, each entry's sources and limitations are part of the asset. Limb
 groups aggregate several muscles; most internal aponeuroses, deep volumes and
