@@ -302,7 +302,8 @@ the data-model-level invariants.
 12. `user_settings` weekly muscle targets (`weekly_working_set_target`,
    `muscle_target_mode`, `muscle_target_overrides`, `count_secondary_muscles`)
    are `in sync scope` ([[muscle.weekly-targets]]). Null = not yet uploaded:
-   no backfill. A device writes all four together.
+   no backfill. A device writes all four; after a wipe, edits stay in kv
+   until sync re-adopts.
 
 ### Entity coverage (Sync v2)
 

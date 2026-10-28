@@ -38,7 +38,11 @@ import {
 } from '@/src/data/local-wipe';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { logEvent } from '@/src/logging/logEvent';
-import { drainAccountLocalSyncedWrites, refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
+import {
+  drainAccountLocalSyncedWrites,
+  forgetSyncedTargetsAdoption,
+  refreshAccountLocalSyncedPreferences,
+} from '@/src/preferences/account-local';
 
 // -----------------------------------------------------------------------------
 // The local-data lock
@@ -111,6 +115,7 @@ const wipeStore = async (database: LocalDatabase, accountUserId: string | null):
   invalidateExerciseCatalogCache();
   notifyLocalDataReset();
   // The emptied row no longer overrides the kv fallback until sync restores it.
+  forgetSyncedTargetsAdoption();
   await refreshAccountLocalSyncedPreferences();
 };
 

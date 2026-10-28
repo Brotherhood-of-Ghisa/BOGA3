@@ -190,6 +190,7 @@ jest.mock('expo-sqlite/kv-store', () => {
       items.set(key, value);
     },
     removeItemSync: (key: string) => items.delete(key),
+    getAllKeysSync: () => [...items.keys()],
     clearSync: () => items.clear(),
   };
   return { __esModule: true, Storage, AsyncStorage: Storage, default: Storage };

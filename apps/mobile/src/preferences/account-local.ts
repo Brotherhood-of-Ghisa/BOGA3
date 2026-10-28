@@ -217,7 +217,7 @@ function writeSyncedPreferences(activeProfile: `account:${string}`, patch: Parti
       const next = { ...optimistic, ...stored, ...patch };
       await store.write(storedFromSyncedPreferences(next));
       if (version !== syncedVersion) return;
-      synced = next;
+      synced = keepingOverrides(next);
       saveError = null;
       publish({ values: syncedView(activeProfile), error: currentError() });
     } catch {
@@ -236,7 +236,13 @@ function writeSyncedPreferences(activeProfile: `account:${string}`, patch: Parti
  */
 export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
   const activeProfile = currentProfile();
-  if (activeProfile === null || !usesSyncedRow(activeProfile)) return;
+  if (activeProfile === null) return;
+  if (!usesSyncedRow(activeProfile)) {
+    if (Object.keys(synced).length === 0) return;
+    synced = {};
+    publish({ values: syncedView(activeProfile) });
+    return;
+  }
   const capturedGeneration = generation;
   const version = syncedVersion;
   await syncedWrites;
@@ -244,16 +250,31 @@ export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
   try { stored = await requireSyncedStore().read(activeProfile.slice('account:'.length)); }
   catch { return; }
   if (capturedGeneration !== generation || version !== syncedVersion) return;
-  const next = syncedPreferencesFromStored(stored);
-  // Keep the same overrides object when unchanged, so an unrelated settings
-  // pull does not republish every preference.
-  if (next.muscleTargetOverrides && synced.muscleTargetOverrides
-    && JSON.stringify(next.muscleTargetOverrides) === JSON.stringify(synced.muscleTargetOverrides)) {
-    next.muscleTargetOverrides = synced.muscleTargetOverrides;
-  }
-  synced = next;
+  synced = keepingOverrides(syncedPreferencesFromStored(stored));
   syncedLoaded = true;
   publish({ values: syncedView(activeProfile) });
+}
+
+/**
+ * A wiped store holds no settings row until sync restores it, so every account
+ * goes back to kv edits until sync adopts its targets again: an edit made
+ * before the restore pull must not push defaults over the account's targets.
+ */
+export function forgetSyncedTargetsAdoption(): void {
+  for (const key of Storage.getAllKeysSync()) {
+    if (key.startsWith('boga3.accountPreferences.v1.') && key.endsWith('.syncedTargetsAdopted')) Storage.removeItemSync(key);
+  }
+}
+
+/**
+ * Keeps the current overrides object when the map is unchanged, so a settings
+ * pull or an edit to another field does not republish every preference.
+ */
+function keepingOverrides(next: Partial<SyncedPreferences>): Partial<SyncedPreferences> {
+  const current = synced.muscleTargetOverrides;
+  return current && next.muscleTargetOverrides
+    && JSON.stringify(next.muscleTargetOverrides) === JSON.stringify(current)
+    ? { ...next, muscleTargetOverrides: current } : next;
 }
 
 /** Wipes call this first, so no queued edit lands in the emptied store. */

@@ -27,6 +27,7 @@ import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import { preferenceKey } from '@/src/preferences/storage';
 import '@/src/preferences/synced-store';
 import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture, type InMemoryTestDatabase } from './helpers/in-memory-db';
@@ -261,6 +262,29 @@ describe('upload once', () => {
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
   });
 
+  it('after a sign-out wipe, an edit before the restore pull cannot push defaults over the account targets', async () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    await signIn();
+    pullPage = [settingsWire(500, A_WIRE)];
+    await runSyncCycle();
+    expect(values().weeklyWorkingSetTarget).toBe(11);
+
+    await wipeLocalForAccountSwitch();
+    expect(Storage.getItemSync(syncedTargetsAdoptedKey(profile))).toBeNull();
+    await signIn();
+    setAccountLocalPreferences({ weeklyWorkingSetTarget: 7 });
+    expect(settingsRow()).toBeUndefined();
+    pushed = [];
+    serverRow(A_TARGETS);
+    pullPage = [settingsWire(500, A_WIRE)];
+
+    await runSyncCycle();
+
+    expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetOverrides: { detailed: { chest: 14 } } });
+    expect(kv('weeklyWorkingSetTarget')).toBeNull();
+  });
+
   it('keeps the kv copy and retries next cycle when the server row cannot be read', async () => {
     storeKvTargets();
     await signIn();
@@ -270,7 +294,7 @@ describe('upload once', () => {
     expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
     expect(kv('weeklyWorkingSetTarget')).toBe('6');
     expect(Storage.getItemSync(syncedTargetsAdoptedKey(profile))).toBeNull();
-    expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'sync.muscle_targets_read_failed' }));
+    expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'sync.muscle_targets_adoption_failed' }));
 
     await runSyncCycle();
     expect(pushed.filter(entity => entity.type === 'user_settings')).toHaveLength(1);
@@ -288,6 +312,12 @@ describe('pulled settings', () => {
     await runSyncCycle();
     expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(14);
     expect(values().progressCountSecondary).toBe(false);
+
+    // A pull that leaves the map unchanged keeps its object, so nothing republishes for it.
+    const overrides = values().muscleTargetOverrides;
+    pullPage = [settingsWire(750, { ...A_WIRE, bodyweight_calculations_enabled: true })];
+    await runSyncCycle();
+    expect(values().muscleTargetOverrides).toBe(overrides);
 
     pullPage = [settingsWire(800, { ...A_WIRE, weekly_working_set_target: 12, muscle_target_mode: 'single',
       count_secondary_muscles: true })];

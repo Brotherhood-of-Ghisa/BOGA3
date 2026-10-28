@@ -80,21 +80,24 @@ const adoptOrUpload = async (profile: `account:${string}`, userId: string,
   return true;
 };
 
-export const adoptOrUploadMuscleTargets = async (userId: string): Promise<void> => {
+const adoptOrUploadOnce = async (userId: string): Promise<void> => {
   const profile = `account:${userId}` as const;
   if (Storage.getItemSync(syncedTargetsAdoptedKey(profile)) === 'true') return;
-  let server: StoredMuscleTargetSettings | null | undefined;
-  try {
-    server = await readServerSettings(userId);
-  } catch (error) {
-    void logEvent({
-      level: 'warn', source: 'sync', event: 'sync.muscle_targets_read_failed',
-      message: 'Could not read the synced muscle targets; retrying next sync.',
-      context: { error: error instanceof Error ? error.message : String(error) },
-    }).catch(() => undefined);
-    return;
-  }
+  const server = await readServerSettings(userId);
   if (server === undefined || !await adoptOrUpload(profile, userId, server)) return;
   dropKvCopy(profile);
   await refreshAccountLocalSyncedPreferences();
+};
+
+/** Never fails the cycle: a one-off upgrade step only logs, and the next cycle retries. */
+export const adoptOrUploadMuscleTargets = async (userId: string): Promise<void> => {
+  try {
+    await adoptOrUploadOnce(userId);
+  } catch (error) {
+    void logEvent({
+      level: 'warn', source: 'sync', event: 'sync.muscle_targets_adoption_failed',
+      message: 'Could not adopt or upload the synced muscle targets; retrying next sync.',
+      context: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+  }
 };
