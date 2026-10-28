@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, Keyboard, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseMerge } from '@/components/exercise-catalog/exercise-merge';
 import { useOpenExerciseEditor, type ExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
@@ -37,12 +37,8 @@ import {
 } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
-import {
-  buildExerciseShareLink,
-  buildExerciseShareMessage,
-  type ExerciseSharePayload,
-} from '@/src/exercise-share';
-import { listMyGroups, type GroupSummary } from '@/src/groups';
+import { listLinks } from '@/src/data/exercise-group-links';
+import { createGroupSharedExercise, listMyGroups, type GroupSummary } from '@/src/groups';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { useLinkedExerciseIds } from '@/src/groups/use-linked-exercise-ids';
 import { exerciseHistoryHref, exerciseLinkHref } from '@/src/navigation/routes';
@@ -108,23 +104,27 @@ function ExerciseCatalogScreen() {
   const linkedExerciseIds = useLinkedExerciseIds(groupLinkingUserId);
 
   const triggerShare = useCallback(async (group: GroupSummary, exercise: ExerciseCatalogExercise) => {
-    const payload: ExerciseSharePayload = {
-      v: 1,
-      name: exercise.name,
-      loadInputMode: exercise.loadInputMode ?? 'total_load',
-      bodyweightContribution: exercise.bodyweightContribution,
-      mappings: exercise.mappings.map((mapping) => ({
-        muscleGroupId: mapping.muscleGroupId,
-        weight: mapping.weight,
-        role: mapping.role,
-      })),
-    };
-    const link = buildExerciseShareLink(group.group_id, payload);
-    const message = buildExerciseShareMessage(group.name, exercise.name, link);
+    setSaveError(null);
     try {
-      await Share.share({ message });
+      const links = await listLinks();
+      const existingLink = links.find(
+        (l) => l.groupId === group.group_id && l.exerciseDefinitionId === exercise.id,
+      );
+      await createGroupSharedExercise({
+        groupId: group.group_id,
+        name: exercise.name,
+        mode: exercise.loadInputMode ?? 'total_load',
+        contribution: exercise.bodyweightContribution,
+        mappings: exercise.mappings.map((mapping) => ({
+          muscle_group_id: mapping.muscleGroupId,
+          weight: mapping.weight,
+          role: mapping.role,
+        })),
+        groupExerciseId: existingLink ? existingLink.groupExerciseId : null,
+      });
+      setSaveFeedback(`Shared "${exercise.name}" with ${group.name}.`);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Couldn't open share sheet.");
+      setSaveError(error instanceof Error ? error.message : "Couldn't share exercise with group.");
     }
   }, []);
 
@@ -133,7 +133,7 @@ function ExerciseCatalogScreen() {
     try {
       const mine = await listMyGroups();
       if (mine.groups.length === 0) {
-        Alert.alert('No groups found', 'You must be a member of a group to share an exercise with a member.');
+        Alert.alert('No groups found', 'You must be a member of a group to share an exercise.');
         return;
       }
       if (mine.groups.length === 1) {
@@ -455,9 +455,9 @@ function ExerciseCatalogScreen() {
         />
         {groupLinkingUserId ? (
           <ListRow
-            accessibilityLabel="Share exercise with group member from actions"
+            accessibilityLabel="Share exercise with group from actions"
             disabled={isActionTargetDeleted}
-            label="Share with group member…"
+            label="Share with group…"
             leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="share" size="md" />}
             onPress={() => {
               if (actionTarget && !actionTarget.deletedAt) {

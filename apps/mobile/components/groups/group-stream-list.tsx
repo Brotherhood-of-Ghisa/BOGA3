@@ -10,6 +10,7 @@ import { GroupMetricStreamCard } from './group-metric-stream-card';
 import { groupScreenStyles } from './screen-styles';
 import { GroupStreamMembershipItem } from './stream-membership-item';
 import { GroupStreamSessionCard } from './stream-session-card';
+import { StreamSharedExerciseCard } from './stream-shared-exercise-card';
 
 type Props = {
   stream: GroupStreamState; userId: string; roleForGroup: (groupId: string) => GroupRole | null;
@@ -35,6 +36,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
     if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession}
       onPressRecord={setSelectedKey} showGroupNames={showGroupNames} />;
     if (item.kind === 'membership') return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;
+    if (item.kind === 'shared_exercise') return <StreamSharedExerciseCard item={item} userId={userId} showGroupName={showGroupNames} />;
     return <GroupMetricStreamCard item={item.event} record={item.record} userId={userId} showGroupName={showGroupNames}
       onPress={item.event.kind === 'record' ? () => setSelectedKey(item.key) : undefined} />;
   };
