@@ -1,8 +1,20 @@
 // The preferences that live on the synced settings row rather than in the
 // device's kv store ([[muscle.weekly-targets]], [[muscle.secondary-filter]]).
 // Pure conversion between the stored columns and the preference values.
-import type { MuscleTargetSettingsWrite, StoredMuscleTargetSettings } from '../data/user-settings';
 import { type AccountLocalPreferences, DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from './model';
+
+/**
+ * The settings row's four columns as the data layer stores them (null until
+ * uploaded or adopted; wire mode, JSON-text overrides). Declared here because
+ * this directory never imports the data layer.
+ */
+export type StoredMuscleTargetSettings = {
+  weeklyWorkingSetTarget: number | null;
+  muscleTargetMode: string | null;
+  muscleTargetOverrides: string | null;
+  countSecondaryMuscles: boolean | null;
+};
+export type MuscleTargetSettingsWrite = { [K in keyof StoredMuscleTargetSettings]: NonNullable<StoredMuscleTargetSettings[K]> };
 
 export const syncedPreferenceFields = [
   'weeklyWorkingSetTarget', 'muscleTargetMode', 'muscleTargetOverrides', 'progressCountSecondary',

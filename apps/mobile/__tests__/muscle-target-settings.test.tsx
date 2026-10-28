@@ -15,6 +15,7 @@ import { muscleGroups } from '@/src/data/schema';
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as setup from '@/src/data/muscle-report-settings';
 import * as userSettingsData from '@/src/data/user-settings';
+import '@/src/sync/synced-preferences-store';
 import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { Storage } from 'expo-sqlite/kv-store';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState,

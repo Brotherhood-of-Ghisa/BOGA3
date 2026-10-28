@@ -46,7 +46,8 @@ export const writeBodyweightCalculationsEnabled = async (enabled: boolean): Prom
  * The synced weekly muscle targets and count-secondary switch as stored on the
  * settings row ([[muscle.weekly-targets]]). Null until this device uploads or
  * adopts them; the mode is the wire value (`single` | `per_muscle`) and the
- * overrides are JSON text. Readers validate every value.
+ * overrides are JSON text. Readers validate every value. `src/preferences/synced.ts`
+ * declares the same shape, since it may not import this layer.
  */
 export type StoredMuscleTargetSettings = {
   weeklyWorkingSetTarget: number | null;

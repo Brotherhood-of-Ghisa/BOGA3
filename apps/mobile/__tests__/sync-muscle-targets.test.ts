@@ -25,7 +25,7 @@ import {
 } from '@/src/preferences/account-local';
 import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import { preferenceKey } from '@/src/preferences/storage';
-import '@/src/preferences/synced-store';
+import '@/src/sync/synced-preferences-store';
 import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
@@ -313,9 +313,14 @@ describe('pulled settings', () => {
     expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(14);
     expect(values().progressCountSecondary).toBe(false);
 
-    // A pull that leaves the map unchanged keeps its object, so nothing republishes for it.
+    // A pull that leaves the map unchanged keeps its object, so nothing republishes
+    // for it, even when the server's jsonb text orders the keys differently.
+    pullPage = [settingsWire(720, { ...A_WIRE,
+      muscle_target_overrides: JSON.stringify({ detailed: { chest: 14, back: 9 }, broad: { quads: 8 } }) })];
+    await runSyncCycle();
     const overrides = values().muscleTargetOverrides;
-    pullPage = [settingsWire(750, { ...A_WIRE, bodyweight_calculations_enabled: true })];
+    pullPage = [settingsWire(750, { ...A_WIRE, bodyweight_calculations_enabled: true,
+      muscle_target_overrides: JSON.stringify({ broad: { quads: 8 }, detailed: { back: 9, chest: 14 } }) })];
     await runSyncCycle();
     expect(values().muscleTargetOverrides).toBe(overrides);
 

@@ -1,6 +1,5 @@
 import { __resetPreferenceMigrationForTests, migrateBrowsingPreferences } from './migration';
 import { configureDisplayEfforts, configurePersonalEffortPolicy } from '../config/personal-effort';
-import type { MuscleTargetSettingsWrite, StoredMuscleTargetSettings } from '../data/user-settings';
 import {
   type AccountLocalPreferences,
   DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
@@ -15,6 +14,8 @@ import {
   storedFromSyncedPreferences,
   syncedPreferencesFromStored,
   syncedTargetsAdoptedKey,
+  type MuscleTargetSettingsWrite,
+  type StoredMuscleTargetSettings,
   type SyncedPreferences,
 } from './synced';
 
@@ -48,7 +49,7 @@ const withSynced = (values: AccountLocalPreferences): AccountLocalPreferences =>
 const usesSyncedRow = (activeProfile: PreferenceProfile): activeProfile is `account:${string}` =>
   activeProfile !== 'local' && Storage.getItemSync(syncedTargetsAdoptedKey(activeProfile)) === 'true';
 
-/** The settings row behind the synced fields; `synced-store.ts` connects the data layer. */
+/** The settings row behind the synced fields; `src/sync/synced-preferences-store.ts` connects it. */
 export type SyncedPreferenceStore = {
   read: (accountUserId: string | null) => Promise<StoredMuscleTargetSettings | null>;
   write: (values: MuscleTargetSettingsWrite) => Promise<void>;
@@ -272,10 +273,14 @@ export function forgetSyncedTargetsAdoption(): void {
  */
 function keepingOverrides(next: Partial<SyncedPreferences>): Partial<SyncedPreferences> {
   const current = synced.muscleTargetOverrides;
-  return current && next.muscleTargetOverrides
-    && JSON.stringify(next.muscleTargetOverrides) === JSON.stringify(current)
+  return current && next.muscleTargetOverrides && canonicalOverrides(next.muscleTargetOverrides) === canonicalOverrides(current)
     ? { ...next, muscleTargetOverrides: current } : next;
 }
+
+/** Key order differs between a local write and the server's jsonb text. */
+const canonicalOverrides = (overrides: SyncedPreferences['muscleTargetOverrides']): string =>
+  JSON.stringify(Object.entries(overrides).sort(([a], [b]) => a.localeCompare(b))
+    .map(([scope, targets]) => [scope, Object.entries(targets ?? {}).sort(([a], [b]) => a.localeCompare(b))]));
 
 /** Wipes call this first, so no queued edit lands in the emptied store. */
 export const drainAccountLocalSyncedWrites = (): Promise<void> => syncedWrites;

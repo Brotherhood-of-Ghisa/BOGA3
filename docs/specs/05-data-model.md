@@ -335,8 +335,8 @@ deployed to production before the client change ships**.
 Server first: a client cannot round-trip a column the server lacks. An
 additive column never moves the protocol version: `sync_push` reads named keys
 only and ignores the rest. Keeping a stored value when a key is omitted is per
-column — only a branch guarding on `_fields ? '<key>'` does, which a new column
-needs so an older writer cannot clear it.
+column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
+column needs so an older writer cannot clear it.
 Server-first additions must also keep unknown entity types out of old-reader
 pulls. The kg-only rename was a protocol-3 cutover, not an
 additive change.

@@ -32,6 +32,7 @@ import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { Storage } from 'expo-sqlite/kv-store';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { applyPullPage } from '@/src/sync/cycle';
+import '@/src/sync/synced-preferences-store';
 import { planRepository, type PlanDraft } from '@/src/session-planner';
 import type { TodayPlan } from '@/src/today-plan';
 

@@ -6,7 +6,7 @@ jest.mock('@/src/data/bootstrap', () =>
 import { Storage } from 'expo-sqlite/kv-store';
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as userSettingsData from '@/src/data/user-settings';
-import '@/src/preferences/synced-store';
+import '@/src/sync/synced-preferences-store';
 import { __resetAccountLocalPreferencesForTests, drainAccountLocalSyncedWrites, ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState, retryAccountLocalPreferences, setAccountLocalPreferenceAccount,
   setAccountLocalPreferences } from '@/src/preferences/account-local';
