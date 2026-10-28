@@ -36,7 +36,7 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps below are ISO 8601 strings. Every weight is kg and load-volume uses
+Timestamps are ISO 8601. Every weight is kg and load-volume uses
 `kg_reps`. The entire serialized success response is limited to 256 KiB and a
 validated user/client pair is limited to 120 requests per minute per function
 instance.
@@ -55,8 +55,8 @@ instance.
 }
 ```
 
-This route exists for the MCP resource server to validate every incoming bearer
-token. It returns no user or account fields.
+The MCP resource server calls this route to validate every bearer token. It
+returns no user or account fields.
 
 ## Training profile
 
@@ -200,8 +200,8 @@ calculation module and read [working sets only](#working-sets-only)
 `gym_usage`, on every exercise, counts the sessions holding a working set per
 gym (up to 50, most recent first) and with no gym; `complete` is false when the
 history read was bounded. BoGa has no
-canonical user-authored note field or failed-set meaning, so this API reports
-those fields unavailable instead of inventing semantics.
+canonical user-authored note field or failed-set meaning, so those fields are
+reported unavailable.
 
 ## Exercise history
 
@@ -216,7 +216,7 @@ training history. Paging never partitions by gym: a page is one page of sets
 across every gym, and a split exercise's sets each carry their own `gym` (`null`
 for a session with no gym), as a workout does — group by it before comparing.
 `gym_bucket` filters the stream to one gym, and only then does the cursor pin
-it and `exercise.gym` name it. Per-gym records are the context route's.
+it and `exercise.gym` name it.
 
 ```json
 {
@@ -248,10 +248,9 @@ which count only there and are never a bucket of their own. `gym_bucket` names
 one gym id, and context's figures, or history's stream, then come from that
 gym's sessions alone. It is `400 INVALID_ARGUMENT` on an exercise that is not
 split, when empty, or against a cursor for another gym, and `404` for a gym the
-user does not own. `none` once selected the no-gym sessions; it is now `400
-INVALID_ARGUMENT`, saying they count in the whole exercise (so a gym whose own
-id is `none` cannot be named), and a history cursor pinned to them is `400
-INVALID_CURSOR` while the exercise is split.
+user does not own. `none` is rejected the same way (the no-gym sessions count in
+the whole exercise, so a gym whose id is `none` cannot be named), and a history cursor pinned to them is `400 INVALID_CURSOR`
+while the exercise is split.
 
 The context route's `exercise.gym_buckets` lists every gym it could see, most
 recently performed first, each with its own `personal_records` and
@@ -260,14 +259,13 @@ recently performed first, each with its own `personal_records` and
 ranked over the sessions those figures count — [working sets
 only](#working-sets-only) — so a gym performed only as warm-ups is not listed.
 Each of a split exercise's `recent_performances` and `volume_series` points
-names its `gym` (`null` for no gym). The history route carries no inventory: every gym's sets are already in
-its pages, each naming its gym.
+names its `gym` (`null` for no gym). The history route carries no inventory;
+its sets already name their gyms.
 
 `exercise.gym` appears only when one gym owns the response: a context or
 history request naming `gym_bucket`. Equal `last_performed_at` values break on
-the gym id, so the order is stable; a truncated history (`history_truncated`)
-can still hide a gym. An exercise that is not split carries `split_by_gym:
-false` and no gym field, and a cursor's filter lapses if the flag is turned off
+the gym id; a truncated history (`history_truncated`) can still hide a gym. An
+exercise that is not split carries `split_by_gym: false` and no gym field, and a cursor's filter lapses if the flag is turned off
 between pages.
 
 A filtered history's `next_cursor` carries its gym, so draining it keeps the
@@ -355,8 +353,7 @@ The API reads the app's own rule for which sets and sessions count
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §1–§2), through the shared calculation modules, so coaching and app figures
 agree. Coaching uses the fixed group and coaching rule of [[set.eligibility]],
-never a device's effort settings. This section lists the fields that rule
-governs.
+never a device's effort settings.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and
@@ -379,17 +376,9 @@ tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
 `metric_revision: "working_sets_v7"` reports a split exercise as the whole
-exercise unless `gym_bucket` names a gym ([gym buckets](#gym-buckets)).
-`"working_sets_v6"` reported it one bucket at a time, defaulting to the most
-recently performed and counting no-gym sessions as their own bucket.
-`"working_sets_v5"` applies the source entry factor to total
-Volume for every exercise, retaining entered Weight and displayed 1RM units.
-`"working_sets_v4"` omitted the factor from ordinary exercise Volume. 1RM follows
-[[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v3"` estimated a
-single's 1RM; `"working_sets_v2"`
-counted technique and cooldown sets as working sets; `"working_sets_v1"`
-let a zero 1RM, Weight or Volume stand as a record; the earlier
-`"bodyweight_optional_v1"` counted warm-ups in every figure.
+exercise unless `gym_bucket` names a gym ([gym buckets](#gym-buckets)). For what
+an earlier `metric_revision` meant, see the
+[revision history](../../../docs/procedures/rule-upgrade.md#revision-history).
 
 ## Optional bodyweight calculation response
 
@@ -428,7 +417,7 @@ owner's timeline. An enabled response may contain:
 }
 ```
 
-The public coaching response does not need a reading identifier. Missing uses
+Missing uses
 `{"status":"missing","value":null,"unit":"kg","measured_at":null}`;
 malformed rows are skipped, so an older valid row may apply; if none applies the
 context is `missing`. There is no future estimate or session override.
@@ -447,18 +436,17 @@ Performed sets use ordinary vocabulary and separate raw/derived values:
 Parsing, the zero rule and the load, Volume and 1RM formulas are the app's
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §4); only confirmed performed rows ([[set.performed]]) that are not deleted
-contribute. The breakdown is an API interpretation aid, not a user-facing label.
+contribute.
 
 Volume coverage remains explicit for invalid/overflow/truncated input. Missing
 bodyweight under the personal policy is complete zero-fallback input, not
-incomplete coverage. A null value is unavailable, never zero. Records remain
-bounded by `history_truncated` and never imply unbounded lifetime coverage.
+incomplete coverage. A null value is unavailable, never zero. Records stay
+bounded by `history_truncated`, never implying lifetime coverage.
 
-`training-metrics.ts` imports the shared calculation boundary. Settings,
-definitions, sessions, sets and applicable readings are owner-filtered and
-batched with no per-set query or timeline response. Preference, contribution,
-reading value/date/delete/restore and session-start changes affect the next API
-read; no derived value is persisted.
+Settings, definitions, sessions, sets and applicable readings are owner-filtered and batched,
+with no per-set query or timeline response. Preference, contribution,
+reading and session-start changes affect the next API read; no derived value is
+persisted.
 
 ## Plan permission and write routes
 
@@ -467,9 +455,8 @@ plans/programmes and editing exercises additionally require a current-grant row 
 `public.agent_plan_permissions` (`plan_access_enabled = true` and `granted_at`
 equal to the live OAuth grant timestamp). A missing, false or grant-mismatched
 row returns `403 PLAN_PERMISSION_REQUIRED` before any referenced exercise or gym
-is resolved. The person enables it per client on the app's Connected Agents
-screen (one switch covers plans and exercises); the base OAuth consent is never
-described as write access.
+is resolved. The person enables it per client on the Connected Agents screen (one switch
+covers plans and exercises); base OAuth consent is never described as write access.
 
 ### `GET /v1/agent/session-plans`
 
@@ -529,13 +516,14 @@ FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
 `expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
 EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.
 
-The service-role-only `agent_*_exercise` RPCs stamp every row they touch with
-`greatest(now, every stamp the exercise holds + 1)`, so devices pull the change
-under LWW. A re-added muscle revives its row; a new one takes the id
-`map_<exercise>__<muscle>`; a dropped one is tombstoned. A `load_input_mode`
-change re-scores linked group exercises. The response is the RPC result
-(`exercise_id`, `revision`, `idempotent_replay`, plus `deleted`/`changed` for
-delete and restore) and `exercise`, the catalog view after the write.
+The service-role-only `agent_*_exercise` RPCs stamp each touched row at or past
+the wall clock and past every stamp the exercise holds, so devices pull the
+change under LWW. A re-added muscle
+revives its row, a new one takes the id `map_<exercise>__<muscle>`, a dropped one
+is tombstoned, and a `load_input_mode` change re-scores linked group exercises.
+The response is the RPC result (`exercise_id`, `revision`, `idempotent_replay`,
+plus `deleted`/`changed` for delete and restore) and `exercise`, the catalog view
+after the write.
 
 ## Status contract
 
