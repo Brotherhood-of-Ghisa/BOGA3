@@ -8,7 +8,7 @@ import {
   uiRoles,
   uiSpace,
   uiText,
-  } from '@/components/ui';
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
 import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';

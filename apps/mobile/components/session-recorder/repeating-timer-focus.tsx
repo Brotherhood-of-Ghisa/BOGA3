@@ -32,7 +32,7 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
   const { width, height } = useWindowDimensions();
   const controlsHeight = uiGeometry.tapTarget + uiSpace.sm * 2 + uiBorder.width
     + uiTypography.lineHeight.xxl * 2
-    + uiTypography.lineHeight.xxs + uiSpace.xs + uiTypography.lineHeight.xxl + uiSpace.lg + uiBorder.width
+    + uiText.label.lineHeight + uiSpace.xs + uiText.figureHero.lineHeight + uiSpace.lg + uiBorder.width
     + uiGeometry.tapTarget + uiSpace.xl + uiGeometry.tapTarget + uiSpace.xl + uiSpace.lg
     + uiSpace.lg * 6;
   const diameter = Math.min(

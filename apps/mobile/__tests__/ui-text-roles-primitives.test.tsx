@@ -4,7 +4,7 @@
  * field, a legend each take one role, so a screen built from them inherits the
  * vocabulary instead of re-assembling face, weight and size.
  */
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet, Text, type TextStyle } from 'react-native';
 
 import { ActionButton, ChipGroup, FormField, ListRow, Notice, PageHeader, SearchField, SectionHeader, SegmentedControl, Sheet, Stat, StatePanel, SwitchRow, Tag, ToggleChip } from '@/components/ui';
@@ -45,6 +45,13 @@ describe('titles', () => {
     expect(style(screen.getByText('Offline'))).toMatchObject(uiText.title);
     expect(style(screen.getByText('Retry later.'))).toMatchObject(uiText.body);
     expect(style(screen.getByText('RM curve'))).toMatchObject(uiText.title);
+  });
+
+  it('heads an information sheet\'s sections in bodyStrong over muted body', () => {
+    render(<Information body="About." label="RM curve" sections={[['Regimes', 'Two fits.']]} testIDPrefix="rm" title="About the RM curve" />);
+    fireEvent.press(screen.getByTestId('rm-info'));
+    expect(style(screen.getByText('Regimes'))).toMatchObject(uiText.bodyStrong);
+    expect(style(screen.getByText('Two fits.'))).toMatchObject({ ...uiText.body, color: uiRoles.inkMuted });
   });
 });
 

@@ -169,8 +169,8 @@ session planner, the exercise screens (page, catalogue, editor, history, link,
 shared exercise), Settings (its pages, Appearance, Profile, Gyms) and the app
 shell (tab bar, stack header, More, connected agents, logs) take every text
 from the roles, and so do the shared primitives in `apps/mobile/components/ui`
-and the sync gate. Display art keeps its own type: the full-screen
-repeating timer, the Train START disc and the share image; the log viewer's
+and the sync gate. Display art keeps its own type: the repeating timer's
+countdown and phase, the Train START disc and the share image; the log viewer's
 context dump, being code, stays wholly in Plex Mono (`figureSmall`). Nothing
 else assembles type: an SVG tick or the native stack header, which take no
 style object, read their role's fields.

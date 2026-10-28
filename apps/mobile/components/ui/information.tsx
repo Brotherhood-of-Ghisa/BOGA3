@@ -32,7 +32,7 @@ export function Information({ title, body, sections = [], label, testIDPrefix }:
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{body}</Text>
         {sections.map(([heading, text]) => <View key={heading} style={styles.section}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>{heading}</Text>
+          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.bodyStrong}>{heading}</Text>
           <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{text}</Text>
         </View>)}
       </ScrollView>
