@@ -2176,8 +2176,86 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '.data.deleted == false and .data.changed
 
 echo "[agent-api-test] letting the per-minute request windows reset before the targets block"
 # The earlier sections spend most of the function's 120-per-minute read window;
-# the targets block makes ~30 more requests and a 30-write rate-limit probe.
+# the seeded-history check and the targets block make ~30 more requests and a
+# 30-write rate-limit probe.
 sleep 61
+echo "[agent-api-test] verifying the training status figures over a seeded seven-week history"
+# Figures worked out by hand from the rows below (UTC, the fixture's zone).
+# The muscle's sets fall on the Thursdays of the 1st, 2nd and 4th full weeks
+# before this one, so this week, today and the recovery days hold none; the
+# second exercise maps to no muscle and its single-rep sets make each 1RM its
+# weight: 95 (50 days ago, the baseline), 100 (40, a record), 105 (20, a
+# record), 102 (10, no record).
+HISTORY_MUSCLE="agent-api-${RUN_TAG}-history-muscle"
+HISTORY_LIFT="agent-api-${RUN_TAG}-history-lift"
+HISTORY_SINGLES="agent-api-${RUN_TAG}-history-singles"
+read -r WEEK_START_MS HISTORY_LAST_TRAINED HISTORY_SERIES_STARTS SINGLES_LAST_DONE SINGLES_LAST_RECORD < <(node -e '
+  const now = Number(process.argv[1]);
+  const day = 86400000;
+  const midnight = Math.floor(now / day) * day;
+  const weekStart = midnight - ((new Date(midnight).getUTCDay() + 6) % 7) * day;
+  const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const starts = [4, 3, 2, 1].map((k) => iso(weekStart - k * 7 * day)).join(",");
+  console.log(weekStart, iso(weekStart - 4 * day), starts, iso(now - 10 * day), iso(now - 20 * day));
+' "${NOW_MS}")
+history_session_sql() { # <suffix> <completed ms> <exercise> <sets as order:weight:reps:type,...>
+  local id="agent-api-${RUN_TAG}-history-$1" values="" entry order weight reps type
+  for entry in ${4//,/ }; do
+    IFS=: read -r order weight reps type <<<"${entry}"
+    [[ "${type}" == "-" ]] && type="null" || type="'${type}'"
+    values+="${values:+,}('${USER_A_UUID}'::uuid,'${id}-set-${order}','${id}-block',${order},'${weight}','${reps}',${type},${NOW_MS},${NOW_MS},${NOW_MS})"
+  done
+  printf "insert into app_public.sessions (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,created_at,updated_at,client_updated_at_ms)
+    values ('%s'::uuid,'%s','%s','completed',%s,%s,3600,%s,%s,%s);
+  insert into app_public.session_exercises (owner_user_id,id,session_id,exercise_definition_id,order_index,name,created_at,updated_at,client_updated_at_ms)
+    values ('%s'::uuid,'%s-block','%s','%s',0,'History',%s,%s,%s);
+  insert into app_public.exercise_sets (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,created_at,updated_at,client_updated_at_ms)
+    values %s;\n" \
+    "${USER_A_UUID}" "${id}" "${GYM_A}" "$(($2 - 3600000))" "$2" "${NOW_MS}" "${NOW_MS}" "${NOW_MS}" \
+    "${USER_A_UUID}" "${id}" "${id}" "$3" "${NOW_MS}" "${NOW_MS}" "${NOW_MS}" "${values}"
+}
+THURSDAY_NOON_MS="$((3 * 86400000 + 43200000))"
+run_psql "
+  begin;
+    set constraints all deferred;
+    insert into app_public.muscle_groups
+      (owner_user_id,id,display_name,family_name,sort_order,is_editable,report_group,tracked,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'${HISTORY_MUSCLE}','History Muscle','back',0,0,null,1,${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.exercise_definitions
+      (owner_user_id,id,name,load_input_mode,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'${HISTORY_LIFT}','History Row','total_load',${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${HISTORY_SINGLES}','History Singles','total_load',${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.exercise_muscle_mappings
+      (owner_user_id,id,exercise_definition_id,muscle_group_id,weight,role,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-history-map','${HISTORY_LIFT}','${HISTORY_MUSCLE}',1.0,'primary',${NOW_MS},${NOW_MS},${NOW_MS});
+    $(history_session_sql w1 "$((WEEK_START_MS - 7 * 86400000 + THURSDAY_NOON_MS))" "${HISTORY_LIFT}" 0:40:10:warm_up,1:60:8:-,2:60:8:-,3:60:8:rir_1)
+    $(history_session_sql w2 "$((WEEK_START_MS - 14 * 86400000 + THURSDAY_NOON_MS))" "${HISTORY_LIFT}" 0:60:8:-,1:60:8:-)
+    $(history_session_sql w4 "$((WEEK_START_MS - 28 * 86400000 + THURSDAY_NOON_MS))" "${HISTORY_LIFT}" 0:40:10:warm_up,1:55:8:-,2:55:8:-,3:55:8:-,4:55:8:-)
+    $(history_session_sql s10 "$((NOW_MS - 10 * 86400000))" "${HISTORY_SINGLES}" 0:102:1:-)
+    $(history_session_sql s20 "$((NOW_MS - 20 * 86400000))" "${HISTORY_SINGLES}" 0:105:1:-)
+    $(history_session_sql s40 "$((NOW_MS - 40 * 86400000))" "${HISTORY_SINGLES}" 0:100:1:-)
+    $(history_session_sql s50 "$((NOW_MS - 50 * 86400000))" "${HISTORY_SINGLES}" 0:95:1:-)
+  commit;
+" >/dev/null
+agent_get "training-status"
+assert_status "200" "training status over the seeded history"
+printf '%s' "${RESPONSE_BODY}" | jq -e \
+  --arg muscle "${HISTORY_MUSCLE}" --arg singles "${HISTORY_SINGLES}" \
+  --arg trained "${HISTORY_LAST_TRAINED}" --arg starts "${HISTORY_SERIES_STARTS}" \
+  --arg done "${SINGLES_LAST_DONE}" --arg record "${SINGLES_LAST_RECORD}" '
+    .data as $s
+    | ($s.muscles | map(select(.id == $muscle)) | first) as $m
+    | ($s.favourite_exercises | map(select(.exercise_id == $singles)) | first) as $f
+    | $m.week_sets == 0 and $m.today_sets == null
+    and ([$m.recovery_days[].sets] | all(. == null))
+    and $m.last_trained_on == $trained
+    and ($m.weekly_sets_last_4_weeks | map(.sets)) == [4, 0, 2, 3]
+    and ($m.weekly_sets_last_4_weeks | map(.week_start) | join(",")) == $starts
+    and $f.sessions_28d == 2 and $f.last_done_on == $done
+    and $f.best_e1rm_kg.last_28d == 105 and $f.best_e1rm_kg.previous_28d == 100
+    and $f.last_record_on == $record and $f.record_history_complete == true
+  ' >/dev/null || fail "training status figures over the seeded history differ from the hand-worked ones"
+
 echo "[agent-api-test] verifying the coach sets weekly muscle targets"
 TARGETS_KEY="agent-api-${RUN_TAG}-targets"
 # Another scope's override and the secondary switch already on the row: the
