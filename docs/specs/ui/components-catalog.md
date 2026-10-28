@@ -111,7 +111,7 @@ folder rather than re-implementing its row, card or sheet.
 | `sync-status/` | `SyncStatusPanel` (Settings → Data & sync), with `ExerciseMergeReview` for current/saved changes and uncertain operation recovery and the snapshot hook behind its Settings card's status |
 | `settings/` | `SettingsCard` (icon, label, status — one per Settings destination), the cards' status strings, the sub page screens, Data & sync's `BackupPanel` and Developer tools |
 | `more/` | More's connected-agent read for `Connect an AI` |
-| `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview |
+| `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview; launcher reconciliation and the shared figure's calendar hook implement [[appearance.november]] |
 | `notifications/` | Settings' scrollable notification controls and the group mute row; server-confirmed state comes from `src/notifications` |
 | `preferences/` | Settings editors (rest timer, effort, Progress); full muscle setup/target pages and their numeric fields |
 | `profile/` | the Profile cards and their panel and form hooks |
