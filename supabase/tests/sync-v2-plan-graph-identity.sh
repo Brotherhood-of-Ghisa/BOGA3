@@ -10,12 +10,14 @@
 # session_plan_exercises or session_plan_sets rows, and that B's rows
 # (graph_version included) are byte-identical afterwards. It also proves:
 #
-#   - A's own block insert still succeeds and advances A's plan graph_version;
+#   - A's own block write still succeeds and advances A's plan graph_version,
+#     both through PostgREST and through sync_push (the app's write path);
 #   - an identity-less delete cascade (deleting an auth user who owns a full
 #     programme/plan/block/set graph) still succeeds;
-#   - catalog: no trigger function on an app_public table sets a
-#     request.jwt.* setting, and every function that does is unreachable by
-#     public, anon and authenticated.
+#   - catalog: the only functions that set a request.jwt.* setting are the
+#     named service-role-only agent RPCs (so no trigger, nor any helper a
+#     trigger calls, can set it), and none is executable by anon or
+#     authenticated.
 
 set -euo pipefail
 
@@ -69,7 +71,8 @@ B_SPS="pgi-${RUN_TAG}-bsps"
 A_SP="pgi-${RUN_TAG}-asp"
 A_SPE="pgi-${RUN_TAG}-aspe"
 PROBE="pgi-${RUN_TAG}-probe"
-DEL_USER="$(uuidgen | tr 'A-Z' 'a-z')"
+A_SPE_PUSH="pgi-${RUN_TAG}-aspe-push"
+DEL_USER="$(run_psql_sql "select gen_random_uuid();")"
 
 cleanup() {
   run_psql_sql "
@@ -188,6 +191,22 @@ A_VER_AFTER="$(run_psql_sql "select graph_version > '${A_VER_BEFORE}'::timestamp
 [[ "${A_VER_AFTER}" == "t" ]] || fail "user A's plan graph_version did not advance on an own block insert"
 pass "user A's own block insert succeeds and advances A's plan graph_version"
 
+# The same through sync_push, which runs the triggers under A's RLS.
+A_VER_BEFORE="$(run_psql_sql "select graph_version from app_public.session_plans where owner_user_id = '${USER_A_UUID}' and id = '${A_SP}';")"
+push_body="$(jq -nc --arg id "${A_SPE_PUSH}" --arg p "${A_SP}" --argjson now "${NOW_MS}" \
+  '{entities: [{type: "session_plan_exercises", id: $id, client_updated_at_ms: $now,
+    fields: {session_plan_id: $p, exercise_definition_id: null, order_index: 1, name: "A Pushed Block",
+             progress_status: "pending", resolved_at: null,
+             created_at: $now, updated_at: $now, deleted_at: null}}]}')"
+status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST \
+  -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${USER_A_TOKEN}" \
+  -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+  --data "${push_body}" "${API_URL}/rest/v1/rpc/sync_push")"
+[[ "${status}" == "200" ]] || fail "user A's sync_push of an own block returned ${status}"
+A_VER_AFTER="$(run_psql_sql "select graph_version > '${A_VER_BEFORE}'::timestamptz from app_public.session_plans where owner_user_id = '${USER_A_UUID}' and id = '${A_SP}';")"
+[[ "${A_VER_AFTER}" == "t" ]] || fail "user A's plan graph_version did not advance on a sync_push block write"
+pass "user A's sync_push block write advances A's plan graph_version"
+
 # Deleting an auth user cascades through their whole plan graph with no
 # request identity; the graph triggers must not abort it.
 run_psql_sql "
@@ -209,18 +228,20 @@ run_psql_sql "delete from auth.users where id = '${DEL_USER}'::uuid;" >/dev/null
   || fail "deleting an auth user that owns a plan graph failed"
 pass "an auth user's delete cascade through a full plan graph succeeds"
 
-# Catalog: identity is never set from a trigger, and only service-only
-# functions may set it.
-trigger_setters="$(run_psql_sql "
-  select coalesce(string_agg(distinct p.proname, ', '), '')
-    from pg_trigger t
-    join pg_class c on c.oid = t.tgrelid
-    join pg_namespace n on n.oid = c.relnamespace
-    join pg_proc p on p.oid = t.tgfoid
-   where n.nspname = 'app_public' and not t.tgisinternal
+# Catalog: only the named service-role-only agent RPCs may set a request
+# identity, from their validated p_owner. An exact list, so a trigger (or a
+# helper a trigger calls) that sets it fails here even if its EXECUTE is
+# revoked.
+ALLOWED_SETTERS="app_public.agent_create_session_plan, app_public.agent_create_training_programme, app_public.agent_exercise_act_as_owner, app_public.agent_plan_claim_receipt"
+setters="$(run_psql_sql "
+  select coalesce(string_agg(n.nspname || '.' || p.proname, ', ' order by n.nspname || '.' || p.proname), '')
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname in ('app_public', 'public')
      and p.prosrc ~* 'set_config\s*\(\s*''request\.jwt';")"
-[[ -z "${trigger_setters}" ]] || fail "trigger function(s) set a request.jwt setting: ${trigger_setters}"
-pass "no app_public trigger function sets a request.jwt setting"
+[[ "${setters}" == "${ALLOWED_SETTERS}" ]] \
+  || fail "identity-setting functions differ from the allowed list: got '${setters}'"
+pass "only the allowed agent RPCs set a request identity"
 
 reachable_setters="$(run_psql_sql "
   select coalesce(string_agg(n.nspname || '.' || p.proname, ', '), '')

@@ -40,9 +40,9 @@ This is the shortest operational summary. Use the "Further reading" section when
     claims before executing any read or write body. Request identity is never
     derived from row data: no trigger may write `request.jwt.claim*`
     (PostgREST sends identity only in `request.jwt.claims`, so a trigger-set
-    `claim.sub` becomes `auth.uid()` before RLS `WITH CHECK` runs). Triggers
-    on user-owned tables are `SECURITY INVOKER`, so their parent reads, locks
-    and bumps obey the caller's RLS. Only service-role-only agent RPCs may set
+    `claim.sub` becomes `auth.uid()` before RLS `WITH CHECK` runs). The plan
+    graph_version and provenance-lock triggers are `SECURITY INVOKER`, so
+    their parent reads, locks and bumps obey the caller's RLS. Only service-role-only agent RPCs may set
     an owner context, from their validated `p_owner` argument
     (`supabase/tests/sync-v2-plan-graph-identity.sh`).
 15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
