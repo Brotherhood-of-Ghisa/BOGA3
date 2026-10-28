@@ -131,13 +131,58 @@ export type CompetitionStreamRecordWire = {
   performance: CompetitionPerformanceWire | null;
   previous: { value: CompetitionHistoryValueWire; performance: CompetitionPerformanceWire | null }[];
 };
+export type GroupSharedExerciseDetailsWire = {
+  group_exercise_id: string | null;
+  group_exercise_name: string | null;
+  name: string;
+  load_input_mode: LoadInputMode;
+  bodyweight_contribution: number;
+  mappings: {
+    muscle_group_id: string;
+    weight: number;
+    role?: 'primary' | 'secondary' | 'stabilizer' | null;
+  }[];
+  created_at_ms: number;
+};
+export type GroupSharedExerciseItemWire = {
+  id: string;
+  group_id: string;
+  shared_by: GroupMemberRef;
+  exercise: GroupSharedExerciseDetailsWire;
+};
+export type CompetitionStreamSharedExerciseWire = {
+  kind: 'shared_exercise';
+  key: string;
+  sort_at_ms: number;
+  id: string;
+  group_id: string;
+  shared_by: GroupMemberRef;
+  exercise: GroupSharedExerciseDetailsWire;
+};
+export type GroupSharedExercisesListWire = {
+  contract_version: 4;
+  group_id: string;
+  shared_exercises: GroupSharedExerciseItemWire[];
+};
+export type GroupSharedExerciseWriteWire = {
+  contract_version: 4;
+  group_id: string;
+  shared_exercise: GroupSharedExerciseItemWire;
+};
+export type GroupSharedExerciseDeleteWire = {
+  contract_version: 4;
+  group_id: string;
+  shared_exercise_id: string;
+  deleted: boolean;
+};
 export type CompetitionStreamItemWire =
   | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
       /** Record events only, from group_competition_stream_v2; absent in a payload cached from the first reader. */
       record?: CompetitionStreamRecordWire }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
-      group: { group_id: string; name: string }; member: GroupMemberRef };
+      group: { group_id: string; name: string }; member: GroupMemberRef }
+  | CompetitionStreamSharedExerciseWire;
 export type CompetitionStreamWire = { contract_version: 4; items: CompetitionStreamItemWire[]; next_cursor: string | null; has_more: boolean };
 /** At a glance: every current member's working sets and group records per requested window, in request order. */
 export type CompetitionPeriodTotalsWire = {

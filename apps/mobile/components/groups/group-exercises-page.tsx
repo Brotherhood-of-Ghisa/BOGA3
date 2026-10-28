@@ -7,6 +7,8 @@ import {
   ActionButton,
   Card,
   Notice,
+  SegmentedControl,
+  type SegmentedControlOption,
   uiGeometry,
   uiSpace,
   uiText,
@@ -44,6 +46,7 @@ import { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-ex
 import { GroupExerciseRow } from './group-exercise-row';
 import { GroupExerciseUnlinkSheet } from './group-exercise-unlink-sheet';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
+import { GroupSharedExercisesList } from './group-shared-exercises-list';
 import { GroupWriteNotice } from './write-notice';
 
 type Feedback = { tone: 'error' | 'success'; message: string };
@@ -59,7 +62,13 @@ type GroupExercisesPageProps = {
   onRetry: () => void;
   /** Re-reads `group_get` after a refusal, so a demoted admin loses the actions. */
   refreshGroup: () => Promise<void>;
+  userId?: string | null;
 };
+
+const TAB_OPTIONS: readonly SegmentedControlOption<'leaderboards' | 'shared'>[] = [
+  { value: 'leaderboards', label: 'Leaderboards' },
+  { value: 'shared', label: 'Shared library' },
+];
 
 const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', groupExerciseId: string) =>
   archiveCompetitionExercise(groupId,groupExerciseId,action === 'archive');
@@ -86,8 +95,10 @@ export function GroupExercisesPage({
   error,
   onRetry,
   refreshGroup,
+  userId,
 }: GroupExercisesPageProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'leaderboards' | 'shared'>('leaderboards');
   const links = useMyGroupExerciseLinks(groupId);
   const [sheetExercise, setSheetExercise] = useState<GroupExercise | null>(null);
   const [pickTarget, setPickTarget] = useState<GroupExercisePickTarget | null>(null);
@@ -198,21 +209,44 @@ export function GroupExercisesPage({
   };
 
   const header = (
-    <View style={styles.header}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
-        Exercises
-      </Text>
-      {canManage ? (
-        <ActionButton
-          accessibilityLabel="Add exercise"
-          label="Add exercise"
-          onPress={() => router.push(`/group/${groupId}/exercises/new`)}
-          testID="group-exercises-add-button"
-          variant="outline"
-        />
-      ) : null}
+    <View style={styles.headerBlock}>
+      <View style={styles.header}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
+          Exercises
+        </Text>
+        {activeTab === 'leaderboards' && canManage ? (
+          <ActionButton
+            accessibilityLabel="Add exercise"
+            label="Add exercise"
+            onPress={() => router.push(`/group/${groupId}/exercises/new`)}
+            testID="group-exercises-add-button"
+            variant="outline"
+          />
+        ) : null}
+      </View>
+      <SegmentedControl
+        onChange={setActiveTab}
+        options={TAB_OPTIONS}
+        testIDPrefix="group-exercises-tab"
+        value={activeTab}
+      />
     </View>
   );
+
+  if (activeTab === 'shared') {
+    return (
+      <View style={styles.page} testID="group-screen-exercises">
+        {header}
+        <GroupSharedExercisesList
+          groupId={groupId}
+          groupName={groupName}
+          myRole={myRole}
+          offline={offline}
+          userId={userId ?? null}
+        />
+      </View>
+    );
+  }
 
   if (!exercises.data) {
     return (
@@ -324,6 +358,9 @@ export function GroupExercisesPage({
 const styles = StyleSheet.create({
   page: {
     gap: uiSpace.md,
+  },
+  headerBlock: {
+    gap: uiSpace.sm,
   },
   header: {
     flexDirection: 'row',

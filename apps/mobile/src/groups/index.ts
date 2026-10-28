@@ -79,5 +79,6 @@ export {
   getCompetitionBoard, getCompetitionCertification, getCompetitionHistory,
   getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionSessionRecords, getCompetitionStream,
   getCompetitionWeek, listCompetitionExercises, updateCompetitionExercise,
+  createGroupSharedExercise, listGroupSharedExercises, deleteGroupSharedExercise,
 } from './api';
 export type * from './competition-wire';

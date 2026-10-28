@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 import * as mockReact from 'react';
-import { Alert, Share } from 'react-native';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 // Offline: the catalogue's links read locally and no group refresh runs.
@@ -45,6 +45,7 @@ jest.mock('@/src/auth', () => ({
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
+  createGroupSharedExercise: jest.fn(),
 }));
 
 import * as groupsApi from '@/src/groups/api';
@@ -93,8 +94,12 @@ beforeEach(() => {
   mockAuthSnapshot = { isConfigured: true, user: { id: 'user-1' } };
   __resetExerciseListPreferencesForTests();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
   (groupsApi.listMyGroups as jest.Mock).mockResolvedValue({ groups: [GROUP_A] });
+  (groupsApi.createGroupSharedExercise as jest.Mock).mockResolvedValue({
+    contract_version: 4,
+    group_id: 'grp-a',
+    shared_exercise: { id: 'sh-1' },
+  });
 });
 
 afterEach(() => {
@@ -102,7 +107,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('catalogue ⋮ Share with group member…', () => {
+describe('catalogue ⋮ Share with group…', () => {
   it('is disabled for a soft-deleted exercise', async () => {
     await openCatalog(() => deleteExerciseCatalogExercise('seed_barbell_bench_press'));
     fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
@@ -112,7 +117,7 @@ describe('catalogue ⋮ Share with group member…', () => {
     await expandChest();
     await openActions('Barbell Bench Press');
 
-    const item = screen.getByLabelText('Share exercise with group member from actions');
+    const item = screen.getByLabelText('Share exercise with group from actions');
     expect(item.props.accessibilityState?.disabled).toBe(true);
   });
 
@@ -123,39 +128,44 @@ describe('catalogue ⋮ Share with group member…', () => {
     await openActions('Barbell Bench Press');
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Share exercise with group member from actions'));
+      fireEvent.press(screen.getByLabelText('Share exercise with group from actions'));
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'No groups found',
-      'You must be a member of a group to share an exercise with a member.'
+      'You must be a member of a group to share an exercise.'
     );
-    expect(Share.share).not.toHaveBeenCalled();
+    expect(groupsApi.createGroupSharedExercise).not.toHaveBeenCalled();
   });
 
-  it('shares directly when user belongs to exactly one group', async () => {
+  it('shares directly in-app when user belongs to exactly one group', async () => {
     (groupsApi.listMyGroups as jest.Mock).mockResolvedValue({ groups: [GROUP_A] });
     await openCatalog();
     await expandChest();
     await openActions('Barbell Bench Press');
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Share exercise with group member from actions'));
+      fireEvent.press(screen.getByLabelText('Share exercise with group from actions'));
     });
 
-    expect(Share.share).toHaveBeenCalledWith({
-      message: expect.stringContaining('Check out the exercise "Barbell Bench Press" shared with "Garage Gym" on BOGA.\nboga3://exercise-share?groupId=grp-a&payload='),
-    });
+    expect(groupsApi.createGroupSharedExercise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupId: 'grp-a',
+        name: 'Barbell Bench Press',
+        mode: 'total_load',
+      })
+    );
+    expect(await screen.findByText('Shared "Barbell Bench Press" with Garage Gym.')).toBeTruthy();
   });
 
-  it('prompts group picker when user belongs to multiple groups, then shares', async () => {
+  it('prompts group picker when user belongs to multiple groups, then shares in-app', async () => {
     (groupsApi.listMyGroups as jest.Mock).mockResolvedValue({ groups: [GROUP_A, GROUP_B] });
     await openCatalog();
     await expandChest();
     await openActions('Barbell Bench Press');
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Share exercise with group member from actions'));
+      fireEvent.press(screen.getByLabelText('Share exercise with group from actions'));
     });
 
     expect(await screen.findByTestId('exercise-share-group-sheet')).toBeTruthy();
@@ -165,8 +175,13 @@ describe('catalogue ⋮ Share with group member…', () => {
       fireEvent.press(screen.getByLabelText('Share exercise with Iron Club'));
     });
 
-    expect(Share.share).toHaveBeenCalledWith({
-      message: expect.stringContaining('Check out the exercise "Barbell Bench Press" shared with "Iron Club" on BOGA.\nboga3://exercise-share?groupId=grp-b&payload='),
-    });
+    expect(groupsApi.createGroupSharedExercise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupId: 'grp-b',
+        name: 'Barbell Bench Press',
+        mode: 'total_load',
+      })
+    );
+    expect(await screen.findByText('Shared "Barbell Bench Press" with Iron Club.')).toBeTruthy();
   });
 });

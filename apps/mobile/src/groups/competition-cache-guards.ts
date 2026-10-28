@@ -1,6 +1,6 @@
 import { isObservedCompetitionPolicy } from './competition-cache-policy';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionSessionDetailWire,
-  isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
+  isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire, isGroupSharedExercisesListWire } from './competition-reader-guards';
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const exact = (v: unknown, keys: string[]): v is Record<string, unknown> => record(v) &&
@@ -26,6 +26,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);
   if (kind === 'group-exercises') return isCompetitionExerciseListWire(value);
+  if (kind === 'shared-exercises') return isGroupSharedExercisesListWire(value) && value.group_id === groupId;
   if (kind === 'boards') return isCompetitionPodiumsWire(value);
   if (kind === 'week') return exact(value,['windowStartMs','summary']) &&
     Number.isSafeInteger(value.windowStartMs) && isCompetitionWeekSummaryWire(value.summary) && value.summary.group_id === groupId;
@@ -35,6 +36,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     value.session.member.user_id === scope[1] && value.session.session_id === scope.slice(2).join(':');
   if (kind === 'stream') return isCompetitionStreamWire(value) && value.items.every(item => item.kind === 'session'
     ? item.groups.every(group => group.group_id === groupId)
+    : item.kind === 'shared_exercise' ? item.group_id === groupId
     : (item.kind === 'competition' ? item.event.group.group_id : item.group.group_id) === groupId);
   return false;
 }

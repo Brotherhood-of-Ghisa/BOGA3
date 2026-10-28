@@ -23,6 +23,8 @@ export const groupCacheKeys = {
   session: (groupId: string, memberUserId: string, sessionId: string) => `session:v7:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
   groupExercises: (groupId: string) => `group-exercises:v7:${groupId}`,
+  /** Group shared exercises list (Option C persistent library). */
+  sharedExercises: (groupId: string) => `shared-exercises:v7:${groupId}`,
   /** Versioned podium payload. Full boards and history are never cached. */
   boards: (groupId: string) => `boards:v7:${groupId}`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
