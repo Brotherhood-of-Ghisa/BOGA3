@@ -916,7 +916,7 @@ const searchExercises = async (
 const attachSessionWeightContexts = async <T extends { id: string }>(
   client: SupabaseClient, userId: string, rows: T[], calculationsEnabled: boolean,
 ): Promise<Array<T & SessionWeightRow>> => {
-  if (rows.length === 0) return rows;
+  if (rows.length === 0) return [];
   if (!calculationsEnabled) {
     return rows.map(row => ({ ...row, body_weight_kg: null, body_weight_source: null,
       body_weight_measurement_id: null, body_weight_measured_at: null }));
@@ -1716,11 +1716,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 type StatusRead<T> = { rows: T[]; truncated: boolean };
 
-/** Runs one owner-filtered read per chunk at once; truncated when any chunk hits `STATUS_ROW_LIMIT`. */
+/** Parallel chunk reads per wave, so a heavy history never bursts the database pool. */
+const STATUS_PARALLEL_READS = 8;
+
+/** One owner-filtered read per chunk, a wave at a time; truncated when any chunk hits `STATUS_ROW_LIMIT`. */
 const readChunks = async <T>(
   ids: string[], size: number, read: (chunkIds: string[]) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>,
 ): Promise<StatusRead<T>> => {
-  const results = await Promise.all(chunk(ids, size).map((chunkIds) => read(chunkIds)));
+  const results: Array<{ data: T[] | null; error: { message?: string } | null }> = [];
+  for (const wave of chunk(chunk(ids, size), STATUS_PARALLEL_READS)) {
+    results.push(...await Promise.all(wave.map((chunkIds) => read(chunkIds))));
+  }
   for (const result of results) throwDatabaseError(result.error);
   return {
     rows: results.flatMap((result) => result.data ?? []),
