@@ -54,3 +54,19 @@ calculation, eligibility or record rule), or the sync protocol.
 - Never stop a Supabase lane mid-run and then `./boga db down`: the backup
   saves a half-reset database. Fix:
   `bash -lc 'source supabase/scripts/_common.sh && run_supabase stop --no-backup'`.
+
+## Revision history
+
+Agent API `metric_revision` values, newest first.
+
+- `working_sets_v7` reports a split exercise as the whole exercise unless
+  `gym_bucket` names a gym.
+- `working_sets_v6` reported it one bucket at a time, defaulting to the most
+  recently performed and counting no-gym sessions as their own bucket.
+- `working_sets_v5` applied the source entry factor to total Volume for every
+  exercise, retaining entered Weight and displayed 1RM units.
+- `working_sets_v4` omitted the factor from ordinary exercise Volume.
+- `working_sets_v3` estimated a single's 1RM.
+- `working_sets_v2` counted technique and cooldown sets as working sets.
+- `working_sets_v1` let a zero 1RM, Weight or Volume stand as a record.
+- `bodyweight_optional_v1` (earlier) counted warm-ups in every figure.
