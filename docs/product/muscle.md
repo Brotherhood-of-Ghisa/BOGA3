@@ -56,8 +56,8 @@ keep their own. Mode changes and disabling a muscle retain its overrides.
 Targets list only enabled reported muscles, including custom muscles. Clearing
 an override restores inheritance; targets are positive whole numbers.
 
-History Sets target grading, Progress Sets references and Today's Plan week
-column use the effective target of each reported muscle, scaled to the period.
+History Sets target grading and Today's Plan week column use the effective
+target of each reported muscle, scaled to the period.
 Counting is unchanged.
 
 Why: individual training goals without losing a shared fallback.

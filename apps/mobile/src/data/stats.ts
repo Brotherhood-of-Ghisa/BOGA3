@@ -1,13 +1,7 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
-import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
-import { drainExerciseSessionFacts } from './exercise-session-facts';
-import {
-  aggregateProgressMuscleTickers, muscleTickerBounds, reportMuscleTrainingStarts,
-  type MuscleTickerOptions, type MuscleTrainingStarts,
-} from './progress-muscle-tickers';
-
+import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseHistoryGymOptions } from './exercise-analytics';
@@ -33,7 +27,6 @@ import {
 } from './muscle-analytics';
 import {
   exerciseDefinitions,
-  exerciseSessionFacts,
   exerciseMuscleMappings,
   exerciseSets,
   gyms,
@@ -91,8 +84,6 @@ export type ProgressComparisons = StatsSummary & {
 };
 
 export type StatsAggregationInput = MuscleAnalyticsInput & {
-  /** By anatomy entry id, as read; `inputInScope` re-keys it to the user's muscles. */
-  muscleTrainingStarts?: MuscleTrainingStarts;
   /** The user's muscle setup ([[muscle.report-groups]]); unset reports every entry as its own muscle. */
   muscleReport?: MuscleReportAssignment;
 };
@@ -102,7 +93,7 @@ export type StatsStore = {
    * The completed sessions in `[start, end)`. Given `now`, also the workout in
    * progress, dated where finishing it now would date it (§2).
    */
-  loadAggregationInput(input: { start: Date; end: Date; now?: Date; muscleTrainingStarts?: { gymId?: string | null; countSecondary?: boolean } }): Promise<StatsAggregationInput>;
+  loadAggregationInput(input: { start: Date; end: Date; now?: Date }): Promise<StatsAggregationInput>;
   loadMuscleGroupTaxonomy(): Promise<StatsAggregationInput['muscleGroups']>;
 };
 
@@ -200,7 +191,7 @@ const inputCountingSecondary = (input: StatsAggregationInput, countSecondary: bo
 const inputReportingMuscles = (input: StatsAggregationInput): StatsAggregationInput => {
   const { muscleReport } = input;
   if (!muscleReport) return input;
-  return { ...applyMuscleReport(input, muscleReport), muscleTrainingStarts: reportMuscleTrainingStarts(input.muscleTrainingStarts, muscleReport) };
+  return applyMuscleReport(input, muscleReport);
 };
 
 const inputInScope = (input: StatsAggregationInput, options: { gymId?: string | null; countSecondary?: boolean }) =>
@@ -289,28 +280,10 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 };
 
 export const createDrizzleStatsStore = (): StatsStore => ({
-  async loadAggregationInput({ start, end, now, muscleTrainingStarts }) {
+  async loadAggregationInput({ start, end, now }) {
     const database = await bootstrapLocalDataLayer();
-    // Facts and raw graph are read synchronously from the same current policy.
-    if (muscleTrainingStarts) drainExerciseSessionFacts(database);
     return database.transaction((transaction) => {
       const database = transaction;
-      const trainingStarts = muscleTrainingStarts ? Object.fromEntries(database
-        .select({ id: exerciseMuscleMappings.muscleGroupId,
-          firstSets: sql<number | null>`min(case when ${exerciseSessionFacts.workingSets} > 0 then ${exerciseSessionFacts.achievedAt} end)`,
-          firstVolume: sql<number | null>`min(case when ${exerciseSessionFacts.volumeSets} > 0 then ${exerciseSessionFacts.achievedAt} end)` })
-        .from(exerciseSessionFacts)
-        .innerJoin(sessions, eq(sessions.id, exerciseSessionFacts.sessionId))
-        .innerJoin(exerciseMuscleMappings, eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseSessionFacts.exerciseDefinitionId))
-        .where(and(isNull(sessions.deletedAt), eq(sessions.status, 'completed'),
-          lt(exerciseSessionFacts.achievedAt, end), isNull(exerciseMuscleMappings.deletedAt), ne(exerciseMuscleMappings.role, 'stabilizer'),
-          muscleTrainingStarts.countSecondary === false ? ne(exerciseMuscleMappings.role, 'secondary') : undefined,
-          or(gt(exerciseSessionFacts.workingSets, 0), gt(exerciseSessionFacts.volumeSets, 0)),
-          muscleTrainingStarts.gymId === undefined ? undefined : muscleTrainingStarts.gymId === null
-            ? isNull(sessions.gymId) : eq(sessions.gymId, muscleTrainingStarts.gymId)))
-        .groupBy(exerciseMuscleMappings.muscleGroupId).all()
-        .map(row => [row.id, { workingSetCount: row.firstSets === null ? undefined : new Date(row.firstSets),
-          totalVolume: row.firstVolume === null ? undefined : new Date(row.firstVolume) }])) : undefined;
       const bodyweightCalculationsEnabled = database
         .select({ enabled: userSettings.bodyweightCalculationsEnabled })
         .from(userSettings)
@@ -446,7 +419,6 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           : [];
 
       return {
-        muscleTrainingStarts: trainingStarts,
         bodyweightCalculationsEnabled,
         effortPolicy: getPersonalEffortPolicy(),
         sessions: sessionsInPeriod,
@@ -490,14 +462,6 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       current: { period: currentPeriod, totals: aggregateStats(inputInScope(currentInput, options)) },
       previous: { period: previousPeriod, totals: aggregateStats(inputInScope(previousInput, options)) },
     };
-  },
-  async computeMuscleTickers(options: MuscleTickerOptions) {
-    const clocked = { ...options, now: options.now ?? new Date() };
-    const bounds = muscleTickerBounds(clocked);
-    const input = await store.loadAggregationInput({ start: bounds.readStart, end: bounds.end,
-      muscleTrainingStarts: { gymId: options.gymId, countSecondary: options.countSecondary } });
-    const scoped = inputInScope(input, options);
-    return aggregateProgressMuscleTickers(scoped, clocked, scoped.muscleTrainingStarts ?? {});
   },
   async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
     const periods = comparisonPeriods(options);
@@ -590,6 +554,5 @@ export const computeSelectedMuscleDailyEffortMetrics =
 
 export const computeSelectedMuscleHistoryEffort = defaultStatsRepository.computeSelectedMuscleHistoryEffort;
 
-export const computeProgressMuscleTickers = defaultStatsRepository.computeMuscleTickers;
 
 export const computeMuscleDailySets = defaultStatsRepository.computeMuscleDailySets;

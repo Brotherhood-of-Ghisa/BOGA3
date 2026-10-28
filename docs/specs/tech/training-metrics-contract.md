@@ -91,8 +91,7 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
-**History minimum.** Session volume comparisons, Weekly heatmap references
-and Muscle List tickers share one minimum of known observations, zeros
+**History minimum.** Session volume comparisons and Weekly heatmap references share one minimum of known observations, zeros
 included (`MIN_HISTORY_OBSERVATIONS` in `apps/mobile/src/utils/history-reference.ts`);
 each owns its window.
 
@@ -322,11 +321,6 @@ Changes are shown as [[comparison.change-display]], each row's Volume change
 against its own baseline; the code adds `empty`, `unavailable` (`—`, a sum
 not finite) and `increased` (the percentage overflows). Row percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
-
-Muscle List tickers (`src/data/progress-muscle-tickers.ts`) plot rolling
-Progress-N-week totals over [[comparison.history-window]], sharing bounded raw
-aggregation and policy-refreshed first-training facts; their references need
-the history minimum (§2). Their history reads use completed sessions only.
 
 No derived figure is written back to a set or session.
 

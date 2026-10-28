@@ -52,14 +52,14 @@ describe('Progress tables', () => {
   it('heads its family and columns with the micro-label, the sorted column in ink', () => {
     render(<ProgressTables {...tableProps} sortMode="now-desc" />);
     expect(style(screen.getByTestId('stats-family-header-back'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText(/Now\s+\(Prev\)/))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText('Now'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
     expect(style(within(screen.getByTestId('stats-muscle-sort-muscle')).getByText('Muscle'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
   });
 
-  it('draws figure cells in the figure role, the previous period muted', () => {
+  it('draws separate period cells in the figure role and the change in its tone', () => {
     render(<ProgressTables {...tableProps} />);
-    expect(style(screen.getByTestId('stats-muscle-row-back_lats-periods'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
-    expect(style(within(screen.getByTestId('stats-muscle-row-back_lats-periods')).getByText('(1)'))).toMatchObject({ color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('stats-muscle-row-back_lats-now'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
+    expect(style(screen.getByTestId('stats-muscle-row-back_lats-previous'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
     expect(style(screen.getByTestId('stats-muscle-row-back_lats-change'))).toMatchObject({ ...FIGURE, color: uiRoles.gain });
   });
 
