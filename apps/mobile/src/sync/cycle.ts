@@ -1,5 +1,7 @@
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calculation-preference';
+import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
+import { adoptOrUploadMuscleTargets } from '@/src/sync/muscle-target-adoption';
 // Client sync cycle: converges local SQLite state with the server by issuing
 // PULL -> PUSH -> PULL until both ends are quiet for one full round.
 //
@@ -553,11 +555,19 @@ interface FieldSpec {
    * preservation: an insert takes the column default, an update leaves it.
    */
   keepWhenAbsent?: true;
+  /**
+   * The pull also keeps the local value when the envelope carries null,
+   * mirroring the push RPC, which never clears these columns.
+   */
+  keepWhenNull?: true;
 }
 
 const TS = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'timestamp' });
 const SC = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'scalar' });
 const KEEP = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind: 'scalar', keepWhenAbsent: true });
+/** A synced muscle-target setting: null means "not uploaded", so it never clears a value. */
+const TARGET = (wireKey: string, prop: string): FieldSpec =>
+  ({ wireKey, prop, kind: 'scalar', keepWhenAbsent: true, keepWhenNull: true });
 
 /**
  * For each entity, the ordered list of typed columns that appear in the wire
@@ -569,6 +579,11 @@ const KEEP = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kin
 const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   user_settings: [
     SC('bodyweight_calculations_enabled', 'bodyweightCalculationsEnabled'),
+    TARGET('weekly_working_set_target', 'weeklyWorkingSetTarget'),
+    TARGET('muscle_target_mode', 'muscleTargetMode'),
+    // JSON text on the wire; the server stores jsonb.
+    TARGET('muscle_target_overrides', 'muscleTargetOverrides'),
+    TARGET('count_secondary_muscles', 'countSecondaryMuscles'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -816,6 +831,9 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
   };
   for (const spec of ENTITY_FIELDS[type]) {
     if (spec.keepWhenAbsent && !(spec.wireKey in envelope.fields)) {
+      continue;
+    }
+    if (spec.keepWhenNull && envelope.fields[spec.wireKey] === null) {
       continue;
     }
     values[spec.prop] = fromWireValue(envelope.fields[spec.wireKey] ?? null, spec.kind);
@@ -1737,6 +1755,7 @@ const notifyPageCommitted = async (page: PullResponse, pageChanged: number): Pro
   }
   if (page.entities.some(entity => entity.type === 'user_settings')) {
     await refreshBodyweightCalculationPreference();
+    await refreshAccountLocalSyncedPreferences();
   }
 };
 
@@ -2070,10 +2089,16 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     // both pull legs WROTE nothing (not merely "the server returned nothing" —
     // a no-op echo of an already-local row is not motion) and the push leg sent
     // nothing. Anything else is real work the next round must follow.
+    let targetsAdoptionChecked = false;
     for (;;) {
       const pulledBefore = await runPullLeg(database);
       // A replay can make deferred old-client metadata safe to seed in this round.
       runBundleMigrations(database);
+      // Once per cycle, after a drained pull: an upload this makes pushes below.
+      if (userId && !targetsAdoptionChecked) {
+        targetsAdoptionChecked = true;
+        await adoptOrUploadMuscleTargets(userId);
+      }
       const pushed = await runPushLegRecoveringLostAttachment(database);
       if (pushed === null) {
         continue;

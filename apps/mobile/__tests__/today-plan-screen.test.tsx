@@ -25,12 +25,15 @@ jest.mock('expo-router', () => ({
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { setMuscleTracked } from '@/src/data/muscle-report-settings';
+import type { Transaction } from '@/src/data/clock';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
+import { applyPullPage } from '@/src/sync/cycle';
 import { planRepository, type PlanDraft } from '@/src/session-planner';
 import type { TodayPlan } from '@/src/today-plan';
 
-import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 
 import { TodayScreen, type TodayScreenProps } from '../app/(tabs)/today';
@@ -203,6 +206,27 @@ describe('Today: the Plan page over real data', () => {
 
     fireEvent.press(text('today-plan-muscle-chest'));
     expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=chest&metric=sets&secondary=hidden');
+  });
+
+  it('shows targets a sync pull changes while the page is open ([[muscle.weekly-targets]])', async () => {
+    await bootLocalApp();
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
+    await renderToday();
+    expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/8');
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('1');
+
+    // The settings row another device or the coach changed, as the pull applies it.
+    localDatabase().transaction(tx => applyPullPage(tx as Transaction, [{
+      type: 'user_settings', id: 'settings', client_updated_at_ms: Date.now(),
+      fields: { bodyweight_calculations_enabled: false, weekly_working_set_target: 10, muscle_target_mode: 'per_muscle',
+        muscle_target_overrides: '{"detailed":{"chest":12}}', count_secondary_muscles: false,
+        created_at: 1, updated_at: 1, deleted_at: null },
+    }], 'user_settings'));
+    await act(() => refreshAccountLocalSyncedPreferences());
+
+    expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/12');
+    expect(text('today-plan-muscle-quads-week')).toHaveTextContent('0/10');
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('');
   });
 
   it("lists only the muscles the user tracks ([[muscle.untracked]])", async () => {

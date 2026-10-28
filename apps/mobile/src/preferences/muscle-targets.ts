@@ -1,4 +1,4 @@
-// Account-local target choices. Muscle identities and reporting stay with the catalogue.
+// Weekly target choices, synced per account (`synced.ts`). Muscle identities and reporting stay with the catalogue.
 export type MuscleTargetMode = 'single' | 'per-muscle';
 export type MuscleTargetScope = 'detailed' | 'broad' | 'custom';
 export type MuscleTargetOverrides = Partial<Record<MuscleTargetScope, Record<string, number>>>;

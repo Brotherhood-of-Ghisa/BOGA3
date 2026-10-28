@@ -163,6 +163,12 @@ export const generatedMigrationBundle = {
     tag: "0025_absurd_ricochet",
     breakpoints: true,
   },
+  {
+    idx: 26,
+    when: 1793196301787,
+    tag: "0026_user_settings_muscle_targets",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -892,6 +898,10 @@ CREATE INDEX \`exercise_merge_local_owner_kind_idx\` ON \`exercise_merge_local\`
 ALTER TABLE \`exercise_sets\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE \`session_exercise_tags\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE \`session_exercises\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;`,
+  m0026: `ALTER TABLE \`user_settings\` ADD \`weekly_working_set_target\` integer;--> statement-breakpoint
+ALTER TABLE \`user_settings\` ADD \`muscle_target_mode\` text;--> statement-breakpoint
+ALTER TABLE \`user_settings\` ADD \`muscle_target_overrides\` text;--> statement-breakpoint
+ALTER TABLE \`user_settings\` ADD \`count_secondary_muscles\` integer;`,
   },
 } as const;
 

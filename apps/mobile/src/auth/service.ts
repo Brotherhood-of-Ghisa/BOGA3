@@ -12,6 +12,7 @@ import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 import { requestSync } from '@/src/sync/scheduler';
 import { __resetNotificationAccountForTests, notificationSessionIdentity, setNotificationAccount } from '@/src/notifications/auth-boundary';
 import { setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import '@/src/preferences/synced-store';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
 

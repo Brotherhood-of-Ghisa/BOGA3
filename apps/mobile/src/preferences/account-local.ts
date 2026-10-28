@@ -1,5 +1,6 @@
 import { __resetPreferenceMigrationForTests, migrateBrowsingPreferences } from './migration';
 import { configureDisplayEfforts, configurePersonalEffortPolicy } from '../config/personal-effort';
+import type { MuscleTargetSettingsWrite, StoredMuscleTargetSettings } from '../data/user-settings';
 import {
   type AccountLocalPreferences,
   DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
@@ -8,6 +9,13 @@ import {
   preferenceValidationMessages,
 } from './model';
 import { type PreferenceProfile, readScopedPreferences, writeScopedPreference } from './storage';
+import {
+  pickSyncedPreferences,
+  storedFromSyncedPreferences,
+  syncedPreferenceFields,
+  syncedPreferencesFromStored,
+  type SyncedPreferences,
+} from './synced';
 
 export type AccountLocalPreferenceState = {
   values: AccountLocalPreferences;
@@ -27,6 +35,27 @@ let generation = 0;
 let loaded = false;
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
+// The synced fields' values from the settings row; each one present overrides
+// the kv value, which stays the fallback until the row holds it.
+let synced: Partial<SyncedPreferences> = {};
+let syncedLoaded = false;
+let syncedVersion = 0;
+let syncedWrites: Promise<void> = Promise.resolve();
+const withSynced = (values: AccountLocalPreferences): AccountLocalPreferences => ({ ...values, ...synced });
+const accountUserIdOf = (activeProfile: PreferenceProfile) =>
+  activeProfile === 'local' ? null : activeProfile.slice('account:'.length);
+
+/** The settings row behind the synced fields; `synced-store.ts` connects the data layer. */
+export type SyncedPreferenceStore = {
+  read: (accountUserId: string | null) => Promise<StoredMuscleTargetSettings | null>;
+  write: (values: MuscleTargetSettingsWrite) => Promise<void>;
+};
+let syncedStore: SyncedPreferenceStore | null = null;
+export const configureSyncedPreferenceStore = (store: SyncedPreferenceStore): void => { syncedStore = store; };
+const requireSyncedStore = (): SyncedPreferenceStore => {
+  if (!syncedStore) throw new Error('The synced preference store is not configured.');
+  return syncedStore;
+};
 
 const publish = (next: Partial<AccountLocalPreferenceState>) => {
   const values = next.values && preferenceFields.some(field => next.values![field] !== state.values[field])
@@ -61,6 +90,7 @@ export function setAccountLocalPreferenceAccount(userId: string | null, isConfig
   generation += 1;
   loaded = false;
   loading = null;
+  resetSynced();
   publish(emptyState());
   void ensureAccountLocalPreferencesLoaded();
 }
@@ -70,7 +100,7 @@ function loadScoped(profileAtStart: PreferenceProfile): boolean {
     const { values } = readScopedPreferences(profileAtStart);
     loaded = true;
     loadError = null;
-    publish({ values, error: currentError() });
+    publish({ values: withSynced(values), error: currentError() });
     return true;
   } catch {
     loadError = 'Preferences could not be loaded. Try again.';
@@ -91,12 +121,13 @@ export async function ensureAccountLocalPreferencesLoaded(): Promise<void> {
       if (capturedGeneration !== generation) return;
       const { values } = readScopedPreferences(capturedProfile);
       loadError = null;
-      publish({ values, error: currentError() });
+      publish({ values: withSynced(values), error: currentError() });
+      if (!syncedLoaded) await refreshAccountLocalSyncedPreferences();
     } catch {
       if (capturedGeneration !== generation) return;
       // A scalar may have committed before a later migration write failed.
       // Publish only what can be read back, keeping migration retryable.
-      try { publish({ values: readScopedPreferences(capturedProfile).values }); }
+      try { publish({ values: withSynced(readScopedPreferences(capturedProfile).values) }); }
       catch { /* Keep the last successfully read durable snapshot. */ }
       loadError = 'Preferences could not be loaded. Try again.';
       publish({ error: currentError() });
@@ -131,6 +162,13 @@ export function setAccountLocalPreferences(patch: Partial<AccountLocalPreference
     publish({ pending });
     return;
   }
+  const syncedPatch = pickSyncedPreferences(pending);
+  for (const field of syncedPreferenceFields) delete pending[field];
+  writeKvPreferences(activeProfile, pending);
+  writeSyncedPreferences(activeProfile, syncedPatch);
+}
+
+function writeKvPreferences(activeProfile: PreferenceProfile, pending: Partial<AccountLocalPreferences>): void {
   const values = { ...state.values };
   try {
     for (const field of preferenceFields) {
@@ -146,6 +184,70 @@ export function setAccountLocalPreferences(patch: Partial<AccountLocalPreference
     saveError = 'Preferences could not be saved. Try again.';
     publish({ values, pending, error: currentError() });
   }
+}
+
+/** The kv values under the synced overlay; the last published values if kv cannot be read. */
+const syncedView = (activeProfile: PreferenceProfile): AccountLocalPreferences => {
+  let base = state.values;
+  try { base = readScopedPreferences(activeProfile).values; } catch { /* Keep the last published values. */ }
+  return withSynced(base);
+};
+
+/**
+ * Publishes the synced fields at once and writes all four to the settings row,
+ * which the next sync pushes. A failed write restores the previous values and
+ * keeps the patch pending for retry.
+ */
+function writeSyncedPreferences(activeProfile: PreferenceProfile, patch: Partial<SyncedPreferences>): void {
+  if (Object.keys(patch).length === 0) return;
+  const previous = synced;
+  const next = { ...pickSyncedPreferences(state.values), ...patch };
+  synced = next;
+  syncedVersion += 1;
+  const version = syncedVersion;
+  publish({ values: withSynced(state.values) });
+  syncedWrites = syncedWrites.then(async () => {
+    try {
+      await requireSyncedStore().write(storedFromSyncedPreferences(next));
+      if (version !== syncedVersion) return;
+      saveError = null;
+      publish({ error: currentError() });
+    } catch {
+      if (version !== syncedVersion) return;
+      synced = previous;
+      saveError = 'Preferences could not be saved. Try again.';
+      publish({ values: syncedView(activeProfile), pending: { ...state.pending, ...patch }, error: currentError() });
+    }
+  });
+}
+
+/**
+ * Re-reads the synced fields from the settings row. Sync calls this after it
+ * applies or adopts a settings row, so mounted screens show the new values.
+ * Waits for queued edits, and drops a read an edit or account switch overtook.
+ */
+export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
+  const activeProfile = currentProfile();
+  if (activeProfile === null) return;
+  const capturedGeneration = generation;
+  const version = syncedVersion;
+  await syncedWrites;
+  let stored: StoredMuscleTargetSettings | null;
+  try { stored = await requireSyncedStore().read(accountUserIdOf(activeProfile)); }
+  catch { return; }
+  if (capturedGeneration !== generation || version !== syncedVersion) return;
+  synced = syncedPreferencesFromStored(stored);
+  syncedLoaded = true;
+  publish({ values: syncedView(activeProfile) });
+}
+
+/** Wipes call this first, so no queued edit lands in the emptied store. */
+export const drainAccountLocalSyncedWrites = (): Promise<void> => syncedWrites;
+
+function resetSynced(): void {
+  synced = {};
+  syncedLoaded = false;
+  syncedVersion += 1;
 }
 
 export async function retryAccountLocalPreferences(): Promise<void> {
@@ -168,5 +270,7 @@ export function __resetAccountLocalPreferencesForTests(): void {
   profile = undefined;
   loaded = false;
   loading = null;
+  resetSynced();
+  syncedWrites = Promise.resolve();
   listeners.clear();
 }

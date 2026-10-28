@@ -1,24 +1,45 @@
+/* eslint-disable import/first */
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- native database boundary.
+  require('./helpers/local-data').localDataBootstrapModule());
+
 import { Storage } from 'expo-sqlite/kv-store';
-import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState,
-  retryAccountLocalPreferences, setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
+import { stampLocalDataOwner } from '@/src/data/local-wipe';
+import * as userSettingsData from '@/src/data/user-settings';
+import '@/src/preferences/synced-store';
+import { __resetAccountLocalPreferencesForTests, drainAccountLocalSyncedWrites, ensureAccountLocalPreferencesLoaded,
+  getAccountLocalPreferenceState, retryAccountLocalPreferences, setAccountLocalPreferenceAccount,
+  setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from '@/src/preferences/model';
 import { effectiveMuscleTargetOverrides, muscleWeeklyTarget, withMuscleTarget } from '@/src/preferences/muscle-targets';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
 import { preferenceKey } from '@/src/preferences/storage';
+import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
 const account = async (id: string | null = 'A') => {
   setAccountLocalPreferenceAccount(id, true);
   await ensureAccountLocalPreferencesLoaded();
 };
 const values = () => getAccountLocalPreferenceState().values;
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  resetLocalData();
+  // A synced store belongs to one account; another account never reads its settings row.
+  stampLocalDataOwner(localDatabase(), 'A');
+});
+afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
-it('preserves the legacy single target and restores independent account-local setups after restart', async () => {
+it('reads the kv target until the settings row holds one, and restores the row after restart', async () => {
   Storage.setItemSync(preferenceKey('account:A', 'weeklyWorkingSetTarget'), '11');
   await account();
   expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'single', muscleTargetOverrides: {} });
   const overrides = { detailed: { chest: 12, 'disabled-custom': 7 }, broad: { chest: 18 }, custom: { neck: 5 } };
   setAccountLocalPreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: overrides });
+  await drainAccountLocalSyncedWrites();
+  // The edit writes all four synced values together, the kv target included.
+  expect(await userSettingsData.readMuscleTargetSettings('A')).toEqual({
+    weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle', muscleTargetOverrides: JSON.stringify(overrides),
+    countSecondaryMuscles: true,
+  });
   __resetAccountLocalPreferencesForTests();
   await account();
   expect(values().muscleTargetOverrides).toEqual(overrides);
@@ -67,14 +88,18 @@ it('falls back from corrupt storage and retries failed map writes without leakin
   await account();
   expect(values().muscleTargetOverrides).toEqual({});
   expect(values().muscleTargetMode).toBe('single');
-  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('full'); });
+  const write = jest.spyOn(userSettingsData, 'writeMuscleTargetSettings').mockRejectedValueOnce(Error('full'));
   setAccountLocalPreferences({ muscleTargetOverrides: { detailed: { chest: 12 } } });
+  await drainAccountLocalSyncedWrites();
   expect(values().muscleTargetOverrides).toEqual({});
   expect(getAccountLocalPreferenceState().pending.muscleTargetOverrides).toEqual({ detailed: { chest: 12 } });
+  expect(getAccountLocalPreferenceState().error).toMatch(/could not be saved/);
   write.mockRestore();
   await retryAccountLocalPreferences();
+  await drainAccountLocalSyncedWrites();
   expect(values().muscleTargetOverrides).toEqual({ detailed: { chest: 12 } });
   expect(getAccountLocalPreferenceState().pending).toEqual({});
+  expect(getAccountLocalPreferenceState().error).toBeNull();
   await account('B');
   expect(values().muscleTargetOverrides).toEqual({});
 });

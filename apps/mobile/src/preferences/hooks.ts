@@ -10,6 +10,7 @@ import {
   setAccountLocalPreferenceValidationError,
   subscribeToAccountLocalPreferences,
 } from './account-local';
+import './synced-store';
 
 export const ensurePreferencesLoaded = () => {
   initializeAccountLocalPreferences(getMobileAuthRuntimeConfig().isConfigured);

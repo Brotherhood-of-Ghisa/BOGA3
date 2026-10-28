@@ -663,6 +663,13 @@ interface EntityContext {
   findings: Findings;
 }
 
+// The CHECK exceptions docs/specs/tech/sync-v2-server-contract.md ("Ground
+// rules") names; every other entity has none.
+const ALLOWED_CHECK_NAMES: Readonly<Record<string, readonly string[]>> = {
+  exercise_definitions: ['exercise_definitions_load_input_mode_valid'],
+  user_settings: ['user_settings_muscle_target_overrides_valid'],
+};
+
 async function checkEntity(ctx: EntityContext): Promise<void> {
   const {
     entity,
@@ -685,8 +692,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
   const pgColByName = new Map(pgCols.map((c) => [c.column_name, c]));
 
   // ---- 4f sanity: contract ground-rule regressions ---------------------
-  const allowedCheckNames =
-    entity === 'exercise_definitions' ? ['exercise_definitions_load_input_mode_valid'] : [];
+  const allowedCheckNames = ALLOWED_CHECK_NAMES[entity] ?? [];
   if (JSON.stringify(checkNames) !== JSON.stringify(allowedCheckNames)) {
     addError(
       findings,
