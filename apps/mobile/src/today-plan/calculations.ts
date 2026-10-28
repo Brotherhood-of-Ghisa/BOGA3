@@ -4,9 +4,9 @@
 // fixed period of their own ([[comparison.allowed-periods]]); the week is
 // [[comparison.window]]'s.
 
-import type { MuscleDailySets } from '@/src/data/muscle-daily-sets';
-import { localDateKey } from '@/src/utils/calendar-weeks';
-import { localWeekWindow, startOfLocalDay, type LocalWindow } from '@/src/utils/local-calendar';
+import type { MuscleDailySets } from '../data/muscle-daily-sets.ts';
+import { localDateKey } from '../utils/calendar-weeks.ts';
+import { localWeekWindow, startOfLocalDay, type LocalWindow } from '../utils/local-calendar.ts';
 
 /** The days before today a muscle's recent sets cover. */
 export const RECOVERY_DAYS = 3;

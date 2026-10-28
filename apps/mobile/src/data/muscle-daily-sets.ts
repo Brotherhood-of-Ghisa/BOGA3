@@ -1,4 +1,4 @@
-import { localDateKey } from '@/src/utils/calendar-weeks';
+import { localDateKey } from '../utils/calendar-weeks.ts';
 import {
   collectMuscleSetContributions,
   countedMuscleAnalyticsSessionIds,
@@ -7,7 +7,7 @@ import {
   type MuscleAnalyticsInput,
   type MuscleSetCounter,
   type ReportedMuscle,
-} from './muscle-analytics';
+} from './muscle-analytics.ts';
 
 /**
  * Each muscle's working sets per local day ([[muscle.set-count]]), and the
