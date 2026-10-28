@@ -27,7 +27,7 @@ it('shows occupied months with rest weeks newest first, compact week dates, alig
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual(
     ['2026-10-05', '2026-09-28', '2026-09-21', '2026-09-14', '2026-09-07'].map(key => `bars-heatmap-cell-${key}`));
   expect(loaded.weekly.map(week => week.weekStartDateKey)).toEqual(chronological);
-  expect(screen.getByText('28 Sep – 4 Oct 2026')).toBeTruthy();
+  expect(screen.getByText('28 Sep – 4 Oct')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('20%');
   expect(style('bars-heatmap-bar-2026-09-28').width).toBe('90%');
   expect(style('bars-heatmap-bar-2026-09-14').width).toBe('100%');
@@ -40,7 +40,7 @@ const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-
 
 it('shows only the end year for a week crossing New Year', () => {
   render(chart(data([day('2025-12-31', 1750)], 52)));
-  expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent('29 Dec – 4 Jan 2026');
+  expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent('29 Dec – 4 Jan');
   expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
     'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
 });
@@ -51,29 +51,29 @@ it.each([
   ['2026-09-28', '28 Sep – 4 Oct 2026'],
   ['2026-03-30', '30 Mar – 5 Apr 2026'],
   ['2025-12-29', '29 Dec – 4 Jan 2026'],
-])('places the complete %s caption above the unchanged horizontal plot', (key, caption) => {
+])('places the complete %s range left of its bar with the muted year on a second line', (key, caption) => {
   const loaded = buildHeatmapData([day(key, 12345)], 'totalVolume', { todayDateKey: key, weeks: 1 });
   render(chart(loaded));
   const date = screen.getByTestId(`bars-heatmap-date-${key}`);
-  expect(date).toHaveTextContent(caption);
+  expect(date).toHaveTextContent(caption.replace(/ ?2026 ?/, ''));
   expect(date).toHaveProp('numberOfLines', 1);
   expect(date).toHaveProp('allowFontScaling', false);
-  expect(StyleSheet.flatten(date.props.style)).toMatchObject({ fontSize: uiTypography.size.sm, color: uiRoles.ink });
-  expect(screen.getByTestId(`bars-heatmap-date-year-${key}`)).toHaveStyle({ color: uiRoles.inkMuted });
+  expect(StyleSheet.flatten(date.props.style)).toMatchObject({ fontSize: uiTypography.size.base, color: uiRoles.ink });
+  expect(screen.getByTestId(`bars-heatmap-date-year-${key}`)).toHaveStyle({ color: uiRoles.inkMuted, fontSize: uiTypography.size.sm });
   expect(screen.getAllByTestId(new RegExp(`^bars-heatmap-(date|plot-row)-${key}$`)).map(node => node.props.testID))
-    .toEqual([`bars-heatmap-date-${key}`, `bars-heatmap-plot-row-${key}`]);
+    .toEqual([`bars-heatmap-plot-row-${key}`, `bars-heatmap-date-${key}`]);
   expect(style(`bars-heatmap-plot-row-${key}`)).toMatchObject({
-    flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget,
-    gap: uiSpace.sm, paddingVertical: uiSpace.sm,
+    flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: uiSpace.sm,
   });
-  expect(style(`bars-heatmap-date-gutter-${key}`)).toEqual({ width: 96 });
+  expect(style(`bars-heatmap-date-gutter-${key}`)).toEqual({ width: 112 });
   expect(style(`bars-heatmap-plot-${key}`)).toMatchObject({ flex: 1, alignSelf: 'stretch', justifyContent: 'center' });
   expect(style(`bars-heatmap-track-${key}`).height).toBe(uiSpace.lg);
   expect(style(`bars-heatmap-bar-${key}`)).toMatchObject({ width: '100%', height: '100%' });
-  expect(style(`bars-heatmap-value-${key}`)).toMatchObject({ width: 42, textAlign: 'right' });
+  expect(style(`bars-heatmap-value-${key}`)).toMatchObject({ textAlign: 'right' });
+  expect(style(`bars-heatmap-value-column-${key}`)).toMatchObject({ width: 42, position: 'relative' });
 });
 
-it('keeps the quieter year in its selected position when the Date format changes on a mounted chart', async () => {
+it('keeps the quieter year below the range when the Date format changes on a mounted chart', async () => {
   initializeAccountLocalPreferences(false);
   await ensureAccountLocalPreferencesLoaded();
   const loaded = buildHeatmapData([day('2025-12-29', 1750)], 'totalVolume', { todayDateKey: '2026-01-04', weeks: 1 });
@@ -84,7 +84,7 @@ it('keeps the quieter year in its selected position when the Date format changes
     ['DD-MM-YYYY', '29 Dec – 4 Jan 2026', '29-12-2025'],
   ] as const) {
     act(() => setAccountLocalPreferences({ dateFormat }));
-    expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent(caption);
+    expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent(caption.replace(/ ?2026 ?/, ''));
     expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveTextContent('2026');
     expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveStyle({ color: uiRoles.inkMuted });
     expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp('accessibilityLabel', `Week of ${spoken}, Volume 1750, Current week`);
@@ -274,7 +274,8 @@ it('retains target colour independently of length and bounds long formatted valu
   render(<WeeklyHeatmap data={loaded} metric="workingSetCount" testIDPrefix={PREFIX} formatValue={value => `${value}000000000000000000`} />);
   expect(style('bars-heatmap-bar-2026-10-05')).toMatchObject({ width: '50%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
-  expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ width: 96, textAlign: 'right' });
+  expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ textAlign: 'right' });
+  expect(style('bars-heatmap-value-column-2026-10-05')).toMatchObject({ width: 96, position: 'relative' });
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).not.toContain('averaged');
   // The ramp names the target and its ends; no sentence explains the colour.
@@ -502,6 +503,41 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
     expect(screen.getByTestId(`bars-heatmap-value-${TODAY}`)).toHaveTextContent('row 60');
   });
 
+it('fits the current annotation above and below the bar in the same compact row as every other week', () => {
+  renderValues([10, 20, 30, 40, 50, 60], 'totalVolume');
+  layoutReferences(240, [['p25', 24], ['median', 24], ['p75', 24]]);
+  for (const key of DATES) {
+    expect(style(`bars-heatmap-plot-row-${key}`).minHeight).toBe(52);
+  }
+  const annotations = screen.getByTestId('bars-heatmap-annotations');
+  expect(StyleSheet.flatten(annotations.props.style).height).toBe(52);
+  const annotation = screen.getByTestId('bars-heatmap-annotation-median', { includeHiddenElements: true });
+  const [label, gap, value] = annotation.children;
+  expect(typeof label === 'object' && StyleSheet.flatten(label.props.style).lineHeight).toBe(14);
+  expect(typeof gap === 'object' && StyleSheet.flatten(gap.props.style).height).toBe(24);
+  expect(typeof value === 'object' && StyleSheet.flatten(value.props.style).lineHeight).toBe(14);
+  const track = screen.getByTestId(`bars-heatmap-track-${TODAY}`);
+  const trackTop = StyleSheet.flatten(track.parent?.parent?.props.style).top;
+  expect(trackTop).toBeGreaterThan(14);
+  expect(trackTop + style(`bars-heatmap-track-${TODAY}`).height).toBeLessThan(38);
+  expect(style('bars-heatmap-median').top).toBeLessThan(trackTop);
+  expect(style('bars-heatmap-median').top + style('bars-heatmap-median').height).toBeGreaterThan(trackTop + 16);
+});
+
+it.each([
+  [[0, 0, 0, 0, 100, 200], 0],
+  [[1, 2, 3, 4, 5, 20], 17.5],
+  [[20, 20, 20, 20, 20, 20], 100],
+])('centres both median captions on the computed tick, including plot edges (%j)', (values, position) => {
+  renderValues(values, 'totalVolume');
+  layoutReferences(200, [['p25', 32], ['median', 48], ['p75', 32]]);
+  const annotation = style('bars-heatmap-annotation-median');
+  expect(annotation.opacity).toBe(1);
+  expect(annotation.alignItems).toBe('center');
+  expect(annotation.transform[0].translateX + 24).toBeCloseTo(position / 100 * 200);
+  expect(percentage('bars-heatmap-median', 'left')).toBeCloseTo(position);
+});
+
 it('keeps the median label when quartile labels overlap, preserving every exact tick and spoken value', () => {
   renderValues([10, 20, 30, 40, 50, 60], 'estimatedRM1');
   layoutReferences(60, [['p25', 24], ['median', 24], ['p75', 24]]);
@@ -605,6 +641,8 @@ it('collapses each empty month to one accessible row between occupied months', (
   const september = screen.getByTestId('bars-heatmap-empty-month-2026-09');
   expect(september).toHaveProp('accessibilityLabel', 'September 2026, No training');
   expect(september).toHaveProp('accessibilityRole', 'text');
+  expect(within(september).getByText('September')).toHaveStyle({ fontSize: uiTypography.size.base });
+  expect(within(september).getByText('2026')).toHaveStyle({ fontSize: uiTypography.size.sm, color: uiRoles.inkMuted });
   expect(september.props.onPress).toBeUndefined();
   expect(screen.queryByTestId('bars-heatmap-cell-2026-09-28')).toBeNull();
   expect(screen.queryByTestId('bars-heatmap-value-2026-09-28')).toBeNull();

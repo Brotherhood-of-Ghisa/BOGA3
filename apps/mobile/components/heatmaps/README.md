@@ -97,7 +97,9 @@ and routes; rest cells in Daily stay text.
   Full dates, today/current week and rest are announced accessibly.
 - **Weekly** rows hold no selection and draw no banner; figure visibility
   follows [[copy.blank-history]]. Occupied Monday-owned months retain all weeks; empty months collapse to one labelled, non-interactive placeholder, except the current week always remains visible with an unfilled track until activity. Zero/unavailable training keeps a month expanded; the current week is announced accessibly.
-  Compact week headings follow [[copy.calendar-dates]].
+  Two-line dates sit left of each bar: the complete range, then a smaller muted
+  year. Collapsed months use the same month/year treatment. All weeks share
+  one compact row height, including the annotated current week. Headings follow [[copy.calendar-dates]].
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -136,7 +138,8 @@ short windows have no implicit 52-week minimum.
 - Weekly percentile names and formatted values belong only to the current
   week's bar; older rows carry no reference rules. `formatReferenceValue`
   formats them. Before the history minimum, a numeric scale stays above the list.
-  Labels centre on their exact ticks and stay within the measured plot;
+  Median label/value midpoints follow its exact tick, including at plot edges;
+  other labels stay within the measured plot;
   collisions favour Median, then P25, then P75. Full reference names, values
   and the saved window remain in the current row's accessible description,
   including coincident ticks. Sets retains only its median.
