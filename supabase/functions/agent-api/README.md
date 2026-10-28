@@ -350,8 +350,8 @@ any internal safety cap explicit. `exercises` lists every block, while
 ## Training status
 
 `GET /v1/agent/training-status` takes no inputs and needs no write access. It
-returns one bounded object ([[agents.write-access]]); days and Monday-start
-weeks are the profile `time_zone`'s (UTC when unset or unknown).
+returns one bounded object; days and Monday-start weeks are the profile
+`time_zone`'s (UTC when unset or unknown).
 
 ```json
 {
@@ -370,7 +370,10 @@ weeks are the profile `time_zone`'s (UTC when unset or unknown).
 }
 ```
 
-`training-status.ts` derives it with Today's Plan's own functions. `revision`
+`training-status.ts` derives the muscles with Today's Plan's own functions,
+under coaching's working-set rule and completed workouts only. Favourites are
+a coach-only order: most sessions with a working set in 28 days, then latest
+done, then name; never the app's recency-weighted Favourites sort. `revision`
 is the settings row's `client_updated_at_ms` (0 with no row); `uploaded: false`
 shows app defaults. Sets older than 56 days are not read, except each
 favourite's own history, which dates its records; `record_history_complete:
