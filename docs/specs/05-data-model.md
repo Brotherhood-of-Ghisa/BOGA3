@@ -80,7 +80,7 @@ what the effort selections mean.
 - Keys live in `expo-sqlite/kv-store` scoped to the authenticated account id,
   with a distinct profile for local-only builds, so they **survive sign-out,
   account switches and sync database rebuilds** — the wipe below empties SQL
-  rows, not the key-value store.
+  rows and the target adoption markers (rule 12).
 - **Any future explicit preference reset must address only its intended
   profile and fields** — never clear the whole key-value store.
 
