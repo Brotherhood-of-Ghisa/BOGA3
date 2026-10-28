@@ -70,7 +70,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     name: process.env.APP_NAME ?? "Boga3",
     slug: "boga3",
-    version: "2.1.0",
+    version: "2.2.0",
     orientation: "portrait",
     icon: "./assets/images/app-icons/warm.png",
     scheme: APP_SCHEME,
@@ -169,7 +169,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     extra: {
         env: process.env.APP_ENV,
-        releaseCodename: "Ziocleziano",
+        releaseCodename: "Chav Jean Pensant",
         bogaAgentConnectUrl:
             process.env.EXPO_PUBLIC_BOGA_AGENT_CONNECT_URL?.trim() ||
             DEFAULT_BOGA_AGENT_CONNECT_URL,
