@@ -16,6 +16,7 @@ import {
   uiTextTone,
   type SegmentedControlOption,
 } from '@/components/ui';
+import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -231,10 +232,12 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
- * and selects/deselects a muscle group on tap.
+ * and selects/deselects a muscle group on tap. Decoration follows
+ * [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
   const { width: windowWidth } = useWindowDimensions();
+  const november = useNovemberAppearance();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
@@ -259,8 +262,9 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         selectedId,
         report,
         palette,
+        november,
       }),
-    [angleDeg, scores, palette, report, selectedId, viewportWidth]
+    [angleDeg, scores, palette, report, selectedId, viewportWidth, november]
   );
 
   const selectedMuscle = useMemo(

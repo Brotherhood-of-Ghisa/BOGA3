@@ -4,13 +4,17 @@ import { getAppIconName, setAlternateAppIcon, supportsAlternateIcons } from 'exp
 
 import { DEFAULT_THEME_PRESET_ID, type ResolvedTheme } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
+import { isNovember, watchNovemberAppearance } from '@/src/utils/seasonal-appearance';
 
 let inFlight: Promise<void> | null = null;
 
 // Each preset has its own icon, every custom colour shares Rainbow, and Warm (the
 // default) is the primary icon and the fallback; names match the config plugin.
-async function applyThemeAppIcon(preset: ResolvedTheme['preset'], interrupted: () => boolean): Promise<boolean> {
-  const iconName = preset.id === DEFAULT_THEME_PRESET_ID ? null : preset.id === 'custom' ? 'Rainbow' : preset.label;
+async function applyThemeAppIcon(
+  preset: ResolvedTheme['preset'], november: boolean, interrupted: () => boolean,
+): Promise<boolean> {
+  const themeName = preset.id === 'custom' ? 'Rainbow' : preset.label;
+  const iconName = november ? `${themeName}November` : preset.id === DEFAULT_THEME_PRESET_ID ? null : themeName;
   try {
     if (getAppIconName() === iconName) return true;
     await setAlternateAppIcon(iconName);
@@ -39,22 +43,25 @@ export function startThemeAppIcon(preset: ResolvedTheme['preset']): () => void {
   if (!supportsAlternateIcons) return () => {};
   let state = AppState.currentState;
   let stopped = false;
-  let finished = false;
+  let completedSeason: { year: number; november: boolean } | undefined;
   let backgrounded = false;
 
   function reconcile() {
-    if (stopped || finished || state !== 'active') return;
+    const now = new Date();
+    const november = isNovember(now);
+    const year = now.getFullYear();
+    if (stopped || (completedSeason?.year === year && completedSeason.november === november) || state !== 'active') return;
     if (inFlight) {
       void inFlight.then(reconcile);
       return;
     }
     backgrounded = false;
-    inFlight = applyThemeAppIcon(preset, () => stopped || backgrounded || state !== 'active')
-      .then((complete) => { finished = complete; })
+    inFlight = applyThemeAppIcon(preset, november, () => stopped || backgrounded || state !== 'active')
+      .then((complete) => { if (complete) completedSeason = { year, november }; })
       .finally(() => {
         inFlight = null;
         // A foreground event can arrive before UIKit rejects the cancelled request.
-        if (!finished) reconcile();
+        reconcile();
       });
   }
 
@@ -63,9 +70,10 @@ export function startThemeAppIcon(preset: ResolvedTheme['preset']): () => void {
     if (state === 'background') backgrounded = true;
     reconcile();
   });
-  reconcile();
+  const stopCalendar = watchNovemberAppearance(reconcile);
   return () => {
     stopped = true;
     subscription.remove();
+    stopCalendar();
   };
 }
