@@ -28,6 +28,10 @@ const spokenDate = (date: Date) => `${WEEKDAYS[date.getDay()]} ${formatCompactDa
 const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
 // A plan's rows are targets, never working sets ([[set.count-display]]).
 const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
+// The grid shows whole sets, rounded down, so a total reads at its target only
+// when it is met; a lone secondary's half set shows as ½, never as 0.
+// Spoken labels keep the exact half-steps ([[muscle.set-count]]).
+export const wholeSets = (count: number) => (count > 0 && count < 1 ? '½' : String(Math.floor(count)));
 
 // No sets that day reads as a rest day ([[copy.blank-history]]); none yet today, as none.
 const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
@@ -59,7 +63,7 @@ function DayCell({ count, weekStart, testID }: { count: number | null; weekStart
     <RecoveryDayColumn weekStart={weekStart}>
       <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
         <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink]}>
-          {count === null ? '' : count}
+          {count === null ? '' : wholeSets(count)}
         </Text>
       </View>
     </RecoveryDayColumn>
@@ -85,7 +89,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
       ))}
       <DayCell count={row.today} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} />
       <Text allowFontScaling={false} style={[uiText.figure, styles.weekCell]} testID={`${testID}-week`}>
-        <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{row.weekSets}</Text>
+        <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{wholeSets(row.weekSets)}</Text>
         <Text allowFontScaling={false} style={uiTextTone.muted}>{`/${row.target}`}</Text>
       </Text>
     </Pressable>
@@ -97,7 +101,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
 // A neutral gutter divides last week's days from this week's, only when both
 // appear. Today has an accent label and border-free cells. At/above-target
 // totals turn green; the numeric ratio also communicates whether it is met.
-// The first rows show and the rest scroll.
+// The first rows show and the rest scroll, with no indicator over the targets.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
   const label = [uiText.label, uiTextTone.faint];
   const weekStart = localWeekWindow(plan.today).start;
@@ -124,17 +128,17 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
         <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Muscle</Text>
         {plan.recoveryDays.map((day, index) => (
           <RecoveryDayColumn heading key={day.getTime()} weekStart={index === weekStartIndex}>
-            <Text allowFontScaling={false} style={[...label, styles.dayLabel]}>{weekdayShort(day)}</Text>
+            <Text allowFontScaling={false} style={[...label, styles.dayLabel]}>{weekdayLetter(day)}</Text>
           </RecoveryDayColumn>
         ))}
         <RecoveryDayColumn heading weekStart={plan.recoveryDays.length === weekStartIndex}>
           <Text allowFontScaling={false} style={[...label, styles.dayLabel, uiTextTone.accent]} testID="today-plan-recovery-today">
-            {weekdayShort(plan.today)}
+            {weekdayLetter(plan.today)}
           </Text>
         </RecoveryDayColumn>
         <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
       </View>
-      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-plan-recovery-rows">
+      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
         {rows}
       </ScrollView>
     </Card>
@@ -243,7 +247,7 @@ export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: D
 // The least trained rows that show before the rest scroll,
 // leaving the plan card room below; a phone too short for both scrolls the page.
 export const VISIBLE_MUSCLE_ROWS = 10;
-const DAY_CELL = 30;
+const DAY_CELL = 26;
 const DAY_CELL_HEIGHT = 22;
 const WEEK_WIDTH = 64;
 const ROW_HEIGHT = 32;
@@ -304,9 +308,11 @@ const styles = StyleSheet.create({
   pressed: {
     backgroundColor: uiRoles.paper,
   },
+  // Gutters either side of the day grid keep it clear of the name and the target.
   nameCell: {
     flex: 1,
     minWidth: 0,
+    marginRight: uiSpace.sm,
   },
   dayColumn: {
     width: DAY_CELL,
@@ -346,7 +352,7 @@ const styles = StyleSheet.create({
   },
   weekCell: {
     width: WEEK_WIDTH,
-    marginLeft: uiSpace.xs,
+    marginLeft: uiSpace.md,
     textAlign: 'right',
   },
   week: {
