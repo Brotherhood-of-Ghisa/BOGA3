@@ -1,7 +1,7 @@
 // Progress reads the user's muscles ([[muscle.report-groups]]): the data path, the
 // 3D body and the helpers the screens share.
 import {
-  buildThemeShadePalette, hitTestProjectedMuscle, projectMuscleBody,
+  buildThemeShadePalette, buildMuscleShadeRamp, hitTestProjectedMuscle, projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
 import {
@@ -34,9 +34,9 @@ const exercise = (mappings: [string, 'primary' | 'secondary' | 'stabilizer'][]):
 });
 
 describe('3D body under the user’s muscles', () => {
-  const buckets = new Map([['back_lats', 3 as const], ['chest', 1 as const]]);
+  const scores = new Map([['back_lats', 1], ['chest', -1]]);
   const project = (report?: typeof BROAD, angleDeg = 180) =>
-    projectMuscleBody({ angleDeg, width: 300, height: 560, buckets, report });
+    projectMuscleBody({ angleDeg, width: 300, height: 560, scores, report });
   const palette = buildThemeShadePalette();
 
   it('gives every member mesh of a muscle its shade and the muscle’s id', () => {
@@ -47,7 +47,7 @@ describe('3D body under the user’s muscles', () => {
     const back = broad.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
     expect(back).toHaveLength(memberTriangles.length);
     expect(new Set(back.map(tri => tri.fill)).size).toBeLessThanOrEqual(12);
-    expect(back.every(tri => palette.buckets[3].includes(tri.fill))).toBe(true);
+    expect(back.every(tri => buildMuscleShadeRamp(1, palette).includes(tri.fill))).toBe(true);
     expect(broad.triangles.some(tri => MERGED_BACK.includes(tri.muscleGroupId))).toBe(false);
   });
 
@@ -78,7 +78,7 @@ describe('3D body under the user’s muscles', () => {
   });
 
   it('marks a muscle selected across all its member meshes', () => {
-    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, buckets, report: BROAD, selectedId: 'back_lats' });
+    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, scores, report: BROAD, selectedId: 'back_lats' });
     const back = selected.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
     expect(back.length).toBeGreaterThan(0);
     expect(back.every(tri => tri.selected)).toBe(true);

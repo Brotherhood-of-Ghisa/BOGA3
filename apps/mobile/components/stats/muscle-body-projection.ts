@@ -1,9 +1,8 @@
-import { hexToLch, lchToHex } from '@/components/ui/lch';
+import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
 import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { formatCountDelta, formatVolumeDelta } from './comparison-format';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
@@ -18,16 +17,9 @@ export type ThemeShadeRoles = Pick<
   'paper' | 'rule' | 'ink' | 'viz1' | 'viz2' | 'viz4'
 >;
 
-export type MuscleChangeBucket = 0 | 1 | 2 | 3;
-
 export type ThemeShadePalette = {
   readonly neutral: readonly string[];
-  readonly buckets: readonly [
-    readonly string[],
-    readonly string[],
-    readonly string[],
-    readonly string[],
-  ];
+  readonly anchors: readonly [Lch, Lch, Lch];
   readonly selectedStroke: string;
 };
 
@@ -115,35 +107,58 @@ export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation
 }
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
+const BODY_MUSCLE_IDS = new Set<string>(MUSCLE_BODY_MESH.materials);
+
+const muscleChange = (row: ProgressMuscleComparison, metric: ProgressMetric): number | null => {
+  const current = row.current[metric];
+  const previous = row.previous[metric];
+  if (current === null || previous === null || !Number.isFinite(current)
+    || !Number.isFinite(previous) || (current === 0 && previous === 0)) return null;
+  if (metric === 'workingSetCount') return Number.isFinite(row.workingSetChange) ? row.workingSetChange : null;
+  const change = row.volumeChange;
+  // New/overflow gains use the dark anchor without entering the finite extrema.
+  if (change.kind === 'new' || change.kind === 'increased') return Infinity;
+  return change.kind === 'percent' && Number.isFinite(change.percent) ? change.percent : null;
+};
 
 /** Follows [[comparison.colour-scale]] and the displayed change's rounding. */
-export function computeMuscleBuckets(
+export function computeMuscleScores(
   muscles: readonly ProgressMuscleComparison[],
   metric: ProgressMetric,
-): ReadonlyMap<string, MuscleChangeBucket> {
-  const buckets = new Map<string, MuscleChangeBucket>();
+): ReadonlyMap<string, number | null> {
+  const changes = new Map<string, number | null>();
+  const ids = new Set(muscles.map(row => row.muscleGroupId));
+  let largestGain = 0;
+  let largestLoss = 0;
   for (const row of muscles) {
-    const current = row.current[metric];
-    const previous = row.previous[metric];
-    const comparable = current !== null && previous !== null
-      && Number.isFinite(current) && Number.isFinite(previous) && (current > 0 || previous > 0);
-    const { tone } = metric === 'workingSetCount'
-      ? formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount)
-      : formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume);
-    const bucket = !comparable ? 0 : tone === 'negative' ? 1 : tone === 'neutral' ? 2 : 3;
-    buckets.set(row.muscleGroupId, bucket);
-    buckets.set(canonicalMuscleId(row.muscleGroupId), bucket);
+    const id = canonicalMuscleId(row.muscleGroupId);
+    if (!BODY_MUSCLE_IDS.has(id) || (id !== row.muscleGroupId && ids.has(id))) continue;
+    const change = muscleChange(row, metric);
+    changes.set(id, change);
+    if (change !== null && Number.isFinite(change)) {
+      largestGain = Math.max(largestGain, change);
+      largestLoss = Math.max(largestLoss, -change);
+    }
   }
-  return buckets;
+  const scores = new Map<string, number | null>();
+  for (const row of muscles) {
+    const id = canonicalMuscleId(row.muscleGroupId);
+    const change = changes.get(id) ?? null;
+    const score = change === Infinity ? 1 : change === null ? null
+      : change > 0 ? change / largestGain : change < 0 ? change / largestLoss : 0;
+    scores.set(id, score);
+    scores.set(row.muscleGroupId, score);
+  }
+  return scores;
 }
 
 const buildShadeRamp = (
-  baseHex: string,
+  base: Lch,
   lightnessSpan: number,
   lightnessShift = 0,
   chromaBoost = 1
 ): readonly string[] => {
-  const { lightness: baseL, chroma: baseC, hue: baseH } = hexToLch(baseHex);
+  const { lightness: baseL, chroma: baseC, hue: baseH } = base;
   return Array.from({ length: SHADE_STEPS }, (_, step) => {
     const t = step / (SHADE_STEPS - 1);
     const deltaL = (t - 0.55) * lightnessSpan + lightnessShift;
@@ -161,23 +176,32 @@ export function buildThemeShadePalette(
 ): ThemeShadePalette {
   const { lightness: paperL, chroma: paperC, hue: paperH } = hexToLch(roles.paper);
   const { lightness: ruleL, chroma: ruleC } = hexToLch(roles.rule);
-  const neutralBase = lchToHex({
+  const neutralBase = hexToLch(lchToHex({
     lightness: (paperL + ruleL) / 2,
     chroma: (paperC + ruleC) / 2,
     hue: paperH,
-  });
+  }));
   const neutral = buildShadeRamp(neutralBase, 18);
 
   return {
     neutral,
-    buckets: [
-      neutral,
-      buildShadeRamp(roles.viz1, 22),
-      buildShadeRamp(roles.viz2, 22),
-      buildShadeRamp(roles.viz4, 22),
-    ],
+    anchors: [hexToLch(roles.viz1), hexToLch(roles.viz2), hexToLch(roles.viz4)],
     selectedStroke: roles.ink,
   };
+}
+
+/** Interpolate the data shade first; facet lighting remains a separate ramp. */
+export function buildMuscleShadeRamp(score: number | null, palette: ThemeShadePalette): readonly string[] {
+  if (score === null || !Number.isFinite(score)) return palette.neutral;
+  const middle = palette.anchors[1];
+  const end = palette.anchors[score < 0 ? 0 : 2];
+  const t = clamp(Math.abs(score), 0, 1);
+  const hueDelta = ((end.hue - middle.hue + 540) % 360) - 180;
+  return buildShadeRamp({
+    lightness: middle.lightness + (end.lightness - middle.lightness) * t,
+    chroma: middle.chroma + (end.chroma - middle.chroma) * t,
+    hue: middle.hue + hueDelta * t,
+  }, 22);
 }
 
 let cachedDefaultPalette: { roles: ThemeShadeRoles; palette: ThemeShadePalette } | null = null;
@@ -217,7 +241,7 @@ type ProjectionContext = {
   readonly verts: RotatedVertices;
   readonly materials: readonly MuscleBodyMaterialId[];
   readonly report?: MuscleReportAssignment;
-  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
+  readonly shades: ReadonlyMap<string, readonly string[]>;
   readonly selectedCanonicalId: string | null;
   readonly palette: ThemeShadePalette;
 };
@@ -229,8 +253,7 @@ const resolveFaceFill = (
   ctx: ProjectionContext
 ): string => {
   if (materialId === 'neutral') return ctx.palette.neutral[step];
-  const bucket = ctx.buckets.get(materialId) ?? 0;
-  return ctx.palette.buckets[bucket][step];
+  return (ctx.shades.get(materialId) ?? ctx.palette.neutral)[step];
 };
 
 type RotatedVertices = {
@@ -455,7 +478,7 @@ export type ProjectMuscleBodyOptions = {
   readonly angleDeg: number;
   readonly width: number;
   readonly height: number;
-  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
+  readonly scores: ReadonlyMap<string, number | null>;
   readonly selectedId?: string | null;
   /** The user's muscle setup; unset shows every anatomy entry as its own muscle. */
   readonly report?: MuscleReportAssignment;
@@ -471,7 +494,7 @@ export function projectMuscleBody({
   angleDeg,
   width,
   height,
-  buckets,
+  scores,
   selectedId = null,
   report,
   palette = getDefaultPalette(),
@@ -486,7 +509,7 @@ export function projectMuscleBody({
     verts,
     materials: mesh.materials,
     report,
-    buckets,
+    shades: new Map([...scores].map(([id, score]) => [id, buildMuscleShadeRamp(score, palette)])),
     selectedCanonicalId,
     palette,
   };
