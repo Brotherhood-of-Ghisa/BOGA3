@@ -266,7 +266,7 @@ try {
       }
 
       const unauthTargets = await client.callTool({
-        arguments: { default_weekly_sets: 12, idempotency_key: `smoke-targets-denied-${Date.now()}` },
+        arguments: { default_weekly_sets: 12, expected_revision: 0, idempotency_key: `smoke-targets-denied-${Date.now()}` },
         name: 'set_muscle_targets',
       });
       if (!unauthTargets.isError || !JSON.stringify(unauthTargets).includes('PLAN_PERMISSION_REQUIRED')) {
@@ -508,6 +508,7 @@ try {
       }
       const foreignTargets = await client.callTool({
         arguments: {
+          expected_revision: Number(newTargets.revision),
           idempotency_key: `smoke-targets-foreign-${Date.now()}`,
           overrides: { [`${smokeMuscleId}-missing`]: 9 },
         },

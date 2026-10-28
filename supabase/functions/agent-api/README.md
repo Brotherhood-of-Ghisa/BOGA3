@@ -381,14 +381,14 @@ muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 `PUT /v1/agent/muscle-targets` needs write access and an `Idempotency-Key`, and
 has its own 30-per-minute window. Strict JSON naming at least one of
 `default_weekly_sets`, `mode` (`single` | `per_muscle`) and `overrides`
-(`{muscle_id: n | null}`, null clears); `expected_revision` is
-`targets.revision` above, optional. Targets are positive whole numbers and ids
-are muscles the user's setup reports (`400 VALIDATION_ERROR` naming the id); a
-stale revision is `409 REVISION_CONFLICT`. `muscle-targets.ts` derives the setup
+(`{muscle_id: n | null}`, null clears), plus `expected_revision`
+(`targets.revision` above). Targets are positive whole numbers and ids
+are muscles the user's setup reports (`400 VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a
+stale revision is `409 REVISION_CONFLICT`, and `uploaded: false` `409
+TARGETS_NOT_SYNCED` (an adopting device would drop the person's own). `muscle-targets.ts` derives the setup
 scope as the app does; `agent_set_muscle_targets` merges into that scope, keeps
 the others and the count-secondary switch, and stamps the row past the wall
-clock so devices pull it. A never-uploaded row takes app defaults for what the
-call omits. It returns `scope`, its `overrides`, `targets`, `idempotent_replay`.
+clock so devices pull it. It returns `scope`, its `overrides`, `targets`, `idempotent_replay`.
 
 ## Working sets only
 
@@ -570,12 +570,12 @@ change re-scores linked group exercises. The response is the RPC result
 
 ## Status contract
 
-- `400` invalid/unknown argument (`VALIDATION_ERROR` for muscle targets), identity input, cursor, or foreign/nonexistent resource reference.
+- `400` invalid/unknown argument (`VALIDATION_ERROR` for targets), identity input, cursor, or foreign/nonexistent resource reference.
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
 - `403` write access missing, disabled or bound to a stale grant.
 - `404` unknown route or inaccessible/nonexistent exercise.
 - `405` unsupported method for the route (`PUT` only for muscle targets).
-- `409` idempotency conflict, stale exercise or targets revision, or edit of a deleted exercise.
+- `409` idempotency conflict, stale revision, unsynced targets, or edit of a deleted exercise.
 - `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.

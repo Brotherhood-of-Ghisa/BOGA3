@@ -1,9 +1,8 @@
 // Wire validation for the coach's weekly muscle target writes
 // (`PUT /v1/agent/muscle-targets`). No database access and no HTTP, so Jest
 // covers these rules beside the app's own target rules
-// (`apps/mobile/src/preferences/muscle-targets.ts`), which they mirror: a
-// positive whole number per target, targets only for muscles the user's own
-// setup reports, and overrides kept per setup scope (detailed, broad, custom).
+// (`apps/mobile/src/preferences/muscle-targets.ts`), which they mirror
+// ([[muscle.weekly-targets]]).
 //
 // The SQL writer (`agent_set_muscle_targets` in
 // supabase/migrations/20261028170000_agent_set_muscle_targets.sql) trusts this
@@ -27,8 +26,8 @@ export type MuscleTargetsChanges = {
 };
 
 export type MuscleTargetsWrite = {
-  /** The revision the coach read the targets with; omitted skips the check. */
-  expected_revision: number | null;
+  /** The revision the coach read the targets with. */
+  expected_revision: number;
   changes: MuscleTargetsChanges;
 };
 
@@ -74,11 +73,12 @@ const readOverrides = (value: unknown): Record<string, number | null> => {
   return Object.fromEntries(entries);
 };
 
-/** The coach's body, strictly parsed; it must change at least one thing. */
+/** The coach's body, strictly parsed; it quotes the revision it read and must change at least one thing. */
 export const normalizeMuscleTargetsWrite = (body: JsonObject): MuscleTargetsWrite => {
   for (const key of Object.keys(body)) {
     if (!KEYS.has(key)) fail(`Unsupported field: ${key}`);
   }
+  const expected_revision = readRevision(body.expected_revision);
   const changes: MuscleTargetsChanges = {};
   if (body.default_weekly_sets !== undefined) changes.default_weekly_sets = readTarget(body.default_weekly_sets, 'default_weekly_sets');
   if (body.mode !== undefined) changes.mode = readMode(body.mode);
@@ -87,10 +87,7 @@ export const normalizeMuscleTargetsWrite = (body: JsonObject): MuscleTargetsWrit
     if (Object.keys(overrides).length > 0) changes.overrides = overrides;
   }
   if (Object.keys(changes).length === 0) fail('Name at least one of default_weekly_sets, mode or overrides to change.');
-  return {
-    expected_revision: body.expected_revision === undefined ? null : readRevision(body.expected_revision),
-    changes,
-  };
+  return { expected_revision, changes };
 };
 
 /**

@@ -10,8 +10,13 @@
 -- The row reaches devices through the ordinary Sync v2 pull: the stamp is
 -- greatest(now, the row's own stamp + 1), so the write wins the server's LWW
 -- and every device's pull apply. The write is revision-checked: the caller
--- passes the row's client_updated_at_ms as get_training_status read it (0 with
--- no row), so an agent never overwrites a change it did not see.
+-- passes the row's client_updated_at_ms as get_training_status read it, so an
+-- agent never overwrites a change it did not see.
+--
+-- It refuses (TARGETS_NOT_SYNCED) until a device has uploaded the person's
+-- targets: a device that finds server targets adopts them and drops its own,
+-- so a coach writing first would replace values the person set on a device that
+-- has not synced yet.
 --
 -- Authoritative references:
 --   docs/specs/10-api-authn-authz-guidelines.md ("Agent writes")
@@ -38,9 +43,6 @@ alter table public.agent_plan_write_receipts
 -- the Edge Function: default_weekly_sets (positive integer), mode (single |
 -- per_muscle) and overrides ({muscle_id: positive integer | null}, null clears
 -- the override). Overrides merge into p_scope's map; the other scopes stay.
--- A row no device has uploaded to yet takes the app's defaults for whatever
--- the call leaves out (8 sets, single mode, secondary sets counted), so the
--- four columns are always written together, as the app writes them.
 create function app_public.agent_set_muscle_targets(
   p_owner uuid,
   p_client_id text,
@@ -59,7 +61,6 @@ declare
   _operation text := 'set_muscle_targets';
   _replay    jsonb;
   _row       app_public.user_settings;
-  _revision  bigint;
   _stamp     bigint;
   _target    bigint;
   _mode      text;
@@ -87,12 +88,14 @@ begin
     from app_public.user_settings s
    where s.owner_user_id = p_owner and s.id = 'settings'
    for update;
-  _revision := case when found and _row.deleted_at is null then _row.client_updated_at_ms else 0 end;
-  if p_expected_revision is not null and p_expected_revision is distinct from _revision then
+  if not found or _row.deleted_at is not null or _row.weekly_working_set_target is null then
+    raise exception 'TARGETS_NOT_SYNCED' using errcode = 'P0001';
+  end if;
+  if p_expected_revision is distinct from _row.client_updated_at_ms then
     raise exception 'REVISION_CONFLICT' using errcode = 'P0001';
   end if;
 
-  _target := coalesce((p_changes ->> 'default_weekly_sets')::bigint, _row.weekly_working_set_target, 8);
+  _target := coalesce((p_changes ->> 'default_weekly_sets')::bigint, _row.weekly_working_set_target);
   _mode := coalesce(p_changes ->> 'mode', _row.muscle_target_mode, 'single');
   _overrides := coalesce(_row.muscle_target_overrides, '{}'::jsonb);
   _scoped := coalesce(_overrides -> p_scope, '{}'::jsonb);
@@ -108,23 +111,15 @@ begin
 
   _stamp := greatest(
     (extract(epoch from clock_timestamp()) * 1000)::bigint,
-    coalesce(_row.client_updated_at_ms + 1, 0)
+    _row.client_updated_at_ms + 1
   );
-  insert into app_public.user_settings (
-    owner_user_id, id, weekly_working_set_target, muscle_target_mode, muscle_target_overrides,
-    count_secondary_muscles, created_at, updated_at, deleted_at, client_updated_at_ms, server_received_at
-  ) values (
-    p_owner, 'settings', _target, _mode, _overrides,
-    coalesce(_row.count_secondary_muscles, true), _stamp, _stamp, null, _stamp, now()
-  )
-  on conflict (owner_user_id, id) do update
-    set weekly_working_set_target = excluded.weekly_working_set_target,
-        muscle_target_mode = excluded.muscle_target_mode,
-        muscle_target_overrides = excluded.muscle_target_overrides,
-        count_secondary_muscles = excluded.count_secondary_muscles,
-        updated_at = excluded.updated_at,
-        deleted_at = null,
-        client_updated_at_ms = excluded.client_updated_at_ms;
+  update app_public.user_settings s
+     set weekly_working_set_target = _target,
+         muscle_target_mode = _mode,
+         muscle_target_overrides = _overrides,
+         updated_at = _stamp,
+         client_updated_at_ms = _stamp
+   where s.owner_user_id = p_owner and s.id = 'settings';
 
   _result := jsonb_build_object(
     'scope', p_scope,

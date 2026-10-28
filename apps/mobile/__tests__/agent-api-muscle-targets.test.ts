@@ -38,11 +38,13 @@ describe('normalizeMuscleTargetsWrite', () => {
       expected_revision: 1761650000000,
       changes: { default_weekly_sets: 10, mode: 'per_muscle', overrides: { back: 12, chest: null, quads: 14 } },
     });
-    expect(Object.keys(normalizeMuscleTargetsWrite({ overrides: { b: 1, a: 2 } }).changes.overrides ?? {})).toEqual(['a', 'b']);
+    expect(Object.keys(normalizeMuscleTargetsWrite({ expected_revision: 1, overrides: { b: 1, a: 2 } }).changes.overrides ?? {})).toEqual(['a', 'b']);
   });
 
-  it('skips the revision check when none is quoted, and accepts a single change', () => {
-    expect(normalizeMuscleTargetsWrite({ mode: 'single' })).toEqual({ expected_revision: null, changes: { mode: 'single' } });
+  it('accepts a single change and revision 0', () => {
+    expect(normalizeMuscleTargetsWrite({ expected_revision: 4, mode: 'single' })).toEqual({
+      expected_revision: 4, changes: { mode: 'single' },
+    });
     expect(normalizeMuscleTargetsWrite({ expected_revision: 0, default_weekly_sets: 1 }).expected_revision).toBe(0);
   });
 
@@ -60,14 +62,16 @@ describe('normalizeMuscleTargetsWrite', () => {
     [{ overrides: { '  ': 9 } }, 'overrides names a blank or overlong muscle id.'],
     [{ overrides: [['chest', 9]] }, 'overrides must map muscle ids to a target or null.'],
     [{ overrides: null }, 'overrides must map muscle ids to a target or null.'],
-    [{ default_weekly_sets: 8, expected_revision: -1 }, 'expected_revision must be the targets revision'],
-    [{ default_weekly_sets: 8, expected_revision: '1' }, 'expected_revision must be the targets revision'],
     [{ default_weekly_sets: 8, count_secondary_muscles: false }, 'Unsupported field: count_secondary_muscles'],
     [{}, 'Name at least one of'],
     [{ overrides: {} }, 'Name at least one of'],
-    [{ expected_revision: 3 }, 'Name at least one of'],
   ])('rejects %j', (body, message) => {
-    expect(rejection(() => normalizeMuscleTargetsWrite(body))).toContain(message);
+    expect(rejection(() => normalizeMuscleTargetsWrite({ expected_revision: 1, ...body }))).toContain(message);
+  });
+
+  it.each([undefined, -1, 1.5, '1', null])('requires the revision it read: %p', (revision) => {
+    const body = { default_weekly_sets: 8, ...(revision === undefined ? {} : { expected_revision: revision }) };
+    expect(rejection(() => normalizeMuscleTargetsWrite(body))).toContain('expected_revision must be the targets revision');
   });
 });
 

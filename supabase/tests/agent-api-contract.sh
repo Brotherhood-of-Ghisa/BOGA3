@@ -2251,7 +2251,7 @@ assert_status "200" "idempotent muscle targets replay"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${TARGETS_NEW_REVISION}" \
   '.data.idempotent_replay == true and .data.targets.revision == $rev' >/dev/null ||
   fail "a repeated idempotency key did not replay the first result"
-agent_put "muscle-targets" '{"default_weekly_sets":3}' "${TARGETS_KEY}"
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${TARGETS_REVISION}" '{default_weekly_sets:3,expected_revision:$rev}')" "${TARGETS_KEY}"
 assert_status "409" "idempotency key reused with another body"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
   fail "a reused key with another body did not return IDEMPOTENCY_CONFLICT"
@@ -2271,24 +2271,25 @@ for BAD in \
   "$(jq -nc --arg m "${MUSCLE_A}" '{overrides:{($m):"9"}}')" \
   "$(jq -nc '{count_secondary_muscles:true}')" \
   "$(jq -nc '{}')"; do
+  BAD="$(printf '%s' "${BAD}" | jq -c --argjson rev "${TARGETS_NEW_REVISION}" '. + {expected_revision:$rev}')"
   agent_put "muscle-targets" "${BAD}" "${TARGETS_KEY}-bad"
   assert_status "400" "invalid muscle targets ${BAD}"
   [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "VALIDATION_ERROR" ]] ||
     fail "invalid muscle targets ${BAD} did not return VALIDATION_ERROR"
 done
-agent_put "muscle-targets" "$(jq -nc --arg m "${MUSCLE_A2}" '{overrides:{($m):9}}')" "${TARGETS_KEY}-untracked"
+agent_put "muscle-targets" "$(jq -nc --arg m "${MUSCLE_A2}" --argjson rev "${TARGETS_NEW_REVISION}" '{overrides:{($m):9},expected_revision:$rev}')" "${TARGETS_KEY}-untracked"
 assert_status "400" "override for a muscle the setup does not report"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A2}" '.error.code == "VALIDATION_ERROR" and (.error.message | contains($m))' \
   >/dev/null || fail "the rejected override did not name the muscle id"
-agent_put "muscle-targets" "$(jq -nc --arg m "${MUSCLE_B}" '{overrides:{($m):9}}')" "${TARGETS_KEY}-foreign"
+agent_put "muscle-targets" "$(jq -nc --arg m "${MUSCLE_B}" --argjson rev "${TARGETS_NEW_REVISION}" '{overrides:{($m):9},expected_revision:$rev}')" "${TARGETS_KEY}-foreign"
 assert_status "400" "override for another owner's muscle"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_B}" '.error.code == "VALIDATION_ERROR" and (.error.message | contains($m))' \
   >/dev/null || fail "the foreign override did not name the muscle id"
-agent_put "muscle-targets" '{"default_weekly_sets":9}' ""
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${TARGETS_NEW_REVISION}" '{default_weekly_sets:9,expected_revision:$rev}')" ""
 assert_status "400" "muscle targets without an idempotency key"
-agent_put "muscle-targets?x=1" '{"default_weekly_sets":9}' "${TARGETS_KEY}-query"
+agent_put "muscle-targets?x=1" "${TARGETS_BODY}" "${TARGETS_KEY}-query"
 assert_status "400" "muscle targets with a query parameter"
-agent_post "muscle-targets" '{"default_weekly_sets":9}' "${TARGETS_KEY}-post"
+agent_post "muscle-targets" "${TARGETS_BODY}" "${TARGETS_KEY}-post"
 assert_status "405" "muscle targets over POST"
 [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "11,per_muscle" ]] ||
@@ -2297,33 +2298,63 @@ assert_status "405" "muscle targets over POST"
 agent_put "muscle-targets" "$(jq -nc --argjson rev "${TARGETS_NEW_REVISION}" --arg m "${MUSCLE_A}" \
   '{overrides:{($m):null},expected_revision:$rev}')" "${TARGETS_KEY}-clear"
 assert_status "200" "null clears an override"
+CLEARED_BODY="${RESPONSE_BODY}"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '(.data.overrides | has($m) | not) and .data.targets.default_weekly_sets == 11' >/dev/null ||
   fail "clearing an override changed more than that override"
 [[ "$(run_psql "select coalesce(muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}', 'cleared')
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "cleared" ]] ||
   fail "the override was not cleared on the row"
 agent_put "muscle-targets" '{"default_weekly_sets":9}' "${TARGETS_KEY}-no-revision"
-assert_status "200" "write without a quoted revision"
+assert_status "400" "write without a quoted revision"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "VALIDATION_ERROR" ]] ||
+  fail "a write without a quoted revision did not return VALIDATION_ERROR"
+CLEARED_REVISION="$(printf '%s' "${CLEARED_BODY}" | jq -er '.data.targets.revision')"
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${CLEARED_REVISION}" '{default_weekly_sets:9,expected_revision:$rev}')" "${TARGETS_KEY}-final"
+assert_status "200" "write quoting the current revision"
+RATE_BODY="$(jq -nc --argjson rev "$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.targets.revision')" '{default_weekly_sets:9,expected_revision:$rev}')"
 [[ "$(run_psql "select count(*) from public.agent_access_audit
   where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
     and tool_name = 'set_muscle_targets' and http_status = 200;")" -ge 3 ]] ||
   fail "muscle targets writes were not audited under their tool name"
 
-echo "[agent-api-test] verifying the first coach write on an account with no uploaded targets"
+echo "[agent-api-test] verifying the coach cannot write before a device uploads targets"
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
       count_secondary_muscles = null, client_updated_at_ms = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
-agent_put "muscle-targets" '{"mode":"per_muscle"}' "${TARGETS_KEY}-first"
-assert_status "200" "first muscle targets write"
-[[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles
-  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "8,per_muscle,true" ]] ||
-  fail "a first write did not fill the app's defaults for what it left out"
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{mode:"per_muscle",expected_revision:$rev}')" "${TARGETS_KEY}-first"
+assert_status "409" "write before any device uploaded targets"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "TARGETS_NOT_SYNCED" ]] ||
+  fail "a write before upload did not return TARGETS_NOT_SYNCED"
+[[ "$(run_psql "select coalesce(weekly_working_set_target::text, 'none') || ',' || coalesce(muscle_target_mode, 'none')
+  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "none,none" ]] ||
+  fail "a refused write before upload changed the settings row"
+update_training_fixture "update app_public.user_settings
+  set weekly_working_set_target = 6, muscle_target_mode = 'single', muscle_target_overrides = null,
+      count_secondary_muscles = true, deleted_at = ${NOW_MS}
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{mode:"per_muscle",expected_revision:$rev}')" "${TARGETS_KEY}-deleted"
+assert_status "409" "write against a deleted settings row"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "TARGETS_NOT_SYNCED" ]] ||
+  fail "a write against a deleted settings row did not return TARGETS_NOT_SYNCED"
+update_training_fixture "update app_public.user_settings set deleted_at = null
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+
+echo "[agent-api-test] verifying the targets route is PUT-only and PUT reaches no other route"
+PLANS_BEFORE_PUT="$(run_psql "select count(*) from app_public.session_plans where owner_user_id = '${USER_A_UUID}'::uuid;")"
+agent_put "session-plans" "${PLAN_BODY}" "agent-api-${RUN_TAG}-plan-put"
+assert_status "405" "PUT on the plans route"
+agent_put "exercises" '{}' "agent-api-${RUN_TAG}-ex-put"
+assert_status "405" "PUT on the exercises route"
+agent_put "programmes" "${PROG_BODY}" "agent-api-${RUN_TAG}-prog-put"
+assert_status "405" "PUT on the programmes route"
+[[ "$(run_psql "select count(*) from app_public.session_plans where owner_user_id = '${USER_A_UUID}'::uuid;")" == "${PLANS_BEFORE_PUT}" ]] ||
+  fail "a PUT created a session plan"
 
 echo "[agent-api-test] verifying the muscle targets write rate limit"
 TARGETS_LIMITED=0
 for ((CALL = 0; CALL < 40; CALL++)); do
-  agent_put "muscle-targets" '{"default_weekly_sets":9}' "${TARGETS_KEY}-no-revision"
+  agent_put "muscle-targets" "${RATE_BODY}" "${TARGETS_KEY}-final"
   if [[ "${RESPONSE_STATUS}" == "429" ]]; then
     TARGETS_LIMITED=1
     break

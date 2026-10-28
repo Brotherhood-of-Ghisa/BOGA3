@@ -81,7 +81,7 @@ export type ExerciseFields = {
 /** The weekly targets an agent may set; overrides map muscle ids to a target, null clearing one. */
 export type MuscleTargetFields = {
   default_weekly_sets?: number;
-  expected_revision?: number;
+  expected_revision: number;
   mode?: 'per_muscle' | 'single';
   overrides?: Record<string, number | null>;
 };

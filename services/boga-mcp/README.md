@@ -71,7 +71,8 @@ One targets tool (same write access, idempotent, marked destructive):
 `set_muscle_targets` sets the default weekly target, the mode and per-muscle
 overrides (`null` clears one) on the person's setup; devices show them after
 their next sync. `expected_revision` is `targets.revision` from
-`get_training_status`. Rules and errors: the
+`get_training_status`; it fails `TARGETS_NOT_SYNCED` until a device has
+uploaded the person's targets. Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
 
 `get_exercise_context` reports `gym_usage` for every exercise: sessions with a

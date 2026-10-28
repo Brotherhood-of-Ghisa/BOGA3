@@ -523,14 +523,20 @@ describe('BoGa MCP server', () => {
     [{ overrides: { chest_sternal: '9' } }],
     [{ overrides: { '': 9 } }],
     [{ expected_revision: -1, default_weekly_sets: 9 }],
+    [{ default_weekly_sets: 9, omitExpectedRevision: true }],
     [{ default_weekly_sets: 9, count_secondary_muscles: false }],
   ])('rejects set_muscle_targets %j before calling the API', async (changes) => {
     const running = await startMcp();
     active.push(running);
     const before = running.requests.length;
 
+    const { omitExpectedRevision, ...fields } = changes as Record<string, unknown>;
     const result = await running.client.callTool({
-      arguments: { idempotency_key: 'targets-bad', ...changes },
+      arguments: {
+        idempotency_key: 'targets-bad',
+        ...(omitExpectedRevision ? {} : { expected_revision: 1 }),
+        ...fields,
+      },
       name: 'set_muscle_targets',
     });
 

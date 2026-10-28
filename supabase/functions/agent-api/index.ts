@@ -2426,6 +2426,13 @@ const throwMuscleTargetsWriteError = (error: { message?: string } | null): void 
       'The targets changed since they were read. Call get_training_status again and retry with targets.revision.',
     );
   }
+  if (message.includes('TARGETS_NOT_SYNCED')) {
+    throw new ApiError(
+      409,
+      'TARGETS_NOT_SYNCED',
+      'No device has uploaded the person’s targets yet (targets.uploaded is false), and a coach write would replace theirs. Ask them to open the app and sync, then retry.',
+    );
+  }
   if (message.includes('INVALID_ARGUMENT')) {
     throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
   }
@@ -2825,6 +2832,9 @@ const dispatchAgentRequest = async (
     await loadPlanPermission(client, agent);
     if (method === 'GET') {
       return getUpcomingSessionPlans(client, agent, url);
+    }
+    if (method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST.');
     }
     return createSessionPlan(client, agent, request, await readJsonBody(request));
   }

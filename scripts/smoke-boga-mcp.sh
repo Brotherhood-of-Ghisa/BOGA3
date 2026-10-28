@@ -247,10 +247,14 @@ else
         (owner_user_id,id,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
       values ('${USER_UUID}'::uuid,'${SESSION_ID}-reading',80,
         $((NOW_MS - 900000)),${NOW_MS},${NOW_MS},${NOW_MS});
+      -- A device has uploaded the person's targets (the coach cannot write before).
       insert into app_public.user_settings
-        (owner_user_id,id,bodyweight_calculations_enabled,created_at,updated_at,client_updated_at_ms)
-      values ('${USER_UUID}'::uuid,'settings',true,${NOW_MS},${NOW_MS},${NOW_MS})
+        (owner_user_id,id,bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,
+         muscle_target_overrides,count_secondary_muscles,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'settings',true,8,'single','{}'::jsonb,true,${NOW_MS},${NOW_MS},${NOW_MS})
       on conflict(owner_user_id,id) do update set bodyweight_calculations_enabled=true,
+        weekly_working_set_target=8,muscle_target_mode='single',muscle_target_overrides='{}'::jsonb,
+        count_secondary_muscles=true,
         deleted_at=null,updated_at=excluded.updated_at,client_updated_at_ms=excluded.client_updated_at_ms;
       insert into app_public.session_exercises
         (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
