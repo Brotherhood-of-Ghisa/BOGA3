@@ -60,7 +60,7 @@ jest.mock('@/src/logging/logEvent', () => ({
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { uiRoles } from '@/components/ui';
+import { uiRoles, uiText } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
@@ -218,6 +218,18 @@ describe('SyncSetupScreen', () => {
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style).color).toBe(
       uiRoles.danger
     );
+  });
+
+  it('draws the failure on the text roles: the message bodyStrong, the detail figureSmall', () => {
+    renderGate();
+
+    publish({ lastCycleErrorCode: 'INTERNAL', lastCycleErrorDetail: 'boom' });
+
+    expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style)).toMatchObject({
+      ...uiText.bodyStrong,
+      color: uiRoles.danger,
+    });
+    expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.style)).toMatchObject(uiText.figureSmall);
   });
 
   it('says what failed: the error code and the sanitized detail under the message', () => {

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, type TextStyle } from 'react-native';
 
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type StatLayout = 'stacked' | 'inline';
 export type StatRank = 'primary' | 'secondary';
@@ -57,7 +58,8 @@ export function Stat({
 }: StatProps) {
   const planned = state === 'planned';
   const legendStyle = [
-    styles.legend,
+    uiText.label,
+    uiTextTone.faint,
     planned ? styles.legendPlanned : null,
     ground === 'viz' ? styles.legendOnViz : null,
   ];
@@ -96,15 +98,6 @@ export function Stat({
 }
 
 const styles = StyleSheet.create({
-  legend: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   legendPlanned: {
     color: uiRoles.inkGhost,
   },
@@ -129,55 +122,22 @@ const styles = StyleSheet.create({
   },
 });
 
-const figure = uiFonts.figure.family;
+// A headline figure; in a list row, the row's `figure`; a gym name, the name
+// that heads a block.
+const stackedValueStyles = {
+  figure: uiText.figureStat,
+  rowFigure: uiText.figure,
+  text: uiText.bodyStrong,
+};
 
-const stackedValueStyles = StyleSheet.create({
-  figure: {
-    fontFamily: figure,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  // A figure in a list row: one rung above body, lighter than a headline.
-  rowFigure: {
-    fontFamily: figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  text: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    // The figure's line-height, so a text value sits level with the figures
-    // beside it in a summary row.
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-});
-
-// Plex Mono ships 500/600/700 only; 500 is its lightest embedded face, and
-// the realised default so that a `record` (700) stands out from it.
-const inlineValueStyles = StyleSheet.create({
-  primary: {
-    fontFamily: figure,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
-  secondary: {
-    fontFamily: figure,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-});
+// The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is
+// its lightest embedded face, so a `record` (700) stands out from it.
+const inlineValueStyles = {
+  primary: [uiText.figureSmall, uiTextTone.ink],
+  secondary: uiText.figureSmall,
+};
 
 const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
   none: null,
-  record: { fontWeight: '700', color: uiRoles.record },
+  record: uiTextTone.record,
 };

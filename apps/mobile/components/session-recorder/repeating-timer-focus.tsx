@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
-import { ActionButton, Icon, IconButton, Screen, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Icon, IconButton, Screen, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiText, uiTypography } from '@/components/ui';
 import { MAX_REPEATING_TIMER_INTERVAL_SECONDS, MIN_REPEATING_TIMER_INTERVAL_SECONDS } from '@/src/preferences/model';
 import { formatRestTimerSeconds, REPEATING_TIMER_PREPARATION_SEC, REPEATING_TIMER_STEP_SEC, type RepeatingTimerModeView } from '@/src/session-recorder/rest-timer';
 
@@ -148,17 +148,17 @@ const styles = StyleSheet.create({
   trigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm },
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.rule },
-  title: { fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xl, lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink },
+  title: uiText.sheetTitle,
   body: { flexGrow: 1, alignItems: 'center', padding: uiSpace.lg, gap: uiSpace.lg },
   meter: { alignItems: 'center', justifyContent: 'center' },
   readout: { width: '80%', alignItems: 'center', gap: uiSpace.sm },
   phase: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xxl * 2, lineHeight: uiTypography.lineHeight.xxl * 2, color: uiRoles.ink },
-  intervalLabel: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking, textTransform: 'uppercase', color: uiRoles.inkMuted },
+  intervalLabel: uiText.label,
   countdown: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.figure.family, fontWeight: '700', fontVariant: ['tabular-nums'], color: uiRoles.ink },
   primary: { alignSelf: 'stretch' },
   reset: { marginTop: 'auto', paddingTop: uiSpace.lg, alignSelf: 'stretch' },
   intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: uiRoles.rule, paddingTop: uiSpace.lg },
   intervalControl: { width: '29%' },
   interval: { alignItems: 'center', gap: uiSpace.xs },
-  intervalValue: { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl, color: uiRoles.ink },
+  intervalValue: uiText.figureHero,
 });
