@@ -1,6 +1,5 @@
 // Progress reads the user's muscles ([[muscle.report-groups]]): the data path, the
-// 3D body, the exercise 3D shading and the helpers the screens share.
-import { buildExerciseBodyMuscle, buildExerciseBodyMuscles, type ExerciseBodyItem } from '@/components/stats/exercise-body-data';
+// 3D body and the helpers the screens share.
 import {
   buildThemeShadePalette, hitTestProjectedMuscle, projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
@@ -89,39 +88,6 @@ describe('3D body under the user’s muscles', () => {
     const detailedReport = buildMuscleReportAssignment(broadMuscleRows().map(row => ({ ...row, reportGroup: null, tracked: 1 })));
     expect(project(detailedReport)).toEqual(project(undefined));
     expect(MUSCLE_BODY_MESH.materials).toContain('serratus_anterior');
-  });
-});
-
-describe('Exercise 3D shading under the user’s muscles', () => {
-  const period = (sets = 0, volume: number | null = 0) => ({ workingSetCount: sets, totalVolume: volume, volumeSetCount: sets });
-  const muscle = (id: string): ProgressMuscleComparison => ({
-    muscleGroupId: id, displayName: id, familyName: 'Legs', sortOrder: 0,
-    current: period(), previous: period(), exercises: [], workingSetChange: 0, volumeChange: { kind: 'empty' },
-  });
-  const item: ExerciseBodyItem = { id: 'squat', name: 'Squat', current: period(3, 300), previous: period(), lastCompletedAt: null };
-  const squat = exercise([['quads', 'primary'], ['glutes_max', 'secondary'], ['hamstrings', 'secondary'],
-    ['adductors', 'secondary'], ['forearms_grip', 'primary']]);
-  const input = { items: [item], exercises: [squat], muscles: [muscle('quads'), muscle('glutes_max')], report: BROAD };
-
-  it('counts a set once per muscle at its strongest entry, as Quads 3 and Glutes & Hams 1.5', () => {
-    const [quads, glutes] = buildExerciseBodyMuscles(input);
-    expect(quads.current.workingSetCount).toBe(3);
-    expect(glutes.current.workingSetCount).toBe(1.5);
-    expect(glutes.current.totalVolume).toBe(150);
-  });
-
-  it('lists an exercise under the muscle one of its entries maps and ignores untracked mappings', () => {
-    const hamstringsOnly = exercise([['hamstrings', 'primary'], ['forearms_grip', 'secondary']]);
-    const detail = buildExerciseBodyMuscle({ ...input, exercises: [hamstringsOnly], muscleGroupId: 'glutes_max' })!;
-    expect(detail.exercises.map(entry => entry.item.id)).toEqual(['squat']);
-    expect(buildExerciseBodyMuscle({ ...input, exercises: [hamstringsOnly], muscleGroupId: 'forearms_grip' })).toBeNull();
-    expect(buildExerciseBodyMuscles({ ...input, exercises: [hamstringsOnly], countSecondary: false })[1].current.workingSetCount).toBe(3);
-  });
-
-  it('drops a muscle reached only as a secondary when secondary work is off', () => {
-    const secondaryOnly = exercise([['adductors', 'secondary']]);
-    const [quads] = buildExerciseBodyMuscles({ ...input, exercises: [secondaryOnly], countSecondary: false });
-    expect(quads.current.workingSetCount).toBe(0);
   });
 });
 

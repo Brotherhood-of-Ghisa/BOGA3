@@ -8,7 +8,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import { StyleSheet, type TextStyle } from 'react-native';
 
 import { ComparisonValues } from '@/components/stats/comparison-columns';
-import { ExerciseBodyView } from '@/components/stats/exercise-body-view';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { ProgressFilters } from '@/components/stats/progress-filters';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
@@ -90,13 +89,6 @@ describe('Progress muscle views', () => {
     const meta = within(row).getByText(/working sets/);
     expect(style(meta)).toMatchObject(META);
     expect(style(within(meta).getByText('3'))).toMatchObject({ fontFamily: uiFonts.figure.family });
-  });
-
-  it('titles the selected muscle on the exercise body view', () => {
-    render(<ExerciseBodyView muscles={muscles} metric="workingSetCount" selectedMuscleId="back_lats"
-      selectedMuscle={{ muscleGroupId: 'back_lats', displayName: 'Lats', exercises: [], secondary: [] }}
-      onSelectMuscle={jest.fn()} renderAll={() => null} renderDetail={() => null} />);
-    expect(style(screen.getByRole('header', { name: 'Lats' }))).toMatchObject({ ...TITLE, color: uiRoles.ink });
   });
 
   it('titles the selected muscle on the muscle view', () => {
