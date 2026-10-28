@@ -49,6 +49,8 @@ import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { linkExercise, listLinks } from '@/src/data/exercise-group-links';
 import { saveExerciseCatalogExercise, listExerciseCatalogExercises } from '@/src/data/exercise-catalog';
+import { setMuscleReportPreset, setMuscleTracked } from '@/src/data/muscle-report-settings';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import type { CompetitionStreamSharedExerciseWire, GroupSharedExerciseItemWire } from '@/src/groups/competition-wire';
 
 const SAMPLE_SHARED_ITEM: CompetitionStreamSharedExerciseWire = {
@@ -148,6 +150,91 @@ describe('StreamSharedExerciseCard', () => {
     const links = await listLinks();
     expect(links.some((l) => l.exerciseDefinitionId === saved.id && l.groupExerciseId === 'ge-1')).toBe(true);
   });
+
+  it('does not offer linking and offers Add as new when matching exercise is already linked elsewhere in this group', async () => {
+    // Save matching exercise in catalog and link it to a different comparison in this group
+    const saved = await saveExerciseCatalogExercise({
+      name: 'Paused Bench Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+    await linkExercise(saved.id, 'group-1', 'ge-other');
+
+    render(
+      <StreamSharedExerciseCard
+        item={SAMPLE_SHARED_ITEM}
+        onAdded={jest.fn()}
+        showGroupName={false}
+        userId="user-me"
+      />,
+    );
+
+    // Link existing button should NOT be rendered because it's already linked to ge-other
+    await waitFor(() => {
+      expect(screen.getByTestId('group-stream-shared-exercise-shared-ex-1-status-exists')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('group-stream-shared-exercise-shared-ex-1-link-existing-btn')).toBeNull();
+
+    // "Add as new" button should be offered
+    const addNewBtn = screen.getByTestId('group-stream-shared-exercise-shared-ex-1-add-new-btn');
+    expect(addNewBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(addNewBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Added "Paused Bench Press" to your exercises.')).toBeTruthy();
+    });
+
+    // Verify existing exercise retained its link to ge-other and new exercise is linked to ge-1
+    const links = await listLinks();
+    expect(links.some((l) => l.exerciseDefinitionId === saved.id && l.groupExerciseId === 'ge-other')).toBe(true);
+    const exercises = await listExerciseCatalogExercises();
+    const created = exercises.find((e) => e.id !== saved.id && e.name === 'Paused Bench Press');
+    expect(created).toBeDefined();
+    expect(links.some((l) => l.exerciseDefinitionId === created?.id && l.groupExerciseId === 'ge-1')).toBe(true);
+  });
+
+  it('projects muscles through user muscle setup: merges broad entries and hides untracked muscles', async () => {
+    // Set broad preset (merges 'chest' and 'serratus_anterior' into 'Chest') and untrack 'quads'
+    await setMuscleReportPreset('broad');
+    await setMuscleTracked(['quads'], false);
+    await invalidateExerciseCatalogCache();
+
+    const itemWithMultipleMuscles: CompetitionStreamSharedExerciseWire = {
+      ...SAMPLE_SHARED_ITEM,
+      id: 'shared-ex-muscles',
+      exercise: {
+        ...SAMPLE_SHARED_ITEM.exercise,
+        mappings: [
+          { muscle_group_id: 'chest', weight: 1, role: 'primary' },
+          { muscle_group_id: 'serratus_anterior', weight: 0.5, role: 'secondary' },
+          { muscle_group_id: 'quads', weight: 0.5, role: 'secondary' },
+        ],
+      },
+    };
+
+    render(
+      <StreamSharedExerciseCard
+        item={itemWithMultipleMuscles}
+        onAdded={jest.fn()}
+        showGroupName={false}
+        userId="user-me"
+      />,
+    );
+
+    await waitFor(() => {
+      // 'Chest' should be shown once as the merged muscle pill
+      expect(screen.getAllByText('Chest')).toHaveLength(1);
+    });
+    // Raw anatomy entry 'serratus_anterior' should not be shown
+    expect(screen.queryByText('serratus_anterior')).toBeNull();
+    expect(screen.queryByText('Serratus Anterior')).toBeNull();
+    // Untracked 'quads' / 'Quads' should not be shown
+    expect(screen.queryByText('Quads')).toBeNull();
+    expect(screen.queryByText('quads')).toBeNull();
+  });
 });
 
 describe('GroupSharedExercisesList', () => {
@@ -235,5 +322,47 @@ describe('GroupSharedExercisesList', () => {
     });
 
     expect(groupsApi.deleteGroupSharedExercise).toHaveBeenCalledWith('group-1', 'shared-ex-1');
+  });
+
+  it('does not offer linking and offers Add as new when matching exercise is already linked to another comparison', async () => {
+    const saved = await saveExerciseCatalogExercise({
+      name: 'Paused Bench Press',
+      loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    });
+    await linkExercise(saved.id, 'group-1', 'ge-other');
+
+    render(
+      <GroupSharedExercisesList
+        groupId="group-1"
+        groupName="Powerlifting Club"
+        myRole="member"
+        offline={false}
+        userId="user-me"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('group-shared-exercise-shared-ex-1-status-exists')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('group-shared-exercise-shared-ex-1-link-btn')).toBeNull();
+
+    const addNewBtn = screen.getByTestId('group-shared-exercise-shared-ex-1-add-new-btn');
+    expect(addNewBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(addNewBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Added "Paused Bench Press" to your exercises.')).toBeTruthy();
+    });
+
+    const links = await listLinks();
+    expect(links.some((l) => l.exerciseDefinitionId === saved.id && l.groupExerciseId === 'ge-other')).toBe(true);
+    const exercises = await listExerciseCatalogExercises();
+    const created = exercises.find((e) => e.id !== saved.id && e.name === 'Paused Bench Press');
+    expect(created).toBeDefined();
+    expect(links.some((l) => l.exerciseDefinitionId === created?.id && l.groupExerciseId === 'ge-1')).toBe(true);
   });
 });

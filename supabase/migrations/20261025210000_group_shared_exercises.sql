@@ -54,15 +54,14 @@ stable
 set search_path = app_public, pg_temp
 as $$
   select jsonb_build_object(
-    'id', p_row.id,
-    'name', p_row.name,
-    'load_input_mode', p_row.load_input_mode,
-    'bodyweight_contribution', p_row.bodyweight_contribution,
-    'mappings', p_row.mappings,
     'group_exercise_id', p_row.group_exercise_id,
     'group_exercise_name', (
       select ge.name from app_public.group_exercises ge where ge.id = p_row.group_exercise_id
     ),
+    'name', p_row.name,
+    'load_input_mode', p_row.load_input_mode,
+    'bodyweight_contribution', p_row.bodyweight_contribution,
+    'mappings', p_row.mappings,
     'created_at_ms', floor(extract(epoch from p_row.created_at) * 1000)::bigint
   );
 $$;
@@ -78,12 +77,9 @@ as $$
     'kind', 'shared_exercise',
     'key', e.id::text,
     'sort_at_ms', p_sort_at_ms,
-    'group', (
-      select jsonb_build_object('group_id', g.id, 'name', g.name)
-        from app_public.groups g
-       where g.id = e.group_id
-    ),
-    'member', app_public.group_member_ref_json(e.member_user_id),
+    'id', se.id,
+    'group_id', e.group_id,
+    'shared_by', app_public.group_member_ref_json(e.member_user_id),
     'exercise', app_public.group_shared_exercise_json(se)
   )
   from app_public.group_events e
@@ -150,10 +146,15 @@ security definer
 set search_path = app_public, pg_temp
 as $$
 declare
-  _uid       uuid := app_public.group_require_app_user();
-  _name      text;
-  _row       app_public.group_shared_exercises;
-  _now_ms    bigint;
+  _uid           uuid := app_public.group_require_app_user();
+  _name          text;
+  _row           app_public.group_shared_exercises;
+  _now_ms        bigint;
+  _mapping       jsonb;
+  _m_id          text;
+  _m_weight      numeric;
+  _m_role        text;
+  _norm_mappings jsonb := '[]'::jsonb;
 begin
   perform app_public.group_require_member(p_group_id, _uid, false);
   perform app_public.group_competition_require_capability();
@@ -174,6 +175,46 @@ begin
   if p_mappings is null or jsonb_typeof(p_mappings) <> 'array' then
     raise exception 'VALIDATION: mappings must be an array' using errcode = 'P0001';
   end if;
+
+  for _mapping in select * from jsonb_array_elements(p_mappings) loop
+    if jsonb_typeof(_mapping) <> 'object' then
+      raise exception 'VALIDATION: mapping must be an object' using errcode = 'P0001';
+    end if;
+
+    _m_id := trim(_mapping->>'muscle_group_id');
+    if _m_id is null or _m_id = '' then
+      raise exception 'VALIDATION: mapping muscle_group_id must be a non-empty string' using errcode = 'P0001';
+    end if;
+
+    if not (_mapping ? 'weight') or jsonb_typeof(_mapping->'weight') <> 'number' then
+      raise exception 'VALIDATION: mapping weight must be a number' using errcode = 'P0001';
+    end if;
+
+    begin
+      _m_weight := (_mapping->>'weight')::numeric;
+    exception when others then
+      raise exception 'VALIDATION: mapping weight must be numeric' using errcode = 'P0001';
+    end;
+
+    if _m_weight is null or _m_weight <= 0 then
+      raise exception 'VALIDATION: mapping weight must be greater than 0' using errcode = 'P0001';
+    end if;
+
+    if _mapping ? 'role' and jsonb_typeof(_mapping->'role') <> 'null' then
+      _m_role := _mapping->>'role';
+      if _m_role not in ('primary', 'secondary', 'stabilizer') then
+        raise exception 'VALIDATION: mapping role must be primary, secondary, or stabilizer' using errcode = 'P0001';
+      end if;
+    else
+      _m_role := null;
+    end if;
+
+    _norm_mappings := _norm_mappings || jsonb_build_array(jsonb_build_object(
+      'muscle_group_id', _m_id,
+      'weight', _m_weight,
+      'role', _m_role
+    ));
+  end loop;
 
   if p_group_exercise_id is not null then
     if not exists (
@@ -201,7 +242,7 @@ begin
     _name,
     p_load_input_mode,
     p_bodyweight_contribution,
-    p_mappings
+    _norm_mappings
   )
   returning * into _row;
 

@@ -22,6 +22,7 @@ import {
 } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { reportedExerciseMuscles, reportedMuscleName } from '@/src/exercise-catalog/reported-muscles';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import { formatBoardDate } from '@/src/groups/board-view-model';
 import type { CompetitionStreamSharedExerciseWire } from '@/src/groups/competition-wire';
@@ -38,10 +39,11 @@ type Props = {
 
 type ActionsProps = {
   testID: string;
-  isLinked: boolean;
+  isTargetLinked: boolean;
   matchingExercise?: ExerciseCatalogExercise;
   groupExerciseId?: string | null;
   exerciseName: string;
+  canLinkExisting: boolean;
   pending: boolean;
   onLinkExisting: () => void;
   onDirectAdd: () => void;
@@ -50,20 +52,21 @@ type ActionsProps = {
 
 function StreamSharedExerciseCardActions({
   testID,
-  isLinked,
+  isTargetLinked,
   matchingExercise,
   groupExerciseId,
   exerciseName,
+  canLinkExisting,
   pending,
   onLinkExisting,
   onDirectAdd,
   onOpenCustomizer,
 }: ActionsProps) {
-  if (isLinked) {
+  if (isTargetLinked) {
     return <Tag label="In your exercises (Linked)" testID={`${testID}-status-linked`} tone="neutral" />;
   }
 
-  if (matchingExercise && groupExerciseId) {
+  if (canLinkExisting && matchingExercise) {
     return (
       <>
         <ActionButton
@@ -91,11 +94,11 @@ function StreamSharedExerciseCardActions({
       <>
         <Tag label="Already in your exercises" testID={`${testID}-status-exists`} tone="neutral" />
         <ActionButton
-          accessibilityLabel="Add another copy"
+          accessibilityLabel={groupExerciseId ? 'Add as new exercise' : 'Add another copy'}
           disabled={pending}
-          label="Add another"
+          label={groupExerciseId ? 'Add as new' : 'Add another'}
           onPress={onDirectAdd}
-          testID={`${testID}-add-another-btn`}
+          testID={groupExerciseId ? `${testID}-add-new-btn` : `${testID}-add-another-btn`}
           variant="outline"
         />
       </>
@@ -143,7 +146,7 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
     );
   }, [catalog.exercises, item.exercise.name]);
 
-  const isLinked = useMemo(() => {
+  const isTargetLinked = useMemo(() => {
     if (!matchingExercise || !item.exercise.group_exercise_id || !links.links) return false;
     return links.links.some(
       (l) =>
@@ -152,12 +155,24 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
     );
   }, [matchingExercise, item.exercise.group_exercise_id, links.links]);
 
+  const canLinkExisting = useMemo(() => {
+    if (!matchingExercise || !item.exercise.group_exercise_id || links.links === null) return false;
+    return !links.links.some((l) => l.exerciseDefinitionId === matchingExercise.id);
+  }, [matchingExercise, item.exercise.group_exercise_id, links.links]);
+
   const muscleNames = useMemo(() => {
-    return item.exercise.mappings.map((m) => {
-      const group = catalog.muscleGroupsById[m.muscle_group_id];
-      return group?.displayName ?? m.muscle_group_id;
-    });
-  }, [catalog.muscleGroupsById, item.exercise.mappings]);
+    const exerciseForReport = {
+      mappings: item.exercise.mappings.map((m, index) => ({
+        id: `m-${index}`,
+        muscleGroupId: m.muscle_group_id,
+        weight: m.weight,
+        role: m.role ?? null,
+      })),
+    };
+    return reportedExerciseMuscles(exerciseForReport, catalog.muscleSetup.assignment)
+      .map(({ muscleGroupId }) => reportedMuscleName(catalog.muscleSetup, catalog.muscleGroupsById, muscleGroupId))
+      .filter((name): name is string => Boolean(name));
+  }, [catalog.muscleGroupsById, catalog.muscleSetup, item.exercise.mappings]);
 
   const handleDirectAdd = async () => {
     setError(null);
@@ -263,9 +278,10 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
       ) : (
         <View style={styles.actionsRow}>
           <StreamSharedExerciseCardActions
+            canLinkExisting={canLinkExisting}
             exerciseName={item.exercise.name}
             groupExerciseId={item.exercise.group_exercise_id}
-            isLinked={isLinked}
+            isTargetLinked={isTargetLinked}
             matchingExercise={matchingExercise}
             onDirectAdd={() => void handleDirectAdd()}
             onLinkExisting={() => void handleLinkExisting()}

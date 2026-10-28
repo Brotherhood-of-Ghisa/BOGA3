@@ -93,14 +93,21 @@ function GroupSharedExerciseCard({
   const matching = catalog.exercises.find(
     (e) => !e.deletedAt && e.name.trim().toLowerCase() === item.exercise.name.trim().toLowerCase(),
   );
-  const isItemLinked =
+  const isItemLinked = Boolean(
     matching &&
     item.exercise.group_exercise_id &&
     links?.some(
       (l) =>
         l.exerciseDefinitionId === matching.id &&
         l.groupExerciseId === item.exercise.group_exercise_id,
-    );
+    ),
+  );
+  const isUnlinkedInGroup = Boolean(
+    matching &&
+    links !== null &&
+    !links.some((l) => l.exerciseDefinitionId === matching.id),
+  );
+  const canLinkExisting = Boolean(matching && item.exercise.group_exercise_id && isUnlinkedInGroup);
   const itemTestID = `group-shared-exercise-${item.id}`;
 
   return (
@@ -133,7 +140,7 @@ function GroupSharedExerciseCard({
       <View style={styles.cardActions}>
         {isItemLinked ? (
           <Tag label="In your exercises (Linked)" testID={`${itemTestID}-status-linked`} tone="neutral" />
-        ) : matching && item.exercise.group_exercise_id ? (
+        ) : canLinkExisting && matching ? (
           <>
             <ActionButton
               accessibilityLabel={`Link ${matching.name} to leaderboard`}
@@ -156,11 +163,11 @@ function GroupSharedExerciseCard({
           <>
             <Tag label="Already in your exercises" testID={`${itemTestID}-status-exists`} tone="neutral" />
             <ActionButton
-              accessibilityLabel="Add another copy"
+              accessibilityLabel={item.exercise.group_exercise_id ? 'Add as new exercise' : 'Add another copy'}
               disabled={isPending}
-              label="Add another"
+              label={item.exercise.group_exercise_id ? 'Add as new' : 'Add another'}
               onPress={() => void onDirectAdd(item)}
-              testID={`${itemTestID}-add-another-btn`}
+              testID={item.exercise.group_exercise_id ? `${itemTestID}-add-new-btn` : `${itemTestID}-add-another-btn`}
               variant="outline"
             />
           </>
