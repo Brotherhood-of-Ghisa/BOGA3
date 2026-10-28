@@ -306,12 +306,12 @@ export const rankFavouriteExercises = (
 /**
  * The local date of each exercise's latest record session: the last session
  * whose 1RM, Weight or Volume beat the whole exercise's record so far (the
- * app's record book). A history read that hit its cap has no Volume record,
- * as in `get_exercise_context`.
+ * app's record book). An exercise whose history hit its cap has no Volume
+ * record, as in `get_exercise_context`.
  */
 export const lastRecordDates = (
   history: StatusTraining, definitions: ReadonlyMap<string, StatusDefinitionRow>,
-  calculationsEnabled: boolean, historyComplete: boolean, timeZone: string,
+  calculationsEnabled: boolean, truncated: ReadonlySet<string>, timeZone: string,
 ): Map<string, string> => {
   const books = new Map<string, ReturnType<typeof createRecordBook>>();
   const lastRecord = new Map<string, string>();
@@ -322,7 +322,7 @@ export const lastRecordDates = (
     const flags = book.add({
       oneRepMax: row.estimatedOneRepMax === null ? null : { value: row.estimatedOneRepMax },
       weight: row.topWeightSet,
-      volume: total === null || !historyComplete ? null : { value: total },
+      volume: total === null || truncated.has(row.exerciseId) ? null : { value: total },
     });
     if (flags.oneRepMax || flags.weight || flags.volume) lastRecord.set(row.exerciseId, localDateKey(row.completedAt));
   }
@@ -340,11 +340,20 @@ export type TrainingStatusInput = {
   favourites: readonly FavouriteExercise[];
   /** The favourites' all-time sessions, for their record dates. */
   history: StatusTraining;
-  historyComplete: boolean;
+  /** The favourites whose history read hit its cap. */
+  historyTruncated: ReadonlySet<string>;
   calculationsEnabled: boolean;
-  /** False when any read hit its cap. */
+  /** False when a read of the 56 days or of the muscles hit its cap (`statusReadComplete`). */
   complete: boolean;
 };
+
+/** Whether the 56-day read and the muscle read are whole: no cap was reached. */
+export const statusReadComplete = (read: {
+  sessionsRead: number; maxSessions: number; musclesRead: number; maxMuscles: number;
+  truncatedReads: ReadonlyArray<{ truncated: boolean }>;
+}): boolean =>
+  read.sessionsRead <= read.maxSessions && read.musclesRead < read.maxMuscles
+  && read.truncatedReads.every((entry) => !entry.truncated);
 
 export const buildTrainingStatus = (input: TrainingStatusInput) => {
   const window = trainingStatusWindow(input.now, input.timeZone);
@@ -353,7 +362,7 @@ export const buildTrainingStatus = (input: TrainingStatusInput) => {
   const { setup, muscles } = deriveStatusMuscles(
     statusMuscleInput(input.training, input.mappings, muscleRows, window, input.timeZone), muscleRows, settings, window,
   );
-  const records = lastRecordDates(input.history, input.definitions, input.calculationsEnabled, input.historyComplete, input.timeZone);
+  const records = lastRecordDates(input.history, input.definitions, input.calculationsEnabled, input.historyTruncated, input.timeZone);
   return {
     metric_revision: METRIC_REVISION,
     as_of: input.now.toISOString(),
@@ -376,7 +385,8 @@ export const buildTrainingStatus = (input: TrainingStatusInput) => {
       last_done_on: localDateKey(favourite.lastDoneAt),
       best_e1rm_kg: { last_28d: favourite.bestLast28, previous_28d: favourite.bestPrevious28 },
       last_record_on: records.get(favourite.exerciseId) ?? null,
+      record_history_complete: !input.historyTruncated.has(favourite.exerciseId),
     })),
-    complete: input.complete && input.historyComplete,
+    complete: input.complete,
   };
 };

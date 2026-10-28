@@ -6,8 +6,8 @@
  * The suite runs in Europe/London (jest.config.js); the status's zone is given.
  */
 import {
-  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, statusSettings, trainingStatusWindow,
-  zonedWallClock,
+  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, statusReadComplete, statusSettings,
+  trainingStatusWindow, zonedWallClock,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusInput,
 } from '../../../supabase/functions/agent-api/training-status.ts';
@@ -72,7 +72,7 @@ const status = (overrides: Partial<TrainingStatusInput> & { timeZone: string }) 
   const input: TrainingStatusInput = {
     now: NOW, settings: null, muscleRows: MUSCLES, mappings: MAPPINGS,
     training: { sessions: [], blocks: [], sets: [] }, definitions: definitionsOf(definition('bench'), definition('row')),
-    favourites: [], history: { sessions: [], blocks: [], sets: [] }, historyComplete: true,
+    favourites: [], history: { sessions: [], blocks: [], sets: [] }, historyTruncated: new Set(),
     calculationsEnabled: false, complete: true, ...overrides,
   };
   return buildTrainingStatus(input);
@@ -239,7 +239,7 @@ describe('training status: favourites and progression', () => {
     expect(result.favourite_exercises).toEqual([{
       exercise_id: 'bench', name: 'Bench', sessions_28d: 2, last_done_on: '2026-10-23',
       best_e1rm_kg: { last_28d: estimateOneRepMax(110, 5), previous_28d: estimateOneRepMax(95, 5) },
-      last_record_on: '2026-10-08',
+      last_record_on: '2026-10-08', record_history_complete: true,
     }]);
   });
 
@@ -251,19 +251,27 @@ describe('training status: favourites and progression', () => {
     expect(result.favourite_exercises[0]).toMatchObject({ last_record_on: null, best_e1rm_kg: { previous_28d: null } });
   });
 
-  it('is incomplete, with no Volume record, when the favourites history hit its cap', () => {
-    // Only Volume rises in the later session: with a truncated history it is no record.
+  it('flags a favourite whose history hit its cap, with no Volume record, and leaves complete to the 56-day read', () => {
+    // Only Volume rises in the later session: with a capped history it is no record.
     const history = training([
       sessionOf('a', 'bench', daysAgo(10), [['100', '5', null]]),
       sessionOf('b', 'bench', daysAgo(3), [['100', '5', null], ['90', '5', null]]),
     ]);
     const definitions = definitionsOf(definition('bench'));
     const favourites = rankFavouriteExercises(history, definitions, false, window, 'UTC');
-    const complete = status({ timeZone: 'UTC', training: history, definitions, favourites, history });
-    const capped = status({ timeZone: 'UTC', training: history, definitions, favourites, history, historyComplete: false });
-    expect(complete).toMatchObject({ complete: true, favourite_exercises: [{ last_record_on: '2026-10-25' }] });
-    expect(capped).toMatchObject({ complete: false, favourite_exercises: [{ last_record_on: null }] });
+    const whole = status({ timeZone: 'UTC', training: history, definitions, favourites, history });
+    const capped = status({ timeZone: 'UTC', training: history, definitions, favourites, history, historyTruncated: new Set(['bench']) });
+    expect(whole).toMatchObject({ complete: true, favourite_exercises: [{ last_record_on: '2026-10-25', record_history_complete: true }] });
+    expect(capped).toMatchObject({ complete: true, favourite_exercises: [{ last_record_on: null, record_history_complete: false }] });
     expect(status({ timeZone: 'UTC', complete: false }).complete).toBe(false);
+  });
+
+  it('is complete only when no 56-day or muscle read reached its cap', () => {
+    const read = { sessionsRead: 200, maxSessions: 200, musclesRead: 499, maxMuscles: 500, truncatedReads: [{ truncated: false }] };
+    expect(statusReadComplete(read)).toBe(true);
+    expect(statusReadComplete({ ...read, sessionsRead: 201 })).toBe(false);
+    expect(statusReadComplete({ ...read, musclesRead: 500 })).toBe(false);
+    expect(statusReadComplete({ ...read, truncatedReads: [{ truncated: false }, { truncated: true }] })).toBe(false);
   });
 });
 

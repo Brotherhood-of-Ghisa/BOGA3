@@ -365,7 +365,7 @@ weeks are the profile `time_zone`'s (UTC when unset or unknown).
     "weekly_sets_last_4_weeks": [{ "week_start": "2026-09-28", "sets": 10 }] }],
   "favourite_exercises": [{ "exercise_id": "…", "name": "Bench Press", "sessions_28d": 7,
     "last_done_on": "2026-10-26", "best_e1rm_kg": { "last_28d": 102.5, "previous_28d": 98.0 },
-    "last_record_on": "2026-10-12" }],
+    "last_record_on": "2026-10-12", "record_history_complete": true }],
   "complete": true
 }
 ```
@@ -373,9 +373,10 @@ weeks are the profile `time_zone`'s (UTC when unset or unknown).
 `training-status.ts` derives it with Today's Plan's own functions. `revision`
 is the settings row's `client_updated_at_ms` (0 with no row); `uploaded: false`
 shows app defaults. Sets older than 56 days are not read, except each
-favourite's history (2000 blocks), which dates its records. `complete: false`
-when a read cap hit: 200 sessions, 1000 rows per chunk, 500 muscles, or that
-history.
+favourite's own history, which dates its records; `record_history_complete:
+false` when that history hit the exercise-context cap (500 blocks), so a
+record may be dated too late. `complete: false` when a 56-day or muscle read
+hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 
 ## Working sets only
 

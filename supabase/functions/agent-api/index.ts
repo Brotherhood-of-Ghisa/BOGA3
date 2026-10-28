@@ -15,7 +15,8 @@ import {
   type GymBucketRank,
 } from './gym-buckets.ts';
 import {
-  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, trainingStatusWindow,
+  buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
+  trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
 } from './training-status.ts';
@@ -1707,131 +1708,100 @@ const getExerciseHistory = async (
   };
 };
 
-/** Status reads: sets of the profile's last 56 days, then the favourites' history. */
+/** Status reads: sets of the profile's last 56 days, then each favourite's history. */
 const STATUS_MAX_SESSIONS = 200;
-const STATUS_MAX_HISTORY_BLOCKS = 2000;
 const STATUS_ROW_LIMIT = 1000;
 const STATUS_MAX_MUSCLES = 500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type StatusRead<T> = { rows: T[]; truncated: boolean };
 
+/** Runs one owner-filtered read per chunk at once; truncated when any chunk hits `STATUS_ROW_LIMIT`. */
+const readChunks = async <T>(
+  ids: string[], size: number, read: (chunkIds: string[]) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>,
+): Promise<StatusRead<T>> => {
+  const results = await Promise.all(chunk(ids, size).map((chunkIds) => read(chunkIds)));
+  for (const result of results) throwDatabaseError(result.error);
+  return {
+    rows: results.flatMap((result) => result.data ?? []),
+    truncated: results.some((result) => (result.data?.length ?? 0) >= STATUS_ROW_LIMIT),
+  };
+};
+
 const loadStatusSessions = async (
   client: SupabaseClient, userId: string, sessionIds: string[], calculationsEnabled: boolean,
 ): Promise<StatusSessionRow[]> => {
-  const rows: Array<{ id: string; completed_at: number }> = [];
-  for (const ids of chunk([...new Set(sessionIds)], 100)) {
-    const { data, error } = await client.schema('app_public').from('sessions')
+  const { rows } = await readChunks([...new Set(sessionIds)], 100, (ids) =>
+    client.schema('app_public').from('sessions')
       .select('id,completed_at').eq('owner_user_id', userId).eq('status', 'completed')
       .is('deleted_at', null).not('completed_at', 'is', null).in('id', ids).limit(100)
-      .returns<Array<{ id: string; completed_at: number }>>();
-    throwDatabaseError(error);
-    rows.push(...(data ?? []));
-  }
+      .returns<Array<{ id: string; completed_at: number }>>());
   return attachSessionWeightContexts(client, userId, rows, calculationsEnabled);
 };
 
-const loadStatusBlocks = async (
+const loadStatusBlocks = (
   client: SupabaseClient, userId: string, sessionIds: string[],
-): Promise<StatusRead<StatusBlockRow>> => {
-  const rows: StatusBlockRow[] = [];
-  let truncated = false;
-  for (const ids of chunk(sessionIds, 100)) {
-    const { data, error } = await client.schema('app_public').from('session_exercises')
+): Promise<StatusRead<StatusBlockRow>> =>
+  readChunks(sessionIds, 100, (ids) =>
+    client.schema('app_public').from('session_exercises')
       .select('id,session_id,exercise_definition_id,order_index').eq('owner_user_id', userId)
-      .is('deleted_at', null).in('session_id', ids).limit(STATUS_ROW_LIMIT).returns<StatusBlockRow[]>();
-    throwDatabaseError(error);
-    if ((data?.length ?? 0) >= STATUS_ROW_LIMIT) truncated = true;
-    rows.push(...(data ?? []));
-  }
-  return { rows, truncated };
-};
+      .is('deleted_at', null).in('session_id', ids).limit(STATUS_ROW_LIMIT).returns<StatusBlockRow[]>());
 
-const loadStatusSets = async (
+const loadStatusSets = (
   client: SupabaseClient, userId: string, blockIds: string[],
-): Promise<StatusRead<StatusSetRow>> => {
-  const rows: StatusSetRow[] = [];
-  let truncated = false;
-  for (const ids of chunk(blockIds, 40)) {
-    const { data, error } = await client.schema('app_public').from('exercise_sets')
+): Promise<StatusRead<StatusSetRow>> =>
+  readChunks(blockIds, 40, (ids) =>
+    client.schema('app_public').from('exercise_sets')
       .select('id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status')
       .eq('owner_user_id', userId).is('deleted_at', null).is('performance_status', null)
       .in('session_exercise_id', ids).order('order_index').order('id').limit(STATUS_ROW_LIMIT)
-      .returns<StatusSetRow[]>();
-    throwDatabaseError(error);
-    if ((data?.length ?? 0) >= STATUS_ROW_LIMIT) truncated = true;
-    rows.push(...(data ?? []));
-  }
-  return { rows, truncated };
-};
-
-const definitionIdsOf = (blocks: StatusBlockRow[]): string[] =>
-  [...new Set(blocks.flatMap((block) => block.exercise_definition_id ? [block.exercise_definition_id] : []))];
+      .returns<StatusSetRow[]>());
 
 /** Every definition the blocks name, deleted ones included: their sets still count for muscles. */
 const loadStatusDefinitions = async (
   client: SupabaseClient, userId: string, exerciseIds: string[],
 ): Promise<Map<string, StatusDefinitionRow>> => {
-  const rows: StatusDefinitionRow[] = [];
-  for (const ids of chunk(exerciseIds, 100)) {
-    const { data, error } = await client.schema('app_public').from('exercise_definitions')
+  const { rows } = await readChunks(exerciseIds, 100, (ids) =>
+    client.schema('app_public').from('exercise_definitions')
       .select('id,name,load_input_mode,bodyweight_contribution,deleted_at').eq('owner_user_id', userId)
-      .in('id', ids).limit(100).returns<StatusDefinitionRow[]>();
-    throwDatabaseError(error);
-    rows.push(...(data ?? []));
-  }
+      .in('id', ids).limit(100).returns<StatusDefinitionRow[]>());
   return new Map(rows.map((row) => [row.id, row]));
 };
 
-const loadStatusMappings = async (
+const loadStatusMappings = (
   client: SupabaseClient, userId: string, exerciseIds: string[],
-): Promise<StatusRead<StatusMappingRow>> => {
-  const rows: StatusMappingRow[] = [];
-  let truncated = false;
-  for (const ids of chunk(exerciseIds, 100)) {
-    const { data, error } = await client.schema('app_public').from('exercise_muscle_mappings')
+): Promise<StatusRead<StatusMappingRow>> =>
+  readChunks(exerciseIds, 100, (ids) =>
+    client.schema('app_public').from('exercise_muscle_mappings')
       .select('exercise_definition_id,muscle_group_id,role').eq('owner_user_id', userId)
       .is('deleted_at', null).in('exercise_definition_id', ids).limit(STATUS_ROW_LIMIT)
-      .returns<StatusMappingRow[]>();
-    throwDatabaseError(error);
-    if ((data?.length ?? 0) >= STATUS_ROW_LIMIT) truncated = true;
-    rows.push(...(data ?? []));
-  }
-  return { rows, truncated };
-};
+      .returns<StatusMappingRow[]>());
 
-/** One owner-filtered read of performed training from session ids. */
-const loadStatusTraining = async (
-  client: SupabaseClient, userId: string, sessionIds: string[], calculationsEnabled: boolean,
-) => {
-  const sessions = await loadStatusSessions(client, userId, sessionIds, calculationsEnabled);
-  const blocks = await loadStatusBlocks(client, userId, sessions.map((row) => row.id));
-  const sets = await loadStatusSets(client, userId, blocks.rows.map((row) => row.id));
-  return { training: { sessions, blocks: blocks.rows, sets: sets.rows }, truncated: blocks.truncated || sets.truncated };
-};
-
-/** The favourites' sessions over all time, newest-edited blocks first, up to the cap. */
+/**
+ * Each favourite's sessions over all time, as `get_exercise_context` reads one
+ * exercise: its newest-edited `MAX_CONTEXT_BLOCKS` blocks. The ids of the
+ * favourites whose history hit a cap come back in `truncated`.
+ */
 const loadFavouriteHistory = async (
   client: SupabaseClient, userId: string, exerciseIds: string[], calculationsEnabled: boolean,
-) => {
-  if (exerciseIds.length === 0) {
-    return { training: { sessions: [], blocks: [], sets: [] } as StatusTraining, complete: true };
-  }
-  const { data, error } = await client.schema('app_public').from('session_exercises')
-    .select('id,session_id,exercise_definition_id,order_index').eq('owner_user_id', userId)
-    .is('deleted_at', null).in('exercise_definition_id', exerciseIds)
-    .order('updated_at', { ascending: false }).order('id').limit(STATUS_MAX_HISTORY_BLOCKS + 1)
-    .returns<StatusBlockRow[]>();
-  throwDatabaseError(error);
-  const blocks = (data ?? []).slice(0, STATUS_MAX_HISTORY_BLOCKS);
+): Promise<{ training: StatusTraining; truncated: Set<string> }> => {
+  const perExercise = await Promise.all(exerciseIds.map(async (exerciseId) => {
+    const { data, error } = await client.schema('app_public').from('session_exercises')
+      .select('id,session_id,exercise_definition_id,order_index').eq('owner_user_id', userId)
+      .eq('exercise_definition_id', exerciseId).is('deleted_at', null)
+      .order('updated_at', { ascending: false }).order('id').limit(MAX_CONTEXT_BLOCKS + 1)
+      .returns<StatusBlockRow[]>();
+    throwDatabaseError(error);
+    return { exerciseId, blocks: (data ?? []).slice(0, MAX_CONTEXT_BLOCKS), capped: (data?.length ?? 0) > MAX_CONTEXT_BLOCKS };
+  }));
+  const blocks = perExercise.flatMap((entry) => entry.blocks);
   const [sessions, sets] = await Promise.all([
     loadStatusSessions(client, userId, blocks.map((row) => row.session_id), calculationsEnabled),
     loadStatusSets(client, userId, blocks.map((row) => row.id)),
   ]);
-  return {
-    training: { sessions, blocks, sets: sets.rows },
-    complete: (data?.length ?? 0) <= STATUS_MAX_HISTORY_BLOCKS && !sets.truncated,
-  };
+  // A set chunk spans exercises, so its cap marks every favourite.
+  const truncated = new Set(perExercise.filter((entry) => entry.capped || sets.truncated).map((entry) => entry.exerciseId));
+  return { training: { sessions, blocks, sets: sets.rows }, truncated };
 };
 
 const getTrainingStatus = async (
@@ -1860,22 +1830,24 @@ const getTrainingStatus = async (
 
   // A margin past 56 days: the builder keeps the sessions inside the profile's calendar window.
   const { data: recent, error: recentError } = await client.schema('app_public').from('sessions')
-    .select('id').eq('owner_user_id', userId).eq('status', 'completed').is('deleted_at', null)
+    .select('id,completed_at').eq('owner_user_id', userId).eq('status', 'completed').is('deleted_at', null)
     .gte('completed_at', now.getTime() - (STATUS_READ_DAYS + 2) * DAY_MS)
     .order('completed_at', { ascending: false }).order('id').limit(STATUS_MAX_SESSIONS + 1)
-    .returns<Array<{ id: string }>>();
+    .returns<Array<{ id: string; completed_at: number }>>();
   throwDatabaseError(recentError);
-  const sessionIds = (recent ?? []).slice(0, STATUS_MAX_SESSIONS).map((row) => row.id);
-  const recentRead = await loadStatusTraining(client, userId, sessionIds, bodyweightCalculationsEnabled);
-  const exerciseIds = definitionIdsOf(recentRead.training.blocks);
-  const [definitions, mappings] = await Promise.all([
+  const sessions = await attachSessionWeightContexts(
+    client, userId, (recent ?? []).slice(0, STATUS_MAX_SESSIONS), bodyweightCalculationsEnabled,
+  );
+  const blocks = await loadStatusBlocks(client, userId, sessions.map((row) => row.id));
+  const exerciseIds = [...new Set(blocks.rows.flatMap((block) => block.exercise_definition_id ? [block.exercise_definition_id] : []))];
+  const [sets, definitions, mappings] = await Promise.all([
+    loadStatusSets(client, userId, blocks.rows.map((row) => row.id)),
     loadStatusDefinitions(client, userId, exerciseIds),
     loadStatusMappings(client, userId, exerciseIds),
   ]);
+  const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
   const window = trainingStatusWindow(now, timeZone);
-  const favourites = rankFavouriteExercises(
-    recentRead.training, definitions, bodyweightCalculationsEnabled, window, timeZone,
-  );
+  const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
   const history = await loadFavouriteHistory(
     client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled,
   );
@@ -1884,14 +1856,17 @@ const getTrainingStatus = async (
     settings: settings.data,
     muscleRows: muscles.data ?? [],
     mappings: mappings.rows,
-    training: recentRead.training,
+    training,
     definitions,
     favourites,
     history: history.training,
-    historyComplete: history.complete,
+    historyTruncated: history.truncated,
     calculationsEnabled: bodyweightCalculationsEnabled,
-    complete: (recent?.length ?? 0) <= STATUS_MAX_SESSIONS && !recentRead.truncated && !mappings.truncated
-      && (muscles.data?.length ?? 0) < STATUS_MAX_MUSCLES,
+    complete: statusReadComplete({
+      sessionsRead: recent?.length ?? 0, maxSessions: STATUS_MAX_SESSIONS,
+      musclesRead: muscles.data?.length ?? 0, maxMuscles: STATUS_MAX_MUSCLES,
+      truncatedReads: [blocks, sets, mappings],
+    }),
   });
 };
 

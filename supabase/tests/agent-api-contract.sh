@@ -567,6 +567,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and $f.last_done_on == $day
     and ($f.best_e1rm_kg.last_28d | type) == "number"
     and $f.best_e1rm_kg.previous_28d == null
+    and $f.record_history_complete == true
     and ($s.favourite_exercises | map(.exercise_id) | index($warmup_only)) == null
   ' >/dev/null || fail "training status shape or figures are wrong"
 printf '%s' "${RESPONSE_BODY}" | jq -e \
