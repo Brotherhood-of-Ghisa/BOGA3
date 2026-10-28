@@ -15,6 +15,8 @@ import { muscleGroups } from '@/src/data/schema';
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as setup from '@/src/data/muscle-report-settings';
 import * as userSettingsData from '@/src/data/user-settings';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { Storage } from 'expo-sqlite/kv-store';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState,
   setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
@@ -127,6 +129,7 @@ it.each(['0', '-1', '1.5', 'bad', '9007199254740992'])('keeps invalid target dra
 it('retains and retries failed saves, then clears drafts on account change', async () => {
   // A synced store belongs to one account; account B never reads A's settings row.
   stampLocalDataOwner(localDatabase(), 'A');
+  Storage.setItemSync(syncedTargetsAdoptedKey('account:A'), 'true');
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
   const write = jest.spyOn(userSettingsData, 'writeMuscleTargetSettings').mockRejectedValueOnce(Error('full'));

@@ -24,11 +24,13 @@ import {
 } from '@/src/data/user-settings';
 import { logEvent } from '@/src/logging/logEvent';
 import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
-import { preferenceKey, readScopedPreferences, type PreferenceProfile } from '@/src/preferences/storage';
-import { pickSyncedPreferences, storedFromSyncedPreferences, syncedPreferenceFields } from '@/src/preferences/synced';
-
-export const syncedTargetsAdoptedKey = (profile: PreferenceProfile) =>
-  `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.syncedTargetsAdopted`;
+import { preferenceKey, readScopedPreferences } from '@/src/preferences/storage';
+import {
+  pickSyncedPreferences,
+  storedFromSyncedPreferences,
+  syncedPreferenceFields,
+  syncedTargetsAdoptedKey,
+} from '@/src/preferences/synced';
 
 type ServerSettingsRow = {
   weekly_working_set_target: number | null;
@@ -62,15 +64,15 @@ const readServerSettings = async (userId: string): Promise<StoredMuscleTargetSet
   return fromServerRow(data as ServerSettingsRow | null);
 };
 
-const dropKvCopy = (profile: PreferenceProfile): void => {
+const dropKvCopy = (profile: `account:${string}`): void => {
   for (const field of syncedPreferenceFields) Storage.removeItemSync(preferenceKey(profile, field));
   Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
 };
 
 /** Returns false when the local row is missing, so the next cycle tries again. */
-const adoptOrUpload = async (profile: PreferenceProfile, userId: string,
+const adoptOrUpload = async (profile: `account:${string}`, userId: string,
   server: StoredMuscleTargetSettings | null): Promise<boolean> => {
-  // Values already here were pulled, adopted or edited on this device; LWW settles an edit.
+  // Edits made before this step stayed in kv, so local values here came from a pull.
   if (hasAnyValue(await readMuscleTargetSettings(userId))) return true;
   if (hasAnyValue(server)) return adoptMuscleTargetSettings(server);
   const stored = pickSyncedPreferences(readScopedPreferences(profile).valid);
@@ -79,7 +81,7 @@ const adoptOrUpload = async (profile: PreferenceProfile, userId: string,
 };
 
 export const adoptOrUploadMuscleTargets = async (userId: string): Promise<void> => {
-  const profile: PreferenceProfile = `account:${userId}`;
+  const profile = `account:${userId}` as const;
   if (Storage.getItemSync(syncedTargetsAdoptedKey(profile)) === 'true') return;
   let server: StoredMuscleTargetSettings | null | undefined;
   try {

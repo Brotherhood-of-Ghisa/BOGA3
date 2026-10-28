@@ -10,6 +10,14 @@ export const syncedPreferenceFields = [
 export type SyncedPreferenceField = typeof syncedPreferenceFields[number];
 export type SyncedPreferences = Pick<AccountLocalPreferences, SyncedPreferenceField>;
 
+/**
+ * Set once sync has adopted or uploaded the profile's targets. Until then the
+ * synced fields stay in the kv store, so an edit made before the first sync is
+ * this device's own value, which adoption replaces or uploads.
+ */
+export const syncedTargetsAdoptedKey = (profile: `account:${string}`) =>
+  `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.syncedTargetsAdopted`;
+
 export const pickSyncedPreferences = (values: Partial<AccountLocalPreferences>): Partial<SyncedPreferences> => {
   const picked: Partial<SyncedPreferences> = {};
   for (const field of syncedPreferenceFields) {

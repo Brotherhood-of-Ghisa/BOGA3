@@ -1,7 +1,8 @@
 -- Synced weekly muscle targets and the count-secondary switch: four nullable,
 -- user-owned columns on the settings singleton.
 --
---   weekly_working_set_target  positive whole number (the default target)
+--   weekly_working_set_target  positive whole number (the default target); bigint
+--                              so any safe integer the app accepts fits
 --   muscle_target_mode         'single' | 'per_muscle'
 --   muscle_target_overrides    {detailed?, broad?, custom?: {muscle_id: int}},
 --                              JSON text on the sync wire
@@ -18,7 +19,7 @@
 -- deploys before the app release that writes the fields.
 
 alter table app_public.user_settings
-  add column weekly_working_set_target integer,
+  add column weekly_working_set_target bigint,
   add column muscle_target_mode text,
   add column muscle_target_overrides jsonb,
   add column count_secondary_muscles boolean;
@@ -95,7 +96,7 @@ begin
   definition := pg_temp.replace_once(definition,
     $old$        _uid,_id,(_fields->>'bodyweight_calculations_enabled')::boolean,$old$,
     $new$        _uid,_id,(_fields->>'bodyweight_calculations_enabled')::boolean,
-        (_fields->>'weekly_working_set_target')::integer,
+        (_fields->>'weekly_working_set_target')::bigint,
         _fields->>'muscle_target_mode',
         nullif((_fields->>'muscle_target_overrides')::jsonb,'null'::jsonb),
         (_fields->>'count_secondary_muscles')::boolean,$new$,

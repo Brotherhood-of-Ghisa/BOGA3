@@ -8,12 +8,13 @@ import {
   preferenceFields,
   preferenceValidationMessages,
 } from './model';
+import { Storage } from 'expo-sqlite/kv-store';
 import { type PreferenceProfile, readScopedPreferences, writeScopedPreference } from './storage';
 import {
   pickSyncedPreferences,
   storedFromSyncedPreferences,
-  syncedPreferenceFields,
   syncedPreferencesFromStored,
+  syncedTargetsAdoptedKey,
   type SyncedPreferences,
 } from './synced';
 
@@ -42,8 +43,10 @@ let syncedLoaded = false;
 let syncedVersion = 0;
 let syncedWrites: Promise<void> = Promise.resolve();
 const withSynced = (values: AccountLocalPreferences): AccountLocalPreferences => ({ ...values, ...synced });
-const accountUserIdOf = (activeProfile: PreferenceProfile) =>
-  activeProfile === 'local' ? null : activeProfile.slice('account:'.length);
+// Only an account whose targets sync has adopted or uploaded keeps them on the
+// settings row; the local-only build and a not-yet-synced account use kv.
+const usesSyncedRow = (activeProfile: PreferenceProfile): activeProfile is `account:${string}` =>
+  activeProfile !== 'local' && Storage.getItemSync(syncedTargetsAdoptedKey(activeProfile)) === 'true';
 
 /** The settings row behind the synced fields; `synced-store.ts` connects the data layer. */
 export type SyncedPreferenceStore = {
@@ -162,8 +165,8 @@ export function setAccountLocalPreferences(patch: Partial<AccountLocalPreference
     publish({ pending });
     return;
   }
-  const syncedPatch = pickSyncedPreferences(pending);
-  for (const field of syncedPreferenceFields) delete pending[field];
+  const syncedPatch = usesSyncedRow(activeProfile) ? pickSyncedPreferences(pending) : {};
+  for (const field of Object.keys(syncedPatch) as (keyof SyncedPreferences)[]) delete pending[field];
   writeKvPreferences(activeProfile, pending);
   writeSyncedPreferences(activeProfile, syncedPatch);
 }
@@ -228,12 +231,12 @@ function writeSyncedPreferences(activeProfile: PreferenceProfile, patch: Partial
  */
 export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
   const activeProfile = currentProfile();
-  if (activeProfile === null) return;
+  if (activeProfile === null || !usesSyncedRow(activeProfile)) return;
   const capturedGeneration = generation;
   const version = syncedVersion;
   await syncedWrites;
   let stored: StoredMuscleTargetSettings | null;
-  try { stored = await requireSyncedStore().read(accountUserIdOf(activeProfile)); }
+  try { stored = await requireSyncedStore().read(activeProfile.slice('account:'.length)); }
   catch { return; }
   if (capturedGeneration !== generation || version !== syncedVersion) return;
   synced = syncedPreferencesFromStored(stored);

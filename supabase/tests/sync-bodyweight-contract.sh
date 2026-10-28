@@ -134,6 +134,11 @@ for bw_invalid in '{"broad": {"chest": 0}}' '{"broad": {"chest": 1.5}}' '{"regio
   assert_non_2xx "invalid overrides ${bw_invalid} rejected"
 done
 bw_targets_unchanged "a rejected push leaves the stored targets"
+# The largest target the app accepts (a safe integer) is stored, not rejected.
+bw_push_settings "$((BASE_MS + 325))" '{"weekly_working_set_target": 9007199254740991}'
+assert_status 200 "settings push with the largest safe target"
+user_select user_settings "id=eq.settings&select=weekly_working_set_target" "${USER_A_TOKEN}"
+assert_json_expr '.[0].weekly_working_set_target == 9007199254740991' "the largest safe target round-trips"
 bw_push_settings "$((BASE_MS + 330))" '{"weekly_working_set_target": 14, "muscle_target_mode": "single", "muscle_target_overrides": "{}", "count_secondary_muscles": true}'
 assert_status 200 "settings push with new targets"
 user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles" "${USER_A_TOKEN}"

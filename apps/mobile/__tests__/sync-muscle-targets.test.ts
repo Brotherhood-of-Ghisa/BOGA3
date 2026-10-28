@@ -21,12 +21,13 @@ import {
   ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState,
   setAccountLocalPreferenceAccount,
+  setAccountLocalPreferences,
 } from '@/src/preferences/account-local';
 import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import { preferenceKey } from '@/src/preferences/storage';
 import '@/src/preferences/synced-store';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
-import { syncedTargetsAdoptedKey } from '@/src/sync/muscle-target-adoption';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture, type InMemoryTestDatabase } from './helpers/in-memory-db';
 
@@ -188,6 +189,14 @@ describe('upload once', () => {
     });
   });
 
+  it('uploads the largest target the app accepts unchanged', async () => {
+    Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), String(Number.MAX_SAFE_INTEGER));
+    await signIn();
+    await runSyncCycle();
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields.weekly_working_set_target)
+      .toBe(Number.MAX_SAFE_INTEGER);
+  });
+
   it('uploads nothing for a device that never stored a target', async () => {
     await signIn();
     await runSyncCycle();
@@ -226,6 +235,29 @@ describe('upload once', () => {
       countSecondaryMuscles: false, localDirty: false, localUpdatedAtMs: 500 });
     expect(JSON.parse(settingsRow()!.muscleTargetOverrides!)).toEqual({ detailed: { chest: 14 } });
     expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, progressCountSecondary: false });
+    expect(kv('weeklyWorkingSetTarget')).toBeNull();
+  });
+
+  it('replaces an edit made before the first sync with the server targets, never pushing it', async () => {
+    storeKvTargets();
+    await signIn();
+    setAccountLocalPreferences({ weeklyWorkingSetTarget: 7 });
+    // Until sync adopts or uploads, an edit stays this device's own kv value.
+    expect(kv('weeklyWorkingSetTarget')).toBe('7');
+    expect(settingsRow()).toBeUndefined();
+    serverRow(A_TARGETS);
+    pullPage = [settingsWire(500, A_WIRE)];
+
+    await runSyncCycle();
+
+    expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'per-muscle' });
+    // After adoption an edit goes to the settings row and pushes.
+    setAccountLocalPreferences({ weeklyWorkingSetTarget: 13 });
+    await runSyncCycle();
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      weekly_working_set_target: 13, muscle_target_mode: 'per_muscle',
+    });
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
   });
 

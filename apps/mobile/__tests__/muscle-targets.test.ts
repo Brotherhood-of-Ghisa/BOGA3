@@ -14,6 +14,7 @@ import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from '@/src/pref
 import { effectiveMuscleTargetOverrides, muscleWeeklyTarget, withMuscleTarget } from '@/src/preferences/muscle-targets';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
 import { preferenceKey } from '@/src/preferences/storage';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
 import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
 const account = async (id: string | null = 'A') => {
@@ -25,6 +26,8 @@ beforeEach(() => {
   resetLocalData();
   // A synced store belongs to one account; another account never reads its settings row.
   stampLocalDataOwner(localDatabase(), 'A');
+  // Sync has adopted or uploaded A's targets, so they live on the settings row.
+  Storage.setItemSync(syncedTargetsAdoptedKey('account:A'), 'true');
 });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 

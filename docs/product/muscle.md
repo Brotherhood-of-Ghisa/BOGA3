@@ -51,8 +51,8 @@ Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; 
 
 Weekly working-set targets repeat until changed, per account, synced: a
 change reaches every signed-in device on its next sync. On upgrade the first
-device to sync uploads its targets; a device finding them adopts them,
-replacing its own. Single uses the default for every muscle; Per muscle uses an override or the
+device to sync uploads its targets (of two at once, the later wins); a device
+finding them adopts them, replacing its own. Single uses the default for every muscle; Per muscle uses an override or the
 live default. Broad and Detailed remember separate overrides; Custom setups
 keep their own. Mode changes and disabling a muscle retain its overrides.
 Targets list only enabled reported muscles, including custom muscles. Clearing

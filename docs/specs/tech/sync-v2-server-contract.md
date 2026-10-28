@@ -7,8 +7,8 @@
 > `docs/specs/10-api-authn-authz-guidelines.md`. **Load when:** changing the
 > server sync schema, the sync RPCs, or `apps/mobile/src/sync/**`.
 
-This doc states invariants and their reasons; the code is the ground truth
-for the how (fix the doc when they disagree):
+Invariants and reasons live here; the code is the how (fix the doc when they
+disagree):
 `supabase/migrations/20260525120000_sync_v2_clean_room.sql`, the sync RPC
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.

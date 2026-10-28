@@ -27,7 +27,9 @@ import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { setMuscleTracked } from '@/src/data/muscle-report-settings';
 import type { Transaction } from '@/src/data/clock';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
-import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
+import { refreshAccountLocalSyncedPreferences, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { Storage } from 'expo-sqlite/kv-store';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { applyPullPage } from '@/src/sync/cycle';
 import { planRepository, type PlanDraft } from '@/src/session-planner';
@@ -209,6 +211,9 @@ describe('Today: the Plan page over real data', () => {
   });
 
   it('shows targets a sync pull changes while the page is open ([[muscle.weekly-targets]])', async () => {
+    // A signed-in account whose targets sync has already adopted.
+    Storage.setItemSync(syncedTargetsAdoptedKey('account:A'), 'true');
+    setAccountLocalPreferenceAccount('A', true);
     await bootLocalApp();
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
     await renderToday();
