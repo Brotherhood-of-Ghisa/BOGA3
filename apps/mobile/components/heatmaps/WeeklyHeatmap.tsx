@@ -142,7 +142,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
     <View style={styles.plot} testID={`${testID}-plot-${week.weekStartDateKey}`}>
       {references.length ? <WeeklyAnnotations key={references.map(reference => `${reference.id}:${reference.text}`).join()} references={references} testID={testID}>{track}</WeeklyAnnotations> : track}
     </View>
-    <View style={{ width: valueWidth }} testID={`${testID}-value-column-${week.weekStartDateKey}`}>
+    <View style={[styles.valueColumn, { width: valueWidth }]} testID={`${testID}-value-column-${week.weekStartDateKey}`}>
       <Text allowFontScaling={false} style={[uiText.figure, styles.value]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
       {prCount > 0 ? <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.record, styles.prs]} testID={`${testID}-prs-${week.weekStartDateKey}`}><FigureText figureStyle={uiTextTone.record}>{`${prCount} PR${prCount === 1 ? '' : 's'}`}</FigureText></Text> : null}
     </View>
@@ -231,8 +231,9 @@ const styles = StyleSheet.create({
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
   value: { textAlign: 'right' },
+  valueColumn: { position: 'relative' },
   // Keep the existing metric/bar axis when adding record counts.
-  prs: { position: 'absolute', top: '100%', right: 0,
+  prs: { position: 'absolute', top: uiTypography.lineHeight.base, right: 0,
     textAlign: 'right' },
   referencePlot: { height: ROW_HEIGHT },
   annotatedTrack: { position: 'absolute', top: uiTypography.lineHeight.xxs + uiSpace.xs, left: 0, right: 0 },

@@ -70,7 +70,7 @@ it.each([
   expect(style(`bars-heatmap-track-${key}`).height).toBe(uiSpace.lg);
   expect(style(`bars-heatmap-bar-${key}`)).toMatchObject({ width: '100%', height: '100%' });
   expect(style(`bars-heatmap-value-${key}`)).toMatchObject({ textAlign: 'right' });
-  expect(style(`bars-heatmap-value-column-${key}`)).toEqual({ width: 42 });
+  expect(style(`bars-heatmap-value-column-${key}`)).toMatchObject({ width: 42, position: 'relative' });
 });
 
 it('keeps the quieter year below the range when the Date format changes on a mounted chart', async () => {
@@ -275,7 +275,7 @@ it('retains target colour independently of length and bounds long formatted valu
   expect(style('bars-heatmap-bar-2026-10-05')).toMatchObject({ width: '50%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ textAlign: 'right' });
-  expect(style('bars-heatmap-value-column-2026-10-05')).toEqual({ width: 96 });
+  expect(style('bars-heatmap-value-column-2026-10-05')).toMatchObject({ width: 96, position: 'relative' });
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).not.toContain('averaged');
   // The ramp names the target and its ends; no sentence explains the colour.

@@ -60,7 +60,8 @@ describe('Weekly heatmap', () => {
     expect(style(screen.getByTestId('w-heatmap-value-2026-10-05'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
     const prs = screen.getByTestId('w-heatmap-prs-2026-10-05');
     expect(prs).toHaveTextContent('2 PRs');
-    expect(style(prs)).toMatchObject({ ...META, color: uiRoles.record, fontWeight: '700', position: 'absolute' });
+    expect(style(prs)).toMatchObject({ ...META, color: uiRoles.record, fontWeight: '700', position: 'absolute', top: uiTypography.lineHeight.base });
+    expect(style(screen.getByTestId('w-heatmap-value-column-2026-10-05'))).toMatchObject({ position: 'relative' });
     // The record line's figure is as heavy as its words.
     expect(style(within(prs).getByText('2'))).toMatchObject({ ...PLEX, color: uiRoles.record, fontWeight: '700' });
     const empty = within(screen.getByTestId('w-heatmap-empty-month-2026-08')).getByText(/August/);
