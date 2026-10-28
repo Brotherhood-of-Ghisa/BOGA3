@@ -2,7 +2,8 @@ import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type SearchFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColor' | 'value' | 'onChangeText'> & {
   value: string;
@@ -37,7 +38,7 @@ export function SearchField({
         accessibilityLabel={accessibilityLabel}
         onChangeText={onChangeText}
         placeholderTextColor={uiRoles.inkFaint}
-        style={styles.input}
+        style={[uiText.input, styles.input]}
         testID={testID}
         value={value}
       />
@@ -71,8 +72,5 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: uiGeometry.tapTarget,
     paddingRight: uiSpace.md,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.lg,
-    color: uiRoles.ink,
   },
 });

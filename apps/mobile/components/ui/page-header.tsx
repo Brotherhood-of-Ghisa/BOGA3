@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 
 type PageHeaderProps = {
   title: string;
@@ -12,7 +13,7 @@ type PageHeaderProps = {
 export function PageHeader({ title }: PageHeaderProps) {
   return (
     <View style={styles.page}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.pageTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.pageTitle}>
         {title}
       </Text>
     </View>
@@ -51,13 +52,6 @@ const styles = StyleSheet.create({
   page: {
     gap: uiSpace.xs,
   },
-  pageTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xxl,
-    lineHeight: uiTypography.lineHeight.xxl,
-    color: uiRoles.ink,
-  },
   section: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -65,11 +59,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   sectionTitle: {
+    ...uiText.title,
     flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
   },
 });

@@ -9,6 +9,22 @@ import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui/toke
 // step of emphasis (`uiTextEmphasis`). Layout (width, alignment, flex) stays
 // in the screen's own styles, listed after the role.
 export const uiText = StyleSheet.create({
+  // A page's own title, at the top of its scroll.
+  pageTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '800',
+    fontSize: uiTypography.size.xxl,
+    lineHeight: uiTypography.lineHeight.xxl,
+    color: uiRoles.ink,
+  },
+  // A sheet's title, in its header bar.
+  sheetTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '800',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
   // A card, section or tab title; a state panel's title.
   title: {
     fontFamily: uiFonts.display.family,
@@ -28,6 +44,41 @@ export const uiText = StyleSheet.create({
     letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
     color: uiRoles.inkMuted,
+  },
+  // A button's caps label (`ActionButton`).
+  button: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.ink,
+  },
+  // A choice's name: a row in a card (`ListRow`/`SwitchRow` at list density),
+  // a form's action row.
+  option: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  // A sheet's roomy option row: `option`, one rung up.
+  optionLarge: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
+  // What a person types into a field. No line-height: a TextInput given one
+  // drifts off its vertical centre. A numeric field adds `inlineFigure`.
+  input: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    color: uiRoles.ink,
   },
   // A row's name, a line of prose.
   body: {
@@ -60,6 +111,14 @@ export const uiText = StyleSheet.create({
     fontWeight: '700',
     fontSize: uiTypography.size.xxl,
     lineHeight: uiTypography.lineHeight.xxl,
+    color: uiRoles.ink,
+  },
+  // A `Stat`'s headline figure: a summary card's, the records panel's.
+  figureStat: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
   // A second headline number beside the hero.

@@ -32,6 +32,7 @@ import {
   Tag,
   ToggleChip,
   uiGeometry,
+  uiText,
   uiRoles,
   uiSpace,
   uiTypography,
@@ -105,10 +106,7 @@ describe('Stat', () => {
   it('sets a text value in the body face', () => {
     render(<Stat kind="text" label="Gym" value="Iron Works" />);
 
-    expect(flatStyle(screen.getByText('Iron Works'))).toMatchObject({
-      fontFamily: 'Source Sans 3',
-      fontWeight: '600',
-    });
+    expect(flatStyle(screen.getByText('Iron Works'))).toMatchObject(uiText.bodyStrong);
   });
 
   it('puts an inline value in the fixed-width, right-aligned metric column', () => {
@@ -124,25 +122,16 @@ describe('Stat', () => {
     });
   });
 
-  it('sets the secondary inline value smaller and muted', () => {
+  it('sets the secondary inline value as the quiet figureSmall, muted beside the ink 1RM', () => {
     render(<Stat label="Vol" layout="inline" rank="secondary" value="2560" />);
 
-    expect(flatStyle(screen.getByText('2560'))).toMatchObject({
-      fontSize: uiTypography.size.xs,
-      fontWeight: '500',
-      color: uiRoles.inkMuted,
-    });
+    expect(flatStyle(screen.getByText('2560'))).toMatchObject({ ...uiText.figureSmall, color: uiRoles.inkMuted });
   });
 
-  it('sets a secondary stacked figure at the row size, lighter than a headline', () => {
+  it('sets a secondary stacked figure as the row figure, lighter than a headline', () => {
     render(<Stat align="end" label="Sets" rank="secondary" value="10 (8)" />);
 
-    expect(flatStyle(screen.getByText('10 (8)'))).toMatchObject({
-      fontFamily: 'IBM Plex Mono',
-      fontWeight: '600',
-      fontSize: uiTypography.size.base,
-      color: uiRoles.ink,
-    });
+    expect(flatStyle(screen.getByText('10 (8)'))).toMatchObject({ ...uiText.figure, color: uiRoles.ink });
   });
 
   it('turns the legend ink on a data-viz ground, where ink-faint is illegible', () => {

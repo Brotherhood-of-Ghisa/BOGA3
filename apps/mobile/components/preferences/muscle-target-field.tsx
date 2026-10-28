@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { IconButton, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { IconButton, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { parseIntegerDraft } from './number-field';
 
 /** Draft/validation boundary for [[muscle.weekly-targets]]. */
@@ -37,7 +37,7 @@ export function MuscleTargetField({ label, value, defaultTarget, testID, onCommi
         allowFontScaling={false} keyboardType="number-pad" returnKeyType="done"
         onChangeText={text => { setDraft(text); setError(null); }} onEndEditing={commit}
         placeholder={defaultTarget === undefined ? undefined : String(defaultTarget)} placeholderTextColor={uiRoles.inkMuted}
-        style={[styles.input, error ? styles.invalid : null]} testID={testID} value={draft} />
+        style={[uiText.input, uiText.inlineFigure, styles.input, error ? styles.invalid : null]} testID={testID} value={draft} />
       {defaultTarget !== undefined ? <View style={styles.reset}>
         {value !== undefined || draft.trim() !== '' ? <IconButton accessibilityLabel={`Reset ${label} to default`}
           name="refresh" onPress={reset} testID={`${testID}-reset`} tone="muted" /> : null}
@@ -53,8 +53,7 @@ const styles = StyleSheet.create({
   name: { flex: 1, minWidth: 0, gap: uiSpace.xs },
   input: { width: uiGeometry.tapTarget + uiSpace.lg, minHeight: uiGeometry.tapTarget,
     padding: uiSpace.sm, borderWidth: uiBorder.width, borderColor: uiRoles.rule, borderRadius: uiGeometry.radius.control,
-    fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink, backgroundColor: uiRoles.surface, textAlign: 'center' },
+    backgroundColor: uiRoles.surface, textAlign: 'center' },
   invalid: { borderColor: uiRoles.danger },
   reset: { width: uiGeometry.tapTarget },
   error: { paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.md },

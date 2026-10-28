@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type SwitchRowProps = {
   // `sheet` (default): a roomy row among a sheet's options. `list`: a form
@@ -38,7 +39,7 @@ export function SwitchRow({ density = 'sheet', disabled = false, divider = false
         pressed && !disabled ? styles.pressed : null,
       ]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, density === 'list' ? styles.labelList : null, disabled ? styles.labelDisabled : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, density === 'list' ? uiText.option : null, disabled ? styles.labelDisabled : null]}>
         {label}
       </Text>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -80,17 +81,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   label: {
+    ...uiText.optionLarge,
     flex: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  labelList: {
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
   },
   labelDisabled: {
     color: uiRoles.inkMuted,

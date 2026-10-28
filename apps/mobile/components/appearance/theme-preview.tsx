@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiFonts, uiGeometry, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -83,12 +83,12 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
       </View>
       <View style={styles.actions}>
         <View style={[styles.button, styles.buttonOutline, { borderColor: roles.danger, backgroundColor: roles.surface }]}>
-          <Text allowFontScaling={false} style={[styles.buttonLabel, text(roles.danger)]}>
+          <Text allowFontScaling={false} style={[uiText.button, text(roles.danger)]}>
             DELETE
           </Text>
         </View>
         <View style={[styles.button, styles.buttonPrimary, { backgroundColor: roles.accent }]}>
-          <Text allowFontScaling={false} style={[styles.buttonLabel, text(roles.surface)]}>
+          <Text allowFontScaling={false} style={[uiText.button, text(roles.surface)]}>
             LOG SET
           </Text>
         </View>
@@ -163,12 +163,5 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: {
     flex: 2,
-  },
-  buttonLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
   },
 });

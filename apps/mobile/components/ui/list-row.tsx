@@ -1,7 +1,8 @@
 import type { ReactNode, Ref } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type ListRowDensity = 'sheet' | 'list';
 export type ListRowTone = 'default' | 'danger';
@@ -165,10 +166,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
   },
   description: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    ...uiText.body,
     color: uiRoles.inkMuted,
   },
   // Width only: the row's own minimum height already makes the column a full
@@ -204,19 +202,7 @@ const densityStyles = StyleSheet.create({
   },
 });
 
-const labelStyles = StyleSheet.create({
-  sheet: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  list: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-});
+const labelStyles = {
+  sheet: uiText.optionLarge,
+  list: uiText.option,
+};

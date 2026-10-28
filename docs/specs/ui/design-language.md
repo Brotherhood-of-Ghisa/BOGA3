@@ -140,12 +140,19 @@ had grown for nine jobs.
 
 | Role | Face | For |
 | --- | --- | --- |
+| `pageTitle` | Archivo 800 · `xxl` | a page's own title |
+| `sheetTitle` | Archivo 800 · `xl` | a sheet's title |
 | `title` | Archivo 700 · `lg` | a card, section or tab title |
 | `label` | Archivo 700 · `xxs` caps, tracked | a block's heading, a column header, a legend, a unit |
+| `button` | Archivo 700 · `sm` caps, tracked | a button's label |
+| `option` | Archivo 600 · `lg` | a row's name in a card; a form's action row |
+| `optionLarge` | Archivo 600 · `xl` | a sheet's option row |
+| `input` | Source Sans 400 · `base`, no line-height | typed text; a numeric field adds `inlineFigure` |
 | `body` | Source Sans 400 · `base` | a row's name, a line of prose |
 | `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
 | `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |
 | `figureHero` | Plex Mono 700 · `xxl` | a block's one headline number |
+| `figureStat` | Plex Mono 700 · `xl` | a `Stat`'s headline figure |
 | `figureLarge` | Plex Mono 600 · `lg` | a second headline number |
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
@@ -161,10 +168,12 @@ session flow (recorder, session view, completion, View Session, Train), the
 session planner, the exercise screens (page, catalogue, editor, history, link,
 shared exercise), Settings (its pages, Appearance, Profile, Gyms) and the app
 shell (tab bar, stack header, More, connected agents, logs) take every text
-from the roles. Display art keeps its own type: the full-screen
-repeating timer, the Train START disc and the share image; the log viewer's
-context dump, being code, stays wholly in Plex Mono (`figureSmall`). Screens not yet moved
-still hold their own styles, and each moves when next touched.
+from the roles, and so do the shared primitives in `apps/mobile/components/ui`
+and the sync gate. Display art keeps its own type: the repeating timer's
+countdown and phase, the Train START disc and the share image; the log viewer's
+context dump, being code, stays wholly in Plex Mono (`figureSmall`). Nothing
+else assembles type: an SVG tick or the native stack header, which take no
+style object, read their role's fields.
 
 ## 4. Surfaces
 

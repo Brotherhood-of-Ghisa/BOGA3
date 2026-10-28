@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 // `figure`: a number, date or code in Plex Mono (`design-language.md` §3).
 // `text`: words (a name, an email) in Source Sans.
@@ -49,7 +50,7 @@ export function FormField({
           allowFontScaling={false}
           multiline={multiline}
           placeholderTextColor={uiRoles.inkGhost}
-          style={[styles.input, face === 'text' ? styles.inputText : null]}
+          style={[uiText.input, face === 'figure' ? uiText.inlineFigure : null, styles.input]}
           testID={testID}
         />
       </View>
@@ -62,7 +63,7 @@ export function FormField({
           {error}
         </Text>
       ) : null}
-      {hint ? <Text allowFontScaling={false} style={styles.hint}>{hint}</Text> : null}
+      {hint ? <Text allowFontScaling={false} style={uiText.meta}>{hint}</Text> : null}
     </View>
   );
 }
@@ -90,38 +91,15 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.danger,
   },
   label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
+    ...uiText.label,
     color: uiRoles.inkFaint,
   },
   input: {
     flex: 1,
     padding: 0,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    color: uiRoles.ink,
-  },
-  inputText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
   },
   error: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
+    ...uiText.meta,
     color: uiRoles.danger,
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

@@ -2,7 +2,8 @@ import type { ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type SegmentedControlOption<TValue extends string | number> = {
   value: TValue;
@@ -113,7 +114,7 @@ export function SegmentedControl<TValue extends string | number>({
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
-                style={[styles.label, selected ? styles.labelSelected : null,
+                style={[uiText.label, selected ? styles.labelSelected : null,
                   disabled && !selected ? styles.labelDisabled : null]}>
                 {option.label}
               </Text>
@@ -165,15 +166,6 @@ const styles = StyleSheet.create({
   },
   segmentSelectedDisabled: {
     backgroundColor: uiRoles.inkGhost,
-  },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   labelSelected: {
     color: uiRoles.surface,
