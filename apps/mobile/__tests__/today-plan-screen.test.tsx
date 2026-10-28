@@ -131,9 +131,9 @@ describe('Today: the Plan page over real data', () => {
     await logSession('sat', local(2026, 10, 31, 9), [{ ...SQUAT, count: 5 }]);
     await renderToday();
 
-    // The columns: the three recovery days, then today.
-    expect(within(text('today-plan-recovery-card')).getByText('Wed')).toBeTruthy();
-    expect(text('today-plan-recovery-today')).toHaveTextContent('Sat');
+    // The columns: the three recovery days, then today, by their initials.
+    expect(within(text('today-plan-recovery-card')).getByText('W')).toBeTruthy();
+    expect(text('today-plan-recovery-today')).toHaveTextContent('S');
     expect(text('today-plan-muscle-quads-today')).toHaveTextContent('5');
     expect(text('today-plan-muscle-chest-today')).toHaveTextContent('');
     expect(text('today-plan-muscle-quads-week')).toHaveTextContent('8/8');
@@ -176,7 +176,7 @@ describe('Today: the Plan page over real data', () => {
     if (hasBoundary) {
       expect(boundary).toBeTruthy();
       // The first current-week column is Monday, even when it is today.
-      expect(boundary!.parent!.parent).toHaveTextContent('Mon');
+      expect(boundary!.parent!.parent).toHaveTextContent('M');
       expect(boundary!.parent!.parent).toHaveStyle({ marginLeft: uiSpace.sm });
     } else {
       expect(boundary).toBeNull();
@@ -188,14 +188,27 @@ describe('Today: the Plan page over real data', () => {
     ['below', 15, uiRoles.ink],
     ['at', 16, uiRoles.gain],
     ['above', 17, uiRoles.gain],
-  ])('colours the weekly total %s target while retaining fractional secondary sets', async (_state, count, color) => {
+  ])('colours the weekly total %s target, showing half-steps rounded down', async (_state, count, color) => {
     await bootLocalApp();
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count }]);
     await renderToday();
 
+    // Triceps gets 7.5, 8 and 8.5 secondary sets: 7.5 shows 7, below; 8.5 shows 8, met.
     const week = within(text('today-plan-muscle-triceps-week'));
-    expect(week.getByText(String(count / 2))).toHaveStyle({ color });
+    expect(week.getByText(String(Math.floor(count / 2)))).toHaveStyle({ color });
     expect(week.getByText('/8')).toHaveStyle({ color: uiRoles.inkMuted });
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent(String(Math.floor(count / 2)));
+    // The spoken label keeps the exact count.
+    expect(text('today-plan-muscle-triceps').props.accessibilityLabel).toContain(`this week ${count / 2} of 8 sets`);
+  });
+
+  it('shows a lone secondary half set as ½, never 0', async () => {
+    await bootLocalApp();
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
+    await renderToday();
+
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
+    expect(within(text('today-plan-muscle-triceps-week')).getByText('½')).toBeTruthy();
   });
 
   it("takes the target from Settings and counts secondary sets as Settings' Progress default says", async () => {
@@ -361,15 +374,17 @@ describe('Today: the Plan page among the cards', () => {
       'today-group-section-tab',
     ]);
     expect(selected('today-progress-section-tab')).toBe(true);
-    // The pager starts one card's step on: 345 + the 8pt gap on a 393pt phone.
+    // The pager starts one card's step on: 361 + the 32pt gap on a 393pt phone.
     fireEvent(text('today-screen'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 760 } } });
-    expect(text('today-screen-pager').props.contentOffset).toEqual({ x: 353, y: 0 });
+    expect(text('today-screen-pager').props.contentOffset).toEqual({ x: 393, y: 0 });
 
     fireEvent.press(text('today-plan-section-tab'));
     expect(selected('today-plan-section-tab')).toBe(true);
     // The page draws its own two cards; ten recovery rows show, the rest scroll inside their card,
     // so the plan card below stays on the page.
     expect(within(text('today-plan-section')).getByTestId('today-plan-recovery-rows')).toHaveStyle({ flexShrink: 1, maxHeight: 10 * 32 });
+    // No scroll indicator over the target column.
+    expect(text('today-plan-recovery-rows').props.showsVerticalScrollIndicator).toBe(false);
     expect(within(text('today-plan-section')).getByTestId('today-plan-week-card')).toBeTruthy();
   });
 

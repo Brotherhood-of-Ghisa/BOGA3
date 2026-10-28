@@ -564,14 +564,14 @@ describe('Today: the cards', () => {
 
   const selected = (testID: string) => text(testID).props.accessibilityState?.selected;
 
-  it('gives You and the group a full-height page each, the next one peeking', async () => {
+  it('gives You and the group a full-width, full-height page each', async () => {
     await bootLocalApp();
     await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
     await renderCards();
 
-    // 393 less both 16pt gutters and the 16pt peek; 700 less the track's 12 + 16.
-    expect(text('today-progress-section')).toHaveStyle({ width: 345, height: 672 });
-    expect(text('today-group-section')).toHaveStyle({ width: 345, height: 672 });
+    // 393 less both 16pt gutters, no peek of the next page; 700 less the track's 12 + 16.
+    expect(text('today-progress-section')).toHaveStyle({ width: 361, height: 672 });
+    expect(text('today-group-section')).toHaveStyle({ width: 361, height: 672 });
     // You draws its two cards; the signed-out panel takes the page's one card.
     expect(within(text('today-progress-section')).getByTestId('today-progress-card')).toBeTruthy();
     expect(within(text('today-progress-section')).getByTestId('today-session-card')).toBeTruthy();
@@ -627,10 +627,10 @@ describe('Today: the cards', () => {
     // A swipe back settles on the first card's offset, the Plan page.
     fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
     expect(selected('today-plan-section-tab')).toBe(true);
-    // One card's step (345 + the 8pt gap) on.
-    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 353, y: 0 } } });
+    // One card's step (361 + the 32pt gap) on.
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 393, y: 0 } } });
     expect(selected('today-progress-section-tab')).toBe(true);
-    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 706, y: 0 } } });
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 786, y: 0 } } });
     expect(selected('today-group-section-tab')).toBe(true);
 
     fireEvent.press(text('today-sessions-button'));
