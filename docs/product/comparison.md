@@ -62,10 +62,11 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 ### comparison.colour-scale · presentation · accepted
 
-Progress 3D colours each muscle by its change against [[comparison.window]],
-using the displayed change's direction: gain, loss or neutral. Both breakdowns
-follow their filtered comparisons; History look-back and weekly targets do not
-set 3D colours. The selected muscle shows its current, previous and change figures.
+Progress 3D uses theme shades for the displayed change against
+[[comparison.window]]: light for decreases, middle for unchanged activity, dark
+for increases; empty/unavailable stays neutral. Both breakdowns follow filtered
+comparisons, independently of History and targets, with no legend. The selected
+muscle shows Now/Prev/Change.
 
 History legends precede their charts and run 0%–100%. Muscle Sets reads
 `% of target`, capped at the effective weekly muscle target; other legends read

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   MAIN_TAB_DEFINITIONS,
   type MainTabKey,
@@ -13,7 +14,7 @@ type MainTabsProps = {
 
 /**
  * The four main tabs in the design language: one card
- * of plain labels. The active tab is `ink` at a heavier weight over an `ink`
+ * of micro-labels. The others stay muted; the active tab is `ink` over an `ink`
  * underline — navigation, not an action, so never `accent` (`ux-rules.md` "Actions and emphasis").
  */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
@@ -30,7 +31,7 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
             onPress={() => onSelect(tab.key)}
             style={({ pressed }) => [styles.tab, pressed && !active ? styles.pressed : null]}
             testID={tab.testID}>
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, active ? styles.labelActive : null]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, active ? uiTextTone.ink : null]}>
               {tab.label}
             </Text>
             <View
@@ -64,17 +65,6 @@ const styles = StyleSheet.create({
   // Depth is a ground change, never an elevation.
   pressed: {
     backgroundColor: uiRoles.paper,
-  },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  labelActive: {
-    fontWeight: '700',
-    color: uiRoles.ink,
   },
   // Always laid out, so the labels do not shift when the active tab changes.
   indicator: {

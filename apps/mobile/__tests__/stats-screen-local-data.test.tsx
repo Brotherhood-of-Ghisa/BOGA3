@@ -233,6 +233,7 @@ describe('Stats over real data', () => {
     await act(async () => updatePreferences({ progressMuscleLayout: '3d' }));
     await renderStats();
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-back_lats'));
+    expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
     const change = () => screen.getByTestId('stats-muscle-body-comparison-change');
     expect(change()).toHaveTextContent(/^0$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^1$/);

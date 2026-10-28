@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles } from '@/components/ui/tokens';
 import { useAuth } from '@/src/auth';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
 
@@ -15,14 +16,15 @@ const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
   // One header style on every stack route (`navigation-contract.md` "Header
   // titles"): the page's own `paper` ground with no shadow line, so header and
-  // page read as one surface, an Archivo 700 `ink` title, an `ink` back arrow.
+  // page read as one surface, the `title` role, an `ink` back arrow. The header
+  // takes no line height, so only the role's face, weight, size and colour.
   headerStyle: { backgroundColor: uiRoles.paper },
   headerShadowVisible: false,
   headerTitleStyle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    color: uiRoles.ink,
+    fontFamily: uiText.title.fontFamily,
+    fontWeight: uiText.title.fontWeight,
+    fontSize: uiText.title.fontSize,
+    color: uiText.title.color,
   },
   headerTintColor: uiRoles.ink,
 } as const;

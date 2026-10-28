@@ -212,8 +212,8 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
   labels. `exercise-history` and the tab-owned pages are hybrids: native
   header (actions in `headerRight`) with `MainTabBar`.
 - Native headers take styling from the root stack's `screenOptions`: `paper`
-  background with no shadow line, Archivo 700 `ink` title at `xl`, and minimal
-  arrow-only back.
+  background with no shadow line, the `title` text role (Archivo 700 `ink` at
+  `lg`), and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back
   item that ignores display mode.
 - Three screens replace the native back item with the shared `IconButton` arrow
