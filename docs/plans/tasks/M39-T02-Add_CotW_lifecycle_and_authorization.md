@@ -1,4 +1,4 @@
-# M39-T02 — Add COW lifecycle and authorization
+# M39-T02 — Add CoW lifecycle and authorization
 
 - Status: `planned`
 - Depends on: `M39-T01-Define_CotW_rules_and_scoring`
@@ -17,7 +17,7 @@ the later rankings and UI consume, with existing group authorization intact.
   and final-result lifecycle storage; definition get/list and next-week
   create/update/cancel operations; exact wire guards and typed API methods.
 - Out: scoring and automatic finalization implementation (T03), public score
-  reads, screens, new sync entities, recurring COW creation and hosted deployment.
+  reads, screens, new sync entities, recurring CoW creation and hosted deployment.
 
 ## Decided
 
@@ -46,9 +46,9 @@ identities and protocol conventions. Group tables stay outside Sync v2.
    scoring context/revision. Validate next-week-only creation on the server;
    reject already-started/further-future weeks, foreign exercises and invalid
    inputs. Capture the creator's zone through the existing group-creation
-   boundary compatibly with old clients; do not change published COW bounds.
+   boundary compatibly with old clients; do not change published CoW bounds.
 2. Serialize mutations with the group authorization lock and enforce
-   one published COW per group/week, no overlapping windows (including zone
+   one published CoW per group/week, no overlapping windows (including zone
    changes), and lifecycle transitions under concurrent admin writes.
    A stale edit must fail predictably without losing the mobile form input.
 3. New tables have RLS, no direct client grants, no `owner_user_id`, and no

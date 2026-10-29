@@ -1,4 +1,4 @@
-# COW — draft UX brief
+# CoW — draft UX brief
 
 - Status: placement/navigation agreed on 2026-10-29; visual layout still draft,
   not yet an accepted design target.
@@ -14,29 +14,30 @@
 
 ## Intended outcome
 
-An admin schedules next week's COW in one short form. Every member can find
+An admin schedules next week's CoW in one short form. Every member can find
 the exercise before it starts, follow each metric during the week, and read
-the stored final outcome afterwards. Use COW in feature names and copy.
+the stored final outcome afterwards. Use CoW in feature names and copy, with plural CoWs; preserve that casing
+even in controls whose surrounding labels use uppercase.
 
 ## Agreed placement and navigation
 
-The operator confirmed that the COW summary belongs on the selected group's
+The operator confirmed that the CoW summary belongs on the selected group's
 At a glance page and appears immediately, without opening another page first.
 Proposed placement is before the existing viewer-local period stepper. The
-COW has fixed group-calendar dates; the summary's week selector cannot move it.
+CoW has fixed group-calendar dates; the summary's week selector cannot move it.
 
-Show the current COW's exercise, dates, metrics and state directly in that
-summary. Open COW opens the secondary COW page with that COW selected. A week
-without a COW shows No COW this week and a browsing link; it cannot be created
+Show the current CoW's exercise, dates, metrics and state directly in that
+summary. Open CoW opens the secondary CoW page with that CoW selected. A week
+without a CoW shows No CoW this week and a browsing link; it cannot be created
 midweek. No new main tab.
 
 Scheduling belongs on the individual group page (the existing group
-management screen), which opens a secondary COW page. Owners/admins can create
-or edit there; every member can view and browse COWs. The At a glance summary
+management screen), which opens a secondary CoW page. Owners/admins can create
+or edit there; every member can view and browse CoWs. The At a glance summary
 is a reading entry, with no scheduling/editing controls. Keep the same selected
-group/COW across both entries, and return Back to the page that opened it.
+group/CoW across both entries, and return Back to the page that opened it.
 
-The secondary page provides current/upcoming COWs and past results. Concrete
+The secondary page provides current/upcoming CoWs and past results. Concrete
 route names and its browsing/form layout remain for T04; creation/editing
 must happen on a secondary page, not an inline At a glance form.
 
@@ -46,38 +47,38 @@ These are layout sketches, not pixel targets:
 Group: Brotherhood                     [switch]
 At a glance | Stream | Leaderboards
 
-COW                              2–8 November
+CoW                              2–8 November
 Bench press                              Live
 1RM · Improvement · Total Volume
-[Open COW]
+[Open CoW]
 
 ...existing group week summary...
 
 Individual group page
-COWs                                       >
-[Schedule next COW]             (admin only)
+CoWs                                       >
+[Schedule next CoW]             (admin only)
 
-Secondary COW page
+Secondary CoW page
 Current | Upcoming | History
-...selected COW / results / permitted editor...
+...selected CoW / results / permitted editor...
 ```
 
-The group-page admin action is Edit next COW when the next slot is full;
-both actions open the secondary COW page in the appropriate mode. The sketch's
+The group-page admin action is Edit next CoW when the next slot is full;
+both actions open the secondary CoW page in the appropriate mode. The sketch's
 browsing controls and styling are proposals, not a finalized layout.
-Date formatting follows the account preference; dates refer to the COW zone.
+Date formatting follows the account preference; dates refer to the CoW zone.
 
-## Schedule next COW
+## Schedule next CoW
 
-From the individual group page, Schedule next COW opens the creation form on
-the secondary COW page. Next week's date range and the group's zone are
+From the individual group page, Schedule next CoW opens the creation form on
+the secondary CoW page. Next week's date range and the group's zone are
 read-only context, not editable date fields. Use the existing group
 exercise picker; require at least one metric. A review section on the same
-form shows dates, exercise and metrics before its one Publish COW action.
-Publishing immediately makes the upcoming COW visible to members.
+form shows dates, exercise and metrics before its one Publish CoW action.
+Publishing immediately makes the upcoming CoW visible to members.
 
 ```text
-< Back                         Schedule COW
+< Back                         Schedule CoW
 
 9–15 November
 Europe/London
@@ -91,7 +92,7 @@ Metrics
 Review
 Bench press · Highest 1RM · 9–15 November
 
-[Publish COW]
+[Publish CoW]
 ```
 
 No exercise exists: offer the existing group-exercise creation path to admins,
@@ -100,9 +101,9 @@ an explicit admin zone choice first. Propose a zone control in existing group
 management, with the creator's device IANA zone as the new-group default;
 never infer an existing creator's zone from another member's phone.
 
-Editing an upcoming COW reuses the form. Edit/cancel controls follow the
+Editing an upcoming CoW reuses the form. Edit/cancel controls follow the
 merged lifecycle contract. Destructive cancellation confirms. An occupied
-slot or concurrent admin write preserves input and offers Open existing COW.
+slot or concurrent admin write preserves input and offers Open existing CoW.
 An uncertain publish response refreshes before retry; it never creates a
 second definition. If next week begins while the form is open, reject stale
 dates and require review of the newly available next week before publishing.
@@ -123,8 +124,8 @@ invent an overall winner. A user's ineligible/not-yet-participating state is
 visible without an enrolment control.
 
 After finalization, the At a glance summary can show the latest final outcome
-until a new current COW starts. Browsing from the group page or summary opens
-the secondary COW page, where History lists stored results newest first and
+until a new current CoW starts. Browsing from the group page or summary opens
+the secondary CoW page, where History lists stored results newest first and
 opens the same final detail. The exact latest-result summary remains a visual
 design proposal. This is persistent in-app
 reporting, not a modal, a seen-once celebration or a push notification.
@@ -138,7 +139,7 @@ Reuse the existing group selector, Sheet/form primitives, rank rows, notices,
 focus/poll/pull refresh and online-only writes. Preserve form input on errors.
 Offline reads use only already-permitted cached summaries and the standard
 last-updated marker; full rankings stay online under existing cache policy.
-Loss of group access hides cached content. Distinguish loading, no COW,
+Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
 Before visual acceptance, review the summary and secondary-page layouts,

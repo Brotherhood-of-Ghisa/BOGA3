@@ -1,4 +1,4 @@
-# M39-T03 — Serve COW rankings, finalization and history
+# M39-T03 — Serve CoW rankings, finalization and history
 
 - Status: `planned`
 - Depends on: `M39-T02-Add_CotW_lifecycle_and_authorization`
@@ -9,7 +9,7 @@
 
 Return one authoritative result per selected challenge metric, with weekly
 best 1RM, pre-week shared baseline and summed weekly Volume implementing T01.
-Automatically finalize and store ended COW results; serve live and final
+Automatically finalize and store ended CoW results; serve live and final
 results through privacy-safe, exact public shapes the mobile UI can use.
 
 ## Scope
@@ -51,7 +51,7 @@ definition, current results, history and linked session reads.
    revision changes according to that contract. Rebuilding must not expose
    an apparently final partial sum or mix generations. Capture the roster as
    of the start even if the job runs late; keep leavers' qualifying results and
-   prevent later joins/rejoins from entering that COW.
+   prevent later joins/rejoins from entering that CoW.
 2. Reuse the pure T01 boundary / existing scorer, retaining precision. Return
    metric-specific rank, unit and missing/unavailable state; deterministic
    ties and overflow follow the contract. Missing source/baseline never

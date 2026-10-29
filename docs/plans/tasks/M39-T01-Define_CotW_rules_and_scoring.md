@@ -1,4 +1,4 @@
-# M39-T01 — Define COW rules and shared scoring
+# M39-T01 — Define CoW rules and shared scoring
 
 - Status: `planned`
 - Depends on: none
@@ -28,10 +28,10 @@ week, baseline or correction rules.
 - D4: weekly Volume sums set volumes; existing lifetime Volume boards stay
   best-single-set. Retain unrounded scores until display.
 - D7: group time zone defaults to the creator's; immutable shared week bounds;
-  schedule next week only, before start, with one published COW per group/week.
+  schedule next week only, before start, with one published CoW per group/week.
 - D8: ended results are stored and final, never recalculated from later source
   changes; current history disclosure/access still applies.
-- D9: roster fixed at start; later join/rejoin waits for the next COW; leaving
+- D9: roster fixed at start; later join/rejoin waits for the next CoW; leaving
   stops contributions but preserves results earned while a member.
 
 ## Open — resolve with the operator at session start
@@ -49,7 +49,7 @@ its consequences change their scope or gates.
 
 1. Put the challenge contract beside the existing group technical contracts
    and route to it from `docs/specs/tech/groups-contract.md` only when changing
-   COW. Apply doc budgets. Record qualifying facts in
+   CoW. Apply doc budgets. Record qualifying facts in
    `docs/product/groups.md` and extend the product-index trigger; highlight
    every added/changed/decided fact in this PR.
 2. Add a small TS scoring module under `apps/mobile/src/groups/`, compatible

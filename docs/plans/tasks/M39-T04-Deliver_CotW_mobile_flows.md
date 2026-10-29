@@ -1,4 +1,4 @@
-# M39-T04 — Deliver COW mobile flows
+# M39-T04 — Deliver CoW mobile flows
 
 - Status: `planned`
 - Depends on: `M39-T03-Serve_CotW_rankings_and_history`
@@ -13,7 +13,7 @@ two-member results, usable unavailable/offline states and visual evidence.
 
 ## Scope
 
-- In: current/next/prior COW discovery, admin next-week scheduling/management,
+- In: current/next/prior CoW discovery, admin next-week scheduling/management,
   group-zone setup where needed, live/finalizing/final results,
   permission/state/error handling, targeted integration and issue closeout.
 - Out: a new top-level tab, combined winner, recurring creation, notifications,
@@ -26,21 +26,21 @@ T02/T03, existing group resource/action hooks, exercise picker and rank/UI
 primitives. A missing improvement baseline does not hide a valid 1RM or
 Volume result. Group %BW 1RM and personal improvement % need distinct labels.
 
-The operator confirmed the COW summary appears immediately on At a glance.
-Scheduling starts on the individual group page and opens a secondary COW page:
+The operator confirmed the CoW summary appears immediately on At a glance.
+Scheduling starts on the individual group page and opens a secondary CoW page:
 owners/admins create/edit; members view/browse. The summary opens that page
 for reading, with no admin scheduling controls on At a glance.
 
 ## Open — resolve with the operator at session start
 
-- Review the attached [COW UX brief](../M39-cow-ux.md), currently a draft, and
+- Review the attached [CoW UX brief](../M39-cow-ux.md), currently a draft, and
   add current group reference screenshots before accepting the design target.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted directions are build
   inputs, never a replacement for the merged T01 contract.
-- Refine the agreed summary and secondary-page layouts, next-COW form,
+- Refine the agreed summary and secondary-page layouts, next-CoW form,
   results/history and group-zone control; placement and navigation above are
   settled. Scheduling always targets next week; no date picker or later-week
-  queue. Retain group/COW identity, its shared zone and Back to the origin.
+  queue. Retain group/CoW identity, its shared zone and Back to the origin.
 - Settle copy using `docs/product/copy.md`. Only a stored final outcome says
   Final; a week whose deadline passed can still be Finalizing. Push result
   announcements remain out of scope; in-app reporting is part of this task.
@@ -54,7 +54,7 @@ for reading, with no admin scheduling controls on At a glance.
    form inputs on failure and re-read after confirmed success. Offline writes
    are refused visibly; handle an uncertain transport outcome by refreshing
    before retry so a successful create cannot duplicate the challenge.
-3. Jest covers happy and failure flows, current/next/prior COW, multi-metric
+3. Jest covers happy and failure flows, current/next/prior CoW, multi-metric
    choice, no baseline/no result, normalized labels, stale responses, lost
    role/access, offline cached/no-cache states, finalizing/final outcomes,
    fixed next-week dates, membership eligibility and revision conflicts. Prove
@@ -77,11 +77,11 @@ for reading, with no admin scheduling controls on At a glance.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Find challenge | Select a group; read the immediate At a glance summary; open its COW on the secondary page | Correct shared week, exercise and selected metric rankings | No current COW stays empty; browsing remains available; no inline admin controls |
-| Set challenge | Owner/admin opens Schedule next COW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming COW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
-| Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server COW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
-| Manage challenge | Admin opens Edit next COW from the group page and edits/cancels on the secondary page | Server lifecycle is reflected immediately; Back returns to the originating group | State/role changed: refresh with input retained; destructive actions confirm |
-| Reopen/history | Open the secondary COW page from the group page or summary, then browse stored results; or reopen offline | Authorized final outcome or permitted cached context; Back preserves origin | No cache, lost membership and suppressed history expose no stale private value |
+| Find challenge | Select a group; read the immediate At a glance summary; open its CoW on the secondary page | Correct shared week, exercise and selected metric rankings | No current CoW stays empty; browsing remains available; no inline admin controls |
+| Set challenge | Owner/admin opens Schedule next CoW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
+| Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
+| Manage challenge | Admin opens Edit next CoW from the group page and edits/cancels on the secondary page | Server lifecycle is reflected immediately; Back returns to the originating group | State/role changed: refresh with input retained; destructive actions confirm |
+| Reopen/history | Open the secondary CoW page from the group page or summary, then browse stored results; or reopen offline | Authorized final outcome or permitted cached context; Back preserves origin | No cache, lost membership and suppressed history expose no stale private value |
 
 Interaction/appearance: reuse group selector, cards, rank rows, sheets,
 notices, tokens and refresh patterns. No cross-metric overall winner. Evidence

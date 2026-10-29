@@ -1,4 +1,4 @@
-# M39 — Group Challenge of the Week (COW)
+# M39 — Group Challenge of the Week (CoW)
 
 - Status: `planned`
 - Created: 2026-10-27, planning baseline `e08bec5c897d0eefb697721a25fbcb5e7f339ceb` on `origin/main`
@@ -22,8 +22,8 @@ and group exercise, using their normally logged and shared workouts.
   recurring creation, notifications, enrolment or manual result submission,
   new workout logging, a new certification system, and new sync entities.
 - Agreed: manually schedule next week only; never create an already-started
-  COW. One published COW per group/week, with several independent metrics.
-  Use the name COW throughout the feature; existing task filenames are kept
+  CoW. One published CoW per group/week, with several independent metrics.
+  Use the name CoW throughout the feature; existing task filenames are kept
   stable.
 
 ## Agreed design direction
@@ -87,10 +87,10 @@ contract, without another service or copies of private workout graphs.
 Use `src/groups/api.ts` as the sole RPC caller, the existing cache/resource
 and action hooks, group picker, rank rows, notices and UI primitives. Reads
 follow existing refresh/offline behavior; admin writes require a connection.
-The draft [COW UX brief](../M39-cow-ux.md) is attached to this milestone and
-T04. The operator confirmed: the COW summary appears immediately on At a
+The draft [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
+T04. The operator confirmed: the CoW summary appears immediately on At a
 glance; admins schedule from the individual group page, which opens a secondary
-COW page for creation/editing or member viewing/browsing. The summary is a
+CoW page for creation/editing or member viewing/browsing. The summary is a
 reading entry, with no scheduling controls. Review the remaining visual
 layout and add current group reference screenshots before accepting the
 design target. The plan prescribes no new main tab.
@@ -101,17 +101,17 @@ Confirmed by the operator on 2026-10-29: use the group's time zone, defaulting
 to its creator's time zone. Schedule next week only, before that week starts;
 there is no midweek creation or queue of later weeks. Store a validated IANA
 zone and immutable UTC Monday-to-Monday `[start, end)` bounds per published
-COW, respecting DST. Later group-zone changes cannot move published COWs.
+CoW, respecting DST. Later group-zone changes cannot move published CoWs.
 Prevent duplicate group/week definitions and overlapping published windows
 under concurrent admin writes, including across zone changes. One current
-COW and one next COW may coexist; past COWs remain history.
+CoW and one next CoW may coexist; past CoWs remain history.
 
 ### D8. Final results are stored
 
-Confirmed by the operator: ended COWs are final and stored. Persist the
+Confirmed by the operator: ended CoWs are final and stored. Persist the
 rankings, selected metrics, score units and scoring context needed to read
 the outcome without recalculating it from mutable workouts. Subsequent source
-edits, deletion, linking or scoring changes never rerank a finalized COW.
+edits, deletion, linking or scoring changes never rerank a finalized CoW.
 Current access/disclosure still applies to history; suppress unsafe figures
 without recalculating or promoting a different winner. Distinguish finalizing
 from final: never publish an incomplete evaluator pass as the final outcome.
@@ -119,14 +119,14 @@ from final: never publish an incomplete evaluator pass as the final outcome.
 Proposed implementation rule, still to confirm in T01: no grace period;
 only completed workouts and eligible source changes received before the end
 count. Processing may finish later, but later arrivals cannot enter. This
-means offline workouts synced after the deadline miss that COW.
+means offline workouts synced after the deadline miss that CoW.
 
 ### D9. Simple participation
 
 The operator delegated this choice: fix the participant roster at the start,
 with automatic participation by every then-current member. Midweek joins or
-rejoins wait for the next COW. Leaving or removal ends further contributions
-for that COW; qualifying results already earned while a member stay in the
+rejoins wait for the next CoW. Leaving or removal ends further contributions
+for that CoW; qualifying results already earned while a member stay in the
 standings and final snapshot. Rejoining does not resume participation that
 week. Former members lose group access under existing authorization.
 
@@ -139,12 +139,12 @@ the owning fact/contract, and update later cards if the answer changes them:
    `started_at`, matching existing group period reads. Settle sessions crossing
    a week or membership-end boundary, archival and late-arriving pre-week
    baseline data. D7's shared calendar and D9's roster are already settled;
-   viewer-local group summaries cannot supply the COW window.
+   viewer-local group summaries cannot supply the CoW window.
 2. Confirm the D8 no-grace/server-receipt cutoff and specify its source-version
    boundary, including completion, baseline, edits and link writes. Decide
    pre-start editing/cancellation and post-start cancellation; finality and
    next-week-only scheduling are already settled. A proposed minimum is edits
-   before start only and explicit cancellation, never editing an active COW.
+   before start only and explicit cancellation, never editing an active CoW.
 3. Improvement arithmetic and ordering: signed `(weekly / baseline - 1) × 100`,
    versus positive gains only; missing weekly results; ties and zero; a
    finite-result/overflow policy for the weekly sum and percentage.
