@@ -30,6 +30,12 @@ without deleting audit. Active/ended CoWs cannot be edited or cancelled.
 
 ## Open — resolve at session start
 
+Load `docs/specs/tech/group-cow-contract.md`: implement its transaction-end
+intake seal, uncertainty marker and boundary high-water marks. Retain minimal
+source revisions through finalization, including non-counting states and the
+transitions used for Volume priority; do not use the sync pull cursor as a receipt. The pure helper
+consumes safe-integer epoch microseconds and immutable intake versions.
+
 - Choose concrete table/RPC names, constraints and indexes from the settled
   lifecycle, not a generic competition framework.
 - Check T01 freshness against main, including how expected revision and

@@ -34,6 +34,11 @@ the server, then UUID, never client/performed/worker time or shared places.
 
 ## Open — resolve at session start
 
+Load `docs/specs/tech/group-cow-contract.md` and consume `scoreCoW` from
+`apps/mobile/src/groups/cow-scoring.ts`. Resolve authorized, complete intake
+versions under the pinned context; its pure tests do not establish actual
+transaction, authorization, scheduling or durable-finality guarantees.
+
 - Trace source/projection freshness fences and choose how to retain the
   deadline's eligible source versions before later mutations. Finalizing on
   first history read from mutable rows is insufficient. Reuse/extend existing
