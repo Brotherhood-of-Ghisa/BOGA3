@@ -125,7 +125,9 @@ describe('Stat', () => {
   it('lets an inline value hug its legend for a caller that sizes the column', () => {
     render(<Stat label="1RM" layout="inline" value="102.1" valueWidth="hug" />);
 
+    expect(flatStyle(screen.getByText('102.1'))).toMatchObject({ flexShrink: 1 });
     expect(flatStyle(screen.getByText('102.1')).width).toBeUndefined();
+    expect(screen.getByLabelText('1RM 102.1')).toHaveStyle({ maxWidth: '100%' });
   });
 
   it('sets a heading value in the card-title face on the headline figure line', () => {

@@ -81,9 +81,9 @@ export function Stat({
 
   if (layout === 'inline') {
     return (
-      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={styles.inline} testID={testID}>
+      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : null]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : styles.inlineValueHug]}>
           {value}
         </Text>
       </View>
@@ -124,6 +124,14 @@ const styles = StyleSheet.create({
     width: uiGeometry.metricValueWidth,
     textAlign: 'right',
   },
+  // Kept inside the caller's column: a value too wide for it ellipsizes
+  // rather than spilling under the column beside it.
+  inlineHug: {
+    maxWidth: '100%',
+  },
+  inlineValueHug: {
+    flexShrink: 1,
+  },
   stackedEnd: {
     alignItems: 'flex-end',
   },
@@ -135,9 +143,10 @@ const stackedValueStyles = {
   figure: uiText.figureStat,
   rowFigure: uiText.figure,
   text: uiText.bodyStrong,
-  // `title`, on `figureStat`'s line height: iOS adds the extra leading above
-  // the glyphs, so the word sits on the same bottom line as the figures.
-  heading: [uiText.title, { lineHeight: uiText.figureStat.lineHeight }],
+  // `title`, on `figureStat`'s line height, set to the line's bottom so the
+  // word sits on the figures' bottom line (iOS puts the extra leading above;
+  // Android needs `textAlignVertical`).
+  heading: [uiText.title, { lineHeight: uiText.figureStat.lineHeight, textAlignVertical: 'bottom' as const }],
 };
 
 // The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is

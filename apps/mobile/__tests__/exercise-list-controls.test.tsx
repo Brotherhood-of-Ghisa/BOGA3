@@ -27,7 +27,6 @@ const item = (id: string, name: string, overrides: Partial<ExerciseListItem> = {
     id,
     name,
     deletedAt: null,
-    muscleSummary: 'Primary: Chest\nSecondary: Front Delts · Triceps',
     muscleLines: { primary: 'Primary: Chest', secondary: 'Secondary: Front Delts · Triceps' },
     statsSummary: 'Never done',
     ...overrides,
@@ -76,7 +75,7 @@ describe('ExerciseListContent rows', () => {
   it('makes each row one target labelled for the pick, with the stats line in words', () => {
     const { onPressExercise } = renderList();
 
-    expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', `${bench.muscleSummary}. ${bench.statsSummary}.`);
+    expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', 'Primary: Chest. Secondary: Front Delts · Triceps. Never done.');
     fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
     expect(onPressExercise).toHaveBeenCalledWith(bench);
     const stats = screen.getAllByText('Never done')[0];
