@@ -1,8 +1,18 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -10,7 +20,7 @@ import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-s
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
 
 import { formatBestSet, todaySessionAccessibilityLabel } from './progress-format';
-import { StepAround } from './step-arrows';
+import { StepArrow, StepAround } from './step-arrows';
 
 export type TodaySessionCardProps = {
   session: LatestSessionSummary;
@@ -81,21 +91,82 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
-// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling.
-function ExerciseTable({ lines }: { lines: SessionExerciseLine[] }) {
+// The page arrows reach up into the gap above the table and down through the
+// header's padding, never into the summary line or the first row.
+const PAGE_ARROW_SLOP = { top: uiSpace.lg, bottom: uiSpace.xs, left: uiSpace.xs / 2, right: uiSpace.xs / 2 };
+
+/**
+ * The rows' scroller: whether there is more than it shows, and a page step up
+ * or down (null at that end). The native scroll events are the one source of
+ * where it is; the arrows re-render only when an end is reached or left.
+ */
+function useRowScroller(rowCount: number) {
+  const scroller = useRef<ScrollViewInstance>(null);
+  const offset = useRef(0);
+  const [viewport, setViewport] = useState(VISIBLE_EXERCISE_ROWS * ROW_HEIGHT);
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(false);
+  const end = Math.max(0, rowCount * ROW_HEIGHT - viewport);
+  // A sub-point remainder is the scroller settling, not a row left to show.
+  const settle = (y: number, last: number) => {
+    offset.current = y;
+    setAtStart(y <= 1);
+    setAtEnd(y >= last - 1);
+  };
+  const scrollTo = (y: number) => scroller.current?.scrollTo({ y: Math.min(end, Math.max(0, y)), animated: true });
+  return {
+    scroller,
+    overflows: end > 0,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => settle(event.nativeEvent.contentOffset.y, end),
+    onLayout: (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      setViewport(height);
+      settle(offset.current, Math.max(0, rowCount * ROW_HEIGHT - height));
+    },
+    onUp: atStart ? null : () => scrollTo(offset.current - viewport),
+    onDown: atEnd ? null : () => scrollTo(offset.current + viewport),
+  };
+}
+
+// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling, with page
+// arrows beside the heading when there is more than it shows. The table sits
+// outside the summary's button, whose responder would otherwise swallow the
+// swipe, and opens the session itself. The button's label already reads every
+// row, so the table is hidden from assistive tech.
+function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen: () => void }) {
+  const { scroller, overflows, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
   const label = [uiText.label, uiTextTone.faint];
   return (
-    <View style={styles.fillTable}>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fillTable}>
       <View style={[styles.row, styles.tableHeader]}>
-        <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Exercise</Text>
+        <View style={[styles.nameCell, styles.nameHeading]}>
+          <Text allowFontScaling={false} style={label}>Exercise</Text>
+          {overflows ? (
+            <View style={styles.pageArrows}>
+              <StepArrow direction="up" hitSlop={PAGE_ARROW_SLOP} label="Earlier exercises" onPress={onUp} testID="today-latest-session-rows-up" />
+              <StepArrow direction="down" hitSlop={PAGE_ARROW_SLOP} label="Later exercises" onPress={onDown} testID="today-latest-session-rows-down" />
+            </View>
+          ) : null}
+        </View>
         <Text allowFontScaling={false} style={[...label, styles.sets]}>Sets</Text>
         <Text allowFontScaling={false} style={[...label, styles.best]}>Best set</Text>
         <Text allowFontScaling={false} style={[...label, styles.oneRepMax]}>1RM</Text>
       </View>
-      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-latest-session-rows">
-        {rows}
+      <ScrollView
+        alwaysBounceVertical={false}
+        nestedScrollEnabled
+        onLayout={onLayout}
+        onScroll={onScroll}
+        ref={scroller}
+        scrollEventThrottle={32}
+        style={styles.fillRows}
+        testID="today-latest-session-rows">
+        {/* No pressed dimming: a swipe starts as a press, and the whole table would flash. */}
+        <Pressable onPress={onOpen} testID="today-latest-session-rows-open">
+          {rows}
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -116,11 +187,11 @@ export function TodaySessionCard({
   onShowSession,
 }: TodaySessionCardProps) {
   const stamp = (
-    // The start reads as a Sessions row's does: a body line, its figures in the figure face.
+    // The start reads as a Sessions row's does: the whole stamp, month included, in the figure face.
     <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID="today-latest-session-start">
-      <FigureText>{formatCompactDate(session.startedAt)}</FigureText>
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatCompactDate(session.startedAt)}</Text>
       <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-      <FigureText>{formatClockTime(session.startedAt.getTime())}</FigureText>
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatClockTime(session.startedAt.getTime())}</Text>
     </Text>
   );
   return (
@@ -139,16 +210,19 @@ export function TodaySessionCard({
         )}
         <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
       </View>
-      <Pressable
-        accessibilityHint="Opens the completed session"
-        accessibilityLabel={todaySessionAccessibilityLabel(session)}
-        accessibilityRole="button"
-        onPress={() => onOpenSession(session.id)}
-        style={({ pressed }) => [styles.body, styles.fillBody, pressed ? styles.pressed : null]}
-        testID="today-latest-session">
-        <SummaryLine session={session} />
-        <ExerciseTable lines={session.exercises} />
-      </Pressable>
+      <View style={[styles.body, styles.fillBody]}>
+        <Pressable
+          accessibilityHint="Opens the completed session"
+          accessibilityLabel={todaySessionAccessibilityLabel(session)}
+          accessibilityRole="button"
+          onPress={() => onOpenSession(session.id)}
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+          testID="today-latest-session">
+          <SummaryLine session={session} />
+        </Pressable>
+        {/* Keyed by session, so stepping to another starts its table at the top. */}
+        <ExerciseTable key={session.id} lines={session.exercises} onOpen={() => onOpenSession(session.id)} />
+      </View>
     </Card>
   );
 }
@@ -187,6 +261,16 @@ const styles = StyleSheet.create({
   nameCell: {
     flex: 1,
     minWidth: 0,
+  },
+  nameHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  // The pair's gap keeps their side reaches apart.
+  pageArrows: {
+    flexDirection: 'row',
+    gap: uiSpace.xs,
   },
   fillTable: {
     flexShrink: 1,
