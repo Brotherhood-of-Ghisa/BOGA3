@@ -2,7 +2,7 @@ import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View, type RefreshControlProps } from 'react-native';
 
 import {
   GroupGlancePage,
@@ -211,35 +211,15 @@ function GroupsTabContent({ userId }: { userId: string }) {
   }
 
   const scrollPage = (frame: SwipePageFrame, testID: string, content: ReactNode) => (
-    <ScrollView
-      contentContainerStyle={styles.pageContent}
-      refreshControl={refreshControl}
-      showsVerticalScrollIndicator={false}
-      style={frameStyle(frame)}
-      testID={testID}>
+    <GroupsScrollPage frame={frame} refreshControl={refreshControl} testID={testID}>
       {content}
-    </ScrollView>
+    </GroupsScrollPage>
   );
   const renderPage: Record<GroupsSection, (frame: SwipePageFrame) => ReactNode> = {
     stream: (frame) => (
       <View style={frameStyle(frame)}>
         <GroupsStreamPage
-          header={
-            isDevMode() ? (
-              <View style={styles.streamTools}>
-                <IconButton
-                  accessibilityHint="Chooses which event types the stream draws"
-                  accessibilityLabel="Event types"
-                  name="more-vertical"
-                  onPress={() => setEventsSheet(true)}
-                  testID="groups-stream-events-button"
-                  tone="muted"
-                />
-              </View>
-            ) : (
-              <View />
-            )
-          }
+          header={<StreamTools onOpenEvents={() => setEventsSheet(true)} />}
           hiddenEventKinds={hiddenEventKinds}
           inlineError={inlineError}
           offline={offline}
@@ -318,6 +298,42 @@ function GroupsTabContent({ userId }: { userId: string }) {
 }
 
 const frameStyle = (frame: SwipePageFrame) => ({ width: frame.width, height: frame.height });
+
+/** A page that scrolls on its own, pulled to refresh the screen. */
+function GroupsScrollPage({ frame, refreshControl, testID, children }: {
+  frame: SwipePageFrame;
+  refreshControl: ReactElement<RefreshControlProps>;
+  testID: string;
+  children: ReactNode;
+}) {
+  return (
+    <ScrollView
+      contentContainerStyle={styles.pageContent}
+      refreshControl={refreshControl}
+      showsVerticalScrollIndicator={false}
+      style={frameStyle(frame)}
+      testID={testID}>
+      {children}
+    </ScrollView>
+  );
+}
+
+/** Over the stream, in dev mode only: the event-type menu. */
+function StreamTools({ onOpenEvents }: { onOpenEvents: () => void }) {
+  if (!isDevMode()) return <View />;
+  return (
+    <View style={styles.streamTools}>
+      <IconButton
+        accessibilityHint="Chooses which event types the stream draws"
+        accessibilityLabel="Event types"
+        name="more-vertical"
+        onPress={onOpenEvents}
+        testID="groups-stream-events-button"
+        tone="muted"
+      />
+    </View>
+  );
+}
 
 type GroupsStreamPageProps = {
   stream: ReturnType<typeof useGroupStream>;
