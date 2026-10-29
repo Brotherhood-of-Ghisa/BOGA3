@@ -27,7 +27,7 @@ import {
   nextExerciseSortMode,
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
-import { comparisonFigures } from '@/components/stats/comparison-columns';
+import { ComparisonHeaders, comparisonFigures } from '@/components/stats/comparison-columns';
 import { compareProgressFamilies, nextMuscleSortMode, sortProgressMuscles } from '@/components/stats/progress-tables';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
@@ -1089,6 +1089,32 @@ describe('resolveComparisonLayout', () => {
     expect(previous).toBeLessThan(change);
   });
 });
+
+it.each([['3d', 320], ['3d', 390], ['list', 320], ['list', 390]] as const)(
+  'reserves the contribution disclosure space only in %s at %ipt', (muscleLayout, width) => {
+    const dimensions = ReactNative.Dimensions.get('window');
+    act(() => ReactNative.Dimensions.set({ window: { width, height: 900, scale: 1, fontScale: 1 } }));
+    const muscle = buildSummary().muscles[0];
+    muscle.exercises = [{ ...muscle, exerciseDefinitionId: 'bench', displayName: 'Long exercise name', role: 'primary',
+      current: { workingSetCount: 1, totalVolume: 188271603422374, volumeSetCount: 1 },
+      previous: { workingSetCount: 1, totalVolume: 6172839456170, volumeSetCount: 1 } }];
+    const onExerciseHistory = jest.fn();
+    render(<ProgressMuscleView muscles={[muscle]} metric="totalVolume" selectedId={muscle.muscleGroupId}
+      muscleLayout={muscleLayout} onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={onExerciseHistory} />);
+    const axis = muscleLayout === 'list';
+    const header = screen.UNSAFE_getAllByType(ComparisonHeaders)
+      .find(node => node.props.testID === 'stats-contributions-header')!;
+    expect(header.props.axis).toBe(axis);
+    expect(header.props.layout).toEqual(resolveComparisonLayout(width,
+      axis ? [muscle, ...muscle.exercises] : muscle.exercises, 'totalVolume', axis, axis));
+    const row = screen.UNSAFE_getAllByType(ListRow).find(node => node.props.testID === 'stats-contribution-bench')!;
+    expect(row.props.trailing).toBe(axis ? null : undefined);
+    expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
+    expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
+    fireEvent.press(screen.getByRole('link', { name: 'Open Long exercise name history' }));
+    expect(onExerciseHistory).toHaveBeenCalledWith(muscle.exercises[0], expect.anything());
+    act(() => ReactNative.Dimensions.set({ window: dimensions }));
+  });
 
 it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt', width => {
   const dimensions = ReactNative.Dimensions.get('window');

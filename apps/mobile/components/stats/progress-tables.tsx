@@ -120,22 +120,22 @@ export function ProgressTables(props: ProgressTablesProps) {
 }
 
 // Both presentations keep one contribution-row and empty-state implementation.
-export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false }: {
+export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false, axis = true }: {
   muscle: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout;
-  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean;
+  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean; axis?: boolean;
 }) {
   const exercises = muscle.exercises.filter(row => hasComparisonMetric(row, metric));
   return <>
-    <Headers name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
+    <Headers axis={axis} name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
     {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
       body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : (splitByEffort ? (['primary', 'secondary'] as const).map(role => {
         const rows = exercises.filter(row => row.role === role);
         return rows.length > 0 ? <Fragment key={role}>
           <StatsTableFamily name={role === 'primary' ? 'Primary effort' : 'Secondary effort'} />
-          {rows.map(row => <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} hideRole />)}
+          {rows.map(row => <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} axis={axis} hideRole />)}
         </Fragment> : null;
       }) : exercises.map(row =>
-        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} />))}
+        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} axis={axis} />))}
   </>;
 }
 
@@ -158,10 +158,10 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
 }
 
 // Contributor headers are labels; the parent muscle determines their context.
-function Headers({ name, layout, metric, testID }: {
-  name: string; layout: ComparisonLayout; metric: ProgressTableMetric; testID: string;
+function Headers({ name, layout, metric, testID, axis }: {
+  name: string; layout: ComparisonLayout; metric: ProgressTableMetric; testID: string; axis: boolean;
 }) {
-  return <ComparisonHeaders layout={layout} metric={metric} testID={testID}
+  return <ComparisonHeaders axis={axis} layout={layout} metric={metric} testID={testID}
     name={<StatsTableHeaderLabel label={name} />} />;
 }
 
@@ -186,20 +186,18 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
   </ListRow>;
 }
 
-function ExerciseRow({ row, metric, layout, onHistory, hideRole }: {
-  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory']; hideRole?: boolean;
+function ExerciseRow({ row, metric, layout, onHistory, hideRole, axis }: {
+  row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory']; hideRole?: boolean; axis: boolean;
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-contribution-${row.exerciseDefinitionId}`;
   const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  // No control of its own, and the chevron's axis still kept clear, so a
-  // contributor's figures stay under its muscle's.
   const history = <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
       <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>{row.displayName}</Text>
       {hideRole ? null : <Text allowFontScaling={false} style={uiText.meta}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>}
     </Pressable>;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={null}>
+  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={axis ? null : undefined}>
     {history}{layout.stacked ? values : null}
   </ListRow>;
 }
