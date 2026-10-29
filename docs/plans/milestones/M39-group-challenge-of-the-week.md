@@ -224,7 +224,7 @@ exception to the viewer-local presentation in [[comparison.window]].
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | M39-T01 | Formalize MVP rules; shared scoring, cutoff/tie vectors and owning facts/contract | none | completed |
-| [M39-T02](../tasks/M39-T02-Add_CotW_lifecycle_and_authorization.md) | Group calendar, scheduling, roster and snapshot lifecycle storage; authorized RPCs | T01 | planned |
+| M39-T02 | Group calendar, scheduling, roster and snapshot lifecycle storage; authorized RPCs | T01 | completed |
 | [M39-T03](../tasks/M39-T03-Serve_CotW_rankings_and_history.md) | Live rankings, automatic finalization, stored final results and safe history | T02 | planned |
 | [M39-T04](../tasks/M39-T04-Deliver_CotW_mobile_flows.md) | Reviewed UX target, scheduling/results UI, integration evidence and issue closeout | T03 | planned |
 
@@ -233,7 +233,8 @@ contract. Review the attached UX brief now; add visual references and settle
 the remaining rule-dependent states before UI implementation. Design work
 needs no separate implementation PR. T01 defines the durable
 `docs/specs/tech/group-cow-contract.md` and pure `cow-scoring.ts` boundary;
-T02 is ready after its implementation PR merges. Delete each card in its shipping PR;
+T02 supplies the server lifecycle/intake and typed definition API;
+T03 is ready after that implementation PR merges. Delete each card in its shipping PR;
 delete this milestone, its UX brief and attached mockups with the last card.
 Evidence belongs in the PRs.
 

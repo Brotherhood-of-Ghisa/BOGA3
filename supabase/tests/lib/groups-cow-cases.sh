@@ -181,6 +181,7 @@ run_cow_contract_cases() {
   [[ "$(run_psql "select input->>'weight_value' from app_public.group_cow_sources where cow_id='${ci}' and set_id='${set}' order by id desc limit 1;")" == 102 ]] || fail "final transaction source not sealed"
   run_psql "begin; select set_config('request.jwt.claims',jsonb_build_object('sub','${OWNER_UID}','role','authenticated')::text,true); update app_public.exercise_sets set weight_value='103' where owner_user_id='${OWNER_UID}' and id='${set}'; rollback;" >/dev/null
   [[ "$(run_psql "select count(*) from app_public.group_cow_sources where cow_id='${ci}' and set_id='${set}';")" == 2 ]] || fail "rollback left a receipt"
+  run_cow_creation_race "${def}"
   # The share trigger can self-heal on a session's unrelated duration edit;
   # that ledger insertion itself, not the later rescan, supplies the receipt.
   run_psql "delete from app_public.group_session_shares where group_id='${cg}' and member_user_id='${OWNER_UID}' and session_id='${sid}';" >/dev/null
@@ -192,12 +193,27 @@ run_cow_contract_cases() {
   run_psql "alter table app_public.group_cow_sources add constraint ${fail_constraint} check(false) not valid;" >/dev/null
   next_cuam
   push "${OWNER_TOKEN}" 'isolated failed CoW capture' "$(e_set "${set}" "${se}" 0 104 5 "" "${CUAM}" null)"
+  probe="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+  if result="$(run_psql_once "insert into app_public.group_cows(id,group_id,group_exercise_id,week_start,time_zone,starts_at,ends_at,metrics,create_key,created_by,available_at)
+    values('${probe}','${cg}','${ce}',date '${next_week}'+14,'UTC',
+      lower(app_public.group_cow_bounds('UTC',date '${next_week}'+14)),upper(app_public.group_cow_bounds('UTC',date '${next_week}'+14)),
+      array['e1rm'],'capture-error-probe','${OWNER_UID}',clock_timestamp());" 2>&1)"; then fail "definition accepted failed private intake"; fi
+  [[ "${result}" == *'INTERNAL: CoW intake could not be validated'* && "${result}" != *'Failing row contains'* && "${result}" != *'weight_value'* ]] ||
+    fail "definition error exposed private failing-row detail"
+  [[ "$(run_psql "select count(*) from app_public.group_cows where id='${probe}';")" == 0 ]] || fail "failed definition intake committed"
   run_psql "alter table app_public.group_cow_sources drop constraint ${fail_constraint};" >/dev/null
   [[ "$(run_psql "select count(*) from app_public.group_cow_intake_failures where cow_id='${ci}' and sqlstate='23514';")" -gt 0 ]] || fail "failed capture lost durable uncertainty"
   # Restore and retain the failure marker: later intake cannot manufacture lost priority.
   next_cuam
   push "${OWNER_TOKEN}" 'CoW capture recovers' "$(e_set "${set}" "${se}" 0 105 5 "" "${CUAM}" null)"
   [[ "$(run_psql "select count(*) from app_public.group_cow_intake_failures where cow_id='${ci}';")" -gt 0 ]] || fail "uncertainty silently cleared"
+  run_psql "alter table app_public.group_cow_pending add constraint cow_intake_pending_failure check(false) not valid;" >/dev/null
+  next_cuam
+  push "${OWNER_TOKEN}" 'isolated failed group intake mark' "$(e_set "${set}" "${se}" 0 106 5 "" "${CUAM}" null)"
+  run_psql "alter table app_public.group_cow_pending drop constraint cow_intake_pending_failure;" >/dev/null
+  [[ "$(run_psql "select count(*) from app_public.group_cow_intake_failures where cow_id is null and group_id='${cg}' and sqlstate='23514';")" -gt 0 ]] || fail "failed intake mark lost its known group scope"
+  next_cuam
+  push "${OWNER_TOKEN}" 'group intake mark recovers' "$(e_set "${set}" "${se}" 0 105 5 "" "${CUAM}" null)"
   # Initial intake is part of publishing a definition: it must finish before start.
   probe="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
   if result="$(run_psql_once "begin;
@@ -213,6 +229,17 @@ run_cow_contract_cases() {
       values('${probe}','${cg}','${ce}',date '${next_week}'+7,'UTC',clock_timestamp()-interval '1 second',clock_timestamp()+interval '7 days',array['e1rm'],'immediate-probe','${OWNER_UID}',clock_timestamp());
     commit;" 2>&1)"; then fail "immediate constraint mode swallowed the definition deadline"; fi
   [[ "${result}" == *'VALIDATION:'* ]] || fail "immediate initial seal did not fail with VALIDATION"
+  run_psql "insert into app_public.group_cows(id,group_id,group_exercise_id,week_start,time_zone,starts_at,ends_at,metrics,create_key,created_by,available_at)
+    values('${probe}','${cg}','${ce}',date '${next_week}'+7,'UTC',clock_timestamp()+interval '1 day',clock_timestamp()+interval '8 days',array['e1rm'],'cancel-deadline-probe','${OWNER_UID}',clock_timestamp());
+    update app_public.group_cows set starts_at=clock_timestamp()+interval '100 milliseconds' where id='${probe}';" >/dev/null
+  if result="$(run_psql_once "begin;
+    select set_config('request.jwt.claims',jsonb_build_object('sub','${OWNER_UID}','role','authenticated')::text,true);
+    select set_config('request.headers','{\"x-boga-group-contract\":\"4\"}',true);
+    select app_public.group_cow_cancel('${cg}','${probe}',1);
+    do \$probe\$ begin while clock_timestamp()<(select starts_at from app_public.group_cows where id='${probe}') loop perform pg_sleep(0.01); end loop; end \$probe\$;
+    commit;" 2>&1)"; then fail "cancellation committed after crossing start"; fi
+  [[ "${result}" == *'VALIDATION:'* ]] || fail "late cancellation seal did not fail with VALIDATION"
+  [[ "$(run_psql "select cancelled_at is null from app_public.group_cows where id='${probe}';")" == t ]] || fail "late cancellation escaped rollback"
   context_count="$(run_psql "select count(*) from app_public.group_cow_contexts where cow_id='${ci}';")"
   rpc "${OWNER_TOKEN}" group_update "$(jq -nc --arg g "${cg}" --arg n "CoW ${RUN_TAG}" '{p_group_id:$g,p_name:$n,p_description:null,p_bodyweight_calculations_enabled:true}')"
   expect_ok "enable group bodyweight at zero contribution"
@@ -341,4 +368,64 @@ run_cow_contract_cases() {
   check "ended definition is finalizing, never an invented final" '.cow.state=="finalizing"'
   rm -rf "${COW_TEST_LOG_DIR}"; COW_TEST_LOG_DIR=""
   pass "CoW calendars, roles, idempotent lifecycle, exact definitions, retained receipts, real deferred-FK cutoff and isolated uncertainty"
+}
+
+# Scheduling and an existing-source correction can overlap without either
+# transaction seeing the other's uncommitted row. Discovery must follow the lock.
+run_cow_creation_race() {
+  local def="$1" g e c sid se set started gate holder writer gate_pid holder_pid writer_pid deadline
+  rpc "${OWNER_TOKEN}" group_create "$(jq -nc --arg n "Create race ${RUN_TAG}" '{p_name:$n,p_description:null,p_time_zone:"UTC"}')"
+  expect_ok "creation race group"
+  g="$(jq -r '.group_id' <<<"${BODY}")"
+  rpc "${OWNER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${g}" Race total_load)"
+  expect_ok "creation race target"
+  e="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+  started="$(run_psql "select floor(extract(epoch from clock_timestamp())*1000)::bigint;")"
+  sid="cow-race-session-${RUN_TAG}"; se="cow-race-block-${RUN_TAG}"; set="cow-race-set-${RUN_TAG}"
+  next_cuam
+  push "${OWNER_TOKEN}" 'share source before first CoW' "$(e_link "${def}" "${g}" "${e}" "${CUAM}")" \
+    "$(e_session "${sid}" "${started}" completed "$((started+1))" 1 null "${CUAM}")" \
+    "$(e_se "${se}" "${sid}" "${def}" 0 Cow "${CUAM}" null)" "$(e_set "${set}" "${se}" 0 100 5 "" "${CUAM}" null)"
+  [[ "$(run_psql "select count(*) from app_public.group_session_shares where group_id='${g}' and member_user_id='${OWNER_UID}' and session_id='${sid}';")" == 1 ]] || fail "creation race source was not legitimately shared"
+  c="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+  gate="cow_create_gate_${RUN_TAG}"; holder="cow_create_holder_${RUN_TAG}"; writer="cow_create_writer_${RUN_TAG}"
+  COW_TEST_LOG_DIR="$(mktemp -d)"
+  run_psql_once "set application_name='${gate}'; select pg_advisory_lock(hashtextextended('${holder}',0)); select pg_sleep(60);" >"${COW_TEST_LOG_DIR}/gate" 2>&1 &
+  gate_pid=$!
+  deadline=$((SECONDS+15))
+  until [[ "$(run_psql "select count(*) from pg_stat_activity where application_name='${gate}' and wait_event='PgSleep';")" == 1 ]]; do
+    [[ ${SECONDS} -lt ${deadline} ]] || fail "creation race gate did not acquire its advisory lock"
+    sleep 0.05
+  done
+  run_psql_once "begin; set application_name='${holder}';
+    select set_config('request.jwt.claims',jsonb_build_object('sub','${OWNER_UID}','role','authenticated')::text,true);
+    select set_config('request.headers','{\"x-boga-group-contract\":\"4\"}',true);
+    select app_public.group_cow_create('${g}','${c}','${e}',array['volume'],1,app_public.group_cow_week('UTC',clock_timestamp())+7);
+    set constraints all immediate;
+    select pg_advisory_xact_lock(hashtextextended('${holder}',0)); commit;" >"${COW_TEST_LOG_DIR}/holder" 2>&1 &
+  holder_pid=$!
+  deadline=$((SECONDS+15))
+  until [[ "$(run_psql "select count(*) from pg_stat_activity where application_name='${holder}' and wait_event='advisory';")" == 1 ]]; do
+    kill -0 "${holder_pid}" 2>/dev/null || { cat "${COW_TEST_LOG_DIR}/holder" >&2; fail "creation race scheduler exited before sealing"; }
+    [[ ${SECONDS} -lt ${deadline} ]] || fail "creation race scheduler never sealed"
+    sleep 0.05
+  done
+  run_psql_once "begin; set application_name='${writer}';
+    select set_config('request.jwt.claims',jsonb_build_object('sub','${OWNER_UID}','role','authenticated')::text,true);
+    update app_public.exercise_sets set weight_value='101' where owner_user_id='${OWNER_UID}' and id='${set}';
+    set constraints all immediate; commit;" >"${COW_TEST_LOG_DIR}/writer" 2>&1 &
+  writer_pid=$!
+  deadline=$((SECONDS+15))
+  while kill -0 "${writer_pid}" 2>/dev/null; do
+    [[ "$(run_psql "select count(*) from pg_stat_activity where application_name='${writer}' and wait_event_type='Lock';")" == 1 ]] && break
+    [[ ${SECONDS} -lt ${deadline} ]] || fail "creation race writer did not finish or reach the group lock"
+    sleep 0.05
+  done
+  run_psql "select pg_cancel_backend(pid) from pg_stat_activity where application_name='${gate}';" >/dev/null
+  wait "${gate_pid}" || true
+  wait "${holder_pid}" || { cat "${COW_TEST_LOG_DIR}/holder" >&2; fail "creation race schedule failed"; }
+  wait "${writer_pid}" || { cat "${COW_TEST_LOG_DIR}/writer" >&2; fail "creation race correction failed"; }
+  [[ "$(run_psql "select input->>'weight_value' from app_public.group_cow_sources where cow_id='${c}' and set_id='${set}' order by id desc limit 1;")" == 101 ]] || fail "concurrent first CoW missed an accepted existing-source correction"
+  rm -rf "${COW_TEST_LOG_DIR}"; COW_TEST_LOG_DIR=""
+  pass "concurrent first CoW and existing-source correction serialize at the final seal"
 }

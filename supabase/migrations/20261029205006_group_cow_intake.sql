@@ -1,10 +1,10 @@
 -- A deferred seal observes the final coherent transaction, never a sync cursor.
 create table app_public.group_cow_pending (
   id bigint generated always as identity primary key,
-  cow_id uuid not null,
+  group_id uuid not null,
   source_xid bigint not null
 );
-create index group_cow_pending_transaction on app_public.group_cow_pending(source_xid,cow_id,id);
+create index group_cow_pending_transaction on app_public.group_cow_pending(source_xid,group_id,id);
 alter table app_public.group_cow_pending enable row level security;
 revoke all on app_public.group_cow_pending from public,anon,authenticated,service_role;
 
@@ -78,9 +78,9 @@ declare c app_public.group_cows; ctx jsonb; graph jsonb; people jsonb; receipt t
   row jsonb; old app_public.group_cow_sources; person jsonb; prior_context jsonb; changed boolean:=false; written_rows integer;
 begin
   perform app_public.group_cow_reject_agent();
-  -- Same lock as management; held through commit. Snapshot is built only after
-  -- the source/FK events preceding the final pending revision have drained.
-  perform 1 from app_public.groups g join app_public.group_cows x on x.group_id=g.id where x.id=p_cow_id for update of g;
+  -- Exclude management/barriers without blocking ordinary group readers.
+  -- The CoW row serializes captures after the final dependency validations.
+  perform 1 from app_public.groups g join app_public.group_cows x on x.group_id=g.id where x.id=p_cow_id for key share of g;
   select * into c from app_public.group_cows where id=p_cow_id for update;
   if not found or c.cancelled_at is not null or c.finalized_at is not null then return; end if;
   delete from app_public.group_cow_sources where cow_id=c.id and source_xid=xid;
@@ -119,11 +119,13 @@ begin
     changed:=true;
   end if;
   -- Restore explicit non-counting states when a source or its share disappears.
-  select graph||coalesce(jsonb_agg(jsonb_build_object('member_user_id',x.member_user_id,'set_id',x.set_id,
+  with present as materialized (
+    select n->>'member_user_id' as member_user_id,n->>'set_id' as set_id from jsonb_array_elements(graph) n
+  ) select graph||coalesce(jsonb_agg(jsonb_build_object('member_user_id',x.member_user_id,'set_id',x.set_id,
       'input',x.input||jsonb_build_object('shared',false,'eligible',false,'context',ctx))),'[]'::jsonb) into graph
     from (select distinct on(member_user_id,set_id) * from app_public.group_cow_sources where cow_id=c.id
       order by member_user_id,set_id,received_at desc,id desc) x
-    where not exists(select 1 from jsonb_array_elements(graph) n where n->>'member_user_id'=x.member_user_id::text and n->>'set_id'=x.set_id);
+    where not exists(select 1 from present n where n.member_user_id=x.member_user_id::text and n.set_id=x.set_id);
   for row in select value from jsonb_array_elements(graph) loop
     select * into old from app_public.group_cow_sources where cow_id=c.id and member_user_id=(row->>'member_user_id')::uuid
       and set_id=row->>'set_id' order by received_at desc,id desc limit 1;
@@ -142,37 +144,47 @@ end $$;
 
 create function app_public.group_cow_pending_seal() returns trigger
 language plpgsql security definer set search_path=app_public,pg_temp as $$
-declare code text; definition_write boolean; starts_at timestamptz;
+declare code text; c app_public.group_cows;
 begin
   perform app_public.group_cow_reject_agent();
-  if new.id is distinct from (select max(id) from app_public.group_cow_pending where cow_id=new.cow_id and source_xid=new.source_xid) then return null; end if;
-  select c.definition_xid=new.source_xid,c.starts_at into definition_write,starts_at
-    from app_public.group_cows c where c.id=new.cow_id;
-  if definition_write then
-    begin
-      perform app_public.group_cow_capture(new.cow_id);
-    exception when others then
-      -- PostgreSQL row-error details can contain another member's private inputs.
-      raise exception 'INTERNAL: CoW intake could not be validated' using errcode='P0001';
-    end;
-    if clock_timestamp()>=starts_at then
-      raise exception 'VALIDATION: finish scheduling, editing or cancelling before the CoW starts' using errcode='P0001';
-    end if;
-  else
-    begin
-      perform app_public.group_cow_capture(new.cow_id);
-    exception when others then
-      get stacked diagnostics code=returned_sqlstate;
-      insert into app_public.group_cow_intake_failures(cow_id,source_xid,sqlstate) values(new.cow_id,new.source_xid,code);
-    end;
-  end if;
-  delete from app_public.group_cow_pending where cow_id=new.cow_id and source_xid=new.source_xid;
+  if new.id is distinct from (select max(id) from app_public.group_cow_pending where group_id=new.group_id and source_xid=new.source_xid) then return null; end if;
+  begin
+    -- Discover after acquiring the lock: a concurrent first definition may
+    -- have been invisible when this source transaction queued its group.
+    perform 1 from app_public.groups where id=new.group_id for key share;
+    for c in select * from app_public.group_cows where group_id=new.group_id and finalized_at is null
+      and (cancelled_at is null or definition_xid=new.source_xid) order by id loop
+      if c.definition_xid=new.source_xid then
+        begin
+          perform app_public.group_cow_capture(c.id);
+        exception when others then
+          -- PostgreSQL row-error details can contain another member's private inputs.
+          raise exception 'INTERNAL: CoW intake could not be validated' using errcode='P0001';
+        end;
+        if clock_timestamp()>=c.starts_at then
+          raise exception 'VALIDATION: finish scheduling, editing or cancelling before the CoW starts' using errcode='P0001';
+        end if;
+      else
+        begin
+          perform app_public.group_cow_capture(c.id);
+        exception when others then
+          get stacked diagnostics code=returned_sqlstate;
+          insert into app_public.group_cow_intake_failures(cow_id,group_id,source_xid,sqlstate) values(c.id,new.group_id,new.source_xid,code);
+        end;
+      end if;
+    end loop;
+  exception when others then
+    if exists(select 1 from app_public.group_cows where group_id=new.group_id and definition_xid=new.source_xid) then raise; end if;
+    get stacked diagnostics code=returned_sqlstate;
+    insert into app_public.group_cow_intake_failures(group_id,source_xid,sqlstate) values(new.group_id,new.source_xid,code);
+  end;
+  delete from app_public.group_cow_pending where group_id=new.group_id and source_xid=new.source_xid;
   return null;
 end $$;
 create constraint trigger group_cow_pending_seal after insert on app_public.group_cow_pending
   deferrable initially deferred for each row execute function app_public.group_cow_pending_seal();
 
-create function app_public.group_cow_mark(p_cow uuid) returns void
+create function app_public.group_cow_mark(p_group uuid) returns void
 language plpgsql volatile security definer set search_path=app_public,pg_temp as $$
 declare xid bigint:=txid_current(); code text;
 begin
@@ -180,25 +192,17 @@ begin
   begin
     -- Early SET CONSTRAINTS can already have sealed this transaction. A later
     -- relevant write invalidates that receipt even if its replacement fails.
-    delete from app_public.group_cow_sources where cow_id=p_cow and source_xid=xid;
-    delete from app_public.group_cow_contexts where cow_id=p_cow and source_xid=xid;
-    insert into app_public.group_cow_pending(cow_id,source_xid) values(p_cow,xid);
+    delete from app_public.group_cow_sources s using app_public.group_cows c
+      where c.id=s.cow_id and c.group_id=p_group and s.source_xid=xid;
+    delete from app_public.group_cow_contexts s using app_public.group_cows c
+      where c.id=s.cow_id and c.group_id=p_group and s.source_xid=xid;
+    insert into app_public.group_cow_pending(group_id,source_xid) values(p_group,xid);
   exception when others then
     if exists(select 1 from app_public.group_cows where definition_xid=xid) then raise; end if;
     get stacked diagnostics code=returned_sqlstate;
-    insert into app_public.group_cow_intake_failures(cow_id,source_xid,sqlstate) values(p_cow,xid,code);
+    insert into app_public.group_cow_intake_failures(group_id,source_xid,sqlstate) values(p_group,xid,code);
   end;
 end $$;
-
--- A transaction can force a seal early, then write again after the edge.
--- Its already sealed targets must still be invalidated/resealed after end.
-create function app_public.group_cow_touched(p_cow uuid) returns boolean
-language sql volatile set search_path=app_public,pg_temp as $$
-  select exists(select 1 from app_public.group_cow_sources where cow_id=p_cow and source_xid=txid_current())
-    or exists(select 1 from app_public.group_cow_contexts where cow_id=p_cow and source_xid=txid_current())
-    or exists(select 1 from app_public.group_cow_admissions where cow_id=p_cow and (joined_xid=txid_current() or ended_xid=txid_current()))
-    or exists(select 1 from app_public.group_cow_pending where cow_id=p_cow and source_xid=txid_current());
-$$;
 
 create function app_public.group_cow_on_source() returns trigger
 language plpgsql security definer set search_path=app_public,pg_temp as $$
@@ -234,11 +238,10 @@ begin
   members:=array[member,coalesce(previous_row->>'owner_user_id',previous_row->>'member_user_id')::uuid];
   -- Do not join through a child parent here: Sync v2 defers its FKs and may
   -- deliver a child before the parent. Graph resolution belongs to the seal.
-  for c in select x.id from app_public.group_cows x where x.cancelled_at is null and x.finalized_at is null
-    and (x.ends_at>clock_timestamp() or app_public.group_cow_touched(x.id)) and (exists(select 1 from app_public.group_memberships m
-      where m.group_id=x.group_id and m.user_id=any(members)) or exists(select 1 from app_public.group_cow_admissions a
-        where a.cow_id=x.id and a.member_user_id=any(members))) order by x.group_id,x.id loop
-    perform app_public.group_cow_mark(c.id);
+  for c in select m.group_id from app_public.group_memberships m where m.user_id=any(members)
+    union select x.group_id from app_public.group_cow_admissions a join app_public.group_cows x on x.id=a.cow_id
+      where a.member_user_id=any(members) order by group_id loop
+    perform app_public.group_cow_mark(c.group_id);
   end loop;
   exception when others then
     if exists(select 1 from app_public.group_cows where definition_xid=txid_current()) then raise; end if;
@@ -254,14 +257,14 @@ begin
   perform app_public.group_cow_reject_agent();
   begin
   if tg_table_name='group_cows' then
+    g:=case when tg_op='DELETE' then old.group_id else new.group_id end;
     if tg_op='DELETE' then
       delete from app_public.group_cow_intake_failures where cow_id=old.id;
-      delete from app_public.group_cow_pending where cow_id=old.id;
       return null;
     end if;
     if tg_op='UPDATE' and row(new.group_exercise_id,new.metrics,new.revision,new.cancelled_at) is not distinct from
       row(old.group_exercise_id,old.metrics,old.revision,old.cancelled_at) then return null; end if;
-    if new.finalized_at is null then perform app_public.group_cow_mark(new.id); end if;
+    if new.finalized_at is null then perform app_public.group_cow_mark(new.group_id); end if;
   else
     if tg_table_name='group_eval_rules_state' then
       if tg_op='UPDATE' and new.rules_version=old.rules_version then return null; end if;
@@ -276,14 +279,18 @@ begin
       if tg_op='UPDATE' and row(new.ended_at,new.joined_at) is not distinct from row(old.ended_at,old.joined_at) then return null; end if;
       g:=case when tg_op='DELETE' then old.group_id else new.group_id end;
     end if;
-    for c in select id from app_public.group_cows where cancelled_at is null and finalized_at is null
-      and (ends_at>clock_timestamp() or app_public.group_cow_touched(id)) and (g is null or group_id=g) order by group_id,id loop
-      perform app_public.group_cow_mark(c.id);
-    end loop;
+    if g is not null then
+      perform app_public.group_cow_mark(g);
+    else
+      -- A global scorer change must also meet a concurrently created first CoW.
+      for c in select id from app_public.groups where deleted_at is null order by id loop
+        perform app_public.group_cow_mark(c.id);
+      end loop;
+    end if;
   end if;
   exception when others then
     if exists(select 1 from app_public.group_cows where definition_xid=txid_current()) then raise; end if;
-    insert into app_public.group_cow_intake_failures(source_xid,sqlstate) values(txid_current(),sqlstate);
+    insert into app_public.group_cow_intake_failures(group_id,source_xid,sqlstate) values(g,txid_current(),sqlstate);
   end;
   return null;
 end $$;
@@ -301,7 +308,7 @@ begin
   end loop;
   for f in select p.oid::regprocedure as signature from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='app_public' and p.proname in ('group_cow_context','group_cow_source_snapshot','group_cow_capture',
-      'group_cow_pending_seal','group_cow_mark','group_cow_touched','group_cow_on_source','group_cow_on_group') loop
+      'group_cow_pending_seal','group_cow_mark','group_cow_on_source','group_cow_on_group') loop
     execute format('revoke all on function %s from public,anon,authenticated,service_role',f.signature);
   end loop;
 end $$;

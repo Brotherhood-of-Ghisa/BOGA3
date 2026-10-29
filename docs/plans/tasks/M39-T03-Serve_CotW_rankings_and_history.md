@@ -52,7 +52,7 @@ with `group_cow_us`, without a `Date` millisecond round-trip.
 
 Implement the scheduled start/close barriers and populate their high-water
 marks and frozen participants; storage alone does not perform those jobs.
-Check applicable CoW-specific and unscoped intake failures before publication.
+Check applicable CoW-specific, group/member and unscoped intake failures before publication.
 Uncertainty cannot be cleared just because a later capture succeeds. Define
 explicit safe recovery or keep Finalizing; source history lost through a
 failed intake cannot be reconstructed from today's mutable graph.

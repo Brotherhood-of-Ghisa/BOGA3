@@ -78,9 +78,10 @@ cleanup() {
   # Always remove the failure-isolation probe constraints, even if the run died
   # between adding and dropping them.
   run_psql "set client_min_messages = warning;
-            select pg_terminate_backend(pid) from pg_stat_activity where application_name in ('cow_fk_holder_${RUN_TAG}','cow_fk_writer_${RUN_TAG}') and pid<>pg_backend_pid();
+            select pg_terminate_backend(pid) from pg_stat_activity where application_name in ('cow_fk_holder_${RUN_TAG}','cow_fk_writer_${RUN_TAG}','cow_create_gate_${RUN_TAG}','cow_create_holder_${RUN_TAG}','cow_create_writer_${RUN_TAG}') and pid<>pg_backend_pid();
             alter table app_public.group_session_shares drop constraint if exists ${FORCE_FAIL_CONSTRAINT};
             alter table app_public.group_cow_sources drop constraint if exists cow_intake_force_failure;
+            alter table app_public.group_cow_pending drop constraint if exists cow_intake_pending_failure;
             alter table app_public.group_events drop constraint if exists ${FORCE_EVENT_FAIL_CONSTRAINT};" >/dev/null
   [[ -z "${COW_TEST_LOG_DIR:-}" ]] || rm -rf "${COW_TEST_LOG_DIR}"
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0

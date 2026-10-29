@@ -43,8 +43,10 @@ source transaction; rollback/rejection creates no receipt. If more relevant
 writes occur after a seal, invalidate it and reseal after the last validation.
 Never backdate receipt to an earlier dependency or transaction timestamp.
 
-Serialize the seal, membership/context mutations and start/close barriers on
-the same affected group/comparison lock, retained through commit. A barrier
+Management and start/close barriers hold the group row `FOR UPDATE`. Seals
+hold it `FOR KEY SHARE`, then serialize source/membership/context captures
+on each CoW row `FOR UPDATE`, all through commit. This excludes barriers
+without blocking ordinary group readers holding `FOR SHARE`. A barrier
 waits for earlier holders; writes obtaining their final seal after the edge
 cannot enter it. Closing records an immutable intake high-water mark, after
 observing committed pre-edge holders. A transaction straddling the edge is
@@ -107,7 +109,10 @@ admin write. The same lock checks both local-week identity and UTC overlap.
 Each local midnight is converted separately by `group_cow_bounds`.
 
 `supabase/migrations/20261029205006_group_cow_intake.sql` owns capture. Source
-triggers mark targets without resolving child parents. The final pending event
+triggers queue membership/admission groups without resolving child parents or
+requiring a visible CoW. The seal locks the group, then discovers its CoWs in a
+fresh snapshot, including concurrent first definitions. It retains late receipts
+for ended but unfinalized CoWs; the worker still applies each cutoff. The final pending event
 follows the relevant `RI_` FK events; `sync_push`'s existing constraint drain
 therefore closes dependencies before capture. An early forced drain is safe:
 another relevant write deletes that transaction's earlier intake and reseals,
@@ -135,8 +140,9 @@ Admission receipts retain candidate periods independently of mutable membership
 timestamps. A first end and same-transaction source revisions share the final
 seal instant; a new period never reopens the old one. Context versions retain
 comparison/scorer/unit availability separately. Capture failures persist
-SQLSTATE and transaction identity without an FK or group-lock acquisition.
-The worker must check both CoW-specific and applicable unscoped failure markers;
+SQLSTATE, transaction identity and known group/member scope without an FK or
+group-lock acquisition. The worker must check CoW-specific, group/member and
+applicable unscoped failure markers;
 later successful input cannot reconstruct lost intermediate priority or
 silently clear uncertainty.
 

@@ -84,6 +84,7 @@ create index group_cow_sources_transaction on app_public.group_cow_sources(cow_i
 create table app_public.group_cow_intake_failures (
   id bigint generated always as identity primary key,
   cow_id uuid,
+  group_id uuid,
   member_user_id uuid,
   source_xid bigint not null,
   failed_at timestamptz not null default clock_timestamp(),
@@ -249,7 +250,7 @@ begin
   key:=jsonb_build_array('edit',p_expected_revision,p_group_exercise_id,p_metrics)::text;
   if c.last_write_key=key then return jsonb_build_object('cow',app_public.group_cow_json(c)); end if;
   if c.revision is distinct from p_expected_revision then raise exception 'CONFLICT: CoW changed; refresh before saving' using errcode='P0001'; end if;
-  if c.cancelled_at is not null or c.starts_at<=clock_timestamp() then raise exception 'VALIDATION: only a scheduled CoW can be edited' using errcode='P0001'; end if;
+  if c.cancelled_at is not null or c.finalized_at is not null or c.starts_at<=clock_timestamp() then raise exception 'VALIDATION: only a scheduled CoW can be edited' using errcode='P0001'; end if;
   chosen:=app_public.group_cow_validate(p_group_id,p_group_exercise_id,p_metrics);
   update app_public.group_cows set group_exercise_id=p_group_exercise_id,metrics=chosen,revision=revision+1,
     last_write_key=key,definition_xid=txid_current(),generation=generation+1 where id=c.id returning * into c;
@@ -267,7 +268,7 @@ begin
   key:=jsonb_build_array('cancel',p_expected_revision)::text;
   if c.last_write_key=key then return jsonb_build_object('cow',app_public.group_cow_json(c)); end if;
   if c.revision is distinct from p_expected_revision then raise exception 'CONFLICT: CoW changed; refresh before cancelling' using errcode='P0001'; end if;
-  if c.cancelled_at is not null or c.starts_at<=clock_timestamp() then raise exception 'VALIDATION: only a scheduled CoW can be cancelled' using errcode='P0001'; end if;
+  if c.cancelled_at is not null or c.finalized_at is not null or c.starts_at<=clock_timestamp() then raise exception 'VALIDATION: only a scheduled CoW can be cancelled' using errcode='P0001'; end if;
   update app_public.group_cows set cancelled_at=clock_timestamp(),revision=revision+1,last_write_key=key,
     definition_xid=txid_current(),generation=generation+1,claim_id=null,lease_until=null where id=c.id returning * into c;
   return jsonb_build_object('cow',app_public.group_cow_json(c));
