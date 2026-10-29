@@ -45,8 +45,10 @@ and Past CoWs sections, with the current metric's top-three preview and Full
 standings. The operator requested a horizontal current-CoW banner, preserving
 existing formatting: exercise/status left, dates/zone right. The revised
 mockup is attached to the brief; no browser tabs or week stepper. The browser and
-Today top-three card are approved design targets. The scheduling form is
-pending review; its earlier approval message was corrected by the operator.
+Today top-three card are approved design targets. The revised individual
+group-page preview is also approved; View CoWs versus View/Edit CoWs wording
+is deferred. Scheduling remains pending selection from the three alternatives
+in the brief; no earlier scheduling draft is approved.
 The fallback is also agreed: a current CoW with no scores still takes priority;
 never substitute older, upcoming or non-final results as fallback. The header opens the
 displayed week's CoW and selected metric. No placeholder or reserved space
@@ -54,14 +56,15 @@ when the card is hidden.
 
 ## Open — resolve with the operator at session start
 
-- Use the two approved mockups in the [CoW UX brief](../M39-cow-ux.md).
-  Review its scheduling form, revised group preview, empty/error targets and state tables;
+- Use the three approved mockups in the [CoW UX brief](../M39-cow-ux.md).
+  Select/refine a scheduling alternative, review empty/error targets and state tables,
+  and settle the deferred group-link wording;
   editing reuses that form with Edit CoW / Save changes, subject to T01.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build
   inputs, never a replacement for the merged T01 contract.
-- Capture current group references before implementation. The brief proposes
-  one Groups CoWs link, a group-page current-CoW preview with View CoWs footer,
-  secondary-page admin management and form entry,
+- Capture current group references before implementation. Preserve the
+  approved group preview and onward view/manage entry. The brief proposes
+  the separate Groups link, secondary-page admin management/form entry,
   state recovery and a Time zone field in group Edit. Finalize rule-dependent
   results/history and zone controls against T01; settled approvals stand.
   Scheduling always targets next week; no date picker or later-week

@@ -1,11 +1,11 @@
 # CoW — UX brief
 
-- Status: two attached mockups approved by the operator on 2026-10-29:
+- Status: three attached mockups approved by the operator on 2026-10-29:
   detailed chronological browser with horizontal banner, and Today top-three
-  card with in-card metric tabs. The last-week-final fallback is also agreed.
-  The scheduling form is pending review; the operator corrected the earlier
-  approval message. The revised group-page preview and empty/error targets
-  remain proposed for review. Only the browser and Today images are approved.
+  card with in-card metric tabs, and the revised individual group-page preview.
+  The last-week-final fallback on Today is also agreed. Scheduling alternatives
+  and empty/error targets remain pending review. The group link's View CoWs
+  versus View/Edit CoWs wording is explicitly deferred.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
@@ -155,11 +155,11 @@ Past CoWs: final results
 On the secondary CoWs page, the Next week section offers Schedule next CoW
 to admins when that slot is empty, or Edit next CoW for an editable next slot,
 subject to T01's lifecycle. Both open the separate form. The group-preview
-arrangement below is proposed for review.
+arrangement below is approved; its onward-link wording remains open.
 Browser/form date formatting follows the account preference; Today uses
 [[copy.calendar-dates]]. CoW dates refer to the group zone on both surfaces.
 
-## Group-page preview target — proposed
+## Group-page preview target — approved
 
 The operator requires the individual group page to show at least the same
 current-CoW information as Today. After Invite/Edit and before Exercises,
@@ -169,7 +169,9 @@ Include the group's time zone; dates follow this page's account preference.
 Do not substitute the viewer for third place. A separate View CoWs footer
 opens the secondary page for browsing and role-appropriate management,
 retaining the displayed CoW and metric. Metric tabs stay independent of this
-navigation target. Invite remains the group's sole primary accent.
+navigation target. Invite remains the group's sole primary accent. The
+operator approved this layout; View CoWs is working copy, with View/Edit CoWs
+left as an alternative to decide later. This does not grant edit access to members.
 
 Proposed reuse: the preview follows Today's current-first, exact-last-week-final
 selection. Unlike Today, the group page always retains its View CoWs entry
@@ -177,7 +179,7 @@ for a current member; when no preview is available, show a short empty state
 beside that link. Loading/errors do not imply absence. Next-week scheduling
 and edit controls live on the secondary CoWs page, not beside this preview.
 
-![Proposed individual group-page current-CoW preview](assets/M39-cow-group-entry.png)
+![Approved individual group-page current-CoW preview](assets/M39-cow-group-entry.png)
 
 Generated with the built-in image-generation tool. Prompt: extend the approved
 browser/Today style into the current group management structure, preserving its
@@ -203,18 +205,42 @@ its Schedule next CoW action opens the creation form. Next week's date range
 and the group's zone are
 read-only context, not editable date fields. Use the existing group
 exercise picker; require at least one metric. The visible form is the review:
-group, fixed week/zone, exercise and metric choices, followed by one Publish
-CoW action. No duplicate Review card or extra confirmation screen.
+group, fixed week/zone, exercise and metric choices, followed by one scheduling
+action. The current alternatives propose Schedule CoW as its label. No duplicate
+Review card or extra confirmation screen.
 Publishing immediately makes the upcoming CoW visible to members.
 
-![Draft Schedule CoW form for next week](assets/M39-cow-schedule.png)
+![Earlier unselected scheduling draft](assets/M39-cow-schedule.png)
 
 Generated with the built-in image-generation tool. Prompt: extend the approved
 CoW style into one short admin form with read-only group/next-week/zone context,
 the existing exercise picker, independent leaderboard checkboxes and one
 Publish CoW action. The illustration shows a filled form, not a new rule that
-all three metrics must be selected. This form is not approved; it remains a
-candidate for review after the group-page correction.
+all three metrics must be selected. This earlier Publish CoW draft is not
+approved; the alternatives below are the current selection set.
+
+### Scheduling layout exploration — pending selection
+
+The three independent alternatives keep the same behavior: fixed group and
+next-week dates/zone, one existing active group exercise, independently chosen
+leaderboards and one Schedule CoW action. They vary context density, order and
+checklist placement within the house style. No wizard, date picker, recurring
+setting, extra review step or new exercise/scoring configuration.
+
+![Scheduling option 1](assets/M39-cow-schedule-option-1.png)
+
+![Scheduling option 2](assets/M39-cow-schedule-option-2.png)
+
+![Scheduling option 3](assets/M39-cow-schedule-option-3.png)
+
+Generated independently with the built-in image-generation tool, grounded in
+the earlier form and approved group image. Prompts: compact context/checklist;
+week-led read-only context block and grouped checklist; exercise-first choices
+with a fixed-week strip before the action. Reference size 853 × 1844; date
+anchor 2026-10-29, next week 2–8 Nov 2026 in Europe/London. Visible option
+numbers follow their display order in the conversation. Squat and the two
+checked metrics are a filled example, not initial defaults or a selection
+requirement. All three remain unapproved until the operator chooses/refines one.
 
 Editing reuses the same form and entered selections, titled Edit CoW with
 Save changes as its primary action. Allowed fields/actions still follow
@@ -232,7 +258,7 @@ Metrics
 [x] 1RM improvement (%)
 [x] Total Volume
 
-[Publish CoW]
+[Schedule CoW]                  (candidate copy)
 ```
 
 No exercise exists: offer the existing group-exercise creation path to admins,
@@ -317,7 +343,7 @@ Publishing failures use inline notices near the unchanged form's action:
 | Missing exercise or metrics | Choose an exercise. / Select at least one leaderboard. at the relevant field; focus the first invalid field. |
 | No eligible exercise / missing zone | No group exercises yet with Add exercise, or Choose a group time zone with Open group settings; return to retained input and revalidate the fixed next-week window. Publish remains unavailable until resolved. |
 | Offline before send | You’re offline. Nothing was published. Keep selections; refuse before sending. |
-| Confirmed rejected write | Show the safe server refusal near Publish/Save and preserve input. Role loss removes admin controls after refresh, while ordinary group browsing remains available. |
+| Confirmed rejected write | Show the safe server refusal near Schedule/Save and preserve input. Role loss removes admin controls after refresh, while ordinary group browsing remains available. |
 | Next slot occupied | Next week already has a CoW. Offer Open existing CoW; retain unsaved selections without overwriting the winner of a concurrent write. |
 | Other state/revision conflict | Refresh and review the changed context with input retained; do not misreport every conflict as an occupied slot or silently overwrite another admin's changes. |
 | Response uncertain | Couldn’t confirm publication. Offer Check status, which reads the authoritative slot before another create. While that read is failing or offline, keep create disabled; never assert Nothing was published. |
@@ -333,7 +359,7 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Review the draft scheduling form and three companion targets before implementation. T01
+Select/refine the scheduling target and review empty/error targets before implementation. T01
 still owns cutoff, edit/cancel, ties and revision policy. Verify approved
 layouts, state handling and fallback with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and

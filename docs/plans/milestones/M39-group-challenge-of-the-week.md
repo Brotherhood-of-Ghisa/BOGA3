@@ -105,9 +105,10 @@ upcoming or non-final fallback. The scheduling form is pending review: the
 operator corrected the earlier approval message. The individual group page
 must show at least Today's current-CoW information: exercise, dates/status,
 top three and in-card metric browsing, plus a link to view/manage CoWs on the
-successive page. The revised preview and empty/error targets await review;
-only the two member targets are approved. The brief includes offline,
-uncertain-publication and access-loss recovery. No new main tab.
+successive page. The revised group preview is approved, with View CoWs versus
+View/Edit CoWs copy left for later. The brief attaches three unapproved
+scheduling alternatives for selection; empty/error targets also await review.
+It includes offline, uncertain-publication and access-loss recovery. No new main tab.
 
 ### D7. Shared calendar and scheduling
 
