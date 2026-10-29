@@ -9,6 +9,9 @@ import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCer
   CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionPeriodTotalsWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
   GroupSharedExerciseDeleteWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
+import type { CoWMetric } from './cow-scoring';
+import { isCoWCalendarWire, isCoWListWire, isCoWWriteWire,
+  type CoWCalendarWire, type CoWListWire, type CoWWriteWire } from './cow-wire';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
 // It is the ONLY code that calls Supabase for groups. Every failure leaves this
@@ -126,7 +129,14 @@ export type GroupRpcName =
   | 'group_competition_period_totals'
   | 'group_shared_exercise_create'
   | 'group_shared_exercises_list'
-  | 'group_shared_exercise_delete';
+  | 'group_shared_exercise_delete'
+  | 'group_cow_calendar_get'
+  | 'group_cow_calendar_set'
+  | 'group_cow_create'
+  | 'group_cow_update'
+  | 'group_cow_cancel'
+  | 'group_cow_get'
+  | 'group_cow_list';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -194,10 +204,11 @@ export type GroupDetailsInput = {
 };
 export type GroupUpdateInput = GroupDetailsInput & { bodyweightCalculationsEnabled: boolean };
 
-export const createGroup = async ({ name, description }: GroupDetailsInput): Promise<GroupCreateResult> =>
+export const createGroup = async ({ name, description, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone }:
+  GroupDetailsInput & { timeZone?: string }): Promise<GroupCreateResult> =>
   expectShape(
     'group_create',
-    await callGroupRpc('group_create', { p_name: name, p_description: description }),
+    await callGroupRpc('group_create', { p_name: name, p_description: description, p_time_zone: timeZone }),
     (r) => isString(r.group_id),
   );
 
@@ -396,3 +407,40 @@ export const deleteGroupSharedExercise = (
     isGroupSharedExerciseDeleteWire,
     (p) => p.group_id === groupId && p.shared_exercise_id === sharedExerciseId && p.deleted === true,
   );
+
+export const getCoWCalendar = (groupId: string): Promise<CoWCalendarWire> =>
+  competitionRpc('group_cow_calendar_get', { p_group_id: groupId }, isCoWCalendarWire);
+
+export const setCoWCalendar = (groupId: string, revision: number, timeZone: string): Promise<CoWCalendarWire> =>
+  competitionRpc('group_cow_calendar_set', {
+    p_group_id: groupId, p_expected_revision: revision, p_time_zone: timeZone,
+  }, isCoWCalendarWire);
+
+export type CoWCreateInput = { cowId: string; groupExerciseId: string; metrics: CoWMetric[];
+  calendarRevision: number; weekStart: string };
+export type CoWUpdateInput = { revision: number; groupExerciseId: string; metrics: CoWMetric[] };
+
+export const createCoW = (groupId: string, input: CoWCreateInput): Promise<CoWWriteWire> =>
+  competitionRpc('group_cow_create', { p_group_id: groupId,
+    p_cow_id: input.cowId, p_group_exercise_id: input.groupExerciseId, p_metrics: input.metrics,
+    p_calendar_revision: input.calendarRevision, p_week_start: input.weekStart }, isCoWWriteWire,
+  p => p.cow.group_id === groupId && p.cow.cow_id === input.cowId);
+
+export const updateCoW = (groupId: string, cowId: string, input: CoWUpdateInput): Promise<CoWWriteWire> =>
+  competitionRpc('group_cow_update', { p_group_id: groupId, p_cow_id: cowId,
+    p_expected_revision: input.revision, p_group_exercise_id: input.groupExerciseId, p_metrics: input.metrics }, isCoWWriteWire,
+  p => p.cow.group_id === groupId && p.cow.cow_id === cowId);
+
+export const cancelCoW = (groupId: string, cowId: string, revision: number): Promise<CoWWriteWire> =>
+  competitionRpc('group_cow_cancel', {
+    p_group_id: groupId, p_cow_id: cowId, p_expected_revision: revision,
+  }, isCoWWriteWire, p => p.cow.group_id === groupId && p.cow.cow_id === cowId);
+
+export const getCoW = (groupId: string, cowId: string): Promise<CoWWriteWire> =>
+  competitionRpc('group_cow_get', { p_group_id: groupId, p_cow_id: cowId }, isCoWWriteWire,
+    p => p.cow.group_id === groupId && p.cow.cow_id === cowId);
+
+export const listCoWs = (groupId: string, before: string | null = null, limit = 20): Promise<CoWListWire> =>
+  competitionRpc('group_cow_list', {
+    p_group_id: groupId, p_before: before, p_limit: limit,
+  }, isCoWListWire, p => p.cows.every(cow => cow.group_id === groupId));

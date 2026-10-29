@@ -1,8 +1,8 @@
 # Challenge of the Week contract
 
 > **Owns:** CoW intake, cutoff, aggregation and publication boundaries.
-> **Status:** pure aggregation implemented; server lifecycle, intake, worker and
-> mobile integration pending. **Load when:** changing CoW.
+> **Status:** aggregation, server definitions, intake and typed API implemented;
+> worker publication and mobile screens pending. **Load when:** changing CoW.
 
 Product rules belong to [[groups.cow-metrics]], [[groups.cow-baseline]],
 [[groups.cow-calendar]], [[groups.cow-participation]],
@@ -89,6 +89,63 @@ transitions before final publication: the reducer accepts no saved aggregate
 receipt checkpoint. After immutable final publication, transient intake can
 be discarded under the audit policy. Later mutations cannot overwrite a
 sealed boundary, even when scoring has not yet run.
+
+## Server lifecycle and intake
+
+`supabase/migrations/20261029204606_group_cow_lifecycle.sql` owns definitions,
+calendar validation and RPCs. `group_create` has one defaulted zone argument:
+old calls create an unset calendar; the typed client supplies its creator's
+device zone. Existing summary payloads remain exact. Legacy calendars require
+an explicit manager choice through the separate calendar RPCs.
+
+Calendar, create, edit and cancel serialize on the existing group lock. Create
+uses a caller-held UUID and immutable request identity; an identical authorized
+retry resolves that identity before recalculating next week, including after
+cancellation, rollover or a zone change. Edit/cancel retain the last successful
+mutation identity and expected revision. Retries cannot undo a superseding
+admin write. The same lock checks both local-week identity and UTC overlap.
+Each local midnight is converted separately by `group_cow_bounds`.
+
+`supabase/migrations/20261029205006_group_cow_intake.sql` owns capture. Source
+triggers mark targets without resolving child parents. The final pending event
+follows the relevant `RI_` FK events; `sync_push`'s existing constraint drain
+therefore closes dependencies before capture. An early forced drain is safe:
+another relevant write deletes that transaction's earlier intake and reseals,
+even after end. Other transactions' sealed versions remain untouched. A
+definition transaction must finish its validated intake before start; failure
+rolls back the admin mutation. Internal capture errors are sanitized before
+returning to an admin: PostgreSQL row-error details may contain private source
+inputs. Source-only capture failures remain isolated.
+
+The source envelope's `eligible` means live source/link/definition only.
+The worker must apply the existing performed/working scorer rules before
+mapping it to `CoWSetVersion.eligible`; SQL mirrors no effort or load formula.
+Share-ledger inserts/deletes are dependencies too: a repaired share gets its
+own timely receipt even when a session's other change is only duration.
+
+An active CoW reuses its matching, eligible completed source's stored private
+reading context first, including an explicit missing context. First intake
+reuses an existing group binding or captures the as-of context. A later
+ordinary evaluator binding cannot change the CoW input or receipt while its
+raw binding key stands. Before start the baseline candidates can still
+refresh. Zero contribution canonicalizes the effective switch to Off, so an
+irrelevant group toggle creates no scoring-context change.
+
+Admission receipts retain candidate periods independently of mutable membership
+timestamps. A first end and same-transaction source revisions share the final
+seal instant; a new period never reopens the old one. Context versions retain
+comparison/scorer/unit availability separately. Capture failures persist
+SQLSTATE and transaction identity without an FK or group-lock acquisition.
+The worker must check both CoW-specific and applicable unscoped failure markers;
+later successful input cannot reconstruct lost intermediate priority or
+silently clear uncertainty.
+
+Start/close high-water marks, frozen participants and claim/generation fields
+are storage for the worker's barriers. Automatic discovery, bound-start
+selection, final publication and uncertainty recovery are still pending;
+definition reads return Finalizing after end, never a fabricated final.
+`apps/mobile/src/groups/cow-wire.ts` owns exact public definition/calendar
+shapes, and `api.ts` remains the sole group RPC caller.
 
 ## Pure reducer
 

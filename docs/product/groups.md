@@ -46,7 +46,7 @@ baseline.
 
 Why: reward personal progress against a stable shared reference.
 Code: `apps/mobile/src/groups/cow-scoring.ts`.
-Pending: frozen source intake in `supabase/migrations/` and `supabase/functions/group-eval/`.
+Pending: freezing the start baseline from retained intake in `supabase/functions/group-eval/`.
 
 ### groups.cow-calendar · definition · accepted
 
@@ -58,8 +58,7 @@ zone changes. Exercise/metric edits and cancellation are pre-start only.
 Cancellation retains audit and releases the slot for replacement.
 
 Why: every member competes in the same week, independently of viewer location.
-Code: `apps/mobile/src/groups/cow-scoring.ts` consumes authoritative bounds.
-Pending: group calendar and scheduling in `supabase/migrations/` and `apps/mobile/src/groups/api.ts`.
+Code: `supabase/migrations/20261029204606_group_cow_lifecycle.sql`; `apps/mobile/src/groups/api.ts`.
 
 ### groups.cow-participation · definition · accepted
 
@@ -71,7 +70,7 @@ authorization still controls reads, including former members' loss of access.
 
 Why: membership changes cannot recruit a different field halfway through a week.
 Code: `apps/mobile/src/groups/cow-scoring.ts` consumes the starting roster and first membership end.
-Pending: roster capture and authorization in `supabase/migrations/`.
+Pending: freezing the start roster from admission receipts in `supabase/functions/group-eval/`.
 
 ### groups.cow-submissions · definition · accepted
 
@@ -87,8 +86,8 @@ identical retries and unrelated writes do not. Client and worker clocks never
 decide ties.
 
 Why: timely submissions remain deterministic through offline sync and evaluator delays.
-Code: `apps/mobile/src/groups/cow-scoring.ts`.
-Pending: transactional acceptance receipts in `supabase/migrations/`.
+Code: `apps/mobile/src/groups/cow-scoring.ts`; receipt intake in `supabase/migrations/20261029205006_group_cow_intake.sql`.
+Pending: server ranking publication from those receipts in `supabase/functions/group-eval/`.
 
 ### groups.cow-finality · definition · accepted
 

@@ -78,8 +78,11 @@ cleanup() {
   # Always remove the failure-isolation probe constraints, even if the run died
   # between adding and dropping them.
   run_psql "set client_min_messages = warning;
+            select pg_terminate_backend(pid) from pg_stat_activity where application_name in ('cow_fk_holder_${RUN_TAG}','cow_fk_writer_${RUN_TAG}') and pid<>pg_backend_pid();
             alter table app_public.group_session_shares drop constraint if exists ${FORCE_FAIL_CONSTRAINT};
+            alter table app_public.group_cow_sources drop constraint if exists cow_intake_force_failure;
             alter table app_public.group_events drop constraint if exists ${FORCE_EVENT_FAIL_CONSTRAINT};" >/dev/null
+  [[ -z "${COW_TEST_LOG_DIR:-}" ]] || rm -rf "${COW_TEST_LOG_DIR}"
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
   local ids
   ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
@@ -1809,6 +1812,9 @@ BACKFILLED="$(run_psql "select app_public.group_events_backfill();")"
 [[ "$(stream_all "${ATHLETE_TOKEN}")" == "${SNAP_ATHLETE}" ]] || fail "athlete's All stream differs after the backfill"
 [[ "$(stream_all "${VIEWER_TOKEN}")" == "${SNAP_VIEWER}" ]] || fail "viewer's All stream differs after the backfill"
 pass "backfill: one item per share and per membership edge, idempotent; three users' streams rebuild byte-identical"
+
+source "${SUPABASE_DIR}/tests/lib/groups-cow-cases.sh"
+run_cow_contract_cases
 
 COMPLETED=1
 echo "[groups-contract] PASS (run ${RUN_TAG})"

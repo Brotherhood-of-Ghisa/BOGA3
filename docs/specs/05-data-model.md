@@ -53,9 +53,8 @@ round-trip and the drift checker ignores it.
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
 No group table carries `owner_user_id` or an FK into a Sync v2 table, so the
-group domain is invisible to `sync-drift --strict`; its only Sync v2 touch
-point is failure-isolated triggers on `sessions` that can never abort
-`sync_push`. Group projections add no Sync v2 entity and no session snapshot
+group domain is invisible to `sync-drift --strict`; failure-isolated triggers
+on scoring dependencies cannot abort personal `sync_push`. Group projections add no Sync v2 entity or session snapshot
 and never rewrite source kg or readings. Load
 [`tech/groups-contract.md`](tech/groups-contract.md) for group tables, triggers
 and RPCs, and
