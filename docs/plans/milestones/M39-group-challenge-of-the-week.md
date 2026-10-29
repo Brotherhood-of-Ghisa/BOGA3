@@ -87,18 +87,21 @@ contract, without another service or copies of private workout graphs.
 Use `src/groups/api.ts` as the sole RPC caller, the existing cache/resource
 and action hooks, group picker, rank rows, notices and UI primitives. Reads
 follow existing refresh/offline behavior; admin writes require a connection.
-The draft [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
+The [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
 T04. The operator clarified: the detailed browser is reached from Groups;
-Today / Groups gets a separate compact card for this week's CoW only. It is
+Today / Groups gets a separate compact card showing this week's CoW when one
+exists; the absence behavior remains open below. It is
 a top-three preview with in-card switching across enabled metric leaderboards;
 its header opens the detailed view. It has no upcoming/history rows or scheduling controls; the
 previous At a glance summary placement was a misunderstanding. Admins schedule
 from the individual group page into secondary creation/editing. The operator selected the
 chronological browser (This week / Next week / Past CoWs) with the exercise
-and status left, dates/zone right, preserving the mockup's formatting. Its
-revised image is attached to the brief. Review that revision, the remaining
-screens and current group references before accepting the complete design
-target. The plan prescribes no new main tab.
+and status left, dates/zone right, preserving the mockup's formatting. Both
+attached browser and Today-card mockups are approved. Whether Today hides the
+card without a current CoW or shows an explicitly labelled previous week's
+final result remains open in the brief. Remaining admin targets still need
+design; the approved images do not need another selection pass. The plan
+prescribes no new main tab.
 
 ### D7. Shared calendar and scheduling
 
