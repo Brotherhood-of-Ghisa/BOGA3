@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { SectionHeader } from '@/components/ui/page-header';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiText } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
@@ -21,6 +20,9 @@ import {
   buildGroupWeekTotals,
   GROUP_HOME_METRIC_LABELS,
 } from '@/src/groups/home-view-model';
+import { formatWeekRange } from '@/components/today/progress-format';
+
+import { GroupCycleButton } from './group-cycle-button';
 
 import { GroupHomeBoard } from './group-home-board';
 import { groupHomeColumnLabel, groupHomePeriodLabel } from './group-home-labels';
@@ -34,6 +36,7 @@ export type GroupGlancePageProps = {
   myUserId: string;
   now: Date;
   metric: GroupHomeMetric;
+  onMetricChange: (next: GroupHomeMetric) => void;
   period: GroupHomePeriod;
   /** 0 is the period in progress; the stepper only walks backwards from it. */
   offset: number;
@@ -48,6 +51,11 @@ export type GroupGlancePageProps = {
 };
 
 const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks' };
+
+const METRIC_OPTIONS = [
+  { value: 'sets' as const, label: GROUP_HOME_METRIC_LABELS.sets },
+  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
+];
 
 /**
  * A held read fades only once it has been waiting this long, so a step to a
@@ -69,9 +77,10 @@ function useHoldFade(holding: boolean): boolean {
 }
 
 /**
- * At a glance: the period stepper on its own card, since it sets the period
- * for everything under it; then the group's own total against the period
- * before; then the period's top five by the chosen metric; then every
+ * At a glance: one row of controls — the period stepper and the metric pill —
+ * since they set everything under them; then three cards: the period, titled
+ * by its name (`This week`), with the group's own total against the period
+ * before; the period's top five by the chosen metric; and `Over time`, every
  * member's place over the six periods ending at it. Selecting a column in
  * the chart reads that period's full ranking into the table under it. The
  * figures are the screen's period-totals read.
@@ -80,6 +89,7 @@ export function GroupGlancePage({
   myUserId,
   now,
   metric,
+  onMetricChange,
   period,
   offset,
   onOffsetChange,
@@ -94,25 +104,34 @@ export function GroupGlancePage({
   // follows the same calendar period while the stepper keeps it in range.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const faded = useHoldFade(held !== null);
-  const label = groupHomePeriodLabel(period, groupHomeWindowFor(period, now, offset), offset, dateFormat);
-  const stepper = (
-    <Card testID="group-glance-period-card">
-      <View style={styles.card}>
+  const window = groupHomeWindowFor(period, now, offset);
+  const label = groupHomePeriodLabel(period, window, offset, dateFormat);
+  const controls = (
+    <View style={styles.controls} testID="group-glance-controls">
+      <View style={styles.stepper}>
         <GroupHomeStepper
           canGoLater={offset < 0}
-          label={label}
           onEarlier={() => onOffsetChange(offset - 1)}
           onLater={() => onOffsetChange(Math.min(0, offset + 1))}
           period={period}
+          range={formatWeekRange(window, dateFormat)}
         />
       </View>
-    </Card>
+      <GroupCycleButton
+        accessibilityLabel="Metric"
+        onChange={onMetricChange}
+        options={METRIC_OPTIONS}
+        style={styles.metric}
+        testID="groups-filter-metric"
+        value={metric}
+      />
+    </View>
   );
 
   if (!series) {
     return (
       <View style={styles.sections} testID="group-glance">
-        {stepper}
+        {controls}
         <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
       </View>
     );
@@ -130,7 +149,7 @@ export function GroupGlancePage({
 
   return (
     <View style={styles.sections} testID="group-glance">
-      {stepper}
+      {controls}
 
       <View
         accessibilityState={{ busy: held !== null }}
@@ -138,6 +157,7 @@ export function GroupGlancePage({
         testID="group-glance-figures">
         <Card testID="group-week-totals-card">
           <View style={styles.card}>
+            <CardTitle testID="group-home-period-title" title={label.title} />
             <GroupWeekTotalsFigures current={totals.current} offset={figures.offset} previous={totals.previous} />
           </View>
         </Card>
@@ -148,40 +168,54 @@ export function GroupGlancePage({
           </View>
         </Card>
 
-        <View style={styles.section}>
-          <SectionHeader title="Rankings" />
-          <Card testID="group-position-card">
-            <View style={styles.card}>
-              <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
-                {`Last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} · ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
-              </Text>
-              <GroupRankChart
-                accessibilityLabel={`Place over the last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
-                columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
-                onSelect={(index) => setSelectedKey(rankSeries.periods[index]?.key ?? null)}
-                selectedIndex={selectedIndex}
-                series={rankSeries}
-              />
-              {selected ? (
-                <>
-                  <View style={styles.divider} />
-                  <GroupRankTable entries={selected.entries} />
-                </>
-              ) : null}
-            </View>
-          </Card>
-        </View>
+        <Card testID="group-position-card">
+          <View style={styles.card}>
+            <CardTitle testID="group-position-title" title="Over time" />
+            <GroupRankChart
+              accessibilityLabel={`Place over the last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
+              columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
+              onSelect={(index) => setSelectedKey(rankSeries.periods[index]?.key ?? null)}
+              selectedIndex={selectedIndex}
+              series={rankSeries}
+            />
+            {selected ? (
+              <>
+                <View style={styles.divider} />
+                <GroupRankTable entries={selected.entries} />
+              </>
+            ) : null}
+          </View>
+        </Card>
       </View>
     </View>
   );
 }
 
+/** A card's own title, inside it: the card needs no heading above it. */
+function CardTitle({ title, testID }: { title: string; testID: string }) {
+  return (
+    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={uiText.title} testID={testID}>
+      {title}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   sections: {
-    gap: uiSpace.xl,
-  },
-  section: {
     gap: uiSpace.md,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  stepper: {
+    flex: 1,
+    minWidth: 0,
+  },
+  metric: {
+    flex: 0,
+    minWidth: 72,
   },
   // A held read under a new period label: faded until the read in view lands.
   held: {

@@ -12,12 +12,12 @@ import type { GroupMemberRef } from './types';
 // ---- Views and routes ---------------------------------------------------------
 
 export type GroupBoardScope = 'certified' | 'all';
-export const DEFAULT_BOARD_SCOPE: GroupBoardScope = 'certified';
+export const DEFAULT_BOARD_SCOPE: GroupBoardScope = 'all';
 
 const firstValue = (value: string | string[] | undefined | null): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
-/** The `scope` query param; anything else is the default (Certified). */
+/** The `scope` query param; anything else is the default (All). */
 export const parseBoardScopeParam = (value: string | string[] | undefined | null): GroupBoardScope => {
   const raw = firstValue(value);
   return raw === 'certified' || raw === 'all' ? raw : DEFAULT_BOARD_SCOPE;
@@ -109,6 +109,8 @@ export type PodiumCardViewModel = {
   youLabel: string | null;
   /** "No certified sets yet · 3 uncertified" / "No sets yet" for an empty podium, else null. */
   emptyLabel: string | null;
+  /** When the newest set on the podium was performed; null for an empty podium. */
+  latestRecordAtMs: number | null;
   accessibilityLabel: string;
 };
 

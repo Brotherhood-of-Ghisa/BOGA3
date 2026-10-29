@@ -44,8 +44,9 @@ describe('formatting', () => {
   it('an invalid scope param falls back to Certified; the board path carries its view', () => {
     expect(parseBoardScopeParam('all')).toBe('all');
     expect(parseBoardScopeParam(['all'])).toBe('all');
-    expect(parseBoardScopeParam('everything')).toBe('certified');
-    expect(parseBoardScopeParam(undefined)).toBe('certified');
+    expect(parseBoardScopeParam('certified')).toBe('certified');
+    expect(parseBoardScopeParam('everything')).toBe('all');
+    expect(parseBoardScopeParam(undefined)).toBe('all');
     expect(groupBoardPath('g1', 'ge1')).toBe('/group/g1/leaderboards/ge1');
     expect(groupBoardPath('g1', 'ge1', { metric: 'volume', scope: 'all' })).toBe(
       '/group/g1/leaderboards/ge1?metric=volume&scope=all',

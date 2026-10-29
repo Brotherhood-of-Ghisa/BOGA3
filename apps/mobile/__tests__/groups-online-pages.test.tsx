@@ -315,7 +315,7 @@ describe('useGroupOnlinePages', () => {
   });
 
   it('group NOT_FOUND evicts the group and reports lost access', async () => {
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: true,podiums: [] }, fetchedAtMs: 1 });
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: false,podiums: [] }, fetchedAtMs: 1 });
     writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP), userId: USER, payload: { ...competitionGroupDetail,group: { ...competitionGroupDetail.group,group_id: GROUP } }, fetchedAtMs: 1 });
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
@@ -329,7 +329,7 @@ describe('useGroupOnlinePages', () => {
   });
 
   it.each(['group exercise not found', 'CoW not found'])('%s reports a missing resource and evicts nothing', async message => {
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: true,podiums: [] }, fetchedAtMs: 1 });
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: false,podiums: [] }, fetchedAtMs: 1 });
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
       .mockRejectedValue(new GroupApiError('NOT_FOUND', message));

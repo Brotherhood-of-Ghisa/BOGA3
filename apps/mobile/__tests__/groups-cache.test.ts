@@ -50,6 +50,14 @@ it.each([
   raw(key,payload);
   expect(readGroupCache(fixture.database,key,'u1')).toBeNull();
 });
+it('keeps podiums under the All scope only', () => {
+  expect(groupCacheKeys.boards('g1')).toBe('boards:v7:g1:all');
+  const certified={ contract_version: 4,certified: true,podiums: [] };
+  expect(() => put(groupCacheKeys.boards('g1'),certified)).toThrow('Unsafe group cache payload.');
+  // The key podiums used before they read All is never read again.
+  raw('boards:v7:g1',{ ...certified,certified: false });
+  expect(readGroupCache(fixture.database,'boards:v7:g1','u1')).toBeNull();
+});
 it('upserts owner and fetch time without exposing the earlier account', () => {
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   const payload={ groups: [] };
@@ -104,6 +112,9 @@ it('access loss drops group projections and every session join; local links rema
   put(groupCacheKeys.glance('g1','week',0),periodTotals('g1'));
   put(groupCacheKeys.glance('g1','week',-2),periodTotals('g1'));
   put(groupCacheKeys.glance('g10','week',0),periodTotals('g10'));
+  put(groupCacheKeys.boards('g1'),{ contract_version: 4,certified: false,podiums: [] });
+  // Certified podiums cached before the page read All.
+  raw('boards:v7:g1',{ contract_version: 4,certified: true,podiums: [] });
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   evictGroup(fixture.database,'g1');
   // Every At a glance entry of g1 goes; g10's (a longer id with the same prefix) stays.

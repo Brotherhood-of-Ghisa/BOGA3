@@ -423,23 +423,17 @@ appId: com.dinoderek.mobile
     visible: { id: "group-mine-list" }
     timeout: 15000
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
-# A link opens the Stream; the section pill cycles on to Leaderboards.
+# A link opens the Stream; the Leaderboards tab is two pages to its right.
 - extendedWaitUntil:
-    visible: { id: "groups-filter-section" }
+    visible: { id: "groups-tab-leaderboards" }
     timeout: 15000
-- tapOn: { id: "groups-filter-section" }
-# The pill's label is a child Text, so the podium below is what proves the
-# section moved.
+- tapOn: { id: "groups-tab-leaderboards" }
+# The podium below is what proves the page moved.
 - extendedWaitUntil:
     visible: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
     timeout: 20000
+# Podiums and their boards open on All, so the uncertified set is on row 1.
 - tapOn: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
-- scrollUntilVisible:
-    element: { id: "group-board-see-all-button" }
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
-- tapOn: { id: "group-board-see-all-button" }
 - scrollUntilVisible:
     element: { id: "group-board-row-1" }
     direction: DOWN

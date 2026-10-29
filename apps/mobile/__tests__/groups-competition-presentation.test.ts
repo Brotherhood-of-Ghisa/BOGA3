@@ -49,9 +49,16 @@ test('podiums preserve server order, unit and default metric; rebuilding has no 
   const payload={ contract_version: 4 as const,certified: false,podiums: [{ exercise: competitionExercise,board: competitionBoard }] };
   expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].viewLabel).toContain('All · 1RM %BW');
   expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].rows[0].valueLabel).toBe('145.7 %BW');
+  // The newest set on the podium dates the card for the Recent order.
+  const later=competitionBoard.entries[0].performance.achieved_at_ms+1;
+  const two={ ...payload,podiums: [{ exercise: competitionExercise,board: { ...competitionBoard,entries: [competitionBoard.entries[0],
+    { ...competitionBoard.entries[0],rank: 2,performance: { ...competitionBoard.entries[0].performance,achieved_at_ms: later } }] } }] };
+  expect(buildCompetitionPodiums(two,'me', 'DD-MM-YYYY')[0].latestRecordAtMs).toBe(later);
   const rebuilding={ ...payload,podiums: [{ exercise: { ...competitionExercise,rebuilding: true,published_revision: null },
     board: { ...competitionBoard,state: 'rebuilding' as const,entries: [],entry_count: 0,me: null } }] };
-  expect(buildCompetitionPodiums(rebuilding,'me', 'DD-MM-YYYY')[0]).toMatchObject({ rows: [],youLabel: null,emptyLabel: 'Recalculating under the new rules…' });
+  expect(buildCompetitionPodiums(rebuilding,'me', 'DD-MM-YYYY')[0]).toMatchObject({ rows: [],youLabel: null,emptyLabel: 'Recalculating under the new rules…',latestRecordAtMs: null });
+  const empty={ ...payload,podiums: [{ exercise: competitionExercise,board: { ...competitionBoard,entries: [],entry_count: 0,me: null } }] };
+  expect(buildCompetitionPodiums(empty,'me', 'DD-MM-YYYY')[0]).toMatchObject({ emptyLabel: 'No sets yet',latestRecordAtMs: null });
 });
 test('normalized full sessions keep permitted reps and effort without derived load columns or totals', () => {
   const model=buildCompetitionSession(competitionSession.session);

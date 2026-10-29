@@ -1,7 +1,8 @@
 /**
- * The Groups screen's At a glance section: the stepper on its own card, the
- * group's week total, the period board by the chosen metric, and the position
- * chart with the selected period's table; a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
+ * The Groups screen's At a glance page: the stepper and the metric on one row,
+ * then three cards titled inside — the week (its total), the period board by
+ * the chosen metric, and `Over time` (the position chart with the selected
+ * period's table); a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
  * offset are the screen's (groups-screens.test.tsx), so they arrive as props;
  * here a fixed six-week series pins every figure.
  */
@@ -61,6 +62,7 @@ const renderPage = ({
   series = seriesFor(period, offset),
   held = null,
   onOffsetChange = jest.fn(),
+  onMetricChange = jest.fn(),
   error = null,
   offline = false,
 }: {
@@ -70,6 +72,7 @@ const renderPage = ({
   series?: GroupHomeWindow[] | null;
   held?: GroupGlanceHeld | null;
   onOffsetChange?: (next: number) => void;
+  onMetricChange?: (next: GroupHomeMetric) => void;
   error?: GroupApiError | null;
   offline?: boolean;
 } = {}) =>
@@ -82,6 +85,7 @@ const renderPage = ({
       now={NOW}
       offline={offline}
       offset={offset}
+      onMetricChange={onMetricChange}
       onOffsetChange={onOffsetChange}
       onRetry={jest.fn()}
       period={period}
@@ -94,14 +98,22 @@ const boardValues = (): string[] =>
   screen.getAllByTestId(/^group-home-board-row-.*-value$/).map((node) => String(node.props.children));
 
 describe('At a glance: the board', () => {
-  it('sets the period on a card of its own, above the board and the position cards', () => {
-    renderPage();
+  it('sets the period and the metric on one row above the cards, each card titled inside', () => {
+    const onMetricChange = jest.fn();
+    renderPage({ onMetricChange });
 
-    expect(within(byId('group-glance-period-card')).getByTestId('group-home-period-stepper')).toBeTruthy();
-    expect(within(byId('group-home-board-card')).queryByTestId('group-home-period-stepper')).toBeNull();
+    const controls = within(byId('group-glance-controls'));
+    expect(controls.getByTestId('group-home-period-stepper')).toBeTruthy();
+    expect(controls.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
+    expect(within(byId('group-glance-figures')).queryByTestId('group-home-period-stepper')).toBeNull();
     expect(within(byId('group-home-board-card')).getByTestId('group-home-board')).toBeTruthy();
-    expect(within(byId('group-glance-figures')).getByTestId('group-position-card')).toBeTruthy();
-    expect(within(byId('group-glance-figures')).getByText('Rankings')).toBeTruthy();
+    // The titles sit in their cards; nothing heads a card from outside.
+    expect(within(byId('group-week-totals-card')).getByTestId('group-home-period-title')).toHaveTextContent('This week');
+    expect(within(byId('group-position-card')).getByTestId('group-position-title')).toHaveTextContent('Over time');
+    expect(screen.queryByText('Rankings')).toBeNull();
+
+    fireEvent.press(byId('groups-filter-metric'));
+    expect(onMetricChange).toHaveBeenCalledWith('prs');
   });
 
   it('opens on this week by sets: the top five, and my place on its own line', () => {
@@ -135,9 +147,9 @@ describe('At a glance: the board', () => {
 
     screen.unmount();
     renderPage({ offset: -2, onOffsetChange });
-    // A week the title already dates says its month underneath, not the dates twice.
+    // A week with no name is titled by its dates.
     expect(byId('group-home-period-title')).toHaveTextContent('28-09-2026 – 04-10-2026');
-    expect(byId('group-home-period-detail')).toHaveTextContent('September 2026');
+    expect(byId('group-home-period-detail')).toHaveTextContent('28-09-2026 – 04-10-2026');
     fireEvent.press(byId('group-home-period-later'));
     expect(onOffsetChange).toHaveBeenLastCalledWith(-1);
   });
@@ -145,10 +157,11 @@ describe('At a glance: the board', () => {
 });
 
 describe('At a glance: before the read lands', () => {
-  it('keeps the stepper and shows the loading state in place of the board and chart', () => {
+  it('keeps the stepper and shows the loading state in place of the cards', () => {
     renderPage({ series: null });
 
-    expect(byId('group-home-period-title')).toHaveTextContent('This week');
+    expect(byId('group-home-period-detail')).toHaveTextContent('12-10-2026 – 18-10-2026');
+    expect(screen.queryByTestId('group-week-totals-card')).toBeNull();
     expect(byId('group-glance-loading')).toBeTruthy();
     expect(screen.queryByTestId('group-home-board')).toBeNull();
     expect(screen.queryByTestId('group-rank-chart')).toBeNull();
@@ -198,6 +211,7 @@ describe('At a glance: a held read while the next one lands', () => {
         now={NOW}
         offline={false}
         offset={-1}
+        onMetricChange={jest.fn()}
         onOffsetChange={jest.fn()}
         onRetry={jest.fn()}
         period="week"
@@ -271,7 +285,7 @@ describe('At a glance: the group total', () => {
       'group-home-board-card',
       'group-position-card',
     ]);
-    expect(totals.getByText('Group total')).toBeTruthy();
+    expect(totals.getByTestId('group-home-period-title')).toHaveTextContent('This week');
     expect(byId('group-week-totals-sets-value')).toHaveTextContent('160');
     expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 last wk');
     expect(byId('group-week-totals-prs-value')).toHaveTextContent('7');
@@ -293,11 +307,13 @@ describe('At a glance: text roles', () => {
   const body = { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
   const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.sm };
 
-  it('titles the period and labels its range', () => {
+  it('titles the cards and labels the stepper\'s range', () => {
     renderPage();
 
-    expect(byId('group-home-period-title')).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
-    expect(byId('group-home-period-detail')).toHaveStyle({ textTransform: 'uppercase', color: uiRoles.inkFaint });
+    const title = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.lg };
+    expect(byId('group-home-period-title')).toHaveStyle(title);
+    expect(byId('group-position-title')).toHaveStyle(title);
+    expect(byId('group-home-period-detail')).toHaveStyle({ textTransform: 'uppercase', color: uiRoles.ink });
   });
 
   it('draws board names as body and figures as small ink figures', () => {

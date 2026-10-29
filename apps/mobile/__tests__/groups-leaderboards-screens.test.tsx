@@ -128,9 +128,10 @@ const row=(rank: number,userId: string,username: string,overrides: Partial<Compe
     achieved_at_ms: SEP_10,session_id: `s-${userId}`,set_id: `set-${userId}` },...overrides } as CompetitionBoardRowWire);
 const boardPage=(rows: CompetitionBoardRowWire[],overrides: Partial<CompetitionBoardWire>={}): CompetitionBoardWire=>({
   ...competitionBoard,group_exercise_id: EXERCISE_ID,rules: BENCH.rules,certified: true,entries: rows,entry_count: rows.length,...overrides });
-const METRIC_PODIUMS={ contract_version: 4 as const,certified: true,podiums: [
-  { exercise: BENCH,board: boardPage([row(1,'u1','Dave',{ certification: competitionCertification }),row(2,'u2','Sam',{ certification: competitionCertification }),row(3,'u3','Kim',{ certification: competitionCertification })],{ me: row(5,USER_ID,'me',{ certification: competitionCertification }),entry_count: 5 }) },
-  { exercise: OLD,board: boardPage([],{ group_exercise_id: 'ge-old',state: 'archived' }) } ] };
+// The Leaderboards page reads the All scope.
+const METRIC_PODIUMS={ contract_version: 4 as const,certified: false,podiums: [
+  { exercise: BENCH,board: boardPage([row(1,'u1','Dave',{ certification: competitionCertification }),row(2,'u2','Sam',{ certification: competitionCertification }),row(3,'u3','Kim',{ certification: competitionCertification })],{ me: row(5,USER_ID,'me',{ certification: competitionCertification }),entry_count: 5,certified: false }) },
+  { exercise: OLD,board: boardPage([],{ group_exercise_id: 'ge-old',state: 'archived',certified: false }) } ] };
 const revision={ rules_revision: 2,representation_version: 4 as const,rules: { bodyweight_calculations_enabled: false,
   bodyweight_contribution: 0,load_input_mode: 'total_load' as const,default_metric: 'e1rm' as const },
   reason: 'initial' as const,legacy: false,published_at_ms: SEP_10,retired_at_ms: null };
@@ -179,17 +180,14 @@ afterEach(() => {
 });
 
 describe('Groups screen Leaderboards segment (E1.1)', () => {
-  // The section pill cycles At a glance -> Stream -> Leaderboards; a link
-  // opens the Stream, so Leaderboards is one press away.
-  const goToSection = (label: string) => {
-    for (let step = 0; step < 3 && !String(screen.getByTestId('groups-filter-section').props.accessibilityLabel).includes(label); step += 1) {
-      fireEvent.press(screen.getByTestId('groups-filter-section'));
-    }
+  // A link opens the Stream; the Leaderboards tab is one press away.
+  const goToSection = (label: 'Stream' | 'Leaderboards') => {
+    fireEvent.press(screen.getByTestId(label === 'Stream' ? 'groups-tab-stream' : 'groups-tab-leaderboards'));
   };
   const openLeaderboards = async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
     goToSection('Leaderboards');
   };
 
@@ -207,18 +205,18 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
     goToSection('Leaderboards');
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
-    expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID);
+    expect(api.getCompetitionPodiums).toHaveBeenCalledWith(GROUP_ID, false);
 
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^Certified · 1RM$/);
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent(/^All · 1RM$/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10-09-2026/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-you`)).toHaveTextContent('You: 5th');
     expect(screen.getByTestId('group-podium-card-ge-old-archived')).toHaveTextContent('Archived');
-    expect(screen.getByTestId('group-podium-card-ge-old-empty')).toHaveTextContent('No certified sets yet');
+    expect(screen.getByTestId('group-podium-card-ge-old-empty')).toHaveTextContent('No sets yet');
     expect(screen.queryByTestId('group-podium-card-ge-old-you')).toBeNull();
 
     await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.boards(GROUP_ID), USER_ID)?.payload).toEqual(METRIC_PODIUMS));
@@ -242,8 +240,35 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     expect(screen.queryByTestId('group-leaderboards-no-match')).toBeNull();
   });
 
+  it('orders the cards by name, or by most recent record, newest first and empty podiums last', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const dated = (exerciseId: string, atMs: number) =>
+      boardPage([row(1, 'u1', 'Dave', { performance: { ...row(1, 'u1', 'Dave').performance, achieved_at_ms: atMs } })], {
+        group_exercise_id: exerciseId,
+        certified: false,
+      });
+    api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4, certified: false, podiums: [
+      { exercise: exercise('ge-squat', 'Squat'), board: boardPage([], { group_exercise_id: 'ge-squat', certified: false }) },
+      { exercise: BENCH, board: dated(EXERCISE_ID, SEP_10) },
+      { exercise: exercise('ge-dl', 'deadlift'), board: dated('ge-dl', SEP_10 + DAY) },
+    ] });
+    await openLeaderboards();
+    await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
+    const names = () => screen.getAllByTestId(/^group-podium-card-.+-name$/).map((node) => node.props.children);
+
+    expect(screen.getByTestId('group-leaderboards-order')).toHaveTextContent('Name');
+    expect(names()).toEqual(['Bench Press', 'deadlift', 'Squat']);
+
+    fireEvent.press(screen.getByTestId('group-leaderboards-order'));
+    expect(screen.getByTestId('group-leaderboards-order')).toHaveTextContent('Recent');
+    expect(names()).toEqual(['deadlift', 'Bench Press', 'Squat']);
+    // The search narrows the ordered cards.
+    fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), 'e');
+    expect(names()).toEqual(['deadlift', 'Bench Press']);
+  });
+
   it('shows the empty state when the group has no exercises', async () => {
-    api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
+    api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: false,podiums: [] });
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-empty')).toHaveTextContent(/No group exercises yet/);
     expect(screen.queryByTestId('group-leaderboards-search')).toBeNull();
@@ -287,7 +312,14 @@ describe('Full board (E1.2)', () => {
     render(<GroupBoardRoute />);
   };
 
-  it('opens on 1RM · Certified with the name as the header title; empty Certified offers "See all sets", which reloads All', async () => {
+  it('opens on 1RM · All by default', async () => {
+    api.getCompetitionBoard.mockResolvedValue(boardPage([row(1, 'u1', 'Dave')], { certified: false }));
+    openBoard();
+    await screen.findByTestId('group-board-row-1');
+    expect(api.getCompetitionBoard).toHaveBeenCalledWith(expect.objectContaining({ metric: 'e1rm', certified: false, cursor: null }));
+  });
+
+  it('opens Certified when asked, with the name as the header title; empty Certified offers "See all sets", which reloads All', async () => {
     api.getCompetitionBoard.mockImplementation(async ({ certified }) =>
       certified
         ? boardPage([])
@@ -295,7 +327,7 @@ describe('Full board (E1.2)', () => {
             certified: false,
           }),
     );
-    openBoard();
+    openBoard({ scope: 'certified' });
 
     expect(await screen.findByTestId('group-board-empty')).toHaveTextContent(/No certified sets yet/);
     expect(api.getCompetitionBoard).toHaveBeenCalledWith(
@@ -340,11 +372,16 @@ describe('Full board (E1.2)', () => {
     );
   });
 
-  it('invalid params fall back to 1RM · Certified; Certified rows carry no mark', async () => {
-    api.getCompetitionBoard.mockResolvedValue(boardPage([row(1, 'u1', 'Dave', { certification: competitionCertification })]));
+  it('invalid params fall back to 1RM · All; Certified rows carry no mark', async () => {
+    api.getCompetitionBoard.mockResolvedValue(boardPage([row(1, 'u1', 'Dave', { certification: competitionCertification })], { certified: false }));
     openBoard({ metric: 'reps', scope: 'mine' });
     await screen.findByTestId('group-board-row-1');
-    expect(api.getCompetitionBoard).toHaveBeenCalledWith(expect.objectContaining({ metric: 'e1rm', certified: true }));
+    expect(api.getCompetitionBoard).toHaveBeenCalledWith(expect.objectContaining({ metric: 'e1rm', certified: false }));
+
+    screen.unmount();
+    api.getCompetitionBoard.mockResolvedValue(boardPage([row(1, 'u1', 'Dave', { certification: competitionCertification })]));
+    openBoard({ scope: 'certified' });
+    await screen.findByTestId('group-board-row-1');
     expect(screen.queryByTestId('group-board-row-1-mark')).toBeNull();
   });
 

@@ -1,18 +1,18 @@
-import { useState, type ReactNode } from 'react';
+import { Stack } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiText } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
-import type { GroupHomeMetric } from '@/src/groups/home-periods';
-import { GROUP_HOME_METRIC_LABELS } from '@/src/groups/home-view-model';
 
-import { GroupCycleButton } from './group-cycle-button';
 import { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 
-/** The Groups screen's three views of one group. */
-export type GroupsSection = 'glance' | 'stream' | 'leaderboards';
+/** The Groups screen's three views of one group, in page order. */
+export type GroupsSection = 'stream' | 'glance' | 'leaderboards';
+
+export const GROUP_SECTIONS: readonly GroupsSection[] = ['stream', 'glance', 'leaderboards'];
 
 export const GROUP_SECTION_LABELS: Record<GroupsSection, string> = {
   glance: 'At a glance',
@@ -20,141 +20,101 @@ export const GROUP_SECTION_LABELS: Record<GroupsSection, string> = {
   leaderboards: 'Leaderboards',
 };
 
-const SECTION_OPTIONS = [
-  { value: 'glance' as const, label: GROUP_SECTION_LABELS.glance },
-  { value: 'stream' as const, label: GROUP_SECTION_LABELS.stream },
-  { value: 'leaderboards' as const, label: GROUP_SECTION_LABELS.leaderboards },
-];
-
-const METRIC_OPTIONS = [
-  { value: 'sets' as const, label: GROUP_HOME_METRIC_LABELS.sets },
-  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
-];
-
 export type GroupScreenHeaderProps = {
   /** My groups; one group leaves the title with no switch. */
   groups: GroupSwitchOption[];
   selectedGroupId: string | null;
+  /** The selected group's name, or `Groups` before one is known. */
   groupName: string;
   onSelectGroup: (groupId: string) => void;
-  section: GroupsSection;
-  onSectionChange: (next: GroupsSection) => void;
-  metric: GroupHomeMetric;
-  onMetricChange: (next: GroupHomeMetric) => void;
-  onOpenMyGroups: () => void;
-  /** A control at the end of the filter row: the stream's event-type menu. */
-  filterTrailing?: ReactNode;
+  onOpenManage: () => void;
 };
 
+// Clear of the back arrow and `Manage` on a 375pt phone.
+const TITLE_MAX_WIDTH = 200;
+
 /**
- * The Groups screen's heading: the group's name as the title, which opens the
- * group switch; then the filter row — the section, pinned across all three,
- * and (at a glance) the metric, a pill that cycles
- * through its options. The section pill says which view this is, so the
- * title stands alone ([[copy.no-subtitles]]).
+ * The Groups screen's native header: the group's name as the title — with
+ * two or more groups a button, a chevron after the name, that opens the group
+ * switch — and `Manage` on the right, the way into joining, creating and each
+ * group's page.
  */
-export function GroupScreenHeader({
-  groups,
-  selectedGroupId,
-  groupName,
-  onSelectGroup,
-  section,
-  onSectionChange,
-  metric,
-  onMetricChange,
-  onOpenMyGroups,
-  filterTrailing,
-}: GroupScreenHeaderProps) {
+export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelectGroup, onOpenManage }: GroupScreenHeaderProps) {
   const [switching, setSwitching] = useState(false);
   const canSwitch = groups.length > 1;
-  // Before any group is known (loading, none joined) there is nothing to
-  // filter and nowhere to be: the title stands alone.
-  const hasGroups = groups.length > 0;
   return (
-    <View style={styles.header}>
-      <View style={styles.titleRow}>
-        <Pressable
-          accessibilityHint={canSwitch ? 'Chooses which group to show' : undefined}
-          accessibilityLabel={`${groupName}, group`}
-          accessibilityRole={canSwitch ? 'button' : 'header'}
-          disabled={!canSwitch}
-          onPress={() => setSwitching(true)}
-          style={({ pressed }) => [styles.title, pressed ? styles.pressed : null]}
-          testID="groups-title">
-          <Text
-            allowFontScaling={false}
-            ellipsizeMode="tail"
-            numberOfLines={1}
-            style={[uiText.title, styles.titleText]}
-            testID="groups-title-name">
-            {groupName}
-          </Text>
-          {canSwitch ? <Icon color={uiRoles.inkMuted} name="caret-down" size="sm" /> : null}
-        </Pressable>
-        <ActionButton label="My groups" onPress={onOpenMyGroups} testID="groups-my-groups-button" variant="text" />
-      </View>
-      {hasGroups ? (
-      <View style={styles.filters} testID="groups-filters">
-        <GroupCycleButton
-          accessibilityLabel="Section"
-          onChange={onSectionChange}
-          options={SECTION_OPTIONS}
-          testID="groups-filter-section"
-          value={section}
-        />
-        {section === 'glance' ? (
-          <>
-            <GroupCycleButton
-              accessibilityLabel="Metric"
-              onChange={onMetricChange}
-              options={METRIC_OPTIONS}
-              testID="groups-filter-metric"
-              value={metric}
-            />
-          </>
-        ) : null}
-        {filterTrailing}
-      </View>
-      ) : null}
-      <GroupSwitchSheet
-        groups={groups}
-        onDismiss={() => setSwitching(false)}
-        onSelect={onSelectGroup}
-        selectedGroupId={selectedGroupId}
-        testIDPrefix="groups-switch"
-        title="Show this group"
-        visible={switching}
+    <>
+      <Stack.Screen
+        options={{
+          title: groupName,
+          headerTitle: () => <GroupsTitle canSwitch={canSwitch} name={groupName} onPress={() => setSwitching(true)} />,
+          headerRight: () => (
+            <ActionButton label="Manage" onPress={onOpenManage} testID="groups-manage-button" variant="text" />
+          ),
+        }}
       />
-    </View>
+      {canSwitch ? (
+        <GroupSwitchSheet
+          groups={groups}
+          onDismiss={() => setSwitching(false)}
+          onSelect={onSelectGroup}
+          selectedGroupId={selectedGroupId}
+          testIDPrefix="groups-switch"
+          title="Show this group"
+          visible={switching}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function GroupsTitle({ name, canSwitch, onPress }: { name: string; canSwitch: boolean; onPress: () => void }) {
+  // A long name shrinks before it truncates.
+  const label = (
+    <Text
+      adjustsFontSizeToFit
+      allowFontScaling={false}
+      ellipsizeMode="tail"
+      minimumFontScale={0.75}
+      numberOfLines={1}
+      style={[uiText.sheetTitle, styles.text]}
+      testID="groups-title-name">
+      {name}
+    </Text>
+  );
+  if (!canSwitch) {
+    return (
+      <View accessibilityLabel={`${name}, group`} accessibilityRole="header" accessible style={styles.title} testID="groups-title">
+        {label}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityHint="Chooses which group to show"
+      accessibilityLabel={`${name}, group`}
+      accessibilityRole="button"
+      hitSlop={uiSpace.sm}
+      onPress={onPress}
+      style={({ pressed }) => [styles.title, pressed ? styles.pressed : null]}
+      testID="groups-title">
+      {label}
+      <Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: uiSpace.sm,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
   title: {
-    flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
+    maxWidth: TITLE_MAX_WIDTH,
   },
   pressed: {
     opacity: 0.6,
   },
-  // One line: a name too long for it is clipped. Nothing wraps.
-  titleText: {
+  text: {
     flexShrink: 1,
-  },
-  filters: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
   },
 });

@@ -1,7 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { LAST_WEEK, WeekFigure, weekFigureStyles, type PreviousWeekName } from '@/components/today/week-figures';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupWeekTotals } from '@/src/groups/home-view-model';
 
@@ -15,17 +14,14 @@ export type GroupWeekTotalsProps = {
 };
 
 /**
- * The whole group's week, as Today's week figures draw one person's: working
- * sets and group records against the week before, each filling a bar in laps
- * of that week's total.
+ * The whole group's week, under the card's week title, as Today's week
+ * figures draw one person's: working sets and group records against the week
+ * before, each filling a bar in laps of that week's total.
  */
 export function GroupWeekTotalsFigures({ current, previous, offset }: GroupWeekTotalsProps) {
   const previousWeek = offset === 0 ? LAST_WEEK : WEEK_BEFORE;
   return (
     <View style={styles.block} testID="group-week-totals">
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
-        Group total
-      </Text>
       <View style={weekFigureStyles.figures}>
         <WeekFigure
           current={current.sets}
