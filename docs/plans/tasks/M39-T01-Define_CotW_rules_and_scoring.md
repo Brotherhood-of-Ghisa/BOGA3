@@ -1,4 +1,4 @@
-# M39-T01 — Define CotW rules and shared scoring
+# M39-T01 — Define CoW rules and shared scoring
 
 - Status: `planned`
 - Depends on: none
@@ -7,14 +7,14 @@
 
 ## Objective
 
-Turn the milestone's three confirmed product choices into one implementable
+Turn the milestone's confirmed product choices into one implementable
 weekly competition contract and a small, pure scoring boundary. Resolve the
 remaining product questions before code so later PRs cannot invent different
 week, baseline or correction rules.
 
 ## Scope
 
-- In: milestone D1–D5; pure aggregation of already calculated group scores;
+- In: milestone D1–D5 and D7–D9; pure aggregation of already calculated group scores;
   deterministic fixtures; durable ownership of cross-surface rules.
 - Out: SQL tables/RPCs, a second load/1RM formula, group worker changes, UI,
   notification delivery and hosted deployment.
@@ -27,13 +27,20 @@ week, baseline or correction rules.
 - D3: ordinary/normalized units and existing privacy apply.
 - D4: weekly Volume sums set volumes; existing lifetime Volume boards stay
   best-single-set. Retain unrounded scores until display.
+- D7: group time zone defaults to the creator's; immutable shared week bounds;
+  schedule next week only, before start, with one published CoW per group/week.
+- D8: ended results are stored and final, never recalculated from later source
+  changes; current history disclosure/access still applies.
+- D9: roster fixed at start; later join/rejoin waits for the next CoW; leaving
+  stops contributions but preserves results earned while a member.
 
 ## Open — resolve with the operator at session start
 
-Resolve every item under the milestone's "Decisions reserved for T01": week
-zone and bounds, participation/session placement, lifecycle and corrections,
+Resolve only the remaining items under the milestone's "Decisions reserved
+for T01": session placement and boundary cases, the proposed no-grace/server-
+receipt cutoff (including baseline and source versions), editing/cancellation,
 signed/positive-only improvement, ties/finite results, comparison revision
-changes and certification scope. A historical baseline must be calculated
+changes and certification scope. Do not reopen D7–D9 as undecided. A historical baseline must be calculated
 under a compatible rule/unit; no mixing historical kg with current %BW.
 Choose the narrowest contract consistent with D1–D3; update later cards if
 its consequences change their scope or gates.
@@ -42,7 +49,7 @@ its consequences change their scope or gates.
 
 1. Put the challenge contract beside the existing group technical contracts
    and route to it from `docs/specs/tech/groups-contract.md` only when changing
-   CotW. Apply doc budgets. Record qualifying facts in
+   CoW. Apply doc budgets. Record qualifying facts in
    `docs/product/groups.md` and extend the product-index trigger; highlight
    every added/changed/decided fact in this PR.
 2. Add a small TS scoring module under `apps/mobile/src/groups/`, compatible
@@ -54,6 +61,8 @@ its consequences change their scope or gates.
    repeated blocks, the pre-week cutoff, shared-only baseline selection,
    missing/zero baseline and weekly results, signed/positive choice, exact
    edges/DST, ties, deduplication, finite-result policy, and ordinary/%BW units.
+   State the deadline contract precisely enough for T03 to distinguish
+   pre-deadline source versions from later writes despite evaluation lag.
    Put authorization assertions in T02/T03 rather than treating pure inputs
    as proof of access control.
 4. Review current consumers of any existing helper changed. Existing board

@@ -1,8 +1,8 @@
-# M39 — Group Challenge of the Week
+# M39 — Group Challenge of the Week (CoW)
 
 - Status: `planned`
 - Created: 2026-10-27, planning baseline `e08bec5c897d0eefb697721a25fbcb5e7f339ceb` on `origin/main`
-- Source: [Groups: CotW, issue #927](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/927)
+- Source: [Groups: weekly challenge, issue #927](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/927)
 - Execution: one task, session, local worktree and PR at a time, following `docs/plans/README.md`.
 
 ## Objective
@@ -14,15 +14,17 @@ and group exercise, using their normally logged and shared workouts.
 
 ## Scope
 
-- In: weekly challenge definition and admin management, shared week boundaries,
-  server-authorized rankings, the group's existing exercise links and scoring
-  units, mobile discovery and results, and previous challenge reads.
+- In: weekly challenge definition and admin management, the group time zone,
+  shared week boundaries, server-authorized rankings, the group's existing
+  exercise links and scoring units, automatic finalization and stored final
+  results, mobile discovery, scheduling and previous challenge reads.
 - Out: combined scores or overall winners across metrics, prizes, automatic
   recurring creation, notifications, enrolment or manual result submission,
   new workout logging, a new certification system, and new sync entities.
-- Planning default: one challenge definition per group/week, manually created
-  for the current or next week; it can enable several independent metrics.
-  T01 settles lifecycle and boundary details before code is written.
+- Agreed: manually schedule next week only; never create an already-started
+  CoW. One published CoW per group/week, with several independent metrics.
+  Use the name CoW throughout the feature; existing task filenames are kept
+  stable.
 
 ## Agreed design direction
 
@@ -72,39 +74,91 @@ header, non-member/nonexistent equivalence, isolated sync triggers, and exact
 public allowlists. New group tables have neither `owner_user_id` nor an FK
 into Sync v2. Existing RPC payloads must remain compatible with old clients.
 
-Prefer reads over existing coherent set projections; add a challenge-specific
-projection/job only if T03 demonstrates why a bounded authorized read is
-insufficient. Do not introduce another worker or cron merely to close a week.
+Reuse coherent set projections and the existing backend evaluation/scheduling
+machinery. Final results require durable snapshots and automatic closure even
+when nobody opens the app. T02 owns lifecycle storage and concurrency; T03
+owns finalization, retry and publication. Preserve the deadline's eligible
+source versions despite later writes or evaluator lag; a live query after the
+deadline cannot prove that. Choose the smallest design that meets this
+contract, without another service or copies of private workout graphs.
 
 ### D6. Reuse the mobile group experience
 
 Use `src/groups/api.ts` as the sole RPC caller, the existing cache/resource
 and action hooks, group picker, rank rows, notices and UI primitives. Reads
 follow existing refresh/offline behavior; admin writes require a connection.
-T04 agrees a repo-native brief with reference screenshots, or another accepted
-design target, before changing UI. The plan does not prescribe a new main tab.
+The [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
+T04. The operator clarified: the detailed browser is reached from Groups;
+Today / Groups gets a separate compact card showing this week's CoW when one
+exists, else exactly last week's stored final CoW, clearly labelled Last week ·
+Final with its dates; hide the card if neither is available. It is
+a top-three preview with in-card switching across enabled metric leaderboards;
+its header opens the detailed view. It has no upcoming/history rows or scheduling controls; the
+previous At a glance summary placement was a misunderstanding. Admins schedule
+from the individual group page into secondary creation/editing. The operator selected the
+chronological browser (This week / Next week / Past CoWs) with the exercise
+and status left, dates/zone right, preserving the mockup's formatting. Both
+attached browser and Today-card mockups and the last-week-final fallback are
+approved. A current CoW takes priority even without scores; no older-week,
+upcoming or non-final fallback. A scheduling-form draft is now attached to
+the brief for review; the approved browser/Today images need no new selection
+pass. The plan
+prescribes no new main tab.
+
+### D7. Shared calendar and scheduling
+
+Confirmed by the operator on 2026-10-29: use the group's time zone, defaulting
+to its creator's time zone. Schedule next week only, before that week starts;
+there is no midweek creation or queue of later weeks. Store a validated IANA
+zone and immutable UTC Monday-to-Monday `[start, end)` bounds per published
+CoW, respecting DST. Later group-zone changes cannot move published CoWs.
+Prevent duplicate group/week definitions and overlapping published windows
+under concurrent admin writes, including across zone changes. One current
+CoW and one next CoW may coexist; past CoWs remain history.
+
+### D8. Final results are stored
+
+Confirmed by the operator: ended CoWs are final and stored. Persist the
+rankings, selected metrics, score units and scoring context needed to read
+the outcome without recalculating it from mutable workouts. Subsequent source
+edits, deletion, linking or scoring changes never rerank a finalized CoW.
+Current access/disclosure still applies to history; suppress unsafe figures
+without recalculating or promoting a different winner. Distinguish finalizing
+from final: never publish an incomplete evaluator pass as the final outcome.
+
+Proposed implementation rule, still to confirm in T01: no grace period;
+only completed workouts and eligible source changes received before the end
+count. Processing may finish later, but later arrivals cannot enter. This
+means offline workouts synced after the deadline miss that CoW.
+
+### D9. Simple participation
+
+The operator delegated this choice: fix the participant roster at the start,
+with automatic participation by every then-current member. Midweek joins or
+rejoins wait for the next CoW. Leaving or removal ends further contributions
+for that CoW; qualifying results already earned while a member stay in the
+standings and final snapshot. Rejoining does not resume participation that
+week. Former members lose group access under existing authorization.
 
 ## Decisions reserved for T01
 
 Resolve these with the operator at that session's start, record the answer in
 the owning fact/contract, and update later cards if the answer changes them:
 
-1. One authoritative time zone per challenge: where it comes from, validation
-   of a Monday–Sunday calendar week, and stored immutable UTC `[start, end)`
-   bounds. All members must compete over identical instants, including DST.
-   Existing group summaries use viewer-local weeks; reusing that window
-   separately for each viewer would be incorrect here.
-2. Session placement and eligibility: proposed default is completed sessions
-   placed by `started_at`, matching current group period reads; whether new
-   members and former members participate and how archival affects results.
-3. Lifecycle: creating this/next week, edits before/after start, cancellation,
-   overlap/concurrent creation, and whether an ended week remains correctable
-   after late sync, source edits, deletions or link changes. Do not promise
-   final winners until this rule is settled.
-4. Improvement arithmetic and ordering: signed `(weekly / baseline - 1) × 100`,
+1. Session placement: proposed default is completed sessions placed by
+   `started_at`, matching existing group period reads. Settle sessions crossing
+   a week or membership-end boundary, archival and late-arriving pre-week
+   baseline data. D7's shared calendar and D9's roster are already settled;
+   viewer-local group summaries cannot supply the CoW window.
+2. Confirm the D8 no-grace/server-receipt cutoff and specify its source-version
+   boundary, including completion, baseline, edits and link writes. Decide
+   pre-start editing/cancellation and post-start cancellation; finality and
+   next-week-only scheduling are already settled. A proposed minimum is edits
+   before start only and explicit cancellation, never editing an active CoW.
+3. Improvement arithmetic and ordering: signed `(weekly / baseline - 1) × 100`,
    versus positive gains only; missing weekly results; ties and zero; a
    finite-result/overflow policy for the weekly sum and percentage.
-5. Rules changes: how the challenge binds its comparison revision and what
+4. Rules changes: how the challenge binds its comparison revision and what
    happens when that revision or disclosure changes. Never mix kg and %BW,
    count a set twice through links, or show stale absolute history. Decide
    whether certification is merely existing context or a ranking filter;
@@ -112,8 +166,11 @@ the owning fact/contract, and update later cards if the answer changes them:
 
 ## Product changes to highlight
 
-This plan changes no accepted runtime fact. The implementation introduces
-weekly challenge rules affecting both server and mobile readers. T01 must
+This plan changes no accepted runtime fact. New planned product choices are
+the group calendar, next-week-only scheduling, fixed participation and stored
+finality (D7–D9), plus the D6 Today summary and Groups/group-page navigation;
+deadline acceptance is explicitly still proposed. The
+implementation introduces weekly rules affecting server and mobile readers. T01 must
 apply `docs/procedures/product-facts-authoring.md` and record qualifying
 cross-surface decisions in `docs/product/groups.md`; extend its index trigger
 beyond certification. Baseline scope, participation, correction/finality,
@@ -129,16 +186,18 @@ exception to the viewer-local presentation in [[comparison.window]].
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M39-T01](../tasks/M39-T01-Define_CotW_rules_and_scoring.md) | Settle weekly rules; shared pure scoring, vectors and owning facts/contract | none | planned |
-| [M39-T02](../tasks/M39-T02-Add_CotW_lifecycle_and_authorization.md) | Server challenge definitions, authorized lifecycle RPCs and client write boundary | T01 | planned |
-| [M39-T03](../tasks/M39-T03-Serve_CotW_rankings_and_history.md) | Weekly scores, improvement baselines, privacy-safe readers and mobile read boundary | T02 | planned |
-| [M39-T04](../tasks/M39-T04-Deliver_CotW_mobile_flows.md) | Admin and member UI, integration evidence and issue closeout | T03 | planned |
+| [M39-T01](../tasks/M39-T01-Define_CotW_rules_and_scoring.md) | Finish unresolved rules; shared scoring, cutoff vectors and owning facts/contract | none | planned |
+| [M39-T02](../tasks/M39-T02-Add_CotW_lifecycle_and_authorization.md) | Group calendar, scheduling, roster and snapshot lifecycle storage; authorized RPCs | T01 | planned |
+| [M39-T03](../tasks/M39-T03-Serve_CotW_rankings_and_history.md) | Live rankings, automatic finalization, stored final results and safe history | T02 | planned |
+| [M39-T04](../tasks/M39-T04-Deliver_CotW_mobile_flows.md) | Reviewed UX target, scheduling/results UI, integration evidence and issue closeout | T03 | planned |
 
 The implementation PRs are sequential because each consumes the previous
-contract. UI target exploration can happen during backend work after T01
-settles the rules; it needs no separate implementation PR. Only T01 is ready
+contract. Review the attached UX brief now; add visual references and settle
+the remaining rule-dependent states before UI implementation. Design work
+needs no separate implementation PR. Only T01 is ready
 to start once the planning PR merges. Delete each card in its shipping PR;
-delete this milestone with the last card. Evidence belongs in the PRs.
+delete this milestone, its UX brief and attached mockups with the last card.
+Evidence belongs in the PRs.
 
 ## Risks and completion
 
@@ -146,8 +205,10 @@ delete this milestone with the last card. Evidence belongs in the PRs.
   need the complete eligible shared source, coherent with rules publication.
 - Totals and baseline details extend the disclosure surface. Test paired
   endpoints and historical reads, including policy changes and missing B.
-- Offline logs, late links and corrections require a stated result policy;
-  they must not silently create a different contest for each device.
+- Automatic finalization needs an authoritative cutoff, coherent source
+  versions and retry-safe snapshot publication. A worker delay or a later
+  source deletion must not produce a different final outcome. Confirm the
+  proposed strict sync deadline before implementing it.
 - Additive migrations only; no changes to personal records, sync protocol,
   stored workout values or existing board/certification history.
 - Every code task adds behavior coverage and runs `./boga test fast`; every
@@ -156,5 +217,6 @@ delete this milestone with the last card. Evidence belongs in the PRs.
   defaults. No thresholds or baselines are relaxed.
 - Close #927 only when T04 proves admin creation through two-member results
   against local Supabase, all selected metrics, missing baseline, offline
-  reads, authorization loss and applicable disclosure. Hosted deployment
+  reads, scheduled start, automatic finalization without an app read, frozen
+  history after source changes, authorization loss and applicable disclosure. Hosted deployment
   remains a separately authorized operation; local tests do not deploy it.
