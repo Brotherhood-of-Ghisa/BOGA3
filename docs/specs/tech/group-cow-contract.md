@@ -17,8 +17,8 @@ load conversion, effort and 1RM stay in the existing scorer/kernel
 ([[set.performed]], [[set.eligibility]], [[1rm.formula]]).
 If changing those, load [group-competition-contract.md](group-competition-contract.md).
 Existing lifetime boards retain their single-set aggregation and achieved-time
-tie ordering. CoW has no runtime caller yet and changes neither publication
-nor private Sync v2.
+tie ordering. CoW aggregation has no worker/UI caller yet; existing board
+publication and private Sync v2 payloads remain unchanged.
 
 If changing lifecycle or endpoints, load [groups-contract.md](groups-contract.md)
 for server-only group storage, role checks, OAuth denial, protocol-4 negotiation,
