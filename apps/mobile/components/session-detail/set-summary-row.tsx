@@ -37,21 +37,27 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
           style={[uiText.figureSmall, row.done ? uiTextTone.ink : uiTextTone.faint, styles.metric, styles.volume]}
           testID={`${testID}-vol`}>{row.volume.replace(' %BW·reps', '')}</Text>
       </> : <>
-      <Stat
-        emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
-        label="1RM"
-        layout="inline"
-        state={state}
-        testID={`${testID}-1rm`}
-        value={row.oneRepMax}
-      />
-      <Stat
-        label="Vol"
-        layout="inline"
-        state={state}
-        testID={`${testID}-vol`}
-        value={row.volume}
-      />
+      <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
+        <Stat
+          emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
+          label="1RM"
+          layout="inline"
+          state={state}
+          testID={`${testID}-1rm`}
+          value={row.oneRepMax}
+          valueWidth="hug"
+        />
+      </View>
+      <View style={[styles.metricColumn, styles.volumeColumn]} testID={`${testID}-vol-column`}>
+        <Stat
+          label="Vol"
+          layout="inline"
+          state={state}
+          testID={`${testID}-vol`}
+          value={row.volume}
+          valueWidth="hug"
+        />
+      </View>
       </> : null}
     </View>
   );
@@ -73,6 +79,15 @@ const styles = StyleSheet.create({
   metric: {
     textAlign: 'right',
   },
+  // 1RM and VOL as two fixed columns: each value right-aligned
+  // in its column, its legend a fixed gap to its left, so a legend reads with
+  // its own value and not the next column's.
+  metricColumn: {
+    alignItems: 'flex-end',
+  },
+  // As wide as the old legend-plus-value pair, so weight × reps keeps its room.
+  oneRepMaxColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
+  volumeColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
   oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
   volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },
   weightReps: {

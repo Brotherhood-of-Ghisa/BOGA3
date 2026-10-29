@@ -98,7 +98,7 @@ describe('controls', () => {
 });
 
 describe('fields', () => {
-  it('types words in input and numbers in input with the figure face', () => {
+  it('types words in input, a search query in inputLarge and numbers in input with the figure face', () => {
     render(<>
       <FormField face="text" hint="Shown to your group." label="Name" onChangeText={jest.fn()} testID="name" value="Ann" />
       <FormField error="Enter a weight" label="Weight" onChangeText={jest.fn()} testID="weight" value="100" />
@@ -106,7 +106,7 @@ describe('fields', () => {
       <SearchField accessibilityLabel="Search" onChangeText={jest.fn()} testID="search" value="bench" />
     </>);
     expect(style(screen.getByTestId('name'))).toMatchObject(uiText.input);
-    expect(style(screen.getByTestId('search'))).toMatchObject(uiText.input);
+    expect(style(screen.getByTestId('search'))).toMatchObject(uiText.inputLarge);
     expect(style(screen.getByTestId('weight'))).toMatchObject({ ...uiText.input, ...uiText.inlineFigure });
     expect(style(screen.getByTestId('rest'))).toMatchObject({ ...uiText.input, ...uiText.inlineFigure });
     expect(style(screen.getByText('Name'))).toMatchObject({ ...uiText.label, color: uiRoles.inkFaint });

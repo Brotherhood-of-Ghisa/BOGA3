@@ -26,7 +26,8 @@ type PreferenceControlsProps = {
 const SORT_LABELS = { favourite: 'Favourite', name: 'A–Z' } as const;
 
 // One row of everyday controls on all three personal browsers: the Never-done
-// filter, the host's own chips, and Sort, which switches between the two orders.
+// filter, the host's own chips, and Sort, which switches between the two orders
+// and shows the current one (`Favourite ⌄`; spoken `Sort: Favourite`).
 export function ExerciseListPreferenceControls({ preferences, onChangePreferences, children }: PreferenceControlsProps) {
   const nextSort = preferences.sort === 'favourite' ? 'name' : 'favourite';
   return (
@@ -45,8 +46,9 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
         accessibilityHint={`Sorts by ${nextSort === 'name' ? 'name A to Z' : 'favourite'}`}
         accessibilityLabel={`Sort: ${SORT_LABELS[preferences.sort]}`}
         accessibilityRole="button"
-        label={`Sort: ${SORT_LABELS[preferences.sort]}`}
+        label={SORT_LABELS[preferences.sort]}
         on={false}
+        trailing={<Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />}
         onPress={() => onChangePreferences({ sort: nextSort })}
         testID="exercise-list-sort"
       />
@@ -211,8 +213,10 @@ type ExerciseListRowProps = {
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
-// Name, wrapping Primary/Secondary muscles and stats. Deleted rows use a faint
-// `Deleted` tag and faint text, never a warning hue.
+// Four lines, in falling emphasis: the name; when it was last done and how
+// often; then Primary and Secondary, both always (`Secondary: None`), the
+// quietest. Deleted rows use a faint `Deleted` tag and faint text, never a
+// warning hue.
 const ExerciseListRow = memo(function ExerciseListRow({
   exercise,
   linked = false,
@@ -222,8 +226,9 @@ const ExerciseListRow = memo(function ExerciseListRow({
   renderActions,
 }: ExerciseListRowProps) {
   const deleted = Boolean(exercise.deletedAt);
+  const faint = deleted ? uiTextTone.faint : null;
   const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
-  const accessibilityHint = `${linked ? 'Linked to a group exercise. ' : ''}${exercise.muscleSummary}. ${exercise.statsSummary}.`;
+  const accessibilityHint = `${linked ? 'Linked to a group exercise. ' : ''}${exercise.muscleLines.primary}. ${exercise.muscleLines.secondary}. ${exercise.statsSummary}.`;
   const text = (
     <View style={styles.rowText}>
       <View style={styles.titleRow}>
@@ -232,19 +237,17 @@ const ExerciseListRow = memo(function ExerciseListRow({
           ellipsizeMode="clip"
           minimumFontScale={0.82}
           numberOfLines={2}
-          style={[uiText.bodyStrong, deleted ? uiTextTone.faint : null, styles.name]}>
+          style={[uiText.option, faint, styles.name]}>
           {exercise.name}
         </Text>
         {linked ? <Icon color={uiRoles.inkMuted} name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
-      <Text allowFontScaling={false}
-        style={[uiText.meta, deleted ? uiTextTone.faint : null]}>
-        {exercise.muscleSummary}
-      </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, deleted ? uiTextTone.faint : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, faint]}>
         <FigureText>{exercise.statsSummary}</FigureText>
       </Text>
+      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.primary}</Text>
+      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.secondary}</Text>
     </View>
   );
 
@@ -281,12 +284,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
   },
+  // `sm` insets and an `xs` gap, so the picker's four chips fit one row on a
+  // 390pt phone.
   chip: {
     minHeight: uiGeometry.tapTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.sm,
     backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,

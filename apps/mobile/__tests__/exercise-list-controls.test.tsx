@@ -27,11 +27,13 @@ const item = (id: string, name: string, overrides: Partial<ExerciseListItem> = {
     id,
     name,
     deletedAt: null,
-    muscleSummary: 'Primary: Chest\nSecondary: Front Delts · Triceps',
+    muscleLines: { primary: 'Primary: Chest', secondary: 'Secondary: Front Delts · Triceps' },
     statsSummary: 'Never done',
     ...overrides,
   }) as ExerciseListItem;
 
+const MUSCLE_LINE = 'Primary: Chest';
+const SECONDARY_LINE = 'Secondary: Front Delts · Triceps';
 const bench = item('bench', 'Bench Press');
 const fly = item('fly', 'Cable Fly', { deletedAt: 1_700_000_000_000 as never });
 
@@ -60,9 +62,11 @@ const colorOf = (node: { props: { style?: unknown } }) =>
   (StyleSheet.flatten(node.props.style as any) ?? {}).color;
 
 describe('ExerciseListContent rows', () => {
-  it('lets all muscle names wrap at their normal size', () => {
+  it('gives Primary and Secondary a line each, wrapping at their normal size', () => {
     renderList();
-    const muscles = within(screen.getByLabelText('Select exercise Bench Press')).getByText(bench.muscleSummary);
+    const row = within(screen.getByLabelText('Select exercise Bench Press'));
+    const muscles = row.getByText(MUSCLE_LINE);
+    expect(row.getByText(SECONDARY_LINE)).toBeTruthy();
     expect(muscles.props.numberOfLines).toBeUndefined();
     expect(muscles.props.adjustsFontSizeToFit).toBeUndefined();
     expect(muscles.props.ellipsizeMode).toBeUndefined();
@@ -71,12 +75,12 @@ describe('ExerciseListContent rows', () => {
   it('makes each row one target labelled for the pick, with the stats line in words', () => {
     const { onPressExercise } = renderList();
 
-    expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', `${bench.muscleSummary}. ${bench.statsSummary}.`);
+    expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', 'Primary: Chest. Secondary: Front Delts · Triceps. Never done.');
     fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
     expect(onPressExercise).toHaveBeenCalledWith(bench);
     const stats = screen.getAllByText('Never done')[0];
     expect(StyleSheet.flatten(stats.props.style).fontFamily).toBe(uiFonts.body.family);
-    expect(colorOf(stats)).toBe(uiRoles.inkMuted);
+    expect(colorOf(stats)).toBe(uiRoles.ink);
   });
 
   it('marks a deleted exercise with a faint tag and faded text, never a warning hue', () => {
@@ -170,6 +174,8 @@ describe('ExerciseListPreferenceControls', () => {
 
     const sort = screen.getByLabelText('Sort: Favourite');
     expect(sort).toHaveProp('accessibilityRole', 'button');
+    // Drawn as the order alone, `Favourite ▾`; the legend `Sort` is spoken.
+    expect(within(sort).getByText('Favourite')).toBeTruthy();
     expect(sort).toHaveProp('accessibilityHint', 'Sorts by name A to Z');
     fireEvent.press(sort);
     expect(onChangePreferences).toHaveBeenLastCalledWith({ sort: 'name' });
@@ -283,27 +289,29 @@ describe('text roles', () => {
     expect(styleOf(screen.getByText('Chest'))).toMatchObject({ ...LABEL, color });
   });
 
-  it('names a row in bodyStrong, its muscles and stats as meta, the stats figures in the figure face', () => {
+  it('falls in emphasis: the name as an option, the last-done line in body with figures, the muscles as meta', () => {
     const recent = item('row', 'Row', { statsSummary: 'Last: 12-10-2026 · 4 sessions' });
     renderList({ items: [recent], sections: [{ familyName: 'Chest', count: 1, exercises: [recent] }] });
     const row = within(screen.getByLabelText('Select exercise Row'));
     expect(styleOf(row.getByText('Row'))).toMatchObject({
-      fontFamily: uiFonts.body.family,
+      fontFamily: uiFonts.display.family,
       fontWeight: '600',
-      fontSize: uiTypography.size.base,
+      fontSize: uiTypography.size.lg,
       color: uiRoles.ink,
     });
-    expect(styleOf(row.getByText(recent.muscleSummary))).toMatchObject({ ...META, color: uiRoles.inkMuted });
     const stats = row.getByText(/^Last:/);
-    expect(styleOf(stats)).toMatchObject(META);
-    expect(styleOf(within(stats).getByText('12-10-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    expect(styleOf(stats)).toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
+    expect(styleOf(within(stats).getByText('12-10-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family });
+    for (const line of [MUSCLE_LINE, SECONDARY_LINE]) {
+      expect(styleOf(row.getByText(line))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    }
   });
 
   it('fades every line of a deleted row', () => {
     renderList();
     const row = within(screen.getByLabelText('Select exercise Cable Fly'));
-    expect(styleOf(row.getByText('Cable Fly'))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', color: uiRoles.inkFaint });
-    expect(colorOf(row.getByText(fly.muscleSummary))).toBe(uiRoles.inkFaint);
+    expect(styleOf(row.getByText('Cable Fly'))).toMatchObject({ fontWeight: '600', color: uiRoles.inkFaint });
+    expect(colorOf(row.getByText(MUSCLE_LINE))).toBe(uiRoles.inkFaint);
     expect(colorOf(row.getByText('Never done'))).toBe(uiRoles.inkFaint);
   });
 

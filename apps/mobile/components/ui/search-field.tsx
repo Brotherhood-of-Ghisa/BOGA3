@@ -16,7 +16,7 @@ export type SearchFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextCo
 };
 
 // A filter or search field: a search glyph, the text, and a clear control while
-// there is text to clear. One tap target tall, `radius.control`, `rule` hairline.
+// there is text to clear; the query at the size of the rows it finds. One tap target tall, `radius.control`, `rule` hairline.
 // The keyboard's Search key closes the keyboard (single-line fields blur on
 // submit).
 export function SearchField({
@@ -38,7 +38,7 @@ export function SearchField({
         accessibilityLabel={accessibilityLabel}
         onChangeText={onChangeText}
         placeholderTextColor={uiRoles.inkFaint}
-        style={[uiText.input, styles.input]}
+        style={[uiText.inputLarge, styles.input]}
         testID={testID}
         value={value}
       />

@@ -215,7 +215,8 @@ export const formatElapsed = (startedAt: Date, now: Date): string => {
 };
 
 /**
- * The active session's title from its local start hour: `Morning training`
+ * A finished session's name from its local start hour (the active session is
+ * titled `Training`, without it): `Morning training`
  * (05–11), `Afternoon training` (12–16), `Evening training` (17–20), else
  * `Night training`.
  */

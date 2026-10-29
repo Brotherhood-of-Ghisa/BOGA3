@@ -80,6 +80,13 @@ export const uiText = StyleSheet.create({
     fontSize: uiTypography.size.base,
     color: uiRoles.ink,
   },
+  // A search field's query, at the size of the row names it finds.
+  inputLarge: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.lg,
+    color: uiRoles.ink,
+  },
   // A row's name, a line of prose.
   body: {
     fontFamily: uiFonts.body.family,

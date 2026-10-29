@@ -33,9 +33,12 @@ export type ExerciseListItem = IndexedExerciseCatalogExercise & {
   hasAllTimeHistory: boolean;
   lastDoneDate: Date | null;
   primaryFamilyName: string;
-  muscleSummary: string;
+  /** A row's two muscle lines, each always shown (`Secondary: None`). */
+  muscleLines: ExerciseMuscleLines;
   statsSummary: string;
 };
+
+export type ExerciseMuscleLines = { primary: string; secondary: string };
 
 export type ExerciseListSection = {
   familyName: string;
@@ -76,21 +79,21 @@ export const getExercisePrimaryFamilyName = (
 };
 
 /**
- * A card's muscle lines, naming the user's muscles ([[muscle.no-breakdown]]):
- * each once, at its strongest role, without untracked ones.
+ * A row's muscle lines, naming the user's muscles ([[muscle.no-breakdown]]):
+ * each once, at its strongest role, without untracked ones. Both roles always,
+ * `None` for an empty one.
  */
-export const formatExerciseMuscleSummary = (
+export const formatExerciseMuscleLines = (
   exercise: ExerciseCatalogExercise,
   muscleSetup: MuscleSetup
-) => {
+): ExerciseMuscleLines => {
   const muscles = exerciseCountedMuscles({ mappings: reportedMappings(exercise.mappings, muscleSetup.assignment) });
-  const lines = (['primary', 'secondary'] as const).map((role) => {
-    const names = muscles
+  const names = (role: 'primary' | 'secondary') =>
+    muscles
       .filter((muscle) => muscle.role === role)
-      .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId);
-    return names.length ? `${role === 'primary' ? 'Primary' : 'Secondary'}: ${names.join(' · ')}` : '';
-  });
-  return lines.filter(Boolean).join('\n') || 'No muscle links';
+      .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId)
+      .join(' · ') || 'None';
+  return { primary: `Primary: ${names('primary')}`, secondary: `Secondary: ${names('secondary')}` };
 };
 
 export { formatShortDate } from '@/src/utils/local-time';
@@ -170,7 +173,7 @@ export const buildExerciseListModel = ({
       hasAllTimeHistory,
       lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
-      muscleSummary: formatExerciseMuscleSummary(exercise, muscleSetup),
+      muscleLines: formatExerciseMuscleLines(exercise, muscleSetup),
       statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
     };
   });

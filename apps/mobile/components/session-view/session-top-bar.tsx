@@ -8,13 +8,13 @@ import { IconButton } from '@/components/ui/icon-button';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
-import { formatElapsed, sessionTitleForStart } from '@/src/session-recorder/session-view-model';
+import { formatElapsed } from '@/src/session-recorder/session-view-model';
 
 type SessionTopBarProps =
   | {
       // The active session: ⋮ opens the session options, Finish ends it.
       mode: 'active';
-      // Names the session by its time of day and drives the elapsed time.
+      // Drives the elapsed time.
       startedAt: Date;
       // Injectable clock for tests.
       now?: () => Date;
@@ -52,7 +52,7 @@ const PRIMARY = {
 
 const systemNow = () => new Date();
 
-// `Morning training · 42:17`: ticks on its own so the rest of the screen does
+// `Training · 42:17`: ticks on its own so the rest of the screen does
 // not re-render each second.
 function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
   const [current, setCurrent] = useState(now);
@@ -66,12 +66,12 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
     // past the hour on a narrow phone.
     <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
       numberOfLines={1} style={[uiText.title, styles.title]} testID="session-view-title">
-      <FigureText strong>{`${sessionTitleForStart(startedAt)} · ${formatElapsed(startedAt, current)}`}</FigureText>
+      <FigureText strong>{`Training · ${formatElapsed(startedAt, current)}`}</FigureText>
     </Text>
   );
 }
 
-// `<Time of day> training · <elapsed>` · ⋮ · ✓ (Finish);
+// `Training · <elapsed>` · ⋮ · ✓ (Finish);
 // `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
