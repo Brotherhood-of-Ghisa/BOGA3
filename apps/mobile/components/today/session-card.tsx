@@ -1,8 +1,19 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { FigureText } from '@/components/ui/figure-text';
+import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -81,21 +92,98 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
-// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling.
-function ExerciseTable({ lines }: { lines: SessionExerciseLine[] }) {
+// A glyph-sized pair beside the Exercise heading; the hit slop takes each to
+// the 44pt height, and the pair's gap keeps their reaches apart.
+const SCROLL_ARROW_WIDTH = 24;
+const SCROLL_ARROW_HEIGHT = 16;
+const SCROLL_ARROW_SLOP = {
+  top: (uiGeometry.tapTarget - SCROLL_ARROW_HEIGHT) / 2,
+  bottom: (uiGeometry.tapTarget - SCROLL_ARROW_HEIGHT) / 2,
+  left: uiSpace.xs / 2,
+  right: uiSpace.xs / 2,
+};
+
+function ScrollArrow({ direction, onPress }: { direction: 'up' | 'down'; onPress: (() => void) | null }) {
+  const disabled = onPress === null;
+  return (
+    <Pressable
+      accessibilityLabel={direction === 'up' ? 'Earlier exercises' : 'Later exercises'}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={SCROLL_ARROW_SLOP}
+      onPress={onPress ?? undefined}
+      style={({ pressed }) => [styles.scrollArrow, pressed && !disabled ? styles.scrollArrowPressed : null]}
+      testID={`today-latest-session-rows-${direction}`}>
+      <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name={`chevron-${direction}`} size="sm" />
+    </Pressable>
+  );
+}
+
+/** Where the rows' scroller is, and a page step up or down from there (null at that end). */
+function useRowScroller(rowCount: number) {
+  const scroller = useRef<ScrollViewInstance>(null);
+  const [offset, setOffset] = useState(0);
+  const [viewport, setViewport] = useState(VISIBLE_EXERCISE_ROWS * ROW_HEIGHT);
+  const end = Math.max(0, rowCount * ROW_HEIGHT - viewport);
+  const scrollTo = (y: number) => {
+    const target = Math.min(end, Math.max(0, y));
+    setOffset(target);
+    scroller.current?.scrollTo({ y: target, animated: true });
+  };
+  return {
+    scroller,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => setOffset(event.nativeEvent.contentOffset.y),
+    onLayout: (event: LayoutChangeEvent) => setViewport(event.nativeEvent.layout.height),
+    // A sub-point remainder is the scroller settling, not a row left to show.
+    onUp: offset > 1 ? () => scrollTo(offset - viewport) : null,
+    onDown: offset < end - 1 ? () => scrollTo(offset + viewport) : null,
+  };
+}
+
+// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling, with
+// arrows beside the heading when there is more to show. The rows sit outside
+// the summary's button, whose responder would otherwise swallow the swipe, and
+// open the session themselves.
+function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen: () => void }) {
+  const { scroller, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
   const label = [uiText.label, uiTextTone.faint];
   return (
     <View style={styles.fillTable}>
       <View style={[styles.row, styles.tableHeader]}>
-        <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Exercise</Text>
+        <View style={[styles.nameCell, styles.nameHeading]}>
+          <Text allowFontScaling={false} style={label}>Exercise</Text>
+          {lines.length > VISIBLE_EXERCISE_ROWS ? (
+            <View style={styles.scrollArrows}>
+              <ScrollArrow direction="up" onPress={onUp} />
+              <ScrollArrow direction="down" onPress={onDown} />
+            </View>
+          ) : null}
+        </View>
         <Text allowFontScaling={false} style={[...label, styles.sets]}>Sets</Text>
         <Text allowFontScaling={false} style={[...label, styles.best]}>Best set</Text>
         <Text allowFontScaling={false} style={[...label, styles.oneRepMax]}>1RM</Text>
       </View>
-      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled style={styles.fillRows} testID="today-latest-session-rows">
-        {rows}
+      <ScrollView
+        alwaysBounceVertical={false}
+        nestedScrollEnabled
+        onLayout={onLayout}
+        onScroll={onScroll}
+        ref={scroller}
+        scrollEventThrottle={32}
+        style={styles.fillRows}
+        testID="today-latest-session-rows">
+        {/* The summary's button speaks for the rows; this is their tap. */}
+        <Pressable
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          onPress={onOpen}
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+          testID="today-latest-session-rows-open">
+          {rows}
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -116,11 +204,11 @@ export function TodaySessionCard({
   onShowSession,
 }: TodaySessionCardProps) {
   const stamp = (
-    // The start reads as a Sessions row's does: a body line, its figures in the figure face.
+    // The start reads as a Sessions row's does: the whole stamp, month included, in the figure face.
     <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID="today-latest-session-start">
-      <FigureText>{formatCompactDate(session.startedAt)}</FigureText>
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatCompactDate(session.startedAt)}</Text>
       <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-      <FigureText>{formatClockTime(session.startedAt.getTime())}</FigureText>
+      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatClockTime(session.startedAt.getTime())}</Text>
     </Text>
   );
   return (
@@ -139,16 +227,18 @@ export function TodaySessionCard({
         )}
         <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
       </View>
-      <Pressable
-        accessibilityHint="Opens the completed session"
-        accessibilityLabel={todaySessionAccessibilityLabel(session)}
-        accessibilityRole="button"
-        onPress={() => onOpenSession(session.id)}
-        style={({ pressed }) => [styles.body, styles.fillBody, pressed ? styles.pressed : null]}
-        testID="today-latest-session">
-        <SummaryLine session={session} />
-        <ExerciseTable lines={session.exercises} />
-      </Pressable>
+      <View style={[styles.body, styles.fillBody]}>
+        <Pressable
+          accessibilityHint="Opens the completed session"
+          accessibilityLabel={todaySessionAccessibilityLabel(session)}
+          accessibilityRole="button"
+          onPress={() => onOpenSession(session.id)}
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+          testID="today-latest-session">
+          <SummaryLine session={session} />
+        </Pressable>
+        <ExerciseTable lines={session.exercises} onOpen={() => onOpenSession(session.id)} />
+      </View>
     </Card>
   );
 }
@@ -187,6 +277,25 @@ const styles = StyleSheet.create({
   nameCell: {
     flex: 1,
     minWidth: 0,
+  },
+  nameHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  scrollArrows: {
+    flexDirection: 'row',
+    gap: uiSpace.xs,
+  },
+  scrollArrow: {
+    width: SCROLL_ARROW_WIDTH,
+    height: SCROLL_ARROW_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: uiGeometry.radius.control,
+  },
+  scrollArrowPressed: {
+    backgroundColor: uiRoles.paper,
   },
   fillTable: {
     flexShrink: 1,

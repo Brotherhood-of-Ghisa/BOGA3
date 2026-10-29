@@ -99,6 +99,8 @@ const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
 };
 
 const text = (testID: string) => screen.getByTestId(testID);
+// The session table's rows: hidden from assistive tech, since the summary's button speaks for them.
+const rowText = (testID: string) => screen.getByTestId(testID, { includeHiddenElements: true });
 
 beforeEach(() => {
   resetLocalData();
@@ -268,26 +270,34 @@ describe('Today: the Progress card over real data', () => {
     // The start reads as a Sessions row: a body line, ink, only its figures in the figure face.
     expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
     expect(within(text('today-latest-session-start')).getByText('07:12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    // The month takes the figure face with its day and year, as a Sessions row's stamp does.
+    expect(within(text('today-latest-session-start')).getByText('15 Oct 26')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     // A faint separator holds the date and the time apart.
     expect(within(text('today-latest-session-start')).getByText(' · ')).toHaveStyle({ color: uiRoles.inkFaint });
     // Sets are ink like the other figure columns, not muted.
-    expect(text('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
+    expect(rowText('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
     // The figure columns sit a clear step apart.
-    expect(text('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
+    expect(rowText('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
-    expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
-    expect(text('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: uiRoles.record });
-    expect(text('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
-    expect(text('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
+    expect(rowText('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
+    expect(rowText('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
     expect(body.props.accessibilityLabel).toBe(
       'Session on 15 Oct 26 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
         + 'Barbell Bench Press, 3 sets, best 115.0 × 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100.0 × 5, 1RM 116.6',
     );
 
+    // Two exercises fit the table: no scroll arrows.
+    expect(screen.queryByTestId('today-latest-session-rows-down')).toBeNull();
+
     fireEvent.press(body);
+    // The rows sit outside the summary's button, so they scroll, and open the session themselves.
+    fireEvent.press(rowText('today-latest-session-rows-open'));
     fireEvent.press(text('today-sessions-button'));
-    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions']]);
+    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/completed-session/oct-15'], ['/sessions']]);
+    expect(within(body).queryByTestId('today-latest-session-rows')).toBeNull();
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
     // The header row keeps a tap height of its own: the compact link no longer holds it open.
@@ -334,7 +344,7 @@ describe('Today: the Progress card over real data', () => {
     fireEvent.press(text('today-latest-session-step-older'));
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('8 Oct 26 · 09:00'));
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
-    expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3110.0 × 5128.2');
+    expect(rowText('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3110.0 × 5128.2');
     // The figures above it stay on this week and period.
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
 
@@ -484,7 +494,19 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 · 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 exercises · 18 sets · 3 PRs @ Canal Street Gym');
     // More exercises than the card shows without scrolling.
-    expect(text('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
+    expect(rowText('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
+    // The arrows beside the heading page the rows: at the top only down steps; one page reaches the last row.
+    expect(text('today-latest-session-rows-up')).toBeDisabled();
+    expect(text('today-latest-session-rows-down')).toBeEnabled();
+    fireEvent.press(text('today-latest-session-rows-down'));
+    await waitFor(() => expect(text('today-latest-session-rows-down')).toBeDisabled());
+    expect(text('today-latest-session-rows-up')).toBeEnabled();
+    fireEvent.press(text('today-latest-session-rows-up'));
+    await waitFor(() => expect(text('today-latest-session-rows-up')).toBeDisabled());
+    // A swipe moves them too: the arrows follow the scroller.
+    fireEvent.scroll(text('today-latest-session-rows'), { nativeEvent: { contentOffset: { x: 0, y: 32 } } });
+    await waitFor(() => expect(text('today-latest-session-rows-up')).toBeEnabled());
+    expect(text('today-latest-session-rows-down')).toBeEnabled();
   });
 });
 
