@@ -1,10 +1,12 @@
 # COW — draft UX brief
 
-- Status: draft for operator review; not yet an accepted design target.
+- Status: placement/navigation agreed on 2026-10-29; visual layout still draft,
+  not yet an accepted design target.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
-  questions stay open. This brief proposes placement and interaction only.
+  questions stay open. Agreed entry points are recorded below; remaining
+  layout and interaction details are proposals.
 - Before acceptance: capture current Groups / At a glance, group management
   and comparison-form screenshots in the worktree's gitignored mobile
   artifacts tree; link them here or in the implementation PR. No screenshots
@@ -16,17 +18,27 @@ An admin schedules next week's COW in one short form. Every member can find
 the exercise before it starts, follow each metric during the week, and read
 the stored final outcome afterwards. Use COW in feature names and copy.
 
-## Proposed placement
+## Agreed placement and navigation
 
-Add one COW card to the selected group's At a glance page, before the existing
-viewer-local period stepper. The COW card has its own fixed group-calendar
-dates; changing the existing summary week never changes the COW context.
+The operator confirmed that the COW summary belongs on the selected group's
+At a glance page and appears immediately, without opening another page first.
+Proposed placement is before the existing viewer-local period stepper. The
+COW has fixed group-calendar dates; the summary's week selector cannot move it.
 
-The card shows this week's COW, its exercise and Live / Finalizing state, with
-an Open COW link. Below it are compact Next COW and Latest results links when
-available, plus COW history. A week without a COW shows No COW this week;
-members cannot enter or create that week. Only owners/admins see Schedule
-next COW, or Manage next COW when it already exists. No new main tab.
+Show the current COW's exercise, dates, metrics and state directly in that
+summary. Open COW opens the secondary COW page with that COW selected. A week
+without a COW shows No COW this week and a browsing link; it cannot be created
+midweek. No new main tab.
+
+Scheduling belongs on the individual group page (the existing group
+management screen), which opens a secondary COW page. Owners/admins can create
+or edit there; every member can view and browse COWs. The At a glance summary
+is a reading entry, with no scheduling/editing controls. Keep the same selected
+group/COW across both entries, and return Back to the page that opened it.
+
+The secondary page provides current/upcoming COWs and past results. Concrete
+route names and its browsing/form layout remain for T04; creation/editing
+must happen on a secondary page, not an inline At a glance form.
 
 These are layout sketches, not pixel targets:
 
@@ -39,22 +51,27 @@ Bench press                              Live
 1RM · Improvement · Total Volume
 [Open COW]
 
-Next COW       Squat · 9–15 November        >
-Latest results Deadlift · 26 Oct–1 Nov      >
-COW history                                >
+...existing group week summary...
+
+Individual group page
+COWs                                       >
 [Schedule next COW]             (admin only)
 
-...existing group week summary...
+Secondary COW page
+Current | Upcoming | History
+...selected COW / results / permitted editor...
 ```
 
-The action is Manage next COW instead of Schedule when the next slot is full;
-the sketch lists possible rows, not a requirement to show all rows at once.
+The group-page admin action is Edit next COW when the next slot is full;
+both actions open the secondary COW page in the appropriate mode. The sketch's
+browsing controls and styling are proposals, not a finalized layout.
 Date formatting follows the account preference; dates refer to the COW zone.
 
 ## Schedule next COW
 
-Open a standard form from the card. Next week's date range and the group's
-zone are read-only context, not editable date fields. Use the existing group
+From the individual group page, Schedule next COW opens the creation form on
+the secondary COW page. Next week's date range and the group's zone are
+read-only context, not editable date fields. Use the existing group
 exercise picker; require at least one metric. A review section on the same
 form shows dates, exercise and metrics before its one Publish COW action.
 Publishing immediately makes the upcoming COW visible to members.
@@ -105,9 +122,11 @@ the rankings, or No qualifying results. Tie presentation follows T01; never
 invent an overall winner. A user's ineligible/not-yet-participating state is
 visible without an enrolment control.
 
-At the next visit after finalization, Latest results on the group card opens
-that outcome, independently of the new live/next COW. History lists completed
-COWs newest first and opens the same final detail. This is persistent in-app
+After finalization, the At a glance summary can show the latest final outcome
+until a new current COW starts. Browsing from the group page or summary opens
+the secondary COW page, where History lists stored results newest first and
+opens the same final detail. The exact latest-result summary remains a visual
+design proposal. This is persistent in-app
 reporting, not a modal, a seen-once celebration or a push notification.
 Final results never imply a drill-down source workout is still available.
 Only provide permitted detail links that remain valid; hide unsafe historical
@@ -122,8 +141,8 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no COW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Before acceptance, review placement and reporting, scheduling/edit/cancel,
-group-zone setup, long names, small/large phones, keyboard and scroll,
+Before visual acceptance, review the summary and secondary-page layouts,
+reporting, scheduling/edit/cancel, group-zone setup, long names, small/large phones, keyboard and scroll,
 VoiceOver, touch targets and non-colour state cues. T04's UX Contract owns the
 flow/acceptance mapping; its PR supplies fresh running-app screenshots against
 this accepted target. Delete this brief with T04 and the milestone.

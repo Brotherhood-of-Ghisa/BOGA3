@@ -88,8 +88,12 @@ Use `src/groups/api.ts` as the sole RPC caller, the existing cache/resource
 and action hooks, group picker, rank rows, notices and UI primitives. Reads
 follow existing refresh/offline behavior; admin writes require a connection.
 The draft [COW UX brief](../M39-cow-ux.md) is attached to this milestone and
-T04. Review it with the operator and add current group reference screenshots
-before accepting it as the design target. The plan prescribes no new main tab.
+T04. The operator confirmed: the COW summary appears immediately on At a
+glance; admins schedule from the individual group page, which opens a secondary
+COW page for creation/editing or member viewing/browsing. The summary is a
+reading entry, with no scheduling controls. Review the remaining visual
+layout and add current group reference screenshots before accepting the
+design target. The plan prescribes no new main tab.
 
 ### D7. Shared calendar and scheduling
 
@@ -154,7 +158,8 @@ the owning fact/contract, and update later cards if the answer changes them:
 
 This plan changes no accepted runtime fact. New planned product choices are
 the group calendar, next-week-only scheduling, fixed participation and stored
-finality (D7–D9); deadline acceptance is explicitly still proposed. The
+finality (D7–D9), plus the D6 summary and group-page navigation;
+deadline acceptance is explicitly still proposed. The
 implementation introduces weekly rules affecting server and mobile readers. T01 must
 apply `docs/procedures/product-facts-authoring.md` and record qualifying
 cross-surface decisions in `docs/product/groups.md`; extend its index trigger
