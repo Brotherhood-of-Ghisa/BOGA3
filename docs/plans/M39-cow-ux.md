@@ -1,11 +1,12 @@
 # CoW — UX brief
 
-- Status: three attached mockups approved by the operator on 2026-10-29:
+- Status: four attached mockups approved by the operator on 2026-10-29:
   detailed chronological browser with horizontal banner, and Today top-three
-  card with in-card metric tabs, and the revised individual group-page preview.
+  card with in-card metric tabs, the revised individual group-page preview,
+  and the scheduling exercise picker.
   The last-week-final fallback on Today is also agreed. Scheduling option 1 is
-  selected as the base for refinement; its exercise picker and empty/error
-  targets remain pending review. The group link's View CoWs
+  selected as the base for refinement; empty/error targets remain pending
+  review. The group link's View CoWs
   versus View/Edit CoWs wording is explicitly deferred.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
@@ -215,8 +216,8 @@ Publishing immediately makes the upcoming CoW visible to members.
 
 The operator agreed to option 1 as the base: compact fixed group/week context,
 one exercise selector, left-aligned independent metric checkboxes and one
-action. The exercise picker below is the next refinement; selection of the
-layout does not approve its unseen interaction details. No wizard, date
+action. The exercise picker below is also approved; remaining empty/error
+states and T01's lifecycle rules stay open. No wizard, date
 picker, recurring setting, extra review step or scoring configuration.
 
 Generated with the built-in image-generation tool, grounded in the earlier
@@ -228,7 +229,7 @@ The [earlier draft](assets/M39-cow-schedule.png),
 [option 2](assets/M39-cow-schedule-option-2.png) and
 [option 3](assets/M39-cow-schedule-option-3.png) are not selected.
 
-### Exercise picker — proposed
+### Exercise picker — approved
 
 Tapping Exercise opens the existing bottom-sheet pattern, titled Choose
 exercise, with a SearchField above a scrollable list of this group's active
@@ -239,7 +240,7 @@ when creating a group exercise, whereas this field selects an existing group
 comparison identity. Do not list private exercises, archived comparisons or
 another group's exercises.
 
-![Proposed scheduling exercise picker](assets/M39-cow-schedule-exercise-picker.png)
+![Approved scheduling exercise picker](assets/M39-cow-schedule-exercise-picker.png)
 
 Generated with the built-in image-generation tool. Prompt: preserve selected
 option 1 behind the standard dimmed backdrop; add a bottom-anchored Choose
@@ -378,7 +379,7 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Review the selected scheduling layout's picker and empty/error targets before implementation. T01
+Preserve the selected scheduling layout and approved picker; review empty/error targets before implementation. T01
 still owns cutoff, edit/cancel, ties and revision policy. Verify approved
 layouts, state handling and fallback with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and

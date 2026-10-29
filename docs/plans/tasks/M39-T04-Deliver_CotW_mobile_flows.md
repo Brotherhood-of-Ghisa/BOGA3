@@ -47,8 +47,8 @@ existing formatting: exercise/status left, dates/zone right. The revised
 mockup is attached to the brief; no browser tabs or week stepper. The browser and
 Today top-three card are approved design targets. The revised individual
 group-page preview is also approved; View CoWs versus View/Edit CoWs wording
-is deferred. Scheduling option 1 is selected as the compact base. Its proposed
-exercise picker and remaining interaction states still need review; earlier
+is deferred. Scheduling option 1 is selected as the compact base. Its exercise
+picker is approved; remaining empty/error states still need review. Earlier
 drafts/options 2 and 3 are not selected.
 The fallback is also agreed: a current CoW with no scores still takes priority;
 never substitute older, upcoming or non-final results as fallback. The header opens the
@@ -57,8 +57,8 @@ when the card is hidden.
 
 ## Open — resolve with the operator at session start
 
-- Use the three approved mockups in the [CoW UX brief](../M39-cow-ux.md).
-  Use selected scheduling option 1; review its exercise picker, empty/error targets and state tables,
+- Use the four approved mockups in the [CoW UX brief](../M39-cow-ux.md).
+  Use selected scheduling option 1; review empty/error targets and state tables,
   and settle the deferred group-link wording;
   editing reuses that form with Edit CoW / Save changes, subject to T01.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build

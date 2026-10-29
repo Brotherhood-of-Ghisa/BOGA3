@@ -106,8 +106,8 @@ must show at least Today's current-CoW information: exercise, dates/status,
 top three and in-card metric browsing, plus a link to view/manage CoWs on the
 successive page. The revised group preview is approved, with View CoWs versus
 View/Edit CoWs copy left for later. Scheduling option 1 is selected as the
-compact base; the brief attaches a proposed searchable group-exercise sheet
-for the next refinement. Picker and empty/error targets still await review.
+compact base; its searchable group-exercise sheet is approved. Empty/error
+targets still await review.
 It includes offline, uncertain-publication and access-loss recovery. No new main tab.
 
 ### D7. Shared calendar and scheduling
