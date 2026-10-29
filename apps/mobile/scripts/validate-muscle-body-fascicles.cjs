@@ -1,5 +1,6 @@
 const { createHash } = require('node:crypto');
 const { reconstruct } = require('./fascicle-geometry.cjs');
+const anatomySource = require('./anatomy/source.json');
 
 function check(condition, message) {
   if (!condition) throw new Error(`Invalid fascicle asset: ${message}`);
@@ -20,6 +21,13 @@ function validateMesh(mesh) {
 }
 
 function validateSegment(segment, id, mesh) {
+  if (Array.isArray(segment)) {
+    check(segment.length === 9 && segment.every(Number.isFinite), `${id} model-space tuple`);
+    check(Math.hypot(...segment.slice(6)) > .9999 && Math.hypot(...segment.slice(6)) < 1.0001, `${id} unit normal`);
+    check(Math.hypot(...segment.slice(0, 3).map((v, k) => v - segment[k + 3])) > 1e-10, `${id} zero-length model segment`);
+    check(segment.slice(0, 6).every((v, k) => Math.abs(v) <= (k % 3 === 1 ? 1 : .7)), `${id} model coordinate bounds`);
+    return;
+  }
   check(record(segment), `${id} segment`);
   check(Number.isInteger(segment.face) && segment.face >= 0 && segment.face < mesh.faces.length, `${id} face`);
   check(segment.side === -1 || segment.side === 1, `${id} side`);
@@ -44,16 +52,56 @@ function validateSegment(segment, id, mesh) {
   }
 }
 
+function validateModelParts(muscle, id) {
+  const expected = anatomySource.groups[id];
+  if (!expected) { check(!muscle.anatomicalParts && muscle.segments.every(s => !Array.isArray(s)), `${id} unexpected model geometry`); return; }
+  check(Array.isArray(muscle.anatomicalParts) && JSON.stringify(muscle.anatomicalParts.map(p => p.id)) === JSON.stringify(expected), `${id} source component coverage`);
+  let offset = muscle.segments.findIndex(Array.isArray);
+  check(muscle.segments.slice(0, offset).every(s => s.layer === 'surface'), `${id} duplicate deep guides`);
+  check(anatomySource.retainSurface.includes(id) || offset === 0, `${id} replaced surface guides`);
+  for (const part of muscle.anatomicalParts) {
+    check(part.start === offset && Number.isInteger(part.count) && part.count > 0, `${id} component range`);
+    const rows = muscle.segments.slice(offset, offset + part.count);
+    check(rows.length === part.count && rows.every(Array.isArray), `${id} component geometry`);
+    const bounds = [Array(3).fill(Infinity), Array(3).fill(-Infinity)];
+    for (const row of rows) for (let axis = 0; axis < 3; axis++) {
+      bounds[0][axis] = Math.min(bounds[0][axis], row[axis], row[axis + 3]);
+      bounds[1][axis] = Math.max(bounds[1][axis], row[axis], row[axis + 3]);
+    }
+    const approved = anatomySource.coverage[part.id].guideBounds;
+    check(bounds.every((b, end) => b.every((v, axis) => Math.abs(v - approved[end][axis]) < .000002)), `${id} registered extent`);
+    check(Array.isArray(part.chains) && part.chains.length > 0, `${id} contour coverage`);
+    const seen = new Set();
+    for (const chain of part.chains) {
+      check(Array.isArray(chain) && chain.length > 0, `${id} empty contour`);
+      let previous = null;
+      for (const signed of chain) {
+        const index = signed >= 0 ? signed : -signed - 1;
+        check(Number.isInteger(signed) && index < rows.length && !seen.has(index), `${id} contour index`);
+        seen.add(index);
+        const row = rows[index], start = signed >= 0 ? 0 : 3, end = 3 - start;
+        check(!previous || previous.every((v, k) => v === row[start + k]), `${id} disconnected contour`);
+        previous = row.slice(end, end + 3);
+      }
+    }
+    check(seen.size === rows.length, `${id} missing contour segments`);
+    offset += part.count;
+  }
+  check(offset === muscle.segments.length, `${id} unassigned model geometry`);
+}
+
 function validateAsset(asset, meshBytes) {
   const mesh = JSON.parse(meshBytes);
   validateMesh(mesh);
-  check(record(asset) && asset.schemaVersion === 1, 'schema version');
+  check(record(asset) && asset.schemaVersion === 2, 'schema version');
   check(asset.quality === 'schematic-not-anatomically-validated', 'quality');
   const reference = asset.referenceMesh;
   check(record(reference) && reference.path === 'muscle-body-mesh.json' && reference.hashEncoding === 'exact-file-bytes', 'mesh identity metadata');
   check(reference.sha256 === createHash('sha256').update(meshBytes).digest('hex'), 'mesh hash mismatch');
   check(reference.vertices === mesh.vertices.length && reference.faces === mesh.faces.length, 'mesh counts');
-  check(record(asset.geometry) && asset.geometry.encoding === 'triangle-local-segments', 'geometry encoding');
+  check(record(asset.geometry) && asset.geometry.encoding === 'mixed-triangle-and-model-segments', 'geometry encoding');
+  check(JSON.stringify(asset.anatomy) === JSON.stringify(anatomySource), 'anatomical provenance/registration');
+  check(asset.anatomy.registration.torso.targetMeshSha256 === reference.sha256, 'anatomical pose mesh hash');
   check(record(asset.provenance) && ['generator', 'origin', 'literatureUse'].every(k => text(asset.provenance[k])), 'provenance');
   check(record(asset.sources) && Object.keys(asset.sources).length > 0, 'sources');
   for (const source of Object.values(asset.sources)) check(record(source) && text(source.label) && text(source.url) && /^https:\/\//.test(source.url), 'source citation');
@@ -63,15 +111,17 @@ function validateAsset(asset, meshBytes) {
     check(record(muscle) && muscle.quality === asset.quality, `${id} quality`);
     check(text(muscle.members) && text(muscle.direction) && refs(muscle.sourceIds, asset.sources), `${id} anatomy/sources`);
     check(Array.isArray(muscle.limitations) && muscle.limitations.length > 0 && muscle.limitations.every(text), `${id} limitations`);
-    check(muscle.attachment === (id === 'chest' ? 'projected-landmarks' : 'material-mask'), `${id} attachment`);
+    const attachment = anatomySource.groups[id] ? (anatomySource.retainSurface.includes(id) ? 'mixed' : 'model-space') : 'material-mask';
+    check(muscle.attachment === attachment, `${id} attachment`);
     check(Array.isArray(muscle.segments) && muscle.segments.length > 0, `${id} geometry coverage`);
     for (const segment of muscle.segments) validateSegment(segment, id, mesh);
-    check([-1, 1].every(side => muscle.segments.some(s => s.side === side)), `${id} bilateral coverage`);
+    validateModelParts(muscle, id);
+    check(muscle.segments.some(Array.isArray) || [-1, 1].every(side => muscle.segments.some(s => s.side === side)), `${id} bilateral coverage`);
   }
   const extensions = asset.muscles.chest.extensions;
   check(Array.isArray(extensions) && extensions.length === 1, 'chest extension');
   const minor = extensions[0];
-  check(record(minor) && minor.id === 'pectoralis_minor' && minor.part === 'minor' && minor.catalogEntry === false && minor.measuredVolume === false && minor.representation === 'deep-projection' && refs(minor.sourceIds, asset.sources), 'minor extension metadata');
+  check(record(minor) && minor.id === 'pectoralis_minor' && minor.part === 'minor' && minor.catalogEntry === false && minor.measuredVolume === false && minor.representation === 'independent-model-space' && refs(minor.sourceIds, asset.sources), 'minor extension metadata');
   return asset;
 }
 module.exports = { validateAsset, validateSegment };

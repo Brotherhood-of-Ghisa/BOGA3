@@ -1,0 +1,2639 @@
+{
+  "sources": {
+    "url": "https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST/isa_BP3D_4.0_obj_99.zip",
+    "version": "BodyParts3D 4.0, 99% polygon reduction",
+    "attribution": "BodyParts3D, \u00a9 The Database Center for Life Science licensed under CC Attribution 4.0 International",
+    "licenseUrl": "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html",
+    "retrieved": "2026-10-29",
+    "models": {
+      "FJ1486": {
+        "name": "right brachialis",
+        "sha256": "be5f40b153fd6ce0c8c274eb4c26be8d1a29b4bbe75dd0e4a0dfe5c4d251fa03",
+        "bytes": 127901
+      },
+      "FJ1512": {
+        "name": "short head of right biceps brachii",
+        "sha256": "2173b7cce29f11036907b80e068e9bd6c16f22359d6e7994af9684454b99b4d5",
+        "bytes": 161507
+      },
+      "FJ1478": {
+        "name": "long head of right biceps brachii",
+        "sha256": "2442d2b5ac30c5da42e72eeff83d143df51c7617001cbc6552096a504f29bc07",
+        "bytes": 105386
+      },
+      "FJ1437": {
+        "name": "right soleus",
+        "sha256": "c9c62b720ffe375a8eddf390608684a796f1ea54880a5c34fa440404addc399e",
+        "bytes": 307036
+      },
+      "FJ1394": {
+        "name": "lateral head of right gastrocnemius",
+        "sha256": "621dc10e974bcc1c53a8843bf1db3a1c322c8327d279010c58533bd28952bf08",
+        "bytes": 201640
+      },
+      "FJ1397": {
+        "name": "medial head of right gastrocnemius",
+        "sha256": "d7f3aa44801171baade1a59c40a8f8bda72097bec07047f93f24ebaac4546cb4",
+        "bytes": 260975
+      },
+      "FJ3368": {
+        "name": "right humerus",
+        "sha256": "85f5445a11ecb029b027db0b9b34933982836d442b19ff531d1ca35a3bc3a237",
+        "bytes": 256564
+      },
+      "FJ3387": {
+        "name": "right tibia",
+        "sha256": "01879d7310938e82eecc02e1115332497e94085ff5cc1fa8eeee47ad1f5d3578",
+        "bytes": 100137
+      },
+      "FJ2810": {
+        "name": "skin (registration reference only)",
+        "sha256": "682f402206f15592acdeaae8ffb6b34c3e5c3267fa4685e63d2e4920ef2a80e0",
+        "bytes": 14465502
+      },
+      "FJ3365": {
+        "name": "right femur (registration reference only)",
+        "sha256": "5eff0f92905dd45bd0e79b1de0144dc15988c73c683468163255ba1452d58037",
+        "bytes": 192114
+      },
+      "FJ3349": {
+        "name": "right radius (registration reference only)",
+        "sha256": "0f824e639b13ea02959734a0d9bd8d7ca67d0b51f531a138d769e1d3b22e0c98",
+        "bytes": 42701
+      },
+      "FJ3391": {
+        "name": "right ulna (registration reference only)",
+        "sha256": "0aad73148e036c980ab24dfa675fcc1f109e5c60d82c12f3696420cf93cb4a98",
+        "bytes": 54174
+      },
+      "FJ3362": {
+        "name": "right clavicle (registration reference only)",
+        "sha256": "9a111cac8351e79dd1315aea90108fe56f78e4bf0159473e6ad727ba91b60e6d",
+        "bytes": 68321
+      },
+      "FJ3393": {
+        "name": "sacrum (registration reference only)",
+        "sha256": "cd04cc9f78d758ba34e92896914f647d22d257b9e7e51b97764670f694033489",
+        "bytes": 654878
+      },
+      "FJ3178": {
+        "name": "body of sternum (registration reference only)",
+        "sha256": "ec90f03f2ce1edebc8793a9e9973229b198d6367eb5eab1dff6e238110e94d9d",
+        "bytes": 374292
+      },
+      "FJ1506": {
+        "name": "right supraspinatus",
+        "sha256": "793771eceb64385269ddeeb09245e8c53b67499194f6fa98049b5e17aafa8e0c",
+        "bytes": 76172
+      },
+      "FJ1500": {
+        "name": "right infraspinatus",
+        "sha256": "28f61376a3a88a28d14c44e1c20e9b7a34129772c130afa003daceac801455b1",
+        "bytes": 69844
+      },
+      "FJ1508": {
+        "name": "right teres minor",
+        "sha256": "f56e595b86cea659891664706cd4443acddd8dc69e4e5bb3855445eef302641a",
+        "bytes": 38012
+      },
+      "FJ1504": {
+        "name": "right subscapularis",
+        "sha256": "fdcbfd01f93e2d24bd73f5cb259a311c9f9e90de08c41573439844eef5f605dd",
+        "bytes": 231733
+      },
+      "FJ1536": {
+        "name": "right rhomboid major",
+        "sha256": "81b84d6d2e7c859004ee2d71f8fef2768ec422fbace3967d54e3f3b2965bdb89",
+        "bytes": 549548
+      },
+      "FJ1537": {
+        "name": "right rhomboid minor",
+        "sha256": "acbd2dcd51879085bb2ec7d12b45c0ba2514ce3a2a1bb680bcf78732a1f688ff",
+        "bytes": 157909
+      },
+      "FJ1459": {
+        "name": "right serratus anterior",
+        "sha256": "33f4ae8c7a84785e2bc5f4f21432d13de0805e485a29f3e6762bac6f85cb61d5",
+        "bytes": 3600341
+      },
+      "FJ1431": {
+        "name": "right psoas major",
+        "sha256": "b66009da13d6241d66de3c0242288abfe0c90ce1c76b38000f9a92b02e2f1e0f",
+        "bytes": 379043
+      },
+      "FJ1422": {
+        "name": "right iliacus",
+        "sha256": "e7201ed4264a06a3689592625a20abcc9aed26435f0797a1e8e41b68335d1e24",
+        "bytes": 238318
+      },
+      "FJ1419": {
+        "name": "right gluteus medius",
+        "sha256": "e2e06899b8a61640b32086432ec4b577b2bf2db6f044d469c01bdceb38bd3831",
+        "bytes": 246651
+      },
+      "FJ1420": {
+        "name": "right gluteus minimus",
+        "sha256": "61ebd1c4cd97adb69324aa74325c05425dbf37f83862a34c6a2f7400c3c017cd",
+        "bytes": 321500
+      },
+      "FJ1441": {
+        "name": "right vastus intermedius",
+        "sha256": "c609da3e64f0fc6c295b66b575503e61cacc8bfd9a5e5ec9b79e4eb476da5bab",
+        "bytes": 305079
+      },
+      "FJ1480": {
+        "name": "medial head of right triceps brachii",
+        "sha256": "1ea653667afa5ff0bf0e01d71ac648819655241c130e8dd1778ed2f9561c34c5",
+        "bytes": 61608
+      },
+      "FJ1435": {
+        "name": "right semimembranosus",
+        "sha256": "1fdce0f7db538e4731207af06a293e41037c2474192f61ca2cb5b0d663b16894",
+        "bytes": 307942
+      },
+      "FJ1444": {
+        "name": "short head of right biceps femoris",
+        "sha256": "c071097501796cee5ff2a011b3d84c7bea4cb153241fce0f8b0a73d070bd990f",
+        "bytes": 124350
+      },
+      "FJ1401": {
+        "name": "right adductor brevis",
+        "sha256": "388e7598162d73b22c18d198b9fa4abb5359eb95ffbbfbf0941740df85e0a4f6",
+        "bytes": 109236
+      },
+      "FJ1403": {
+        "name": "right adductor magnus",
+        "sha256": "e9a3ed2907b10d8f4d93c78f04eb0c4b3b96a44230958b90979a0d7142695fdd",
+        "bytes": 478061
+      },
+      "FJ1402": {
+        "name": "right adductor longus",
+        "sha256": "f5165be945dbae2a81a1261b5f5c169c9ba677e80c70af263a08efc2f57f3f53",
+        "bytes": 174040
+      },
+      "FJ1421": {
+        "name": "right gracilis",
+        "sha256": "82d12d8359e66303a7e5a21c2b9b24b26d33b8bbeab55f8f97c87881e25e5fa7",
+        "bytes": 227763
+      },
+      "FJ1427": {
+        "name": "right pectineus",
+        "sha256": "8dfb6a8868ddbf1e72679a821fb79ed49573ed6ceab40108bd0d5b8c109171ba",
+        "bytes": 97969
+      },
+      "FJ1497": {
+        "name": "right flexor digitorum profundus",
+        "sha256": "e62f8adfa454bee523974952500aa32a16f086b249a434b4bbeabc333878ac39",
+        "bytes": 392489
+      },
+      "FJ1498": {
+        "name": "right flexor pollicis longus",
+        "sha256": "e0fc87382350f38acb2a5197e83dabb450ba6d823222388c8e169e30c0bbfb94",
+        "bytes": 151641
+      },
+      "FJ1503": {
+        "name": "right pronator quadratus",
+        "sha256": "04adea4b7060a08c9d734ea78156525b3d3983fc1da0601ac151198985e78cfd",
+        "bytes": 192602
+      },
+      "FJ1505": {
+        "name": "right supinator",
+        "sha256": "83c5940f2c6516ecf5b0eb69de5dc0a056177b29f7bc046b94cc20c85460ae46",
+        "bytes": 241649
+      },
+      "FJ1484": {
+        "name": "right abductor pollicis longus",
+        "sha256": "35a1077de93e2bdcaaa68e688f4f31a371c3c61e35d629314507e549e5241d14",
+        "bytes": 143120
+      },
+      "FJ1494": {
+        "name": "right extensor pollicis brevis",
+        "sha256": "61cfb7481e1f7dea291cf59208719b08c27191156e38ffd25e744918836d957b",
+        "bytes": 79961
+      },
+      "FJ1495": {
+        "name": "right extensor pollicis longus",
+        "sha256": "99a201417061edb3b2adc54fcd2b41eefa81c0e9e31027b43c41c328d1ade4f5",
+        "bytes": 110183
+      },
+      "FJ1493": {
+        "name": "right extensor indicis",
+        "sha256": "b23d7087dbe581fa03e316dfed18f73ba4ccb54b16091d442ac057f9aa9c7b60",
+        "bytes": 62068
+      },
+      "FJ1527": {
+        "name": "right iliocostalis lumborum",
+        "sha256": "8a15295f08faac150ee5f16fe1035398dcfa60d3cba8b42b504b53764032b718",
+        "bytes": 1189971
+      },
+      "FJ1528": {
+        "name": "right iliocostalis thoracis",
+        "sha256": "0ee5ad819949cd4197dd96b00373547b42f7e1831b2add6baea4baf3661f38fa",
+        "bytes": 618808
+      },
+      "FJ1526": {
+        "name": "right iliocostalis cervicis",
+        "sha256": "0d2b4b780dd191b9e6518dc3a71ad8c032da0db3631a2a582969faf7dfdbb96b",
+        "bytes": 237546
+      },
+      "FJ1535": {
+        "name": "right longissimus thoracis",
+        "sha256": "b555761d298a4bea88a05d2067b0cfff507522546bfc0dcb9b3bad576a3449fa",
+        "bytes": 1319188
+      },
+      "FJ1534": {
+        "name": "right longissimus cervicis",
+        "sha256": "d89596561e6d76dc5d5e6895711d598201056b1c7a834ee0c593702ef9382608",
+        "bytes": 229177
+      },
+      "FJ1533": {
+        "name": "right longissimus capitis",
+        "sha256": "845e65ab735bc49c5026fab485f8dd2eb9624ac7c2519927578d7d7508e644cd",
+        "bytes": 179817
+      },
+      "FJ1544": {
+        "name": "right spinalis thoracis",
+        "sha256": "d269ffdde57349435a3cfcc3c53c3b2532acf4ddaabfc7fdc8b0e3df66b15232",
+        "bytes": 598901
+      },
+      "FJ1543": {
+        "name": "spinalis (atlas component FJ1543)",
+        "sha256": "3dc2e6367ead09b94da4551212a36692ecf56586be7c27d8b5e834d4c32e1fcb",
+        "bytes": 103745
+      },
+      "FJ1456": {
+        "name": "right pectoralis minor",
+        "sha256": "65831afdc2f80bf5fca581f196de727aa30c3adcc682ac4506a4a5d6cc71db05",
+        "bytes": 719480
+      },
+      "FJ1433": {
+        "name": "right rectus femoris",
+        "sha256": "a5f75907d784dd2a44d7efa96cb31009aba2afe43465336b105561751b19f8ef",
+        "bytes": 389745
+      },
+      "FJ1442": {
+        "name": "right vastus lateralis",
+        "sha256": "f67be78d7d0ddc6e78c0683ce4bd5be7492e4137f8661bc54039cbf535a88880",
+        "bytes": 464679
+      },
+      "FJ1443": {
+        "name": "right vastus medialis",
+        "sha256": "5bdb79f52849241e20ff2280332f20efd38f1b4bda1fb1337e10a5c3e466002b",
+        "bytes": 317804
+      },
+      "FJ1436": {
+        "name": "right semitendinosus",
+        "sha256": "a9351992df5093e761784b73ca3f4a7d09d0c997e3cef2f840a45b863eb7097d",
+        "bytes": 195220
+      },
+      "FJ1395": {
+        "name": "long head of right biceps femoris",
+        "sha256": "0c22806bfd2a0f8745023a7d438250411f9d013f3d966c5c75335f5b57f8e142",
+        "bytes": 341489
+      },
+      "FJ1477": {
+        "name": "lateral head of right triceps brachii",
+        "sha256": "1d1c3b42eec0dffe696bd25cffa81784c87c15f16c9605050fdf1cb2f47698dd",
+        "bytes": 182250
+      },
+      "FJ1479": {
+        "name": "long head of right triceps brachii",
+        "sha256": "acc48f746bd07a117357a9c49a1a9850c96b85d7c63cf90a662a45717875a315",
+        "bytes": 113287
+      },
+      "FJ1496": {
+        "name": "right flexor carpi radialis",
+        "sha256": "8e83c638e2353bb8ba65547f4b846d89a1f393c4761806faf8e09970c9b6b6bf",
+        "bytes": 82751
+      },
+      "FJ1502": {
+        "name": "right palmaris longus",
+        "sha256": "2e033c8fbc77aa1922179eeae6d90075df9360d00882beb9b45b148074f91f8a",
+        "bytes": 435055
+      },
+      "FJ1475": {
+        "name": "right flexor digitorum superficialis (component FJ1475)",
+        "sha256": "9b3877dcb9838ac4e37f2a1fbf0542fca888a32650285bb07278d6ba9fa968e1",
+        "bytes": 664548
+      },
+      "FJ1499": {
+        "name": "right flexor digitorum superficialis (component FJ1499)",
+        "sha256": "7f148f7db90d9723dcfe6742c55afc2100b712c00992d83356373ca27a2b0dc0",
+        "bytes": 63323
+      },
+      "FJ1487": {
+        "name": "right brachioradialis",
+        "sha256": "0ff651a5417f240c6a5205bef5218336a61fe3474752cca1b483d02aae0b92ad",
+        "bytes": 359055
+      },
+      "FJ1490": {
+        "name": "right extensor carpi radialis longus",
+        "sha256": "8b6ec821491a2eafaee8c813cfad4532beae94c354595cc3e922d8cdbb36fb32",
+        "bytes": 179061
+      },
+      "FJ1489": {
+        "name": "right extensor carpi radialis brevis",
+        "sha256": "31ccd9ec738252ec2eae88cf68068679d0663425c98b8d90dcbca18b3cbd1988",
+        "bytes": 158039
+      },
+      "FJ1492": {
+        "name": "right extensor digitorum",
+        "sha256": "31f528b3ba6a8fb26177c9f1455692be3acfbb173b4c4cbf9dc3d597acb5c5ff",
+        "bytes": 342296
+      },
+      "FJ1491": {
+        "name": "right extensor digiti minimi",
+        "sha256": "2717a761854ba7fe50d12f5ec4eca0f0728795777ae9a7ec87e019f01e3b8267",
+        "bytes": 102700
+      },
+      "FJ1472": {
+        "name": "right extensor carpi ulnaris (component FJ1472)",
+        "sha256": "f6aadd5b1df9440ec0c4fabf21641f72447d5190bcaf58f357e8b5a76b3f5889",
+        "bytes": 248132
+      },
+      "FJ1517": {
+        "name": "right extensor carpi ulnaris (component FJ1517)",
+        "sha256": "e6a4cec704d3601a33704b40ee1f3f7bce484017dd563d1f4d2da43331b3ffce",
+        "bytes": 102287
+      },
+      "FJ1474": {
+        "name": "humeral head of right pronator teres",
+        "sha256": "589e18d8dd9eac471404fae1035b01476ed0021af1cb2822c8c759164a2a45ba",
+        "bytes": 151318
+      },
+      "FJ1516": {
+        "name": "ulnar head of right pronator teres",
+        "sha256": "62058afdb37b3637c21f7ad15fe681acced1e36c986190a692f1733cb0a79760",
+        "bytes": 77585
+      },
+      "FJ1473": {
+        "name": "humeral head of right flexor carpi ulnaris",
+        "sha256": "ccab7efb32e7b3cfc21039a138811f2972df5f2d91d23bbdbe63f13354774795",
+        "bytes": 196103
+      },
+      "FJ1518": {
+        "name": "ulnar head of right flexor carpi ulnaris",
+        "sha256": "22abf242ce9d43dd9c6e02ef297b8e5982227a7ec1c7ead965674b92b476bad2",
+        "bytes": 149622
+      }
+    }
+  },
+  "registration": {
+    "FJ3368": {
+      "sourceProximal": [
+        -166.8530178571429,
+        -76.73058482142858,
+        1332.4723214285711
+      ],
+      "sourceDistal": [
+        -202.1946902654867,
+        -70.74229911504425,
+        1033.577256637168
+      ],
+      "targetProximal": [
+        0.247,
+        0.54,
+        -0.015
+      ],
+      "targetDistal": [
+        0.348,
+        0.245,
+        0.0
+      ],
+      "uniformScale": 0.001036987605516159,
+      "method": "Bone end-centroid registration to manually chosen BoGa joint centres; mirrored to opposite side; not anatomically validated."
+    },
+    "FJ3387": {
+      "sourceProximal": [
+        -74.14274418604654,
+        -81.95677906976745,
+        372.33160465116276
+      ],
+      "sourceDistal": [
+        -52.30955116279071,
+        -80.85893488372092,
+        -2.2837638139534886
+      ],
+      "targetProximal": [
+        0.14861197174530216,
+        -0.423,
+        -0.009628178368121444
+      ],
+      "targetDistal": [
+        0.20199614727224702,
+        -0.876,
+        -0.05126610850908306
+      ],
+      "uniformScale": 0.0012205941277634732,
+      "method": "Bone end-centroid registration to body-derived lower-leg pose landmarks; mirrored to opposite side; not anatomically validated.",
+      "targetMethod": "Centres of positive-x body cross-section bounds at the knee/ankle heights; visual alignment, not clinically identified tibial landmarks."
+    },
+    "FJ3349": {
+      "sourceProximal": [
+        -232.25445,
+        -76.89364,
+        1033.6430000000003
+      ],
+      "sourceDistal": [
+        -274.32699999999994,
+        -116.87174999999998,
+        806.7007499999999
+      ],
+      "targetProximal": [
+        0.34640000000000004,
+        0.245,
+        0.005400000000000002
+      ],
+      "targetDistal": [
+        0.42715000000000003,
+        0.026,
+        0.08165
+      ],
+      "uniformScale": 0.001048264635178171,
+      "method": "Bone end-centroid registration to avatar cross-section pose landmarks; mirrored; provisional."
+    },
+    "FJ3365": {
+      "sourceProximal": [
+        -86.89577088607597,
+        -78.51239240506325,
+        827.9942151898737
+      ],
+      "sourceDistal": [
+        -67.46908481012657,
+        -77.0266417721519,
+        372.9637468354431
+      ],
+      "targetProximal": [
+        0.1048,
+        -0.06,
+        0.015000000000000006
+      ],
+      "targetDistal": [
+        0.1486,
+        -0.423,
+        -0.009600000000000001
+      ],
+      "uniformScale": 0.0008046144310178007,
+      "method": "Bone end-centroid registration to avatar cross-section pose landmarks; mirrored; provisional."
+    },
+    "torso": {
+      "method": "Atlas skin cross-section registration to the avatar, with piecewise vertical pose landmarks; provisional visual deformation, not measured anatomy.",
+      "sourceHeights": [
+        700.0,
+        735.0,
+        834.0,
+        950.0,
+        1100.0,
+        1250.0,
+        1332.0,
+        1400.0,
+        1500.0
+      ],
+      "targetHeights": [
+        -0.19,
+        -0.15,
+        -0.06,
+        0.08,
+        0.27,
+        0.445,
+        0.54,
+        0.65,
+        0.8
+      ],
+      "reference": "FJ2810",
+      "targetMeshSha256": "ecb9032f3fae6d8e7818ae5a923d906ee47921eb5ff2a2cf6201f44c4521da09"
+    }
+  },
+  "retainSurface": [
+    "back_upper",
+    "chest"
+  ],
+  "extensions": {
+    "chest": {
+      "id": "pectoralis_minor",
+      "catalogEntry": false,
+      "measuredVolume": false
+    }
+  },
+  "excluded": [
+    "multifidus",
+    "tensor fasciae latae",
+    "intrinsic hand muscles",
+    "adductor minimus"
+  ],
+  "groups": {
+    "brachialis": [
+      "FJ1486"
+    ],
+    "rotator_cuff": [
+      "FJ1506",
+      "FJ1500",
+      "FJ1508",
+      "FJ1504"
+    ],
+    "back_upper": [
+      "FJ1536",
+      "FJ1537"
+    ],
+    "serratus_anterior": [
+      "FJ1459"
+    ],
+    "hip_flexors": [
+      "FJ1431",
+      "FJ1422"
+    ],
+    "hip_abductors": [
+      "FJ1419",
+      "FJ1420"
+    ],
+    "calves": [
+      "FJ1394",
+      "FJ1397",
+      "FJ1437"
+    ],
+    "quads": [
+      "FJ1433",
+      "FJ1441",
+      "FJ1442",
+      "FJ1443"
+    ],
+    "triceps": [
+      "FJ1480",
+      "FJ1477",
+      "FJ1479"
+    ],
+    "hamstrings": [
+      "FJ1435",
+      "FJ1444",
+      "FJ1436",
+      "FJ1395"
+    ],
+    "adductors": [
+      "FJ1401",
+      "FJ1403",
+      "FJ1402",
+      "FJ1421",
+      "FJ1427"
+    ],
+    "forearms_grip": [
+      "FJ1497",
+      "FJ1498",
+      "FJ1503",
+      "FJ1505",
+      "FJ1484",
+      "FJ1494",
+      "FJ1495",
+      "FJ1493",
+      "FJ1496",
+      "FJ1502",
+      "FJ1475",
+      "FJ1499",
+      "FJ1487",
+      "FJ1490",
+      "FJ1489",
+      "FJ1492",
+      "FJ1491",
+      "FJ1472",
+      "FJ1517",
+      "FJ1474",
+      "FJ1516",
+      "FJ1473",
+      "FJ1518"
+    ],
+    "spinal_erectors": [
+      "FJ1527",
+      "FJ1528",
+      "FJ1526",
+      "FJ1535",
+      "FJ1534",
+      "FJ1533",
+      "FJ1544",
+      "FJ1543"
+    ],
+    "chest": [
+      "FJ1456"
+    ]
+  },
+  "coverage": {
+    "FJ1486": {
+      "family": "brachialis",
+      "sourceBounds": [
+        [
+          0.295771,
+          0.209126,
+          -0.019215
+        ],
+        [
+          0.373292,
+          0.432759,
+          0.014234
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.29664,
+          0.209672,
+          -0.018991
+        ],
+        [
+          0.373174,
+          0.432728,
+          0.01402
+        ]
+      ],
+      "axisCoverage": [
+        0.9873,
+        0.9974,
+        0.9869
+      ]
+    },
+    "FJ1506": {
+      "family": "rotator_cuff",
+      "sourceBounds": [
+        [
+          0.07991,
+          0.51143,
+          -0.063006
+        ],
+        [
+          0.24522,
+          0.556759,
+          0.033479
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.079993,
+          0.511573,
+          -0.062935
+        ],
+        [
+          0.245219,
+          0.555887,
+          0.03328
+        ]
+      ],
+      "axisCoverage": [
+        0.9995,
+        0.9776,
+        0.9972
+      ]
+    },
+    "FJ1500": {
+      "family": "rotator_cuff",
+      "sourceBounds": [
+        [
+          0.062281,
+          0.394285,
+          -0.074797
+        ],
+        [
+          0.24204,
+          0.538807,
+          0.01461
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.065376,
+          0.394386,
+          -0.074754
+        ],
+        [
+          0.24202,
+          0.537819,
+          0.014594
+        ]
+      ],
+      "axisCoverage": [
+        0.9827,
+        0.9925,
+        0.9993
+      ]
+    },
+    "FJ1508": {
+      "family": "rotator_cuff",
+      "sourceBounds": [
+        [
+          0.089167,
+          0.410653,
+          -0.057584
+        ],
+        [
+          0.23843,
+          0.522529,
+          0.017571
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.08918,
+          0.410661,
+          -0.057533
+        ],
+        [
+          0.238412,
+          0.522258,
+          0.017534
+        ]
+      ],
+      "axisCoverage": [
+        0.9998,
+        0.9975,
+        0.9988
+      ]
+    },
+    "FJ1504": {
+      "family": "rotator_cuff",
+      "sourceBounds": [
+        [
+          0.064287,
+          0.38102,
+          -0.067535
+        ],
+        [
+          0.211213,
+          0.531659,
+          0.04109
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.06795,
+          0.384597,
+          -0.066843
+        ],
+        [
+          0.210539,
+          0.530889,
+          0.040817
+        ]
+      ],
+      "axisCoverage": [
+        0.9705,
+        0.9711,
+        0.9911
+      ]
+    },
+    "FJ1536": {
+      "family": "back_upper",
+      "sourceBounds": [
+        [
+          -0.001276,
+          0.372888,
+          -0.081637
+        ],
+        [
+          0.088783,
+          0.587979,
+          -0.05513
+        ]
+      ],
+      "guideBounds": [
+        [
+          -0.001154,
+          0.372903,
+          -0.080826
+        ],
+        [
+          0.086353,
+          0.587654,
+          -0.055528
+        ]
+      ],
+      "axisCoverage": [
+        0.9717,
+        0.9984,
+        0.9544
+      ]
+    },
+    "FJ1537": {
+      "family": "back_upper",
+      "sourceBounds": [
+        [
+          -0.001642,
+          0.480683,
+          -0.071843
+        ],
+        [
+          0.076688,
+          0.629796,
+          -0.039822
+        ]
+      ],
+      "guideBounds": [
+        [
+          -0.001342,
+          0.480766,
+          -0.071838
+        ],
+        [
+          0.076307,
+          0.629576,
+          -0.039903
+        ]
+      ],
+      "axisCoverage": [
+        0.9913,
+        0.998,
+        0.9973
+      ]
+    },
+    "FJ1459": {
+      "family": "serratus_anterior",
+      "sourceBounds": [
+        [
+          0.058306,
+          0.242336,
+          -0.075832
+        ],
+        [
+          0.178706,
+          0.566497,
+          0.083953
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.059524,
+          0.245345,
+          -0.072475
+        ],
+        [
+          0.177986,
+          0.566423,
+          0.078836
+        ]
+      ],
+      "axisCoverage": [
+        0.9839,
+        0.9905,
+        0.947
+      ]
+    },
+    "FJ1431": {
+      "family": "hip_flexors",
+      "sourceBounds": [
+        [
+          0.008171,
+          -0.149805,
+          -0.040838
+        ],
+        [
+          0.145259,
+          0.268404,
+          0.068778
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.008194,
+          -0.149581,
+          -0.040176
+        ],
+        [
+          0.145074,
+          0.267709,
+          0.06844
+        ]
+      ],
+      "axisCoverage": [
+        0.9985,
+        0.9978,
+        0.9909
+      ]
+    },
+    "FJ1422": {
+      "family": "hip_flexors",
+      "sourceBounds": [
+        [
+          0.088979,
+          -0.151346,
+          -0.048145
+        ],
+        [
+          0.155567,
+          0.090122,
+          0.075795
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.091009,
+          -0.151278,
+          -0.047043
+        ],
+        [
+          0.155075,
+          0.089886,
+          0.075473
+        ]
+      ],
+      "axisCoverage": [
+        0.9621,
+        0.9987,
+        0.9885
+      ]
+    },
+    "FJ1419": {
+      "family": "hip_abductors",
+      "sourceBounds": [
+        [
+          0.071303,
+          -0.101143,
+          -0.085453
+        ],
+        [
+          0.187884,
+          0.081144,
+          0.023213
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.073281,
+          -0.100591,
+          -0.085061
+        ],
+        [
+          0.187756,
+          0.080642,
+          0.023134
+        ]
+      ],
+      "axisCoverage": [
+        0.9819,
+        0.9942,
+        0.9957
+      ]
+    },
+    "FJ1420": {
+      "family": "hip_abductors",
+      "sourceBounds": [
+        [
+          0.082105,
+          -0.106109,
+          -0.039847
+        ],
+        [
+          0.185188,
+          0.047722,
+          0.029785
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.084653,
+          -0.105632,
+          -0.039755
+        ],
+        [
+          0.184851,
+          0.047621,
+          0.029402
+        ]
+      ],
+      "axisCoverage": [
+        0.972,
+        0.9962,
+        0.9932
+      ]
+    },
+    "FJ1394": {
+      "family": "calves",
+      "sourceBounds": [
+        [
+          0.145579,
+          -0.702375,
+          -0.115794
+        ],
+        [
+          0.231287,
+          -0.354786,
+          -0.005327
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.145862,
+          -0.695361,
+          -0.115329
+        ],
+        [
+          0.230551,
+          -0.361381,
+          -0.028962
+        ]
+      ],
+      "axisCoverage": [
+        0.9881,
+        0.9608,
+        0.7818
+      ]
+    },
+    "FJ1397": {
+      "family": "calves",
+      "sourceBounds": [
+        [
+          0.108396,
+          -0.72059,
+          -0.108456
+        ],
+        [
+          0.187395,
+          -0.355089,
+          0.008501
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.109892,
+          -0.7075,
+          -0.108443
+        ],
+        [
+          0.182356,
+          -0.37266,
+          -0.000183
+        ]
+      ],
+      "axisCoverage": [
+        0.9173,
+        0.9161,
+        0.9256
+      ]
+    },
+    "FJ1437": {
+      "family": "calves",
+      "sourceBounds": [
+        [
+          0.13676,
+          -0.829423,
+          -0.09604
+        ],
+        [
+          0.23262,
+          -0.429688,
+          -0.013525
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.136852,
+          -0.808232,
+          -0.092178
+        ],
+        [
+          0.231696,
+          -0.445547,
+          -0.013826
+        ]
+      ],
+      "axisCoverage": [
+        0.9894,
+        0.9073,
+        0.9495
+      ]
+    },
+    "FJ1433": {
+      "family": "quads",
+      "sourceBounds": [
+        [
+          0.112043,
+          -0.468984,
+          0.007834
+        ],
+        [
+          0.177768,
+          -0.023508,
+          0.063916
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.112424,
+          -0.468602,
+          0.008164
+        ],
+        [
+          0.176713,
+          -0.024904,
+          0.063848
+        ]
+      ],
+      "axisCoverage": [
+        0.9781,
+        0.996,
+        0.9929
+      ]
+    },
+    "FJ1441": {
+      "family": "quads",
+      "sourceBounds": [
+        [
+          0.128607,
+          -0.446768,
+          0.008665
+        ],
+        [
+          0.175387,
+          -0.10277,
+          0.047128
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.128757,
+          -0.446753,
+          0.009382
+        ],
+        [
+          0.173981,
+          -0.103113,
+          0.045507
+        ]
+      ],
+      "axisCoverage": [
+        0.9667,
+        0.999,
+        0.9392
+      ]
+    },
+    "FJ1442": {
+      "family": "quads",
+      "sourceBounds": [
+        [
+          0.124774,
+          -0.465908,
+          -0.012151
+        ],
+        [
+          0.195317,
+          -0.089185,
+          0.047702
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.12525,
+          -0.465739,
+          -0.011333
+        ],
+        [
+          0.193877,
+          -0.089274,
+          0.047441
+        ]
+      ],
+      "axisCoverage": [
+        0.9728,
+        0.9993,
+        0.982
+      ]
+    },
+    "FJ1443": {
+      "family": "quads",
+      "sourceBounds": [
+        [
+          0.110771,
+          -0.447793,
+          0.005417
+        ],
+        [
+          0.170371,
+          -0.12948,
+          0.057499
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.11155,
+          -0.44695,
+          0.005945
+        ],
+        [
+          0.1703,
+          -0.129891,
+          0.057054
+        ]
+      ],
+      "axisCoverage": [
+        0.9857,
+        0.9961,
+        0.9813
+      ]
+    },
+    "FJ1480": {
+      "family": "triceps",
+      "sourceBounds": [
+        [
+          0.271135,
+          0.239654,
+          -0.030468
+        ],
+        [
+          0.364947,
+          0.46409,
+          -0.006604
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.271764,
+          0.239962,
+          -0.030298
+        ],
+        [
+          0.3626,
+          0.464058,
+          -0.008188
+        ]
+      ],
+      "axisCoverage": [
+        0.9683,
+        0.9985,
+        0.9265
+      ]
+    },
+    "FJ1477": {
+      "family": "triceps",
+      "sourceBounds": [
+        [
+          0.266181,
+          0.247393,
+          -0.061897
+        ],
+        [
+          0.361547,
+          0.501869,
+          -0.017229
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.266268,
+          0.247823,
+          -0.061757
+        ],
+        [
+          0.361482,
+          0.501649,
+          -0.01746
+        ]
+      ],
+      "axisCoverage": [
+        0.9984,
+        0.9974,
+        0.9917
+      ]
+    },
+    "FJ1479": {
+      "family": "triceps",
+      "sourceBounds": [
+        [
+          0.226479,
+          0.245393,
+          -0.063836
+        ],
+        [
+          0.359853,
+          0.503454,
+          -0.021471
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.226528,
+          0.245528,
+          -0.062875
+        ],
+        [
+          0.359832,
+          0.502877,
+          -0.021575
+        ]
+      ],
+      "axisCoverage": [
+        0.9995,
+        0.9972,
+        0.9749
+      ]
+    },
+    "FJ1435": {
+      "family": "hamstrings",
+      "sourceBounds": [
+        [
+          0.071338,
+          -0.469784,
+          -0.035845
+        ],
+        [
+          0.154662,
+          -0.120905,
+          0.00961
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.071588,
+          -0.469107,
+          -0.034669
+        ],
+        [
+          0.154492,
+          -0.121043,
+          0.008671
+        ]
+      ],
+      "axisCoverage": [
+        0.995,
+        0.9977,
+        0.9535
+      ]
+    },
+    "FJ1444": {
+      "family": "hamstrings",
+      "sourceBounds": [
+        [
+          0.141217,
+          -0.45185,
+          -0.030546
+        ],
+        [
+          0.191442,
+          -0.201386,
+          0.010988
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.141494,
+          -0.451765,
+          -0.030485
+        ],
+        [
+          0.191427,
+          -0.201495,
+          0.010983
+        ]
+      ],
+      "axisCoverage": [
+        0.9942,
+        0.9992,
+        0.9984
+      ]
+    },
+    "FJ1436": {
+      "family": "hamstrings",
+      "sourceBounds": [
+        [
+          0.077668,
+          -0.495061,
+          -0.040785
+        ],
+        [
+          0.160621,
+          -0.113968,
+          0.004119
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.077913,
+          -0.494901,
+          -0.040452
+        ],
+        [
+          0.160621,
+          -0.114018,
+          0.003397
+        ]
+      ],
+      "axisCoverage": [
+        0.997,
+        0.9994,
+        0.9765
+      ]
+    },
+    "FJ1395": {
+      "family": "hamstrings",
+      "sourceBounds": [
+        [
+          0.083756,
+          -0.452082,
+          -0.045668
+        ],
+        [
+          0.194902,
+          -0.111375,
+          -0.002048
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.084012,
+          -0.451496,
+          -0.043839
+        ],
+        [
+          0.194502,
+          -0.111444,
+          -0.002463
+        ]
+      ],
+      "axisCoverage": [
+        0.9941,
+        0.9981,
+        0.9486
+      ]
+    },
+    "FJ1401": {
+      "family": "adductors",
+      "sourceBounds": [
+        [
+          0.059384,
+          -0.239323,
+          0.007583
+        ],
+        [
+          0.13781,
+          -0.093123,
+          0.051378
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.059388,
+          -0.239175,
+          0.007639
+        ],
+        [
+          0.137791,
+          -0.093259,
+          0.051221
+        ]
+      ],
+      "axisCoverage": [
+        0.9997,
+        0.9981,
+        0.9951
+      ]
+    },
+    "FJ1403": {
+      "family": "adductors",
+      "sourceBounds": [
+        [
+          0.056077,
+          -0.422001,
+          -0.013767
+        ],
+        [
+          0.149509,
+          -0.110471,
+          0.033267
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.056421,
+          -0.421162,
+          -0.013534
+        ],
+        [
+          0.148477,
+          -0.110786,
+          0.033133
+        ]
+      ],
+      "axisCoverage": [
+        0.9853,
+        0.9963,
+        0.9922
+      ]
+    },
+    "FJ1402": {
+      "family": "adductors",
+      "sourceBounds": [
+        [
+          0.054231,
+          -0.314174,
+          0.010021
+        ],
+        [
+          0.138192,
+          -0.093317,
+          0.059853
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.054263,
+          -0.313953,
+          0.010417
+        ],
+        [
+          0.137922,
+          -0.093524,
+          0.05978
+        ]
+      ],
+      "axisCoverage": [
+        0.9964,
+        0.9981,
+        0.9906
+      ]
+    },
+    "FJ1421": {
+      "family": "adductors",
+      "sourceBounds": [
+        [
+          0.051223,
+          -0.495262,
+          -0.0157
+        ],
+        [
+          0.16177,
+          -0.095415,
+          0.056105
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.051378,
+          -0.494907,
+          -0.015699
+        ],
+        [
+          0.161445,
+          -0.095461,
+          0.056103
+        ]
+      ],
+      "axisCoverage": [
+        0.9957,
+        0.999,
+        1.0
+      ]
+    },
+    "FJ1427": {
+      "family": "adductors",
+      "sourceBounds": [
+        [
+          0.057314,
+          -0.180556,
+          0.00962
+        ],
+        [
+          0.132239,
+          -0.07536,
+          0.05861
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.057342,
+          -0.18024,
+          0.010069
+        ],
+        [
+          0.131958,
+          -0.076539,
+          0.058595
+        ]
+      ],
+      "axisCoverage": [
+        0.9959,
+        0.9858,
+        0.9905
+      ]
+    },
+    "FJ1497": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.319564,
+          -0.107227,
+          0.002383
+        ],
+        [
+          0.483388,
+          0.225564,
+          0.177568
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.319632,
+          -0.107198,
+          0.005701
+        ],
+        [
+          0.482082,
+          0.223803,
+          0.173494
+        ]
+      ],
+      "axisCoverage": [
+        0.9916,
+        0.9946,
+        0.9578
+      ]
+    },
+    "FJ1498": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.36414,
+          -0.033603,
+          0.028807
+        ],
+        [
+          0.480597,
+          0.178955,
+          0.141496
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.364465,
+          -0.03296,
+          0.028887
+        ],
+        [
+          0.479966,
+          0.178687,
+          0.14046
+        ]
+      ],
+      "axisCoverage": [
+        0.9918,
+        0.9957,
+        0.9901
+      ]
+    },
+    "FJ1503": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.367193,
+          0.03909,
+          0.058314
+        ],
+        [
+          0.421638,
+          0.083009,
+          0.089796
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.367744,
+          0.039211,
+          0.058333
+        ],
+        [
+          0.420009,
+          0.082859,
+          0.089478
+        ]
+      ],
+      "axisCoverage": [
+        0.96,
+        0.9938,
+        0.9893
+      ]
+    },
+    "FJ1505": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.337706,
+          0.145685,
+          -0.018096
+        ],
+        [
+          0.384796,
+          0.266985,
+          0.028293
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.338027,
+          0.146441,
+          -0.017976
+        ],
+        [
+          0.384788,
+          0.266545,
+          0.028039
+        ]
+      ],
+      "axisCoverage": [
+        0.993,
+        0.9901,
+        0.9919
+      ]
+    },
+    "FJ1484": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.353583,
+          0.011625,
+          0.009001
+        ],
+        [
+          0.446006,
+          0.179544,
+          0.098753
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.354181,
+          0.011978,
+          0.00931
+        ],
+        [
+          0.445825,
+          0.179255,
+          0.097347
+        ]
+      ],
+      "axisCoverage": [
+        0.9916,
+        0.9962,
+        0.9809
+      ]
+    },
+    "FJ1494": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.371762,
+          -0.013786,
+          0.042809
+        ],
+        [
+          0.47337,
+          0.105267,
+          0.118479
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.371875,
+          -0.012592,
+          0.043577
+        ],
+        [
+          0.472173,
+          0.105259,
+          0.116872
+        ]
+      ],
+      "axisCoverage": [
+        0.9871,
+        0.9899,
+        0.9686
+      ]
+    },
+    "FJ1495": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.355431,
+          -0.035251,
+          0.020749
+        ],
+        [
+          0.48645,
+          0.143215,
+          0.139078
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.355492,
+          -0.035193,
+          0.020802
+        ],
+        [
+          0.486443,
+          0.143198,
+          0.138979
+        ]
+      ],
+      "axisCoverage": [
+        0.9995,
+        0.9996,
+        0.9987
+      ]
+    },
+    "FJ1493": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.370896,
+          -0.100808,
+          0.05167
+        ],
+        [
+          0.484938,
+          0.078662,
+          0.161207
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.370984,
+          -0.100791,
+          0.051728
+        ],
+        [
+          0.484863,
+          0.078658,
+          0.161121
+        ]
+      ],
+      "axisCoverage": [
+        0.9986,
+        0.9999,
+        0.9987
+      ]
+    },
+    "FJ1496": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.293683,
+          0.000708,
+          -0.002236
+        ],
+        [
+          0.429193,
+          0.261487,
+          0.10328
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.294104,
+          0.000798,
+          -0.001735
+        ],
+        [
+          0.428875,
+          0.261002,
+          0.103273
+        ]
+      ],
+      "axisCoverage": [
+        0.9945,
+        0.9978,
+        0.9952
+      ]
+    },
+    "FJ1502": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.289293,
+          -0.050167,
+          -0.000332
+        ],
+        [
+          0.455603,
+          0.257242,
+          0.129494
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.290625,
+          -0.048202,
+          -0.000149
+        ],
+        [
+          0.455099,
+          0.256706,
+          0.128636
+        ]
+      ],
+      "axisCoverage": [
+        0.989,
+        0.9919,
+        0.992
+      ]
+    },
+    "FJ1475": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.287978,
+          -0.099541,
+          -0.002704
+        ],
+        [
+          0.481276,
+          0.25643,
+          0.155321
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.288364,
+          -0.098283,
+          -0.002168
+        ],
+        [
+          0.48079,
+          0.255488,
+          0.154911
+        ]
+      ],
+      "axisCoverage": [
+        0.9955,
+        0.9938,
+        0.994
+      ]
+    },
+    "FJ1499": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.346575,
+          0.03084,
+          0.017108
+        ],
+        [
+          0.402583,
+          0.203167,
+          0.098911
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.346599,
+          0.030941,
+          0.017122
+        ],
+        [
+          0.402117,
+          0.203154,
+          0.098473
+        ]
+      ],
+      "axisCoverage": [
+        0.9913,
+        0.9993,
+        0.9945
+      ]
+    },
+    "FJ1487": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.302858,
+          0.030275,
+          -0.031418
+        ],
+        [
+          0.43205,
+          0.354813,
+          0.086897
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.304177,
+          0.030716,
+          -0.030661
+        ],
+        [
+          0.432014,
+          0.353144,
+          0.085995
+        ]
+      ],
+      "axisCoverage": [
+        0.9895,
+        0.9935,
+        0.986
+      ]
+    },
+    "FJ1490": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.322691,
+          -0.001892,
+          -0.028862
+        ],
+        [
+          0.434886,
+          0.309262,
+          0.089762
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.323405,
+          -0.001806,
+          -0.028851
+        ],
+        [
+          0.433492,
+          0.309202,
+          0.089007
+        ]
+      ],
+      "axisCoverage": [
+        0.9812,
+        0.9995,
+        0.9935
+      ]
+    },
+    "FJ1489": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.334832,
+          -0.007583,
+          -0.027136
+        ],
+        [
+          0.42433,
+          0.287269,
+          0.085632
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.33499,
+          -0.007583,
+          -0.027061
+        ],
+        [
+          0.424298,
+          0.286979,
+          0.085034
+        ]
+      ],
+      "axisCoverage": [
+        0.9979,
+        0.999,
+        0.994
+      ]
+    },
+    "FJ1492": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.337753,
+          -0.098328,
+          -0.02716
+        ],
+        [
+          0.479905,
+          0.26775,
+          0.15064
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.337835,
+          -0.094069,
+          -0.026433
+        ],
+        [
+          0.478506,
+          0.266817,
+          0.145342
+        ]
+      ],
+      "axisCoverage": [
+        0.9896,
+        0.9858,
+        0.9661
+      ]
+    },
+    "FJ1491": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.338357,
+          -0.060648,
+          -0.01993
+        ],
+        [
+          0.397069,
+          0.257545,
+          0.124514
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.338553,
+          -0.060578,
+          -0.019921
+        ],
+        [
+          0.396851,
+          0.257385,
+          0.124504
+        ]
+      ],
+      "axisCoverage": [
+        0.993,
+        0.9993,
+        0.9999
+      ]
+    },
+    "FJ1472": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.33312,
+          -0.014985,
+          -0.024976
+        ],
+        [
+          0.393337,
+          0.265649,
+          0.099361
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.334078,
+          -0.01471,
+          -0.024688
+        ],
+        [
+          0.393219,
+          0.265532,
+          0.099257
+        ]
+      ],
+      "axisCoverage": [
+        0.9821,
+        0.9986,
+        0.9968
+      ]
+    },
+    "FJ1517": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.34857,
+          -0.009842,
+          0.006985
+        ],
+        [
+          0.392503,
+          0.166639,
+          0.095759
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.348792,
+          -0.009616,
+          0.006989
+        ],
+        [
+          0.392197,
+          0.166233,
+          0.09567
+        ]
+      ],
+      "axisCoverage": [
+        0.988,
+        0.9964,
+        0.9989
+      ]
+    },
+    "FJ1474": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.295345,
+          0.130687,
+          -0.006919
+        ],
+        [
+          0.390492,
+          0.269597,
+          0.041377
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.295461,
+          0.130717,
+          -0.006858
+        ],
+        [
+          0.390446,
+          0.269155,
+          0.040782
+        ]
+      ],
+      "axisCoverage": [
+        0.9983,
+        0.9966,
+        0.9864
+      ]
+    },
+    "FJ1516": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.319387,
+          0.141448,
+          0.006043
+        ],
+        [
+          0.387428,
+          0.230907,
+          0.036854
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.319412,
+          0.14145,
+          0.006099
+        ],
+        [
+          0.387393,
+          0.2307,
+          0.036594
+        ]
+      ],
+      "axisCoverage": [
+        0.9991,
+        0.9977,
+        0.9897
+      ]
+    },
+    "FJ1473": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.287944,
+          -0.004715,
+          -0.010386
+        ],
+        [
+          0.401031,
+          0.250199,
+          0.105317
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.287968,
+          -0.004417,
+          -0.010384
+        ],
+        [
+          0.400155,
+          0.249967,
+          0.104204
+        ]
+      ],
+      "axisCoverage": [
+        0.992,
+        0.9979,
+        0.9904
+      ]
+    },
+    "FJ1518": {
+      "family": "forearms_grip",
+      "sourceBounds": [
+        [
+          0.306735,
+          0.042943,
+          -0.024655
+        ],
+        [
+          0.376865,
+          0.246377,
+          0.079136
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.306843,
+          0.042959,
+          -0.023909
+        ],
+        [
+          0.376815,
+          0.244454,
+          0.076891
+        ]
+      ],
+      "axisCoverage": [
+        0.9978,
+        0.9905,
+        0.9712
+      ]
+    },
+    "FJ1527": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.00617,
+          -0.063581,
+          -0.101016
+        ],
+        [
+          0.123291,
+          0.43205,
+          -0.041771
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.006876,
+          -0.06344,
+          -0.100197
+        ],
+        [
+          0.122284,
+          0.431667,
+          -0.043022
+        ]
+      ],
+      "axisCoverage": [
+        0.9854,
+        0.9989,
+        0.9651
+      ]
+    },
+    "FJ1528": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.040333,
+          0.215052,
+          -0.070608
+        ],
+        [
+          0.122251,
+          0.586928,
+          0.012406
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.041263,
+          0.215333,
+          -0.070497
+        ],
+        [
+          0.122189,
+          0.586661,
+          0.011849
+        ]
+      ],
+      "axisCoverage": [
+        0.9879,
+        0.9985,
+        0.9919
+      ]
+    },
+    "FJ1526": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.030369,
+          0.433065,
+          -0.06447
+        ],
+        [
+          0.093832,
+          0.679565,
+          0.0195
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.030631,
+          0.433483,
+          -0.064293
+        ],
+        [
+          0.092862,
+          0.678856,
+          0.018838
+        ]
+      ],
+      "axisCoverage": [
+        0.9806,
+        0.9954,
+        0.99
+      ]
+    },
+    "FJ1535": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          -0.000834,
+          -0.041849,
+          -0.081028
+        ],
+        [
+          0.090331,
+          0.602134,
+          0.006167
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.004776,
+          -0.041754,
+          -0.08076
+        ],
+        [
+          0.089482,
+          0.600949,
+          0.004676
+        ]
+      ],
+      "axisCoverage": [
+        0.9292,
+        0.998,
+        0.9798
+      ]
+    },
+    "FJ1534": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.023315,
+          0.447166,
+          -0.0591
+        ],
+        [
+          0.068499,
+          0.72143,
+          0.039668
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.023476,
+          0.447172,
+          -0.058474
+        ],
+        [
+          0.068393,
+          0.721315,
+          0.039621
+        ]
+      ],
+      "axisCoverage": [
+        0.9941,
+        0.9996,
+        0.9932
+      ]
+    },
+    "FJ1533": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.031314,
+          0.544271,
+          -0.035951
+        ],
+        [
+          0.086819,
+          0.79985,
+          0.047329
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.031656,
+          0.544376,
+          -0.035665
+        ],
+        [
+          0.084806,
+          0.799195,
+          0.045804
+        ]
+      ],
+      "axisCoverage": [
+        0.9576,
+        0.997,
+        0.9783
+      ]
+    },
+    "FJ1544": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          -0.001843,
+          0.110703,
+          -0.076665
+        ],
+        [
+          0.015937,
+          0.544529,
+          -0.033569
+        ]
+      ],
+      "guideBounds": [
+        [
+          -0.001353,
+          0.111135,
+          -0.07661
+        ],
+        [
+          0.014389,
+          0.544221,
+          -0.033573
+        ]
+      ],
+      "axisCoverage": [
+        0.8854,
+        0.9983,
+        0.9986
+      ]
+    },
+    "FJ1543": {
+      "family": "spinal_erectors",
+      "sourceBounds": [
+        [
+          0.000107,
+          0.536768,
+          -0.064623
+        ],
+        [
+          0.014503,
+          0.70313,
+          -0.002364
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.000464,
+          0.537105,
+          -0.064204
+        ],
+        [
+          0.014298,
+          0.703051,
+          -0.002366
+        ]
+      ],
+      "axisCoverage": [
+        0.9609,
+        0.9975,
+        0.9932
+      ]
+    },
+    "FJ1456": {
+      "family": "chest",
+      "sourceBounds": [
+        [
+          0.075229,
+          0.36527,
+          0.01876
+        ],
+        [
+          0.165721,
+          0.533825,
+          0.106282
+        ]
+      ],
+      "guideBounds": [
+        [
+          0.075249,
+          0.366898,
+          0.018787
+        ],
+        [
+          0.165565,
+          0.533752,
+          0.105445
+        ]
+      ],
+      "axisCoverage": [
+        0.9981,
+        0.9899,
+        0.9901
+      ]
+    }
+  },
+  "registeredGuidesSha256": "6d7b6593a18657f6c25b7bd48c3e9f7525904e810e1361b7b1b7cd0b4d2d7175",
+  "registeredGuidesHashEncoding": "uncompressed UTF-8 JSON bytes; gzip is an offline transport only",
+  "registeredTopologySha256": "c54b57f2257f4dd6801e1d888735f3784243e6d5d9e3ad0c2635f8778fb1728d",
+  "topologyIdentity": "Same source component and cut level; undirected edge of exact original OBJ vertex XYZ keys, normal/export seams canonicalized without changing geometry or PCA weights."
+}

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Defs, Path, Use } from 'react-native-svg';
 
 import {
   Card,
@@ -233,8 +233,9 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
- * and selects/deselects a muscle group on tap. Selected schematic fibres use
- * surfaced relief, even through hidden/back-facing anatomy; body colours stay live.
+ * and selects a muscle group on tap. Selected schematic fibres reveal
+ * full source-shape extents through covering anatomy, with provisional registration;
+ * independent normals hide their own far surface. Body colours and hit targets stay live.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
@@ -393,12 +394,16 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
               {(['surface', 'deep'] as const).map(layer => projected.fibres[layer] ? (
                 <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} />
               ) : null)}
+              {projected.fibres.anatomicalParts?.map(part => part.d ? (
+                <ReliefFibres key={part.id} d={part.d} layer="deep" id={`anatomy-${part.id}`} />
+              ) : null)}
             </Svg>
           </View>
         </GestureDetector>
         <View style={styles.information}>
           <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-            body="Fibre lines are schematic directions, not measured anatomy. Selected fibres stay visible through the body as you rotate. Deep-muscle guides, including the small chest muscle, are projected onto the surface; they do not show physical depth." />
+            body="Fibre directions are schematic, not measured anatomy. Selected guides reveal the full muscle shape through covering muscles as you rotate. Anatomical shapes are provisionally aligned to this model."
+            sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, bilateral mirroring and schematic fibre generation. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
       </View>
       {selectedMuscle ? <View testID="stats-muscle-body-comparison">
@@ -430,14 +435,18 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
   );
 }
 
-function ReliefFibres({ d, layer }: { d: string; layer: 'surface' | 'deep' }) {
+function ReliefFibres({ d, layer, id = layer }: { d: string; layer: 'surface' | 'deep'; id?: string }) {
+  const definitionId = useId();
+  // Share native path parsing and stroked bounds between the ordered relief paints.
+  // Transparent fill and stroke alpha avoid native outline clips and offscreen opacity layers.
   return <>
-    <Path d={d} fill="none" stroke={uiRoles.surface} strokeWidth={1.1} opacity={0.95}
+    <Defs><Path id={definitionId} d={d} /></Defs>
+    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.surface} strokeWidth={1.1} strokeOpacity={0.95}
       translateX={0.45} translateY={-0.45} strokeLinecap="round" strokeLinejoin="round"
-      testID={`stats-muscle-body-fibres-${layer}-highlight`} />
-    <Path d={d} fill="none" stroke={uiRoles.inkMuted} strokeWidth={0.9}
-      opacity={layer === 'surface' ? 0.72 : 0.70} strokeLinecap="round" strokeLinejoin="round"
-      testID={`stats-muscle-body-fibres-${layer}-shade`} />
+      testID={`stats-muscle-body-fibres-${id}-highlight`} />
+    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.inkMuted} strokeWidth={0.9}
+      strokeOpacity={layer === 'surface' ? 0.72 : 0.70} strokeLinecap="round" strokeLinejoin="round"
+      testID={`stats-muscle-body-fibres-${id}-shade`} />
   </>;
 }
 

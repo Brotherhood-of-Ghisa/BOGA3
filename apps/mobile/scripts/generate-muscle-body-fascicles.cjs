@@ -6,6 +6,7 @@ const { createHash } = require('node:crypto');
 const { at, weights, reconstruct, planeCut, projectedPath } = require('./fascicle-geometry.cjs');
 const source = require('./muscle-body-fascicles-source.json');
 const { validateAsset } = require('./validate-muscle-body-fascicles.cjs');
+const { applyGuides } = require('./anatomy/apply-guides.cjs');
 const meshPath = path.join(__dirname, '../components/stats/muscle-body-mesh.json');
 const assetPath = path.join(__dirname, '../components/stats/muscle-body-fascicles.json');
 
@@ -164,13 +165,14 @@ function generate(meshBytes) {
   addFields(mesh, muscles);
   addChest(mesh, muscles.chest);
   const asset = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     referenceMesh: { path: 'muscle-body-mesh.json', sha256: createHash('sha256').update(meshBytes).digest('hex'), hashEncoding: 'exact-file-bytes', vertices: mesh.vertices.length, faces: mesh.faces.length },
-    geometry: { encoding: 'triangle-local-segments', anchor: '[w0,w1,w2] in face vertex order', coordinates: 'Reference mesh coordinates; no offset baked in.', continuity: 'Render each segment independently. Never connect across gaps or faces without checking adjacency.', layer: 'deep-projection is a schematic surface overlay, not physical depth.' },
+    geometry: { encoding: 'mixed-triangle-and-model-segments', anchor: 'Objects: barycentric anchors in face vertex order. Arrays: [ax,ay,az,bx,by,bz,nx,ny,nz], one source side; mirror x and nx.', coordinates: 'Reference mesh coordinates; no offset baked in.', continuity: 'Triangle guides are independent. Model chains follow verified source-edge adjacency; signed local index -i-1 reverses endpoints without changing the normal. Never bridge a gap or culled edge.', layer: 'Independent source guides reveal through covering anatomy; normals hide their own far-facing surfaces.' },
     quality: 'schematic-not-anatomically-validated',
-    provenance: { generator: 'apps/mobile/scripts/generate-muscle-body-fascicles.cjs', origin: source.provenance, literatureUse: 'Qualitative architecture/directions only. No measured coordinates, individual pennation angles, published figures or third-party geometry copied.' },
+    provenance: { generator: 'apps/mobile/scripts/generate-muscle-body-fascicles.cjs', origin: 'BoGa procedural surface fields plus registered BodyParts3D source shapes; see anatomy for source checksums, license and adaptations.', literatureUse: 'Literature informs qualitative directions only; no publication figures or measured fascicle directions copied. Licensed BodyParts3D geometry informs full muscle shape.' },
     sources: source.sources, muscles
   };
+  applyGuides(asset);
   validateAsset(asset, meshBytes);
   return asset;
 }
