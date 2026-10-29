@@ -22,11 +22,15 @@ results through privacy-safe, exact public shapes the mobile UI can use.
 
 ## Decided
 
-Milestone D1–D5, D7–D9 and the merged T01 contract. Never use the lifetime winning
+Milestone D1–D5, D7–D10 and the merged T01 contract. Never use the lifetime winning
 board row as the weekly source. Sum eligible per-set Volume once per set.
 The improvement denominator is group-shared and strictly pre-week; missing
 baseline excludes only that metric. Preserve normalized disclosure across
 definition, current results, history and linked session reads.
+Freeze the baseline's eligible pre-start versions. Signed improvement includes
+zero and negatives, descending; completed sessions are placed by start time.
+Equal unrounded scores prefer the earlier current-score submission accepted by
+the server, then UUID, never client/performed/worker time or shared places.
 
 ## Open — resolve at session start
 
@@ -52,11 +56,15 @@ definition, current results, history and linked session reads.
    an apparently final partial sum or mix generations. Capture the roster as
    of the start even if the job runs late; keep leavers' qualifying results and
    prevent later joins/rejoins from entering that CoW.
+   Resolve the latest accepted state at each cutoff, including removed or
+   ineligible sources; never choose an older version merely because it qualified.
 2. Reuse the pure T01 boundary / existing scorer, retaining precision. Return
-   metric-specific rank, unit and missing/unavailable state; deterministic
-   ties and overflow follow the contract. Missing source/baseline never
+   metric-specific ordinal rank, unit and missing/unavailable state. Carry
+   D10's winning-set/aggregate acceptance priority independently of worker
+   publication, including scoring-input revisions, removals and identical retries.
+   Deterministic ties and overflow follow D10/T01. Missing source/baseline never
    produces a fabricated percentage. Zero attained 1RM/Volume never ranks;
-   eligibility of a genuine 0% improvement follows T01's signed/gains rule.
+   genuine 0% and negative improvements rank when their inputs qualify.
 3. Apply current authorization/disclosure on every current/history read,
    even for saved or archived rules. Reject OAuth and outsiders; never expose
    private B, its provenance, digests, or suppressed absolute counterparts.
@@ -73,13 +81,18 @@ definition, current results, history and linked session reads.
    authorized stored final CoW, else explicit absence. Return the displayed
    CoW identity, actual dates and finality so the client can label the fallback
    Last week · Final and open the right detail. Preserve stored scores/units
-   under current historical disclosure; never rescore finals or select older,
-   upcoming or still-finalizing outcomes. Re-evaluate week-bound selection and
+   under current historical disclosure; never rescore finals. Never use older,
+   upcoming, still-finalizing or terminal-unavailable outcomes as fallback;
+   a current unavailable CoW still takes precedence. A valid empty
+   final is distinct and can supply the dated fallback. Re-evaluate week-bound selection and
    cache identity at rollover. Never derive Today ranks from local logs.
 5. Extend the existing group backend and real-client API suites with at least
    two members, several sessions, pre-week and boundary sets, several selected
    metrics, missing baseline/reading, ordinary and normalized exercises, and
-   source/revision/role races. Prove Today top-three order/units independently
+   source/revision/role races. Prove receipt-based tie order is unchanged by
+   worker delay/coalescing, including revised inputs with equal scores, removed
+   Volume contributions, identical retries and equal-time UUID fallback.
+   Prove Today top-three order/units independently
    for each enabled metric, including fewer entries and no improvement baseline.
    Cover current/no-scores precedence, last-week-final fallback, absent/non-final
    previous week, older/upcoming exclusion, permissions, and group-zone rollover.
@@ -94,6 +107,15 @@ definition, current results, history and linked session reads.
    Test delayed/crashed/retried jobs, no app reads, evaluator backlog and
    mutations on both sides of the cutoff; distinguish a late upload from
    timely data whose evaluation finishes late.
+7. Use the context bound at start for baseline and weekly aggregation. An
+   in-week scoring revision/version change or archive makes that CoW's rankings
+   unavailable, with an unavailable stored final outcome at end; no migration
+   to another scorer or mixed units. Failed processing remains retryable
+   Finalizing, distinct from this terminal context failure. Previously final
+   outcomes remain immutable under current disclosure. Decide failure from
+   context changes accepted during the week: a post-cutoff change must not
+   invalidate timely results merely because finalization is delayed. Test both
+   sides of that boundary and terminal-unavailable versus valid-empty fallback.
 
 ## Specs to update
 
