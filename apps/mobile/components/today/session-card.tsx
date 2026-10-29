@@ -13,7 +13,6 @@ import {
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -21,7 +20,7 @@ import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-s
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
 
 import { formatBestSet, todaySessionAccessibilityLabel } from './progress-format';
-import { StepAround } from './step-arrows';
+import { StepArrow, StepAround } from './step-arrows';
 
 export type TodaySessionCardProps = {
   session: LatestSessionSummary;
@@ -92,73 +91,62 @@ function SummaryLine({ session }: { session: LatestSessionSummary }) {
   );
 }
 
-// A glyph-sized pair beside the Exercise heading; the hit slop takes each to
-// the 44pt height, and the pair's gap keeps their reaches apart.
-const SCROLL_ARROW_WIDTH = 24;
-const SCROLL_ARROW_HEIGHT = 16;
-const SCROLL_ARROW_SLOP = {
-  top: (uiGeometry.tapTarget - SCROLL_ARROW_HEIGHT) / 2,
-  bottom: (uiGeometry.tapTarget - SCROLL_ARROW_HEIGHT) / 2,
-  left: uiSpace.xs / 2,
-  right: uiSpace.xs / 2,
-};
+// The page arrows reach up into the gap above the table and down through the
+// header's padding, never into the summary line or the first row.
+const PAGE_ARROW_SLOP = { top: uiSpace.lg, bottom: uiSpace.xs, left: uiSpace.xs / 2, right: uiSpace.xs / 2 };
 
-function ScrollArrow({ direction, onPress }: { direction: 'up' | 'down'; onPress: (() => void) | null }) {
-  const disabled = onPress === null;
-  return (
-    <Pressable
-      accessibilityLabel={direction === 'up' ? 'Earlier exercises' : 'Later exercises'}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      hitSlop={SCROLL_ARROW_SLOP}
-      onPress={onPress ?? undefined}
-      style={({ pressed }) => [styles.scrollArrow, pressed && !disabled ? styles.scrollArrowPressed : null]}
-      testID={`today-latest-session-rows-${direction}`}>
-      <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name={`chevron-${direction}`} size="sm" />
-    </Pressable>
-  );
-}
-
-/** Where the rows' scroller is, and a page step up or down from there (null at that end). */
+/**
+ * The rows' scroller: whether there is more than it shows, and a page step up
+ * or down (null at that end). The native scroll events are the one source of
+ * where it is; the arrows re-render only when an end is reached or left.
+ */
 function useRowScroller(rowCount: number) {
   const scroller = useRef<ScrollViewInstance>(null);
-  const [offset, setOffset] = useState(0);
+  const offset = useRef(0);
   const [viewport, setViewport] = useState(VISIBLE_EXERCISE_ROWS * ROW_HEIGHT);
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(false);
   const end = Math.max(0, rowCount * ROW_HEIGHT - viewport);
-  const scrollTo = (y: number) => {
-    const target = Math.min(end, Math.max(0, y));
-    setOffset(target);
-    scroller.current?.scrollTo({ y: target, animated: true });
+  // A sub-point remainder is the scroller settling, not a row left to show.
+  const settle = (y: number, last: number) => {
+    offset.current = y;
+    setAtStart(y <= 1);
+    setAtEnd(y >= last - 1);
   };
+  const scrollTo = (y: number) => scroller.current?.scrollTo({ y: Math.min(end, Math.max(0, y)), animated: true });
   return {
     scroller,
-    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => setOffset(event.nativeEvent.contentOffset.y),
-    onLayout: (event: LayoutChangeEvent) => setViewport(event.nativeEvent.layout.height),
-    // A sub-point remainder is the scroller settling, not a row left to show.
-    onUp: offset > 1 ? () => scrollTo(offset - viewport) : null,
-    onDown: offset < end - 1 ? () => scrollTo(offset + viewport) : null,
+    overflows: end > 0,
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => settle(event.nativeEvent.contentOffset.y, end),
+    onLayout: (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      setViewport(height);
+      settle(offset.current, Math.max(0, rowCount * ROW_HEIGHT - height));
+    },
+    onUp: atStart ? null : () => scrollTo(offset.current - viewport),
+    onDown: atEnd ? null : () => scrollTo(offset.current + viewport),
   };
 }
 
-// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling, with
-// arrows beside the heading when there is more to show. The rows sit outside
-// the summary's button, whose responder would otherwise swallow the swipe, and
-// open the session themselves.
+// Exercise, sets, best set, 1RM; four rows tall, the rest scrolling, with page
+// arrows beside the heading when there is more than it shows. The table sits
+// outside the summary's button, whose responder would otherwise swallow the
+// swipe, and opens the session itself. The button's label already reads every
+// row, so the table is hidden from assistive tech.
 function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen: () => void }) {
-  const { scroller, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
+  const { scroller, overflows, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
   const label = [uiText.label, uiTextTone.faint];
   return (
-    <View style={styles.fillTable}>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fillTable}>
       <View style={[styles.row, styles.tableHeader]}>
         <View style={[styles.nameCell, styles.nameHeading]}>
           <Text allowFontScaling={false} style={label}>Exercise</Text>
-          {lines.length > VISIBLE_EXERCISE_ROWS ? (
-            <View style={styles.scrollArrows}>
-              <ScrollArrow direction="up" onPress={onUp} />
-              <ScrollArrow direction="down" onPress={onDown} />
+          {overflows ? (
+            <View style={styles.pageArrows}>
+              <StepArrow direction="up" hitSlop={PAGE_ARROW_SLOP} label="Earlier exercises" onPress={onUp} testID="today-latest-session-rows-up" />
+              <StepArrow direction="down" hitSlop={PAGE_ARROW_SLOP} label="Later exercises" onPress={onDown} testID="today-latest-session-rows-down" />
             </View>
           ) : null}
         </View>
@@ -175,13 +163,8 @@ function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen
         scrollEventThrottle={32}
         style={styles.fillRows}
         testID="today-latest-session-rows">
-        {/* The summary's button speaks for the rows; this is their tap. */}
-        <Pressable
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          onPress={onOpen}
-          style={({ pressed }) => (pressed ? styles.pressed : null)}
-          testID="today-latest-session-rows-open">
+        {/* No pressed dimming: a swipe starts as a press, and the whole table would flash. */}
+        <Pressable onPress={onOpen} testID="today-latest-session-rows-open">
           {rows}
         </Pressable>
       </ScrollView>
@@ -237,7 +220,8 @@ export function TodaySessionCard({
           testID="today-latest-session">
           <SummaryLine session={session} />
         </Pressable>
-        <ExerciseTable lines={session.exercises} onOpen={() => onOpenSession(session.id)} />
+        {/* Keyed by session, so stepping to another starts its table at the top. */}
+        <ExerciseTable key={session.id} lines={session.exercises} onOpen={() => onOpenSession(session.id)} />
       </View>
     </Card>
   );
@@ -283,19 +267,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  scrollArrows: {
+  // The pair's gap keeps their side reaches apart.
+  pageArrows: {
     flexDirection: 'row',
     gap: uiSpace.xs,
-  },
-  scrollArrow: {
-    width: SCROLL_ARROW_WIDTH,
-    height: SCROLL_ARROW_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: uiGeometry.radius.control,
-  },
-  scrollArrowPressed: {
-    backgroundColor: uiRoles.paper,
   },
   fillTable: {
     flexShrink: 1,
