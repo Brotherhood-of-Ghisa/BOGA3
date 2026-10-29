@@ -109,8 +109,8 @@ describe('Progress filters and week list', () => {
   });
 
   it('draws a week card\'s detail and the empty week in meta, its figures in the figure face', () => {
-    const group = { key: 'se1', sessionId: 's1', title: 'Barbell Bench Press', detail: 'Mon 5 Oct', workingSetCount: 1,
-      exerciseDefinitionId: null, record: [], rows: [] };
+    const group = { key: 'se1', sessionId: 's1', title: 'Barbell Bench Press', detail: 'Mon 5 Oct',
+      exerciseDefinitionId: null, role: null, record: [], rows: [] };
     const view = render(<WeekSetList groups={[group]} loading={false} error={null} onOpenSession={jest.fn()} testID="week" />);
     const detail = screen.getByText(/Mon/);
     expect(style(detail)).toMatchObject(META);

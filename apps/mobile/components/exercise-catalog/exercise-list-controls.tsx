@@ -59,6 +59,7 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
 type FilterChipProps = {
   label: string;
   size?: 'pill' | 'compact';
+  leading?: ReactNode;
   trailing?: ReactNode;
   on: boolean;
   onPress: () => void;
@@ -71,7 +72,7 @@ type FilterChipProps = {
 
 // Full-height filters or compact row controls share their pill and selected
 // state. Compact controls keep a 44pt tap target through hit slop.
-export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
+export function FilterChip({ label, size = 'pill', leading, trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
   const compact = size === 'compact';
   return (
     <Pressable
@@ -80,6 +81,7 @@ export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID
       onPress={onPress}
       style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
+      {leading}
       <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, compact ? styles.compactLabel : uiTextTone.ink, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>

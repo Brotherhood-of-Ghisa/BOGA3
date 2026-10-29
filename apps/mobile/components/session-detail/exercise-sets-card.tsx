@@ -13,7 +13,8 @@ import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
   name: string;
-  // The header's count: `2/3` on the session view, `3 sets` on View Session.
+  // The header's count: `2/3` on the session view, `3 sets` on View Session;
+  // a history week's day or gym. One line, never more than its share.
   count: string;
   // Faded when nothing is done yet.
   countMuted?: boolean;
@@ -73,7 +74,7 @@ export function ExerciseSetsCard({
         <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[uiText.title, styles.name]}>
           <FigureText strong>{`${name}${percentageMetrics ? ' (% BW)' : ''}`}</FigureText>
         </Text>
-        <Text allowFontScaling={false} style={[uiText.meta, countMuted ? uiTextTone.faint : null]} testID={`${testID}-count`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, styles.count, countMuted ? uiTextTone.faint : null]} testID={`${testID}-count`}>
           <FigureText>{count}</FigureText>
         </Text>
         {accessory}
@@ -123,6 +124,9 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
+  },
+  count: {
+    maxWidth: '45%',
   },
   rows: {
     paddingHorizontal: uiSpace.md,

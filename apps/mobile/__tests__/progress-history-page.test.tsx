@@ -29,6 +29,7 @@ let mockScreenOptions: {
 } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 const mockPush = jest.fn();
+const mockSetParams = jest.fn();
 
 jest.mock('expo-router', () => ({
   // The native header, as the route declares it: its rendered title and items
@@ -41,7 +42,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, setParams: mockSetParams }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -103,6 +104,7 @@ import { getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from
 import { updatePreferences } from '@/src/preferences/hooks';
 import { progressHistoryHref } from '@/src/navigation/routes';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
+import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 const buildWeeklyEffort = (): SelectedMuscleWeeklyEffort => ({
   weekStartDateKey: '2026-05-11',
@@ -368,8 +370,9 @@ describe('HistoryView', () => {
 
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
 
+    // A reload over a drawn chart keeps it, with no loading panel above it.
     rerender(<HistoryView {...buildViewProps({ ...shared, view: 'daily', isLoading: true })} />);
-    expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull();
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
 
@@ -465,7 +468,9 @@ describe('ProgressHistoryScreen', () => {
     // The newest week in the window is focused, and it is the week trained.
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
     expect(mockScreenOptions.title).toBe('Side delts');
-    expect(mockScreenOptions.headerTitle).toBeUndefined();
+    // The title is drawn in the page-title role; with no muscle setup to switch through, it is no button.
+    expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('Side delts');
+    expect(screen.getByTestId('progress-history-title')).toHaveProp('accessibilityRole', 'header');
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
 
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
@@ -480,6 +485,43 @@ describe('ProgressHistoryScreen', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/sessions?week=2026-06-01');
     // Closed by the choice it answered.
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
+  });
+
+  it('makes a muscle page\'s title a switch between the user\'s muscles, by family, in place', async () => {
+    const setup = buildMuscleSetup(mockCatalog.muscleGroups);
+    Object.assign(mockCatalog, { muscleSetup: setup });
+    mockPush.mockClear();
+    try {
+      render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+      await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
+      const title = screen.getByLabelText('Side delts, switch muscle');
+      fireEvent.press(title);
+      const sheet = screen.getByTestId('progress-history-muscle-sheet');
+      expect(sheet).toHaveTextContent(/Shoulders.*Side delts.*Arms.*Triceps.*Core.*Core/);
+      expect(screen.getByTestId('progress-history-muscle-option-front_delts')).toHaveProp('accessibilityState', { checked: true });
+      // The current muscle is no change.
+      fireEvent.press(screen.getByTestId('progress-history-muscle-option-front_delts'));
+      expect(mockSetParams).not.toHaveBeenCalled();
+      fireEvent.press(title);
+      fireEvent.press(screen.getByTestId('progress-history-muscle-option-triceps'));
+      expect(mockSetParams).toHaveBeenCalledWith({ muscleGroupId: 'triceps' });
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(mockCatalog, { muscleSetup: undefined });
+      mockSetParams.mockClear();
+    }
+  });
+
+  it('draws an exercise page\'s title in the same role, with no muscle switch', async () => {
+    Object.assign(mockCatalog, { muscleSetup: buildMuscleSetup(mockCatalog.muscleGroups) });
+    try {
+      render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
+      await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+      expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('Bench Press');
+      expect(screen.getByTestId('progress-history-title')).toHaveProp('accessibilityRole', 'header');
+    } finally {
+      Object.assign(mockCatalog, { muscleSetup: undefined });
+    }
   });
 
   it('offers no ⋮ on a muscle\'s rest week, which has nothing to open', async () => {
@@ -502,9 +544,9 @@ describe('ProgressHistoryScreen', () => {
     expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
     // Options are merged across renders, so the key must be named to clear it.
     expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
-    // The page's own choices are no header item: its Filters sits in the body's selector row.
-    expect(within(screen.getByTestId('stats-muscle-history-overlay')).getByTestId('progress-history-filters'))
-      .toHaveProp('accessibilityLabel', 'Filters');
+    // The page's own choices are no header item: its secondary-set chip sits in the body's selector row.
+    expect(within(screen.getByTestId('stats-muscle-history-overlay')).getByTestId('stats-muscle-history-secondary'))
+      .toHaveProp('accessibilityState', { checked: true });
   });
 
   it('drops the ⋮ when the Timeline is left for another view on a muscle page', async () => {
