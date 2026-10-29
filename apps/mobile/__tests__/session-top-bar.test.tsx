@@ -6,14 +6,14 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('titles an active session by its time of day and ticks the elapsed time each second', () => {
+it('titles an active session Training, without its time of day, and ticks the elapsed time each second', () => {
   jest.useFakeTimers();
   const startedAt = new Date(2026, 8, 23, 18, 0, 0);
   let current = new Date(2026, 8, 23, 18, 42, 17);
   render(
     <SessionTopBar mode="active" now={() => current} onFinish={() => {}} onOpenOptions={() => {}} startedAt={startedAt} />
   );
-  expect(screen.getByTestId('session-view-title')).toHaveTextContent('Evening training · 42:17');
+  expect(screen.getByTestId('session-view-title')).toHaveTextContent('Training · 42:17');
   // A long title shrinks rather than truncating the elapsed time.
   expect(screen.getByTestId('session-view-title')).toHaveProp('adjustsFontSizeToFit', true);
 
@@ -21,7 +21,7 @@ it('titles an active session by its time of day and ticks the elapsed time each 
   act(() => {
     jest.advanceTimersByTime(1000);
   });
-  expect(screen.getByTestId('session-view-title')).toHaveTextContent('Evening training · 1:02:05');
+  expect(screen.getByTestId('session-view-title')).toHaveTextContent('Training · 1:02:05');
 });
 
 it('keeps the fixed titles for an edited and a just-finished session', () => {

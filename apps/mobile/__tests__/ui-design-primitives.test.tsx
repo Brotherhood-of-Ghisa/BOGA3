@@ -122,6 +122,22 @@ describe('Stat', () => {
     });
   });
 
+  it('lets an inline value hug its legend for a caller that sizes the column', () => {
+    render(<Stat label="1RM" layout="inline" value="102.1" valueWidth="hug" />);
+
+    expect(flatStyle(screen.getByText('102.1')).width).toBeUndefined();
+  });
+
+  it('sets a heading value in the card-title face on the headline figure line', () => {
+    render(<Stat kind="heading" label="Gym" value="Maestro Block History Gym" />);
+
+    expect(flatStyle(screen.getByText('Maestro Block History Gym'))).toMatchObject({
+      ...uiText.title,
+      lineHeight: uiText.figureStat.lineHeight,
+    });
+    expect(screen.getByText('Maestro Block History Gym')).toHaveProp('numberOfLines', 1);
+  });
+
   it('sets the secondary inline value as the quiet figureSmall, muted beside the ink 1RM', () => {
     render(<Stat label="Vol" layout="inline" rank="secondary" value="2560" />);
 

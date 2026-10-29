@@ -3,6 +3,7 @@ import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   buildExerciseListModel,
   formatExerciseListStatsSummary,
+  formatExerciseMuscleLines,
   formatExerciseMuscleSummary,
   type ExerciseListPreferences,
 } from '@/src/exercise-catalog/list-model';
@@ -63,6 +64,8 @@ describe('exercise browser model', () => {
     expect(formatExerciseMuscleSummary(exercises[0], muscleSetup)).toBe('Primary: Chest');
     expect(formatExerciseMuscleSummary(exercises[1], muscleSetup)).toBe('Secondary: Chest');
     expect(formatExerciseMuscleSummary(exercises[3], muscleSetup)).toBe('No muscle links');
+    expect(formatExerciseMuscleLines(exercises[0], muscleSetup)).toEqual({ primary: 'Primary: Chest', secondary: 'Secondary: None' });
+    expect(formatExerciseMuscleLines(exercises[1], muscleSetup)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: Chest' });
     expect(formatExerciseMuscleSummary(exercises[0], buildMuscleSetup([]))).toBe('Primary: chest');
   });
 
@@ -141,4 +144,5 @@ describe('browser last-performed date', () => {
   it('never invents a date for an unused exercise', () => {
     expect(formatExerciseListStatsSummary(undefined, false, null, 'DD-MM-YYYY')).toBe('Never done');
   });
+
 });

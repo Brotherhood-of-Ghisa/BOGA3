@@ -149,6 +149,7 @@ had grown for nine jobs.
 | `option` | Archivo 600 · `lg` | a row's name in a card; a form's action row |
 | `optionLarge` | Archivo 600 · `xl` | a sheet's option row |
 | `input` | Source Sans 400 · `base`, no line-height | typed text; a numeric field adds `inlineFigure` |
+| `inputLarge` | Source Sans 400 · `lg`, no line-height | a search field's query |
 | `body` | Source Sans 400 · `base` | a row's name, a line of prose |
 | `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
 | `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |

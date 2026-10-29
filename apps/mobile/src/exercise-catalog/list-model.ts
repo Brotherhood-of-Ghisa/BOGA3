@@ -34,8 +34,12 @@ export type ExerciseListItem = IndexedExerciseCatalogExercise & {
   lastDoneDate: Date | null;
   primaryFamilyName: string;
   muscleSummary: string;
+  /** A row's two muscle lines, each always shown (`Secondary: None`). */
+  muscleLines: ExerciseMuscleLines;
   statsSummary: string;
 };
+
+export type ExerciseMuscleLines = { primary: string; secondary: string };
 
 export type ExerciseListSection = {
   familyName: string;
@@ -79,21 +83,44 @@ export const getExercisePrimaryFamilyName = (
  * A card's muscle lines, naming the user's muscles ([[muscle.no-breakdown]]):
  * each once, at its strongest role, without untracked ones.
  */
+const roleNames = (
+  exercise: ExerciseCatalogExercise,
+  muscleSetup: MuscleSetup
+): Record<'primary' | 'secondary', string | null> => {
+  const muscles = exerciseCountedMuscles({ mappings: reportedMappings(exercise.mappings, muscleSetup.assignment) });
+  const line = (role: 'primary' | 'secondary') => {
+    const names = muscles
+      .filter((muscle) => muscle.role === role)
+      .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId);
+    return names.length ? names.join(' · ') : null;
+  };
+  return { primary: line('primary'), secondary: line('secondary') };
+};
+
+/** A row's muscle lines: both roles, always, `None` for an empty one. */
+export const formatExerciseMuscleLines = (
+  exercise: ExerciseCatalogExercise,
+  muscleSetup: MuscleSetup
+): ExerciseMuscleLines => {
+  const { primary, secondary } = roleNames(exercise, muscleSetup);
+  return { primary: `Primary: ${primary ?? 'None'}`, secondary: `Secondary: ${secondary ?? 'None'}` };
+};
+
 export const formatExerciseMuscleSummary = (
   exercise: ExerciseCatalogExercise,
   muscleSetup: MuscleSetup
 ) => {
-  const muscles = exerciseCountedMuscles({ mappings: reportedMappings(exercise.mappings, muscleSetup.assignment) });
-  const lines = (['primary', 'secondary'] as const).map((role) => {
-    const names = muscles
-      .filter((muscle) => muscle.role === role)
-      .map((muscle) => muscleSetup.musclesById[muscle.muscleGroupId]?.displayName ?? muscle.muscleGroupId);
-    return names.length ? `${role === 'primary' ? 'Primary' : 'Secondary'}: ${names.join(' · ')}` : '';
-  });
+  const { primary, secondary } = roleNames(exercise, muscleSetup);
+  const lines = [primary && `Primary: ${primary}`, secondary && `Secondary: ${secondary}`];
   return lines.filter(Boolean).join('\n') || 'No muscle links';
 };
 
 export { formatShortDate } from '@/src/utils/local-time';
+
+const formatSessionCount = (aggregate: ExerciseAggregate | undefined) => {
+  const count = aggregate?.sessionCount ?? 0;
+  return `${count} ${count === 1 ? 'session' : 'sessions'}`;
+};
 
 export const formatExerciseListStatsSummary = (
   aggregate: ExerciseAggregate | undefined,
@@ -102,8 +129,7 @@ export const formatExerciseListStatsSummary = (
   dateFormat: ExerciseDateFormat
 ): string => {
   if (!hasAllTimeHistory) return 'Never done';
-  const count = aggregate?.sessionCount ?? 0;
-  const sessions = `${count} ${count === 1 ? 'session' : 'sessions'}`;
+  const sessions = formatSessionCount(aggregate);
   if (!lastDoneDate) return sessions;
   return `Last: ${formatShortDate(lastDoneDate, dateFormat)} · ${sessions}`;
 };
@@ -171,6 +197,7 @@ export const buildExerciseListModel = ({
       lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
       muscleSummary: formatExerciseMuscleSummary(exercise, muscleSetup),
+      muscleLines: formatExerciseMuscleLines(exercise, muscleSetup),
       statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
     };
   });

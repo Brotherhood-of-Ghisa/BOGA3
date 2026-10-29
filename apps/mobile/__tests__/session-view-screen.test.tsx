@@ -91,7 +91,6 @@ import * as sessionDrafts from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
-import { sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 import * as insightsRepository from '@/src/session-insights/repository';
 import { getRestTimerEntry } from '@/src/session-recorder/rest-timer';
 import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
@@ -255,9 +254,8 @@ describe('Session view', () => {
       'accessibilityLabel',
       `Gym ${SESSION_VIEW_FIXTURE.gymName}`
     );
-    // The title names the session by when it started and carries the elapsed time.
-    const title = `${sessionTitleForStart(sessionRow(SESSION)!.startedAt)} · 47:`;
-    expect(screen.getByTestId('session-view-title')).toHaveTextContent(new RegExp(`^${title}\\d{2}$`));
+    // The title is `Training` and the elapsed time, without the time of day.
+    expect(screen.getByTestId('session-view-title')).toHaveTextContent(/^Training · 47:\d{2}$/);
     expect(screen.queryByTestId('session-view-summary-time')).toBeNull();
     // Every exercise on the session counts, the untouched Cable Flys included;
     // the legend reads `Ex`, spoken in full.

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ExerciseSetsCard } from '@/components/session-detail/exercise-sets-card';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
@@ -37,6 +37,15 @@ it('keeps ordinary rows compact with inline metrics', () => {
   expect(screen.getByTestId('ordinary')).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
   expect(screen.getByTestId('ordinary-1rm')).toHaveStyle({ flexDirection: 'row' });
   expect(screen.getByTestId('ordinary-vol')).toHaveStyle({ flexDirection: 'row' });
+});
+
+it('sets 1RM and Vol in two equal fixed columns, each legend hugging its right-aligned value', () => {
+  render(<SetSummaryRow row={row} testID="cols" />);
+  const oneRepMaxColumn = screen.getByTestId('cols-1rm-column');
+  const volumeColumn = screen.getByTestId('cols-vol-column');
+  expect(oneRepMaxColumn).toHaveStyle({ width: uiGeometry.metricValueWidth * 2, alignItems: 'flex-end' });
+  expect(volumeColumn).toHaveStyle({ width: uiGeometry.metricValueWidth * 2, alignItems: 'flex-end', marginLeft: uiSpace.sm });
+  expect(screen.getByText(row.oneRepMax)).not.toHaveStyle({ width: uiGeometry.metricValueWidth });
 });
 
 it('retains reps-only context when normalized metrics are undisclosed', () => {
