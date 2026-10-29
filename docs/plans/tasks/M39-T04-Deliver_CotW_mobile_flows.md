@@ -22,7 +22,7 @@ two-member results, usable unavailable/offline states and visual evidence.
 
 ## Decided
 
-Milestone D1–D9 and the merged T01 contract. Reuse the API/guards/cache from
+Milestone D1–D10 and the merged T01 contract. Reuse the API/guards/cache from
 T02/T03, existing group resource/action hooks, exercise picker and rank/UI
 primitives. A missing improvement baseline does not hide a valid 1RM or
 Volume result. Group %BW 1RM and personal improvement % need distinct labels.
@@ -60,7 +60,8 @@ when the card is hidden.
 - Use the four approved mockups in the [CoW UX brief](../M39-cow-ux.md).
   Use selected scheduling option 1; review empty/error targets and state tables,
   and settle the deferred group-link wording;
-  editing reuses that form with Edit CoW / Save changes, subject to T01.
+  editing reuses that form with Edit CoW / Save changes before start only.
+  Cancellation also ends at start and confirms; no active/ended edit/cancel.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build
   inputs, never a replacement for the merged T01 contract.
 - Capture current group references before implementation. Preserve the
@@ -73,6 +74,12 @@ when the card is hidden.
 - Settle copy using `docs/product/copy.md`. Only a stored final outcome says
   Final; a week whose deadline passed can still be Finalizing. Push result
   announcements remain out of scope; in-app reporting is part of this task.
+  Signed improvement includes zero/negative values. Use server ordinal places,
+  whose ties prefer earlier server submission; do not show shared winners.
+  A start-bound scoring-context change/archival is unavailable, not an empty
+  board or an invitation to repair the active CoW by editing it.
+  An unavailable prior final cannot supply Today fallback; a valid empty final
+  can. A current unavailable CoW remains current rather than falling back.
 
 ## Deliverables and acceptance
 
@@ -91,7 +98,9 @@ when the card is hidden.
    stored final result with Last week · Final/dates, else no card or gap. Prove
    current/no-scores precedence and no older/upcoming/non-final fallback,
    group-zone rollover, and that group switching cannot retain stale CoW
-   context, in-card metric switching shows the proper server top three and units
+   context. Test unavailable prior finals excluded from fallback, valid empty
+   finals retained, and a current unavailable CoW still taking precedence. Prove
+   in-card metric switching shows the proper server top three and units
    without opening detail, and the header opens the same metric/group/CoW.
    Cover fewer/no qualifying rows, only enabled metrics and no substitution of
    the viewer for a top-three place. The group-page preview shows at least

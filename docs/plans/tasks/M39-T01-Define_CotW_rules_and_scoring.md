@@ -8,13 +8,13 @@
 ## Objective
 
 Turn the milestone's confirmed product choices into one implementable
-weekly competition contract and a small, pure scoring boundary. Resolve the
-remaining product questions before code so later PRs cannot invent different
-week, baseline or correction rules.
+weekly competition contract and a small, pure scoring boundary. Formalize the
+delegated MVP choices so later PRs cannot invent different week, baseline,
+submission-priority or correction rules.
 
 ## Scope
 
-- In: milestone D1–D5 and D7–D9; pure aggregation of already calculated group scores;
+- In: milestone D1–D5 and D7–D10; pure aggregation of already calculated group scores;
   deterministic fixtures; durable ownership of cross-surface rules.
 - Out: SQL tables/RPCs, a second load/1RM formula, group worker changes, UI,
   notification delivery and hosted deployment.
@@ -23,27 +23,32 @@ week, baseline or correction rules.
 
 - D1: one group exercise; independently selected metric rankings.
 - D2: the member's pre-week best group-shared 1RM; no positive baseline means
-  unranked improvement, not an invented 0% or personal-history fallback.
+  unranked improvement, not an invented 0% or personal-history fallback. Freeze
+  eligible baseline versions at start; signed improvement includes zero and negatives.
 - D3: ordinary/normalized units and existing privacy apply.
 - D4: weekly Volume sums set volumes; existing lifetime Volume boards stay
   best-single-set. Retain unrounded scores until display.
 - D7: group time zone defaults to the creator's; immutable shared week bounds;
   schedule next week only, before start, with one published CoW per group/week.
 - D8: ended results are stored and final, never recalculated from later source
-  changes; current history disclosure/access still applies.
+  changes; current history disclosure/access still applies. Server acceptance
+  before cutoff is required, with no late-sync grace period.
 - D9: roster fixed at start; later join/rejoin waits for the next CoW; leaving
   stops contributions but preserves results earned while a member.
+- D10: completed sessions placed by start time; receipt-based tie priority,
+  stable UUID last tie-break, before-start-only edit/cancel, one All ranking,
+  finite values and unavailable outcome on an in-week scoring-context change.
 
-## Open — resolve with the operator at session start
+## Implementation choices at session start
 
-Resolve only the remaining items under the milestone's "Decisions reserved
-for T01": session placement and boundary cases, the proposed no-grace/server-
-receipt cutoff (including baseline and source versions), editing/cancellation,
-signed/positive-only improvement, ties/finite results, comparison revision
-changes and certification scope. Do not reopen D7–D9 as undecided. A historical baseline must be calculated
-under a compatible rule/unit; no mixing historical kg with current %BW.
-Choose the narrowest contract consistent with D1–D3; update later cards if
-its consequences change their scope or gates.
+MVP product choices are settled in D2/D8/D10; do not reopen them as questions
+requiring another operator answer. Trace existing scoring/intake/version
+boundaries and choose the smallest implementation consistent with the
+milestone's handoff. Define the authoritative acceptance point and how each
+metric derives its submission time from D10's winning-set/aggregate receipts,
+including removed contributions, despite delayed/coalesced evaluation. Do not
+build a history of every intermediate aggregate score. Baseline and weekly scores use the start-bound context;
+an in-week context change is unavailable, not a historical-rules evaluator.
 
 ## Deliverables and acceptance
 
@@ -59,10 +64,19 @@ its consequences change their scope or gates.
    scoring is necessary; never duplicate parsing, effort or load arithmetic.
 3. Jest vectors prove weekly max versus weekly sum over several sessions and
    repeated blocks, the pre-week cutoff, shared-only baseline selection,
-   missing/zero baseline and weekly results, signed/positive choice, exact
-   edges/DST, ties, deduplication, finite-result policy, and ordinary/%BW units.
+   missing/zero baseline and weekly results, signed negative/zero ordering,
+   exact edges/DST, receipt-priority ties, deduplication, finite-result policy,
+   and ordinary/%BW units. Prove earlier accepted equal scores beat later ones
+   despite opposite client/performed/worker times, identical retries keep
+   priority, scoring-input corrections use their new receipt time, Volume
+   removals advance aggregate receipt, and identical times use UUID.
+   Cover baseline uploads after start, membership-end crossing,
+   completion after cutoff and transactions whose required writes cross cutoff.
+   Latest accepted states include deletion/ineligibility: a pre-cutoff removal
+   cannot resurrect an older qualifying version; a post-cutoff removal cannot rerank finals.
    State the deadline contract precisely enough for T03 to distinguish
-   pre-deadline source versions from later writes despite evaluation lag.
+   pre-deadline source versions from later writes despite evaluation lag, and
+   scope the unavailable context-change outcome without rewriting prior finals.
    Put authorization assertions in T02/T03 rather than treating pure inputs
    as proof of access control.
 4. Review current consumers of any existing helper changed. Existing board

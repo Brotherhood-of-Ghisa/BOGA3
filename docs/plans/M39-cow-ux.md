@@ -10,8 +10,8 @@
   versus View/Edit CoWs wording is explicitly deferred.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
-- Authority: milestone D1–D9 for agreed product direction; remaining T01
-  questions stay open. Agreed entry points are recorded below; remaining
+- Authority: milestone D1–D10 for agreed product/MVP direction; T01 formalizes
+  those choices. Agreed entry points are recorded below; remaining
   layout and interaction details are proposals.
 - Implementation references: capture current Groups / At a glance, group
   management and comparison-form screenshots for the remaining flows, in the
@@ -101,6 +101,9 @@ existing no-results state; lack of scores is not lack of a CoW. At a week
 boundary, re-evaluate selection and labels so the fallback cannot silently
 become two weeks old. Use authorized stored results and their original units,
 under the existing historical-disclosure policy; never recalculate the final.
+An unavailable final outcome cannot supply this fallback; retain it in the
+browser instead. A valid empty final remains eligible. A current unavailable
+CoW still takes priority over any prior result.
 
 Groups provides one full-width CoWs chevron row below its existing group
 heading/filter controls and before the selected view's content. It opens the
@@ -217,7 +220,7 @@ Publishing immediately makes the upcoming CoW visible to members.
 The operator agreed to option 1 as the base: compact fixed group/week context,
 one exercise selector, left-aligned independent metric checkboxes and one
 action. The exercise picker below is also approved; remaining empty/error
-states and T01's lifecycle rules stay open. No wizard, date
+states remain to review; T01 formalizes the agreed MVP lifecycle. No wizard, date
 picker, recurring setting, extra review step or scoring configuration.
 
 Generated with the built-in image-generation tool, grounded in the earlier
@@ -264,7 +267,9 @@ selection; do not silently substitute one or create a catalogue copy.
 
 Editing reuses the same form and entered selections, titled Edit CoW with
 Save changes as its primary action. Allowed fields/actions still follow
-T01's lifecycle; the draft layout does not settle editing or cancellation policy.
+the MVP lifecycle: exercise/metrics may change before start only. Admins can
+cancel before start with confirmation and release the next-week slot; no
+active/ended edit or cancellation. T01 formalizes this contract.
 
 ```text
 < Back                         Schedule CoW
@@ -305,9 +310,11 @@ available. There is no combined winner or weekly certification action.
 
 Upcoming: exercise, metrics and start date, with no ranking yet. Live: current
 standings and end date/time. After the deadline: Finalizing until the server
-returns its stored outcome. Final: the per-metric winner or tied winners and
-the rankings, or No qualifying results. Tie presentation follows T01; never
-invent an overall winner. A user's ineligible/not-yet-participating state is
+returns its stored outcome. Final: each metric's winner and ordinal rankings,
+or No qualifying results. Equal scores prefer earlier server submission, then
+UUID; there are no shared places/winners. Improvement retains its sign: −2%
+ranks above −5%, with 0% valid when inputs qualify. Never invent an overall
+winner. A user's ineligible/not-yet-participating state is
 visible without an enrolment control.
 
 Today never labels an ended previous week's CoW as current; its agreed
@@ -350,7 +357,7 @@ alternative designs or running-app evidence.
 | Offline, permitted summary cached | Standard neutral Offline · last updated HH:MM marker; keep permitted context/top-three summary. Full standings and history remain online-only; show This loads when you're back online in their areas. |
 | Offline, no cache | You’re offline / This loads when you're back online. No endless spinner, empty-week claim or queued write. Reuse this compact state on Today until a read establishes the agreed selection. |
 | Confirmed lost group access | Replace all group/CoW content with the existing generic lost-access state; evict cached group results and hide Today content. No retained scores, form values or Retry that implies membership can be restored. Back remains available. |
-| Incompatible or unavailable comparison | Safe Group comparisons unavailable state, not raw payload/errors or fallback kg figures. Retain only independently authorized safe context; follow T01/T03's revision/disclosure outcome. |
+| Scoring context changes / comparison archived after start | Safe Group comparisons unavailable state for rankings; store an unavailable final outcome with no winner at end. Do not migrate contexts, invent an empty board or repair an active CoW by editing it. Prior finalized outcomes keep their original result under current safe disclosure. |
 
 The agreed Today hide rule applies after a successful read establishes that
 neither current nor the exact last-week-final fallback is available. Hiding
@@ -380,7 +387,7 @@ Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
 Preserve the selected scheduling layout and approved picker; review empty/error targets before implementation. T01
-still owns cutoff, edit/cancel, ties and revision policy. Verify approved
+formalizes the agreed cutoff, edit/cancel, tie and context-change rules. Verify approved
 layouts, state handling and fallback with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and
 non-colour state cues in the running app. T04's UX Contract owns the

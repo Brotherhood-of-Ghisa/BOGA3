@@ -14,16 +14,19 @@ the later rankings and UI consume, with existing group authorization intact.
 ## Scope
 
 - In: group time-zone default/storage, additive group-domain schema, participant
-  and final-result lifecycle storage; definition get/list and next-week
+  and final-result lifecycle, cutoff intake/context and tie-priority storage;
+  definition get/list and next-week
   create/update/cancel operations; exact wire guards and typed API methods.
 - Out: scoring and automatic finalization implementation (T03), public score
   reads, screens, new sync entities, recurring CoW creation and hosted deployment.
 
 ## Decided
 
-Milestone D1–D5, D7–D9 and the merged T01 contract. Only an active owner/admin may
+Milestone D1–D5, D7–D10 and the merged T01 contract. Only an active owner/admin may
 manage a challenge; active members can read it. Use existing group exercise
 identities and protocol conventions. Group tables stay outside Sync v2.
+Edit/cancel is before start only; cancellation releases that next-week slot
+without deleting audit. Active/ended CoWs cannot be edited or cancelled.
 
 ## Open — resolve at session start
 
@@ -37,7 +40,11 @@ identities and protocol conventions. Group tables stay outside Sync v2.
   before scheduling; create-group defaults must receive the creator's zone.
 - Provide the lifecycle/claim/fencing storage T03 needs for scheduled roster
   capture and retry-safe finalization. Finalization must not depend on a mobile
-  read. Handle membership changes at start and source writes at the cutoff.
+  read. Retain the authoritative acceptance ordering and source versions needed
+  for frozen baselines, deadline/leave cutoffs and metric tie priority. A
+  transaction-start timestamp alone cannot prove timely receipt of later writes.
+  Bind comparison/scorer context at start; expose an unavailable outcome on an
+  in-week context change or archive, without affecting prior finalized snapshots.
 
 ## Deliverables and acceptance
 
@@ -50,7 +57,8 @@ identities and protocol conventions. Group tables stay outside Sync v2.
 2. Serialize mutations with the group authorization lock and enforce
    one published CoW per group/week, no overlapping windows (including zone
    changes), and lifecycle transitions under concurrent admin writes.
-   A stale edit must fail predictably without losing the mobile form input.
+   Reject active/ended edits or cancellation. A stale edit must fail predictably
+   without losing the mobile form input; cancelled next slots may be replaced.
 3. New tables have RLS, no direct client grants, no `owner_user_id`, and no
    FK into a private mirror entity. Every privileged helper/RPC independently
    denies OAuth agents. Auth, membership, role and input check order follows
@@ -63,7 +71,8 @@ identities and protocol conventions. Group tables stay outside Sync v2.
    owner/admin success, member write denial, anonymous/OAuth denial,
    outsider/nonexistent equivalence, cross-group exercise rejection, direct
    table denial, next-week-only/deadline inputs, DST and zone defaults/changes,
-   stale/concurrent changes and idempotent
+   before/after-start edit/cancel, replacement after cancellation,
+   cutoff/membership/receipt capture, context changes and stale/concurrent/idempotent
    behavior required by the contract. New schema must not enter sync drift.
 
 ## Specs to update
