@@ -1,4 +1,4 @@
-# M39-T03 — Serve CotW rankings and history
+# M39-T03 — Serve COW rankings, finalization and history
 
 - Status: `planned`
 - Depends on: `M39-T02-Add_CotW_lifecycle_and_authorization`
@@ -9,19 +9,20 @@
 
 Return one authoritative result per selected challenge metric, with weekly
 best 1RM, pre-week shared baseline and summed weekly Volume implementing T01.
-Serve current and prior challenges through privacy-safe, exact public shapes
-that the mobile UI can use directly.
+Automatically finalize and store ended COW results; serve live and final
+results through privacy-safe, exact public shapes the mobile UI can use.
 
 ## Scope
 
-- In: authorized candidate selection, shared pure aggregation, coherent
-  result reads, exact wire/API/cache boundary and local-Supabase integration.
+- In: start-time roster capture, authorized candidate selection, shared pure
+  aggregation, coherent live reads, automatic/retryable finalization, durable
+  immutable results, exact wire/API/cache boundary and local-Supabase integration.
 - Out: changing existing lifetime boards, copying private workout graphs,
   public private-reading context, screens, notifications and hosted deployment.
 
 ## Decided
 
-Milestone D1–D5 and the merged T01 contract. Never use the lifetime winning
+Milestone D1–D5, D7–D9 and the merged T01 contract. Never use the lifetime winning
 board row as the weekly source. Sum eligible per-set Volume once per set.
 The improvement denominator is group-shared and strictly pre-week; missing
 baseline excludes only that metric. Preserve normalized disclosure across
@@ -29,12 +30,14 @@ definition, current results, history and linked session reads.
 
 ## Open — resolve at session start
 
-- Trace the complete current source/projection graph and its freshness fences.
-  Prefer a bounded read over coherent existing scores. If data completeness or
-  performance requires a projection, justify it and extend the existing
-  `group-eval` pipeline with generation/revision fences; do not create another
-  service. SQL may filter/aggregate published values but never mirror the load,
-  effort or 1RM calculation rules from TS.
+- Trace source/projection freshness fences and choose how to retain the
+  deadline's eligible source versions before later mutations. Finalizing on
+  first history read from mutable rows is insufficient. Reuse/extend existing
+  backend evaluation/scheduling, with no separate service. SQL may aggregate
+  published values but never mirror TS load, effort or 1RM rules.
+- Define automatic start/close discovery, coherent draining of work accepted
+  before the agreed deadline, retry/backoff and exactly-once final publication
+  using T02's storage. The passage of time needs no open app or new workout.
 - Choose pagination/indexing and unavailable/rebuilding envelopes. Account for
   an all-time baseline without an unbounded raw graph in a mobile payload.
 - Decide which score/baseline details are safe and useful to return. A weekly
@@ -46,7 +49,9 @@ definition, current results, history and linked session reads.
    identical bounds for every viewer. Handle late sync, completed-state
    changes, edits/deletes/restores, link changes, leave/rejoin, archive and
    revision changes according to that contract. Rebuilding must not expose
-   an apparently final partial sum or mix generations.
+   an apparently final partial sum or mix generations. Capture the roster as
+   of the start even if the job runs late; keep leavers' qualifying results and
+   prevent later joins/rejoins from entering that COW.
 2. Reuse the pure T01 boundary / existing scorer, retaining precision. Return
    metric-specific rank, unit and missing/unavailable state; deterministic
    ties and overflow follow the contract. Missing source/baseline never
@@ -65,6 +70,15 @@ definition, current results, history and linked session reads.
    metrics, missing baseline/reading, ordinary and normalized exercises, and
    source/revision/role races. Run real responses through the mobile guards.
    Read each test directory's README before modifying its tests.
+6. At the agreed deadline, finalize all selected metrics as one coherent,
+   durable outcome with original units, ranks and scoring context. Publish
+   once, including an empty outcome; a retry cannot replace final results.
+   Expose finalizing until complete. Afterwards serve the stored outcome:
+   later edits/deletes/restores, links, membership or formula changes cannot
+   rerank it. Current disclosure can hide unsafe figures without rescoring.
+   Test delayed/crashed/retried jobs, no app reads, evaluator backlog and
+   mutations on both sides of the cutoff; distinguish a late upload from
+   timely data whose evaluation finishes late.
 
 ## Specs to update
 
