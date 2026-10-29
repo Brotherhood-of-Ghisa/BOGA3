@@ -3,8 +3,9 @@
 - Status: three attached mockups approved by the operator on 2026-10-29:
   detailed chronological browser with horizontal banner, and Today top-three
   card with in-card metric tabs, and the revised individual group-page preview.
-  The last-week-final fallback on Today is also agreed. Scheduling alternatives
-  and empty/error targets remain pending review. The group link's View CoWs
+  The last-week-final fallback on Today is also agreed. Scheduling option 1 is
+  selected as the base for refinement; its exercise picker and empty/error
+  targets remain pending review. The group link's View CoWs
   versus View/Edit CoWs wording is explicitly deferred.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
@@ -198,49 +199,67 @@ Use native chevron-only Back and house tokens at implementation; the generated
 empty/error images inherit a short back label from the earlier browser reference,
 which is not a new exception to the navigation contract.
 
-## Schedule next CoW — pending review
+## Schedule next CoW — option 1 selected
 
 From the group preview's View CoWs link, admins reach the secondary CoWs page;
 its Schedule next CoW action opens the creation form. Next week's date range
 and the group's zone are
-read-only context, not editable date fields. Use the existing group
-exercise picker; require at least one metric. The visible form is the review:
+read-only context, not editable date fields. Choose one existing active group
+exercise and require at least one metric. The visible form is the review:
 group, fixed week/zone, exercise and metric choices, followed by one scheduling
-action. The current alternatives propose Schedule CoW as its label. No duplicate
+action labelled Schedule CoW in the selected layout. No duplicate
 Review card or extra confirmation screen.
 Publishing immediately makes the upcoming CoW visible to members.
 
-![Earlier unselected scheduling draft](assets/M39-cow-schedule.png)
+![Selected scheduling option 1 — compact checklist](assets/M39-cow-schedule-option-1.png)
 
-Generated with the built-in image-generation tool. Prompt: extend the approved
-CoW style into one short admin form with read-only group/next-week/zone context,
-the existing exercise picker, independent leaderboard checkboxes and one
-Publish CoW action. The illustration shows a filled form, not a new rule that
-all three metrics must be selected. This earlier Publish CoW draft is not
-approved; the alternatives below are the current selection set.
+The operator agreed to option 1 as the base: compact fixed group/week context,
+one exercise selector, left-aligned independent metric checkboxes and one
+action. The exercise picker below is the next refinement; selection of the
+layout does not approve its unseen interaction details. No wizard, date
+picker, recurring setting, extra review step or scoring configuration.
 
-### Scheduling layout exploration — pending selection
+Generated with the built-in image-generation tool, grounded in the earlier
+form and approved group image. Prompt: compact two-column next-week context
+with checklist controls on the page ground. Reference size 853 × 1844; date
+anchor 2026-10-29, next week 2–8 Nov 2026 in Europe/London. Squat and the two
+checked metrics are a filled example, not initial defaults or a requirement.
+The [earlier draft](assets/M39-cow-schedule.png),
+[option 2](assets/M39-cow-schedule-option-2.png) and
+[option 3](assets/M39-cow-schedule-option-3.png) are not selected.
 
-The three independent alternatives keep the same behavior: fixed group and
-next-week dates/zone, one existing active group exercise, independently chosen
-leaderboards and one Schedule CoW action. They vary context density, order and
-checklist placement within the house style. No wizard, date picker, recurring
-setting, extra review step or new exercise/scoring configuration.
+### Exercise picker — proposed
 
-![Scheduling option 1](assets/M39-cow-schedule-option-1.png)
+Tapping Exercise opens the existing bottom-sheet pattern, titled Choose
+exercise, with a SearchField above a scrollable list of this group's active
+comparison exercises. Reuse Sheet, SearchField and ListRow; the existing
+group switch supplies the immediate-selection/checkmark interaction. The
+standard catalogue picker is not the data source: it copies catalogue items
+when creating a group exercise, whereas this field selects an existing group
+comparison identity. Do not list private exercises, archived comparisons or
+another group's exercises.
 
-![Scheduling option 2](assets/M39-cow-schedule-option-2.png)
+![Proposed scheduling exercise picker](assets/M39-cow-schedule-exercise-picker.png)
 
-![Scheduling option 3](assets/M39-cow-schedule-option-3.png)
+Generated with the built-in image-generation tool. Prompt: preserve selected
+option 1 behind the standard dimmed backdrop; add a bottom-anchored Choose
+exercise sheet with search, Bench press / Deadlift / Squat rows and a trailing
+check on the current Squat choice. No confirm/cancel buttons or keyboard in
+this initial state. Same reference dimensions, date and group zone.
 
-Generated independently with the built-in image-generation tool, grounded in
-the earlier form and approved group image. Prompts: compact context/checklist;
-week-led read-only context block and grouped checklist; exercise-first choices
-with a fixed-week strip before the action. Reference size 853 × 1844; date
-anchor 2026-10-29, next week 2–8 Nov 2026 in Europe/London. Visible option
-numbers follow their display order in the conversation. Squat and the two
-checked metrics are a filled example, not initial defaults or a selection
-requirement. All three remain unapproved until the operator chooses/refines one.
+Tap a row to select its stable group-exercise identity, dismiss the sheet and
+update the form field, preserving metric choices. Reopening marks the current
+choice. Dismissing via backdrop, handle, Back or accessible escape changes
+nothing; return accessibility focus to the Exercise field. Keep search
+unfocused initially; typing filters only that group's loaded choices.
+
+No matches is distinct from no active group exercises: the former keeps the
+search editable; the latter offers the existing Add exercise path, returning
+to the retained form and refreshed choices. A failed read has Retry rather
+than an empty list. Permitted cached choices may remain readable offline;
+publishing stays online-only and revalidates the exercise on the server. If
+the selected exercise becomes unavailable, retain input but require another
+selection; do not silently substitute one or create a catalogue copy.
 
 Editing reuses the same form and entered selections, titled Edit CoW with
 Save changes as its primary action. Allowed fields/actions still follow
@@ -258,7 +277,7 @@ Metrics
 [x] 1RM improvement (%)
 [x] Total Volume
 
-[Schedule CoW]                  (candidate copy)
+[Schedule CoW]
 ```
 
 No exercise exists: offer the existing group-exercise creation path to admins,
@@ -359,7 +378,7 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Select/refine the scheduling target and review empty/error targets before implementation. T01
+Review the selected scheduling layout's picker and empty/error targets before implementation. T01
 still owns cutoff, edit/cancel, ties and revision policy. Verify approved
 layouts, state handling and fallback with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and

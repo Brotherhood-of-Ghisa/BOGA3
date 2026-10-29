@@ -47,8 +47,9 @@ existing formatting: exercise/status left, dates/zone right. The revised
 mockup is attached to the brief; no browser tabs or week stepper. The browser and
 Today top-three card are approved design targets. The revised individual
 group-page preview is also approved; View CoWs versus View/Edit CoWs wording
-is deferred. Scheduling remains pending selection from the three alternatives
-in the brief; no earlier scheduling draft is approved.
+is deferred. Scheduling option 1 is selected as the compact base. Its proposed
+exercise picker and remaining interaction states still need review; earlier
+drafts/options 2 and 3 are not selected.
 The fallback is also agreed: a current CoW with no scores still takes priority;
 never substitute older, upcoming or non-final results as fallback. The header opens the
 displayed week's CoW and selected metric. No placeholder or reserved space
@@ -57,7 +58,7 @@ when the card is hidden.
 ## Open — resolve with the operator at session start
 
 - Use the three approved mockups in the [CoW UX brief](../M39-cow-ux.md).
-  Select/refine a scheduling alternative, review empty/error targets and state tables,
+  Use selected scheduling option 1; review its exercise picker, empty/error targets and state tables,
   and settle the deferred group-link wording;
   editing reuses that form with Edit CoW / Save changes, subject to T01.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build
@@ -104,6 +105,10 @@ when the card is hidden.
    retain safe loaded sections, and an uncertain publish disables another
    create until Check status resolves the authoritative slot. Verify missing
    zone/exercise return paths retain the form and revalidate next week's bounds. Use
+   Jest to prove the picker searches only active comparisons in the selected
+   group, tapping a row retains its identity and metric choices, dismissal
+   changes nothing, empty search differs from no exercises/read failure,
+   unavailable selections block publication and focus returns to the field. Use
    existing test fixtures and read `apps/mobile/__tests__/README.md` first.
 4. Prove next-week scheduling through two-member results and stored final
    history against local Supabase and the production client. Reuse existing
@@ -126,6 +131,7 @@ when the card is hidden.
 | Browse Today rankings | Tap an enabled metric inside the CoW card; read its first three places | Correct server ranks/units update in place; header opens the same metric in detail | Fewer/no results and unavailable metrics stay explicit; controls never trigger navigation |
 | Browse group preview | Read the individual group's CoW preview, switch metric, then follow View CoWs | At least Today's current information; the secondary browser retains group/CoW/metric and shows management only to admins | View CoWs remains available to current members when no preview exists; no inline scheduling; absence and errors stay distinct |
 | Set challenge | Owner/admin follows the group preview's View CoWs link, then Schedule next CoW; reviews fixed dates/zone on the form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
+| Choose exercise | Tap the scheduling form's Exercise field, search active group comparisons and tap a row | Sheet closes, field updates to that identity and metric choices remain; reopening marks it | Dismissal changes nothing; no matches/no exercises/read failure stay distinct; unavailable choices cannot publish |
 | Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
 | Manage challenge | Admin follows View CoWs, then Edit next CoW on the secondary page, and edits/cancels in the form | Server lifecycle is reflected immediately; Back returns through the browser to the originating group | State/role changed: refresh with input retained; destructive actions confirm |
 | Reopen/history | Open the secondary CoW page from the group page or summary, then browse stored results; or reopen offline | Authorized final outcome or permitted cached context; Back preserves origin | Full rankings/history stay online-only; no cache, lost membership and suppressed history expose no stale private value |

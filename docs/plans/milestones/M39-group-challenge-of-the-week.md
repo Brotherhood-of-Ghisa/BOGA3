@@ -101,13 +101,13 @@ chronological browser (This week / Next week / Past CoWs) with the exercise
 and status left, dates/zone right, preserving the mockup's formatting. Both
 attached browser and Today-card mockups and the last-week-final fallback are
 approved. A current CoW takes priority even without scores; no older-week,
-upcoming or non-final fallback. The scheduling form is pending review: the
-operator corrected the earlier approval message. The individual group page
+upcoming or non-final fallback. The individual group page
 must show at least Today's current-CoW information: exercise, dates/status,
 top three and in-card metric browsing, plus a link to view/manage CoWs on the
 successive page. The revised group preview is approved, with View CoWs versus
-View/Edit CoWs copy left for later. The brief attaches three unapproved
-scheduling alternatives for selection; empty/error targets also await review.
+View/Edit CoWs copy left for later. Scheduling option 1 is selected as the
+compact base; the brief attaches a proposed searchable group-exercise sheet
+for the next refinement. Picker and empty/error targets still await review.
 It includes offline, uncertain-publication and access-loss recovery. No new main tab.
 
 ### D7. Shared calendar and scheduling
