@@ -90,17 +90,19 @@ follow existing refresh/offline behavior; admin writes require a connection.
 The [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
 T04. The operator clarified: the detailed browser is reached from Groups;
 Today / Groups gets a separate compact card showing this week's CoW when one
-exists; the absence behavior remains open below. It is
+exists, else exactly last week's stored final CoW, clearly labelled Last week ·
+Final with its dates; hide the card if neither is available. It is
 a top-three preview with in-card switching across enabled metric leaderboards;
 its header opens the detailed view. It has no upcoming/history rows or scheduling controls; the
 previous At a glance summary placement was a misunderstanding. Admins schedule
 from the individual group page into secondary creation/editing. The operator selected the
 chronological browser (This week / Next week / Past CoWs) with the exercise
 and status left, dates/zone right, preserving the mockup's formatting. Both
-attached browser and Today-card mockups are approved. Whether Today hides the
-card without a current CoW or shows an explicitly labelled previous week's
-final result remains open in the brief. Remaining admin targets still need
-design; the approved images do not need another selection pass. The plan
+attached browser and Today-card mockups and the last-week-final fallback are
+approved. A current CoW takes priority even without scores; no older-week,
+upcoming or non-final fallback. A scheduling-form draft is now attached to
+the brief for review; the approved browser/Today images need no new selection
+pass. The plan
 prescribes no new main tab.
 
 ### D7. Shared calendar and scheduling

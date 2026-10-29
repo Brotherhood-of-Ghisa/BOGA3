@@ -65,16 +65,24 @@ definition, current results, history and linked session reads.
    keys through the existing group modules. Do not cache full result pages
    where the existing online-paged pattern suffices. Evict incompatible new
    payload generations and drop stale account/group responses. Provide the
-   compact current-CoW summary Today consumes, including up to three ordered
+   compact CoW summary Today consumes, including up to three ordered
    public rank rows per enabled metric with explicit units and coherent scoring
    context. This bounded podium payload can use the summary cache; full result
-   pages remain online. Use the authoritative group week, never upcoming or
-   previous-week data as current, and never derive Today ranks from local logs.
+   pages remain online. Select the current group-week CoW when it exists,
+   including when it has no scores; otherwise exactly the prior group week's
+   authorized stored final CoW, else explicit absence. Return the displayed
+   CoW identity, actual dates and finality so the client can label the fallback
+   Last week · Final and open the right detail. Preserve stored scores/units
+   under current historical disclosure; never rescore finals or select older,
+   upcoming or still-finalizing outcomes. Re-evaluate week-bound selection and
+   cache identity at rollover. Never derive Today ranks from local logs.
 5. Extend the existing group backend and real-client API suites with at least
    two members, several sessions, pre-week and boundary sets, several selected
    metrics, missing baseline/reading, ordinary and normalized exercises, and
    source/revision/role races. Prove Today top-three order/units independently
    for each enabled metric, including fewer entries and no improvement baseline.
+   Cover current/no-scores precedence, last-week-final fallback, absent/non-final
+   previous week, older/upcoming exclusion, permissions, and group-zone rollover.
    Run real responses through the mobile guards.
    Read each test directory's README before modifying its tests.
 6. At the agreed deadline, finalize all selected metrics as one coherent,

@@ -2,8 +2,8 @@
 
 - Status: both attached mockups approved by the operator on 2026-10-29:
   detailed chronological browser with horizontal banner, and Today top-three
-  card with in-card metric tabs. The no-current-CoW fallback and remaining
-  admin screens still need decisions.
+  card with in-card metric tabs. The last-week-final fallback is also agreed;
+  the admin scheduling form below is a draft for review.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
@@ -48,8 +48,8 @@ even in controls whose surrounding labels use uppercase.
 
 The operator clarified two distinct surfaces: the selected detailed browser
 is accessible from Groups; when this week's CoW exists, Today / Groups shows
-it in a separate small card for the selected group. The absence case is open
-below. The earlier At a glance summary
+it in a separate small card for the selected group, using the agreed fallback
+below when absent. The earlier At a glance summary
 placement was a misunderstanding and is replaced by this distinction.
 
 Today shows the current exercise, week, status and the first three places of
@@ -82,14 +82,21 @@ theme, type, existing working-set board and tab bar; consume Recent's spare
 space, allowing its list to scroll. Both the behavior and attached layout are
 approved. The full browser stays separate.
 
-### Open: no CoW this week
+### Agreed: no CoW this week
 
-The operator is choosing between hiding the Today card completely and showing
-the previous calendar week's stored final leaderboard. The proposed fallback
-uses an explicit Last week / Final label and dates, retains top-three metric
-browsing, and hides the card if that prior week has no final CoW. It never
-shows a stale Live result or searches arbitrarily far back. There is no
-placeholder card. Do not implement either choice as settled until confirmed.
+The operator chose this priority: show the current group's current-week CoW
+when it exists; otherwise show exactly the previous group-calendar week's
+stored final CoW. Label the fallback Last week · Final with its actual dates,
+retain top-three metric browsing, and open that displayed CoW/metric in detail.
+If no authorized final outcome is available for that previous week, hide the
+card entirely, with no placeholder or reserved space. Never search older weeks,
+substitute an upcoming CoW, or show a stale Live/Finalizing result as final.
+
+A current CoW with no qualifying scores still takes priority and shows its
+existing no-results state; lack of scores is not lack of a CoW. At a week
+boundary, re-evaluate selection and labels so the fallback cannot silently
+become two weeks old. Use authorized stored results and their original units,
+under the existing historical-disclosure policy; never recalculate the final.
 
 Groups provides an entry to the secondary detailed CoW browser. Its exact
 entry-link layout remains to be designed; it does not embed the full browser
@@ -144,24 +151,34 @@ Browser/form date formatting follows the account preference; Today uses
 From the individual group page, Schedule next CoW opens the creation form on
 the secondary CoW page. Next week's date range and the group's zone are
 read-only context, not editable date fields. Use the existing group
-exercise picker; require at least one metric. A review section on the same
-form shows dates, exercise and metrics before its one Publish CoW action.
+exercise picker; require at least one metric. The visible form is the review:
+group, fixed week/zone, exercise and metric choices, followed by one Publish
+CoW action. No duplicate Review card or extra confirmation screen.
 Publishing immediately makes the upcoming CoW visible to members.
+
+![Draft Schedule CoW form for next week](assets/M39-cow-schedule.png)
+
+Generated with the built-in image-generation tool. Prompt: extend the approved
+CoW style into one short admin form with read-only group/next-week/zone context,
+the existing exercise picker, independent leaderboard checkboxes and one
+Publish CoW action. The illustration shows a filled form, not a new rule that
+all three metrics must be selected. This target is not yet approved.
+
+Editing reuses the same form and entered selections, titled Edit CoW with
+Save changes as its primary action. Allowed fields/actions still follow
+T01's lifecycle; this draft does not settle editing or cancellation policy.
 
 ```text
 < Back                         Schedule CoW
 
-9–15 November
+2 – 8 Nov 2026
 Europe/London
 
-Exercise                         [Choose >]
+Exercise                          [Squat >]
 Metrics
 [x] Highest 1RM
-[ ] Personal 1RM improvement
-[ ] Total Volume
-
-Review
-Bench press · Highest 1RM · 9–15 November
+[x] 1RM improvement (%)
+[x] Total Volume
 
 [Publish CoW]
 ```
@@ -194,8 +211,8 @@ the rankings, or No qualifying results. Tie presentation follows T01; never
 invent an overall winner. A user's ineligible/not-yet-participating state is
 visible without an enrolment control.
 
-Today never labels an ended previous week's CoW as current; its optional
-explicitly labelled last-week fallback remains open above. Stored outcomes
+Today never labels an ended previous week's CoW as current; its agreed
+explicitly labelled last-week fallback follows the priority above. Stored outcomes
 live under Past CoWs in the detailed browser, newest first, with the same final
 detail opened from there. Both Groups and the Today card can reach the browser;
 admin scheduling remains on the individual group page. This is persistent in-app
@@ -213,8 +230,8 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Settle the no-current-week fallback and remaining group-entry/admin form
-targets before implementing those flows. Verify the approved layouts with
+Settle the remaining group-entry/admin form targets before implementing those
+flows. Verify the approved layouts and fallback state with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and
 non-colour state cues in the running app. T04's UX Contract owns the
 flow/acceptance mapping; its PR supplies fresh running-app screenshots against

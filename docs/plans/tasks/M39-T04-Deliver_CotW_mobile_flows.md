@@ -13,7 +13,7 @@ two-member results, usable unavailable/offline states and visual evidence.
 
 ## Scope
 
-- In: compact current-CoW card on Today / Groups, detailed current/next/prior
+- In: compact current/last-week-final CoW card on Today / Groups, detailed current/next/prior
   browser reached from Groups, admin next-week scheduling/management,
   group-zone setup where needed, live/finalizing/final results,
   permission/state/error handling, targeted integration and issue closeout.
@@ -28,7 +28,8 @@ primitives. A missing improvement baseline does not hide a valid 1RM or
 Volume result. Group %BW 1RM and personal improvement % need distinct labels.
 
 The operator clarified: Today / Groups shows a small card for this week's CoW
-when one exists; the absence rule remains open below. The detailed secondary
+when one exists, otherwise last week's stored final CoW labelled Last week ·
+Final with actual dates; hide the card when neither is available. The detailed secondary
 browser is accessible from Groups. The earlier
 At a glance summary placement is replaced by this distinction. The Today card
 shows the first three places and supports in-card switching between enabled
@@ -43,18 +44,19 @@ standings. The operator requested a horizontal current-CoW banner, preserving
 existing formatting: exercise/status left, dates/zone right. The revised
 mockup is attached to the brief; no browser tabs or week stepper. Both this
 browser and the Today top-three card mockup are approved design targets.
+The fallback is also agreed: a current CoW with no scores still takes priority;
+never substitute older, upcoming or non-final results as fallback. The header opens the
+displayed week's CoW and selected metric. No placeholder or reserved space
+when the card is hidden.
 
 ## Open — resolve with the operator at session start
 
 - Use both approved mockups in the [CoW UX brief](../M39-cow-ux.md). Add
-  current group references and agree targets for the remaining admin flows.
+  current group references and review the attached draft scheduling form;
+  editing reuses that form with Edit CoW / Save changes, subject to T01.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build
   inputs, never a replacement for the merged T01 contract.
-- Settle the no-current-week Today behavior: hide the card, or show the
-  previous week's stored final podium clearly labelled Last week / Final
-  with its dates, hiding it when unavailable. No placeholder or stale-current
-  presentation. This choice is still open in the brief.
-- Design the Groups entry-link layout, next-CoW form,
+- Finalize the Groups entry-link layout, draft next-CoW form,
   results/history and group-zone control; placement and navigation above are
   settled. Scheduling always targets next week; no date picker or later-week
   queue. Retain group/CoW identity, its shared zone and Back to the origin.
@@ -75,8 +77,10 @@ browser and the Today top-three card mockup are approved design targets.
    choice, no baseline/no result, normalized labels, stale responses, lost
    role/access, offline cached/no-cache states, finalizing/final outcomes,
    fixed next-week dates, membership eligibility and revision conflicts. Prove
-   the Today card uses the group's current week and agreed absence/fallback
-   rule (never an upcoming or mislabeled past CoW), group switching cannot retain stale CoW
+   the Today card uses the group's current week, then exactly last week's
+   stored final result with Last week · Final/dates, else no card or gap. Prove
+   current/no-scores precedence and no older/upcoming/non-final fallback,
+   group-zone rollover, and that group switching cannot retain stale CoW
    context, in-card metric switching shows the proper server top three and units
    without opening detail, and the header opens the same metric/group/CoW.
    Cover fewer/no qualifying rows, only enabled metrics and no substitution of
@@ -101,7 +105,7 @@ browser and the Today top-three card mockup are approved design targets.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Find challenge | Read the Today card or open the detailed browser from Groups | Correct selected group, authoritative week and detail context | No current CoW follows the still-open hide/labelled-final-fallback rule; no placeholder or admin controls |
+| Find challenge | Read the Today card or open the detailed browser from Groups | Current CoW first, otherwise exactly last week's stored final with explicit label/dates; detail matches displayed context | No eligible current/fallback means no card or gap; no older/upcoming/non-final fallback or admin controls |
 | Browse Today rankings | Tap an enabled metric inside the CoW card; read its first three places | Correct server ranks/units update in place; header opens the same metric in detail | Fewer/no results and unavailable metrics stay explicit; controls never trigger navigation |
 | Set challenge | Owner/admin opens Schedule next CoW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
 | Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
