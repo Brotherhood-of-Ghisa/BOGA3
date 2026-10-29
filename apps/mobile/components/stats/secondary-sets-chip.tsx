@@ -10,9 +10,10 @@ export type SecondarySetsChipProps = {
 };
 
 /**
- * A muscle history page's secondary-set switch, one compact `Sec` chip in its
- * selector row. Its disc says the state, as the week's cards mark work: a half
- * disc while secondary sets count, a full disc for primary only. The chip
+ * A muscle history page's secondary-set switch, one compact chip in its
+ * selector row. It names and marks the state as the week's cards mark work:
+ * `Sec` under a half disc while secondary sets count, `Pri` under a full disc
+ * for primary only. The chip
  * never fills, so the row's ink stays on the view selector.
  */
 export function SecondarySetsChip({ value, onChange, testID }: SecondarySetsChipProps) {
@@ -21,7 +22,7 @@ export function SecondarySetsChip({ value, onChange, testID }: SecondarySetsChip
       accessibilityLabel="Count secondary sets"
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
-      label="Sec"
+      label={value ? 'Sec' : 'Pri'}
       leading={<Icon color={uiRoles.inkMuted} name={value ? 'role-secondary' : 'role-primary'} size="xs" />}
       on={false}
       onPress={() => onChange(!value)}

@@ -679,7 +679,7 @@ describe('The history page over real data', () => {
     expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
     // The page's own chip opens on Progress's choice and changes it for this visit.
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Pri');
     fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
     await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-empty'));
