@@ -95,16 +95,19 @@ Final with its dates; hide the card if neither is available. It is
 a top-three preview with in-card switching across enabled metric leaderboards;
 its header opens the detailed view. It has no upcoming/history rows or scheduling controls; the
 previous At a glance summary placement was a misunderstanding. Admins schedule
-from the individual group page into secondary creation/editing. The operator selected the
+via the individual group page's View CoWs link into the secondary browser's
+management actions and creation/editing form. The operator selected the
 chronological browser (This week / Next week / Past CoWs) with the exercise
 and status left, dates/zone right, preserving the mockup's formatting. Both
 attached browser and Today-card mockups and the last-week-final fallback are
 approved. A current CoW takes priority even without scores; no older-week,
-upcoming or non-final fallback. The operator also approved the scheduling form.
-The brief now proposes the group-page CoWs row/outlined admin action and
-empty/error targets, with offline, uncertain-publication and access-loss
-recovery. These companion targets await review; the three approved targets
-need no new selection pass. The plan prescribes no new main tab.
+upcoming or non-final fallback. The scheduling form is pending review: the
+operator corrected the earlier approval message. The individual group page
+must show at least Today's current-CoW information: exercise, dates/status,
+top three and in-card metric browsing, plus a link to view/manage CoWs on the
+successive page. The revised preview and empty/error targets await review;
+only the two member targets are approved. The brief includes offline,
+uncertain-publication and access-loss recovery. No new main tab.
 
 ### D7. Shared calendar and scheduling
 
