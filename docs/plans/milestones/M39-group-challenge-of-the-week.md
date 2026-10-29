@@ -1,6 +1,6 @@
 # M39 — Group Challenge of the Week (CoW)
 
-- Status: `planned`
+- Status: `in progress`
 - Created: 2026-10-27, planning baseline `e08bec5c897d0eefb697721a25fbcb5e7f339ceb` on `origin/main`
 - Source: [Groups: weekly challenge, issue #927](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/927)
 - Execution: one task, session, local worktree and PR at a time, following `docs/plans/README.md`.
@@ -223,7 +223,7 @@ exception to the viewer-local presentation in [[comparison.window]].
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M39-T01](../tasks/M39-T01-Define_CotW_rules_and_scoring.md) | Formalize MVP rules; shared scoring, cutoff/tie vectors and owning facts/contract | none | planned |
+| M39-T01 | Formalize MVP rules; shared scoring, cutoff/tie vectors and owning facts/contract | none | completed |
 | [M39-T02](../tasks/M39-T02-Add_CotW_lifecycle_and_authorization.md) | Group calendar, scheduling, roster and snapshot lifecycle storage; authorized RPCs | T01 | planned |
 | [M39-T03](../tasks/M39-T03-Serve_CotW_rankings_and_history.md) | Live rankings, automatic finalization, stored final results and safe history | T02 | planned |
 | [M39-T04](../tasks/M39-T04-Deliver_CotW_mobile_flows.md) | Reviewed UX target, scheduling/results UI, integration evidence and issue closeout | T03 | planned |
@@ -231,8 +231,9 @@ exception to the viewer-local presentation in [[comparison.window]].
 The implementation PRs are sequential because each consumes the previous
 contract. Review the attached UX brief now; add visual references and settle
 the remaining rule-dependent states before UI implementation. Design work
-needs no separate implementation PR. Only T01 is ready
-to start once the planning PR merges. Delete each card in its shipping PR;
+needs no separate implementation PR. T01 defines the durable
+`docs/specs/tech/group-cow-contract.md` and pure `cow-scoring.ts` boundary;
+T02 is ready after its implementation PR merges. Delete each card in its shipping PR;
 delete this milestone, its UX brief and attached mockups with the last card.
 Evidence belongs in the PRs.
 

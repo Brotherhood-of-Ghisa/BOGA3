@@ -35,7 +35,8 @@ Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts
 
 ### comparison.window · definition · accepted
 
-Weeks start Monday, local time.
+Weeks start Monday. Presentation uses local time; CoW uses the authoritative
+group calendar of [[groups.cow-calendar]].
 
 | Screen | Current period | Compared with |
 | --- | --- | --- |

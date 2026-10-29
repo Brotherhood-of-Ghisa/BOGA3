@@ -11,6 +11,7 @@
 | Tables, constraints, grants, function bodies | the group migrations in `supabase/migrations/` |
 | Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
 | Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
+| CoW intake, cutoffs and weekly aggregation (changing CoW) | [group-cow-contract.md](group-cow-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
 | Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
