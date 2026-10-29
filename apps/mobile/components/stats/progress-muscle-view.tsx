@@ -17,7 +17,7 @@ export function ProgressMuscleView(props: Props) {
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, exercises, metric);
+  const layout = resolveComparisonLayout(width, exercises, metric, false);
   return <View style={styles.body}>
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} />
     {selected ? <StatsTable testID="stats-contributions">
@@ -28,7 +28,7 @@ export function ProgressMuscleView(props: Props) {
             accessibilityLabel: `Open ${selected.displayName} ${option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'}` }))}
           testIDPrefix="stats-contributions-view" onNavigate={(view, target) => onMuscleHistory(selected, target, view)} />
       </View>
-      <ProgressContributionRows splitByEffort muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
+      <ProgressContributionRows axis={false} splitByEffort muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
     </StatsTable> : null}
   </View>;
 }
