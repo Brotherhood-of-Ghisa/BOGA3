@@ -1,7 +1,8 @@
 # CoW — draft UX brief
 
-- Status: placement/navigation agreed on 2026-10-29; visual layout still draft,
-  not yet an accepted design target.
+- Status: placement/navigation and chronological browser direction selected
+  on 2026-10-29; revised horizontal banner shown for review. The remaining
+  screens are still draft, not yet a complete accepted design target.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
@@ -9,8 +10,32 @@
   layout and interaction details are proposals.
 - Before acceptance: capture current Groups / At a glance, group management
   and comparison-form screenshots in the worktree's gitignored mobile
-  artifacts tree; link them here or in the implementation PR. No screenshots
-  or rendered prototype were produced in this planning update.
+  artifacts tree; link them here or in the implementation PR. The generated
+  browser mockup below is a design input, not a running-app screenshot or an
+  interaction-tested prototype.
+
+## Selected browser direction
+
+The operator selected the third displayed concept: a chronological page with
+This week, Next week and Past CoWs visible together. The current CoW has a
+metric selector and top-three ranking preview, followed by Full standings;
+upcoming and past CoWs are compact rows. No Current/Next/History tab bar or
+week stepper on this browser.
+
+Requested refinement: arrange the top current-CoW information horizontally
+like the first concept, preserving the third concept's formatting. The
+exercise and Live state sit left; dates and time zone sit right. Keep all
+other sections, type, colours and figures unchanged. The attached revision
+implements that request; its final acceptance and the other screen targets
+remain for review.
+
+![Selected chronological CoW browser with horizontal banner](assets/M39-cow-browser.png)
+
+Generated with the built-in image-generation tool. Prompt: edit the selected
+chronological concept only, use the first concept solely for two-column header
+alignment, retain the same date range/zone, and preserve all other content and
+formatting. This image covers the member browser only; admin forms and the
+At a glance summary still need their own visual review.
 
 ## Intended outcome
 
@@ -37,8 +62,8 @@ or edit there; every member can view and browse CoWs. The At a glance summary
 is a reading entry, with no scheduling/editing controls. Keep the same selected
 group/CoW across both entries, and return Back to the page that opened it.
 
-The secondary page provides current/upcoming CoWs and past results. Concrete
-route names and its browsing/form layout remain for T04; creation/editing
+The secondary page uses the selected chronological browser for current/upcoming
+CoWs and past results. Concrete route names and form layout remain for T04; creation/editing
 must happen on a secondary page, not an inline At a glance form.
 
 These are layout sketches, not pixel targets:
@@ -59,13 +84,14 @@ CoWs                                       >
 [Schedule next CoW]             (admin only)
 
 Secondary CoW page
-Current | Upcoming | History
-...selected CoW / results / permitted editor...
+This week: current CoW and ranking preview
+Next week: upcoming CoW
+Past CoWs: final results
 ```
 
 The group-page admin action is Edit next CoW when the next slot is full;
 both actions open the secondary CoW page in the appropriate mode. The sketch's
-browsing controls and styling are proposals, not a finalized layout.
+admin controls remain proposals; the browser direction is selected above.
 Date formatting follows the account preference; dates refer to the CoW zone.
 
 ## Schedule next CoW
@@ -146,4 +172,5 @@ Before visual acceptance, review the summary and secondary-page layouts,
 reporting, scheduling/edit/cancel, group-zone setup, long names, small/large phones, keyboard and scroll,
 VoiceOver, touch targets and non-colour state cues. T04's UX Contract owns the
 flow/acceptance mapping; its PR supplies fresh running-app screenshots against
-this accepted target. Delete this brief with T04 and the milestone.
+this accepted target. Delete this brief and its selected mockup with T04 and
+the milestone.

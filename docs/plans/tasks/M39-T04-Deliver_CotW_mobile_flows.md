@@ -31,13 +31,20 @@ Scheduling starts on the individual group page and opens a secondary CoW page:
 owners/admins create/edit; members view/browse. The summary opens that page
 for reading, with no admin scheduling controls on At a glance.
 
+The member browser direction is selected: chronological This week, Next week
+and Past CoWs sections, with the current metric's top-three preview and Full
+standings. The operator requested a horizontal current-CoW banner, preserving
+existing formatting: exercise/status left, dates/zone right. The revised
+mockup is attached to the brief; no browser tabs or week stepper.
+
 ## Open — resolve with the operator at session start
 
-- Review the attached [CoW UX brief](../M39-cow-ux.md), currently a draft, and
-  add current group reference screenshots before accepting the design target.
+- Review the attached [CoW UX brief](../M39-cow-ux.md) and selected browser
+  revision; add current group reference screenshots and the remaining screen
+  targets before accepting the complete design target.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted directions are build
   inputs, never a replacement for the merged T01 contract.
-- Refine the agreed summary and secondary-page layouts, next-CoW form,
+- Refine the agreed summary, selected browser revision, next-CoW form,
   results/history and group-zone control; placement and navigation above are
   settled. Scheduling always targets next week; no date picker or later-week
   queue. Retain group/CoW identity, its shared zone and Back to the origin.
@@ -107,7 +114,7 @@ also require `backend` / `groups-competitions`. On Linux the group UI trigger
 selects `android-smoke`; use any broader Android lanes the actual diff requires.
 
 Use `./boga test for`, obtain lane agreement and independent code/product
-review. Delete this card, the attached UX brief and the milestone in the shipping PR, link the
+review. Delete this card, the attached UX brief/mockup and the milestone in the shipping PR, link the
 feature's evidence there, and close #927 only when its complete acceptance
 holds. After the human merges, confirm the remote merge and release this
 task's worktree/slot in the same session.

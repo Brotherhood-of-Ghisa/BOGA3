@@ -91,9 +91,12 @@ The draft [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
 T04. The operator confirmed: the CoW summary appears immediately on At a
 glance; admins schedule from the individual group page, which opens a secondary
 CoW page for creation/editing or member viewing/browsing. The summary is a
-reading entry, with no scheduling controls. Review the remaining visual
-layout and add current group reference screenshots before accepting the
-design target. The plan prescribes no new main tab.
+reading entry, with no scheduling controls. The operator selected the
+chronological browser (This week / Next week / Past CoWs) with the exercise
+and status left, dates/zone right, preserving the mockup's formatting. Its
+revised image is attached to the brief. Review that revision, the remaining
+screens and current group references before accepting the complete design
+target. The plan prescribes no new main tab.
 
 ### D7. Shared calendar and scheduling
 
@@ -186,7 +189,8 @@ contract. Review the attached UX brief now; add visual references and settle
 the remaining rule-dependent states before UI implementation. Design work
 needs no separate implementation PR. Only T01 is ready
 to start once the planning PR merges. Delete each card in its shipping PR;
-delete this milestone with the last card. Evidence belongs in the PRs.
+delete this milestone, its UX brief and selected mockup with the last card.
+Evidence belongs in the PRs.
 
 ## Risks and completion
 
