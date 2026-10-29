@@ -74,13 +74,15 @@ end $$;
 
 create function app_public.group_cow_capture(p_cow_id uuid) returns void
 language plpgsql volatile security definer set search_path=app_public,pg_temp as $$
-declare c app_public.group_cows; ctx jsonb; graph jsonb; people jsonb; receipt timestamptz; xid bigint:=txid_current();
+declare c app_public.group_cows; group_id uuid; ctx jsonb; graph jsonb; people jsonb; receipt timestamptz; xid bigint:=txid_current();
   row jsonb; old app_public.group_cow_sources; person jsonb; prior_context jsonb; changed boolean:=false; written_rows integer;
 begin
   perform app_public.group_cow_reject_agent();
-  -- Exclude management/barriers without blocking ordinary group readers.
-  -- The CoW row serializes captures after the final dependency validations.
-  perform 1 from app_public.groups g join app_public.group_cows x on x.group_id=g.id where x.id=p_cow_id for key share of g;
+  -- A separate fence keeps private source writes compatible with lifetime
+  -- publication and notification locks. Management takes it before CoW rows.
+  select x.group_id into group_id from app_public.group_cows x where x.id=p_cow_id;
+  if not found then return; end if;
+  perform pg_advisory_xact_lock(hashtextextended('group-cow:'||group_id::text,0));
   select * into c from app_public.group_cows where id=p_cow_id for update;
   if not found or c.cancelled_at is not null or c.finalized_at is not null then return; end if;
   delete from app_public.group_cow_sources where cow_id=c.id and source_xid=xid;
@@ -151,7 +153,11 @@ begin
   begin
     -- Discover after acquiring the lock: a concurrent first definition may
     -- have been invisible when this source transaction queued its group.
-    perform 1 from app_public.groups where id=new.group_id for key share;
+    if not exists(select 1 from app_public.groups where id=new.group_id) then
+      delete from app_public.group_cow_pending where group_id=new.group_id and source_xid=new.source_xid;
+      return null;
+    end if;
+    perform pg_advisory_xact_lock(hashtextextended('group-cow:'||new.group_id::text,0));
     for c in select * from app_public.group_cows where group_id=new.group_id and finalized_at is null
       and (cancelled_at is null or definition_xid=new.source_xid) order by id loop
       if c.definition_xid=new.source_xid then

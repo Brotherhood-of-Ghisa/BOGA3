@@ -210,6 +210,7 @@ begin
   perform app_public.group_competition_require_capability();
   role:=app_public.group_require_member(p_group_id,u,true);
   if role not in ('owner','admin') then raise exception 'FORBIDDEN: only managers can schedule CoWs' using errcode='P0001'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('group-cow:'||p_group_id::text,0));
   key:=jsonb_build_array(p_group_exercise_id,p_metrics,p_calendar_revision,p_week_start)::text;
   select * into c from app_public.group_cows where id=p_cow_id;
   if found then
@@ -245,6 +246,7 @@ begin
   perform app_public.group_competition_require_capability();
   role:=app_public.group_require_member(p_group_id,u,true);
   if role not in ('owner','admin') then raise exception 'FORBIDDEN: only managers can edit CoWs' using errcode='P0001'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('group-cow:'||p_group_id::text,0));
   select * into c from app_public.group_cows where id=p_cow_id and group_id=p_group_id for update;
   if not found then raise exception 'NOT_FOUND: CoW not found' using errcode='P0001'; end if;
   key:=jsonb_build_array('edit',p_expected_revision,p_group_exercise_id,p_metrics)::text;
@@ -263,6 +265,7 @@ begin
   perform app_public.group_competition_require_capability();
   role:=app_public.group_require_member(p_group_id,u,true);
   if role not in ('owner','admin') then raise exception 'FORBIDDEN: only managers can cancel CoWs' using errcode='P0001'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('group-cow:'||p_group_id::text,0));
   select * into c from app_public.group_cows where id=p_cow_id and group_id=p_group_id for update;
   if not found then raise exception 'NOT_FOUND: CoW not found' using errcode='P0001'; end if;
   key:=jsonb_build_array('cancel',p_expected_revision)::text;

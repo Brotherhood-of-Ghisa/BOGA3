@@ -43,10 +43,13 @@ source transaction; rollback/rejection creates no receipt. If more relevant
 writes occur after a seal, invalidate it and reseal after the last validation.
 Never backdate receipt to an earlier dependency or transaction timestamp.
 
-Management and start/close barriers hold the group row `FOR UPDATE`. Seals
-hold it `FOR KEY SHARE`, then serialize source/membership/context captures
-on each CoW row `FOR UPDATE`, all through commit. This excludes barriers
-without blocking ordinary group readers holding `FOR SHARE`. A barrier
+Serialize seals, membership/context captures and start/close barriers on
+`pg_advisory_xact_lock(hashtextextended('group-cow:'||group_id,0))`, retained
+through commit. Management takes its existing group row lock first, then this
+fence before touching CoW rows. Seals take only the advisory fence, then CoW
+rows in UUID order; they never wait on a group row. Barriers needing a group
+row lock take it before the advisory too, never afterwards. Lifetime publication and
+notification locks must remain compatible with private source commits. A barrier
 waits for earlier holders; writes obtaining their final seal after the edge
 cannot enter it. Closing records an immutable intake high-water mark, after
 observing committed pre-edge holders. A transaction straddling the edge is
@@ -110,7 +113,7 @@ Each local midnight is converted separately by `group_cow_bounds`.
 
 `supabase/migrations/20261029205006_group_cow_intake.sql` owns capture. Source
 triggers queue membership/admission groups without resolving child parents or
-requiring a visible CoW. The seal locks the group, then discovers its CoWs in a
+requiring a visible CoW. The seal takes the group-scoped advisory fence, then discovers its CoWs in a
 fresh snapshot, including concurrent first definitions. It retains late receipts
 for ended but unfinalized CoWs; the worker still applies each cutoff. The final pending event
 follows the relevant `RI_` FK events; `sync_push`'s existing constraint drain
