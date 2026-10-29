@@ -53,26 +53,35 @@ is accessible from Groups; Today / Groups gets a separate small card showing
 only this week's CoW for the selected group. The earlier At a glance summary
 placement was a misunderstanding and is replaced by this distinction.
 
-Today shows the current exercise, week, status and enabled metrics immediately.
-The whole card opens the detailed browser with that group and current CoW
-selected. It has no rankings, metric controls, upcoming/history rows or admin
-actions. A week without a CoW shows No CoW this week, never a prior result or
+Today shows the current exercise, week, status and the first three places of
+the selected leaderboard. Compact 1RM / Improvement / Volume tabs switch
+between the enabled metrics inside the card; no navigation or swipe is needed.
+Only metrics enabled for that CoW are offered. Render at most three qualifying
+server-ranked rows with their correct unit; do not substitute the viewer for
+third place or fabricate missing results. Keep the preview height stable when
+switching to a metric with fewer results.
+
+The header/chevron opens the detailed browser with the same group, current CoW
+and selected metric. Metric controls stay independent of that link; the whole
+card is not one nested press target. There are no upcoming/history rows or
+admin actions. A week without a CoW shows No CoW this week, never a prior result or
 next week's challenge presented as current. The authoritative group-calendar
 window determines this card; the existing Today working-set board keeps its
 own viewer-local week. No new main tab.
 
 Proposed placement: between Today's existing group week board and Recent.
-Keep the group's existing header/switch and board intact. Recent remains the
+Keep the group's existing header/switch and working-set board intact. Recent remains the
 elastic, internally scrollable part; adding the small card must not push it
 or the tab bar off-screen. Long names wrap without reducing type size.
 
 ![Proposed compact current-CoW card on Today / Groups](assets/M39-cow-today.png)
 
-Generated with the built-in image-generation tool. Prompt: edit the supplied
-Today / Groups screenshot to insert one small current-CoW card between its
-board and Recent; preserve its theme, type, existing board/session content and
-tab bar; use the existing Recent whitespace. Placement/content are proposed
-for review. The full browser target above stays separate.
+Generated with the built-in image-generation tool. Prompt: refine the current
+Today card with three metric tabs and the selected ranking's top-three rows;
+retain the current exercise/week/status and header detail link. Preserve the
+theme, type, existing working-set board and tab bar; consume Recent's spare
+space, allowing its list to scroll. The top-three/in-card-browsing behavior is
+agreed; revised layout is shown for review. The full browser stays separate.
 
 Groups provides an entry to the secondary detailed CoW browser. Its exact
 entry-link layout remains to be designed; it does not embed the full browser
@@ -96,7 +105,10 @@ Today: Plan | You | Groups
 
 CoW                         26 Oct – 1 Nov 26
 Bench press                         Live   >
-1RM · Improvement · Volume
+[1RM] | Improvement | Volume
+1 GoldmanBoyo                         112.5
+2 You                                 108.0
+3 Jemiliano Snr                       103.0
 
 ...existing Recent sessions...
 

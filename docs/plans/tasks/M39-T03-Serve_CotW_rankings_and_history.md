@@ -65,12 +65,17 @@ definition, current results, history and linked session reads.
    keys through the existing group modules. Do not cache full result pages
    where the existing online-paged pattern suffices. Evict incompatible new
    payload generations and drop stale account/group responses. Provide the
-   small current-CoW summary Today consumes, using the authoritative group
-   week; never return upcoming or previous-week data as its current result.
+   compact current-CoW summary Today consumes, including up to three ordered
+   public rank rows per enabled metric with explicit units and coherent scoring
+   context. This bounded podium payload can use the summary cache; full result
+   pages remain online. Use the authoritative group week, never upcoming or
+   previous-week data as current, and never derive Today ranks from local logs.
 5. Extend the existing group backend and real-client API suites with at least
    two members, several sessions, pre-week and boundary sets, several selected
    metrics, missing baseline/reading, ordinary and normalized exercises, and
-   source/revision/role races. Run real responses through the mobile guards.
+   source/revision/role races. Prove Today top-three order/units independently
+   for each enabled metric, including fewer entries and no improvement baseline.
+   Run real responses through the mobile guards.
    Read each test directory's README before modifying its tests.
 6. At the agreed deadline, finalize all selected metrics as one coherent,
    durable outcome with original units, ranks and scoring context. Publish

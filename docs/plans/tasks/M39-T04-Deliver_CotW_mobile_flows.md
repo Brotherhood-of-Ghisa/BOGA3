@@ -30,7 +30,9 @@ Volume result. Group %BW 1RM and personal improvement % need distinct labels.
 The operator clarified: Today / Groups shows a small card for this week's CoW
 only; the detailed secondary browser is accessible from Groups. The earlier
 At a glance summary placement is replaced by this distinction. The Today card
-opens that group's current CoW in the browser. Scheduling starts on the
+shows the first three places and supports in-card switching between enabled
+1RM / Improvement / Volume leaderboards. Its header opens that group's current
+CoW with the selected metric; switching metrics never navigates. Scheduling starts on the
 individual group page and opens secondary creation/editing for owners/admins;
 members view/browse. No admin scheduling controls on Today.
 
@@ -71,7 +73,10 @@ mockup is attached to the brief; no browser tabs or week stepper.
    fixed next-week dates, membership eligibility and revision conflicts. Prove
    the Today card is immediately visible and current-week-only in the group's
    zone (no upcoming/past fallback), group switching cannot retain stale CoW
-   context, Groups opens the detailed browser, group-page admin scheduling opens the
+   context, in-card metric switching shows the proper server top three and units
+   without opening detail, and the header opens the same metric/group/CoW.
+   Cover fewer/no qualifying rows, only enabled metrics and no substitution of
+   the viewer for a top-three place. Groups opens the detailed browser; group-page admin scheduling opens the
    secondary form, members can browse without edit controls, and Back retains
    the originating group/page. Use
    existing test fixtures and read `apps/mobile/__tests__/README.md` first.
@@ -82,7 +87,9 @@ mockup is attached to the brief; no browser tabs or week stepper.
    its device-only behavior and state exactly what the flow proves.
 5. Capture the running app at small and large phone sizes and compare against
    the agreed target, including create, rankings and unavailable/error states;
-   add any size required by the current competition contract. Check accessible
+   add any size required by the current competition contract. Include Today
+   with its full weekly board, CoW preview and training-now/recent content:
+   preserve usable internal scrolling and the tab bar on small screens. Check accessible
    labels, touch targets, scrolling/keyboard and non-colour state cues. Link
    screenshots and material deviations in the PR.
 
@@ -91,6 +98,7 @@ mockup is attached to the brief; no browser tabs or week stepper.
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
 | Find challenge | Read the compact current-CoW card on Today / Groups, or open the detailed browser from Groups | Correct selected group and authoritative CoW week; Today opens its current detail | No current CoW is explicit; Today never substitutes an upcoming or past CoW; no inline admin controls |
+| Browse Today rankings | Tap an enabled metric inside the CoW card; read its first three places | Correct server ranks/units update in place; header opens the same metric in detail | Fewer/no results and unavailable metrics stay explicit; controls never trigger navigation |
 | Set challenge | Owner/admin opens Schedule next CoW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
 | Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
 | Manage challenge | Admin opens Edit next CoW from the group page and edits/cancels on the secondary page | Server lifecycle is reflected immediately; Back returns to the originating group | State/role changed: refresh with input retained; destructive actions confirm |

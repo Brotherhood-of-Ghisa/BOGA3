@@ -90,7 +90,8 @@ follow existing refresh/offline behavior; admin writes require a connection.
 The draft [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
 T04. The operator clarified: the detailed browser is reached from Groups;
 Today / Groups gets a separate compact card for this week's CoW only. It is
-a reading entry, with no upcoming/history rows or scheduling controls; the
+a top-three preview with in-card switching across enabled metric leaderboards;
+its header opens the detailed view. It has no upcoming/history rows or scheduling controls; the
 previous At a glance summary placement was a misunderstanding. Admins schedule
 from the individual group page into secondary creation/editing. The operator selected the
 chronological browser (This week / Next week / Past CoWs) with the exercise
