@@ -92,6 +92,9 @@ cleanup() {
     begin;
       delete from public.app_logs
        where event in ('group.share_failed', 'group.event_failed') and user_id in (${ids});
+      delete from app_public.group_cow_intake_failures where member_user_id in (${ids})
+        or group_id in (select id from app_public.groups where created_by in (${ids})
+          or id in (select group_id from app_public.group_memberships where user_id in (${ids})));
       delete from app_public.groups
        where created_by in (${ids})
           or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
