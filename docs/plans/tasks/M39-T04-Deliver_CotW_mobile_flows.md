@@ -42,8 +42,8 @@ The member browser direction is selected: chronological This week, Next week
 and Past CoWs sections, with the current metric's top-three preview and Full
 standings. The operator requested a horizontal current-CoW banner, preserving
 existing formatting: exercise/status left, dates/zone right. The revised
-mockup is attached to the brief; no browser tabs or week stepper. Both this
-browser and the Today top-three card mockup are approved design targets.
+mockup is attached to the brief; no browser tabs or week stepper. The browser,
+Today top-three card and scheduling form are approved design targets.
 The fallback is also agreed: a current CoW with no scores still takes priority;
 never substitute older, upcoming or non-final results as fallback. The header opens the
 displayed week's CoW and selected metric. No placeholder or reserved space
@@ -51,14 +51,16 @@ when the card is hidden.
 
 ## Open — resolve with the operator at session start
 
-- Use both approved mockups in the [CoW UX brief](../M39-cow-ux.md). Add
-  current group references and review the attached draft scheduling form;
+- Use the three approved mockups in the [CoW UX brief](../M39-cow-ux.md).
+  Review its companion group-entry, empty and error targets and state tables;
   editing reuses that form with Edit CoW / Save changes, subject to T01.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted targets are build
   inputs, never a replacement for the merged T01 contract.
-- Finalize the Groups entry-link layout, draft next-CoW form,
-  results/history and group-zone control; placement and navigation above are
-  settled. Scheduling always targets next week; no date picker or later-week
+- Capture current group references before implementation. The brief proposes
+  one Groups CoWs link, a group-page browse row/outlined scheduling action,
+  state recovery and a Time zone field in group Edit. Finalize rule-dependent
+  results/history and zone controls against T01; settled approvals stand.
+  Scheduling always targets next week; no date picker or later-week
   queue. Retain group/CoW identity, its shared zone and Back to the origin.
 - Settle copy using `docs/product/copy.md`. Only a stored final outcome says
   Final; a week whose deadline passed can still be Finalizing. Push result
@@ -86,7 +88,11 @@ when the card is hidden.
    Cover fewer/no qualifying rows, only enabled metrics and no substitution of
    the viewer for a top-three place. Groups opens the detailed browser; group-page admin scheduling opens the
    secondary form, members can browse without edit controls, and Back retains
-   the originating group/page. Use
+   the originating group/page. Prove empty sections stay distinct from failed
+   reads, Today does not infer absence from loading/errors, partial failures
+   retain safe loaded sections, and an uncertain publish disables another
+   create until Check status resolves the authoritative slot. Verify missing
+   zone/exercise return paths retain the form and revalidate next week's bounds. Use
    existing test fixtures and read `apps/mobile/__tests__/README.md` first.
 4. Prove next-week scheduling through two-member results and stored final
    history against local Supabase and the production client. Reuse existing
@@ -105,12 +111,12 @@ when the card is hidden.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Find challenge | Read the Today card or open the detailed browser from Groups | Current CoW first, otherwise exactly last week's stored final with explicit label/dates; detail matches displayed context | No eligible current/fallback means no card or gap; no older/upcoming/non-final fallback or admin controls |
+| Find challenge | Read the Today card or open the detailed browser from Groups | Current CoW first, otherwise exactly last week's stored final with explicit label/dates; detail matches displayed context | A successful read establishing no eligible current/fallback means no card or gap; loading/errors remain distinct; no older/upcoming/non-final fallback or admin controls |
 | Browse Today rankings | Tap an enabled metric inside the CoW card; read its first three places | Correct server ranks/units update in place; header opens the same metric in detail | Fewer/no results and unavailable metrics stay explicit; controls never trigger navigation |
 | Set challenge | Owner/admin opens Schedule next CoW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
 | Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
 | Manage challenge | Admin opens Edit next CoW from the group page and edits/cancels on the secondary page | Server lifecycle is reflected immediately; Back returns to the originating group | State/role changed: refresh with input retained; destructive actions confirm |
-| Reopen/history | Open the secondary CoW page from the group page or summary, then browse stored results; or reopen offline | Authorized final outcome or permitted cached context; Back preserves origin | No cache, lost membership and suppressed history expose no stale private value |
+| Reopen/history | Open the secondary CoW page from the group page or summary, then browse stored results; or reopen offline | Authorized final outcome or permitted cached context; Back preserves origin | Full rankings/history stay online-only; no cache, lost membership and suppressed history expose no stale private value |
 
 Interaction/appearance: reuse group selector, cards, rank rows, sheets,
 notices, tokens and refresh patterns. No cross-metric overall winner. Evidence

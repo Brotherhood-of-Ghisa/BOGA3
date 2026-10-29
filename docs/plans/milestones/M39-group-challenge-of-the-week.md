@@ -100,10 +100,11 @@ chronological browser (This week / Next week / Past CoWs) with the exercise
 and status left, dates/zone right, preserving the mockup's formatting. Both
 attached browser and Today-card mockups and the last-week-final fallback are
 approved. A current CoW takes priority even without scores; no older-week,
-upcoming or non-final fallback. A scheduling-form draft is now attached to
-the brief for review; the approved browser/Today images need no new selection
-pass. The plan
-prescribes no new main tab.
+upcoming or non-final fallback. The operator also approved the scheduling form.
+The brief now proposes the group-page CoWs row/outlined admin action and
+empty/error targets, with offline, uncertain-publication and access-loss
+recovery. These companion targets await review; the three approved targets
+need no new selection pass. The plan prescribes no new main tab.
 
 ### D7. Shared calendar and scheduling
 
@@ -169,7 +170,8 @@ the owning fact/contract, and update later cards if the answer changes them:
 This plan changes no accepted runtime fact. New planned product choices are
 the group calendar, next-week-only scheduling, fixed participation and stored
 finality (D7–D9), plus the D6 Today summary and Groups/group-page navigation;
-deadline acceptance is explicitly still proposed. The
+deadline acceptance is explicitly still proposed. Group-entry and empty/error
+handling are proposed design extensions, not shipped behavior. The
 implementation introduces weekly rules affecting server and mobile readers. T01 must
 apply `docs/procedures/product-facts-authoring.md` and record qualifying
 cross-surface decisions in `docs/product/groups.md`; extend its index trigger

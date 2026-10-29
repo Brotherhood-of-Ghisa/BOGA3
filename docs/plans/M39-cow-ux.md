@@ -1,9 +1,10 @@
 # CoW — UX brief
 
-- Status: both attached mockups approved by the operator on 2026-10-29:
+- Status: three attached mockups approved by the operator on 2026-10-29:
   detailed chronological browser with horizontal banner, and Today top-three
-  card with in-card metric tabs. The last-week-final fallback is also agreed;
-  the admin scheduling form below is a draft for review.
+  card with in-card metric tabs, and the admin scheduling form. The
+  last-week-final fallback is also agreed. Companion group-entry, empty and
+  error targets below are proposed for review; they do not reopen these approvals.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
@@ -34,8 +35,8 @@ approved as the member browser target.
 Generated with the built-in image-generation tool. Prompt: edit the selected
 chronological concept only, use the first concept solely for two-column header
 alignment, retain the same date range/zone, and preserve all other content and
-formatting. This image covers the member browser; admin forms still need
-their own visual design.
+formatting. This image covers the member browser; the approved admin form
+appears below.
 
 ## Intended outcome
 
@@ -98,9 +99,12 @@ boundary, re-evaluate selection and labels so the fallback cannot silently
 become two weeks old. Use authorized stored results and their original units,
 under the existing historical-disclosure policy; never recalculate the final.
 
-Groups provides an entry to the secondary detailed CoW browser. Its exact
-entry-link layout remains to be designed; it does not embed the full browser
-or require another duplicate weekly summary card.
+Groups provides one full-width CoWs chevron row below its existing group
+heading/filter controls and before the selected view's content. It opens the
+secondary browser for the selected group, across At a glance, Stream and
+Leaderboards. Keep the existing section selector unchanged. Show the entry
+even when the group has no CoWs; do not show it without a selected membership.
+It does not embed the browser or add another weekly summary card.
 
 Scheduling belongs on the individual group page (the existing group
 management screen), which opens a secondary CoW page. Owners/admins can create
@@ -109,7 +113,7 @@ is a reading entry, with no scheduling/editing controls. Keep the same selected
 group/CoW across both entries, and return Back to the page that opened it.
 
 The secondary page uses the selected chronological browser for current/upcoming
-CoWs and past results. Concrete route names and form layout remain for T04; creation/editing
+CoWs and past results. Concrete route names remain for T04; creation/editing
 must happen on a secondary page, not an inline Today form.
 
 These are layout sketches, not pixel targets:
@@ -140,13 +144,41 @@ Next week: upcoming CoW
 Past CoWs: final results
 ```
 
-The group-page admin action is Edit next CoW when the next slot is full;
-both actions open the secondary CoW page in the appropriate mode. The sketch's
-admin controls remain proposals; the browser direction is selected above.
+The group-page admin action is Edit next CoW when the next slot is full,
+subject to T01's lifecycle; both actions open the secondary CoW page in the
+appropriate mode. The group-entry arrangement below is proposed for review.
 Browser/form date formatting follows the account preference; Today uses
 [[copy.calendar-dates]]. CoW dates refer to the group zone on both surfaces.
 
-## Schedule next CoW
+## Group-page entry target — proposed
+
+On the individual group management page, place a compact CoWs block after
+the existing Invite/Edit actions and before Exercises. Its CoWs chevron row
+opens the chronological browser for every member. Owners/admins also see a
+separate outlined Schedule next CoW action below it, or Edit next CoW for an
+existing editable next slot. Ordinary members see neither admin action.
+Show Schedule only after the next-slot read confirms availability; an unknown
+slot uses Loading… or inline Retry, rather than guessing it is empty.
+Invite remains this page's sole primary accent; do not add ranking previews,
+week summaries or a second orange button here.
+
+![Proposed individual group-page CoWs entry](assets/M39-cow-group-entry.png)
+
+Generated with the built-in image-generation tool. Prompt: extend the approved
+form/browser style into the current group management structure, preserving its
+member/notification rows, Invite/Edit and exercise list; insert only a CoWs
+browse row and outlined next-week scheduling action. Grounding is the current
+route/component source plus approved images, not a new running-app capture.
+
+Back from the browser/form restores the opening page and selected group.
+An Open group action in the browser opens this management page for that group;
+returning restores the browser rather than changing the selected group.
+Do not add scheduling actions to the member browser or Today.
+Use native chevron-only Back and house tokens at implementation; the generated
+empty/error images inherit a short back label from the earlier browser reference,
+which is not a new exception to the navigation contract.
+
+## Schedule next CoW — approved
 
 From the individual group page, Schedule next CoW opens the creation form on
 the secondary CoW page. Next week's date range and the group's zone are
@@ -156,17 +188,18 @@ group, fixed week/zone, exercise and metric choices, followed by one Publish
 CoW action. No duplicate Review card or extra confirmation screen.
 Publishing immediately makes the upcoming CoW visible to members.
 
-![Draft Schedule CoW form for next week](assets/M39-cow-schedule.png)
+![Approved Schedule CoW form for next week](assets/M39-cow-schedule.png)
 
 Generated with the built-in image-generation tool. Prompt: extend the approved
 CoW style into one short admin form with read-only group/next-week/zone context,
 the existing exercise picker, independent leaderboard checkboxes and one
 Publish CoW action. The illustration shows a filled form, not a new rule that
-all three metrics must be selected. This target is not yet approved.
+all three metrics must be selected. The operator approved this target on
+2026-10-29.
 
 Editing reuses the same form and entered selections, titled Edit CoW with
 Save changes as its primary action. Allowed fields/actions still follow
-T01's lifecycle; this draft does not settle editing or cancellation policy.
+T01's lifecycle; visual approval does not settle editing or cancellation policy.
 
 ```text
 < Back                         Schedule CoW
@@ -186,7 +219,8 @@ Metrics
 No exercise exists: offer the existing group-exercise creation path to admins,
 then return to the retained form. Group zone missing on an older group: require
 an explicit admin zone choice first. Propose a zone control in existing group
-management, with the creator's device IANA zone as the new-group default;
+management's Edit form, using a Time zone field and the existing picker
+conventions, with the creator's device IANA zone as the new-group default;
 never infer an existing creator's zone from another member's phone.
 
 Editing an upcoming CoW reuses the form. Edit/cancel controls follow the
@@ -221,7 +255,57 @@ Final results never imply a drill-down source workout is still available.
 Only provide permitted detail links that remain valid; hide unsafe historical
 figures under current disclosure without inventing new winners.
 
-## Shared states and review checklist
+## Empty and error targets — proposed
+
+The browser keeps its This week / Next week / Past CoWs structure when
+individual sections are empty. Only a successful authorized response proves
+absence; a loading or failed read must never claim No CoW. Empty sections
+carry one short state, no invented rankings or zero scores.
+
+![Proposed empty chronological CoWs browser](assets/M39-cow-empty.png)
+
+![Proposed CoWs read error without cached data](assets/M39-cow-error.png)
+
+Generated with the built-in image-generation tool, independently per image.
+Prompts: retain the approved chronological browser's visual language and group
+context; show empty dated sections with one Open group action, or replace
+unknown results with a plain StatePanel and outlined Retry. Date anchor:
+2026-10-29; group zone Europe/London. These are complementary states, not
+alternative designs or running-app evidence.
+
+| Situation | Presentation and recovery |
+| --- | --- |
+| Browser section absent | This week: No CoW this week with dates/zone. Next week: Nothing scheduled with dates and one Open group action. Past: No past CoWs only after the history read succeeds. Keep other populated sections visible. |
+| Current metric has no results | Keep exercise/week/status and enabled metric tabs; show No qualifying results in the ranking area. No podium, fake zero, viewer promotion or last-week substitution. Omit Full standings when that metric has no rows. |
+| No improvement baseline / ineligible member | A personal Unranked state, with one reason: No pre-week baseline or Eligible next week, as returned by the server. Other members and enabled metrics remain available. No Join button. |
+| Deadline passed | Finalizing until stored final results arrive. A final empty metric says Final plus No qualifying results. Neither processing delay nor unavailable figures may be labelled an empty successful result. |
+| Initial read, no cache | Plain Loading… StatePanel; keep group context/Back usable. Today uses a compact loading line in its CoW position, not fabricated ranking rows. Automatic refresh stays silent once content exists. |
+| Read fails, no cache | Couldn’t load CoWs / Please try again. / outlined Retry. A failed metric/history page has its own Retry; retain loaded sections and never show No past CoWs for a failed history read. Today uses a compact inline Retry in the CoW position. |
+| Refresh fails beside permitted data | Retain that data and show the existing inline error with Retry. Never promote a cached lifecycle state to Final. Drop stale responses after group/metric changes. |
+| Offline, permitted summary cached | Standard neutral Offline · last updated HH:MM marker; keep permitted context/top-three summary. Full standings and history remain online-only; show This loads when you're back online in their areas. |
+| Offline, no cache | You’re offline / This loads when you're back online. No endless spinner, empty-week claim or queued write. Reuse this compact state on Today until a read establishes the agreed selection. |
+| Confirmed lost group access | Replace all group/CoW content with the existing generic lost-access state; evict cached group results and hide Today content. No retained scores, form values or Retry that implies membership can be restored. Back remains available. |
+| Incompatible or unavailable comparison | Safe Group comparisons unavailable state, not raw payload/errors or fallback kg figures. Retain only independently authorized safe context; follow T01/T03's revision/disclosure outcome. |
+
+The agreed Today hide rule applies after a successful read establishes that
+neither current nor the exact last-week-final fallback is available. Hiding
+then leaves no gap. Network/read failures remain visibly distinct from absence.
+
+Publishing failures use inline notices near the unchanged form's action:
+
+| Situation | Presentation and recovery |
+| --- | --- |
+| Missing exercise or metrics | Choose an exercise. / Select at least one leaderboard. at the relevant field; focus the first invalid field. |
+| No eligible exercise / missing zone | No group exercises yet with Add exercise, or Choose a group time zone with Open group settings; return to retained input and revalidate the fixed next-week window. Publish remains unavailable until resolved. |
+| Offline before send | You’re offline. Nothing was published. Keep selections; refuse before sending. |
+| Confirmed rejected write | Show the safe server refusal near Publish/Save and preserve input. Role loss removes admin controls after refresh, while ordinary group browsing remains available. |
+| Next slot occupied | Next week already has a CoW. Offer Open existing CoW; retain unsaved selections without overwriting the winner of a concurrent write. |
+| Other state/revision conflict | Refresh and review the changed context with input retained; do not misreport every conflict as an occupied slot or silently overwrite another admin's changes. |
+| Response uncertain | Couldn’t confirm publication. Offer Check status, which reads the authoritative slot before another create. While that read is failing or offline, keep create disabled; never assert Nothing was published. |
+| Week rolls over during entry | Week changed. Review the new dates. Refresh the fixed next-week dates and require deliberate review/publish; never silently move the submitted challenge. |
+| Confirmed success | Re-read and show the upcoming CoW immediately with neutral `CoW published.` feedback; Back returns to the opening group page. No second confirmation screen or automatic recurring schedule. |
+
+## Review and implementation checklist
 
 Reuse the existing group selector, Sheet/form primitives, rank rows, notices,
 focus/poll/pull refresh and online-only writes. Preserve form input on errors.
@@ -230,8 +314,9 @@ last-updated marker; full rankings stay online under existing cache policy.
 Loss of group access hides cached content. Distinguish loading, no CoW,
 upcoming, live, finalizing, final-empty, final, unavailable and error+Retry.
 
-Settle the remaining group-entry/admin form targets before implementing those
-flows. Verify the approved layouts and fallback state with
+Review the three companion targets before implementing those flows. T01
+still owns cutoff, edit/cancel, ties and revision policy. Verify approved
+layouts, state handling and fallback with
 long names, small/large phones, keyboard/scroll, VoiceOver, touch targets and
 non-colour state cues in the running app. T04's UX Contract owns the
 flow/acceptance mapping; its PR supplies fresh running-app screenshots against
