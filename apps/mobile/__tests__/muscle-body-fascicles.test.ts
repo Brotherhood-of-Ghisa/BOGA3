@@ -16,20 +16,22 @@ describe('offline fascicle companion asset', () => {
     expect(JSON.stringify(asset) + '\n').toBe(committed);
     expect(Object.keys(asset.muscles).sort()).toEqual(MUSCLE_MAP_REFERENCE.map(m => m.id).sort());
     for (const muscle of Object.values(asset.muscles) as any[]) {
-      expect(new Set(muscle.segments.map((s: any) => s.side))).toEqual(new Set([-1, 1]));
+      expect(muscle.segments.some(Array.isArray) || [-1, 1].every(side => muscle.segments.some((s: any) => s.side === side))).toBe(true);
       expect(muscle.quality).toBe('schematic-not-anatomically-validated');
       expect(muscle.limitations.length).toBeGreaterThan(0);
       expect(muscle.sourceIds.every((id: string) => asset.sources[id]?.url.startsWith('https://'))).toBe(true);
     }
     expect(asset).not.toHaveProperty('broad');
     expect(asset.muscles).not.toHaveProperty('pec_minor');
-    expect(asset.muscles.chest.extensions[0]).toMatchObject({ catalogEntry: false, measuredVolume: false, representation: 'deep-projection' });
+    expect(asset.muscles.chest.extensions[0]).toMatchObject({ catalogEntry: false, measuredVolume: false, representation: 'independent-model-space' });
+    asset.anatomy.sources.attribution = 'Incorrect attribution';
+    expect(() => validateAsset(asset, meshBytes)).toThrow(/anatomical provenance/);
   });
 
   it('reconstructs endpoints and interior samples inside their owning triangle and material mask', () => {
     const asset = fresh();
     for (const [id, muscle] of Object.entries(asset.muscles) as [string, any][]) {
-      for (const segment of muscle.segments) {
+      for (const segment of muscle.segments.filter((s: any) => !Array.isArray(s))) {
         const triangle = mesh.faces[segment.face].slice(0, 3).map((i: number) => mesh.vertices[i]);
         for (const t of [0, .25, .5, .75, 1]) {
           const w = segment.a.map((v: number, k: number) => v + (segment.b[k] - v) * t);
@@ -47,11 +49,11 @@ describe('offline fascicle companion asset', () => {
     }
     // Corrected pectoral landmarks intentionally extend beyond the old chest material.
     expect(asset.muscles.chest.segments.some((s: any) => mesh.materials[mesh.faces[s.face][3]] !== 'chest')).toBe(true);
-    expect(new Set(asset.muscles.chest.segments.map((s: any) => s.part))).toEqual(new Set(['clavicular', 'sternocostal', 'minor']));
+    expect(new Set(asset.muscles.chest.segments.filter((s: any) => !Array.isArray(s)).map((s: any) => s.part))).toEqual(new Set(['clavicular', 'sternocostal']));
   });
 
   it.each([
-    ['schema', (a: any) => { a.schemaVersion = 2; }],
+    ['schema', (a: any) => { a.schemaVersion = 3; }],
     ['hash', (a: any) => { a.referenceMesh.sha256 = '0'.repeat(64); }],
     ['missing muscle', (a: any) => { delete a.muscles.biceps; }],
     ['extra muscle', (a: any) => { a.muscles.pec_minor = a.muscles.chest; }],
@@ -67,7 +69,7 @@ describe('offline fascicle companion asset', () => {
     ['invalid sum', (a: any) => { a.muscles.biceps.segments[0].a = [0, 0, 0]; }],
     ['outside triangle', (a: any) => { a.muscles.biceps.segments[0].a = [-.2, .2, 1]; }],
     ['wrong anchor arity', (a: any) => { a.muscles.biceps.segments[0].a = [0, 1]; }],
-    ['wrong material', (a: any) => { a.muscles.biceps.segments[0].face = a.muscles.calves.segments[0].face; }],
+    ['wrong material', (a: any) => { a.muscles.biceps.segments[0].face = a.muscles.traps_upper.segments[0].face; }],
     ['zero length', (a: any) => { a.muscles.biceps.segments[0].b = a.muscles.biceps.segments[0].a; }],
     ['false minor volume', (a: any) => { a.muscles.chest.extensions[0].measuredVolume = true; }],
     ['missing chest provenance', (a: any) => { delete a.muscles.chest.segments[0].attachment; }],

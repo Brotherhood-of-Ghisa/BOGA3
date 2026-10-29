@@ -3,7 +3,7 @@ import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { MUSCLE_BODY_FASCICLES, type MuscleBodyFascicles, type MuscleBodyFibreSegment } from './muscle-body-fibres';
+import { isModelFibre, MUSCLE_BODY_FASCICLES, type ModelFibreSegment, type MuscleBodyFascicles, type MuscleBodyFibreSegment, type MuscleBodyFibreSelection, type TriangleFibreSegment } from './muscle-body-fibres';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
@@ -11,6 +11,7 @@ import {
   type MuscleBodyMesh,
 } from './muscle-body-mesh';
 import { MOUSTACHE_FILL, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
+import { reduceFibreRun, type FibrePoint } from './projected-fibre-contour';
 
 export type BodyOrientation = 'front' | 'back';
 
@@ -50,7 +51,7 @@ export type ProjectedPathBatch = {
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
-  readonly fibres: { readonly surface: string; readonly deep: string };
+  readonly fibres: { readonly surface: string; readonly deep: string; readonly anatomicalParts?: readonly { readonly id: string; readonly d: string }[] };
 };
 
 export const SHADE_STEPS = 12;
@@ -257,18 +258,23 @@ type RotatedVertices = {
   readonly sy: Float64Array;
 };
 
+const projectionFrame = (
+  angleDeg: number,
+  width: number,
+  height: number
+) => {
+  const rad = (normaliseBodyAngle(angleDeg) * Math.PI) / 180;
+  return { cos: Math.cos(rad), sin: Math.sin(rad),
+    scale: Math.min(width / MODEL_WIDTH_SPAN, height / MODEL_HEIGHT_SPAN), halfW: width / 2, halfH: height / 2 };
+};
+
 const rotateAndProjectVertices = (
   mesh: MuscleBodyMesh,
   angleDeg: number,
   width: number,
   height: number
 ): RotatedVertices => {
-  const rad = (normaliseBodyAngle(angleDeg) * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const scale = Math.min(width / MODEL_WIDTH_SPAN, height / MODEL_HEIGHT_SPAN);
-  const halfW = width / 2;
-  const halfH = height / 2;
+  const { cos, sin, scale, halfW, halfH } = projectionFrame(angleDeg, width, height);
   const count = mesh.vertices.length;
 
   const rx = new Float64Array(count);
@@ -349,23 +355,38 @@ const pointInTriangle = (
   return !(hasNeg && hasPos);
 };
 
-/** Select once per setup/selection, not once per drag frame. */
+const prepareModelContour = (
+  segments: readonly MuscleBodyFibreSegment[],
+  offset: number,
+  indices: readonly number[],
+): readonly ModelFibreSegment[] => indices.map(index => {
+  const s = segments[offset + (index >= 0 ? index : -index - 1)] as ModelFibreSegment;
+  return index >= 0 ? s : [s[3], s[4], s[5], s[0], s[1], s[2], s[6], s[7], s[8]];
+});
+
+/** Select and orient topology-checked contours once per setup/selection. */
 export function selectMuscleFibres(
   selectedId: string | null,
   report?: MuscleReportAssignment,
   fascicles: MuscleBodyFascicles = MUSCLE_BODY_FASCICLES,
-): readonly MuscleBodyFibreSegment[] {
-  if (!selectedId) return [];
+): MuscleBodyFibreSelection {
+  if (!selectedId) return { segments: [], anatomicalParts: [] };
   const selected = canonicalMuscleId(selectedId);
-  return Object.entries(fascicles)
+  const entries = Object.entries(fascicles)
     .filter(([entry]) => reportedMaterial(entry as MuscleBodyMaterialId, report) === selected)
-    .flatMap(([, muscle]) => muscle.segments);
+    .map(([, muscle]) => muscle);
+  return {
+    segments: entries.flatMap(muscle => muscle.segments.filter((segment): segment is TriangleFibreSegment => !isModelFibre(segment))),
+    anatomicalParts: entries.flatMap(muscle => (muscle.anatomicalParts ?? []).map(part => ({ id: part.id,
+      chains: part.chains.map(indices => prepareModelContour(muscle.segments, part.start, indices)) }))),
+  };
 }
 
 const projectFibreSegments = (
-  segments: readonly MuscleBodyFibreSegment[],
+  selection: MuscleBodyFibreSelection,
   mesh: MuscleBodyMesh,
   verts: RotatedVertices,
+  frame: ReturnType<typeof projectionFrame>,
 ): ProjectedMuscleBody['fibres'] => {
   const surface: string[] = [];
   const deep: string[] = [];
@@ -374,14 +395,63 @@ const projectFibreSegments = (
     const y = weights[0] * verts.sy[face[0]] + weights[1] * verts.sy[face[1]] + weights[2] * verts.sy[face[2]];
     return `${roundCoord(x)} ${roundCoord(y)}`;
   };
-  for (const segment of segments) {
+  for (const segment of selection.segments) {
     const face = mesh.faces[segment.face];
     if (!face) continue;
     // Selection deliberately surfaces every independent segment, including hidden/deep guides.
     const target = segment.layer === 'surface' ? surface : deep;
     target.push(`M${endpoint(face, segment.a)}L${endpoint(face, segment.b)}`);
   }
-  return { surface: surface.join(''), deep: deep.join('') };
+  const fibres: ProjectedMuscleBody['fibres'] = { surface: surface.join(''), deep: deep.join('') };
+  if (!selection.anatomicalParts.length) return fibres;
+  // Keep each component's highlight/shade together; flattening them fills fibre gaps at overlaps.
+  return { ...fibres, anatomicalParts: selection.anatomicalParts.map(part => {
+    const paths: string[] = [];
+    for (const chain of part.chains) projectModelContour(chain, frame, paths);
+    return { id: part.id, d: paths.join('') };
+  }) };
+};
+
+const modelEndpoint = (
+  segment: ModelFibreSegment,
+  offset: 0 | 3,
+  side: number,
+  frame: ReturnType<typeof projectionFrame>,
+): FibrePoint => {
+  const { cos, sin, scale, halfW, halfH } = frame;
+  const x = halfW + (side * segment[offset] * cos + segment[offset + 2] * sin) * scale;
+  return [Math.round(x * 10), Math.round((halfH - segment[offset + 1] * scale) * 10)];
+};
+
+const appendModelRun = (points: readonly FibrePoint[], paths: string[]): void => {
+  if (!points.length) return;
+  const reduced = reduceFibreRun(points);
+  paths.push(reduced.map((point, i) => `${i === 0 ? 'M' : 'L'}${point[0] / 10} ${point[1] / 10}`).join(''));
+  // SVG needs a zero-length edge to paint the isolated round cap.
+  if (reduced.length === 1) paths.push(`L${reduced[0][0] / 10} ${reduced[0][1] / 10}`);
+};
+
+const projectModelContour = (
+  chain: readonly ModelFibreSegment[],
+  frame: ReturnType<typeof projectionFrame>,
+  paths: string[],
+): void => {
+  const { cos, sin } = frame;
+  for (const side of [1, -1]) {
+    let points: FibrePoint[] = [];
+    for (const segment of chain) {
+      if (-side * segment[6] * sin + segment[8] * cos < BACKFACE_CULL_NZ) {
+        appendModelRun(points, paths);
+        points = [];
+        continue;
+      }
+      if (!points.length) points.push(modelEndpoint(segment, 0, side, frame));
+      const end = modelEndpoint(segment, 3, side, frame);
+      const last = points[points.length - 1];
+      if (end[0] !== last[0] || end[1] !== last[1]) points.push(end);
+    }
+    appendModelRun(points, paths);
+  }
 };
 
 const batchSlabTriangles = (
@@ -456,7 +526,7 @@ export type ProjectMuscleBodyOptions = {
   readonly palette?: ThemeShadePalette;
   readonly mesh?: MuscleBodyMesh;
   /** Prepared for this selection/report; omit to resolve directly from the source asset. */
-  readonly selectedFibres?: readonly MuscleBodyFibreSegment[];
+  readonly selectedFibres?: MuscleBodyFibreSelection;
   readonly november?: boolean;
 };
 
@@ -476,7 +546,7 @@ export function projectMuscleBody({
   selectedFibres = selectMuscleFibres(selectedId, report),
   november = false,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || !mesh.vertices.length || !mesh.faces.length) {
     return { triangles: [], batches: [], fibres: { surface: '', deep: '' } };
   }
   const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
@@ -512,7 +582,7 @@ export function projectMuscleBody({
     batches.push(...batchSlabTriangles(projectMoustache(angleDeg, width, height, ctx, triangles), DEPTH_SLABS));
   }
 
-  const fibres = projectFibreSegments(selectedFibres, mesh, verts);
+  const fibres = projectFibreSegments(selectedFibres, mesh, verts, projectionFrame(angleDeg, width, height));
   return { triangles, batches, fibres };
 }
 
